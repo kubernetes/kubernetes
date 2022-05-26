@@ -1,0 +1,38 @@
+project_name: tparallel
+env:
+  - GO111MODULE=on
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - main: ./cmd/tparallel
+    binary: tparallel
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.Revision={{.ShortCommit}}
+    env:
+      - CGO_ENABLED=0
+archives:
+  - name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    replacements:
+      darwin: darwin
+      linux: linux
+      windows: windows
+      386: i386
+      amd64: x86_64
+    format_overrides:
+      - goos: windows
+        format: zip
+release:
+  prerelease: auto
+brews:
+  - tap:
+      owner: moricho
+      name: homebrew-tparallel
+    homepage: https://github.com/moricho/tparallel
+    description: tparallel detects inappropriate usage of t.Parallel() method in your Go test codes
+    install: |
+      bin.install "tparallel"
+    test: |
+      system "#{bin}/goreleaser -v"

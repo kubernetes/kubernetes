@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/assert"
 

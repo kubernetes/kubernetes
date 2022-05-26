@@ -60,8 +60,6 @@ EXCLUDED_PATTERNS+=(
 # compare current and generated results without 'cp -a' since this
 # command does not execute without error in downstream ci.
 EXCLUDED_PATTERNS+=(
-  "verify-mocks.sh"                         # TODO(soltysh) fails to install mockgen with "inconsistent vendoring" go mod
-  "verify-pkg-names.sh"                     # TODO(soltysh) fails on packages that look related to changes from local mockgen run
   "verify-codegen.sh"                       # TODO(marun) Fix inconsistent behavior between local and ci execution
   "verify-conformance-yaml.sh"              # TODO(soltysh) I don't expect us needing this
   "verify-e2e-test-ownership.sh"            # TODO(soltysh) Is it worth fixing this check?
@@ -85,7 +83,6 @@ if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
   EXCLUDED_PATTERNS+=(
     "verify-typecheck.sh"              # runs in separate typecheck job
     "verify-typecheck-providerless.sh" # runs in separate typecheck job
-    "verify-typecheck-dockerless.sh" # runs in separate typecheck job
     )
 fi
 

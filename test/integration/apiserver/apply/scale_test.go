@@ -398,7 +398,7 @@ func assertReplicasValue(t *testing.T, obj *unstructured.Unstructured, value int
 	actualValue, found, err := unstructured.NestedInt64(obj.Object, "spec", "replicas")
 
 	if err != nil {
-		t.Fatalf("Error when retriving replicas field: %v", err)
+		t.Fatalf("Error when retrieving replicas field: %v", err)
 	}
 	if !found {
 		t.Fatalf("Replicas field not found")

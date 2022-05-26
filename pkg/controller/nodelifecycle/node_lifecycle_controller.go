@@ -699,6 +699,7 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 				//count the evictionsNumber
 				zone := nodetopology.GetZoneKey(node)
 				evictionsNumber.WithLabelValues(zone).Inc()
+				evictionsTotal.WithLabelValues(zone).Inc()
 			}
 
 			return result, 0
@@ -742,6 +743,7 @@ func (nc *Controller) doEvictionPass(ctx context.Context) {
 			if node != nil {
 				zone := nodetopology.GetZoneKey(node)
 				evictionsNumber.WithLabelValues(zone).Inc()
+				evictionsTotal.WithLabelValues(zone).Inc()
 			}
 
 			return true, 0
@@ -1040,8 +1042,8 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 		} else {
 			transitionTime = nodeHealth.readyTransitionTimestamp
 		}
-		if klog.V(5).Enabled() {
-			klog.Infof("Node %s ReadyCondition updated. Updating timestamp: %+v vs %+v.", node.Name, nodeHealth.status, node.Status)
+		if klogV := klog.V(5); klogV.Enabled() {
+			klogV.Infof("Node %s ReadyCondition updated. Updating timestamp: %+v vs %+v.", node.Name, nodeHealth.status, node.Status)
 		} else {
 			klog.V(3).Infof("Node %s ReadyCondition updated. Updating timestamp.", node.Name)
 		}
@@ -1396,6 +1398,7 @@ func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
 		// Init the metric for the new zone.
 		klog.Infof("Initializing eviction metric for zone: %v", zone)
 		evictionsNumber.WithLabelValues(zone).Add(0)
+		evictionsTotal.WithLabelValues(zone).Add(0)
 	}
 }
 

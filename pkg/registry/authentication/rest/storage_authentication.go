@@ -33,7 +33,7 @@ type RESTStorageProvider struct {
 	APIAudiences  authenticator.Audiences
 }
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
 	// TODO figure out how to make the swagger generation stable, while allowing this endpoint to be disabled.
 	// if p.Authenticator == nil {
 	// 	return genericapiserver.APIGroupInfo{}, false
@@ -43,18 +43,21 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if apiResourceConfigSource.VersionEnabled(authenticationv1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[authenticationv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
+	if storageMap := p.v1Storage(apiResourceConfigSource, restOptionsGetter); len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[authenticationv1.SchemeGroupVersion.Version] = storageMap
 	}
 
-	return apiGroupInfo, true, nil
+	return apiGroupInfo, nil
 }
 
 func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
+
 	// tokenreviews
-	tokenReviewStorage := tokenreview.NewREST(p.Authenticator, p.APIAudiences)
-	storage["tokenreviews"] = tokenReviewStorage
+	if resource := "tokenreviews"; apiResourceConfigSource.ResourceEnabled(authenticationv1.SchemeGroupVersion.WithResource(resource)) {
+		tokenReviewStorage := tokenreview.NewREST(p.Authenticator, p.APIAudiences)
+		storage[resource] = tokenReviewStorage
+	}
 
 	return storage
 }

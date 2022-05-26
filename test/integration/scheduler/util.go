@@ -77,7 +77,7 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 
 	informers.Start(testCtx.Scheduler.StopEverything)
 	informers.WaitForCacheSync(testCtx.Scheduler.StopEverything)
-	go dc.Run(testCtx.Scheduler.StopEverything)
+	go dc.Run(testCtx.Ctx)
 	return dc
 }
 
@@ -143,6 +143,10 @@ func waitForReflection(t *testing.T, nodeLister corelisters.NodeLister, key stri
 	return err
 }
 
+func updateNode(cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
+	return cs.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
+}
+
 func createNode(cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
 	return cs.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
 }
@@ -168,7 +172,7 @@ func createNodes(cs clientset.Interface, prefix string, wrapper *st.NodeWrapper,
 // createAndWaitForNodesInCache calls createNodes(), and wait for the created
 // nodes to be present in scheduler cache.
 func createAndWaitForNodesInCache(testCtx *testutils.TestContext, prefix string, wrapper *st.NodeWrapper, numNodes int) ([]*v1.Node, error) {
-	existingNodes := testCtx.Scheduler.SchedulerCache.NodeCount()
+	existingNodes := testCtx.Scheduler.Cache.NodeCount()
 	nodes, err := createNodes(testCtx.ClientSet, prefix, wrapper, numNodes)
 	if err != nil {
 		return nodes, fmt.Errorf("cannot create nodes: %v", err)
@@ -180,7 +184,7 @@ func createAndWaitForNodesInCache(testCtx *testutils.TestContext, prefix string,
 // within 30 seconds; otherwise returns false.
 func waitForNodesInCache(sched *scheduler.Scheduler, nodeCount int) error {
 	err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		return sched.SchedulerCache.NodeCount() >= nodeCount, nil
+		return sched.Cache.NodeCount() >= nodeCount, nil
 	})
 	if err != nil {
 		return fmt.Errorf("cannot obtain available nodes in scheduler cache: %v", err)
@@ -362,7 +366,7 @@ func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.
 		}
 		_, cond := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
 		return cond != nil && cond.Status == v1.ConditionFalse &&
-			cond.Reason == v1.PodReasonUnschedulable, nil
+			cond.Reason == v1.PodReasonUnschedulable && pod.Spec.NodeName == "", nil
 	}
 }
 
@@ -432,7 +436,7 @@ func waitForPDBsStable(testCtx *testutils.TestContext, pdbs []*policy.PodDisrupt
 // waitCachedPodsStable waits until scheduler cache has the given pods.
 func waitCachedPodsStable(testCtx *testutils.TestContext, pods []*v1.Pod) error {
 	return wait.Poll(time.Second, 30*time.Second, func() (bool, error) {
-		cachedPods, err := testCtx.Scheduler.SchedulerCache.PodCount()
+		cachedPods, err := testCtx.Scheduler.Cache.PodCount()
 		if err != nil {
 			return false, err
 		}
@@ -444,7 +448,7 @@ func waitCachedPodsStable(testCtx *testutils.TestContext, pods []*v1.Pod) error 
 			if err1 != nil {
 				return false, err1
 			}
-			cachedPod, err2 := testCtx.Scheduler.SchedulerCache.GetPod(actualPod)
+			cachedPod, err2 := testCtx.Scheduler.Cache.GetPod(actualPod)
 			if err2 != nil || cachedPod == nil {
 				return false, err2
 			}

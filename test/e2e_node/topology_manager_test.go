@@ -19,7 +19,7 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -341,6 +341,13 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	var cpuCap, cpuAlloc int64
 
 	cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(f)
+	ginkgo.By(fmt.Sprintf("checking node CPU capacity (%d) and allocatable CPUs (%d)", cpuCap, cpuAlloc))
+
+	// Albeit even the weakest CI machines usually have 2 cpus, let's be extra careful and
+	// check explicitly. We prefer to skip than a false negative (and a failed test).
+	if cpuAlloc < 1 {
+		e2eskipper.Skipf("Skipping basic CPU Manager tests since CPU capacity < 2")
+	}
 
 	ginkgo.By("running a non-Gu pod")
 	runNonGuPodTest(f, cpuCap)
@@ -348,13 +355,13 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	ginkgo.By("running a Gu pod")
 	runGuPodTest(f, 1)
 
-	ginkgo.By("running multiple Gu and non-Gu pods")
-	runMultipleGuNonGuPods(f, cpuCap, cpuAlloc)
-
-	// Skip rest of the tests if CPU capacity < 3.
-	if cpuCap < 3 {
+	// Skip rest of the tests if CPU allocatable < 3.
+	if cpuAlloc < 3 {
 		e2eskipper.Skipf("Skipping rest of the CPU Manager tests since CPU capacity < 3")
 	}
+
+	ginkgo.By("running multiple Gu and non-Gu pods")
+	runMultipleGuNonGuPods(f, cpuCap, cpuAlloc)
 
 	ginkgo.By("running a Gu pod requesting multiple CPUs")
 	runMultipleCPUGuPod(f)
@@ -472,7 +479,7 @@ func getSRIOVDevicePluginConfigMap(cmFile string) *v1.ConfigMap {
 	// the SRIOVDP configuration is hw-dependent, so we allow per-test-host customization.
 	framework.Logf("host-local SRIOV Device Plugin Config Map %q", cmFile)
 	if cmFile != "" {
-		data, err = ioutil.ReadFile(cmFile)
+		data, err = os.ReadFile(cmFile)
 		if err != nil {
 			framework.Failf("unable to load the SRIOV Device Plugin ConfigMap: %v", err)
 		}

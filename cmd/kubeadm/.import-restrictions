@@ -6,6 +6,9 @@ rules:
     allowedPrefixes:
       - k8s.io/kube-openapi/pkg/util/proto
       - k8s.io/kube-openapi/pkg/schemaconv
+      - k8s.io/kube-openapi/pkg/handler3
+      - k8s.io/kube-openapi/pkg/spec3
+      - k8s.io/kube-openapi/pkg/validation/spec
   - selectorRegexp: k8s[.]io/kube-proxy/
     allowedPrefixes:
       - k8s.io/kube-proxy/config/v1alpha1
@@ -17,3 +20,4 @@ rules:
       - gopkg.in/inf.v0
       - gopkg.in/square/go-jose.v2
       - gopkg.in/yaml.v2
+      - gopkg.in/yaml.v3

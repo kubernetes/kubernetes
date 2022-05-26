@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: APIGroup
-name: "2"
+name: nameValue
 preferredVersion:
-  groupVersion: "5"
-  version: "6"
+  groupVersion: groupVersionValue
+  version: versionValue
 serverAddressByClientCIDRs:
-- clientCIDR: "7"
-  serverAddress: "8"
+- clientCIDR: clientCIDRValue
+  serverAddress: serverAddressValue
 versions:
-- groupVersion: "3"
-  version: "4"
+- groupVersion: groupVersionValue
+  version: versionValue

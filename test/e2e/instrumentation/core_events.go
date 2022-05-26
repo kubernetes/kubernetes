@@ -86,7 +86,9 @@ var _ = common.SIGDescribe("Events", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundCreatedEvent, true, "unable to find the test event")
+		if !foundCreatedEvent {
+			framework.Failf("unable to find test event %s in namespace %s, full list of events is %+v", eventTestName, f.Namespace.Name, eventsList.Items)
+		}
 
 		ginkgo.By("patching the test event")
 		// patch the event's message
@@ -123,7 +125,9 @@ var _ = common.SIGDescribe("Events", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundCreatedEvent, false, "should not have found test event after deletion")
+		if foundCreatedEvent {
+			framework.Failf("Should not have found test event %s in namespace %s, full list of events %+v", eventTestName, f.Namespace.Name, eventsList.Items)
+		}
 	})
 
 	/*

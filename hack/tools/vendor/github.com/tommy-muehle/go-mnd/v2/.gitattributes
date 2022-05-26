@@ -1,0 +1,9 @@
+/.gitattributes  export-ignore
+/.gitignore      export-ignore
+/.editorconfig   export-ignore
+/.goreleaser.yml export-ignore
+/.github/        export-ignore
+/examples/       export-ignore
+/testdata/       export-ignore
+/tools/          export-ignore
+/Makefile        export-ignore

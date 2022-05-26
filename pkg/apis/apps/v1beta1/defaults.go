@@ -70,10 +70,18 @@ func SetDefaults_StatefulSet(obj *appsv1beta1.StatefulSet) {
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
 	if obj.Spec.UpdateStrategy.Type == appsv1beta1.RollingUpdateStatefulSetStrategyType &&
-		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
-		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
-		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
-		*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+		obj.Spec.UpdateStrategy.RollingUpdate != nil {
+
+		if obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
+			obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
+			*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
+			if obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
+				maxUnavailable := intstr.FromInt(1)
+				obj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+			}
+		}
 	}
 }
 

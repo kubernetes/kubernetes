@@ -137,6 +137,9 @@ type GenericAPIServer struct {
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
 	openAPIConfig *openapicommon.Config
 
+	// Enable swagger and/or OpenAPI V3 if these configs are non-nil.
+	openAPIV3Config *openapicommon.Config
+
 	// SkipOpenAPIInstallation indicates not to install the OpenAPI handler
 	// during PrepareRun.
 	// Set this to true when the specific API Server has its own OpenAPI handler
@@ -357,9 +360,12 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
 		}.InstallV2(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+	}
+
+	if s.openAPIV3Config != nil && !s.skipOpenAPIInstallation {
 		if utilfeature.DefaultFeatureGate.Enabled(features.OpenAPIV3) {
 			s.OpenAPIV3VersionedService = routes.OpenAPI{
-				Config: s.openAPIConfig,
+				Config: s.openAPIV3Config,
 			}.InstallV3(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
 		}
 	}
@@ -450,7 +456,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 
 	// close socket after delayed stopCh
 	drainedCh := s.lifecycleSignals.InFlightRequestsDrained
-	stopHttpServerCh := delayedStopCh.Signaled()
+	delayedStopOrDrainedCh := delayedStopCh.Signaled()
 	shutdownTimeout := s.ShutdownTimeout
 	if s.ShutdownSendRetryAfter {
 		// when this mode is enabled, we do the following:
@@ -459,10 +465,19 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		// - once drained, http Server Shutdown is invoked with a timeout of 2s,
 		//   net/http waits for 1s for the peer to respond to a GO_AWAY frame, so
 		//   we should wait for a minimum of 2s
-		stopHttpServerCh = drainedCh.Signaled()
+		delayedStopOrDrainedCh = drainedCh.Signaled()
 		shutdownTimeout = 2 * time.Second
 		klog.V(1).InfoS("[graceful-termination] using HTTP Server shutdown timeout", "ShutdownTimeout", shutdownTimeout)
 	}
+
+	// pre-shutdown hooks need to finish before we stop the http server
+	preShutdownHooksHasStoppedCh, stopHttpServerCh := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(stopHttpServerCh)
+
+		<-delayedStopOrDrainedCh
+		<-preShutdownHooksHasStoppedCh
+	}()
 
 	stoppedCh, listenerStoppedCh, err := s.NonBlockingRun(stopHttpServerCh, shutdownTimeout)
 	if err != nil {
@@ -493,8 +508,12 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	klog.V(1).Info("[graceful-termination] waiting for shutdown to be initiated")
 	<-stopCh
 
-	// run shutdown hooks directly. This includes deregistering from the kubernetes endpoint in case of kube-apiserver.
-	err = s.RunPreShutdownHooks()
+	// run shutdown hooks directly. This includes deregistering from
+	// the kubernetes endpoint in case of kube-apiserver.
+	func() {
+		defer close(preShutdownHooksHasStoppedCh)
+		err = s.RunPreShutdownHooks()
+	}()
 	if err != nil {
 		return err
 	}
@@ -535,7 +554,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 	var listenerStoppedCh <-chan struct{}
 	if s.SecureServingInfo != nil && s.Handler != nil {
 		var err error
-		stoppedCh, listenerStoppedCh, err = s.SecureServingInfo.ServeWithListenerStopped(s.Handler, shutdownTimeout, internalStopCh)
+		stoppedCh, listenerStoppedCh, err = s.SecureServingInfo.Serve(s.Handler, shutdownTimeout, internalStopCh)
 		if err != nil {
 			close(internalStopCh)
 			close(auditStopCh)
@@ -574,7 +593,10 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 			continue
 		}
 
-		apiGroupVersion := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
+		apiGroupVersion, err := s.getAPIGroupVersion(apiGroupInfo, groupVersion, apiPrefix)
+		if err != nil {
+			return err
+		}
 		if apiGroupInfo.OptionsExternalVersion != nil {
 			apiGroupVersion.OptionsExternalVersion = apiGroupInfo.OptionsExternalVersion
 		}
@@ -687,15 +709,18 @@ func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	return s.InstallAPIGroups(apiGroupInfo)
 }
 
-func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion, apiPrefix string) *genericapi.APIGroupVersion {
+func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion, apiPrefix string) (*genericapi.APIGroupVersion, error) {
 	storage := make(map[string]rest.Storage)
 	for k, v := range apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version] {
-		storage[strings.ToLower(k)] = v
+		if strings.ToLower(k) != k {
+			return nil, fmt.Errorf("resource names must be lowercase only, not %q", k)
+		}
+		storage[k] = v
 	}
 	version := s.newAPIGroupVersion(apiGroupInfo, groupVersion)
 	version.Root = apiPrefix
 	version.Storage = storage
-	return version
+	return version, nil
 }
 
 func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion schema.GroupVersion) *genericapi.APIGroupVersion {
@@ -711,7 +736,7 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		UnsafeConvertor:       runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
 		Defaulter:             apiGroupInfo.Scheme,
 		Typer:                 apiGroupInfo.Scheme,
-		Linker:                runtime.SelfLinker(meta.NewAccessor()),
+		Namer:                 runtime.Namer(meta.NewAccessor()),
 
 		EquivalentResourceRegistry: s.EquivalentResourceRegistry,
 

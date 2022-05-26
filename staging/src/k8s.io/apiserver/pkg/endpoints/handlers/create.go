@@ -47,7 +47,7 @@ import (
 	utiltrace "k8s.io/utils/trace"
 )
 
-var namespaceGVK = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"}
+var namespaceGVR = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
 
 func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Interface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
@@ -152,16 +152,24 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		if len(name) == 0 {
 			_, name, _ = scope.Namer.ObjectName(obj)
 		}
-		if len(namespace) == 0 && *gvk == namespaceGVK {
+		if len(namespace) == 0 && scope.Resource == namespaceGVR {
 			namespace = name
 		}
 		ctx = request.WithNamespace(ctx, namespace)
 
-		ae := audit.AuditEventFrom(ctx)
-		admit = admission.WithAudit(admit, ae)
+		admit = admission.WithAudit(admit)
 		audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 
 		userInfo, _ := request.UserFrom(ctx)
+
+		// if this object supports namespace info
+		if objectMeta, err := meta.Accessor(obj); err == nil {
+			// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
+			if err := rest.EnsureObjectNamespaceMatchesRequestNamespace(rest.ExpectedNamespaceForResource(namespace, scope.Resource), objectMeta); err != nil {
+				scope.err(err, w, req)
+				return
+			}
+		}
 
 		trace.Step("About to store object in database")
 		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
@@ -215,6 +223,8 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			status.Code = int32(code)
 		}
 
+		trace.Step("About to write a response")
+		defer trace.Step("Writing http response done")
 		transformResponseObject(ctx, scope, trace, req, w, code, outputMediaType, result)
 	}
 }

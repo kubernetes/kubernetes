@@ -17,7 +17,6 @@ limitations under the License.
 package phases
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -150,7 +149,7 @@ func TestConfigDirCleaner(t *testing.T) {
 			t.Logf("Running test: %s", name)
 
 			// Create a temporary directory for our fake config dir:
-			tmpDir, err := ioutil.TempDir("", "kubeadm-reset-test")
+			tmpDir, err := os.MkdirTemp("", "kubeadm-reset-test")
 			if err != nil {
 				t.Errorf("Unable to create temporary directory: %s", err)
 			}
@@ -174,7 +173,7 @@ func TestConfigDirCleaner(t *testing.T) {
 			if test.resetDir == "" {
 				test.resetDir = "pki"
 			}
-			resetConfigDir(tmpDir, filepath.Join(tmpDir, test.resetDir))
+			resetConfigDir(tmpDir, filepath.Join(tmpDir, test.resetDir), false)
 
 			// Verify the files we cleanup implicitly in every test:
 			assertExists(t, tmpDir)

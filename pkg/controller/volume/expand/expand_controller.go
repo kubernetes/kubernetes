@@ -143,7 +143,6 @@ func NewExpandController(
 		kubeClient,
 		&expc.volumePluginMgr,
 		expc.recorder,
-		false,
 		blkutil)
 
 	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{

@@ -2,6 +2,7 @@
 
 This is a simple server that responds with the http headers it received.
 
+Image versions >= 2.5 support IPv6.
 Image Versions >= 1.10 support HTTP2 on :8443.
 Image Versions >= 1.9 expose HTTPS endpoint on :8443.
 Image versions >= 1.4 removes the redirect introduced in 1.3.

@@ -20,6 +20,7 @@ package profile
 import (
 	"errors"
 	"fmt"
+
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -37,11 +38,7 @@ func newProfile(cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, re
 	opts ...frameworkruntime.Option) (framework.Framework, error) {
 	recorder := recorderFact(cfg.SchedulerName)
 	opts = append(opts, frameworkruntime.WithEventRecorder(recorder))
-	fwk, err := frameworkruntime.NewFramework(r, &cfg, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return fwk, nil
+	return frameworkruntime.NewFramework(r, &cfg, opts...)
 }
 
 // Map holds frameworks indexed by scheduler name.

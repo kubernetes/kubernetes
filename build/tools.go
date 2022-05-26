@@ -17,10 +17,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This package imports things required by build scripts, to force `go mod` to see them as dependencies
+// This package imports things required by build scripts and test packages of submodules, to force `go mod` to see them as dependencies
 package tools
 
 import (
+	// build script dependencies
 	_ "github.com/onsi/ginkgo/ginkgo"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf"
 	_ "k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo"
@@ -29,4 +30,7 @@ import (
 	_ "k8s.io/gengo/examples/import-boss/generators"
 	_ "k8s.io/gengo/examples/set-gen/generators"
 	_ "k8s.io/kube-openapi/cmd/openapi-gen"
+
+	// submodule test dependencies
+	_ "github.com/armon/go-socks5" // for staging/src/k8s.io/apimachinery/pkg/util/httpstream/spdy/roundtripper_test.go
 )

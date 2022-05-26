@@ -89,10 +89,13 @@ func DefaultBehaviorOnFatal() {
 	fatalErrHandler = fatal
 }
 
-// fatal prints the message (if provided) and then exits. If V(6) or greater,
-// klog.Fatal is invoked for extended information.
+// fatal prints the message (if provided) and then exits. If V(99) or greater,
+// klog.Fatal is invoked for extended information. This is intended for maintainer
+// debugging and out of a reasonable range for users.
 func fatal(msg string, code int) {
-	if klog.V(6).Enabled() {
+	// nolint:logcheck // Not using the result of klog.V(99) inside the if
+	// branch is okay, we just use it to determine how to terminate.
+	if klog.V(99).Enabled() {
 		klog.FatalDepth(2, msg)
 	}
 	if len(msg) > 0 {
@@ -396,11 +399,14 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 }
 
 func AddValidateFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("validate", true, "If true, use a schema to validate the input before sending it")
-}
-
-func AddValidateOptionFlags(cmd *cobra.Command, options *ValidateOptions) {
-	cmd.Flags().BoolVar(&options.EnableValidation, "validate", options.EnableValidation, "If true, use a schema to validate the input before sending it")
+	cmd.Flags().String(
+		"validate",
+		"strict",
+		`Must be one of: strict (or true), warn, ignore (or false).
+		"true" or "strict" will use a schema to validate the input and fail the request if invalid. It will perform server side validation if ServerSideFieldValidation is enabled on the api-server, but will fall back to less reliable client-side validation if not.
+		"warn" will warn about unknown or duplicate fields without blocking the request if server-side field validation is enabled on the API server, and behave as "ignore" otherwise.
+		"false" or "ignore" will not perform any schema validation, silently dropping any unknown or duplicate fields.`,
+	)
 }
 
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
@@ -463,8 +469,16 @@ func AddChunkSizeFlag(cmd *cobra.Command, value *int64) {
 		"Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
 }
 
+func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
+	cmd.Flags().StringVarP(p, "selector", "l", *p, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
+}
+
+func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string, allowedSubresources ...string) {
+	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s Must be one of %v. This flag is alpha and may change in the future.", usage, allowedSubresources))
+}
+
 type ValidateOptions struct {
-	EnableValidation bool
+	ValidationDirective string
 }
 
 // Merge converts the passed in object to JSON, merges the fragment into it using an RFC7396 JSON Merge Patch,
@@ -563,6 +577,30 @@ func GetForceConflictsFlag(cmd *cobra.Command) bool {
 
 func GetFieldManagerFlag(cmd *cobra.Command) string {
 	return GetFlagString(cmd, "field-manager")
+}
+
+func GetValidationDirective(cmd *cobra.Command) (string, error) {
+	var validateFlag = GetFlagString(cmd, "validate")
+	b, err := strconv.ParseBool(validateFlag)
+	if err != nil {
+		switch validateFlag {
+		case cmd.Flag("validate").NoOptDefVal:
+			return metav1.FieldValidationStrict, nil
+		case "strict":
+			return metav1.FieldValidationStrict, nil
+		case "warn":
+			return metav1.FieldValidationWarn, nil
+		case "ignore":
+			return metav1.FieldValidationIgnore, nil
+		default:
+			return metav1.FieldValidationStrict, fmt.Errorf(`invalid - validate option %q; must be one of: strict (or true), warn, ignore (or false)`, validateFlag)
+		}
+	}
+	// The flag was a boolean
+	if b {
+		return metav1.FieldValidationStrict, nil
+	}
+	return metav1.FieldValidationIgnore, nil
 }
 
 type DryRunStrategy int

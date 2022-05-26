@@ -22,11 +22,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/util/parsers"
-	utilpointer "k8s.io/utils/pointer"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/util/parsers"
+	"k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -64,7 +63,7 @@ func SetDefaults_ReplicationController(obj *v1.ReplicationController) {
 	}
 }
 func SetDefaults_Volume(obj *v1.Volume) {
-	if utilpointer.AllPtrFieldsNil(&obj.VolumeSource) {
+	if pointer.AllPtrFieldsNil(&obj.VolumeSource) {
 		obj.VolumeSource = v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{},
 		}
@@ -131,16 +130,19 @@ func SetDefaults_Service(obj *v1.Service) {
 		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && obj.Spec.InternalTrafficPolicy == nil {
-		serviceInternalTrafficPolicyCluster := v1.ServiceInternalTrafficPolicyCluster
-		obj.Spec.InternalTrafficPolicy = &serviceInternalTrafficPolicyCluster
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
+		if obj.Spec.InternalTrafficPolicy == nil {
+			if obj.Spec.Type == v1.ServiceTypeNodePort || obj.Spec.Type == v1.ServiceTypeLoadBalancer || obj.Spec.Type == v1.ServiceTypeClusterIP {
+				serviceInternalTrafficPolicyCluster := v1.ServiceInternalTrafficPolicyCluster
+				obj.Spec.InternalTrafficPolicy = &serviceInternalTrafficPolicyCluster
+			}
+		}
+
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
-		if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
-			if obj.Spec.AllocateLoadBalancerNodePorts == nil {
-				obj.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
-			}
+	if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
+		if obj.Spec.AllocateLoadBalancerNodePorts == nil {
+			obj.Spec.AllocateLoadBalancerNodePorts = pointer.BoolPtr(true)
 		}
 	}
 }
@@ -326,20 +328,17 @@ func SetDefaults_HTTPGetAction(obj *v1.HTTPGetAction) {
 
 // SetDefaults_Namespace adds a default label for all namespaces
 func SetDefaults_Namespace(obj *v1.Namespace) {
-	// TODO, remove the feature gate in 1.22
 	// we can't SetDefaults for nameless namespaces (generateName).
 	// This code needs to be kept in sync with the implementation that exists
 	// in Namespace Canonicalize strategy (pkg/registry/core/namespace)
 
 	// note that this can result in many calls to feature enablement in some cases, but
 	// we assume that there's no real cost there.
-	if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
-		if len(obj.Name) > 0 {
-			if obj.Labels == nil {
-				obj.Labels = map[string]string{}
-			}
-			obj.Labels[v1.LabelMetadataName] = obj.Name
+	if len(obj.Name) > 0 {
+		if obj.Labels == nil {
+			obj.Labels = map[string]string{}
 		}
+		obj.Labels[v1.LabelMetadataName] = obj.Name
 	}
 }
 

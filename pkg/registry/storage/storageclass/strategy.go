@@ -24,7 +24,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
 )
 
@@ -44,9 +43,6 @@ func (storageClassStrategy) NamespaceScoped() bool {
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
 func (storageClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	class := obj.(*storage.StorageClass)
-
-	storageutil.DropDisabledFields(class, nil)
 }
 
 func (storageClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -69,10 +65,6 @@ func (storageClassStrategy) AllowCreateOnUpdate() bool {
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
 func (storageClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newClass := obj.(*storage.StorageClass)
-	oldClass := old.(*storage.StorageClass)
-
-	storageutil.DropDisabledFields(oldClass, newClass)
 }
 
 func (storageClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

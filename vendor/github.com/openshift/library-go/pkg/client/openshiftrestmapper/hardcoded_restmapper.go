@@ -160,6 +160,11 @@ var defaultRESTMappings = []meta.RESTMapping{
 		Scope:            meta.RESTScopeNamespace,
 		Resource:         schema.GroupVersionResource{Group: "monitoring.coreos.com", Version: "v1", Resource: "servicemonitors"},
 	},
+	{
+		GroupVersionKind: schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"},
+		Scope:            meta.RESTScopeNamespace,
+		Resource:         schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"},
+	},
 }
 
 func NewOpenShiftHardcodedRESTMapper(delegate meta.RESTMapper) meta.RESTMapper {

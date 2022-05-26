@@ -158,7 +158,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 	if cgroups.IsCgroup2UnifiedMode() {
 		klog.Warningf("Cannot detect current cgroup on cgroup v2")
 	} else {
-		selfContainer, err := cgroups.GetOwnCgroupPath("cpu")
+		selfContainer, err = cgroups.GetOwnCgroup("cpu")
 		if err != nil {
 			return nil, err
 		}

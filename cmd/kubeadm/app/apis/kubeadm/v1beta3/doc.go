@@ -173,22 +173,22 @@ limitations under the License.
 // 	  - system:bootstrappers:kubeadm:default-node-token
 // 	nodeRegistration:
 // 	  name: "ec2-10-100-0-1"
-// 	  criSocket: "/var/run/dockershim.sock"
+// 	  criSocket: "unix:///var/run/containerd/containerd.sock"
 // 	  taints:
 // 	  - key: "kubeadmNode"
-// 	    value: "master"
+// 	    value: "someValue"
 // 	    effect: "NoSchedule"
 // 	  kubeletExtraArgs:
 // 	    v: 4
-//	  ignorePreflightErrors:
-//	  - IsPrivilegedUser
-//    imagePullPolicy: "IfNotPresent"
+// 	  ignorePreflightErrors:
+// 	  - IsPrivilegedUser
+// 	  imagePullPolicy: "IfNotPresent"
 // 	localAPIEndpoint:
 // 	  advertiseAddress: "10.100.0.1"
 // 	  bindPort: 6443
-//	certificateKey: "e6a2eb8581237ab72a4f494f30285ec12a9694d750b9785706a83bfcbbbd2204"
-//  skipPhases:
-//  - addon/kube-proxy
+// 	certificateKey: "e6a2eb8581237ab72a4f494f30285ec12a9694d750b9785706a83bfcbbbd2204"
+// 	skipPhases:
+// 	- addon/kube-proxy
 // 	---
 // 	apiVersion: kubeadm.k8s.io/v1beta3
 // 	kind: ClusterConfiguration

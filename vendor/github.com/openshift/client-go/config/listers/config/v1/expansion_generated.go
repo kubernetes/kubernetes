@@ -42,6 +42,14 @@ type ImageListerExpansion interface{}
 // ImageContentPolicyLister.
 type ImageContentPolicyListerExpansion interface{}
 
+// ImageDigestMirrorSetListerExpansion allows custom methods to be added to
+// ImageDigestMirrorSetLister.
+type ImageDigestMirrorSetListerExpansion interface{}
+
+// ImageTagMirrorSetListerExpansion allows custom methods to be added to
+// ImageTagMirrorSetLister.
+type ImageTagMirrorSetListerExpansion interface{}
+
 // InfrastructureListerExpansion allows custom methods to be added to
 // InfrastructureLister.
 type InfrastructureListerExpansion interface{}
@@ -53,6 +61,10 @@ type IngressListerExpansion interface{}
 // NetworkListerExpansion allows custom methods to be added to
 // NetworkLister.
 type NetworkListerExpansion interface{}
+
+// NodeListerExpansion allows custom methods to be added to
+// NodeLister.
+type NodeListerExpansion interface{}
 
 // OAuthListerExpansion allows custom methods to be added to
 // OAuthLister.

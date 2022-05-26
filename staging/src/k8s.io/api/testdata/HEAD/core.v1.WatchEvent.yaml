@@ -5,4 +5,4 @@ object:
     replicas: 1
   status:
     available: 1
-type: "2"
+type: typeValue

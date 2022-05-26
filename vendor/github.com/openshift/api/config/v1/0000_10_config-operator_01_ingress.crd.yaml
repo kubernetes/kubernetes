@@ -53,7 +53,7 @@ spec:
                       hostname:
                         description: hostname is the hostname that should be used by the route.
                         type: string
-                        format: hostname
+                        pattern: ^([a-zA-Z0-9\p{S}\p{L}]((-?[a-zA-Z0-9\p{S}\p{L}]{0,62})?)|([a-zA-Z0-9\p{S}\p{L}](([a-zA-Z0-9-\p{S}\p{L}]{0,61}[a-zA-Z0-9\p{S}\p{L}])?)(\.)){1,}([a-zA-Z\p{L}]){2,63})$|^(([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})[\.]){0,}([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})$
                       name:
                         description: "name is the logical name of the route to customize. \n The namespace and name of this componentRoute must match a corresponding entry in the list of status.componentRoutes if the route is to be customized."
                         type: string
@@ -226,13 +226,13 @@ spec:
                         type: array
                         minItems: 1
                         items:
-                          description: Hostname is an alias for hostname string validation.
+                          description: "Hostname is an alias for hostname string validation. \n The left operand of the | is the original kubebuilder hostname validation format, which is incorrect because it allows upper case letters, disallows hyphen or number in the TLD, and allows labels to start/end in non-alphanumeric characters.  See https://bugzilla.redhat.com/show_bug.cgi?id=2039256. ^([a-zA-Z0-9\\p{S}\\p{L}]((-?[a-zA-Z0-9\\p{S}\\p{L}]{0,62})?)|([a-zA-Z0-9\\p{S}\\p{L}](([a-zA-Z0-9-\\p{S}\\p{L}]{0,61}[a-zA-Z0-9\\p{S}\\p{L}])?)(\\.)){1,}([a-zA-Z\\p{L}]){2,63})$ \n The right operand of the | is a new pattern that mimics the current API route admission validation on hostname, except that it allows hostnames longer than the maximum length: ^(([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})[\\.]){0,}([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})$ \n Both operand patterns are made available so that modifications on ingress spec can still happen after an invalid hostname was saved via validation by the incorrect left operand of the | operator."
                           type: string
-                          format: hostname
+                          pattern: ^([a-zA-Z0-9\p{S}\p{L}]((-?[a-zA-Z0-9\p{S}\p{L}]{0,62})?)|([a-zA-Z0-9\p{S}\p{L}](([a-zA-Z0-9-\p{S}\p{L}]{0,61}[a-zA-Z0-9\p{S}\p{L}])?)(\.)){1,}([a-zA-Z\p{L}]){2,63})$|^(([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})[\.]){0,}([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})$
                       defaultHostname:
                         description: defaultHostname is the hostname of this route prior to customization.
                         type: string
-                        format: hostname
+                        pattern: ^([a-zA-Z0-9\p{S}\p{L}]((-?[a-zA-Z0-9\p{S}\p{L}]{0,62})?)|([a-zA-Z0-9\p{S}\p{L}](([a-zA-Z0-9-\p{S}\p{L}]{0,61}[a-zA-Z0-9\p{S}\p{L}])?)(\.)){1,}([a-zA-Z\p{L}]){2,63})$|^(([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})[\.]){0,}([a-z0-9][-a-z0-9]{0,61}[a-z0-9]|[a-z0-9]{1,63})$
                       name:
                         description: "name is the logical name of the route to customize. It does not have to be the actual name of a route resource but it cannot be renamed. \n The namespace and name of this componentRoute must match a corresponding entry in the list of spec.componentRoutes if the route is to be customized."
                         type: string
@@ -268,6 +268,13 @@ spec:
                             resource:
                               description: resource of the referent.
                               type: string
+                defaultPlacement:
+                  description: "defaultPlacement is set at installation time to control which nodes will host the ingress router pods by default. The options are control-plane nodes or worker nodes. \n This field works by dictating how the Cluster Ingress Operator will consider unset replicas and nodePlacement fields in IngressController resources when creating the corresponding Deployments. \n See the documentation for the IngressController replicas and nodePlacement fields for more information. \n When omitted, the default value is Workers"
+                  type: string
+                  enum:
+                    - ControlPlane
+                    - Workers
+                    - ""
       served: true
       storage: true
       subresources:

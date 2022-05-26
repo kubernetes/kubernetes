@@ -47,11 +47,11 @@ type SetImageOptions struct {
 	Infos          []*resource.Info
 	Selector       string
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	DryRunVerifier *resource.QueryParamVerifier
 	All            bool
 	Output         string
 	Local          bool
-	ResolveImage   ImageResolver
+	ResolveImage   ImageResolverFunc
 	fieldManager   string
 
 	PrintObj printers.ResourcePrinterFunc
@@ -63,6 +63,14 @@ type SetImageOptions struct {
 
 	genericclioptions.IOStreams
 }
+
+// ImageResolver is a func that receives an image name, and
+// resolves it to an appropriate / compatible image name.
+// Adds flexibility for future image resolving methods.
+type ImageResolverFunc func(in string) (string, error)
+
+// ImageResolver to use.
+var ImageResolver = resolveImageFunc
 
 var (
 	imageResources = i18n.T(`
@@ -123,10 +131,11 @@ func NewCmdImage(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set image will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-set")
+	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
+
 	return cmd
 }
 
@@ -149,9 +158,9 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.Output = cmdutil.GetFlagString(cmd, "output")
-	o.ResolveImage = resolveImageFunc
+	o.ResolveImage = ImageResolver
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
@@ -325,11 +334,6 @@ func hasWildcardKey(containerImages map[string]string) bool {
 	_, ok := containerImages["*"]
 	return ok
 }
-
-// ImageResolver is a func that receives an image name, and
-// resolves it to an appropriate / compatible image name.
-// Adds flexibility for future image resolving methods.
-type ImageResolver func(in string) (string, error)
 
 // implements ImageResolver
 func resolveImageFunc(in string) (string, error) {

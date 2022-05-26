@@ -17,17 +17,21 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"reflect"
 	"testing"
 )
 
 func TestConfigurationChannels(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	mux := NewMux(nil)
-	channelOne := mux.Channel("one")
-	if channelOne != mux.Channel("one") {
+	channelOne := mux.ChannelWithContext(ctx, "one")
+	if channelOne != mux.ChannelWithContext(ctx, "one") {
 		t.Error("Didn't get the same muxuration channel back with the same name")
 	}
-	channelTwo := mux.Channel("two")
+	channelTwo := mux.ChannelWithContext(ctx, "two")
 	if channelOne == channelTwo {
 		t.Error("Got back the same muxuration channel for different names")
 	}
@@ -50,12 +54,18 @@ func (m MergeMock) Merge(source string, update interface{}) error {
 }
 
 func TestMergeInvoked(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	merger := MergeMock{"one", "test", t}
 	mux := NewMux(&merger)
-	mux.Channel("one") <- "test"
+	mux.ChannelWithContext(ctx, "one") <- "test"
 }
 
 func TestMergeFuncInvoked(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	ch := make(chan bool)
 	mux := NewMux(MergeFunc(func(source string, update interface{}) error {
 		if source != "one" {
@@ -67,11 +77,14 @@ func TestMergeFuncInvoked(t *testing.T) {
 		ch <- true
 		return nil
 	}))
-	mux.Channel("one") <- "test"
+	mux.ChannelWithContext(ctx, "one") <- "test"
 	<-ch
 }
 
 func TestSimultaneousMerge(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	ch := make(chan bool, 2)
 	mux := NewMux(MergeFunc(func(source string, update interface{}) error {
 		switch source {
@@ -89,8 +102,8 @@ func TestSimultaneousMerge(t *testing.T) {
 		ch <- true
 		return nil
 	}))
-	source := mux.Channel("one")
-	source2 := mux.Channel("two")
+	source := mux.ChannelWithContext(ctx, "one")
+	source2 := mux.ChannelWithContext(ctx, "two")
 	source <- "test"
 	source2 <- "test2"
 	<-ch

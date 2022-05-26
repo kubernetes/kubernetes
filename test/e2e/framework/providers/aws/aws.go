@@ -26,7 +26,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	awscloud "k8s.io/legacy-cloud-providers/aws"
@@ -91,6 +91,14 @@ func (p *Provider) DeleteNode(node *v1.Node) error {
 	}
 	_, err = client.TerminateInstances(req)
 	return err
+}
+
+func (p *Provider) CreateShare() (string, string, string, error) {
+	return "", "", "", nil
+}
+
+func (p *Provider) DeleteShare(accountName, shareName string) error {
+	return nil
 }
 
 // CreatePD creates a persistent volume on the specified availability zone

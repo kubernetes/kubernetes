@@ -18,6 +18,7 @@ package value
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -33,13 +34,13 @@ type testTransformer struct {
 	receivedFrom, receivedTo []byte
 }
 
-func (t *testTransformer) TransformFromStorage(from []byte, context Context) (data []byte, stale bool, err error) {
-	t.receivedFrom = from
+func (t *testTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, stale bool, err error) {
+	t.receivedFrom = data
 	return t.from, t.stale, t.err
 }
 
-func (t *testTransformer) TransformToStorage(to []byte, context Context) (data []byte, err error) {
-	t.receivedTo = to
+func (t *testTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, err error) {
+	t.receivedTo = data
 	return t.to, t.err
 }
 
@@ -68,7 +69,7 @@ func TestPrefixFrom(t *testing.T) {
 		{[]byte("stale:value"), []byte("value3"), true, nil, 3},
 	}
 	for i, test := range testCases {
-		got, stale, err := p.TransformFromStorage(test.input, nil)
+		got, stale, err := p.TransformFromStorage(context.Background(), test.input, nil)
 		if err != test.err || stale != test.stale || !bytes.Equal(got, test.expect) {
 			t.Errorf("%d: unexpected out: %q %t %#v", i, string(got), stale, err)
 			continue
@@ -93,7 +94,7 @@ func TestPrefixTo(t *testing.T) {
 	}
 	for i, test := range testCases {
 		p := NewPrefixTransformers(testErr, test.transformers...)
-		got, err := p.TransformToStorage([]byte("value"), nil)
+		got, err := p.TransformToStorage(context.Background(), []byte("value"), nil)
 		if err != test.err || !bytes.Equal(got, test.expect) {
 			t.Errorf("%d: unexpected out: %q %#v", i, string(got), err)
 			continue
@@ -183,7 +184,7 @@ func TestPrefixFromMetrics(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			tc.prefix.TransformFromStorage(tc.input, nil)
+			tc.prefix.TransformFromStorage(context.Background(), tc.input, nil)
 			defer transformerOperationsTotal.Reset()
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
 				t.Fatal(err)
@@ -241,7 +242,7 @@ func TestPrefixToMetrics(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			tc.prefix.TransformToStorage(tc.input, nil)
+			tc.prefix.TransformToStorage(context.Background(), tc.input, nil)
 			defer transformerOperationsTotal.Reset()
 			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), tc.metrics...); err != nil {
 				t.Fatal(err)

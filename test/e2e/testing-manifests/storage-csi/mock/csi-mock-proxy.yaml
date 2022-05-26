@@ -15,7 +15,7 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-provisioner
-          image: k8s.gcr.io/sig-storage/csi-provisioner:v2.2.0
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
           args:
             - "--csi-address=$(ADDRESS)"
             # Topology support is needed for the pod rescheduling test
@@ -35,7 +35,7 @@ spec:
             - mountPath: /csi
               name: socket-dir
         - name: driver-registrar
-          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.1.0
+          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -53,16 +53,20 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: mock
-          image: k8s.gcr.io/sig-storage/mock-driver:v4.1.0
+          image: k8s.gcr.io/sig-storage/hostpathplugin:v1.7.3
           args:
-            # -v3 shows when connections get established. Higher log levels print information about
-            # transferred bytes, but cannot print message content (no gRPC parsing), so this is usually
-            # not interesting.
-            - -v=3
+            - -v=5
+            - -nodeid=$(KUBE_NODE_NAME)
+            - -endpoint=/csi/csi.sock
             - -proxy-endpoint=tcp://:9000
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
           ports:
             - containerPort: 9000
               name: socat

@@ -17,3 +17,4 @@
       - csi.sharedresource.openshift.io
       - diskplugin.csi.alibabacloud.com
       - vpc.block.csi.ibm.io
+      - powervs.csi.ibm.com

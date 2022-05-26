@@ -10,7 +10,7 @@ import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "github.com/openshift/api/build/v1";
 
 // BinaryBuildRequestOptions are the options required to fully speficy a binary build request
 //
@@ -670,6 +670,10 @@ message BuildVolumeSource {
   // configMap represents a ConfigMap that should populate this volume
   // +optional
   optional k8s.io.api.core.v1.ConfigMapVolumeSource configMap = 3;
+
+  // csi represents ephemeral storage provided by external CSI drivers which support this capability
+  // +optional
+  optional k8s.io.api.core.v1.CSIVolumeSource csi = 4;
 }
 
 // CommonSpec encapsulates all the inputs necessary to represent a build.

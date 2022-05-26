@@ -39,8 +39,9 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/slice"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -56,15 +57,16 @@ type PatchOptions struct {
 	ToPrinter   func(string) (printers.ResourcePrinter, error)
 	Recorder    genericclioptions.Recorder
 
-	Local     bool
-	PatchType string
-	Patch     string
-	PatchFile string
+	Local       bool
+	PatchType   string
+	Patch       string
+	PatchFile   string
+	Subresource string
 
 	namespace                    string
 	enforceNamespace             bool
 	dryRunStrategy               cmdutil.DryRunStrategy
-	dryRunVerifier               *resource.DryRunVerifier
+	dryRunVerifier               *resource.QueryParamVerifier
 	outputFormat                 string
 	args                         []string
 	builder                      *resource.Builder
@@ -94,8 +96,13 @@ var (
 		kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve-hostname","image":"new image"}]}}'
 
 		# Update a container's image using a JSON patch with positional arrays
-		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'`))
+		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'
+		
+		# Update a deployment's replicas through the scale subresource using a merge patch.
+		kubectl patch deployment nginx-deployment --subresource='scale' --type='merge' -p '{"spec":{"replicas":2}}'`))
 )
+
+var supportedSubresources = []string{"status", "scale"}
 
 func NewPatchOptions(ioStreams genericclioptions.IOStreams) *PatchOptions {
 	return &PatchOptions{
@@ -115,7 +122,7 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 		Short:                 i18n.T("Update fields of a resource"),
 		Long:                  patchLong,
 		Example:               patchExample,
-		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
+		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -133,6 +140,7 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to update")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-patch")
+	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, patch will operate on the subresource of the requested object.", supportedSubresources...)
 
 	return cmd
 }
@@ -169,7 +177,7 @@ func (o *PatchOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	return nil
 }
@@ -192,7 +200,9 @@ func (o *PatchOptions) Validate() error {
 			return fmt.Errorf("--type must be one of %v, not %q", sets.StringKeySet(patchTypes).List(), o.PatchType)
 		}
 	}
-
+	if len(o.Subresource) > 0 && !slice.ContainsString(supportedSubresources, o.Subresource, nil) {
+		return fmt.Errorf("invalid subresource value: %q. Must be one of %v", o.Subresource, supportedSubresources)
+	}
 	return nil
 }
 
@@ -224,6 +234,7 @@ func (o *PatchOptions) RunPatch() error {
 		LocalParam(o.Local).
 		NamespaceParam(o.namespace).DefaultNamespace().
 		FilenameParam(o.enforceNamespace, &o.FilenameOptions).
+		Subresource(o.Subresource).
 		ResourceTypeOrNameArgs(false, o.args...).
 		Flatten().
 		Do()
@@ -255,7 +266,8 @@ func (o *PatchOptions) RunPatch() error {
 			helper := resource.
 				NewHelper(client, mapping).
 				DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
-				WithFieldManager(o.fieldManager)
+				WithFieldManager(o.fieldManager).
+				WithSubresource(o.Subresource)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, nil)
 			if err != nil {
 				return err

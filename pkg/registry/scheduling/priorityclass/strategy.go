@@ -24,7 +24,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	schedulingutil "k8s.io/kubernetes/pkg/apis/scheduling/util"
 	"k8s.io/kubernetes/pkg/apis/scheduling/validation"
 )
 
@@ -46,16 +45,10 @@ func (priorityClassStrategy) NamespaceScoped() bool {
 func (priorityClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pc := obj.(*scheduling.PriorityClass)
 	pc.Generation = 1
-	schedulingutil.DropDisabledFields(pc, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (priorityClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newClass := obj.(*scheduling.PriorityClass)
-	oldClass := old.(*scheduling.PriorityClass)
-
-	schedulingutil.DropDisabledFields(newClass, oldClass)
-}
+func (priorityClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {}
 
 // Validate validates a new PriorityClass.
 func (priorityClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

@@ -50,7 +50,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			},
 		}
 
-		runtimeClass := newRuntimeClass(f.Namespace.Name, "conflict-runtimeclass", framework.TestContext.ContainerRuntime)
+		runtimeClass := newRuntimeClass(f.Namespace.Name, "conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
 		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
@@ -60,8 +60,9 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			labelFooName: "bar",
 		}
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectError(err, "should be forbidden")
-		framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
+		if !apierrors.IsForbidden(err) {
+			framework.Failf("expected 'forbidden' as error, got instead: %v", err)
+		}
 	})
 
 	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func() {
@@ -104,7 +105,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, taint)
 
 		ginkgo.By("Trying to create runtimeclass and pod")
-		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass", framework.TestContext.ContainerRuntime)
+		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
 		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
@@ -150,7 +151,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 		}
 
 		ginkgo.By("Trying to create runtimeclass and pod")
-		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass", framework.TestContext.ContainerRuntime)
+		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass")
 		runtimeClass.Scheduling = scheduling
 		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
@@ -172,7 +173,7 @@ var _ = SIGDescribe("RuntimeClass", func() {
 })
 
 // newRuntimeClass returns a test runtime class.
-func newRuntimeClass(namespace, name, handler string) *nodev1.RuntimeClass {
+func newRuntimeClass(namespace, name string) *nodev1.RuntimeClass {
 	uniqueName := fmt.Sprintf("%s-%s", namespace, name)
-	return runtimeclasstest.NewRuntimeClass(uniqueName, e2enode.PreconfiguredRuntimeClassHandler(handler))
+	return runtimeclasstest.NewRuntimeClass(uniqueName, e2enode.PreconfiguredRuntimeClassHandler)
 }

@@ -78,12 +78,16 @@ type Info struct {
 	// defined. If retrieved from the server, the Builder expects the mapping client to
 	// decide the final form. Use the AsVersioned, AsUnstructured, and AsInternal helpers
 	// to alter the object versions.
+	// If Subresource is specified, this will be the object for the subresource.
 	Object runtime.Object
 	// Optional, this is the most recent resource version the server knows about for
 	// this type of resource. It may not match the resource version of the object,
 	// but if set it should be equal to or newer than the resource version of the
 	// object (however the server defines resource version).
 	ResourceVersion string
+	// Optional, if specified, the object is the most recent value of the subresource
+	// returned by the server if available.
+	Subresource string
 }
 
 // Visit implements Visitor
@@ -93,7 +97,7 @@ func (i *Info) Visit(fn VisitorFunc) error {
 
 // Get retrieves the object from the Namespace and Name fields
 func (i *Info) Get() (err error) {
-	obj, err := NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name)
+	obj, err := NewHelper(i.Client, i.Mapping).WithSubresource(i.Subresource).Get(i.Namespace, i.Name)
 	if err != nil {
 		if errors.IsNotFound(err) && len(i.Namespace) > 0 && i.Namespace != metav1.NamespaceDefault && i.Namespace != metav1.NamespaceAll {
 			err2 := i.Client.Get().AbsPath("api", "v1", "namespaces", i.Namespace).Do(context.TODO()).Error()
@@ -204,9 +208,9 @@ type EagerVisitorList []Visitor
 // Visit implements Visitor, and gathers errors that occur during processing until
 // all sub visitors have been visited.
 func (l EagerVisitorList) Visit(fn VisitorFunc) error {
-	errs := []error(nil)
+	var errs []error
 	for i := range l {
-		if err := l[i].Visit(func(info *Info, err error) error {
+		err := l[i].Visit(func(info *Info, err error) error {
 			if err != nil {
 				errs = append(errs, err)
 				return nil
@@ -215,7 +219,8 @@ func (l EagerVisitorList) Visit(fn VisitorFunc) error {
 				errs = append(errs, err)
 			}
 			return nil
-		}); err != nil {
+		})
+		if err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -253,13 +258,15 @@ func (v *URLVisitor) Visit(fn VisitorFunc) error {
 // readHttpWithRetries tries to http.Get the v.URL retries times before giving up.
 func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts int) (io.ReadCloser, error) {
 	var err error
-	var body io.ReadCloser
 	if attempts <= 0 {
 		return nil, fmt.Errorf("http attempts must be greater than 0, was %d", attempts)
 	}
 	for i := 0; i < attempts; i++ {
-		var statusCode int
-		var status string
+		var (
+			statusCode int
+			status     string
+			body       io.ReadCloser
+		)
 		if i > 0 {
 			time.Sleep(duration)
 		}
@@ -272,10 +279,12 @@ func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts
 			continue
 		}
 
-		// Error - Set the error condition from the StatusCode
-		if statusCode != http.StatusOK {
-			err = fmt.Errorf("unable to read URL %q, server reported %s, status code=%d", u, status, statusCode)
+		if statusCode == http.StatusOK {
+			return body, nil
 		}
+		body.Close()
+		// Error - Set the error condition from the StatusCode
+		err = fmt.Errorf("unable to read URL %q, server reported %s, status code=%d", u, status, statusCode)
 
 		if statusCode >= 500 && statusCode < 600 {
 			// Retry 500's
@@ -285,7 +294,7 @@ func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts
 			break
 		}
 	}
-	return body, err
+	return nil, err
 }
 
 // httpget Defines function to retrieve a url and return the results.  Exists for unit test stubbing.
@@ -346,7 +355,7 @@ type ContinueOnErrorVisitor struct {
 // returned by the visitor directly may still result in some items
 // not being visited.
 func (v ContinueOnErrorVisitor) Visit(fn VisitorFunc) error {
-	errs := []error{}
+	var errs []error
 	err := v.Visitor.Visit(func(info *Info, err error) error {
 		if err != nil {
 			errs = append(errs, err)
@@ -420,7 +429,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if info.Mapping != nil && !info.Mapping.GroupVersionKind.Empty() {
 			preferredGVKs = append(preferredGVKs, info.Mapping.GroupVersionKind)
 		}
-		errs := []error{}
+		var errs []error
 		for i := range items {
 			item, err := v.mapper.infoForObject(items[i], v.typer, preferredGVKs)
 			if err != nil {
@@ -439,7 +448,6 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 			}
 		}
 		return utilerrors.NewAggregate(errs)
-
 	})
 }
 

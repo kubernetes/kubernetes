@@ -18,7 +18,7 @@ package metrics
 
 import (
 	"context"
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/component-base/version"
@@ -189,8 +189,8 @@ func (v *GaugeVec) Reset() {
 	v.GaugeVec.Reset()
 }
 
-func newGaugeFunc(opts GaugeOpts, function func() float64, v semver.Version) GaugeFunc {
-	g := NewGauge(&opts)
+func newGaugeFunc(opts *GaugeOpts, function func() float64, v semver.Version) GaugeFunc {
+	g := NewGauge(opts)
 
 	if !g.Create(&v) {
 		return nil
@@ -205,7 +205,7 @@ func newGaugeFunc(opts GaugeOpts, function func() float64, v semver.Version) Gau
 // concurrently. If that results in concurrent calls to Write, like in the case
 // where a GaugeFunc is directly registered with Prometheus, the provided
 // function must be concurrency-safe.
-func NewGaugeFunc(opts GaugeOpts, function func() float64) GaugeFunc {
+func NewGaugeFunc(opts *GaugeOpts, function func() float64) GaugeFunc {
 	v := parseVersion(version.Get())
 
 	return newGaugeFunc(opts, function, v)
@@ -215,13 +215,13 @@ func NewGaugeFunc(opts GaugeOpts, function func() float64) GaugeFunc {
 func (v *GaugeVec) WithContext(ctx context.Context) *GaugeVecWithContext {
 	return &GaugeVecWithContext{
 		ctx:      ctx,
-		GaugeVec: *v,
+		GaugeVec: v,
 	}
 }
 
 // GaugeVecWithContext is the wrapper of GaugeVec with context.
 type GaugeVecWithContext struct {
-	GaugeVec
+	*GaugeVec
 	ctx context.Context
 }
 

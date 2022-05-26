@@ -35,6 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
@@ -181,7 +182,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 				"spec": {
 					"containers": [{
 						"name":  "nginx",
-						"image": "nginx:latest",
+						"image": "` + imageutils.GetE2EImage(imageutils.NginxNew) + `",
 					}]
 				}
 			}`,
@@ -293,7 +294,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 				"spec": {
 					"containers": [{
 						"name":  "nginx",
-						"image": "nginx:latest",
+						"image": "` + imageutils.GetE2EImage(imageutils.NginxNew) + `",
 						"ports": [{
 							"containerPort": 80,
 							"protocol": "TCP"
@@ -338,7 +339,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 				"spec": {
 					"containers": [{
 						"name":  "nginx",
-						"image": "nginx:latest"
+						"image": "` + imageutils.GetE2EImage(imageutils.NginxNew) + `",
 					}]
 				}
 			}
@@ -399,7 +400,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 					"hostname": "test-hostname",
 					"containers": [{
 						"name":  "nginx",
-						"image": "nginx:latest"
+						"image": "` + imageutils.GetE2EImage(imageutils.NginxNew) + `",
 					}]
 				}
 			}
@@ -444,7 +445,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 				"spec": {
 					"containers": [{
 						"name":  "nginx",
-						"image": "nginx:latest"
+						"image": "` + imageutils.GetE2EImage(imageutils.NginxNew) + `",
 					}]
 				}
 			}
@@ -505,7 +506,7 @@ var _ = SIGDescribe("ServerSideApply", func() {
 				"spec": {
 					"containers": [{
 						"name":  "nginx",
-						"image": "nginx:latest"
+						"image": "` + imageutils.GetE2EImage(imageutils.NginxNew) + `",
 					}]
 				}
 			}
@@ -991,7 +992,7 @@ spec:
 				"spec": {
 					"containers": [{
 						"name":  "nginx",
-						"image": "nginx:latest",
+						"image": "` + imageutils.GetE2EImage(imageutils.NginxNew) + `",
 					}]
 				}
 			}
@@ -1040,7 +1041,7 @@ spec:
 				"spec": {
 					"containers": [{
 						"name":  "nginx",
-						"image": "nginx:latest",
+						"image": "` + imageutils.GetE2EImage(imageutils.NginxNew) + `",
 					}]
 				}
 			}

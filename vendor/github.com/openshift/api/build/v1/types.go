@@ -1411,6 +1411,9 @@ const (
 
 	// BuildVolumeSourceTypeConfigmap is the ConfigMap build source volume type
 	BuildVolumeSourceTypeConfigMap BuildVolumeSourceType = "ConfigMap"
+
+	// BuildVolumeSourceTypeCSI is the CSI build source volume type
+	BuildVolumeSourceTypeCSI BuildVolumeSourceType = "CSI"
 )
 
 // BuildVolumeSource represents the source of a volume to mount
@@ -1430,6 +1433,10 @@ type BuildVolumeSource struct {
 	// configMap represents a ConfigMap that should populate this volume
 	// +optional
 	ConfigMap *corev1.ConfigMapVolumeSource `json:"configMap,omitempty" protobuf:"bytes,3,opt,name=configMap"`
+
+	// csi represents ephemeral storage provided by external CSI drivers which support this capability
+	// +optional
+	CSI *corev1.CSIVolumeSource `json:"csi,omitempty" protobuf:"bytes,4,opt,name=csi"`
 }
 
 // BuildVolumeMount describes the mounting of a Volume within buildah's runtime environment.

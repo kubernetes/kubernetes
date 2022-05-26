@@ -9,9 +9,11 @@ reviewers:
   - jeremyrickard # SIG Technical Lead / RelEng subproject owner
   #- justaugustus # SIG Chair / RelEng subproject owner / Release Manager - approvals only
   - lavalamp
+  - palnabarun # Release Manager
   - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
   - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
   - spiffxp
+  - Verolop # Release Manager
   - xmudrii # Release Manager
 approvers:
   - bentheelder

@@ -19,7 +19,6 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
-	"path"
 	"sort"
 	"strings"
 	"sync"
@@ -235,7 +234,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !ok {
 		responsewriters.ErrorNegotiated(
 			apierrors.NewInternalError(fmt.Errorf("no RequestInfo found in the context")),
-			Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
+			Codecs, schema.GroupVersion{}, w, req,
 		)
 		return
 	}
@@ -814,14 +813,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			replicasPathInCustomResource,
 		)
 
-		selfLinkPrefix := ""
-		switch crd.Spec.Scope {
-		case apiextensionsv1.ClusterScoped:
-			selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, v.Name) + "/" + crd.Status.AcceptedNames.Plural + "/"
-		case apiextensionsv1.NamespaceScoped:
-			selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, v.Name, "namespaces") + "/"
-		}
-
 		clusterScoped := crd.Spec.Scope == apiextensionsv1.ClusterScoped
 
 		// CRDs explicitly do not support protobuf, but some objects returned by the API server do
@@ -843,9 +834,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 		requestScopes[v.Name] = &handlers.RequestScope{
 			Namer: handlers.ContextBasedNaming{
-				SelfLinker:         meta.NewAccessor(),
-				ClusterScoped:      clusterScoped,
-				SelfLinkPathPrefix: selfLinkPrefix,
+				Namer:         meta.NewAccessor(),
+				ClusterScoped: clusterScoped,
 			},
 			Serializer:          negotiatedSerializer,
 			ParameterCodec:      parameterCodec,
@@ -888,7 +878,13 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			requestScopes[v.Name] = &reqScope
 		}
 
-		// override scaleSpec subresource values
+		scaleColumns, err := getScaleColumnsForVersion(crd, v.Name)
+		if err != nil {
+			return nil, fmt.Errorf("the server could not properly serve the CR scale subresource columns %w", err)
+		}
+		scaleTable, _ := tableconvertor.New(scaleColumns, schema.GroupVersionKind{crd.Spec.Group, v.Name, crd.Spec.Names.Kind})
+
+		// override scale subresource values
 		// shallow copy
 		scaleScope := *requestScopes[v.Name]
 		scaleConverter := scale.NewScaleConverter()
@@ -896,11 +892,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		scaleScope.Serializer = serializer.NewCodecFactory(scaleConverter.Scheme())
 		scaleScope.Kind = autoscalingv1.SchemeGroupVersion.WithKind("Scale")
 		scaleScope.Namer = handlers.ContextBasedNaming{
-			SelfLinker:         meta.NewAccessor(),
-			ClusterScoped:      clusterScoped,
-			SelfLinkPathPrefix: selfLinkPrefix,
-			SelfLinkPathSuffix: "/scale",
+			Namer:         meta.NewAccessor(),
+			ClusterScoped: clusterScoped,
 		}
+		scaleScope.TableConvertor = scaleTable
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) && subresources != nil && subresources.Scale != nil {
 			scaleScope, err = scopeWithFieldManager(
@@ -921,10 +916,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		statusScope := *requestScopes[v.Name]
 		statusScope.Subresource = "status"
 		statusScope.Namer = handlers.ContextBasedNaming{
-			SelfLinker:         meta.NewAccessor(),
-			ClusterScoped:      clusterScoped,
-			SelfLinkPathPrefix: selfLinkPrefix,
-			SelfLinkPathSuffix: "/status",
+			Namer:         meta.NewAccessor(),
+			ClusterScoped: clusterScoped,
 		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) && subresources != nil && subresources.Status != nil {

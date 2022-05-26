@@ -18,6 +18,9 @@ import (
 	"go/types"
 	"io"
 	"sort"
+	"strings"
+
+	"golang.org/x/tools/internal/typeparams"
 )
 
 type intReader struct {
@@ -41,6 +44,19 @@ func (r *intReader) uint64() uint64 {
 	return i
 }
 
+// Keep this in sync with constants in iexport.go.
+const (
+	iexportVersionGo1_11   = 0
+	iexportVersionPosCol   = 1
+	iexportVersionGo1_18   = 2
+	iexportVersionGenerics = 2
+)
+
+type ident struct {
+	pkg  string
+	name string
+}
+
 const predeclReserved = 32
 
 type itag uint64
@@ -56,6 +72,9 @@ const (
 	signatureType
 	structType
 	interfaceType
+	typeParamType
+	instanceType
+	unionType
 )
 
 // IImportData imports a package from the serialized package data
@@ -78,15 +97,17 @@ func IImportBundle(fset *token.FileSet, imports map[string]*types.Package, data 
 func iimportCommon(fset *token.FileSet, imports map[string]*types.Package, data []byte, bundle bool, path string) (pkgs []*types.Package, err error) {
 	const currentVersion = 1
 	version := int64(-1)
-	defer func() {
-		if e := recover(); e != nil {
-			if version > currentVersion {
-				err = fmt.Errorf("cannot import %q (%v), export data is newer version - update tool", path, e)
-			} else {
-				err = fmt.Errorf("cannot import %q (%v), possibly version skew - reinstall package", path, e)
+	if !debug {
+		defer func() {
+			if e := recover(); e != nil {
+				if version > currentVersion {
+					err = fmt.Errorf("cannot import %q (%v), export data is newer version - update tool", path, e)
+				} else {
+					err = fmt.Errorf("cannot import %q (%v), possibly version skew - reinstall package", path, e)
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	r := &intReader{bytes.NewReader(data), path}
 
@@ -101,9 +122,13 @@ func iimportCommon(fset *token.FileSet, imports map[string]*types.Package, data 
 
 	version = int64(r.uint64())
 	switch version {
-	case currentVersion, 0:
+	case iexportVersionGo1_18, iexportVersionPosCol, iexportVersionGo1_11:
 	default:
-		errorf("unknown iexport format version %d", version)
+		if version > iexportVersionGo1_18 {
+			errorf("unstable iexport format version %d, just rebuild compiler and std library", version)
+		} else {
+			errorf("unknown iexport format version %d", version)
+		}
 	}
 
 	sLen := int64(r.uint64())
@@ -115,8 +140,8 @@ func iimportCommon(fset *token.FileSet, imports map[string]*types.Package, data 
 	r.Seek(sLen+dLen, io.SeekCurrent)
 
 	p := iimporter{
-		ipath:   path,
 		version: int(version),
+		ipath:   path,
 
 		stringData:  stringData,
 		stringCache: make(map[uint64]string),
@@ -125,12 +150,16 @@ func iimportCommon(fset *token.FileSet, imports map[string]*types.Package, data 
 		declData: declData,
 		pkgIndex: make(map[*types.Package]map[string]uint64),
 		typCache: make(map[uint64]types.Type),
+		// Separate map for typeparams, keyed by their package and unique
+		// name.
+		tparamIndex: make(map[ident]types.Type),
 
 		fake: fakeFileSet{
 			fset:  fset,
-			files: make(map[string]*token.File),
+			files: make(map[string]*fileInfo),
 		},
 	}
+	defer p.fake.setLines() // set lines for files in fset
 
 	for i, pt := range predeclared() {
 		p.typCache[uint64(i)] = pt
@@ -216,22 +245,42 @@ func iimportCommon(fset *token.FileSet, imports map[string]*types.Package, data 
 }
 
 type iimporter struct {
-	ipath   string
 	version int
+	ipath   string
 
 	stringData  []byte
 	stringCache map[uint64]string
 	pkgCache    map[uint64]*types.Package
 
-	declData []byte
-	pkgIndex map[*types.Package]map[string]uint64
-	typCache map[uint64]types.Type
+	declData    []byte
+	pkgIndex    map[*types.Package]map[string]uint64
+	typCache    map[uint64]types.Type
+	tparamIndex map[ident]types.Type
 
 	fake          fakeFileSet
 	interfaceList []*types.Interface
+
+	indent int // for tracing support
+}
+
+func (p *iimporter) trace(format string, args ...interface{}) {
+	if !trace {
+		// Call sites should also be guarded, but having this check here allows
+		// easily enabling/disabling debug trace statements.
+		return
+	}
+	fmt.Printf(strings.Repeat("..", p.indent)+format+"\n", args...)
 }
 
 func (p *iimporter) doDecl(pkg *types.Package, name string) {
+	if debug {
+		p.trace("import decl %s", name)
+		p.indent++
+		defer func() {
+			p.indent--
+			p.trace("=> %s", name)
+		}()
+	}
 	// See if we've already imported this declaration.
 	if obj := pkg.Scope().Lookup(name); obj != nil {
 		return
@@ -273,7 +322,7 @@ func (p *iimporter) pkgAt(off uint64) *types.Package {
 }
 
 func (p *iimporter) typAt(off uint64, base *types.Named) types.Type {
-	if t, ok := p.typCache[off]; ok && (base == nil || !isInterface(t)) {
+	if t, ok := p.typCache[off]; ok && canReuse(base, t) {
 		return t
 	}
 
@@ -285,10 +334,28 @@ func (p *iimporter) typAt(off uint64, base *types.Named) types.Type {
 	r.declReader.Reset(p.declData[off-predeclReserved:])
 	t := r.doType(base)
 
-	if base == nil || !isInterface(t) {
+	if canReuse(base, t) {
 		p.typCache[off] = t
 	}
 	return t
+}
+
+// canReuse reports whether the type rhs on the RHS of the declaration for def
+// may be re-used.
+//
+// Specifically, if def is non-nil and rhs is an interface type with methods, it
+// may not be re-used because we have a convention of setting the receiver type
+// for interface methods to def.
+func canReuse(def *types.Named, rhs types.Type) bool {
+	if def == nil {
+		return true
+	}
+	iface, _ := rhs.(*types.Interface)
+	if iface == nil {
+		return true
+	}
+	// Don't use iface.Empty() here as iface may not be complete.
+	return iface.NumEmbeddeds() == 0 && iface.NumExplicitMethods() == 0
 }
 
 type importReader struct {
@@ -315,17 +382,26 @@ func (r *importReader) obj(name string) {
 
 		r.declare(types.NewConst(pos, r.currPkg, name, typ, val))
 
-	case 'F':
-		sig := r.signature(nil)
-
+	case 'F', 'G':
+		var tparams []*typeparams.TypeParam
+		if tag == 'G' {
+			tparams = r.tparamList()
+		}
+		sig := r.signature(nil, nil, tparams)
 		r.declare(types.NewFunc(pos, r.currPkg, name, sig))
 
-	case 'T':
+	case 'T', 'U':
 		// Types can be recursive. We need to setup a stub
 		// declaration before recursing.
 		obj := types.NewTypeName(pos, r.currPkg, name, nil)
 		named := types.NewNamed(obj, nil, nil)
+		// Declare obj before calling r.tparamList, so the new type name is recognized
+		// if used in the constraint of one of its own typeparams (see #48280).
 		r.declare(obj)
+		if tag == 'U' {
+			tparams := r.tparamList()
+			typeparams.SetForNamed(named, tparams)
+		}
 
 		underlying := r.p.typAt(r.uint64(), named).Underlying()
 		named.SetUnderlying(underlying)
@@ -335,11 +411,54 @@ func (r *importReader) obj(name string) {
 				mpos := r.pos()
 				mname := r.ident()
 				recv := r.param()
-				msig := r.signature(recv)
+
+				// If the receiver has any targs, set those as the
+				// rparams of the method (since those are the
+				// typeparams being used in the method sig/body).
+				base := baseType(recv.Type())
+				assert(base != nil)
+				targs := typeparams.NamedTypeArgs(base)
+				var rparams []*typeparams.TypeParam
+				if targs.Len() > 0 {
+					rparams = make([]*typeparams.TypeParam, targs.Len())
+					for i := range rparams {
+						rparams[i] = targs.At(i).(*typeparams.TypeParam)
+					}
+				}
+				msig := r.signature(recv, rparams, nil)
 
 				named.AddMethod(types.NewFunc(mpos, r.currPkg, mname, msig))
 			}
 		}
+
+	case 'P':
+		// We need to "declare" a typeparam in order to have a name that
+		// can be referenced recursively (if needed) in the type param's
+		// bound.
+		if r.p.version < iexportVersionGenerics {
+			errorf("unexpected type param type")
+		}
+		name0 := tparamName(name)
+		tn := types.NewTypeName(pos, r.currPkg, name0, nil)
+		t := typeparams.NewTypeParam(tn, nil)
+
+		// To handle recursive references to the typeparam within its
+		// bound, save the partial type in tparamIndex before reading the bounds.
+		id := ident{r.currPkg.Name(), name}
+		r.p.tparamIndex[id] = t
+		var implicit bool
+		if r.p.version >= iexportVersionGo1_18 {
+			implicit = r.bool()
+		}
+		constraint := r.typ()
+		if implicit {
+			iface, _ := constraint.(*types.Interface)
+			if iface == nil {
+				errorf("non-interface constraint marked implicit")
+			}
+			typeparams.MarkImplicit(iface)
+		}
+		typeparams.SetTypeParamConstraint(t, constraint)
 
 	case 'V':
 		typ := r.typ()
@@ -357,6 +476,10 @@ func (r *importReader) declare(obj types.Object) {
 
 func (r *importReader) value() (typ types.Type, val constant.Value) {
 	typ = r.typ()
+	if r.p.version >= iexportVersionGo1_18 {
+		// TODO: add support for using the kind.
+		_ = constant.Kind(r.int64())
+	}
 
 	switch b := typ.Underlying().(*types.Basic); b.Info() & types.IsConstType {
 	case types.IsBoolean:
@@ -499,7 +622,7 @@ func (r *importReader) qualifiedIdent() (*types.Package, string) {
 }
 
 func (r *importReader) pos() token.Pos {
-	if r.p.version >= 1 {
+	if r.p.version >= iexportVersionPosCol {
 		r.posv1()
 	} else {
 		r.posv0()
@@ -547,8 +670,17 @@ func isInterface(t types.Type) bool {
 func (r *importReader) pkg() *types.Package { return r.p.pkgAt(r.uint64()) }
 func (r *importReader) string() string      { return r.p.stringAt(r.uint64()) }
 
-func (r *importReader) doType(base *types.Named) types.Type {
-	switch k := r.kind(); k {
+func (r *importReader) doType(base *types.Named) (res types.Type) {
+	k := r.kind()
+	if debug {
+		r.p.trace("importing type %d (base: %s)", k, base)
+		r.p.indent++
+		defer func() {
+			r.p.indent--
+			r.p.trace("=> %s", res)
+		}()
+	}
+	switch k {
 	default:
 		errorf("unexpected kind tag in %q: %v", r.p.ipath, k)
 		return nil
@@ -571,7 +703,7 @@ func (r *importReader) doType(base *types.Named) types.Type {
 		return types.NewMap(r.typ(), r.typ())
 	case signatureType:
 		r.currPkg = r.pkg()
-		return r.signature(nil)
+		return r.signature(nil, nil, nil)
 
 	case structType:
 		r.currPkg = r.pkg()
@@ -611,13 +743,56 @@ func (r *importReader) doType(base *types.Named) types.Type {
 				recv = types.NewVar(token.NoPos, r.currPkg, "", base)
 			}
 
-			msig := r.signature(recv)
+			msig := r.signature(recv, nil, nil)
 			methods[i] = types.NewFunc(mpos, r.currPkg, mname, msig)
 		}
 
 		typ := newInterface(methods, embeddeds)
 		r.p.interfaceList = append(r.p.interfaceList, typ)
 		return typ
+
+	case typeParamType:
+		if r.p.version < iexportVersionGenerics {
+			errorf("unexpected type param type")
+		}
+		pkg, name := r.qualifiedIdent()
+		id := ident{pkg.Name(), name}
+		if t, ok := r.p.tparamIndex[id]; ok {
+			// We're already in the process of importing this typeparam.
+			return t
+		}
+		// Otherwise, import the definition of the typeparam now.
+		r.p.doDecl(pkg, name)
+		return r.p.tparamIndex[id]
+
+	case instanceType:
+		if r.p.version < iexportVersionGenerics {
+			errorf("unexpected instantiation type")
+		}
+		// pos does not matter for instances: they are positioned on the original
+		// type.
+		_ = r.pos()
+		len := r.uint64()
+		targs := make([]types.Type, len)
+		for i := range targs {
+			targs[i] = r.typ()
+		}
+		baseType := r.typ()
+		// The imported instantiated type doesn't include any methods, so
+		// we must always use the methods of the base (orig) type.
+		// TODO provide a non-nil *Environment
+		t, _ := typeparams.Instantiate(nil, baseType, targs, false)
+		return t
+
+	case unionType:
+		if r.p.version < iexportVersionGenerics {
+			errorf("unexpected instantiation type")
+		}
+		terms := make([]*typeparams.Term, r.uint64())
+		for i := range terms {
+			terms[i] = typeparams.NewTerm(r.bool(), r.typ())
+		}
+		return typeparams.NewUnion(terms)
 	}
 }
 
@@ -625,11 +800,25 @@ func (r *importReader) kind() itag {
 	return itag(r.uint64())
 }
 
-func (r *importReader) signature(recv *types.Var) *types.Signature {
+func (r *importReader) signature(recv *types.Var, rparams []*typeparams.TypeParam, tparams []*typeparams.TypeParam) *types.Signature {
 	params := r.paramList()
 	results := r.paramList()
 	variadic := params.Len() > 0 && r.bool()
-	return types.NewSignature(recv, params, results, variadic)
+	return typeparams.NewSignatureType(recv, rparams, tparams, params, results, variadic)
+}
+
+func (r *importReader) tparamList() []*typeparams.TypeParam {
+	n := r.uint64()
+	if n == 0 {
+		return nil
+	}
+	xs := make([]*typeparams.TypeParam, n)
+	for i := range xs {
+		// Note: the standard library importer is tolerant of nil types here,
+		// though would panic in SetTypeParams.
+		xs[i] = r.typ().(*typeparams.TypeParam)
+	}
+	return xs
 }
 
 func (r *importReader) paramList() *types.Tuple {
@@ -673,4 +862,14 @@ func (r *importReader) byte() byte {
 		errorf("declReader.ReadByte: %v", err)
 	}
 	return x
+}
+
+func baseType(typ types.Type) *types.Named {
+	// pointer receivers are never types.Named types
+	if p, _ := typ.(*types.Pointer); p != nil {
+		typ = p.Elem()
+	}
+	// receiver base types are always (possibly generic) types.Named types
+	n, _ := typ.(*types.Named)
+	return n
 }

@@ -20,7 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -187,7 +187,7 @@ func (t *MySQLUpgradeTest) addName(name string) error {
 	}
 	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			return err
 		}
@@ -205,7 +205,7 @@ func (t *MySQLUpgradeTest) countNames() (int, error) {
 	}
 	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			return 0, err
 		}

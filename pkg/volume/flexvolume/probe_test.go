@@ -30,8 +30,9 @@ import (
 )
 
 const (
-	pluginDir  = "/flexvolume"
-	driverName = "fake-driver"
+	pluginDir       = "/flexvolume"
+	driverName      = "fake-driver"
+	errorDriverName = "error-driver"
 )
 
 func assertPathSuffix(t *testing.T, dir1 string, dir2 string) {
@@ -185,7 +186,7 @@ func TestEmptyPluginDir(t *testing.T) {
 		pluginDir: pluginDir,
 		watcher:   watcher,
 		fs:        fs,
-		factory:   fakePluginFactory{error: false},
+		factory:   fakePluginFactory{},
 	}
 	prober.Init()
 
@@ -279,12 +280,40 @@ func TestProberError(t *testing.T) {
 		pluginDir: pluginDir,
 		watcher:   watcher,
 		fs:        fs,
-		factory:   fakePluginFactory{error: true},
+		factory:   fakePluginFactory{errorDriver: driverName},
 	}
 	installDriver(driverName, fs)
 	prober.Init()
 
 	_, err := prober.Probe()
+	assert.Error(t, err)
+}
+
+func TestProberSuccessAndError(t *testing.T) {
+
+	// Arrange
+	fs := utilfs.NewTempFs()
+	watcher := newFakeWatcher()
+	prober := &flexVolumeProber{
+		pluginDir: pluginDir,
+		watcher:   watcher,
+		fs:        fs,
+		factory:   fakePluginFactory{errorDriver: errorDriverName},
+	}
+	installDriver(driverName, fs)
+	prober.Init()
+
+	installDriver(errorDriverName, fs)
+	driverPath := filepath.Join(pluginDir, errorDriverName)
+	watcher.TriggerEvent(fsnotify.Create, filepath.Join(driverPath, errorDriverName))
+
+	// Act
+	events, err := prober.Probe()
+
+	// Assert
+	assert.Equal(t, 1, len(events))
+	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)
+	assert.Equal(t, driverName, events[0].PluginName)
 	assert.Error(t, err)
 }
 
@@ -307,7 +336,7 @@ func initTestEnvironment(t *testing.T) (
 		pluginDir: pluginDir,
 		watcher:   watcher,
 		fs:        fs,
-		factory:   fakePluginFactory{error: false},
+		factory:   fakePluginFactory{},
 	}
 	driverPath = filepath.Join(pluginDir, driverName)
 	installDriver(driverName, fs)
@@ -320,13 +349,13 @@ func initTestEnvironment(t *testing.T) (
 
 // Fake Flexvolume plugin
 type fakePluginFactory struct {
-	error bool // Indicates whether an error should be returned.
+	errorDriver string // the name of the driver in error
 }
 
 var _ PluginFactory = fakePluginFactory{}
 
 func (m fakePluginFactory) NewFlexVolumePlugin(_, driverName string, _ exec.Interface) (volume.VolumePlugin, error) {
-	if m.error {
+	if driverName == m.errorDriver {
 		return nil, fmt.Errorf("Flexvolume plugin error")
 	}
 	// Dummy Flexvolume plugin. Prober never interacts with the plugin.

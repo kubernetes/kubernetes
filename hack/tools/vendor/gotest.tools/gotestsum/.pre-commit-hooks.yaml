@@ -1,0 +1,9 @@
+- id: gotestsum
+  name: gotestsum
+  description: |
+    `go test` runner with output optimized for humans, JUnit XML for CI
+    integration, and a summary of the test results.
+  entry: gotestsum
+  types: [go]
+  language: golang
+  pass_filenames: false

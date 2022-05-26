@@ -34,8 +34,11 @@ func TestNewCmdVersionClientVersion(t *testing.T) {
 	if err := o.Complete(tf, &cobra.Command{}); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if err := o.Validate(); err != nil {
+	if err := o.Validate(nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
+	}
+	if err := o.Validate([]string{"extraParameter0"}); !strings.Contains(err.Error(), "extra arguments") {
+		t.Errorf("Unexpected error: should fail to validate the args length greater than 0")
 	}
 	if err := o.Run(); err != nil {
 		t.Errorf("Cannot execute version command: %v", err)

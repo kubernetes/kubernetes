@@ -3,7 +3,6 @@ package intelrdt
 import (
 	"bufio"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -49,7 +48,7 @@ func parseMonFeatures(reader io.Reader) (monFeatures, error) {
 }
 
 func getMonitoringStats(containerPath string, stats *Stats) error {
-	numaFiles, err := ioutil.ReadDir(filepath.Join(containerPath, "mon_data"))
+	numaFiles, err := os.ReadDir(filepath.Join(containerPath, "mon_data"))
 	if err != nil {
 		return err
 	}

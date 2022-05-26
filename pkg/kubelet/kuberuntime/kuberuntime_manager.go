@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -134,9 +133,6 @@ type kubeGenericRuntimeManager struct {
 	// Internal lifecycle event handlers for container resource management.
 	internalLifecycle cm.InternalContainerLifecycle
 
-	// A shim to legacy functions for backward compatibility.
-	legacyLogProvider LegacyLogProvider
-
 	// Manage container logs.
 	logManager logs.ContainerLogManager
 
@@ -169,12 +165,6 @@ type KubeGenericRuntime interface {
 	kubecontainer.CommandRunner
 }
 
-// LegacyLogProvider gives the ability to use unsupported docker log drivers (e.g. journald)
-type LegacyLogProvider interface {
-	// GetContainerLogTail gets the last few lines of the logs for a specific container.
-	GetContainerLogTail(uid kubetypes.UID, name, namespace string, containerID kubecontainer.ContainerID) (string, error)
-}
-
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
 func NewKubeGenericRuntimeManager(
 	recorder record.EventRecorder,
@@ -198,7 +188,6 @@ func NewKubeGenericRuntimeManager(
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	internalLifecycle cm.InternalContainerLifecycle,
-	legacyLogProvider LegacyLogProvider,
 	logManager logs.ContainerLogManager,
 	runtimeClassManager *runtimeclass.Manager,
 	seccompDefault bool,
@@ -206,6 +195,8 @@ func NewKubeGenericRuntimeManager(
 	getNodeAllocatable func() v1.ResourceList,
 	memoryThrottlingFactor float64,
 ) (KubeGenericRuntime, error) {
+	runtimeService = newInstrumentedRuntimeService(runtimeService)
+	imageService = newInstrumentedImageManagerService(imageService)
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:               recorder,
 		cpuCFSQuota:            cpuCFSQuota,
@@ -217,10 +208,9 @@ func NewKubeGenericRuntimeManager(
 		machineInfo:            machineInfo,
 		osInterface:            osInterface,
 		runtimeHelper:          runtimeHelper,
-		runtimeService:         newInstrumentedRuntimeService(runtimeService),
-		imageService:           newInstrumentedImageManagerService(imageService),
+		runtimeService:         runtimeService,
+		imageService:           imageService,
 		internalLifecycle:      internalLifecycle,
-		legacyLogProvider:      legacyLogProvider,
 		logManager:             logManager,
 		runtimeClassManager:    runtimeClassManager,
 		logReduction:           logreduction.NewLogReduction(identicalErrorDelay),
@@ -299,17 +289,6 @@ func (m *kubeGenericRuntimeManager) Type() string {
 	return m.runtimeName
 }
 
-// SupportsSingleFileMapping returns whether the container runtime supports single file mappings or not.
-// It is supported on Windows only if the container runtime is containerd.
-func (m *kubeGenericRuntimeManager) SupportsSingleFileMapping() bool {
-	switch goruntime.GOOS {
-	case "windows":
-		return m.Type() != types.DockerContainerRuntime
-	default:
-		return true
-	}
-}
-
 func newRuntimeVersion(version string) (*utilversion.Version, error) {
 	if ver, err := utilversion.ParseSemantic(version); err == nil {
 		return ver, err
@@ -351,11 +330,14 @@ func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) 
 // Status returns the status of the runtime. An error is returned if the Status
 // function itself fails, nil otherwise.
 func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, error) {
-	status, err := m.runtimeService.Status()
+	resp, err := m.runtimeService.Status(false)
 	if err != nil {
 		return nil, err
 	}
-	return toKubeRuntimeStatus(status), nil
+	if resp.GetStatus() == nil {
+		return nil, errors.New("runtime status is nil")
+	}
+	return toKubeRuntimeStatus(resp.GetStatus()), nil
 }
 
 // GetPods returns a list of containers grouped by pods. The boolean parameter
@@ -840,7 +822,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		}
 		klog.V(4).InfoS("Created PodSandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
 
-		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
+		resp, err := m.runtimeService.PodSandboxStatus(podSandboxID, false)
 		if err != nil {
 			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)
 			if referr != nil {
@@ -851,12 +833,16 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			result.Fail(err)
 			return
 		}
+		if resp.GetStatus() == nil {
+			result.Fail(errors.New("pod sandbox status is nil"))
+			return
+		}
 
 		// If we ever allow updating a pod from non-host-network to
 		// host-network, we may use a stale IP.
 		if !kubecontainer.IsHostNetworkPod(pod) {
 			// Overwrite the podIPs passed in the pod status, since we just started the pod sandbox.
-			podIPs = m.determinePodSandboxIPs(pod.Namespace, pod.Name, podSandboxStatus)
+			podIPs = m.determinePodSandboxIPs(pod.Namespace, pod.Name, resp.GetStatus())
 			klog.V(4).InfoS("Determined the ip for pod after sandbox changed", "IPs", podIPs, "pod", klog.KObj(pod))
 		}
 	}
@@ -1053,7 +1039,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	sandboxStatuses := []*runtimeapi.PodSandboxStatus{}
 	podIPs := []string{}
 	for idx, podSandboxID := range podSandboxIDs {
-		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
+		resp, err := m.runtimeService.PodSandboxStatus(podSandboxID, false)
 		// Between List (getSandboxIDByPodUID) and check (PodSandboxStatus) another thread might remove a container, and that is normal.
 		// The previous call (getSandboxIDByPodUID) never fails due to a pod sandbox not existing.
 		// Therefore, this method should not either, but instead act as if the previous call failed,
@@ -1065,11 +1051,14 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 			klog.ErrorS(err, "PodSandboxStatus of sandbox for pod", "podSandboxID", podSandboxID, "pod", klog.KObj(pod))
 			return nil, err
 		}
-		sandboxStatuses = append(sandboxStatuses, podSandboxStatus)
+		if resp.GetStatus() == nil {
+			return nil, errors.New("pod sandbox status is nil")
 
+		}
+		sandboxStatuses = append(sandboxStatuses, resp.Status)
 		// Only get pod IP from latest sandbox
-		if idx == 0 && podSandboxStatus.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			podIPs = m.determinePodSandboxIPs(namespace, name, podSandboxStatus)
+		if idx == 0 && resp.Status.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+			podIPs = m.determinePodSandboxIPs(namespace, name, resp.Status)
 		}
 	}
 

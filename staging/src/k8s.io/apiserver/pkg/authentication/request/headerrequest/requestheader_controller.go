@@ -162,29 +162,29 @@ func (c *RequestHeaderAuthRequestController) AllowedClientNames() []string {
 }
 
 // Run starts RequestHeaderAuthRequestController controller and blocks until stopCh is closed.
-func (c *RequestHeaderAuthRequestController) Run(workers int, stopCh <-chan struct{}) {
+func (c *RequestHeaderAuthRequestController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
 	klog.Infof("Starting %s", c.name)
 	defer klog.Infof("Shutting down %s", c.name)
 
-	go c.configmapInformer.Run(stopCh)
+	go c.configmapInformer.Run(ctx.Done())
 
 	// wait for caches to fill before starting your work
-	if !cache.WaitForNamedCacheSync(c.name, stopCh, c.configmapInformerSynced) {
+	if !cache.WaitForNamedCacheSync(c.name, ctx.Done(), c.configmapInformerSynced) {
 		return
 	}
 
 	// doesn't matter what workers say, only start one.
-	go wait.Until(c.runWorker, time.Second, stopCh)
+	go wait.Until(c.runWorker, time.Second, ctx.Done())
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 // // RunOnce runs a single sync loop
-func (c *RequestHeaderAuthRequestController) RunOnce() error {
-	configMap, err := c.client.CoreV1().ConfigMaps(c.configmapNamespace).Get(context.TODO(), c.configmapName, metav1.GetOptions{})
+func (c *RequestHeaderAuthRequestController) RunOnce(ctx context.Context) error {
+	configMap, err := c.client.CoreV1().ConfigMaps(c.configmapNamespace).Get(ctx, c.configmapName, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		// ignore, authConfigMap is nil now

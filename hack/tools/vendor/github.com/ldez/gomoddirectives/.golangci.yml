@@ -1,0 +1,87 @@
+run:
+  deadline: 2m
+  skip-files: []
+  skip-dirs: []
+
+linters-settings:
+  govet:
+    enable-all: true
+  gocyclo:
+    min-complexity: 12
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  misspell:
+    locale: US
+  gofumpt:
+    extra-rules: true
+  depguard:
+    list-type: blacklist
+    include-go-root: false
+    packages:
+      - github.com/pkg/errors
+  godox:
+    keywords:
+      - FIXME
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - sloppyReassign
+      - rangeValCopy
+      - octalLiteral
+      - paramTypeCombine # already handle by gofumpt.extra-rules
+    settings:
+      hugeParam:
+        sizeThreshold: 100
+  forbidigo:
+    forbid:
+      - '^print(ln)?$'
+      - '^fmt\.Print(f|ln)?$'
+      - '^panic$'
+      - '^spew\.Print(f|ln)?$'
+      - '^spew\.Dump$'
+  tagliatelle:
+    case:
+      rules:
+        json: pascal
+
+linters:
+  enable-all: true
+  disable:
+    - maligned # deprecated
+    - interfacer # deprecated
+    - golint # deprecated
+    - scopelint # deprecated
+    - sqlclosecheck # not relevant (SQL)
+    - rowserrcheck # not relevant (SQL)
+    - cyclop # duplicate of gocyclo
+    - lll
+    - dupl
+    - prealloc
+    - bodyclose
+    - wsl
+    - nlreturn
+    - gomnd
+    - testpackage
+    - paralleltest
+    - tparallel
+    - goerr113
+    - wrapcheck
+    - exhaustive
+    - exhaustivestruct
+
+issues:
+  exclude-use-default: false
+  max-per-linter: 0
+  max-same-issues: 0
+  exclude: []
+  exclude-rules:
+    - path: "(.+)_test.go"
+      linters:
+      - funlen
+      - goconst
+    - path: cmd/gomoddirectives/gomoddirectives.go
+      text: 'use of `fmt.Println` forbidden'

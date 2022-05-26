@@ -1,0 +1,24 @@
+language: go
+
+go:
+  - "1.13"
+  - "1.14"
+  - tip
+
+env:
+  - GO111MODULE=on
+
+before_install:
+  - go get github.com/axw/gocov/gocov
+  - go get github.com/mattn/goveralls
+  - go get golang.org/x/tools/cmd/cover
+  - go get golang.org/x/tools/cmd/goimports
+  - wget -O - -q https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh
+
+script:
+  - test -z "$(goimports -d ./ 2>&1)"
+  - ./bin/golangci-lint run
+  - go test -v -race ./...
+
+after_success:
+  - test "$TRAVIS_GO_VERSION" = "1.14" && goveralls -service=travis-ci

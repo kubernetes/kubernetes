@@ -115,10 +115,8 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 		}
 	case apps.RollingUpdateStatefulSetStrategyType:
 		if spec.UpdateStrategy.RollingUpdate != nil {
-			allErrs = append(allErrs,
-				apivalidation.ValidateNonnegativeField(
-					int64(spec.UpdateStrategy.RollingUpdate.Partition),
-					fldPath.Child("updateStrategy").Child("rollingUpdate").Child("partition"))...)
+			allErrs = append(allErrs, validateRollingUpdateStatefulSet(spec.UpdateStrategy.RollingUpdate, fldPath.Child("updateStrategy", "rollingUpdate"))...)
+
 		}
 	default:
 		allErrs = append(allErrs,
@@ -415,6 +413,26 @@ func ValidateRollingUpdateDaemonSet(rollingUpdate *apps.RollingUpdateDaemonSet, 
 		}
 		// Validate that MaxUnavailable is not more than 100%.
 		allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	}
+	return allErrs
+}
+
+// validateRollingUpdateStatefulSet validates a given RollingUpdateStatefulSet.
+func validateRollingUpdateStatefulSet(rollingUpdate *apps.RollingUpdateStatefulSetStrategy, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	fldPathMaxUn := fldPath.Child("maxUnavailable")
+	allErrs = append(allErrs,
+		apivalidation.ValidateNonnegativeField(
+			int64(rollingUpdate.Partition),
+			fldPath.Child("partition"))...)
+	if rollingUpdate.MaxUnavailable != nil {
+		allErrs = append(allErrs, ValidatePositiveIntOrPercent(*rollingUpdate.MaxUnavailable, fldPathMaxUn)...)
+		if getIntOrPercentValue(*rollingUpdate.MaxUnavailable) == 0 {
+			// MaxUnavailable cannot be 0.
+			allErrs = append(allErrs, field.Invalid(fldPathMaxUn, *rollingUpdate.MaxUnavailable, "cannot be 0"))
+		}
+		// Validate that MaxUnavailable is not more than 100%.
+		allErrs = append(allErrs, IsNotMoreThan100Percent(*rollingUpdate.MaxUnavailable, fldPathMaxUn)...)
 	}
 	return allErrs
 }

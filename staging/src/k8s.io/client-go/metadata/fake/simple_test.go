@@ -39,13 +39,6 @@ const (
 	testAPIVersion = "testgroup/testversion"
 )
 
-var scheme *runtime.Scheme
-
-func init() {
-	scheme = runtime.NewScheme()
-	metav1.AddMetaToScheme(scheme)
-}
-
 func newPartialObjectMetadata(apiVersion, kind, namespace, name string) *metav1.PartialObjectMetadata {
 	return &metav1.PartialObjectMetadata{
 		TypeMeta: metav1.TypeMeta{
@@ -66,6 +59,8 @@ func newPartialObjectMetadataWithAnnotations(annotations map[string]string) *met
 }
 
 func TestList(t *testing.T) {
+	scheme := NewTestScheme()
+	metav1.AddMetaToScheme(scheme)
 	client := NewSimpleMetadataClient(scheme,
 		newPartialObjectMetadata("group/version", "TheKind", "ns-foo", "name-foo"),
 		newPartialObjectMetadata("group2/version", "TheKind", "ns-foo", "name2-foo"),
@@ -98,6 +93,8 @@ type patchTestCase struct {
 }
 
 func (tc *patchTestCase) runner(t *testing.T) {
+	scheme := NewTestScheme()
+	metav1.AddMetaToScheme(scheme)
 	client := NewSimpleMetadataClient(scheme, tc.object)
 	resourceInterface := client.Resource(schema.GroupVersionResource{Group: testGroup, Version: testVersion, Resource: testResource}).Namespace(testNamespace)
 

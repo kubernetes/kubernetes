@@ -39,8 +39,7 @@ parallelism=${PARALLELISM:-8}
 artifacts="${ARTIFACTS:-"/tmp/_artifacts/$(date +%y%m%dT%H%M%S)"}"
 remote=${REMOTE:-"false"}
 remote_mode=${REMOTE_MODE:-"gce"}
-runtime=${RUNTIME:-"docker"}
-container_runtime_endpoint=${CONTAINER_RUNTIME_ENDPOINT:-""}
+container_runtime_endpoint=${CONTAINER_RUNTIME_ENDPOINT:-"unix:///run/containerd/containerd.sock"}
 image_service_endpoint=${IMAGE_SERVICE_ENDPOINT:-""}
 run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
 test_args=${TEST_ARGS:-""}
@@ -78,13 +77,11 @@ if [ ! -d "${artifacts}" ]; then
 fi
 echo "Test artifacts will be written to ${artifacts}"
 
-if [[ ${runtime} == "remote" ]] ; then
-  if [[ -n ${container_runtime_endpoint} ]] ; then
-    test_args="--container-runtime-endpoint=${container_runtime_endpoint} ${test_args}"
-  fi
-  if [[ -n ${image_service_endpoint} ]] ; then
-    test_args="--image-service-endpoint=${image_service_endpoint} ${test_args}"
-  fi
+if [[ -n ${container_runtime_endpoint} ]] ; then
+  test_args="--container-runtime-endpoint=${container_runtime_endpoint} ${test_args}"
+fi
+if [[ -n ${image_service_endpoint} ]] ; then
+  test_args="--image-service-endpoint=${image_service_endpoint} ${test_args}"
 fi
 
 
@@ -222,12 +219,6 @@ else
     sudo -v || exit 1
   fi
 
-  # Do not use any network plugin by default. User could override the flags with
-  # test_args.
-  test_args='--kubelet-flags="--network-plugin= --cni-bin-dir=" '${test_args}
-
-  # Runtime flags
-  test_args='--kubelet-flags="--container-runtime='${runtime}'" '${test_args}
 
   # Use cluster.local as default dns-domain
   test_args='--dns-domain="'${KUBE_DNS_DOMAIN:-cluster.local}'" '${test_args}
@@ -236,9 +227,9 @@ else
   # Provided for backwards compatibility
   go run test/e2e_node/runner/local/run_local.go \
     --system-spec-name="${system_spec_name}" --extra-envs="${extra_envs}" \
-    --ginkgo-flags="${ginkgoflags}" --test-flags="--container-runtime=${runtime} \
-    --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
-    ${test_args}" --runtime-config="${runtime_config}" \
+    --ginkgo-flags="${ginkgoflags}" \
+    --test-flags="--alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) ${test_args}" \
+    --runtime-config="${runtime_config}" \
     --kubelet-config-file="${kubelet_config_file}" \
     --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?

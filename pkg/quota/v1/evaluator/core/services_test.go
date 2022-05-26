@@ -24,10 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
-	"k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -56,9 +53,8 @@ func TestServiceEvaluatorMatchesResources(t *testing.T) {
 func TestServiceEvaluatorUsage(t *testing.T) {
 	evaluator := NewServiceEvaluator(nil)
 	testCases := map[string]struct {
-		service                         *api.Service
-		usage                           corev1.ResourceList
-		serviceLBNodePortControlEnabled bool
+		service *api.Service
+		usage   corev1.ResourceList
 	}{
 		"loadbalancer": {
 			service: &api.Service{
@@ -185,7 +181,6 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
-			serviceLBNodePortControlEnabled: true,
 		},
 		"nodeports-default-enabled": {
 			service: &api.Service{
@@ -232,7 +227,6 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
-			serviceLBNodePortControlEnabled: true,
 		},
 		"nodeports-disabled-but-specified": {
 			service: &api.Service{
@@ -257,12 +251,10 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				corev1.ResourceServicesLoadBalancers: resource.MustParse("1"),
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "services"}): resource.MustParse("1"),
 			},
-			serviceLBNodePortControlEnabled: true,
 		},
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ServiceLBNodePortControl, testCase.serviceLBNodePortControlEnabled)()
 			actual, err := evaluator.Usage(testCase.service)
 			if err != nil {
 				t.Errorf("%s unexpected error: %v", testName, err)

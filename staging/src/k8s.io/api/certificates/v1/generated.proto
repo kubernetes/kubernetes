@@ -27,7 +27,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/api/certificates/v1";
 
 // CertificateSigningRequest objects provide a mechanism to obtain x509 certificates
 // by submitting a certificate signing request, and having it asynchronously approved and issued.
@@ -153,8 +153,6 @@ message CertificateSigningRequestSpec {
   //   3. Signer whose configured minimum is longer than the requested duration
   //
   // The minimum valid value for expirationSeconds is 600, i.e. 10 minutes.
-  //
-  // As of v1.22, this field is beta and is controlled via the CSRDuration feature gate.
   //
   // +optional
   optional int32 expirationSeconds = 8;

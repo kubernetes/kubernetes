@@ -14,7 +14,7 @@ var (
 			`\[Feature:PodSecurityPolicy\]`,
 			`\[Feature:StatefulSetAutoDeletePVC\]`,
 			`\[Feature:CustomResourceValidationExpressions\]`,
-			`\[Feature:GRPCContainerProbe\]`,
+			`\[Feature:ProxyTerminatingEndpoints\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
@@ -45,6 +45,9 @@ var (
 			`Advanced Audit should audit API calls`, // expects to be able to call /logs
 
 			`Firewall rule should have correct firewall rules for e2e cluster`, // Upstream-install specific
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=2079958
+			`\[sig-network\] \[Feature:Topology Hints\] should distribute endpoints evenly`,
 		},
 		// tests that are known broken and need to be fixed upstream or in openshift
 		// always add an issue here

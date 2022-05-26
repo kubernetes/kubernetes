@@ -226,7 +226,6 @@ func autoConvert_v1alpha1_LoggingConfiguration_To_config_LoggingConfiguration(in
 	out.FlushFrequency = time.Duration(in.FlushFrequency)
 	out.Verbosity = config.VerbosityLevel(in.Verbosity)
 	out.VModule = *(*config.VModuleConfiguration)(unsafe.Pointer(&in.VModule))
-	out.Sanitization = in.Sanitization
 	if err := Convert_v1alpha1_FormatOptions_To_config_FormatOptions(&in.Options, &out.Options, s); err != nil {
 		return err
 	}
@@ -238,7 +237,6 @@ func autoConvert_config_LoggingConfiguration_To_v1alpha1_LoggingConfiguration(in
 	out.FlushFrequency = time.Duration(in.FlushFrequency)
 	out.Verbosity = uint32(in.Verbosity)
 	out.VModule = *(*VModuleConfiguration)(unsafe.Pointer(&in.VModule))
-	out.Sanitization = in.Sanitization
 	if err := Convert_config_FormatOptions_To_v1alpha1_FormatOptions(&in.Options, &out.Options, s); err != nil {
 		return err
 	}

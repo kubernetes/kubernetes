@@ -270,6 +270,8 @@ func TestCreateServiceDualStackIPv6(t *testing.T) {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
+	cfg.GenericConfig.PublicAddress = netutils.ParseIPSloppy("2001:db8::10")
+
 	_, s, closeFn := framework.RunAnAPIServer(cfg)
 	defer closeFn()
 
@@ -715,6 +717,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 		t.Fatalf("bad cidr: %v", err)
 	}
 	cfg.ExtraConfig.ServiceIPRange = *cidr
+	cfg.GenericConfig.PublicAddress = netutils.ParseIPSloppy("2001:db8::10")
 
 	_, secCidr, err := netutils.ParseCIDRSloppy(secondaryServiceCIDR)
 	if err != nil {

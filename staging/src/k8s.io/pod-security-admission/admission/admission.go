@@ -453,8 +453,9 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 		a.Metrics.RecordError(false, attrs)
 	}
 
-	if klog.V(5).Enabled() {
-		klog.InfoS("PodSecurity evaluation", "policy", fmt.Sprintf("%v", nsPolicy), "op", attrs.GetOperation(), "resource", attrs.GetResource(), "namespace", attrs.GetNamespace(), "name", attrs.GetName())
+	klogV := klog.V(5)
+	if klogV.Enabled() {
+		klogV.InfoS("PodSecurity evaluation", "policy", fmt.Sprintf("%v", nsPolicy), "op", attrs.GetOperation(), "resource", attrs.GetResource(), "namespace", attrs.GetNamespace(), "name", attrs.GetName())
 	}
 	cachedResults := make(map[api.LevelVersion]policy.AggregateCheckResult)
 	response := allowedResponse()

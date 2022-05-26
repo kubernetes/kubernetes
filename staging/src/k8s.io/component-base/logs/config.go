@@ -71,8 +71,6 @@ func BindLoggingFlags(c *config.LoggingConfiguration, fs *pflag.FlagSet) {
 	fs.DurationVar(&c.FlushFrequency, logFlushFreqFlagName, logFlushFreq, "Maximum number of seconds between log flushes")
 	fs.VarP(&c.Verbosity, "v", "v", "number for the log level verbosity")
 	fs.Var(&c.VModule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging (only works for text log format)")
-	fs.BoolVar(&c.Sanitization, "experimental-logging-sanitization", c.Sanitization, `[Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
-Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
 
 	// JSON options. We only register them if "json" is a valid format. The
 	// config file API however always has them.

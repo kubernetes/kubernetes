@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/user"
 	"sync"
 	"time"
@@ -55,7 +54,7 @@ const (
 // before test running so that the image pulling won't fail in actual test.
 var NodePrePullImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
-	"google/cadvisor:latest",
+	"gcr.io/cadvisor/cadvisor:v0.43.0",
 	"k8s.gcr.io/stress:v1",
 	busyboxImage,
 	"k8s.gcr.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
@@ -117,21 +116,6 @@ type puller interface {
 	Name() string
 }
 
-type dockerPuller struct {
-}
-
-func (dp *dockerPuller) Name() string {
-	return "docker"
-}
-
-func (dp *dockerPuller) Pull(image string) ([]byte, error) {
-	// TODO(random-liu): Use docker client to get rid of docker binary dependency.
-	if exec.Command("docker", "inspect", "--type=image", image).Run() != nil {
-		return exec.Command("docker", "pull", image).CombinedOutput()
-	}
-	return nil, nil
-}
-
 type remotePuller struct {
 	imageService internalapi.ImageManagerService
 }
@@ -141,8 +125,8 @@ func (rp *remotePuller) Name() string {
 }
 
 func (rp *remotePuller) Pull(image string) ([]byte, error) {
-	imageStatus, err := rp.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image})
-	if err == nil && imageStatus != nil {
+	resp, err := rp.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image}, false)
+	if err == nil && resp.GetImage() != nil {
 		return nil, nil
 	}
 	_, err = rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil, nil)
@@ -150,20 +134,13 @@ func (rp *remotePuller) Pull(image string) ([]byte, error) {
 }
 
 func getPuller() (puller, error) {
-	runtime := framework.TestContext.ContainerRuntime
-	switch runtime {
-	case "docker":
-		return &dockerPuller{}, nil
-	case "remote":
-		_, is, err := getCRIClient()
-		if err != nil {
-			return nil, err
-		}
-		return &remotePuller{
-			imageService: is,
-		}, nil
+	_, is, err := getCRIClient()
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("can't prepull images, unknown container runtime %q", runtime)
+	return &remotePuller{
+		imageService: is,
+	}, nil
 }
 
 // PrePullAllImages pre-fetches all images tests depend on so that we don't fail in an actual test.

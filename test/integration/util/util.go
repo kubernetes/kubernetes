@@ -40,8 +40,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	pvutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
@@ -120,6 +120,7 @@ func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {
 	pvInformer := informerFactory.Core().V1().PersistentVolumes()
 
 	syncPV := func(obj *v1.PersistentVolume) {
+		ctx := context.Background()
 		if obj.Spec.ClaimRef != nil {
 			claimRef := obj.Spec.ClaimRef
 			pvc, err := clientSet.CoreV1().PersistentVolumeClaims(claimRef.Namespace).Get(ctx, claimRef.Name, metav1.GetOptions{})
@@ -370,7 +371,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 // WaitForSchedulerCacheCleanup waits for cleanup of scheduler's cache to complete
 func WaitForSchedulerCacheCleanup(sched *scheduler.Scheduler, t *testing.T) {
 	schedulerCacheIsEmpty := func() (bool, error) {
-		dump := sched.SchedulerCache.Dump()
+		dump := sched.Cache.Dump()
 
 		return len(dump.Nodes) == 0 && len(dump.AssumedPods) == 0, nil
 	}

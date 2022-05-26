@@ -561,7 +561,7 @@ func WaitForPodFailedReason(c clientset.Interface, pod *v1.Pod, reason string, t
 		return false, nil
 	})
 	if waitErr != nil {
-		return fmt.Errorf("error waiting for pod SysctlForbidden status: %v", waitErr)
+		return fmt.Errorf("error waiting for pod failure status: %v", waitErr)
 	}
 	return nil
 }

@@ -178,6 +178,10 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
+func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
 // GetResetFields implements rest.ResetFieldsStrategy
 func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
@@ -242,6 +246,17 @@ func (r *REST) defaultOnReadService(service *api.Service) {
 
 	// Set ipFamilies and ipFamilyPolicy if needed.
 	r.defaultOnReadIPFamilies(service)
+
+	// We unintentionally defaulted internalTrafficPolicy when it's not needed
+	// for the ExternalName type. It's too late to change the field in storage,
+	// but we can drop the field when read.
+	defaultOnReadInternalTrafficPolicy(service)
+}
+
+func defaultOnReadInternalTrafficPolicy(service *api.Service) {
+	if service.Spec.Type == api.ServiceTypeExternalName {
+		service.Spec.InternalTrafficPolicy = nil
+	}
 }
 
 func (r *REST) defaultOnReadIPFamilies(service *api.Service) {

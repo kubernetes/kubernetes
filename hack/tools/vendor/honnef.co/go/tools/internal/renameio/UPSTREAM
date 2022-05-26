@@ -1,0 +1,2 @@
+This package is a copy of cmd/go/internal/renameio.
+The upstream package no longer exists, as the Go project replaced all of its uses with the lockedfile package.

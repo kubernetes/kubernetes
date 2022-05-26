@@ -1201,6 +1201,24 @@ func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
 			},
 			want: true,
 		},
+		{
+			name: "driverPolicy is ReadWriteOnceWithFSTypeFSGroupPolicy with CSI inline volume",
+			args: args{
+				fsGroup:      new(int64),
+				fsType:       "ext4",
+				driverPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+			},
+			fields: fields{
+				spec: volume.NewSpecFromVolume(&api.Volume{
+					VolumeSource: api.VolumeSource{
+						CSI: &api.CSIVolumeSource{
+							Driver: testDriver,
+						},
+					},
+				}),
+			},
+			want: true,
+		},
 	}
 
 	for _, tt := range tests {

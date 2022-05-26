@@ -33,7 +33,6 @@ import (
 	core "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
@@ -138,13 +137,13 @@ func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string,
 	allErrs := field.ErrorList{}
 
 	if p := annotations[v1.AppArmorBetaDefaultProfileAnnotationKey]; p != "" {
-		if err := apparmor.ValidateProfileFormat(p); err != nil {
+		if err := apivalidation.ValidateAppArmorProfileFormat(p); err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath.Key(v1.AppArmorBetaDefaultProfileAnnotationKey), p, err.Error()))
 		}
 	}
 	if allowed := annotations[v1.AppArmorBetaAllowedProfilesAnnotationKey]; allowed != "" {
 		for _, p := range strings.Split(allowed, ",") {
-			if err := apparmor.ValidateProfileFormat(p); err != nil {
+			if err := apivalidation.ValidateAppArmorProfileFormat(p); err != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath.Key(v1.AppArmorBetaAllowedProfilesAnnotationKey), allowed, err.Error()))
 			}
 		}

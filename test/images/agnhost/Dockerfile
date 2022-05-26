@@ -38,7 +38,8 @@ RUN tar -xzvf /coredns.tgz && rm -f /coredns.tgz
 # PORT 8080 needed by: netexec, nettest, resource-consumer, resource-consumer-controller
 # PORT 8081 needed by: netexec
 # PORT 9376 needed by: serve-hostname
-EXPOSE 80 8080 8081 9376
+# PORT 5000 needed by: grpc-health-checking
+EXPOSE 80 8080 8081 9376 5000
 
 # from netexec
 RUN mkdir /uploads

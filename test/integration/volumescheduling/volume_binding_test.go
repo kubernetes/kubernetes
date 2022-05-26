@@ -31,19 +31,15 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/workqueue"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -704,13 +700,6 @@ func TestPVAffinityConflict(t *testing.T) {
 }
 
 func TestVolumeProvision(t *testing.T) {
-	t.Run("with CSIStorageCapacity", func(t *testing.T) { testVolumeProvision(t, true) })
-	t.Run("without CSIStorageCapacity", func(t *testing.T) { testVolumeProvision(t, false) })
-}
-
-func testVolumeProvision(t *testing.T, storageCapacity bool) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, storageCapacity)()
-
 	config := setupCluster(t, "volume-scheduling", 1, 0, 0)
 	defer config.teardown()
 
@@ -859,8 +848,6 @@ func testVolumeProvision(t *testing.T, storageCapacity bool) {
 
 // TestCapacity covers different scenarios involving CSIStorageCapacity objects.
 func TestCapacity(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, true)()
-
 	config := setupCluster(t, "volume-scheduling", 1, 0, 0)
 	defer config.teardown()
 
@@ -941,8 +928,8 @@ func TestCapacity(t *testing.T) {
 
 		// Create CSIStorageCapacity
 		if test.haveCapacity {
-			if _, err := config.client.StorageV1beta1().CSIStorageCapacities("default").Create(context.TODO(),
-				&storagev1beta1.CSIStorageCapacity{
+			if _, err := config.client.StorageV1().CSIStorageCapacities("default").Create(context.TODO(),
+				&storagev1.CSIStorageCapacity{
 					ObjectMeta: metav1.ObjectMeta{
 						GenerateName: "foo-",
 					},
@@ -1155,7 +1142,7 @@ func deleteTestObjects(client clientset.Interface, ns string, option metav1.Dele
 	client.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 	client.StorageV1().StorageClasses().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 	client.StorageV1().CSIDrivers().DeleteCollection(context.TODO(), option, metav1.ListOptions{})
-	client.StorageV1beta1().CSIStorageCapacities("default").DeleteCollection(context.TODO(), option, metav1.ListOptions{})
+	client.StorageV1().CSIStorageCapacities("default").DeleteCollection(context.TODO(), option, metav1.ListOptions{})
 }
 
 func makeStorageClass(name string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {

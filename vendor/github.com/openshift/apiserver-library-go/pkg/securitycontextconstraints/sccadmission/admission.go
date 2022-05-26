@@ -142,9 +142,12 @@ var standardSCCNames = sets.NewString(
 	"hostaccess",
 	"hostmount-anyuid",
 	"hostnetwork",
+	"hostnetwork-v2",
 	"nonroot",
+	"nonroot-v2",
 	"privileged",
 	"restricted",
+	"restricted-v2",
 )
 
 func requireStandardSCCs(sccs []*securityv1.SecurityContextConstraints, err error) error {
@@ -384,14 +387,18 @@ func shouldIgnore(a admission.Attributes) (bool, error) {
 		return true, nil
 	}
 
-	_, ok := a.GetObject().(*coreapi.Pod)
+	pod, ok := a.GetObject().(*coreapi.Pod)
 	// if we can't convert then fail closed since we've already checked that this is supposed to be a pod object.
 	// this shouldn't normally happen during admission but could happen if an integrator passes a versioned
 	// pod object rather than an internal object.
 	if !ok {
 		return false, admission.NewForbidden(a, fmt.Errorf("object was marked as kind pod but was unable to be converted: %v", a.GetObject()))
 	}
-
+	// ignore all Windows pods
+	// TODO: This can be expanded to other OS'es later if needed
+	if pod.Spec.OS != nil && pod.Spec.OS.Name == coreapi.Windows {
+		return true, nil
+	}
 	// if this is an update, see if we are only updating the ownerRef.  Garbage collection does this
 	// and we should allow it in general, since you had the power to update and the power to delete.
 	// The worst that happens is that you delete something, but you aren't controlling the privileged object itself

@@ -95,7 +95,7 @@ It can be used by anyone, but if you need to build your own, you can read more a
 
 For Windows, in order to spawn process-isolated containers, the container OS version should closely match
 the host OS version. For this reason, we build test images for different Windows OS Versions: 1809 (Windows Server 2019),
-2004, 20H2, ltsc2022. In order add support for a new Windows OS version, a new entry for that OS version will have
+20H2, ltsc2022. In order to add support for a new Windows OS version, a new entry for that OS version will have
 to be first added to the `windows-servercore-cache` and `busybox` images, followed by the rest of the images.
 These images are then used by the rest of the E2E test images as a cache / base image.
 
@@ -182,7 +182,8 @@ After all the above has been done, run the [desired tests](https://github.com/ku
 
 Now that you have made the changes and tested locally, you are ready to share those changes.  This is a multi step process:
 
-1. Open a pull request with your changes to the test image (the new functionality and version bump). Go through the review process and merge the pull request. See this [pull request](https://github.com/kubernetes/kubernetes/pull/99860/files) for an example.
+1. In the same pull request containing your proposed changes, bump the version of the image in question. Each test image has
+a VERSION file in its directory. For example, the agnhost image's VERSION file is in `test/images/agnhost/VERSION`.
 2. After the pull request has been approved and merged, an **automatic** postsubmit
 job will then be triggered which will build the images that were changed.  For example, if a change was
 made in `test/images/agnhost`, then the job [post-kubernetes-push-e2e-agnhost-test-images](

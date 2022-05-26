@@ -141,6 +141,10 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
 }
 
+func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
+}
+
 // Implement ShortNamesProvider
 var _ rest.ShortNamesProvider = &REST{}
 
@@ -209,6 +213,10 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 		return nil, false, errors.NewBadRequest(fmt.Sprintf("%v", err))
 	}
 	return newScale, false, err
+}
+
+func (r *ScaleREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
 func toScaleCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {
@@ -286,7 +294,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		if _, ok := replicasPathInStatefulSet[requestGroupVersion.String()]; ok {
 			groupVersion = requestGroupVersion
 		} else {
-			klog.Fatal("Unrecognized group/version in request info %q", requestGroupVersion.String())
+			klog.Fatalf("Unrecognized group/version in request info %q", requestGroupVersion.String())
 		}
 	}
 

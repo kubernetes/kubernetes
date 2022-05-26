@@ -66,6 +66,8 @@ type CgroupManager interface {
 	Destroy(*CgroupConfig) error
 	// Update cgroup configuration.
 	Update(*CgroupConfig) error
+	// Validate checks if the cgroup is valid
+	Validate(name CgroupName) error
 	// Exists checks if the cgroup already exists
 	Exists(name CgroupName) bool
 	// Name returns the literal cgroupfs name on the host after any driver specific conversions.

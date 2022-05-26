@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: Node
+metadata:
+  annotations:
+    "9": "10"
+  clusterName: "15"
+  creationTimestamp: "2061-09-19T18:13:36Z"
+  deletionGracePeriodSeconds: -4955867275792137171
+  finalizers:
+  - "14"
+  generateName: "3"
+  generation: 8071137005907523419
+  labels:
+    "7": "8"
+  managedFields:
+  - apiVersion: "17"
+    fieldsType: "18"
+    manager: "16"
+    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
+  name: "2"
+  namespace: "4"
+  ownerReferences:
+  - apiVersion: "11"
+    blockOwnerDeletion: true
+    controller: false
+    kind: "12"
+    name: "13"
+    uid: Dz廔ȇ{sŊƏp
+  resourceVersion: "11042405498087606203"
+  selfLink: "5"
+  uid: "7"
+spec:
+  configSource:
+    configMap:
+      kubeletConfigKey: "28"
+      name: "26"
+      namespace: "25"
+      resourceVersion: "27"
+      uid: Ă凗蓏Ŋ蛊ĉy
+  externalID: "29"
+  podCIDR: "20"
+  podCIDRs:
+  - "21"
+  providerID: "22"
+  taints:
+  - effect: Hr鯹)晿<o,c鮽ort昍řČ扷5Ɨ
+    key: "23"
+    value: "24"
+status:
+  addresses:
+  - address: "32"
+    type: OŖ樅尷
+  allocatable:
+    峅x: "826"
+  capacity:
+    縕>Ž燹憍峕?狱³-Ǐ忄*齧獚敆Ȏț: "2"
+  conditions:
+  - lastHeartbeatTime: "2339-08-25T14:46:58Z"
+    lastTransitionTime: "2681-06-13T05:43:15Z"
+    message: "31"
+    reason: "30"
+    status: P$Iņɖ橙9ȫŚʒ
+    type: ""
+  config:
+    active:
+      configMap:
+        kubeletConfigKey: "52"
+        name: "50"
+        namespace: "49"
+        resourceVersion: "51"
+        uid: 譋娲瘹ɭȊɚɎ(
+    assigned:
+      configMap:
+        kubeletConfigKey: "48"
+        name: "46"
+        namespace: "45"
+        resourceVersion: "47"
+        uid: £趕ã/鈱$-议}ȧ外ĺ
+    error: "57"
+    lastKnownGood:
+      configMap:
+        kubeletConfigKey: "56"
+        name: "54"
+        namespace: "53"
+        resourceVersion: "55"
+        uid: ėf倐ȓ圬剴扲ȿQZ{ʁgɸ
+  daemonEndpoints:
+    kubeletEndpoint:
+      Port: -1579157235
+  images:
+  - names:
+    - "43"
+    sizeBytes: 9177598355370950419
+  nodeInfo:
+    architecture: "42"
+    bootID: "35"
+    containerRuntimeVersion: "38"
+    kernelVersion: "36"
+    kubeProxyVersion: "40"
+    kubeletVersion: "39"
+    machineID: "33"
+    operatingSystem: "41"
+    osImage: "37"
+    systemUUID: "34"
+  phase: '%a鯿rŎǀ朲^苣f'
+  volumesAttached:
+  - devicePath: "44"
+    name: ȭ%ƎÜ掸8½£.vǴʌ鴜Ł%ŨȈ
+  volumesInUse:
+  - üA謥ǣ偐圠=l畣潁谯耨V6&]鴍Ɋ

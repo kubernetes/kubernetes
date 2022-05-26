@@ -314,6 +314,7 @@ var map_BuildVolumeSource = map[string]string{
 	"type":      "type is the BuildVolumeSourceType for the volume source. Type must match the populated volume source. Valid types are: Secret, ConfigMap",
 	"secret":    "secret represents a Secret that should populate this volume. More info: https://kubernetes.io/docs/concepts/storage/volumes#secret",
 	"configMap": "configMap represents a ConfigMap that should populate this volume",
+	"csi":       "csi represents ephemeral storage provided by external CSI drivers which support this capability",
 }
 
 func (BuildVolumeSource) SwaggerDoc() map[string]string {

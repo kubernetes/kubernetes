@@ -102,6 +102,12 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 
 	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
 	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, newPath.Child("ShowHiddenMetricsForVersion"))...)
+	if config.DetectLocalMode == kubeproxyconfig.LocalModeBridgeInterface {
+		allErrs = append(allErrs, validateInterface(config.DetectLocal.BridgeInterface, newPath.Child("InterfaceName"))...)
+	}
+	if config.DetectLocalMode == kubeproxyconfig.LocalModeInterfaceNamePrefix {
+		allErrs = append(allErrs, validateInterface(config.DetectLocal.InterfaceNamePrefix, newPath.Child("InterfacePrefix"))...)
+	}
 
 	return allErrs
 }
@@ -315,5 +321,13 @@ func validateShowHiddenMetricsVersion(version string, fldPath *field.Path) field
 		allErrs = append(allErrs, field.Invalid(fldPath, version, e.Error()))
 	}
 
+	return allErrs
+}
+
+func validateInterface(iface string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(iface) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, iface, "must not be empty"))
+	}
 	return allErrs
 }

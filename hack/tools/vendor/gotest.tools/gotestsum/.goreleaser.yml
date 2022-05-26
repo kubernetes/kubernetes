@@ -1,0 +1,23 @@
+
+project_name: gotestsum
+
+release:
+  github:
+    owner: gotestyourself
+    name: gotestsum
+
+builds:
+  - binary: gotestsum
+    goos:
+      - darwin
+      - windows
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    env: [CGO_ENABLED=0]
+    ldflags: ["-s -w -X gotest.tools/gotestsum/cmd.version={{.Version}}"]
+
+checksum:
+  name_template: '{{ .ProjectName }}-{{ .Version }}-checksums.txt'

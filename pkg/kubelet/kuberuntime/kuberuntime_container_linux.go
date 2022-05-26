@@ -24,7 +24,6 @@ import (
 	"time"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -139,11 +138,11 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 	// API server does this for new containers, but we repeat this logic in Kubelet
 	// for containers running on existing Kubernetes clusters.
 	if cpuRequest.IsZero() && !cpuLimit.IsZero() {
-		cpuShares = milliCPUToShares(cpuLimit.MilliValue())
+		cpuShares = int64(cm.MilliCPUToShares(cpuLimit.MilliValue()))
 	} else {
-		// if cpuRequest.Amount is nil, then milliCPUToShares will return the minimal number
+		// if cpuRequest.Amount is nil, then MilliCPUToShares will return the minimal number
 		// of CPU shares.
-		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
+		cpuShares = int64(cm.MilliCPUToShares(cpuRequest.MilliValue()))
 	}
 	resources.CpuShares = cpuShares
 	if memLimit != 0 {
@@ -170,7 +169,7 @@ func GetHugepageLimitsFromResources(resources v1.ResourceRequirements) []*runtim
 	var hugepageLimits []*runtimeapi.HugepageLimit
 
 	// For each page size, limit to 0.
-	for _, pageSize := range cgroupfs.HugePageSizes {
+	for _, pageSize := range libcontainercgroups.HugePageSizes() {
 		hugepageLimits = append(hugepageLimits, &runtimeapi.HugepageLimit{
 			PageSize: pageSize,
 			Limit:    uint64(0),

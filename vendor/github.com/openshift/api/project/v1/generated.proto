@@ -10,7 +10,7 @@ import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "github.com/openshift/api/project/v1";
 
 // Projects are the unit of isolation and collaboration in OpenShift. A project has one or more members,
 // a quota on the resources that the project may consume, and the security controls on the resources in

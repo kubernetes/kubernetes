@@ -9,7 +9,7 @@ import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "github.com/openshift/api/oauth/v1";
 
 // ClusterRoleScopeRestriction describes restrictions on cluster role scopes
 message ClusterRoleScopeRestriction {

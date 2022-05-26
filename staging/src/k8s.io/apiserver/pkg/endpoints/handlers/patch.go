@@ -124,8 +124,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		}
 		options.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("PatchOptions"))
 
-		ae := audit.AuditEventFrom(ctx)
-		admit = admission.WithAudit(admit, ae)
+		admit = admission.WithAudit(admit)
 
 		audit.LogRequestPatch(req.Context(), patchBytes)
 		trace.Step("Recorded the audit event")
@@ -236,16 +235,13 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		}
 		trace.Step("Object stored in database")
 
-		if err := setObjectSelfLink(ctx, result, req, scope.Namer); err != nil {
-			scope.err(err, w, req)
-			return
-		}
-		trace.Step("Self-link added")
-
 		status := http.StatusOK
 		if wasCreated {
 			status = http.StatusCreated
 		}
+
+		trace.Step("About to write a response")
+		defer trace.Step("Writing http response done")
 		transformResponseObject(ctx, scope, trace, req, w, status, outputMediaType, result)
 	}
 }
@@ -577,6 +573,14 @@ func (p *patcher) applyPatch(ctx context.Context, _, currentObject runtime.Objec
 			return nil, err
 		}
 		return nil, errors.NewConflict(p.resource.GroupResource(), p.name, fmt.Errorf("uid mismatch: the provided object specified uid %s, and no existing object was found", accessor.GetUID()))
+	}
+
+	// if this object supports namespace info
+	if objectMeta, err := meta.Accessor(objToUpdate); err == nil {
+		// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
+		if err := rest.EnsureObjectNamespaceMatchesRequestNamespace(rest.ExpectedNamespaceForResource(p.namespace, p.resource), objectMeta); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := checkName(objToUpdate, p.name, p.namespace, p.namer); err != nil {

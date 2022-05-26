@@ -75,10 +75,6 @@ func EnforceDataSourceBackwardsCompatibility(pvcSpec, oldPVCSpec *core.Persisten
 }
 
 func DropDisabledFieldsFromStatus(pvc, oldPVC *core.PersistentVolumeClaim) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) && oldPVC.Status.Conditions == nil {
-		pvc.Status.Conditions = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
 		if !allocatedResourcesInUse(oldPVC) {
 			pvc.Status.AllocatedResources = nil

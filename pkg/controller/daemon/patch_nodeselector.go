@@ -39,6 +39,17 @@ func NewNodeSelectorAwareDaemonSetsController(openshiftDefaultNodeSelectorString
 	return controller, nil
 }
 
+func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *appsv1.DaemonSet) (bool, bool) {
+	shouldRun, shouldContinueRunning := NodeShouldRunDaemonPod(node, ds)
+	if shouldRun && shouldContinueRunning {
+		if matches, matchErr := dsc.namespaceNodeSelectorMatches(node, ds); !matches || matchErr != nil {
+			return false, false
+		}
+	}
+
+	return shouldRun, shouldContinueRunning
+}
+
 func (dsc *DaemonSetsController) namespaceNodeSelectorMatches(node *v1.Node, ds *appsv1.DaemonSet) (bool, error) {
 	if dsc.namespaceLister == nil {
 		return true, nil

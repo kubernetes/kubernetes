@@ -1447,6 +1447,70 @@ func Test_MarkVolumeAsUncertain(t *testing.T) {
 	verifyAttachedVolume(t, attachedVolumes, volumeName, string(volumeName), nodeName, "", true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 }
 
+// Calls AddVolumeNode() once with attached set to true.
+// Verifies GetVolumesToReportAttachedForNode has an update for the node.
+// Call GetVolumesToReportAttachedForNode a second time for the node, verify it does not report
+// an update is needed any more
+// Then calls RemoveVolumeFromReportAsAttached()
+// Verifies GetVolumesToReportAttachedForNode reports an update is needed
+func Test_GetVolumesToReportAttachedForNode_Positive(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld(volumePluginMgr)
+	volumeName := v1.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+
+	nodeName := types.NodeName("node-name")
+	devicePath := "fake/device/path"
+
+	// Act
+	generatedVolumeName, err := asw.AddVolumeNode(volumeName, volumeSpec, nodeName, devicePath, true)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	needsUpdate, attachedVolumes := asw.GetVolumesToReportAttachedForNode(nodeName)
+	if !needsUpdate {
+		t.Fatalf("GetVolumesToReportAttachedForNode_Positive_NewVolumeNewNodeWithTrueAttached failed. Actual: <node %q does not need an update> Expect: <node exists in the reportedAsAttached map and needs an update", nodeName)
+	}
+	if len(attachedVolumes) != 1 {
+		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
+	}
+
+	needsUpdate, _ = asw.GetVolumesToReportAttachedForNode(nodeName)
+	if needsUpdate {
+		t.Fatalf("GetVolumesToReportAttachedForNode_Positive_NewVolumeNewNodeWithTrueAttached failed. Actual: <node %q needs an update> Expect: <node exists in the reportedAsAttached map and does not need an update", nodeName)
+	}
+
+	removeVolumeDetachErr := asw.RemoveVolumeFromReportAsAttached(generatedVolumeName, nodeName)
+	if removeVolumeDetachErr != nil {
+		t.Fatalf("RemoveVolumeFromReportAsAttached failed. Expected: <no error> Actual: <%v>", removeVolumeDetachErr)
+	}
+
+	needsUpdate, attachedVolumes = asw.GetVolumesToReportAttachedForNode(nodeName)
+	if !needsUpdate {
+		t.Fatalf("GetVolumesToReportAttachedForNode_Positive_NewVolumeNewNodeWithTrueAttached failed. Actual: <node %q does not need an update> Expect: <node exists in the reportedAsAttached map and needs an update", nodeName)
+	}
+	if len(attachedVolumes) != 0 {
+		t.Fatalf("len(attachedVolumes) Expected: <0> Actual: <%v>", len(attachedVolumes))
+	}
+}
+
+// Verifies GetVolumesToReportAttachedForNode reports no update needed for an unknown node.
+func Test_GetVolumesToReportAttachedForNode_UnknownNode(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld(volumePluginMgr)
+	nodeName := types.NodeName("node-name")
+
+	needsUpdate, _ := asw.GetVolumesToReportAttachedForNode(nodeName)
+	if needsUpdate {
+		t.Fatalf("GetVolumesToReportAttachedForNode_UnknownNode failed. Actual: <node %q needs an update> Expect: <node does not exist in the reportedAsAttached map and does not need an update", nodeName)
+	}
+}
+
 func verifyAttachedVolume(
 	t *testing.T,
 	attachedVolumes []AttachedVolume,

@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -507,9 +506,7 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
 }
 
 // SystemVerificationCheck defines struct used for running the system verification node check in test/e2e_node/system
-type SystemVerificationCheck struct {
-	IsDocker bool
-}
+type SystemVerificationCheck struct{}
 
 // Name will return SystemVerification as name for SystemVerificationCheck
 func (SystemVerificationCheck) Name() string {
@@ -529,11 +526,6 @@ func (sysver SystemVerificationCheck) Check() (warnings, errorList []error) {
 	// All the common validators we'd like to run:
 	var validators = []system.Validator{
 		&system.KernelValidator{Reporter: reporter}}
-
-	// run the docker validator only with docker runtime
-	if sysver.IsDocker {
-		validators = append(validators, &system.DockerValidator{Reporter: reporter})
-	}
 
 	if runtime.GOOS == "linux" {
 		//add linux validators
@@ -748,7 +740,7 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
 func (evc ExternalEtcdVersionCheck) configRootCAs(config *tls.Config) (*tls.Config, error) {
 	var CACertPool *x509.CertPool
 	if evc.Etcd.External.CAFile != "" {
-		CACert, err := ioutil.ReadFile(evc.Etcd.External.CAFile)
+		CACert, err := os.ReadFile(evc.Etcd.External.CAFile)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't load external etcd's server certificate %s", evc.Etcd.External.CAFile)
 		}
@@ -941,7 +933,7 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
 		if ip := netutils.ParseIPSloppy(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
-			if netutils.IsIPv6(ip) {
+			if netutils.IsIPv6(ip) && runtime.GOOS == "linux" {
 				checks = append(checks,
 					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 					FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
@@ -1011,7 +1003,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 			}
 		}
 	}
-	if addIPv6Checks {
+	if addIPv6Checks && runtime.GOOS == "linux" {
 		checks = append(checks,
 			FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 			FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
@@ -1025,26 +1017,19 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 // kubeadm init and join commands
 func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kubeadmapi.NodeRegistrationOptions, checks []Checker) []Checker {
 	containerRuntime, err := utilruntime.NewContainerRuntime(execer, nodeReg.CRISocket)
-	isDocker := false
 	if err != nil {
-		fmt.Printf("[preflight] WARNING: Couldn't create the interface used for talking to the container runtime: %v\n", err)
+		klog.Warningf("[preflight] WARNING: Couldn't create the interface used for talking to the container runtime: %v\n", err)
 	} else {
 		checks = append(checks, ContainerRuntimeCheck{runtime: containerRuntime})
-		if containerRuntime.IsDocker() {
-			isDocker = true
-			checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
-		}
 	}
 
 	// non-windows checks
 	if runtime.GOOS == "linux" {
-		if !isDocker {
-			checks = append(checks, InPathCheck{executable: "crictl", mandatory: true, exec: execer})
-		}
 		checks = append(checks,
 			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 			FileContentCheck{Path: ipv4Forward, Content: []byte{'1'}},
 			SwapCheck{},
+			InPathCheck{executable: "crictl", mandatory: true, exec: execer},
 			InPathCheck{executable: "conntrack", mandatory: true, exec: execer},
 			InPathCheck{executable: "ip", mandatory: true, exec: execer},
 			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
@@ -1057,7 +1042,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 			InPathCheck{executable: "touch", mandatory: false, exec: execer})
 	}
 	checks = append(checks,
-		SystemVerificationCheck{IsDocker: isDocker},
+		SystemVerificationCheck{},
 		HostnameCheck{nodeName: nodeReg.Name},
 		KubeletVersionCheck{KubernetesVersion: k8sVersion, exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},

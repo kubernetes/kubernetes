@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 )
@@ -121,7 +120,7 @@ func newWebhook(t *testing.T, endpoint string, groupVersion schema.GroupVersion)
 }
 
 func TestWebhook(t *testing.T) {
-	versions := []schema.GroupVersion{auditv1.SchemeGroupVersion, auditv1beta1.SchemeGroupVersion}
+	versions := []schema.GroupVersion{auditv1.SchemeGroupVersion}
 	for _, version := range versions {
 		gotEvents := false
 

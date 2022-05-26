@@ -61,6 +61,17 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+const (
+	UnprivilegedUserToken = "unprivileged-user"
+)
+
+// MinVerbosity determines the minimum klog verbosity when running tests that
+// involve the apiserver.  This overrides the -v value from the command line,
+// i.e. -v=0 has no effect when MinVerbosity is 4 (the default).  Tests can opt
+// out of this by setting MinVerbosity to zero before starting the control
+// plane or choose some different minimum verbosity.
+var MinVerbosity = 4
+
 // Config is a struct of configuration directives for NewControlPlaneComponents.
 type Config struct {
 	// If nil, a default is used, partially filled configs will not get populated.
@@ -80,11 +91,16 @@ func (alwaysAllow) Authorize(ctx context.Context, requestAttributes authorizer.A
 	return authorizer.DecisionAllow, "always allow", nil
 }
 
-// alwaysEmpty simulates "no authentication" for old tests
-func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
+// unsecuredUser simulates requests to the unsecured endpoint for old tests
+func unsecuredUser(req *http.Request) (*authauthenticator.Response, bool, error) {
+	auth := req.Header.Get("Authorization")
+	if len(auth) != 0 {
+		return nil, false, nil
+	}
 	return &authauthenticator.Response{
 		User: &user.DefaultInfo{
-			Name: "",
+			Name:   "system:unsecured",
+			Groups: []string{user.SystemPrivilegedGroup, user.AllAuthenticated},
 		},
 	}, true, nil
 }
@@ -125,16 +141,35 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 	return openAPIConfig
 }
 
+// DefaultOpenAPIV3Config returns an openapicommon.Config initialized to default values.
+func DefaultOpenAPIV3Config() *openapicommon.Config {
+	openAPIConfig := genericapiserver.DefaultOpenAPIV3Config(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
+	openAPIConfig.Info = &spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:   "Kubernetes",
+			Version: "unversioned",
+		},
+	}
+	openAPIConfig.DefaultResponse = &spec.Response{
+		ResponseProps: spec.ResponseProps{
+			Description: "Default Response.",
+		},
+	}
+	openAPIConfig.GetDefinitions = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(openapi.GetOpenAPIDefinitions)
+
+	return openAPIConfig
+}
+
 // startAPIServerOrDie starts a kubernetes API server and an httpserver to handle api requests
 func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	var m *controlplane.Instance
 	var s *httptest.Server
 
-	// Ensure we log at least level 4
+	// Ensure we log at least at the desired level
 	v := flag.Lookup("v").Value
 	level, _ := strconv.Atoi(v.String())
-	if level < 4 {
-		v.Set("4")
+	if level < MinVerbosity {
+		v.Set(strconv.Itoa(MinVerbosity))
 	}
 
 	if incomingServer != nil {
@@ -171,12 +206,17 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
 		Name:   user.APIServerUser,
 		UID:    uuid.New().String(),
-		Groups: []string{user.SystemPrivilegedGroup},
+		Groups: []string{user.SystemPrivilegedGroup, user.AllAuthenticated},
+	}
+	tokens[UnprivilegedUserToken] = &user.DefaultInfo{
+		Name:   "unprivileged",
+		UID:    uuid.New().String(),
+		Groups: []string{user.AllAuthenticated},
 	}
 
 	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens, controlPlaneConfig.GenericConfig.Authentication.APIAudiences)
 	if controlPlaneConfig.GenericConfig.Authentication.Authenticator == nil {
-		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
+		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(unsecuredUser))
 	} else {
 		controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, controlPlaneConfig.GenericConfig.Authentication.Authenticator)
 	}
@@ -325,7 +365,8 @@ func NewControlPlaneConfigWithOptions(opts *ControlPlaneConfigOptions) *controlp
 
 	// TODO: get rid of these tests or port them to secure serving
 	genericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
-
+	// if using endpoint reconciler the service subnet IP family must match the Public address
+	genericConfig.PublicAddress = netutils.ParseIPSloppy("10.1.1.1")
 	err = etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
 	if err != nil {
 		panic(err)

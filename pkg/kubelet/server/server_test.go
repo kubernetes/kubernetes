@@ -863,7 +863,7 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?c=ls&c=-a&" + api.ExecStdinParam + "=1"
 
-	upgradeRoundTripper := spdy.NewRoundTripper(nil, true, true)
+	upgradeRoundTripper := spdy.NewRoundTripper(nil)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	resp, err := c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
@@ -1019,7 +1019,7 @@ func testExecAttach(t *testing.T, verb string) {
 				upgradeRoundTripper httpstream.UpgradeRoundTripper
 				c                   *http.Client
 			)
-			upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
+			upgradeRoundTripper = spdy.NewRoundTripper(nil)
 			c = &http.Client{Transport: upgradeRoundTripper}
 
 			resp, err = c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
@@ -1115,7 +1115,7 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/portForward/" + podNamespace + "/" + podName
 
-	upgradeRoundTripper := spdy.NewRoundTripper(nil, true, true)
+	upgradeRoundTripper := spdy.NewRoundTripper(nil)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
 	req := makeReq(t, "POST", url, "portforward.k8s.io")
@@ -1214,7 +1214,7 @@ func TestServePortForward(t *testing.T) {
 				c                   *http.Client
 			)
 
-			upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
+			upgradeRoundTripper = spdy.NewRoundTripper(nil)
 			c = &http.Client{Transport: upgradeRoundTripper}
 
 			req := makeReq(t, "POST", url, "portforward.k8s.io")

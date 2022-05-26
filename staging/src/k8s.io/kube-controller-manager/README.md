@@ -23,3 +23,4 @@ Code changes are made in that location, merged into `k8s.io/kubernetes` and late
  1. Directly modify any files under `pkg` in this repo.  Those are driven from `k8s.io/kubernetes/staging/src/k8s.io/kube-controller-manager`.
  2. Expect compatibility.  This repo is changing quickly in direct support of
     Kubernetes and the kube-controller-manager API.
+

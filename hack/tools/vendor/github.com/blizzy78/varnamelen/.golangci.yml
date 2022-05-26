@@ -1,0 +1,55 @@
+linters:
+  enable:
+    - asciicheck
+    - bodyclose
+    - cyclop
+    - durationcheck
+    - errname
+    - errorlint
+    - exportloopref
+    - forcetypeassert
+    - gocognit
+    - gocritic
+    - goerr113
+    - gofmt
+    - goprintffuncname
+    - gosec
+    - ifshort
+    - nakedret
+    - nestif
+    - nilerr
+    - noctx
+    - nolintlint
+    - prealloc
+    - predeclared
+    - promlinter
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - stylecheck
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - varnamelen
+    - wastedassign
+    - wrapcheck
+    - wsl
+
+linters-settings:
+  gocognit:
+    min-complexity: 15
+  nakedret:
+    max-func-lines: 0
+  nolintlint:
+    allow-unused: false
+    allow-leading-space: false
+    require-explanation: true
+    require-specific: true
+  unused:
+    go: 1.16
+  varnamelen:
+    check-return: true
+    ignore-type-assert-ok: true
+    ignore-map-index-ok: true
+    ignore-chan-recv-ok: true

@@ -72,18 +72,6 @@ run_kubectl_create_error_tests() {
   # Passing no arguments to create is an error
   ! kubectl create || exit 1
 
-  ## kubectl create should not panic on empty string lists in a template
-  ERROR_FILE="${KUBE_TEMP}/validation-error"
-  kubectl create -f hack/testdata/invalid-rc-with-empty-args.yaml "${kube_flags[@]}" 2> "${ERROR_FILE}" || true
-  # Post-condition: should get an error reporting the empty string
-  if grep -q "unknown object type \"nil\" in ReplicationController" "${ERROR_FILE}"; then
-    kube::log::status "\"kubectl create with empty string list returns error as expected: $(cat "${ERROR_FILE}")"
-  else
-    kube::log::status "\"kubectl create with empty string list returns unexpected error or non-error: $(cat "${ERROR_FILE}")"
-    exit 1
-  fi
-  rm "${ERROR_FILE}"
-
   # Posting a pod to namespaces should fail.  Also tests --raw forcing the post location
   grep -q 'the object provided is unrecognized (must be of type Namespace)' <<< "$( kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml --v=8 2>&1 )"
 
@@ -149,6 +137,86 @@ run_kubectl_create_kustomization_directory_tests() {
 
   # cleanup
   kubectl delete -k hack/testdata/kustomize
+
+  set +o nounset
+  set +o errexit
+}
+
+has_one_of_error_message() {
+  local message=$1
+  local match1=$2
+  local match2=$3
+
+  if (grep -q "${match1}" <<< "${message}") || (grep -q "${match2}" <<< "${message}"); then
+    echo "Successful"
+    echo "message:${message}"
+    echo "has either:${match1}"
+    echo "or:${match2}"
+    return 0
+  else
+    echo "FAIL!"
+    echo "message:${message}"
+    echo "has neither:${match1}"
+    echo "nor:${match2}"
+    caller
+    return 1
+  fi
+}
+
+# Runs tests related to kubectl create --validate
+run_kubectl_create_validate_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+
+  ## test --validate=true
+  kube::log::status "Testing kubectl create --validate=true"
+  # create and verify
+  output_message=$(! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=true 2>&1)
+  has_one_of_error_message "${output_message}" 'strict decoding error' 'error validating data'
+
+  ## test  --validate=false
+  kube::log::status "Testing kubectl create --validate=false"
+  # create and verify
+  output_message=$(kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=false)
+  kube::test::if_has_string "${output_message}" "deployment.apps/invalid-nginx-deployment created"
+  # cleanup
+  kubectl delete deployment invalid-nginx-deployment
+
+  ## test --validate=strict
+  kube::log::status "Testing kubectl create --validate=strict"
+  # create and verify
+  output_message=$(! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=strict 2>&1)
+  has_one_of_error_message "${output_message}" 'strict decoding error' 'error validating data'
+
+  ## test --validate=warn
+  kube::log::status "Testing kubectl create --validate=warn"
+  # create and verify
+  output_message=$(kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=warn)
+  kube::test::if_has_string "${output_message}" "deployment.apps/invalid-nginx-deployment created"
+  # cleanup
+  kubectl delete deployment invalid-nginx-deployment
+
+  ## test  --validate=ignore
+  kube::log::status "Testing kubectl create --validate=ignore"
+  # create and verify
+  output_message=$(kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=ignore)
+  kube::test::if_has_string "${output_message}" "deployment.apps/invalid-nginx-deployment created"
+  # cleanup
+  kubectl delete deployment invalid-nginx-deployment
+
+  ## test default is strict validation
+  kube::log::status "Testing kubectl create"
+  # create and verify
+  output_message=$(! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml 2>&1)
+  has_one_of_error_message "${output_message}" 'strict decoding error' 'error validating data'
+
+  ## test invalid validate value
+  kube::log::status "Testing kubectl create --validate=foo"
+  # create and verify
+  output_message=$(! kubectl create -f hack/testdata/invalid-deployment-unknown-and-duplicate-fields.yaml --validate=foo 2>&1)
+  kube::test::if_has_string "${output_message}" 'invalid - validate option "foo"'
 
   set +o nounset
   set +o errexit

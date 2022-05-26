@@ -41,7 +41,7 @@ func (IDRange) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicyReview = map[string]string{
-	"":       "PodSecurityPolicyReview checks which service accounts (not users, since that would be cluster-wide) can create the `PodTemplateSpec` in question.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":       "PodSecurityPolicyReview checks which service accounts (not users, since that would be cluster-wide) can create the `PodTemplateSpec` in question.\n\nCompatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).",
 	"spec":   "spec is the PodSecurityPolicy to check.",
 	"status": "status represents the current information/status for the PodSecurityPolicyReview.",
 }
@@ -70,7 +70,7 @@ func (PodSecurityPolicyReviewStatus) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicySelfSubjectReview = map[string]string{
-	"":       "PodSecurityPolicySelfSubjectReview checks whether this user/SA tuple can create the PodTemplateSpec\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":       "PodSecurityPolicySelfSubjectReview checks whether this user/SA tuple can create the PodTemplateSpec\n\nCompatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).",
 	"spec":   "spec defines specification the PodSecurityPolicySelfSubjectReview.",
 	"status": "status represents the current information/status for the PodSecurityPolicySelfSubjectReview.",
 }
@@ -89,7 +89,7 @@ func (PodSecurityPolicySelfSubjectReviewSpec) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicySubjectReview = map[string]string{
-	"":       "PodSecurityPolicySubjectReview checks whether a particular user/SA tuple can create the PodTemplateSpec.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":       "PodSecurityPolicySubjectReview checks whether a particular user/SA tuple can create the PodTemplateSpec.\n\nCompatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).",
 	"spec":   "spec defines specification for the PodSecurityPolicySubjectReview.",
 	"status": "status represents the current information/status for the PodSecurityPolicySubjectReview.",
 }
@@ -121,7 +121,7 @@ func (PodSecurityPolicySubjectReviewStatus) SwaggerDoc() map[string]string {
 }
 
 var map_RangeAllocation = map[string]string{
-	"":      "RangeAllocation is used so we can easily expose a RangeAllocation typed for security group\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"":      "RangeAllocation is used so we can easily expose a RangeAllocation typed for security group\n\nCompatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.",
 	"range": "range is a string representing a unique label for a range of uids, \"1000000000-2000000000/10000\".",
 	"data":  "data is a byte array representing the serialized state of a range allocation.  It is a bitmap with each bit set to one to represent a range is taken.",
 }

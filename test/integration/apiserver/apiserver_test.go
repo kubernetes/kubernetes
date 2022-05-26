@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -117,7 +116,7 @@ func verifyStatusCode(t *testing.T, verb, URL, body string, expectedStatusCode i
 		t.Fatalf("unexpected error: %v in req: %v", err, req)
 	}
 	defer resp.Body.Close()
-	b, _ := ioutil.ReadAll(resp.Body)
+	b, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != expectedStatusCode {
 		t.Errorf("Expected status %v, but got %v", expectedStatusCode, resp.StatusCode)
 		t.Errorf("Body: %v", string(b))
@@ -562,7 +561,7 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 	}
 	count := int64(len(items))
 
-	// Cacher.GetToList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
+	// Cacher.GetList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
 	// the limit is respected when testing here.
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(opts.Continue) > 0
@@ -1369,6 +1368,226 @@ func TestAPICRDProtobuf(t *testing.T) {
 	}
 }
 
+func TestGetSubresourcesAsTables(t *testing.T) {
+	testNamespace := "test-transform"
+	tearDown, config, _, err := fixtures.StartDefaultServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	s, clientset, closeFn := setup(t)
+	defer closeFn()
+	fmt.Printf("%#v\n", clientset)
+
+	apiExtensionClient, err := apiextensionsclient.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fooWithSubresourceCRD := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foosubs.cr.bar.com",
+		},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "cr.bar.com",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural: "foosubs",
+				Kind:   "FooSub",
+			},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								"spec": {
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"replicas": {
+											Type: "integer",
+										},
+									},
+								},
+								"status": {
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"replicas": {
+											Type: "integer",
+										},
+									},
+								},
+							},
+						},
+					},
+					Subresources: &apiextensionsv1.CustomResourceSubresources{
+						Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+						Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+							SpecReplicasPath:   ".spec.replicas",
+							StatusReplicasPath: ".status.replicas",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fooWithSubresourceCRD, err = fixtures.CreateNewV1CustomResourceDefinition(fooWithSubresourceCRD, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	subresourcesCrdGVR := schema.GroupVersionResource{Group: fooWithSubresourceCRD.Spec.Group, Version: fooWithSubresourceCRD.Spec.Versions[0].Name, Resource: "foosubs"}
+	subresourcesCrclient := dynamicClient.Resource(subresourcesCrdGVR).Namespace(testNamespace)
+
+	testcases := []struct {
+		name        string
+		accept      string
+		object      func(*testing.T) (metav1.Object, string, string)
+		subresource string
+	}{
+		{
+			name:   "v1 verify status subresource returns a table for CRDs",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := subresourcesCrclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "FooSub", "metadata": map[string]interface{}{"name": "test-1"}, "spec": map[string]interface{}{"replicas": 2}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				return cr, subresourcesCrdGVR.Group, "foosubs"
+			},
+			subresource: "status",
+		},
+		{
+			name:   "v1 verify scale subresource returns a table for CRDs",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := subresourcesCrclient.Create(context.TODO(), &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "FooSub", "metadata": map[string]interface{}{"name": "test-2"}, "spec": map[string]interface{}{"replicas": 2}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				return cr, subresourcesCrdGVR.Group, "foosubs"
+			},
+			subresource: "scale",
+		},
+		{
+			name:   "verify status subresource returns a table for replicationcontrollers",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				rc := &v1.ReplicationController{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "replicationcontroller-1",
+					},
+					Spec: v1.ReplicationControllerSpec{
+						Replicas: int32Ptr(2),
+						Selector: map[string]string{
+							"label": "test-label",
+						},
+						Template: &v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"label": "test-label",
+								},
+							},
+							Spec: v1.PodSpec{
+								Containers: []v1.Container{
+									{Name: "test-name", Image: "nonexistant-image"},
+								},
+							},
+						},
+					},
+				}
+				rc, err := clientset.CoreV1().ReplicationControllers(testNamespace).Create(context.TODO(), rc, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create replicationcontroller: %v", err)
+				}
+				return rc, "", "replicationcontrollers"
+			},
+			subresource: "status",
+		},
+		{
+			name:   "verify scale subresource returns a table for replicationcontrollers",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				rc := &v1.ReplicationController{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "replicationcontroller-2",
+					},
+					Spec: v1.ReplicationControllerSpec{
+						Replicas: int32Ptr(2),
+						Selector: map[string]string{
+							"label": "test-label",
+						},
+						Template: &v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"label": "test-label",
+								},
+							},
+							Spec: v1.PodSpec{
+								Containers: []v1.Container{
+									{Name: "test-name", Image: "nonexistant-image"},
+								},
+							},
+						},
+					},
+				}
+				rc, err := clientset.CoreV1().ReplicationControllers(testNamespace).Create(context.TODO(), rc, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create replicationcontroller: %v", err)
+				}
+				return rc, "", "replicationcontrollers"
+			},
+			subresource: "scale",
+		},
+	}
+
+	for i := range testcases {
+		tc := testcases[i]
+		t.Run(tc.name, func(t *testing.T) {
+			obj, group, resource := tc.object(t)
+
+			cfg := dynamic.ConfigFor(config)
+			if len(group) == 0 {
+				cfg = dynamic.ConfigFor(&restclient.Config{Host: s.URL})
+				cfg.APIPath = "/api"
+			} else {
+				cfg.APIPath = "/apis"
+			}
+			cfg.GroupVersion = &schema.GroupVersion{Group: group, Version: "v1"}
+
+			client, err := restclient.RESTClientFor(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			res := client.Get().
+				Resource(resource).NamespaceIfScoped(obj.GetNamespace(), len(obj.GetNamespace()) > 0).
+				SetHeader("Accept", tc.accept).
+				Name(obj.GetName()).
+				SubResource(tc.subresource).
+				Do(context.TODO())
+
+			resObj, err := res.Get()
+			if err != nil {
+				t.Fatalf("failed to retrieve object from response: %v", err)
+			}
+			actualKind := resObj.GetObjectKind().GroupVersionKind().Kind
+			if actualKind != "Table" {
+				t.Fatalf("Expected Kind 'Table', got '%v'", actualKind)
+			}
+		})
+	}
+}
+
 func TestTransform(t *testing.T) {
 	testNamespace := "test-transform"
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
@@ -1417,6 +1636,12 @@ func TestTransform(t *testing.T) {
 	}
 	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Versions[0].Name, Resource: "foos"}
 	crclient := dynamicClient.Resource(crdGVR).Namespace(testNamespace)
+
+	previousList, err := crclient.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("failed to list CRs before test: %v", err)
+	}
+	previousRV := previousList.GetResourceVersion()
 
 	testcases := []struct {
 		name          string
@@ -1958,21 +2183,29 @@ func TestTransform(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			rv, _ := strconv.Atoi(obj.GetResourceVersion())
-			if rv < 1 {
-				rv = 1
+			var rv string
+			if obj.GetResourceVersion() == "" || obj.GetResourceVersion() == "0" {
+				// no object was created in the preamble to the test, so get recent data
+				rv = "0"
+			} else {
+				// we created an object, and need to list+watch from some time before the creation to see it
+				rv = previousRV
 			}
 
+			ctx, cancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
+			t.Cleanup(func() {
+				cancel()
+			})
 			w, err := client.Get().
 				Resource(resource).NamespaceIfScoped(obj.GetNamespace(), len(obj.GetNamespace()) > 0).
 				SetHeader("Accept", tc.accept).
 				VersionedParams(&metav1.ListOptions{
-					ResourceVersion: strconv.Itoa(rv - 1),
+					ResourceVersion: rv,
 					Watch:           true,
 					FieldSelector:   fields.OneTermEqualSelector("metadata.name", obj.GetName()).String(),
 				}, metav1.ParameterCodec).
 				Param("includeObject", string(tc.includeObject)).
-				Stream(context.TODO())
+				Stream(ctx)
 			if (tc.wantErr != nil) != (err != nil) {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -2070,7 +2303,7 @@ func expectPartialObjectMetaEventsProtobuf(t *testing.T, r io.Reader, values ...
 	metav1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
 	rs := protobuf.NewRawSerializer(scheme, scheme)
 	d := streaming.NewDecoder(
-		protobuf.LengthDelimitedFramer.NewFrameReader(ioutil.NopCloser(r)),
+		protobuf.LengthDelimitedFramer.NewFrameReader(io.NopCloser(r)),
 		rs,
 	)
 	ds := metainternalversionscheme.Codecs.UniversalDeserializer()
@@ -2179,7 +2412,7 @@ func expectPartialObjectMetaV1EventsProtobuf(t *testing.T, r io.Reader, values .
 	metav1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
 	rs := protobuf.NewRawSerializer(scheme, scheme)
 	d := streaming.NewDecoder(
-		protobuf.LengthDelimitedFramer.NewFrameReader(ioutil.NopCloser(r)),
+		protobuf.LengthDelimitedFramer.NewFrameReader(io.NopCloser(r)),
 		rs,
 	)
 	ds := metainternalversionscheme.Codecs.UniversalDeserializer()
@@ -2469,4 +2702,8 @@ func assertManagedFields(t *testing.T, obj *unstructured.Unstructured) {
 	if len(obj.GetManagedFields()) == 0 {
 		t.Errorf("unexpected empty managed fields in object: %v", obj)
 	}
+}
+
+func int32Ptr(i int32) *int32 {
+	return &i
 }

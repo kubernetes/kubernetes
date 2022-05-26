@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build windows
 // +build windows
 
 package svc
 
 import (
-	"path/filepath"
 	"strings"
 	"unsafe"
 
@@ -73,36 +73,29 @@ func IsWindowsService() (bool, error) {
 	// Specifically, it looks up whether the parent process has session ID zero
 	// and is called "services".
 
-	var pbi windows.PROCESS_BASIC_INFORMATION
-	pbiLen := uint32(unsafe.Sizeof(pbi))
-	err := windows.NtQueryInformationProcess(windows.CurrentProcess(), windows.ProcessBasicInformation, unsafe.Pointer(&pbi), pbiLen, &pbiLen)
+	var currentProcess windows.PROCESS_BASIC_INFORMATION
+	infoSize := uint32(unsafe.Sizeof(currentProcess))
+	err := windows.NtQueryInformationProcess(windows.CurrentProcess(), windows.ProcessBasicInformation, unsafe.Pointer(&currentProcess), infoSize, &infoSize)
 	if err != nil {
 		return false, err
 	}
-	var psid uint32
-	err = windows.ProcessIdToSessionId(uint32(pbi.InheritedFromUniqueProcessId), &psid)
-	if err != nil || psid != 0 {
-		return false, nil
+	var parentProcess *windows.SYSTEM_PROCESS_INFORMATION
+	for infoSize = uint32((unsafe.Sizeof(*parentProcess) + unsafe.Sizeof(uintptr(0))) * 1024); ; {
+		parentProcess = (*windows.SYSTEM_PROCESS_INFORMATION)(unsafe.Pointer(&make([]byte, infoSize)[0]))
+		err = windows.NtQuerySystemInformation(windows.SystemProcessInformation, unsafe.Pointer(parentProcess), infoSize, &infoSize)
+		if err == nil {
+			break
+		} else if err != windows.STATUS_INFO_LENGTH_MISMATCH {
+			return false, err
+		}
 	}
-	pproc, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pbi.InheritedFromUniqueProcessId))
-	if err != nil {
-		return false, err
+	for ; ; parentProcess = (*windows.SYSTEM_PROCESS_INFORMATION)(unsafe.Pointer(uintptr(unsafe.Pointer(parentProcess)) + uintptr(parentProcess.NextEntryOffset))) {
+		if parentProcess.UniqueProcessID == currentProcess.InheritedFromUniqueProcessId {
+			return parentProcess.SessionID == 0 && strings.EqualFold("services.exe", parentProcess.ImageName.String()), nil
+		}
+		if parentProcess.NextEntryOffset == 0 {
+			break
+		}
 	}
-	defer windows.CloseHandle(pproc)
-	var exeNameBuf [261]uint16
-	exeNameLen := uint32(len(exeNameBuf) - 1)
-	err = windows.QueryFullProcessImageName(pproc, 0, &exeNameBuf[0], &exeNameLen)
-	if err != nil {
-		return false, err
-	}
-	exeName := windows.UTF16ToString(exeNameBuf[:exeNameLen])
-	if !strings.EqualFold(filepath.Base(exeName), "services.exe") {
-		return false, nil
-	}
-	system32, err := windows.GetSystemDirectory()
-	if err != nil {
-		return false, err
-	}
-	targetExeName := filepath.Join(system32, "services.exe")
-	return strings.EqualFold(exeName, targetExeName), nil
+	return false, nil
 }

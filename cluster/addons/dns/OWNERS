@@ -1,10 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- bowei
-- mrhohn
-- prameshj
+  - bowei
+  - mrhohn
+  - prameshj
 reviewers:
-- bowei
-- mrhohn
-- prameshj
+  - bowei
+  - mrhohn
+  - prameshj

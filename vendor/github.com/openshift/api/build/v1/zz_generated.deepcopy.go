@@ -799,6 +799,11 @@ func (in *BuildVolumeSource) DeepCopyInto(out *BuildVolumeSource) {
 		*out = new(corev1.ConfigMapVolumeSource)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.CSI != nil {
+		in, out := &in.CSI, &out.CSI
+		*out = new(corev1.CSIVolumeSource)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

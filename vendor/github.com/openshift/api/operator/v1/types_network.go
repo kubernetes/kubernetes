@@ -343,9 +343,9 @@ type KuryrConfig struct {
 
 	// enablePortPoolsPrepopulation when true will make Kuryr prepopulate each newly created port
 	// pool with a minimum number of ports. Kuryr uses Neutron port pooling to fight the fact
-	// that it takes a significant amount of time to create one. Instead of creating it when
-	// pod is being deployed, Kuryr keeps a number of ports ready to be attached to pods. By
-	// default port prepopulation is disabled.
+	// that it takes a significant amount of time to create one. It creates a number of ports when
+	// the first pod that is configured to use the dedicated network for pods is created in a namespace,
+	// and keeps them ready to be attached to pods. Port prepopulation is disabled by default.
 	// +optional
 	EnablePortPoolsPrepopulation bool `json:"enablePortPoolsPrepopulation,omitempty"`
 

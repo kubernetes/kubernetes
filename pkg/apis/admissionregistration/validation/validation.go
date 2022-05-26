@@ -46,9 +46,9 @@ func validateResources(resources []string, fldPath *field.Path) field.ErrorList 
 		allErrors = append(allErrors, field.Required(fldPath, ""))
 	}
 
-	// */x
-	resourcesWithWildcardSubresoures := sets.String{}
 	// x/*
+	resourcesWithWildcardSubresoures := sets.String{}
+	// */x
 	subResourcesWithWildcardResource := sets.String{}
 	// */*
 	hasDoubleWildcard := false
@@ -217,8 +217,9 @@ func validateValidatingWebhookConfiguration(e *admissionregistration.ValidatingW
 		if opts.requireUniqueWebhookNames && len(hook.Name) > 0 {
 			if hookNames.Has(hook.Name) {
 				allErrors = append(allErrors, field.Duplicate(field.NewPath("webhooks").Index(i).Child("name"), hook.Name))
+			} else {
+				hookNames.Insert(hook.Name)
 			}
-			hookNames.Insert(hook.Name)
 		}
 	}
 	return allErrors
@@ -248,8 +249,9 @@ func validateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebho
 		if opts.requireUniqueWebhookNames && len(hook.Name) > 0 {
 			if hookNames.Has(hook.Name) {
 				allErrors = append(allErrors, field.Duplicate(field.NewPath("webhooks").Index(i).Child("name"), hook.Name))
+			} else {
+				hookNames.Insert(hook.Name)
 			}
-			hookNames.Insert(hook.Name)
 		}
 	}
 	return allErrors

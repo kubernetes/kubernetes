@@ -11,7 +11,11 @@ import (
 // tracepoints. The top-level directory is the group, the event's subdirectory
 // is the name. Example:
 //
-//	Tracepoint("syscalls", "sys_enter_fork", prog)
+//	tp, err := Tracepoint("syscalls", "sys_enter_fork", prog)
+//
+// Losing the reference to the resulting Link (tp) will close the Tracepoint
+// and prevent further execution of prog. The Link must be Closed during
+// program shutdown to avoid leaking system resources.
 //
 // Note that attaching eBPF programs to syscalls (sys_enter_*/sys_exit_*) is
 // only possible as of kernel 4.14 (commit cf5f5ce).
@@ -34,7 +38,7 @@ func Tracepoint(group, name string, prog *ebpf.Program) (Link, error) {
 		return nil, err
 	}
 
-	fd, err := openTracepointPerfEvent(tid)
+	fd, err := openTracepointPerfEvent(tid, perfAllThreads)
 	if err != nil {
 		return nil, err
 	}

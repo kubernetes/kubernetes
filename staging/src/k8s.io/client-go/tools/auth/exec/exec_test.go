@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientauthenticationv1 "k8s.io/client-go/pkg/apis/clientauthentication/v1"
-	clientauthenticationv1alpha1 "k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"
 	clientauthenticationv1beta1 "k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
 	"k8s.io/client-go/rest"
 )
@@ -241,11 +240,6 @@ func TestLoadExecCredential(t *testing.T) {
 		{
 			name:            "v1beta1 nil cluster",
 			data:            marshal(t, clientauthenticationv1beta1.SchemeGroupVersion, &clientauthenticationv1beta1.ExecCredential{}),
-			wantErrorPrefix: "ExecCredential does not contain cluster information",
-		},
-		{
-			name:            "v1alpha1",
-			data:            marshal(t, clientauthenticationv1alpha1.SchemeGroupVersion, &clientauthenticationv1alpha1.ExecCredential{}),
 			wantErrorPrefix: "ExecCredential does not contain cluster information",
 		},
 		{

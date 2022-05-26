@@ -34,6 +34,8 @@ type RateLimitingInterface interface {
 
 // NewRateLimitingQueue constructs a new workqueue with rateLimited queuing ability
 // Remember to call Forget!  If you don't, you may end up tracking failures forever.
+// NewRateLimitingQueue does not emit metrics. For use with a MetricsProvider, please use
+// NewNamedRateLimitingQueue instead.
 func NewRateLimitingQueue(rateLimiter RateLimiter) RateLimitingInterface {
 	return &rateLimitingType{
 		DelayingInterface: NewDelayingQueue(),

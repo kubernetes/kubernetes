@@ -18,7 +18,7 @@ package metrics
 
 import (
 	"context"
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -193,13 +193,13 @@ func (v *SummaryVec) Reset() {
 func (v *SummaryVec) WithContext(ctx context.Context) *SummaryVecWithContext {
 	return &SummaryVecWithContext{
 		ctx:        ctx,
-		SummaryVec: *v,
+		SummaryVec: v,
 	}
 }
 
 // SummaryVecWithContext is the wrapper of SummaryVec with context.
 type SummaryVecWithContext struct {
-	SummaryVec
+	*SummaryVec
 	ctx context.Context
 }
 

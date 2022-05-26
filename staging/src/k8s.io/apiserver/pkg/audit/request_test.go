@@ -25,25 +25,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestLogAnnotation(t *testing.T) {
-	ev := &auditinternal.Event{
-		Level:   auditinternal.LevelMetadata,
-		AuditID: "fake id",
-	}
-	LogAnnotation(ev, "foo", "bar")
-	LogAnnotation(ev, "foo", "baz")
-	assert.Equal(t, "bar", ev.Annotations["foo"], "audit annotation should not be overwritten.")
-
-	LogAnnotation(ev, "qux", "")
-	LogAnnotation(ev, "qux", "baz")
-	assert.Equal(t, "", ev.Annotations["qux"], "audit annotation should not be overwritten.")
-}
 
 func TestMaybeTruncateUserAgent(t *testing.T) {
 	req := &http.Request{}

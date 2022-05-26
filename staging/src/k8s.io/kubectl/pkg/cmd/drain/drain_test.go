@@ -599,7 +599,7 @@ func TestDrain(t *testing.T) {
 			args:                  []string{"node", "--force"},
 			expectFatal:           false,
 			expectDelete:          true,
-			expectWarning:         "WARNING: deleting Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet: default/bar",
+			expectWarning:         "WARNING: deleting Pods that declare no controller: default/bar",
 			expectOutputToContain: "node/node drained",
 		},
 		{

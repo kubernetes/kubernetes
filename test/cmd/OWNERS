@@ -1,6 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- sig-cli-maintainers
+  - sig-cli-maintainers
 reviewers:
-- sig-cli
+  - sig-cli-reviewers

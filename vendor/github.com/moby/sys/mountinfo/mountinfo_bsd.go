@@ -1,4 +1,5 @@
-// +build freebsd,cgo openbsd,cgo
+//go:build (freebsd && cgo) || (openbsd && cgo) || (darwin && cgo)
+// +build freebsd,cgo openbsd,cgo darwin,cgo
 
 package mountinfo
 
@@ -21,7 +22,7 @@ func parseMountTable(filter FilterFunc) ([]*Info, error) {
 
 	count := int(C.getmntinfo(&rawEntries, C.MNT_WAIT))
 	if count == 0 {
-		return nil, fmt.Errorf("Failed to call getmntinfo")
+		return nil, fmt.Errorf("failed to call getmntinfo")
 	}
 
 	var entries []C.struct_statfs
@@ -55,6 +56,10 @@ func parseMountTable(filter FilterFunc) ([]*Info, error) {
 }
 
 func mounted(path string) (bool, error) {
+	path, err := normalizePath(path)
+	if err != nil {
+		return false, err
+	}
 	// Fast path: compare st.st_dev fields.
 	// This should always work for FreeBSD and OpenBSD.
 	mounted, err := mountedByStat(path)

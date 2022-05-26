@@ -33,7 +33,7 @@ CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
 # This is defined in root Makefile, but some build contexts do not refer to them
 KUBE_BASE_IMAGE_REGISTRY?=k8s.gcr.io
-BASE_IMAGE_VERSION?=bullseye-v1.0.0
+BASE_IMAGE_VERSION?=bullseye-v1.2.0
 BASEIMAGE?=${KUBE_BASE_IMAGE_REGISTRY}/build-image/debian-base-${ARCH}:${BASE_IMAGE_VERSION}
 
 # Keep debian releases (e.g. debian 11 == bullseye) consistent 

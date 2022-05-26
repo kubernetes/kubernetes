@@ -58,7 +58,8 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 			client := fake.NewSimpleClientset(
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
 			)
-			ctx := context.Background()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			_ = informerFactory.Core().V1().Services().Lister()
 			informerFactory.Start(ctx.Done())

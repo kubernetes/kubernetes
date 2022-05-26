@@ -239,7 +239,8 @@ func (f *FakeClock) Sleep(d time.Duration) {
 
 // IntervalClock implements clock.PassiveClock, but each invocation of Now steps the clock forward the specified duration.
 // IntervalClock technically implements the other methods of clock.Clock, but each implementation is just a panic.
-// See SimpleIntervalClock for an alternative that only has the methods of PassiveClock.
+//
+// Deprecated: See SimpleIntervalClock for an alternative that only has the methods of PassiveClock.
 type IntervalClock struct {
 	Time     time.Time
 	Duration time.Duration
@@ -282,9 +283,9 @@ func (*IntervalClock) Tick(d time.Duration) <-chan time.Time {
 
 // NewTicker has no implementation yet and is omitted.
 // TODO: make interval clock use FakeClock so this can be implemented.
-//func (*IntervalClock) NewTicker(d time.Duration) clock.Ticker {
-//	panic("IntervalClock doesn't implement NewTicker")
-//}
+func (*IntervalClock) NewTicker(d time.Duration) clock.Ticker {
+	panic("IntervalClock doesn't implement NewTicker")
+}
 
 // Sleep is unimplemented, will panic.
 func (*IntervalClock) Sleep(d time.Duration) {

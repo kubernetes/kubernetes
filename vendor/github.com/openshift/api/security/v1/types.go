@@ -307,8 +307,8 @@ type SecurityContextConstraintsList struct {
 
 // PodSecurityPolicySubjectReview checks whether a particular user/SA tuple can create the PodTemplateSpec.
 //
-// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
-// +openshift:compatibility-gen:level=1
+// Compatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=2
 type PodSecurityPolicySubjectReview struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -356,8 +356,8 @@ type PodSecurityPolicySubjectReviewStatus struct {
 
 // PodSecurityPolicySelfSubjectReview checks whether this user/SA tuple can create the PodTemplateSpec
 //
-// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
-// +openshift:compatibility-gen:level=1
+// Compatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=2
 type PodSecurityPolicySelfSubjectReview struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -380,8 +380,8 @@ type PodSecurityPolicySelfSubjectReviewSpec struct {
 
 // PodSecurityPolicyReview checks which service accounts (not users, since that would be cluster-wide) can create the `PodTemplateSpec` in question.
 //
-// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
-// +openshift:compatibility-gen:level=1
+// Compatibility level 2: Stable within a major release for a minimum of 9 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=2
 type PodSecurityPolicyReview struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -427,8 +427,8 @@ type ServiceAccountPodSecurityPolicyReviewStatus struct {
 
 // RangeAllocation is used so we can easily expose a RangeAllocation typed for security group
 //
-// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
-// +openshift:compatibility-gen:level=1
+// Compatibility level 4: No compatibility is provided, the API can change at any point for any reason. These capabilities should not be used by applications needing long term support.
+// +openshift:compatibility-gen:level=4
 type RangeAllocation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`

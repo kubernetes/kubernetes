@@ -3,12 +3,11 @@
 # Any kind/feature PRs must be approved by SIG Cloud Provider going forward.
 
 emeritus_approvers:
-- anguslees
-- NickrenREN
-- dims
-- FengyunPan2
+  - anguslees
+  - NickrenREN
+  - dims
+  - FengyunPan2
 reviewers:
-- anguslees
-- NickrenREN
-- dims
-- FengyunPan2
+  - anguslees
+  - NickrenREN
+  - dims

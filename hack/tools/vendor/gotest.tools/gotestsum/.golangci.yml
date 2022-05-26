@@ -1,0 +1,53 @@
+linters-settings:
+  gocyclo:
+    min-complexity: 12
+  goconst:
+    min-len: 2
+    min-occurrences: 4
+  lll:
+    line-length: 120
+
+issues:
+  exclude-use-default: false
+  exclude-rules:
+    - linters: [golint]
+      text: 'should have comment .*or be unexported'
+    - linters: [stylecheck]
+      text: 'ST1000: at least one file in a package should have a package comment'
+    - linters: [errcheck]
+      text: 'Error return value of `.*\.WriteString` is not checked'
+    - linters: [unparam]
+      text: 'result .* is always'
+    - linters: [unparam]
+      text: 'always receives'
+
+linters:
+  disable-all: true
+  enable:
+    - bodyclose
+    - deadcode
+    - depguard
+    - errcheck
+    - gocognit
+    - goconst
+    - gocyclo
+    - gofmt
+    - goimports
+    - golint
+    - gosimple
+    - govet
+    - ineffassign
+    - interfacer
+    - lll
+    - misspell
+    - nakedret
+    - prealloc
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace

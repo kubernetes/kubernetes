@@ -1,5 +1,5 @@
 {
   "kind": "GetOptions",
   "apiVersion": "v1",
-  "resourceVersion": "2"
+  "resourceVersion": "resourceVersionValue"
 }

@@ -37,6 +37,7 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -340,6 +341,74 @@ func TestDescribePodPriority(t *testing.T) {
 	}
 	if !strings.Contains(out, "high-priority") || !strings.Contains(out, "1000") {
 		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePriorityClass(t *testing.T) {
+	preemptLowerPriority := corev1.PreemptLowerPriority
+	preemptNever := corev1.PreemptNever
+
+	testCases := []struct {
+		name          string
+		priorityClass *schedulingv1.PriorityClass
+		expect        []string
+	}{
+		{
+			name: "test1",
+			priorityClass: &schedulingv1.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Value:            10,
+				GlobalDefault:    false,
+				PreemptionPolicy: &preemptLowerPriority,
+				Description:      "test1",
+			},
+			expect: []string{
+				"Name", "bar",
+				"Value", "10",
+				"GlobalDefault", "false",
+				"PreemptionPolicy", "PreemptLowerPriority",
+				"Description", "test1",
+				"Annotations", "",
+			},
+		},
+		{
+			name: "test2",
+			priorityClass: &schedulingv1.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Value:            100,
+				GlobalDefault:    true,
+				PreemptionPolicy: &preemptNever,
+				Description:      "test2",
+			},
+			expect: []string{
+				"Name", "bar",
+				"Value", "100",
+				"GlobalDefault", "true",
+				"PreemptionPolicy", "Never",
+				"Description", "test2",
+				"Annotations", "",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.priorityClass)
+			c := &describeClient{T: t, Interface: fake}
+			d := PriorityClassDescriber{c}
+			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+		})
 	}
 }
 
@@ -2257,7 +2326,7 @@ func TestDescribeJob(t *testing.T) {
 				if !strings.Contains(out, fmt.Sprintf("Completed Indexes:  %s\n", tc.wantCompletedIndexes)) {
 					t.Errorf("Output didn't contain wanted Completed Indexes:\n%s", out)
 				}
-			} else if strings.Contains(out, fmt.Sprintf("Completed Indexes:")) {
+			} else if strings.Contains(out, "Completed Indexes:") {
 				t.Errorf("Output contains unexpected completed indexes:\n%s", out)
 			}
 		})
@@ -2265,6 +2334,7 @@ func TestDescribeJob(t *testing.T) {
 }
 
 func TestDescribeIngress(t *testing.T) {
+	ingresClassName := "test"
 	backendV1beta1 := networkingv1beta1.IngressBackend{
 		ServiceName: "default-backend",
 		ServicePort: intstr.FromInt(80),
@@ -2279,6 +2349,7 @@ func TestDescribeIngress(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: networkingv1beta1.IngressSpec{
+			IngressClassName: &ingresClassName,
 			Rules: []networkingv1beta1.IngressRule{
 				{
 					Host: "foo.bar.com",
@@ -2311,6 +2382,7 @@ func TestDescribeIngress(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: networkingv1.IngressSpec{
+			IngressClassName: &ingresClassName,
 			Rules: []networkingv1.IngressRule{
 				{
 					Host: "foo.bar.com",
@@ -2354,7 +2426,8 @@ Labels:           id1=app1
                   id2=app2
 Namespace:        foo
 Address:          
-Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Ingress Class:    test
+Default backend:  <default>
 Rules:
   Host         Path  Backends
   ----         ----  --------
@@ -2369,7 +2442,8 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
-Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Ingress Class:    test
+Default backend:  <default>
 Rules:
   Host         Path  Backends
   ----         ----  --------
@@ -2385,6 +2459,7 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2406,7 +2481,8 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
-Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Ingress Class:    test
+Default backend:  <default>
 Rules:
   Host         Path  Backends
   ----         ----  --------
@@ -2422,6 +2498,7 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2443,7 +2520,8 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
-Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+Ingress Class:    test
+Default backend:  <default>
 Rules:
   Host         Path  Backends
   ----         ----  --------
@@ -2459,7 +2537,8 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
-					DefaultBackend: &backendV1,
+					DefaultBackend:   &backendV1,
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2481,6 +2560,7 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
 Rules:
   Host         Path  Backends
@@ -2497,7 +2577,8 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
-					DefaultBackend: &backendResource,
+					DefaultBackend:   &backendResource,
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2519,6 +2600,7 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  APIGroup: example.com, Kind: foo, Name: bar
 Rules:
   Host         Path  Backends
@@ -2535,7 +2617,8 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
-					DefaultBackend: &backendResource,
+					DefaultBackend:   &backendResource,
+					IngressClassName: &ingresClassName,
 					Rules: []networkingv1.IngressRule{
 						{
 							Host: "foo.bar.com",
@@ -2557,6 +2640,7 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    test
 Default backend:  APIGroup: example.com, Kind: foo, Name: bar
 Rules:
   Host         Path  Backends
@@ -2573,6 +2657,31 @@ Events:        <none>` + "\n",
 					Namespace: "foo",
 				},
 				Spec: networkingv1.IngressSpec{
+					DefaultBackend:   &backendV1,
+					IngressClassName: &ingresClassName,
+				},
+			}),
+			output: `Name:             bar
+Labels:           <none>
+Namespace:        foo
+Address:          
+Ingress Class:    test
+Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
+Rules:
+  Host        Path  Backends
+  ----        ----  --------
+  *           *     default-backend:80 (<error: endpoints "default-backend" not found>)
+Annotations:  <none>
+Events:       <none>
+`,
+		},
+		"EmptyIngressClassName": {
+			input: fake.NewSimpleClientset(&networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: networkingv1.IngressSpec{
 					DefaultBackend: &backendV1,
 				},
 			}),
@@ -2580,6 +2689,7 @@ Events:        <none>` + "\n",
 Labels:           <none>
 Namespace:        foo
 Address:          
+Ingress Class:    <none>
 Default backend:  default-backend:80 (<error: endpoints "default-backend" not found>)
 Rules:
   Host        Path  Backends
@@ -2609,6 +2719,7 @@ Events:       <none>
 }
 
 func TestDescribeIngressV1(t *testing.T) {
+	ingresClassName := "test"
 	defaultBackend := networkingv1.IngressBackend{
 		Service: &networkingv1.IngressServiceBackend{
 			Name: "default-backend",
@@ -2628,6 +2739,7 @@ func TestDescribeIngressV1(t *testing.T) {
 			Namespace: "foo",
 		},
 		Spec: networkingv1.IngressSpec{
+			IngressClassName: &ingresClassName,
 			Rules: []networkingv1.IngressRule{
 				{
 					Host: "foo.bar.com",
@@ -3886,16 +3998,14 @@ func TestDescribeEvents(t *testing.T) {
 		"NodeDescriber": &NodeDescriber{
 			fake.NewSimpleClientset(&corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:     "bar",
-					SelfLink: "/api/v1/nodes/bar",
+					Name: "bar",
 				},
 			}, events),
 		},
 		"PersistentVolumeDescriber": &PersistentVolumeDescriber{
 			fake.NewSimpleClientset(&corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:     "bar",
-					SelfLink: "/api/v1/persistentvolumes/bar",
+					Name: "bar",
 				},
 			}, events),
 		},
@@ -3904,7 +4014,6 @@ func TestDescribeEvents(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",
-					SelfLink:  "/api/v1/namespaces/foo/pods/bar",
 				},
 			}, events),
 		},
@@ -4825,6 +4934,7 @@ func TestDescribeNode(t *testing.T) {
 		&corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "bar",
+				UID:  "uid",
 			},
 			Spec: corev1.NodeSpec{
 				Unschedulable: true,
@@ -4877,6 +4987,42 @@ func TestDescribeNode(t *testing.T) {
 				Phase: corev1.PodRunning,
 			},
 		},
+		&corev1.EventList{
+			Items: []corev1.Event{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "event-1",
+						Namespace: "default",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind: "Node",
+						Name: "bar",
+						UID:  "bar",
+					},
+					Message:        "Node bar status is now: NodeHasNoDiskPressure",
+					FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					Count:          1,
+					Type:           corev1.EventTypeNormal,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "event-2",
+						Namespace: "default",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind: "Node",
+						Name: "bar",
+						UID:  "0ceac5fb-a393-49d7-b04f-9ea5f18de5e9",
+					},
+					Message:        "Node bar status is now: NodeReady",
+					FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					Count:          2,
+					Type:           corev1.EventTypeNormal,
+				},
+			},
+		},
 	)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := NodeDescriber{c}
@@ -4894,7 +5040,9 @@ func TestDescribeNode(t *testing.T) {
   memory             1Gi (8%)     2Gi (16%)
   ephemeral-storage  0 (0%)       0 (0%)
   hugepages-1Gi      0 (0%)       0 (0%)
-  hugepages-2Mi      512Mi (25%)  512Mi (25%)`}
+  hugepages-2Mi      512Mi (25%)  512Mi (25%)`,
+		`Node bar status is now: NodeHasNoDiskPressure`,
+		`Node bar status is now: NodeReady`}
 	for _, expected := range expectedOut {
 		if !strings.Contains(out, expected) {
 			t.Errorf("expected to find %q in output: %q", expected, out)

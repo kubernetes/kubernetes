@@ -1,0 +1,8 @@
+glob.iml
+.idea
+*.cpu
+*.mem
+*.test
+*.dot
+*.png
+*.svg

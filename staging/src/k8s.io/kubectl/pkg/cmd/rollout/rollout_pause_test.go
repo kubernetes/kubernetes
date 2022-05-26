@@ -34,7 +34,6 @@ import (
 )
 
 var rolloutPauseGroupVersionEncoder = schema.GroupVersion{Group: "apps", Version: "v1"}
-var rolloutPauseGroupVersionDecoder = schema.GroupVersion{Group: "apps", Version: "v1"}
 
 func TestRolloutPause(t *testing.T) {
 	deploymentName := "deployment/nginx-deployment"

@@ -132,3 +132,10 @@ for image in $images; do
     esac
     download "$project" "$path" "$tag" "$rbac"
 done
+
+# Update the mock driver manifests, too.
+grep -r image: hostpath/hostpath/csi-hostpath-plugin.yaml | while read -r image; do
+    version=$(echo "$image" | sed -e 's/.*:\(.*\)/\1/')
+    image=$(echo "$image" | sed -e 's/.*image: \([^:]*\).*/\1/')
+    sed -i -e "s;$image:.*;$image:$version;" mock/*.yaml
+done

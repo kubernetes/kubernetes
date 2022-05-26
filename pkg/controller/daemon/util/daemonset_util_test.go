@@ -52,10 +52,10 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 
 func TestIsPodUpdated(t *testing.T) {
 	templateGeneration := utilpointer.Int64Ptr(12345)
-	badGeneration := utilpointer.Int64Ptr(12345)
+	badGeneration := utilpointer.Int64Ptr(12350)
 	hash := "55555"
-	labels := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration), extensions.DefaultDaemonSetUniqueLabelKey: hash}
-	labelsNoHash := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration)}
+	labels := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(*templateGeneration), extensions.DefaultDaemonSetUniqueLabelKey: hash}
+	labelsNoHash := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(*templateGeneration)}
 	tests := []struct {
 		test               string
 		templateGeneration *int64

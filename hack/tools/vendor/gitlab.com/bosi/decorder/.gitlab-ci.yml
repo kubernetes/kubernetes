@@ -1,0 +1,61 @@
+###############################
+# This file is auto-generated #
+###############################
+
+variables:
+    APP_NAME: decorder
+
+stages:
+    - test
+    - build
+    - release
+
+test:
+    stage: test
+    image: golang:1.17.5@sha256:c72fa9afc50b3303e8044cf28fb358b48032a548e1825819420fd40155a131cb
+    before_script:
+        - set -eu
+        - if [[ -f .env.pipeline ]];then cp .env.pipeline .env;fi
+        - mkdir -p ~/.ssh
+        - touch ~/.ssh/known_hosts
+        - ssh-keyscan gitlab.com > ~/.ssh/known_hosts
+    retry: 2
+    script:
+        - '### run tests ###'
+        - make test
+        - make test-cover
+
+lint:source-code:
+    stage: test
+    image: golangci/golangci-lint:v1.43.0-alpine@sha256:24d773a07983d19963b6e07c7d5bce1b7835f8fb37486d34081e6a40302c17c5
+    script:
+        - '### run linter ###'
+        - golangci-lint run ./...
+
+license-check:
+    stage: test
+    image: golang:1.17.5@sha256:c72fa9afc50b3303e8044cf28fb358b48032a548e1825819420fd40155a131cb
+    before_script:
+        - set -eu
+        - if [[ -f .env.pipeline ]];then cp .env.pipeline .env;fi
+        - mkdir -p ~/.ssh
+        - touch ~/.ssh/known_hosts
+        - ssh-keyscan gitlab.com > ~/.ssh/known_hosts
+    script:
+        - '### run license-check ###'
+        - make check-licenses
+    artifacts:
+        paths:
+            - LICENSES-3RD-PARTY
+        expire_in: 7 days
+
+pages:
+    stage: release
+    image: golang:1.17.5@sha256:c72fa9afc50b3303e8044cf28fb358b48032a548e1825819420fd40155a131cb
+    only:
+        - tags
+    script:
+        - make gitlab-pages
+    artifacts:
+        paths:
+            - public/

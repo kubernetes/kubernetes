@@ -52,6 +52,14 @@ func (c *FakeConfigV1) ImageContentPolicies() v1.ImageContentPolicyInterface {
 	return &FakeImageContentPolicies{c}
 }
 
+func (c *FakeConfigV1) ImageDigestMirrorSets() v1.ImageDigestMirrorSetInterface {
+	return &FakeImageDigestMirrorSets{c}
+}
+
+func (c *FakeConfigV1) ImageTagMirrorSets() v1.ImageTagMirrorSetInterface {
+	return &FakeImageTagMirrorSets{c}
+}
+
 func (c *FakeConfigV1) Infrastructures() v1.InfrastructureInterface {
 	return &FakeInfrastructures{c}
 }
@@ -62,6 +70,10 @@ func (c *FakeConfigV1) Ingresses() v1.IngressInterface {
 
 func (c *FakeConfigV1) Networks() v1.NetworkInterface {
 	return &FakeNetworks{c}
+}
+
+func (c *FakeConfigV1) Nodes() v1.NodeInterface {
+	return &FakeNodes{c}
 }
 
 func (c *FakeConfigV1) OAuths() v1.OAuthInterface {

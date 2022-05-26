@@ -793,7 +793,7 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 			}
 		}
 
-		// Remove from nodeZones cache if using deprecated LabelFailureDomainBetaZone
+		//Remove from nodeZones cache if using depreciated LabelFailureDomainBetaZone
 		prevZoneFailureDomain, ok := prevNode.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
 		if ok && az.isAvailabilityZone(prevZoneFailureDomain) {
 			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
@@ -808,17 +808,16 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 			delete(az.nodeResourceGroups, prevNode.ObjectMeta.Name)
 		}
 
+		// Remove from unmanagedNodes cache.
 		managed, ok := prevNode.ObjectMeta.Labels[managedByAzureLabel]
-		isNodeManagedByCloudProvider := !ok || managed != "false"
-
-		// Remove unmanagedNodes cache
-		if !isNodeManagedByCloudProvider {
+		if ok && managed == "false" {
 			az.unmanagedNodes.Delete(prevNode.ObjectMeta.Name)
+			az.excludeLoadBalancerNodes.Delete(prevNode.ObjectMeta.Name)
 		}
 
-		if newNode == nil {
-			// the node is being deleted from the cluster, exclude it from load balancers
-			az.excludeLoadBalancerNodes.Insert(prevNode.ObjectMeta.Name)
+		// Remove from excludeLoadBalancerNodes cache.
+		if _, hasExcludeBalancerLabel := prevNode.ObjectMeta.Labels[v1.LabelNodeExcludeBalancers]; hasExcludeBalancerLabel {
+			az.excludeLoadBalancerNodes.Delete(prevNode.ObjectMeta.Name)
 		}
 	}
 
@@ -841,26 +840,16 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 			az.nodeResourceGroups[newNode.ObjectMeta.Name] = strings.ToLower(newRG)
 		}
 
-		_, hasExcludeBalancerLabel := newNode.ObjectMeta.Labels[v1.LabelNodeExcludeBalancers]
+		// Add to unmanagedNodes cache.
 		managed, ok := newNode.ObjectMeta.Labels[managedByAzureLabel]
-		isNodeManagedByCloudProvider := !ok || managed != "false"
-
-		// update unmanagedNodes cache
-		if !isNodeManagedByCloudProvider {
+		if ok && managed == "false" {
 			az.unmanagedNodes.Insert(newNode.ObjectMeta.Name)
+			az.excludeLoadBalancerNodes.Insert(newNode.ObjectMeta.Name)
 		}
-		// update excludeLoadBalancerNodes cache
-		switch {
-		case !isNodeManagedByCloudProvider:
+
+		// Add to excludeLoadBalancerNodes cache.
+		if _, hasExcludeBalancerLabel := newNode.ObjectMeta.Labels[v1.LabelNodeExcludeBalancers]; hasExcludeBalancerLabel {
 			az.excludeLoadBalancerNodes.Insert(newNode.ObjectMeta.Name)
-		case hasExcludeBalancerLabel:
-			az.excludeLoadBalancerNodes.Insert(newNode.ObjectMeta.Name)
-		case !isNodeReady(newNode):
-			az.excludeLoadBalancerNodes.Insert(newNode.ObjectMeta.Name)
-		default:
-			// Nodes not falling into the three cases above are valid backends and
-			// are removed from excludeLoadBalancerNodes cache.
-			az.excludeLoadBalancerNodes.Delete(newNode.ObjectMeta.Name)
 		}
 	}
 }
@@ -985,15 +974,4 @@ func (az *Cloud) ShouldNodeExcludedFromLoadBalancer(nodeName string) (bool, erro
 	}
 
 	return az.excludeLoadBalancerNodes.Has(nodeName), nil
-}
-
-// This, along with the few lines that call this function in updateNodeCaches, should be
-// replaced by https://github.com/kubernetes-sigs/cloud-provider-azure/pull/1195 once that merges.
-func isNodeReady(node *v1.Node) bool {
-	for _, cond := range node.Status.Conditions {
-		if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
-			return true
-		}
-	}
-	return false
 }

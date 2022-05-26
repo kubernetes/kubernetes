@@ -45,12 +45,10 @@ import (
 // through the WithFrameworkOutOfTreeRegistry option.
 func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.Features{
-		EnablePodAffinityNamespaceSelector: feature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector),
-		EnablePodDisruptionBudget:          feature.DefaultFeatureGate.Enabled(features.PodDisruptionBudget),
-		EnablePodOverhead:                  feature.DefaultFeatureGate.Enabled(features.PodOverhead),
-		EnableReadWriteOncePod:             feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
-		EnableVolumeCapacityPriority:       feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
-		EnableCSIStorageCapacity:           feature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity),
+		EnablePodDisruptionBudget:           feature.DefaultFeatureGate.Enabled(features.PodDisruptionBudget),
+		EnableReadWriteOncePod:              feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+		EnableVolumeCapacityPriority:        feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
+		EnableMinDomainsInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.MinDomainsInPodTopologySpread),
 	}
 
 	return runtime.Registry{
@@ -60,9 +58,9 @@ func NewInTreeRegistry() runtime.Registry {
 		nodename.Name:                        nodename.New,
 		nodeports.Name:                       nodeports.New,
 		nodeaffinity.Name:                    nodeaffinity.New,
-		podtopologyspread.Name:               podtopologyspread.New,
+		podtopologyspread.Name:               runtime.FactoryAdapter(fts, podtopologyspread.New),
 		nodeunschedulable.Name:               nodeunschedulable.New,
-		noderesources.FitName:                runtime.FactoryAdapter(fts, noderesources.NewFit),
+		noderesources.Name:                   runtime.FactoryAdapter(fts, noderesources.NewFit),
 		noderesources.BalancedAllocationName: runtime.FactoryAdapter(fts, noderesources.NewBalancedAllocation),
 		volumebinding.Name:                   runtime.FactoryAdapter(fts, volumebinding.New),
 		volumerestrictions.Name:              runtime.FactoryAdapter(fts, volumerestrictions.New),
@@ -72,7 +70,7 @@ func NewInTreeRegistry() runtime.Registry {
 		nodevolumelimits.GCEPDName:           runtime.FactoryAdapter(fts, nodevolumelimits.NewGCEPD),
 		nodevolumelimits.AzureDiskName:       runtime.FactoryAdapter(fts, nodevolumelimits.NewAzureDisk),
 		nodevolumelimits.CinderName:          runtime.FactoryAdapter(fts, nodevolumelimits.NewCinder),
-		interpodaffinity.Name:                runtime.FactoryAdapter(fts, interpodaffinity.New),
+		interpodaffinity.Name:                interpodaffinity.New,
 		queuesort.Name:                       queuesort.New,
 		defaultbinder.Name:                   defaultbinder.New,
 		defaultpreemption.Name:               runtime.FactoryAdapter(fts, defaultpreemption.New),

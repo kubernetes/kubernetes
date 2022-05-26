@@ -176,6 +176,79 @@ spec:
                           - RoundRobin
                           - Sequential
                           type: string
+                        transportConfig:
+                          description: "transportConfig is used to configure the transport
+                            type, server name, and optional custom CA or CA bundle
+                            to use when forwarding DNS requests to an upstream resolver.
+                            \n The default value is \"\" (empty) which results in
+                            a standard cleartext connection being used when forwarding
+                            DNS requests to an upstream resolver."
+                          properties:
+                            tls:
+                              description: tls contains the additional configuration
+                                options to use when Transport is set to "TLS".
+                              properties:
+                                caBundle:
+                                  description: "caBundle references a ConfigMap that
+                                    must contain either a single CA Certificate or
+                                    a CA Bundle. This allows cluster administrators
+                                    to provide their own CA or CA bundle for validating
+                                    the certificate of upstream resolvers. \n 1. The
+                                    configmap must contain a `ca-bundle.crt` key.
+                                    2. The value must be a PEM encoded CA certificate
+                                    or CA bundle. 3. The administrator must create
+                                    this configmap in the openshift-config namespace.
+                                    4. The upstream server certificate must contain
+                                    a Subject Alternative Name (SAN) that matches
+                                    ServerName."
+                                  properties:
+                                    name:
+                                      description: name is the metadata.name of the
+                                        referenced config map
+                                      type: string
+                                  required:
+                                  - name
+                                  type: object
+                                serverName:
+                                  description: serverName is the upstream server to
+                                    connect to when forwarding DNS queries. This is
+                                    required when Transport is set to "TLS". ServerName
+                                    will be validated against the DNS naming conventions
+                                    in RFC 1123 and should match the TLS certificate
+                                    installed in the upstream resolver(s).
+                                  maxLength: 253
+                                  pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
+                                  type: string
+                              required:
+                              - serverName
+                              type: object
+                            transport:
+                              description: "transport allows cluster administrators
+                                to opt-in to using a DNS-over-TLS connection between
+                                cluster DNS and an upstream resolver(s). Configuring
+                                TLS as the transport at this level without configuring
+                                a CABundle will result in the system certificates
+                                being used to verify the serving certificate of the
+                                upstream resolver(s). \n Possible values: \"\" (empty)
+                                - This means no explicit choice has been made and
+                                the platform chooses the default which is subject
+                                to change over time. The current default is \"Cleartext\".
+                                \"Cleartext\" - Cluster admin specified cleartext
+                                option. This results in the same functionality as
+                                an empty value but may be useful when a cluster admin
+                                wants to be more explicit about the transport, or
+                                wants to switch from \"TLS\" to \"Cleartext\" explicitly.
+                                \"TLS\" - This indicates that DNS queries should be
+                                sent over a TLS connection. If Transport is set to
+                                TLS, you MUST also set ServerName. If a port is not
+                                included with the upstream IP, port 853 will be tried
+                                by default per RFC 7858 section 3.1; https://datatracker.ietf.org/doc/html/rfc7858#section-3.1."
+                              enum:
+                              - TLS
+                              - Cleartext
+                              - ""
+                              type: string
+                          type: object
                         upstreams:
                           description: "upstreams is a list of resolvers to forward
                             name queries for subdomains of Zones. Each instance of
@@ -228,6 +301,75 @@ spec:
                     - RoundRobin
                     - Sequential
                     type: string
+                  transportConfig:
+                    description: "transportConfig is used to configure the transport
+                      type, server name, and optional custom CA or CA bundle to use
+                      when forwarding DNS requests to an upstream resolver. \n The
+                      default value is \"\" (empty) which results in a standard cleartext
+                      connection being used when forwarding DNS requests to an upstream
+                      resolver."
+                    properties:
+                      tls:
+                        description: tls contains the additional configuration options
+                          to use when Transport is set to "TLS".
+                        properties:
+                          caBundle:
+                            description: "caBundle references a ConfigMap that must
+                              contain either a single CA Certificate or a CA Bundle.
+                              This allows cluster administrators to provide their
+                              own CA or CA bundle for validating the certificate of
+                              upstream resolvers. \n 1. The configmap must contain
+                              a `ca-bundle.crt` key. 2. The value must be a PEM encoded
+                              CA certificate or CA bundle. 3. The administrator must
+                              create this configmap in the openshift-config namespace.
+                              4. The upstream server certificate must contain a Subject
+                              Alternative Name (SAN) that matches ServerName."
+                            properties:
+                              name:
+                                description: name is the metadata.name of the referenced
+                                  config map
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          serverName:
+                            description: serverName is the upstream server to connect
+                              to when forwarding DNS queries. This is required when
+                              Transport is set to "TLS". ServerName will be validated
+                              against the DNS naming conventions in RFC 1123 and should
+                              match the TLS certificate installed in the upstream
+                              resolver(s).
+                            maxLength: 253
+                            pattern: ^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])(\.([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]{0,61}[a-zA-Z0-9]))*$
+                            type: string
+                        required:
+                        - serverName
+                        type: object
+                      transport:
+                        description: "transport allows cluster administrators to opt-in
+                          to using a DNS-over-TLS connection between cluster DNS and
+                          an upstream resolver(s). Configuring TLS as the transport
+                          at this level without configuring a CABundle will result
+                          in the system certificates being used to verify the serving
+                          certificate of the upstream resolver(s). \n Possible values:
+                          \"\" (empty) - This means no explicit choice has been made
+                          and the platform chooses the default which is subject to
+                          change over time. The current default is \"Cleartext\".
+                          \"Cleartext\" - Cluster admin specified cleartext option.
+                          This results in the same functionality as an empty value
+                          but may be useful when a cluster admin wants to be more
+                          explicit about the transport, or wants to switch from \"TLS\"
+                          to \"Cleartext\" explicitly. \"TLS\" - This indicates that
+                          DNS queries should be sent over a TLS connection. If Transport
+                          is set to TLS, you MUST also set ServerName. If a port is
+                          not included with the upstream IP, port 853 will be tried
+                          by default per RFC 7858 section 3.1; https://datatracker.ietf.org/doc/html/rfc7858#section-3.1."
+                        enum:
+                        - TLS
+                        - Cleartext
+                        - ""
+                        type: string
+                    type: object
                   upstreams:
                     default:
                     - type: SystemResolvConf

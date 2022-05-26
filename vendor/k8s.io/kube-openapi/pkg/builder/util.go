@@ -19,7 +19,7 @@ package builder
 import (
 	"sort"
 
-	"github.com/emicklei/go-restful"
+	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -42,20 +42,20 @@ func sortParameters(p []spec.Parameter) {
 	sort.Sort(byNameIn{p})
 }
 
-func groupRoutesByPath(routes []restful.Route) map[string][]restful.Route {
-	pathToRoutes := make(map[string][]restful.Route)
+func groupRoutesByPath(routes []common.Route) map[string][]common.Route {
+	pathToRoutes := make(map[string][]common.Route)
 	for _, r := range routes {
-		pathToRoutes[r.Path] = append(pathToRoutes[r.Path], r)
+		pathToRoutes[r.Path()] = append(pathToRoutes[r.Path()], r)
 	}
 	return pathToRoutes
 }
 
-func mapKeyFromParam(param *restful.Parameter) interface{} {
+func mapKeyFromParam(param common.Parameter) interface{} {
 	return struct {
 		Name string
-		Kind int
+		Kind common.ParameterKind
 	}{
-		Name: param.Data().Name,
-		Kind: param.Data().Kind,
+		Name: param.Name(),
+		Kind: param.Kind(),
 	}
 }

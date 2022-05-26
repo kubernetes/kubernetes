@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
@@ -194,7 +195,11 @@ current-context: default
 				return fmt.Errorf("failed to execute test template: %v", err)
 			}
 			// Create a new authorizer
-			sarClient, err := subjectAccessReviewInterfaceFromKubeconfig(p, "v1", testRetryBackoff, nil)
+			clientConfig, err := webhookutil.LoadKubeconfig(p, nil)
+			if err != nil {
+				return err
+			}
+			sarClient, err := subjectAccessReviewInterfaceFromConfig(clientConfig, "v1", testRetryBackoff)
 			if err != nil {
 				return fmt.Errorf("error building sar client: %v", err)
 			}
@@ -333,7 +338,11 @@ func newV1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, cache
 	if err := json.NewEncoder(tempfile).Encode(config); err != nil {
 		return nil, err
 	}
-	sarClient, err := subjectAccessReviewInterfaceFromKubeconfig(p, "v1", testRetryBackoff, nil)
+	clientConfig, err := webhookutil.LoadKubeconfig(p, nil)
+	if err != nil {
+		return nil, err
+	}
+	sarClient, err := subjectAccessReviewInterfaceFromConfig(clientConfig, "v1", testRetryBackoff)
 	if err != nil {
 		return nil, fmt.Errorf("error building sar client: %v", err)
 	}

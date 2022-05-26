@@ -766,20 +766,22 @@ func thresholdsMet(thresholds []evictionapi.Threshold, observations signalObserv
 }
 
 func debugLogObservations(logPrefix string, observations signalObservations) {
-	if !klog.V(3).Enabled() {
+	klogV := klog.V(3)
+	if !klogV.Enabled() {
 		return
 	}
 	for k, v := range observations {
 		if !v.time.IsZero() {
-			klog.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", v.available, "capacity", v.capacity, "time", v.time)
+			klogV.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", v.available, "capacity", v.capacity, "time", v.time)
 		} else {
-			klog.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", v.available, "capacity", v.capacity)
+			klogV.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", v.available, "capacity", v.capacity)
 		}
 	}
 }
 
 func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionapi.Threshold, observations signalObservations) {
-	if !klog.V(3).Enabled() {
+	klogV := klog.V(3)
+	if !klogV.Enabled() {
 		return
 	}
 	for i := range thresholds {
@@ -787,9 +789,9 @@ func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionap
 		observed, found := observations[threshold.Signal]
 		if found {
 			quantity := evictionapi.GetThresholdQuantity(threshold.Value, observed.capacity)
-			klog.InfoS("Eviction manager: threshold observed resource", "log", logPrefix, "signal", threshold.Signal, "quantity", quantity, "resource", observed.available)
+			klogV.InfoS("Eviction manager: threshold observed resource", "log", logPrefix, "signal", threshold.Signal, "quantity", quantity, "resource", observed.available)
 		} else {
-			klog.InfoS("Eviction manager: threshold had no observation", "log", logPrefix, "signal", threshold.Signal)
+			klogV.InfoS("Eviction manager: threshold had no observation", "log", logPrefix, "signal", threshold.Signal)
 		}
 	}
 }

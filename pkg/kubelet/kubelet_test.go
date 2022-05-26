@@ -39,7 +39,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
@@ -87,7 +86,6 @@ import (
 )
 
 func init() {
-	utilruntime.ReallyCrash = true
 }
 
 const (
@@ -365,7 +363,6 @@ func newTestKubeletWithImageList(
 		kubelet.hostutil,
 		kubelet.getPodsDir(),
 		kubelet.recorder,
-		false, /* experimentalCheckNodeCapabilitiesBeforeMount*/
 		false, /* keepTerminatedPodVolumes */
 		volumetest.NewBlockVolumePathHandler())
 
@@ -2367,13 +2364,6 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, pod, v1.PodFailed)
-}
-
-func TestPreInitRuntimeService(t *testing.T) {
-	err := PreInitRuntimeService(nil, nil, nil, "", "", "", "", "")
-	if err == nil {
-		t.Fatal("PreInitRuntimeService should fail when not configured with a container runtime")
-	}
 }
 
 func TestSyncLabels(t *testing.T) {

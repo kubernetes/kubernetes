@@ -77,7 +77,7 @@ var (
 
 func Setup() error {
 	var err error
-	rootResctrl, err = intelrdt.GetIntelRdtPath(rootContainer)
+	rootResctrl, err = intelrdt.Root()
 	if err != nil {
 		return fmt.Errorf("unable to initialize resctrl: %v", err)
 	}

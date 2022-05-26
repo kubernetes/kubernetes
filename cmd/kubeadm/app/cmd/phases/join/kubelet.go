@@ -170,7 +170,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 		klog.V(1).Infoln("[kubelet-start] Stopping the kubelet")
 		kubeletphase.TryStopKubelet()
 	} else {
-		fmt.Println("[dryrun] Would stop the kubelet")
+		fmt.Println("[kubelet-start] Would stop the kubelet")
 	}
 
 	// Write the configuration for the kubelet (using the bootstrap token credentials) to disk so the kubelet can start
@@ -187,7 +187,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	}
 
 	if data.DryRun() {
-		fmt.Println("[dryrun] Would start the kubelet")
+		fmt.Println("[kubelet-start] Would start the kubelet")
 		// If we're dry-running, print the kubelet config manifests and print static pod manifests if joining a control plane.
 		// TODO: think of a better place to move this call - e.g. a hidden phase.
 		if err := dryrunutil.PrintFilesIfDryRunning(cfg.ControlPlane != nil, data.ManifestDir(), data.OutputWriter()); err != nil {

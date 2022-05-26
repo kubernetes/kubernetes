@@ -36,7 +36,7 @@ func (RouteIngress) SwaggerDoc() map[string]string {
 
 var map_RouteIngressCondition = map[string]string{
 	"":                   "RouteIngressCondition contains details for the current condition of this route on a particular router.",
-	"type":               "Type is the type of the condition. Currently only Ready.",
+	"type":               "Type is the type of the condition. Currently only Admitted.",
 	"status":             "Status is the status of the condition. Can be True, False, Unknown.",
 	"reason":             "(brief) reason for the condition's last transition, and is usually a machine and human readable constant",
 	"message":            "Human readable message indicating details about last transition.",

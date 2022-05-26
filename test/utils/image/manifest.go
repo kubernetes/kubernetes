@@ -17,10 +17,13 @@ limitations under the License.
 package image
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -73,9 +76,20 @@ func initReg() RegistryList {
 		return registry
 	}
 
-	fileContent, err := ioutil.ReadFile(repoList)
-	if err != nil {
-		panic(fmt.Errorf("Error reading '%v' file contents: %v", repoList, err))
+	var fileContent []byte
+	var err error
+	if strings.HasPrefix(repoList, "https://") || strings.HasPrefix(repoList, "http://") {
+		var b bytes.Buffer
+		err = readFromURL(repoList, bufio.NewWriter(&b))
+		if err != nil {
+			panic(fmt.Errorf("error reading '%v' url contents: %v", repoList, err))
+		}
+		fileContent = b.Bytes()
+	} else {
+		fileContent, err = os.ReadFile(repoList)
+		if err != nil {
+			panic(fmt.Errorf("error reading '%v' file contents: %v", repoList, err))
+		}
 	}
 
 	err = yaml.Unmarshal(fileContent, &registry)
@@ -85,12 +99,33 @@ func initReg() RegistryList {
 	return registry
 }
 
+// Essentially curl url | writer
+func readFromURL(url string, writer io.Writer) error {
+	httpTransport := new(http.Transport)
+	httpTransport.Proxy = http.ProxyFromEnvironment
+
+	c := &http.Client{Transport: httpTransport}
+	r, err := c.Get(url)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+	if r.StatusCode >= 400 {
+		return fmt.Errorf("%v returned %d", url, r.StatusCode)
+	}
+	_, err = io.Copy(writer, r.Body)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 var (
 	initRegistry = RegistryList{
 		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
 		PromoterE2eRegistry:      "k8s.gcr.io/e2e-test-images",
 		BuildImageRegistry:       "k8s.gcr.io/build-image",
-		InvalidRegistry:          "invalid.com/invalid",
+		InvalidRegistry:          "invalid.registry.k8s.io/invalid",
 		GcEtcdRegistry:           "k8s.gcr.io",
 		GcRegistry:               "k8s.gcr.io",
 		SigStorageRegistry:       "k8s.gcr.io/sig-storage",
@@ -123,8 +158,6 @@ const (
 	AuthenticatedWindowsNanoServer
 	// BusyBox image
 	BusyBox
-	// CheckMetadataConcealment image
-	CheckMetadataConcealment
 	// CudaVectorAdd image
 	CudaVectorAdd
 	// CudaVectorAdd2 image
@@ -198,19 +231,18 @@ const (
 
 func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs := map[int]Config{}
-	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.33"}
+	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.36"}
 	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{list.GcAuthenticatedRegistry, "windows-nanoserver", "v1"}
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.17.5"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.29-2"}
-	configs[CheckMetadataConcealment] = Config{list.PromoterE2eRegistry, "metadata-concealment", "1.6"}
 	configs[CudaVectorAdd] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
-	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "bullseye-v1.1.0"}
+	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "bullseye-v1.3.0"}
 	configs[EchoServer] = Config{list.PromoterE2eRegistry, "echoserver", "2.4"}
-	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.1-0"}
+	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.3-0"}
 	configs[GlusterDynamicProvisioner] = Config{list.PromoterE2eRegistry, "glusterdynamic-provisioner", "v1.3"}
 	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-2"}
 	configs[HttpdNew] = Config{list.PromoterE2eRegistry, "httpd", "2.4.39-2"}
@@ -219,7 +251,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[JessieDnsutils] = Config{list.PromoterE2eRegistry, "jessie-dnsutils", "1.5"}
 	configs[Kitten] = Config{list.PromoterE2eRegistry, "kitten", "1.5"}
 	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.5"}
-	configs[NFSProvisioner] = Config{list.SigStorageRegistry, "nfs-provisioner", "v2.2.2"}
+	configs[NFSProvisioner] = Config{list.SigStorageRegistry, "nfs-provisioner", "v3.0.1"}
 	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.14-2"}
 	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.15-2"}
 	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.2"}
@@ -228,7 +260,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.3"}
 	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.2"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	configs[Pause] = Config{list.GcRegistry, "pause", "3.6"}
+	configs[Pause] = Config{list.GcRegistry, "pause", "3.7"}
 	configs[Perl] = Config{list.PromoterE2eRegistry, "perl", "5.26"}
 	configs[PrometheusDummyExporter] = Config{list.GcRegistry, "prometheus-dummy-exporter", "v0.1.0"}
 	configs[PrometheusToSd] = Config{list.GcRegistry, "prometheus-to-sd", "v0.5.0"}
@@ -241,6 +273,11 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[VolumeGlusterServer] = Config{list.PromoterE2eRegistry, "volume/gluster", "1.3"}
 	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.4"}
 	configs[WindowsServer] = Config{list.MicrosoftRegistry, "windows", "1809"}
+
+	// This adds more config entries. Those have no pre-defined index number,
+	// but will be used via ReplaceRegistryInImageURL when deploying
+	// CSI drivers (test/e2e/storage/util/create.go).
+	appendCSIImageConfigs(configs)
 
 	// if requested, map all the SHAs into a known format based on the input
 	originalImageConfigs := configs

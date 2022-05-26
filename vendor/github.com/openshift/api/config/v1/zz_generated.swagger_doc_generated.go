@@ -548,6 +548,26 @@ func (ClusterVersion) SwaggerDoc() map[string]string {
 	return map_ClusterVersion
 }
 
+var map_ClusterVersionCapabilitiesSpec = map[string]string{
+	"":                              "ClusterVersionCapabilitiesSpec selects the managed set of optional, core cluster components.",
+	"baselineCapabilitySet":         "baselineCapabilitySet selects an initial set of optional capabilities to enable, which can be extended via additionalEnabledCapabilities.  If unset, the cluster will choose a default, and the default may change over time. The current default is vCurrent.",
+	"additionalEnabledCapabilities": "additionalEnabledCapabilities extends the set of managed capabilities beyond the baseline defined in baselineCapabilitySet.  The default is an empty set.",
+}
+
+func (ClusterVersionCapabilitiesSpec) SwaggerDoc() map[string]string {
+	return map_ClusterVersionCapabilitiesSpec
+}
+
+var map_ClusterVersionCapabilitiesStatus = map[string]string{
+	"":                    "ClusterVersionCapabilitiesStatus describes the state of optional, core cluster components.",
+	"enabledCapabilities": "enabledCapabilities lists all the capabilities that are currently managed.",
+	"knownCapabilities":   "knownCapabilities lists all the capabilities known to the current cluster.",
+}
+
+func (ClusterVersionCapabilitiesStatus) SwaggerDoc() map[string]string {
+	return map_ClusterVersionCapabilitiesStatus
+}
+
 var map_ClusterVersionList = map[string]string{
 	"": "ClusterVersionList is a list of ClusterVersion resources.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 }
@@ -562,6 +582,7 @@ var map_ClusterVersionSpec = map[string]string{
 	"desiredUpdate": "desiredUpdate is an optional field that indicates the desired value of the cluster version. Setting this value will trigger an upgrade (if the current version does not match the desired version). The set of recommended update values is listed as part of available updates in status, and setting values outside that range may cause the upgrade to fail. You may specify the version field without setting image if an update exists with that version in the availableUpdates or history.\n\nIf an upgrade fails the operator will halt and report status about the failing component. Setting the desired update value back to the previous version will cause a rollback to be attempted. Not all rollbacks will succeed.",
 	"upstream":      "upstream may be used to specify the preferred update server. By default it will use the appropriate update server for the cluster and region.",
 	"channel":       "channel is an identifier for explicitly requesting that a non-default set of updates be applied to this cluster. The default channel will be contain stable updates that are appropriate for production clusters.",
+	"capabilities":  "capabilities configures the installation of optional, core cluster components.  A null value here is identical to an empty object; see the child properties for default semantics.",
 	"overrides":     "overrides is list of overides for components that are managed by cluster version operator. Marking a component unmanaged will prevent the operator from creating or updating the object.",
 }
 
@@ -575,6 +596,7 @@ var map_ClusterVersionStatus = map[string]string{
 	"history":            "history contains a list of the most recent versions applied to the cluster. This value may be empty during cluster startup, and then will be updated when a new update is being applied. The newest update is first in the list and it is ordered by recency. Updates in the history have state Completed if the rollout completed - if an update was failing or halfway applied the state will be Partial. Only a limited amount of update history is preserved.",
 	"observedGeneration": "observedGeneration reports which version of the spec is being synced. If this value is not equal to metadata.generation, then the desired and conditions fields may represent a previous version.",
 	"versionHash":        "versionHash is a fingerprint of the content that the cluster will be updated with. It is used by the operator to avoid unnecessary work and is for internal use only.",
+	"capabilities":       "capabilities describes the state of optional, core cluster components.",
 	"conditions":         "conditions provides information about the cluster version. The condition \"Available\" is set to true if the desiredUpdate has been reached. The condition \"Progressing\" is set to true if an update is being applied. The condition \"Degraded\" is set to true if an update is currently blocked by a temporary or permanent error. Conditions are only valid for the current desiredUpdate when metadata.generation is equal to status.generation.",
 	"availableUpdates":   "availableUpdates contains updates recommended for this cluster. Updates which appear in conditionalUpdates but not in availableUpdates may expose this cluster to known issues. This list may be empty if no updates are recommended, if the update service is unavailable, or if an invalid channel has been specified.",
 	"conditionalUpdates": "conditionalUpdates contains the list of updates that may be recommended for this cluster if it meets specific required conditions. Consumers interested in the set of updates that are actually recommended for this cluster should use availableUpdates. This list may be empty if no updates are recommended, if the update service is unavailable, or if an empty or invalid channel has been specified.",
@@ -882,6 +904,80 @@ func (RepositoryDigestMirrors) SwaggerDoc() map[string]string {
 	return map_RepositoryDigestMirrors
 }
 
+var map_ImageDigestMirrorSet = map[string]string{
+	"":     "ImageDigestMirrorSet holds cluster-wide information about how to handle registry mirror rules on using digest pull specification. When multiple policies are defined, the outcome of the behavior is defined on each field.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"spec": "spec holds user settable values for configuration",
+}
+
+func (ImageDigestMirrorSet) SwaggerDoc() map[string]string {
+	return map_ImageDigestMirrorSet
+}
+
+var map_ImageDigestMirrorSetList = map[string]string{
+	"": "ImageDigestMirrorSetList lists the items in the ImageDigestMirrorSet CRD.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+}
+
+func (ImageDigestMirrorSetList) SwaggerDoc() map[string]string {
+	return map_ImageDigestMirrorSetList
+}
+
+var map_ImageDigestMirrorSetSpec = map[string]string{
+	"":                   "ImageDigestMirrorSetSpec is the specification of the ImageDigestMirrorSet CRD.",
+	"imageDigestMirrors": "imageDigestMirrors allows images referenced by image digests in pods to be pulled from alternative mirrored repository locations. The image pull specification provided to the pod will be compared to the source locations described in imageDigestMirrors and the image may be pulled down from any of the mirrors in the list instead of the specified repository allowing administrators to choose a potentially faster mirror. To use mirrors to pull images using tag specification, users should configure a list of mirrors using \"ImageTagMirrorSet\" CRD.\n\nIf the image pull specification matches the repository of \"source\" in multiple imagedigestmirrorset objects, only the objects which define the most specific namespace match will be used. For example, if there are objects using quay.io/libpod and quay.io/libpod/busybox as the \"source\", only the objects using quay.io/libpod/busybox are going to apply for pull specification quay.io/libpod/busybox. Each “source” repository is treated independently; configurations for different “source” repositories don’t interact.\n\nIf the \"mirrors\" is not specified, the image will continue to be pulled from the specified repository in the pull spec.\n\nWhen multiple policies are defined for the same “source” repository, the sets of defined mirrors will be merged together, preserving the relative order of the mirrors, if possible. For example, if policy A has mirrors `a, b, c` and policy B has mirrors `c, d, e`, the mirrors will be used in the order `a, b, c, d, e`.  If the orders of mirror entries conflict (e.g. `a, b` vs. `b, a`) the configuration is not rejected but the resulting order is unspecified. Users who want to use a specific order of mirrors, should configure them into one list of mirrors using the expected order.",
+}
+
+func (ImageDigestMirrorSetSpec) SwaggerDoc() map[string]string {
+	return map_ImageDigestMirrorSetSpec
+}
+
+var map_ImageDigestMirrors = map[string]string{
+	"":                   "ImageDigestMirrors holds cluster-wide information about how to handle mirrors in the registries config.",
+	"source":             "source matches the repository that users refer to, e.g. in image pull specifications. Setting source to a registry hostname e.g. docker.io. quay.io, or registry.redhat.io, will match the image pull specification of corressponding registry. \"source\" uses one of the following formats: host[:port] host[:port]/namespace[/namespace…] host[:port]/namespace[/namespace…]/repo [*.]host for more information about the format, see the document about the location field: https://github.com/containers/image/blob/main/docs/containers-registries.conf.5.md#choosing-a-registry-toml-table",
+	"mirrors":            "mirrors is zero or more locations that may also contain the same images. No mirror will be configured if not specified. Images can be pulled from these mirrors only if they are referenced by their digests. The mirrored location is obtained by replacing the part of the input reference that matches source by the mirrors entry, e.g. for registry.redhat.io/product/repo reference, a (source, mirror) pair *.redhat.io, mirror.local/redhat causes a mirror.local/redhat/product/repo repository to be used. The order of mirrors in this list is treated as the user's desired priority, while source is by default considered lower priority than all mirrors. If no mirror is specified or all image pulls from the mirror list fail, the image will continue to be pulled from the repository in the pull spec unless explicitly prohibited by \"mirrorSourcePolicy\" Other cluster configuration, including (but not limited to) other imageDigestMirrors objects, may impact the exact order mirrors are contacted in, or some mirrors may be contacted in parallel, so this should be considered a preference rather than a guarantee of ordering. \"mirrors\" uses one of the following formats: host[:port] host[:port]/namespace[/namespace…] host[:port]/namespace[/namespace…]/repo for more information about the format, see the document about the location field: https://github.com/containers/image/blob/main/docs/containers-registries.conf.5.md#choosing-a-registry-toml-table",
+	"mirrorSourcePolicy": "mirrorSourcePolicy defines the fallback policy if fails to pull image from the mirrors. If unset, the image will continue to be pulled from the the repository in the pull spec. sourcePolicy is valid configuration only when one or more mirrors are in the mirror list.",
+}
+
+func (ImageDigestMirrors) SwaggerDoc() map[string]string {
+	return map_ImageDigestMirrors
+}
+
+var map_ImageTagMirrorSet = map[string]string{
+	"":     "ImageTagMirrorSet holds cluster-wide information about how to handle registry mirror rules on using tag pull specification. When multiple policies are defined, the outcome of the behavior is defined on each field.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"spec": "spec holds user settable values for configuration",
+}
+
+func (ImageTagMirrorSet) SwaggerDoc() map[string]string {
+	return map_ImageTagMirrorSet
+}
+
+var map_ImageTagMirrorSetList = map[string]string{
+	"": "ImageTagMirrorSetList lists the items in the ImageTagMirrorSet CRD.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+}
+
+func (ImageTagMirrorSetList) SwaggerDoc() map[string]string {
+	return map_ImageTagMirrorSetList
+}
+
+var map_ImageTagMirrorSetSpec = map[string]string{
+	"":                "ImageTagMirrorSetSpec is the specification of the ImageTagMirrorSet CRD.",
+	"imageTagMirrors": "imageTagMirrors allows images referenced by image tags in pods to be pulled from alternative mirrored repository locations. The image pull specification provided to the pod will be compared to the source locations described in imageTagMirrors and the image may be pulled down from any of the mirrors in the list instead of the specified repository allowing administrators to choose a potentially faster mirror. To use mirrors to pull images using digest specification only, users should configure a list of mirrors using \"ImageDigestMirrorSet\" CRD.\n\nIf the image pull specification matches the repository of \"source\" in multiple imagetagmirrorset objects, only the objects which define the most specific namespace match will be used. For example, if there are objects using quay.io/libpod and quay.io/libpod/busybox as the \"source\", only the objects using quay.io/libpod/busybox are going to apply for pull specification quay.io/libpod/busybox. Each “source” repository is treated independently; configurations for different “source” repositories don’t interact.\n\nIf the \"mirrors\" is not specified, the image will continue to be pulled from the specified repository in the pull spec.\n\nWhen multiple policies are defined for the same “source” repository, the sets of defined mirrors will be merged together, preserving the relative order of the mirrors, if possible. For example, if policy A has mirrors `a, b, c` and policy B has mirrors `c, d, e`, the mirrors will be used in the order `a, b, c, d, e`.  If the orders of mirror entries conflict (e.g. `a, b` vs. `b, a`) the configuration is not rejected but the resulting order is unspecified. Users who want to use a deterministic order of mirrors, should configure them into one list of mirrors using the expected order.",
+}
+
+func (ImageTagMirrorSetSpec) SwaggerDoc() map[string]string {
+	return map_ImageTagMirrorSetSpec
+}
+
+var map_ImageTagMirrors = map[string]string{
+	"":                   "ImageTagMirrors holds cluster-wide information about how to handle mirrors in the registries config.",
+	"source":             "source matches the repository that users refer to, e.g. in image pull specifications. Setting source to a registry hostname e.g. docker.io. quay.io, or registry.redhat.io, will match the image pull specification of corressponding registry. \"source\" uses one of the following formats: host[:port] host[:port]/namespace[/namespace…] host[:port]/namespace[/namespace…]/repo [*.]host for more information about the format, see the document about the location field: https://github.com/containers/image/blob/main/docs/containers-registries.conf.5.md#choosing-a-registry-toml-table",
+	"mirrors":            "mirrors is zero or more locations that may also contain the same images. No mirror will be configured if not specified. Images can be pulled from these mirrors only if they are referenced by their tags. The mirrored location is obtained by replacing the part of the input reference that matches source by the mirrors entry, e.g. for registry.redhat.io/product/repo reference, a (source, mirror) pair *.redhat.io, mirror.local/redhat causes a mirror.local/redhat/product/repo repository to be used. Pulling images by tag can potentially yield different images, depending on which endpoint we pull from. Configuring a list of mirrors using \"ImageDigestMirrorSet\" CRD and forcing digest-pulls for mirrors avoids that issue. The order of mirrors in this list is treated as the user's desired priority, while source is by default considered lower priority than all mirrors. If no mirror is specified or all image pulls from the mirror list fail, the image will continue to be pulled from the repository in the pull spec unless explicitly prohibited by \"mirrorSourcePolicy\". Other cluster configuration, including (but not limited to) other imageTagMirrors objects, may impact the exact order mirrors are contacted in, or some mirrors may be contacted in parallel, so this should be considered a preference rather than a guarantee of ordering. \"mirrors\" uses one of the following formats: host[:port] host[:port]/namespace[/namespace…] host[:port]/namespace[/namespace…]/repo for more information about the format, see the document about the location field: https://github.com/containers/image/blob/main/docs/containers-registries.conf.5.md#choosing-a-registry-toml-table",
+	"mirrorSourcePolicy": "mirrorSourcePolicy defines the fallback policy if fails to pull image from the mirrors. If unset, the image will continue to be pulled from the repository in the pull spec. sourcePolicy is valid configuration only when one or more mirrors are in the mirror list.",
+}
+
+func (ImageTagMirrors) SwaggerDoc() map[string]string {
+	return map_ImageTagMirrors
+}
+
 var map_AWSPlatformSpec = map[string]string{
 	"":                 "AWSPlatformSpec holds the desired state of the Amazon Web Services infrastructure provider. This only includes fields that can be modified in the cluster.",
 	"serviceEndpoints": "serviceEndpoints list contains custom endpoints which will override default service endpoint of AWS Services. There must be only one ServiceEndpoint for a service.",
@@ -1108,6 +1204,46 @@ func (KubevirtPlatformStatus) SwaggerDoc() map[string]string {
 	return map_KubevirtPlatformStatus
 }
 
+var map_NutanixPlatformSpec = map[string]string{
+	"":              "NutanixPlatformSpec holds the desired state of the Nutanix infrastructure provider. This only includes fields that can be modified in the cluster.",
+	"prismCentral":  "prismCentral holds the endpoint address and port to access the Nutanix Prism Central. When a cluster-wide proxy is installed, by default, this endpoint will be accessed via the proxy. Should you wish for communication with this endpoint not to be proxied, please add the endpoint to the proxy spec.noProxy list.",
+	"prismElements": "prismElements holds one or more endpoint address and port data to access the Nutanix Prism Elements (clusters) of the Nutanix Prism Central. Currently we only support one Prism Element (cluster) for an OpenShift cluster, where all the Nutanix resources (VMs, subnets, volumes, etc.) used in the OpenShift cluster are located. In the future, we may support Nutanix resources (VMs, etc.) spread over multiple Prism Elements (clusters) of the Prism Central.",
+}
+
+func (NutanixPlatformSpec) SwaggerDoc() map[string]string {
+	return map_NutanixPlatformSpec
+}
+
+var map_NutanixPlatformStatus = map[string]string{
+	"":                    "NutanixPlatformStatus holds the current status of the Nutanix infrastructure provider.",
+	"apiServerInternalIP": "apiServerInternalIP is an IP address to contact the Kubernetes API server that can be used by components inside the cluster, like kubelets using the infrastructure rather than Kubernetes networking. It is the IP that the Infrastructure.status.apiServerInternalURI points to. It is the IP for a self-hosted load balancer in front of the API servers.",
+	"ingressIP":           "ingressIP is an external IP which routes to the default ingress controller. The IP is a suitable target of a wildcard DNS record used to resolve default route host names.",
+}
+
+func (NutanixPlatformStatus) SwaggerDoc() map[string]string {
+	return map_NutanixPlatformStatus
+}
+
+var map_NutanixPrismElementEndpoint = map[string]string{
+	"":         "NutanixPrismElementEndpoint holds the name and endpoint data for a Prism Element (cluster)",
+	"name":     "name is the name of the Prism Element (cluster). This value will correspond with the cluster field configured on other resources (eg Machines, PVCs, etc).",
+	"endpoint": "endpoint holds the endpoint address and port data of the Prism Element (cluster). When a cluster-wide proxy is installed, by default, this endpoint will be accessed via the proxy. Should you wish for communication with this endpoint not to be proxied, please add the endpoint to the proxy spec.noProxy list.",
+}
+
+func (NutanixPrismElementEndpoint) SwaggerDoc() map[string]string {
+	return map_NutanixPrismElementEndpoint
+}
+
+var map_NutanixPrismEndpoint = map[string]string{
+	"":        "NutanixPrismEndpoint holds the endpoint address and port to access the Nutanix Prism Central or Element (cluster)",
+	"address": "address is the endpoint address (DNS name or IP address) of the Nutanix Prism Central or Element (cluster)",
+	"port":    "port is the port number to access the Nutanix Prism Central or Element (cluster)",
+}
+
+func (NutanixPrismEndpoint) SwaggerDoc() map[string]string {
+	return map_NutanixPrismEndpoint
+}
+
 var map_OpenStackPlatformSpec = map[string]string{
 	"": "OpenStackPlatformSpec holds the desired state of the OpenStack infrastructure provider. This only includes fields that can be modified in the cluster.",
 }
@@ -1149,7 +1285,7 @@ func (OvirtPlatformStatus) SwaggerDoc() map[string]string {
 
 var map_PlatformSpec = map[string]string{
 	"":             "PlatformSpec holds the desired state specific to the underlying infrastructure provider of the current cluster. Since these are used at spec-level for the underlying cluster, it is supposed that only one of the spec structs is set.",
-	"type":         "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", \"KubeVirt\", \"EquinixMetal\", \"PowerVS\", \"AlibabaCloud\" and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.",
+	"type":         "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", \"KubeVirt\", \"EquinixMetal\", \"PowerVS\", \"AlibabaCloud\", \"Nutanix\" and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.",
 	"aws":          "AWS contains settings specific to the Amazon Web Services infrastructure provider.",
 	"azure":        "Azure contains settings specific to the Azure infrastructure provider.",
 	"gcp":          "GCP contains settings specific to the Google Cloud Platform infrastructure provider.",
@@ -1162,6 +1298,7 @@ var map_PlatformSpec = map[string]string{
 	"equinixMetal": "EquinixMetal contains settings specific to the Equinix Metal infrastructure provider.",
 	"powervs":      "PowerVS contains settings specific to the IBM Power Systems Virtual Servers infrastructure provider.",
 	"alibabaCloud": "AlibabaCloud contains settings specific to the Alibaba Cloud infrastructure provider.",
+	"nutanix":      "Nutanix contains settings specific to the Nutanix infrastructure provider.",
 }
 
 func (PlatformSpec) SwaggerDoc() map[string]string {
@@ -1170,7 +1307,7 @@ func (PlatformSpec) SwaggerDoc() map[string]string {
 
 var map_PlatformStatus = map[string]string{
 	"":             "PlatformStatus holds the current status specific to the underlying infrastructure provider of the current cluster. Since these are used at status-level for the underlying cluster, it is supposed that only one of the status structs is set.",
-	"type":         "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", \"EquinixMetal\", \"PowerVS\", \"AlibabaCloud\" and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.\n\nThis value will be synced with to the `status.platform` and `status.platformStatus.type`. Currently this value cannot be changed once set.",
+	"type":         "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", \"EquinixMetal\", \"PowerVS\", \"AlibabaCloud\", \"Nutanix\" and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.\n\nThis value will be synced with to the `status.platform` and `status.platformStatus.type`. Currently this value cannot be changed once set.",
 	"aws":          "AWS contains settings specific to the Amazon Web Services infrastructure provider.",
 	"azure":        "Azure contains settings specific to the Azure infrastructure provider.",
 	"gcp":          "GCP contains settings specific to the Google Cloud Platform infrastructure provider.",
@@ -1183,6 +1320,7 @@ var map_PlatformStatus = map[string]string{
 	"equinixMetal": "EquinixMetal contains settings specific to the Equinix Metal infrastructure provider.",
 	"powervs":      "PowerVS contains settings specific to the Power Systems Virtual Servers infrastructure provider.",
 	"alibabaCloud": "AlibabaCloud contains settings specific to the Alibaba Cloud infrastructure provider.",
+	"nutanix":      "Nutanix contains settings specific to the Nutanix infrastructure provider.",
 }
 
 func (PlatformStatus) SwaggerDoc() map[string]string {
@@ -1296,7 +1434,8 @@ func (IngressSpec) SwaggerDoc() map[string]string {
 }
 
 var map_IngressStatus = map[string]string{
-	"componentRoutes": "componentRoutes is where participating operators place the current route status for routes whose hostnames and serving certificates can be customized by the cluster-admin.",
+	"componentRoutes":  "componentRoutes is where participating operators place the current route status for routes whose hostnames and serving certificates can be customized by the cluster-admin.",
+	"defaultPlacement": "defaultPlacement is set at installation time to control which nodes will host the ingress router pods by default. The options are control-plane nodes or worker nodes.\n\nThis field works by dictating how the Cluster Ingress Operator will consider unset replicas and nodePlacement fields in IngressController resources when creating the corresponding Deployments.\n\nSee the documentation for the IngressController replicas and nodePlacement fields for more information.\n\nWhen omitted, the default value is Workers",
 }
 
 func (IngressStatus) SwaggerDoc() map[string]string {
@@ -1405,6 +1544,33 @@ var map_NetworkStatus = map[string]string{
 
 func (NetworkStatus) SwaggerDoc() map[string]string {
 	return map_NetworkStatus
+}
+
+var map_Node = map[string]string{
+	"":       "Node holds cluster-wide information about node specific features.\n\nCompatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+	"spec":   "spec holds user settable values for configuration",
+	"status": "status holds observed values.",
+}
+
+func (Node) SwaggerDoc() map[string]string {
+	return map_Node
+}
+
+var map_NodeList = map[string]string{
+	"": "Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
+}
+
+func (NodeList) SwaggerDoc() map[string]string {
+	return map_NodeList
+}
+
+var map_NodeSpec = map[string]string{
+	"cgroupMode":           "CgroupMode determines the cgroups version on the node",
+	"workerLatencyProfile": "WorkerLatencyProfile determins the how fast the kubelet is updating the status and corresponding reaction of the cluster",
+}
+
+func (NodeSpec) SwaggerDoc() map[string]string {
+	return map_NodeSpec
 }
 
 var map_BasicAuthIdentityProvider = map[string]string{

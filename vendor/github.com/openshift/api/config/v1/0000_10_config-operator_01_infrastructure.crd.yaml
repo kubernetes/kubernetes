@@ -89,6 +89,64 @@ spec:
                     kubevirt:
                       description: Kubevirt contains settings specific to the kubevirt infrastructure provider.
                       type: object
+                    nutanix:
+                      description: Nutanix contains settings specific to the Nutanix infrastructure provider.
+                      type: object
+                      required:
+                        - prismCentral
+                        - prismElements
+                      properties:
+                        prismCentral:
+                          description: prismCentral holds the endpoint address and port to access the Nutanix Prism Central. When a cluster-wide proxy is installed, by default, this endpoint will be accessed via the proxy. Should you wish for communication with this endpoint not to be proxied, please add the endpoint to the proxy spec.noProxy list.
+                          type: object
+                          required:
+                            - address
+                            - port
+                          properties:
+                            address:
+                              description: address is the endpoint address (DNS name or IP address) of the Nutanix Prism Central or Element (cluster)
+                              type: string
+                              maxLength: 256
+                            port:
+                              description: port is the port number to access the Nutanix Prism Central or Element (cluster)
+                              type: integer
+                              format: int32
+                              maximum: 65535
+                              minimum: 1
+                        prismElements:
+                          description: prismElements holds one or more endpoint address and port data to access the Nutanix Prism Elements (clusters) of the Nutanix Prism Central. Currently we only support one Prism Element (cluster) for an OpenShift cluster, where all the Nutanix resources (VMs, subnets, volumes, etc.) used in the OpenShift cluster are located. In the future, we may support Nutanix resources (VMs, etc.) spread over multiple Prism Elements (clusters) of the Prism Central.
+                          type: array
+                          items:
+                            description: NutanixPrismElementEndpoint holds the name and endpoint data for a Prism Element (cluster)
+                            type: object
+                            required:
+                              - endpoint
+                              - name
+                            properties:
+                              endpoint:
+                                description: endpoint holds the endpoint address and port data of the Prism Element (cluster). When a cluster-wide proxy is installed, by default, this endpoint will be accessed via the proxy. Should you wish for communication with this endpoint not to be proxied, please add the endpoint to the proxy spec.noProxy list.
+                                type: object
+                                required:
+                                  - address
+                                  - port
+                                properties:
+                                  address:
+                                    description: address is the endpoint address (DNS name or IP address) of the Nutanix Prism Central or Element (cluster)
+                                    type: string
+                                    maxLength: 256
+                                  port:
+                                    description: port is the port number to access the Nutanix Prism Central or Element (cluster)
+                                    type: integer
+                                    format: int32
+                                    maximum: 65535
+                                    minimum: 1
+                              name:
+                                description: name is the name of the Prism Element (cluster). This value will correspond with the cluster field configured on other resources (eg Machines, PVCs, etc).
+                                type: string
+                                maxLength: 256
+                          x-kubernetes-list-map-keys:
+                            - name
+                          x-kubernetes-list-type: map
                     openstack:
                       description: OpenStack contains settings specific to the OpenStack infrastructure provider.
                       type: object
@@ -122,7 +180,7 @@ spec:
                             - name
                           x-kubernetes-list-type: map
                     type:
-                      description: type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are "AWS", "Azure", "BareMetal", "GCP", "Libvirt", "OpenStack", "VSphere", "oVirt", "KubeVirt", "EquinixMetal", "PowerVS", "AlibabaCloud" and "None". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.
+                      description: type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are "AWS", "Azure", "BareMetal", "GCP", "Libvirt", "OpenStack", "VSphere", "oVirt", "KubeVirt", "EquinixMetal", "PowerVS", "AlibabaCloud", "Nutanix" and "None". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.
                       type: string
                       enum:
                         - ""
@@ -140,6 +198,7 @@ spec:
                         - EquinixMetal
                         - PowerVS
                         - AlibabaCloud
+                        - Nutanix
                     vsphere:
                       description: VSphere contains settings specific to the VSphere infrastructure provider.
                       type: object
@@ -193,6 +252,7 @@ spec:
                     - EquinixMetal
                     - PowerVS
                     - AlibabaCloud
+                    - Nutanix
                 platformStatus:
                   description: platformStatus holds status information specific to the underlying infrastructure provider.
                   type: object
@@ -202,7 +262,6 @@ spec:
                       type: object
                       required:
                         - region
-                        - resourceGroupID
                       properties:
                         region:
                           description: region specifies the region for Alibaba Cloud resources created for the cluster.
@@ -211,7 +270,7 @@ spec:
                         resourceGroupID:
                           description: resourceGroupID is the ID of the resource group for the cluster.
                           type: string
-                          pattern: ^rg-[0-9A-Za-z]+$
+                          pattern: ^(rg-[0-9A-Za-z]+)?$
                         resourceTags:
                           description: resourceTags is a list of additional tags to apply to Alibaba Cloud resources created for the cluster.
                           type: array
@@ -363,6 +422,16 @@ spec:
                         ingressIP:
                           description: ingressIP is an external IP which routes to the default ingress controller. The IP is a suitable target of a wildcard DNS record used to resolve default route host names.
                           type: string
+                    nutanix:
+                      description: Nutanix contains settings specific to the Nutanix infrastructure provider.
+                      type: object
+                      properties:
+                        apiServerInternalIP:
+                          description: apiServerInternalIP is an IP address to contact the Kubernetes API server that can be used by components inside the cluster, like kubelets using the infrastructure rather than Kubernetes networking. It is the IP that the Infrastructure.status.apiServerInternalURI points to. It is the IP for a self-hosted load balancer in front of the API servers.
+                          type: string
+                        ingressIP:
+                          description: ingressIP is an external IP which routes to the default ingress controller. The IP is a suitable target of a wildcard DNS record used to resolve default route host names.
+                          type: string
                     openstack:
                       description: OpenStack contains settings specific to the OpenStack infrastructure provider.
                       type: object
@@ -425,7 +494,7 @@ spec:
                           description: 'zone holds the default zone for the new Power VS resources created by the cluster. Note: Currently only single-zone OCP clusters are supported'
                           type: string
                     type:
-                      description: "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", \"EquinixMetal\", \"PowerVS\", \"AlibabaCloud\" and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform. \n This value will be synced with to the `status.platform` and `status.platformStatus.type`. Currently this value cannot be changed once set."
+                      description: "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", \"EquinixMetal\", \"PowerVS\", \"AlibabaCloud\", \"Nutanix\" and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform. \n This value will be synced with to the `status.platform` and `status.platformStatus.type`. Currently this value cannot be changed once set."
                       type: string
                       enum:
                         - ""
@@ -443,6 +512,7 @@ spec:
                         - EquinixMetal
                         - PowerVS
                         - AlibabaCloud
+                        - Nutanix
                     vsphere:
                       description: VSphere contains settings specific to the VSphere infrastructure provider.
                       type: object

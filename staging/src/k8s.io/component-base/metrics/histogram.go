@@ -18,7 +18,7 @@ package metrics
 
 import (
 	"context"
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -199,13 +199,13 @@ func (v *HistogramVec) Reset() {
 func (v *HistogramVec) WithContext(ctx context.Context) *HistogramVecWithContext {
 	return &HistogramVecWithContext{
 		ctx:          ctx,
-		HistogramVec: *v,
+		HistogramVec: v,
 	}
 }
 
 // HistogramVecWithContext is the wrapper of HistogramVec with context.
 type HistogramVecWithContext struct {
-	HistogramVec
+	*HistogramVec
 	ctx context.Context
 }
 

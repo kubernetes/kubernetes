@@ -1,7 +1,7 @@
 apiVersion: apps/v1beta1
 kind: DeploymentRollback
-name: "2"
+name: nameValue
 rollbackTo:
-  revision: 4518808233936994290
+  revision: 1
 updatedAnnotations:
-  "3": "4"
+  updatedAnnotationsKey: updatedAnnotationsValue

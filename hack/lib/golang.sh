@@ -481,7 +481,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.17.0
+  minimum_go_version=go1.18.0
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -496,9 +496,6 @@ EOF
 # ${PATH}. It will also check that the Go version is good enough for the
 # Kubernetes build.
 #
-# Inputs:
-#   KUBE_EXTRA_GOPATH - If set, this is included in created GOPATH
-#
 # Outputs:
 #   env-var GOPATH points to our local output dir
 #   env-var GOBIN is unset (we want binaries in a predictable place)
@@ -511,11 +508,6 @@ kube::golang::setup_env() {
 
   export GOPATH="${KUBE_GOPATH}"
   export GOCACHE="${KUBE_GOPATH}/cache"
-
-  # Append KUBE_EXTRA_GOPATH to the GOPATH if it is defined.
-  if [[ -n ${KUBE_EXTRA_GOPATH:-} ]]; then
-    GOPATH="${GOPATH}:${KUBE_EXTRA_GOPATH}"
-  fi
 
   # Make sure our own Go binaries are in PATH.
   export PATH="${KUBE_GOPATH}/bin:${PATH}"
@@ -697,41 +689,42 @@ kube::golang::build_binaries_for_platform() {
   local -a nonstatics=()
   local -a tests=()
 
-  V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
-
   for binary in "${binaries[@]}"; do
     if [[ "${binary}" =~ ".test"$ ]]; then
       tests+=("${binary}")
+      kube::log::info "    ${binary} (test)"
     elif kube::golang::is_statically_linked_library "${binary}"; then
       statics+=("${binary}")
+      kube::log::info "    ${binary} (static)"
     else
       nonstatics+=("${binary}")
+      kube::log::info "    ${binary} (non-static)"
     fi
   done
+
+  V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
 
   local -a build_args
   if [[ "${#statics[@]}" != 0 ]]; then
     build_args=(
-      -installsuffix static
+      -installsuffix=static
       ${goflags:+"${goflags[@]}"}
-      -gcflags "${gogcflags:-}"
-      -asmflags "${goasmflags:-}"
-      -ldflags "${goldflags:-}"
-      -tags "${gotags:-}"
+      -gcflags="${gogcflags}"
+      -asmflags="${goasmflags}"
+      -ldflags="${goldflags}"
+      -tags="${gotags:-}"
     )
-    V=1 kube::log::info "> static build CGO_ENABLED=0: ${statics[*]}"
     CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
   fi
 
   if [[ "${#nonstatics[@]}" != 0 ]]; then
     build_args=(
       ${goflags:+"${goflags[@]}"}
-      -gcflags "${gogcflags:-}"
-      -asmflags "${goasmflags:-}"
-      -ldflags "${goldflags:-}"
-      -tags "${gotags:-}"
+      -gcflags="${gogcflags}"
+      -asmflags="${goasmflags}"
+      -ldflags="${goldflags}"
+      -tags="${gotags:-}"
     )
-    V=1 kube::log::info "> non-static build: ${nonstatics[*]}"
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
 
@@ -743,10 +736,10 @@ kube::golang::build_binaries_for_platform() {
     mkdir -p "$(dirname "${outfile}")"
     go test -c \
       ${goflags:+"${goflags[@]}"} \
-      -gcflags "${gogcflags:-}" \
-      -asmflags "${goasmflags:-}" \
-      -ldflags "${goldflags:-}" \
-      -tags "${gotags:-}" \
+      -gcflags="${gogcflags}" \
+      -asmflags="${goasmflags}" \
+      -ldflags="${goldflags}" \
+      -tags="${gotags:-}" \
       -o "${outfile}" \
       "${testpkg}"
   done
@@ -798,17 +791,31 @@ kube::golang::build_binaries() {
     local host_platform
     host_platform=$(kube::golang::host_platform)
 
+    # These are "local" but are visible to and relied on by functions this
+    # function calls.  They are effectively part of the calling API to
+    # build_binaries_for_platform.
     local goflags goldflags goasmflags gogcflags gotags
-    # If GOLDFLAGS is unset, then set it to the a default of "-s -w".
-    # Disable SC2153 for this, as it will throw a warning that the local
-    # variable goldflags will exist, and it suggest changing it to this.
-    # shellcheck disable=SC2153
-    goldflags="${GOLDFLAGS=-s -w} $(kube::version::ldflags)"
-    goasmflags="-trimpath=${KUBE_ROOT}"
-    gogcflags="${GOGCFLAGS:-} -trimpath=${KUBE_ROOT}"
 
-    # extract tags if any specified in GOFLAGS
-    # shellcheck disable=SC2001
+    # This is $(pwd) because we use run-in-gopath to build.  Once that is
+    # excised, this can become ${KUBE_ROOT}.
+    local trimroot # two lines to appease shellcheck SC2155
+    trimroot=$(pwd)
+
+    goasmflags="all=-trimpath=${trimroot}"
+
+    gogcflags="all=-trimpath=${trimroot} ${GOGCFLAGS:-}"
+    if [[ "${DBG:-}" == 1 ]]; then
+        # Debugging - disable optimizations and inlining.
+        gogcflags="${gogcflags} -N -l"
+    fi
+
+    goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
+    if [[ "${DBG:-}" != 1 ]]; then
+        # Not debugging - disable symbols and DWARF.
+        goldflags="${goldflags} -s -w"
+    fi
+
+    # Extract tags if any specified in GOFLAGS
     gotags="selinux,notest,$(echo "${GOFLAGS:-}" | sed -ne 's|.*-tags=\([^-]*\).*|\1|p')"
 
     local -a targets=()
@@ -873,7 +880,7 @@ kube::golang::build_binaries() {
       exit "${fails}"
     else
       for platform in "${platforms[@]}"; do
-        kube::log::status "Building go targets for ${platform}:" "${targets[@]}"
+        kube::log::status "Building go targets for ${platform}"
         (
           kube::golang::set_platform_envs "${platform}"
           kube::golang::build_binaries_for_platform "${platform}"

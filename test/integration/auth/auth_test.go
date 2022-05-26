@@ -30,7 +30,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -57,11 +57,13 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	resttransport "k8s.io/client-go/transport"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -86,7 +88,7 @@ func getTestTokenAuth() authenticator.Request {
 }
 
 func getTestWebhookTokenAuth(serverURL string, customDial utilnet.DialFunc) (authenticator.Request, error) {
-	kubecfgFile, err := ioutil.TempFile("", "webhook-kubecfg")
+	kubecfgFile, err := os.CreateTemp("", "webhook-kubecfg")
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +110,13 @@ func getTestWebhookTokenAuth(serverURL string, customDial utilnet.DialFunc) (aut
 		Jitter:   0.2,
 		Steps:    5,
 	}
-	webhookTokenAuth, err := webhook.New(kubecfgFile.Name(), "v1beta1", nil, retryBackoff, customDial)
+
+	clientConfig, err := webhookutil.LoadKubeconfig(kubecfgFile.Name(), customDial)
+	if err != nil {
+		return nil, err
+	}
+
+	webhookTokenAuth, err := webhook.New(clientConfig, "v1beta1", nil, retryBackoff)
 	if err != nil {
 		return nil, err
 	}
@@ -494,7 +502,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
@@ -555,11 +563,9 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
-
 	ns := framework.CreateTestingNamespace("auth-always-deny", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	transport := http.DefaultTransport
+	transport := resttransport.NewBearerAuthRoundTripper(framework.UnprivilegedUserToken, http.DefaultTransport)
 
 	for _, r := range getTestRequests(ns.Name) {
 		bodyBytes := bytes.NewReader([]byte(r.body))
@@ -644,7 +650,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
@@ -743,7 +749,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 			if resp.StatusCode != http.StatusUnauthorized {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status %v, but got %v", http.StatusUnauthorized, resp.StatusCode)
-				b, _ := ioutil.ReadAll(resp.Body)
+				b, _ := io.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
 			}
 		}()
@@ -1048,14 +1054,14 @@ func csrPEM(t *testing.T) []byte {
 }
 
 func newAuthorizerWithContents(t *testing.T, contents string) authorizer.Authorizer {
-	f, err := ioutil.TempFile("", "auth_test")
+	f, err := os.CreateTemp("", "auth_test")
 	if err != nil {
 		t.Fatalf("unexpected error creating policyfile: %v", err)
 	}
 	f.Close()
 	defer os.Remove(f.Name())
 
-	if err := ioutil.WriteFile(f.Name(), []byte(contents), 0700); err != nil {
+	if err := os.WriteFile(f.Name(), []byte(contents), 0700); err != nil {
 		t.Fatalf("unexpected error writing policyfile: %v", err)
 	}
 
@@ -1216,7 +1222,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
@@ -1301,7 +1307,7 @@ func TestKindAuthorization(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
@@ -1368,7 +1374,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
-				b, _ := ioutil.ReadAll(resp.Body)
+				b, _ := io.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
 			}
 		}()
@@ -1406,7 +1412,7 @@ func testWebhookTokenAuthenticator(customDialer bool, t *testing.T) {
 
 	// Set up an API server
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
+	controlPlaneConfig.GenericConfig.Authentication.Authenticator = group.NewAuthenticatedGroupAdder(authenticator)
 	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()

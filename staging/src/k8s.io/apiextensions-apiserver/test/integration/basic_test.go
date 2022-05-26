@@ -35,10 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestServerUp(t *testing.T) {
@@ -624,55 +621,6 @@ func TestSameNameDiffNamespace(t *testing.T) {
 	ns2 := "namespace-2"
 	testSimpleCRUD(t, ns2, noxuDefinition, dynamicClient)
 
-}
-
-func TestSelfLink(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoveSelfLink, false)()
-
-	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tearDown()
-
-	// namespace scoped
-	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
-	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ns := "not-the-default"
-	noxuNamespacedResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, noxuDefinition)
-
-	noxuInstanceToCreate := fixtures.NewNoxuInstance(ns, "foo")
-	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(context.TODO(), noxuInstanceToCreate, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if e, a := "/apis/mygroup.example.com/v1beta1/namespaces/not-the-default/noxus/foo", createdNoxuInstance.GetSelfLink(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
-
-	// cluster scoped
-	curletDefinition := fixtures.NewCurletV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
-	curletDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(curletDefinition, apiExtensionClient, dynamicClient)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	curletResourceClient := newNamespacedCustomResourceClient(ns, dynamicClient, curletDefinition)
-
-	curletInstanceToCreate := fixtures.NewCurletInstance(ns, "foo")
-	createdCurletInstance, err := curletResourceClient.Create(context.TODO(), curletInstanceToCreate, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if e, a := "/apis/mygroup.example.com/v1beta1/curlets/foo", createdCurletInstance.GetSelfLink(); e != a {
-		t.Errorf("expected %v, got %v", e, a)
-	}
 }
 
 func TestPreserveInt(t *testing.T) {

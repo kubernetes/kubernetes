@@ -236,7 +236,7 @@ func TestValidateWebhookDuration(ts *testing.T) {
 		ts.Run(test.Name, func(t *testing.T) {
 			ctx := context.TODO()
 			if test.InitContext {
-				ctx = request.WithWebhookDurationAndCustomClock(ctx, &clk)
+				ctx = request.WithLatencyTrackersAndCustomClock(ctx, &clk)
 			}
 			wh, err := NewValidatingAdmissionWebhook(nil)
 			if err != nil {
@@ -261,7 +261,7 @@ func TestValidateWebhookDuration(ts *testing.T) {
 			}
 
 			_ = wh.Validate(ctx, webhooktesting.NewAttribute(ns, nil, test.IsDryRun), objectInterfaces)
-			wd, ok := request.WebhookDurationFrom(ctx)
+			wd, ok := request.LatencyTrackersFrom(ctx)
 			if !ok {
 				if test.InitContext {
 					t.Errorf("expected webhook duration to be initialized")
@@ -272,11 +272,11 @@ func TestValidateWebhookDuration(ts *testing.T) {
 				t.Errorf("expected webhook duration to not be initialized")
 				return
 			}
-			if wd.AdmitTracker.GetLatency() != 0 {
-				t.Errorf("expected admit duration to be equal to 0 got %q", wd.AdmitTracker.GetLatency())
+			if wd.MutatingWebhookTracker.GetLatency() != 0 {
+				t.Errorf("expected admit duration to be equal to 0 got %q", wd.MutatingWebhookTracker.GetLatency())
 			}
-			if wd.ValidateTracker.GetLatency() < test.ExpectedDurationMax {
-				t.Errorf("expected validate duraion to be greater or equal to %q got %q", test.ExpectedDurationMax, wd.ValidateTracker.GetLatency())
+			if wd.ValidatingWebhookTracker.GetLatency() < test.ExpectedDurationMax {
+				t.Errorf("expected validate duraion to be greater or equal to %q got %q", test.ExpectedDurationMax, wd.ValidatingWebhookTracker.GetLatency())
 			}
 		})
 	}

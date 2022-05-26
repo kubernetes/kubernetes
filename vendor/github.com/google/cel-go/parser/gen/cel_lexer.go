@@ -1,4 +1,4 @@
-// Generated from /Users/tswadell/go/src/github.com/google/cel-go/bin/../parser/gen/CEL.g4 by ANTLR 4.7.
+// Code generated from /Users/tswadell/go/src/github.com/google/cel-go/bin/../parser/gen/CEL.g4 by ANTLR 4.9.1. DO NOT EDIT.
 
 package gen
 
@@ -233,18 +233,19 @@ var lexerSymbolicNames = []string{
 	"", "EQUALS", "NOT_EQUALS", "IN", "LESS", "LESS_EQUALS", "GREATER_EQUALS",
 	"GREATER", "LOGICAL_AND", "LOGICAL_OR", "LBRACKET", "RPRACKET", "LBRACE",
 	"RBRACE", "LPAREN", "RPAREN", "DOT", "COMMA", "MINUS", "EXCLAM", "QUESTIONMARK",
-	"COLON", "PLUS", "STAR", "SLASH", "PERCENT", "TRUE", "FALSE", "NULL", "WHITESPACE",
-	"COMMENT", "NUM_FLOAT", "NUM_INT", "NUM_UINT", "STRING", "BYTES", "IDENTIFIER",
+	"COLON", "PLUS", "STAR", "SLASH", "PERCENT", "CEL_TRUE", "CEL_FALSE", "NUL",
+	"WHITESPACE", "COMMENT", "NUM_FLOAT", "NUM_INT", "NUM_UINT", "STRING",
+	"BYTES", "IDENTIFIER",
 }
 
 var lexerRuleNames = []string{
 	"EQUALS", "NOT_EQUALS", "IN", "LESS", "LESS_EQUALS", "GREATER_EQUALS",
 	"GREATER", "LOGICAL_AND", "LOGICAL_OR", "LBRACKET", "RPRACKET", "LBRACE",
 	"RBRACE", "LPAREN", "RPAREN", "DOT", "COMMA", "MINUS", "EXCLAM", "QUESTIONMARK",
-	"COLON", "PLUS", "STAR", "SLASH", "PERCENT", "TRUE", "FALSE", "NULL", "BACKSLASH",
-	"LETTER", "DIGIT", "EXPONENT", "HEXDIGIT", "RAW", "ESC_SEQ", "ESC_CHAR_SEQ",
-	"ESC_OCT_SEQ", "ESC_BYTE_SEQ", "ESC_UNI_SEQ", "WHITESPACE", "COMMENT",
-	"NUM_FLOAT", "NUM_INT", "NUM_UINT", "STRING", "BYTES", "IDENTIFIER",
+	"COLON", "PLUS", "STAR", "SLASH", "PERCENT", "CEL_TRUE", "CEL_FALSE", "NUL",
+	"BACKSLASH", "LETTER", "DIGIT", "EXPONENT", "HEXDIGIT", "RAW", "ESC_SEQ",
+	"ESC_CHAR_SEQ", "ESC_OCT_SEQ", "ESC_BYTE_SEQ", "ESC_UNI_SEQ", "WHITESPACE",
+	"COMMENT", "NUM_FLOAT", "NUM_INT", "NUM_UINT", "STRING", "BYTES", "IDENTIFIER",
 }
 
 type CELLexer struct {
@@ -254,8 +255,13 @@ type CELLexer struct {
 	// TODO: EOF string
 }
 
+// NewCELLexer produces a new lexer instance for the optional input antlr.CharStream.
+//
+// The *CELLexer instance produced may be reused by calling the SetInputStream method.
+// The initial lexer configuration is expensive to construct, and the object is not thread-safe;
+// however, if used within a Golang sync.Pool, the construction cost amortizes well and the
+// objects can be used in a thread-safe manner.
 func NewCELLexer(input antlr.CharStream) *CELLexer {
-
 	l := new(CELLexer)
 	lexerDeserializer := antlr.NewATNDeserializer(nil)
 	lexerAtn := lexerDeserializer.DeserializeFromUInt16(serializedLexerAtn)
@@ -263,7 +269,6 @@ func NewCELLexer(input antlr.CharStream) *CELLexer {
 	for index, ds := range lexerAtn.DecisionToState {
 		lexerDecisionToDFA[index] = antlr.NewDFA(ds, index)
 	}
-
 	l.BaseLexer = antlr.NewBaseLexer(input)
 	l.Interpreter = antlr.NewLexerATNSimulator(l, lexerAtn, lexerDecisionToDFA, antlr.NewPredictionContextCache())
 
@@ -305,9 +310,9 @@ const (
 	CELLexerSTAR           = 23
 	CELLexerSLASH          = 24
 	CELLexerPERCENT        = 25
-	CELLexerTRUE           = 26
-	CELLexerFALSE          = 27
-	CELLexerNULL           = 28
+	CELLexerCEL_TRUE       = 26
+	CELLexerCEL_FALSE      = 27
+	CELLexerNUL            = 28
 	CELLexerWHITESPACE     = 29
 	CELLexerCOMMENT        = 30
 	CELLexerNUM_FLOAT      = 31

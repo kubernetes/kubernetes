@@ -112,6 +112,16 @@ var (
 	}
 )
 
+// AddSpecialVerb allows the addition of items to the `specialVerbs` map for non-k8s native resources.
+func AddSpecialVerb(verb string, gr schema.GroupResource) {
+	resources, ok := specialVerbs[verb]
+	if !ok {
+		resources = make([]schema.GroupResource, 1)
+	}
+	resources = append(resources, gr)
+	specialVerbs[verb] = resources
+}
+
 // ResourceOptions holds the related options for '--resource' option
 type ResourceOptions struct {
 	Group       string
@@ -128,16 +138,17 @@ type CreateRoleOptions struct {
 	Resources     []ResourceOptions
 	ResourceNames []string
 
-	DryRunStrategy   cmdutil.DryRunStrategy
-	DryRunVerifier   *resource.DryRunVerifier
-	OutputFormat     string
-	Namespace        string
-	EnforceNamespace bool
-	Client           clientgorbacv1.RbacV1Interface
-	Mapper           meta.RESTMapper
-	PrintObj         func(obj runtime.Object) error
-	FieldManager     string
-	CreateAnnotation bool
+	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resource.QueryParamVerifier
+	ValidationDirective string
+	OutputFormat        string
+	Namespace           string
+	EnforceNamespace    bool
+	Client              clientgorbacv1.RbacV1Interface
+	Mapper              meta.RESTMapper
+	PrintObj            func(obj runtime.Object) error
+	FieldManager        string
+	CreateAnnotation    bool
 
 	genericclioptions.IOStreams
 }
@@ -250,7 +261,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.OutputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.CreateAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 
@@ -261,6 +272,11 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 	}
 	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
+	}
+
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
 	}
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
@@ -366,6 +382,7 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 		if o.FieldManager != "" {
 			createOptions.FieldManager = o.FieldManager
 		}
+		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(role.GroupVersionKind()); err != nil {
 				return err

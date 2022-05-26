@@ -1,9 +1,11 @@
 apiVersion: v1
-container: "2"
+container: containerValue
 follow: true
 insecureSkipTLSVerifyBackend: true
 kind: PodLogOptions
-limitBytes: 5323465663502687351
-sinceSeconds: 1002466899136229878
-tailLines: -6357999603795826160
+limitBytes: 8
+previous: true
+sinceSeconds: 4
+sinceTime: "2005-01-01T01:01:01Z"
+tailLines: 7
 timestamps: true

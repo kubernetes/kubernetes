@@ -4,11 +4,16 @@ import (
 	"github.com/cilium/ebpf/internal/unix"
 )
 
-//go:generate stringer -output types_string.go -type=MapType,ProgramType,AttachType,PinType
+//go:generate stringer -output types_string.go -type=MapType,ProgramType,PinType
 
 // MapType indicates the type map structure
 // that will be initialized in the kernel.
 type MapType uint32
+
+// Max returns the latest supported MapType.
+func (_ MapType) Max() MapType {
+	return maxMapType - 1
+}
 
 // All the various map types that can be created
 const (
@@ -85,15 +90,28 @@ const (
 	SkStorage
 	// DevMapHash - Hash-based indexing scheme for references to network devices.
 	DevMapHash
-	StructOpts
+	// StructOpsMap - This map holds a kernel struct with its function pointer implemented in a BPF
+	// program.
+	StructOpsMap
+	// RingBuf - Similar to PerfEventArray, but shared across all CPUs.
 	RingBuf
+	// InodeStorage - Specialized local storage map for inodes.
 	InodeStorage
+	// TaskStorage - Specialized local storage map for task_struct.
 	TaskStorage
+	// maxMapType - Bound enum of MapTypes, has to be last in enum.
+	maxMapType
 )
+
+// Deprecated: StructOpts was a typo, use StructOpsMap instead.
+//
+// Declared as a variable to prevent stringer from picking it up
+// as an enum value.
+var StructOpts MapType = StructOpsMap
 
 // hasPerCPUValue returns true if the Map stores a value per CPU.
 func (mt MapType) hasPerCPUValue() bool {
-	return mt == PerCPUHash || mt == PerCPUArray || mt == LRUCPUHash
+	return mt == PerCPUHash || mt == PerCPUArray || mt == LRUCPUHash || mt == PerCPUCGroupStorage
 }
 
 // canStoreMap returns true if the map type accepts a map fd
@@ -110,6 +128,11 @@ func (mt MapType) canStoreProgram() bool {
 
 // ProgramType of the eBPF program
 type ProgramType uint32
+
+// Max return the latest supported ProgramType.
+func (_ ProgramType) Max() ProgramType {
+	return maxProgramType - 1
+}
 
 // eBPF program types
 const (
@@ -144,12 +167,15 @@ const (
 	Extension
 	LSM
 	SkLookup
+	maxProgramType
 )
 
 // AttachType of the eBPF program, needed to differentiate allowed context accesses in
 // some newer program types like CGroupSockAddr. Should be set to AttachNone if not required.
 // Will cause invalid argument (EINVAL) at program load time if set incorrectly.
 type AttachType uint32
+
+//go:generate stringer -type AttachType -trimprefix Attach
 
 // AttachNone is an alias for AttachCGroupInetIngress for readability reasons.
 const AttachNone AttachType = 0
@@ -193,6 +219,10 @@ const (
 	AttachXDPCPUMap
 	AttachSkLookup
 	AttachXDP
+	AttachSkSKBVerdict
+	AttachSkReuseportSelect
+	AttachSkReuseportSelectOrMigrate
+	AttachPerfEvent
 )
 
 // AttachFlags of the eBPF program used in BPF_PROG_ATTACH command

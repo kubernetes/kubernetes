@@ -125,7 +125,8 @@ func (f ReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*appsv1.ReplicaS
 		}
 		selector, err = metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
-			return
+			// This object has an invalid selector, it does not match the pod
+			continue
 		}
 
 		if selector.Matches(labels.Set(pod.Labels)) {
@@ -164,7 +165,8 @@ func (f StatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*appsv1.Statef
 		}
 		selector, err = metav1.LabelSelectorAsSelector(ss.Spec.Selector)
 		if err != nil {
-			return
+			// This object has an invalid selector, it does not match the pod
+			continue
 		}
 		if selector.Matches(labels.Set(pod.Labels)) {
 			sss = append(sss, ss)
@@ -250,18 +252,6 @@ func (nodes NodeInfoLister) HavePodsWithAffinityList() ([]*framework.NodeInfo, e
 // required anti-affinity. For the fake lister we just return everything.
 func (nodes NodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo, error) {
 	return nodes, nil
-}
-
-// NewNodeInfoLister create a new fake NodeInfoLister from a slice of v1.Nodes.
-func NewNodeInfoLister(nodes []*v1.Node) framework.NodeInfoLister {
-	nodeInfoList := make([]*framework.NodeInfo, len(nodes))
-	for _, node := range nodes {
-		nodeInfo := framework.NewNodeInfo()
-		nodeInfo.SetNode(node)
-		nodeInfoList = append(nodeInfoList, nodeInfo)
-	}
-
-	return NodeInfoLister(nodeInfoList)
 }
 
 var _ storagelisters.CSINodeLister = CSINodeLister{}

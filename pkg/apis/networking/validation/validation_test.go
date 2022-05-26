@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -457,6 +458,138 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 			t.Errorf("expected failure: %s", testName)
 		}
 	}
+}
+
+func TestValidateNetworkPolicyStatusUpdate(t *testing.T) {
+
+	type netpolStatusCases struct {
+		obj          networking.NetworkPolicyStatus
+		expectedErrs field.ErrorList
+	}
+
+	testCases := map[string]netpolStatusCases{
+		"valid conditions": {
+			obj: networking.NetworkPolicyStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(networking.NetworkPolicyConditionStatusAccepted),
+						Status: metav1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+						Reason:             "RuleApplied",
+						Message:            "rule was successfully applied",
+						ObservedGeneration: 2,
+					},
+					{
+						Type:   string(networking.NetworkPolicyConditionStatusFailure),
+						Status: metav1.ConditionFalse,
+						LastTransitionTime: metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+						Reason:             "RuleApplied",
+						Message:            "no error was found",
+						ObservedGeneration: 2,
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{},
+		},
+		"duplicate type": {
+			obj: networking.NetworkPolicyStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(networking.NetworkPolicyConditionStatusAccepted),
+						Status: metav1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+						Reason:             "RuleApplied",
+						Message:            "rule was successfully applied",
+						ObservedGeneration: 2,
+					},
+					{
+						Type:   string(networking.NetworkPolicyConditionStatusAccepted),
+						Status: metav1.ConditionFalse,
+						LastTransitionTime: metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+						Reason:             string(networking.NetworkPolicyConditionReasonFeatureNotSupported),
+						Message:            "endport is not supported",
+						ObservedGeneration: 2,
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{field.Duplicate(field.NewPath("status").Child("conditions").Index(1).Child("type"),
+				string(networking.NetworkPolicyConditionStatusAccepted))},
+		},
+		"invalid generation": {
+			obj: networking.NetworkPolicyStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   string(networking.NetworkPolicyConditionStatusAccepted),
+						Status: metav1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+						Reason:             "RuleApplied",
+						Message:            "rule was successfully applied",
+						ObservedGeneration: -1,
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status").Child("conditions").Index(0).Child("observedGeneration"),
+				int64(-1), "must be greater than or equal to zero")},
+		},
+		"invalid null transition time": {
+			obj: networking.NetworkPolicyStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               string(networking.NetworkPolicyConditionStatusAccepted),
+						Status:             metav1.ConditionTrue,
+						Reason:             "RuleApplied",
+						Message:            "rule was successfully applied",
+						ObservedGeneration: 3,
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status").Child("conditions").Index(0).Child("lastTransitionTime"),
+				"must be set")},
+		},
+		"multiple condition errors": {
+			obj: networking.NetworkPolicyStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:               string(networking.NetworkPolicyConditionStatusAccepted),
+						Status:             metav1.ConditionTrue,
+						Reason:             "RuleApplied",
+						Message:            "rule was successfully applied",
+						ObservedGeneration: -1,
+					},
+				},
+			},
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("status").Child("conditions").Index(0).Child("observedGeneration"),
+					int64(-1), "must be greater than or equal to zero"),
+				field.Required(field.NewPath("status").Child("conditions").Index(0).Child("lastTransitionTime"),
+					"must be set"),
+			},
+		},
+	}
+
+	for testName, testCase := range testCases {
+		errs := ValidateNetworkPolicyStatusUpdate(testCase.obj, networking.NetworkPolicyStatus{}, field.NewPath("status"))
+		if len(errs) != len(testCase.expectedErrs) {
+			t.Errorf("Test %s: Expected %d errors, got %d (%+v)", testName, len(testCase.expectedErrs), len(errs), errs)
+		}
+
+		for i, err := range errs {
+			if err.Error() != testCase.expectedErrs[i].Error() {
+				t.Errorf("Test %s: Expected error: %v, got %v", testName, testCase.expectedErrs[i], err)
+			}
+		}
+	}
+
 }
 
 func TestValidateIngress(t *testing.T) {

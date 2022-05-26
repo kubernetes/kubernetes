@@ -11,7 +11,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "github.com/openshift/api/apps/v1";
 
 // CustomDeploymentStrategyParams are the input to the Custom deployment strategy.
 message CustomDeploymentStrategyParams {

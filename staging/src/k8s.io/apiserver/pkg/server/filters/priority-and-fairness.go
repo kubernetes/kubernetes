@@ -110,7 +110,6 @@ func WithPriorityAndFairness(
 
 			httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
 			httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))
-			httplog.AddKeyValue(ctx, "apf_fd", truncateLogField(flowDistinguisher))
 		}
 		// estimateWork is called, if at all, after noteFn
 		estimateWork := func() flowcontrolrequest.WorkEstimate {
@@ -123,7 +122,18 @@ func WithPriorityAndFairness(
 				return workEstimator(r, "", "")
 			}
 
-			return workEstimator(r, classification.FlowSchemaName, classification.PriorityLevelName)
+			workEstimate := workEstimator(r, classification.FlowSchemaName, classification.PriorityLevelName)
+
+			fcmetrics.ObserveWorkEstimatedSeats(classification.PriorityLevelName, classification.FlowSchemaName, workEstimate.MaxSeats())
+			// nolint:logcheck // Not using the result of klog.V
+			// inside the if branch is okay, we just use it to
+			// determine whether the additional information should
+			// be added.
+			if klog.V(4).Enabled() {
+				httplog.AddKeyValue(ctx, "apf_iseats", workEstimate.InitialSeats)
+				httplog.AddKeyValue(ctx, "apf_fseats", workEstimate.FinalSeats)
+			}
+			return workEstimate
 		}
 
 		var served bool
@@ -284,11 +294,7 @@ func WithPriorityAndFairness(
 		if !served {
 			setResponseHeaders(classification, w)
 
-			if isMutatingRequest {
-				epmetrics.DroppedRequests.WithContext(ctx).WithLabelValues(epmetrics.MutatingKind).Inc()
-			} else {
-				epmetrics.DroppedRequests.WithContext(ctx).WithLabelValues(epmetrics.ReadOnlyKind).Inc()
-			}
+			epmetrics.RecordDroppedRequest(r, requestInfo, epmetrics.APIServerComponent, isMutatingRequest)
 			epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
 			tooManyRequests(r, w)
 		}

@@ -23,9 +23,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -34,13 +32,6 @@ import (
 var _ volume.NodeExpandableVolumePlugin = &csiPlugin{}
 
 func (c *csiPlugin) RequiresFSResize() bool {
-	// We could check plugin's node capability but we instead are going to rely on
-	// NodeExpand to do the right thing and return early if plugin does not have
-	// node expansion capability.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandCSIVolumes) {
-		klog.V(4).Infof("Resizing is not enabled for CSI volume")
-		return false
-	}
 	return true
 }
 
@@ -80,20 +71,6 @@ func (c *csiPlugin) nodeExpandWithClient(
 
 	if !nodeExpandSet {
 		return false, fmt.Errorf("Expander.NodeExpand found CSI plugin %s/%s to not support node expansion", c.GetPluginName(), driverName)
-	}
-
-	// Check whether "STAGE_UNSTAGE_VOLUME" is set
-	stageUnstageSet, err := csClient.NodeSupportsStageUnstage(ctx)
-	if err != nil {
-		return false, fmt.Errorf("Expander.NodeExpand failed to check if plugins supports stage_unstage %v", err)
-	}
-
-	// if plugin does not support STAGE_UNSTAGE but CSI volume path is staged
-	// it must mean this was placeholder staging performed by k8s and not CSI staging
-	// in which case we should return from here so as volume can be node published
-	// before we can resize
-	if !stageUnstageSet && resizeOptions.CSIVolumePhase == volume.CSIVolumeStaged {
-		return false, nil
 	}
 
 	pv := resizeOptions.VolumeSpec.PersistentVolume

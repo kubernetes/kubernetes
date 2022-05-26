@@ -19,7 +19,6 @@ package testing
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"time"
@@ -73,7 +72,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		}
 	}()
 
-	result.TmpDir, err = ioutil.TempDir("", "kube-controller-manager")
+	result.TmpDir, err = os.MkdirTemp("", "kube-controller-manager")
 	if err != nil {
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}

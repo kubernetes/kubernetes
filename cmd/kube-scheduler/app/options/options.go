@@ -84,7 +84,9 @@ func NewOptions() *Options {
 		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
-		Deprecated:     &DeprecatedOptions{},
+		Deprecated: &DeprecatedOptions{
+			PodMaxInUnschedulablePodsDuration: 5 * time.Minute,
+		},
 		LeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
 			LeaderElect:       true,
 			LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
@@ -237,6 +239,12 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		}
 	}
 	o.Metrics.Apply()
+
+	// Apply value independently instead of using ApplyDeprecated() because it can't be configured via ComponentConfig.
+	if o.Deprecated != nil {
+		c.PodMaxInUnschedulablePodsDuration = o.Deprecated.PodMaxInUnschedulablePodsDuration
+	}
+
 	return nil
 }
 
@@ -250,7 +258,6 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.SecureServing.Validate()...)
 	errs = append(errs, o.Authentication.Validate()...)
 	errs = append(errs, o.Authorization.Validate()...)
-	errs = append(errs, o.Deprecated.Validate()...)
 	errs = append(errs, o.Metrics.Validate()...)
 
 	return errs

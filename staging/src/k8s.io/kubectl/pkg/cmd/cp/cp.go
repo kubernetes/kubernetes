@@ -32,8 +32,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubectl/pkg/cmd/exec"
-	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -102,20 +102,20 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 			if len(args) == 0 {
 				if strings.IndexAny(toComplete, "/.~") == 0 {
 					// Looks like a path, do nothing
-				} else if strings.Index(toComplete, ":") != -1 {
+				} else if strings.Contains(toComplete, ":") {
 					// TODO: complete remote files in the pod
 				} else if idx := strings.Index(toComplete, "/"); idx > 0 {
 					// complete <namespace>/<pod>
 					namespace := toComplete[:idx]
 					template := "{{ range .items }}{{ .metadata.namespace }}/{{ .metadata.name }}: {{ end }}"
-					comps = get.CompGetFromTemplate(&template, f, namespace, cmd, []string{"pod"}, toComplete)
+					comps = completion.CompGetFromTemplate(&template, f, namespace, cmd, []string{"pod"}, toComplete)
 				} else {
 					// Complete namespaces followed by a /
-					for _, ns := range get.CompGetResource(f, cmd, "namespace", toComplete) {
+					for _, ns := range completion.CompGetResource(f, cmd, "namespace", toComplete) {
 						comps = append(comps, fmt.Sprintf("%s/", ns))
 					}
 					// Complete pod names followed by a :
-					for _, pod := range get.CompGetResource(f, cmd, "pod", toComplete) {
+					for _, pod := range completion.CompGetResource(f, cmd, "pod", toComplete) {
 						comps = append(comps, fmt.Sprintf("%s:", pod))
 					}
 
@@ -373,7 +373,7 @@ func (t *TarPipe) initReadFrom(n uint64) {
 		Command:  []string{"tar", "cf", "-", t.src.File.String()},
 		Executor: &exec.DefaultRemoteExecutor{},
 	}
-	if t.o.MaxTries > 0 {
+	if t.o.MaxTries != 0 {
 		options.Command = []string{"sh", "-c", fmt.Sprintf("tar cf - %s | tail -c+%d", t.src.File, n)}
 	}
 
@@ -387,10 +387,10 @@ func (t *TarPipe) Read(p []byte) (n int, err error) {
 	n, err = t.reader.Read(p)
 	if err != nil {
 		if t.o.MaxTries < 0 || t.retries < t.o.MaxTries {
+			t.retries++
 			fmt.Printf("Resuming copy at %d bytes, retry %d/%d\n", t.bytesRead, t.retries, t.o.MaxTries)
 			t.initReadFrom(t.bytesRead + 1)
 			err = nil
-			t.retries++
 		} else {
 			fmt.Printf("Dropping out copy after %d retries\n", t.retries)
 		}

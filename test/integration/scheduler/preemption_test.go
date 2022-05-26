@@ -34,17 +34,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1beta3"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -102,8 +99,8 @@ func (fp *tokenFilter) Filter(ctx context.Context, state *framework.CycleState, 
 	return framework.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
 }
 
-func (fp *tokenFilter) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
-	return nil
+func (fp *tokenFilter) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+	return nil, nil
 }
 
 func (fp *tokenFilter) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
@@ -439,8 +436,6 @@ func TestPreemption(t *testing.T) {
 
 // TestNonPreemption tests NonPreempt option of PriorityClass of scheduler works as expected.
 func TestNonPreemption(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NonPreemptingPriority, true)()
-
 	var preemptNever = v1.PreemptNever
 	// Initialize scheduler.
 	testCtx := initTest(t, "non-preemption")
@@ -1436,14 +1431,9 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 	return testCtx
 }
 
-// TestPreferNominatedNode test when the feature of "PreferNominatedNode" is enabled, the overall scheduling logic is not changed.
-// If the nominated node pass all the filters, then preemptor pod will run on the nominated node, otherwise, it will be scheduled
-// to another node in the cluster that ables to pass all the filters.
-// NOTE: This integration test is not intending to check the logic of preemption, but rather a sanity check when the feature is
-// enabled.
+// TestPreferNominatedNode test that if the nominated node pass all the filters, then preemptor pod will run on the nominated node,
+// otherwise, it will be scheduled to another node in the cluster that ables to pass all the filters.
 func TestPreferNominatedNode(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferNominatedNode, true)()
-
 	defaultNodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",

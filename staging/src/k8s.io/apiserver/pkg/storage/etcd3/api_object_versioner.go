@@ -60,7 +60,7 @@ func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint6
 	return nil
 }
 
-// PrepareObjectForStorage clears resource version and self link prior to writing to etcd.
+// PrepareObjectForStorage clears resourceVersion and selfLink prior to writing to etcd.
 func (a APIObjectVersioner) PrepareObjectForStorage(obj runtime.Object) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {

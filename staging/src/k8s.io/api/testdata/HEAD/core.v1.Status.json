@@ -2,24 +2,27 @@
   "kind": "Status",
   "apiVersion": "v1",
   "metadata": {
-    "selfLink": "ȉŏ軂:鹼(c螂z=lx*",
-    "resourceVersion": "17435791464288618533"
+    "selfLink": "selfLinkValue",
+    "resourceVersion": "resourceVersionValue",
+    "continue": "continueValue",
+    "remainingItemCount": 4
   },
-  "status": "2",
-  "message": "3",
-  "reason": "\u003e渽蝧抰鹐ȾZȢXQ輂]",
+  "status": "statusValue",
+  "message": "messageValue",
+  "reason": "reasonValue",
   "details": {
-    "name": "4",
-    "group": "5",
-    "kind": "6",
+    "name": "nameValue",
+    "group": "groupValue",
+    "kind": "kindValue",
+    "uid": "uidValue",
     "causes": [
       {
-        "reason": "桰]]æȌ殸2爟¼ªov鈶Ƒ",
-        "message": "7",
-        "field": "8"
+        "reason": "reasonValue",
+        "message": "messageValue",
+        "field": "fieldValue"
       }
     ],
-    "retryAfterSeconds": -309161244
+    "retryAfterSeconds": 5
   },
-  "code": -467962515
+  "code": 6
 }

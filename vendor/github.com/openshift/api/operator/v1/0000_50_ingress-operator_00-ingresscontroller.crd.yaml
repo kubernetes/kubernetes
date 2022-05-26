@@ -144,6 +144,28 @@ spec:
                     description: hostNetwork holds parameters for the HostNetwork
                       endpoint publishing strategy. Present only if type is HostNetwork.
                     properties:
+                      httpPort:
+                        default: 80
+                        description: httpPort is the port on the host which should
+                          be used to listen for HTTP requests. This field should be
+                          set when port 80 is already in use. The value should not
+                          coincide with the NodePort range of the cluster. When the
+                          value is 0 or is not specified it defaults to 80.
+                        format: int32
+                        maximum: 65535
+                        minimum: 0
+                        type: integer
+                      httpsPort:
+                        default: 443
+                        description: httpsPort is the port on the host which should
+                          be used to listen for HTTPS requests. This field should
+                          be set when port 443 is already in use. The value should
+                          not coincide with the NodePort range of the cluster. When
+                          the value is 0 or is not specified it defaults to 443.
+                        format: int32
+                        maximum: 65535
+                        minimum: 0
+                        type: integer
                       protocol:
                         description: "protocol specifies whether the IngressController
                           expects incoming connections to use plain TCP or whether
@@ -167,6 +189,29 @@ spec:
                         - TCP
                         - PROXY
                         type: string
+                      statsPort:
+                        default: 1936
+                        description: statsPort is the port on the host where the stats
+                          from the router are published. The value should not coincide
+                          with the NodePort range of the cluster. If an external load
+                          balancer is configured to forward connections to this IngressController,
+                          the load balancer should use this port for health checks.
+                          The load balancer can send HTTP probes on this port on a
+                          given node, with the path /healthz/ready to determine if
+                          the ingress controller is ready to receive traffic on the
+                          node. For proper operation the load balancer must not forward
+                          traffic to a node until the health check reports ready.
+                          The load balancer should also stop forwarding requests within
+                          a maximum of 45 seconds after /healthz/ready starts reporting
+                          not-ready. Probing every 5 to 10 seconds, with a 5-second
+                          timeout and with a threshold of two successful or failed
+                          requests to become healthy or unhealthy respectively, are
+                          well-tested values. When the value is 0 or is not specified
+                          it defaults to 1936.
+                        format: int32
+                        maximum: 65535
+                        minimum: 0
+                        type: integer
                     type: object
                   loadBalancer:
                     description: loadBalancer holds parameters for the load balancer.
@@ -188,6 +233,19 @@ spec:
                                 description: classicLoadBalancerParameters holds configuration
                                   parameters for an AWS classic load balancer. Present
                                   only if type is Classic.
+                                properties:
+                                  connectionIdleTimeout:
+                                    description: connectionIdleTimeout specifies the
+                                      maximum time period that a connection may be
+                                      idle before the load balancer closes the connection.  The
+                                      value must be parseable as a time duration value;
+                                      see <https://pkg.go.dev/time#ParseDuration>.  A
+                                      nil or zero value means no opinion, in which
+                                      case a default value is used.  The default value
+                                      for this field is 60s.  This default is subject
+                                      to change.
+                                    format: duration
+                                    type: string
                                 type: object
                               networkLoadBalancer:
                                 description: networkLoadBalancerParameters holds configuration
@@ -237,12 +295,13 @@ spec:
                           type:
                             description: type is the underlying infrastructure provider
                               for the load balancer. Allowed values are "AWS", "Azure",
-                              "BareMetal", "GCP", "OpenStack", and "VSphere".
+                              "BareMetal", "GCP", "Nutanix", "OpenStack", and "VSphere".
                             enum:
                             - AWS
                             - Azure
                             - BareMetal
                             - GCP
+                            - Nutanix
                             - OpenStack
                             - VSphere
                             - IBM
@@ -806,9 +865,14 @@ spec:
                 properties:
                   nodeSelector:
                     description: "nodeSelector is the node selector applied to ingress
-                      controller deployments. \n If unset, the default is: \n   kubernetes.io/os:
-                      linux   node-role.kubernetes.io/worker: '' \n If set, the specified
-                      selector is used and replaces the default."
+                      controller deployments. \n If set, the specified selector is
+                      used and replaces the default. \n If unset, the default depends
+                      on the value of the defaultPlacement field in the cluster config.openshift.io/v1/ingresses
+                      status. \n When defaultPlacement is Workers, the default is:
+                      \n   kubernetes.io/os: linux   node-role.kubernetes.io/worker:
+                      '' \n When defaultPlacement is ControlPlane, the default is:
+                      \n   kubernetes.io/os: linux   node-role.kubernetes.io/master:
+                      '' \n These defaults are subject to change."
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector
@@ -896,8 +960,16 @@ spec:
                     type: array
                 type: object
               replicas:
-                description: replicas is the desired number of ingress controller
-                  replicas. If unset, defaults to 2.
+                description: "replicas is the desired number of ingress controller
+                  replicas. If unset, the default depends on the value of the defaultPlacement
+                  field in the cluster config.openshift.io/v1/ingresses status. \n
+                  The value of replicas is set based on the value of a chosen field
+                  in the Infrastructure CR. If defaultPlacement is set to ControlPlane,
+                  the chosen field will be controlPlaneTopology. If it is set to Workers
+                  the chosen field will be infrastructureTopology. Replicas will then
+                  be set to 1 or 2 based whether the chosen field's value is SingleReplica
+                  or HighlyAvailable, respectively. \n These defaults are subject
+                  to change."
                 format: int32
                 type: integer
               routeAdmission:
@@ -1076,6 +1148,17 @@ spec:
                     type: string
                 type: object
               tuningOptions:
+                anyOf:
+                - properties:
+                    maxConnections:
+                      enum:
+                      - -1
+                      - 0
+                - properties:
+                    maxConnections:
+                      format: int32
+                      maximum: 2000000
+                      minimum: 2000
                 description: "tuningOptions defines parameters for adjusting the performance
                   of ingress controller pods. All fields are optional and will use
                   their respective defaults if not set. See specific tuningOptions
@@ -1125,6 +1208,57 @@ spec:
                       to use significantly more memory than necessary."
                     format: int32
                     minimum: 4096
+                    type: integer
+                  healthCheckInterval:
+                    description: "healthCheckInterval defines how long the router
+                      waits between two consecutive health checks on its configured
+                      backends.  This value is applied globally as a default for all
+                      routes, but may be overridden per-route by the route annotation
+                      \"router.openshift.io/haproxy.health.check.interval\". \n Expects
+                      an unsigned duration string of decimal numbers, each with optional
+                      fraction and a unit suffix, eg \"300ms\", \"1.5h\" or \"2h45m\".
+                      Valid time units are \"ns\", \"us\" (or \"µs\" U+00B5 or \"μs\"
+                      U+03BC), \"ms\", \"s\", \"m\", \"h\". \n Setting this to less
+                      than 5s can cause excess traffic due to too frequent TCP health
+                      checks and accompanying SYN packet storms.  Alternatively, setting
+                      this too high can result in increased latency, due to backend
+                      servers that are no longer available, but haven't yet been detected
+                      as such. \n An empty or zero healthCheckInterval means no opinion
+                      and IngressController chooses a default, which is subject to
+                      change over time. Currently the default healthCheckInterval
+                      value is 5s. \n Currently the minimum allowed value is 1s and
+                      the maximum allowed value is 2147483647ms (24.85 days).  Both
+                      are subject to change over time."
+                    pattern: ^0|([0-9]+(\.[0-9]+)?(ns|us|µs|μs|ms|s|m|h))+$
+                    type: string
+                  maxConnections:
+                    description: "maxConnections defines the maximum number of simultaneous
+                      connections that can be established per HAProxy process. Increasing
+                      this value allows each ingress controller pod to handle more
+                      connections but at the cost of additional system resources being
+                      consumed. \n Permitted values are: empty, 0, -1, and the range
+                      2000-2000000. \n If this field is empty or 0, the IngressController
+                      will use the default value of 20000, but the default is subject
+                      to change in future releases. \n If the value is -1 then HAProxy
+                      will dynamically compute a maximum value based on the available
+                      ulimits in the running container. Selecting -1 (i.e., auto)
+                      will result in a large value being computed (~520000 on OpenShift
+                      >=4.10 clusters) and therefore each HAProxy process will incur
+                      significant memory usage compared to the current default of
+                      20000. \n Setting a value that is greater than the current operating
+                      system limit will prevent the HAProxy process from starting.
+                      \n If you choose a discrete value (e.g., 750000) and the router
+                      pod is migrated to a new node, there's no guarantee that that
+                      new node has identical ulimits configured. In such a scenario
+                      the pod would fail to start. If you have nodes with different
+                      ulimits configured (e.g., different tuned profiles) and you
+                      choose a discrete value then the guidance is to use -1 and let
+                      the value be computed dynamically at runtime. \n You can monitor
+                      memory usage for router containers with the following metric:
+                      'container_memory_working_set_bytes{container=\"router\",namespace=\"openshift-ingress\"}'.
+                      \n You can monitor memory usage of individual HAProxy processes
+                      in router containers with the following metric: 'container_memory_working_set_bytes{container=\"router\",namespace=\"openshift-ingress\"}/container_processes{container=\"router\",namespace=\"openshift-ingress\"}'."
+                    format: int32
                     type: integer
                   serverFinTimeout:
                     description: "serverFinTimeout defines how long a connection will
@@ -1233,6 +1367,28 @@ spec:
                     description: hostNetwork holds parameters for the HostNetwork
                       endpoint publishing strategy. Present only if type is HostNetwork.
                     properties:
+                      httpPort:
+                        default: 80
+                        description: httpPort is the port on the host which should
+                          be used to listen for HTTP requests. This field should be
+                          set when port 80 is already in use. The value should not
+                          coincide with the NodePort range of the cluster. When the
+                          value is 0 or is not specified it defaults to 80.
+                        format: int32
+                        maximum: 65535
+                        minimum: 0
+                        type: integer
+                      httpsPort:
+                        default: 443
+                        description: httpsPort is the port on the host which should
+                          be used to listen for HTTPS requests. This field should
+                          be set when port 443 is already in use. The value should
+                          not coincide with the NodePort range of the cluster. When
+                          the value is 0 or is not specified it defaults to 443.
+                        format: int32
+                        maximum: 65535
+                        minimum: 0
+                        type: integer
                       protocol:
                         description: "protocol specifies whether the IngressController
                           expects incoming connections to use plain TCP or whether
@@ -1256,6 +1412,29 @@ spec:
                         - TCP
                         - PROXY
                         type: string
+                      statsPort:
+                        default: 1936
+                        description: statsPort is the port on the host where the stats
+                          from the router are published. The value should not coincide
+                          with the NodePort range of the cluster. If an external load
+                          balancer is configured to forward connections to this IngressController,
+                          the load balancer should use this port for health checks.
+                          The load balancer can send HTTP probes on this port on a
+                          given node, with the path /healthz/ready to determine if
+                          the ingress controller is ready to receive traffic on the
+                          node. For proper operation the load balancer must not forward
+                          traffic to a node until the health check reports ready.
+                          The load balancer should also stop forwarding requests within
+                          a maximum of 45 seconds after /healthz/ready starts reporting
+                          not-ready. Probing every 5 to 10 seconds, with a 5-second
+                          timeout and with a threshold of two successful or failed
+                          requests to become healthy or unhealthy respectively, are
+                          well-tested values. When the value is 0 or is not specified
+                          it defaults to 1936.
+                        format: int32
+                        maximum: 65535
+                        minimum: 0
+                        type: integer
                     type: object
                   loadBalancer:
                     description: loadBalancer holds parameters for the load balancer.
@@ -1277,6 +1456,19 @@ spec:
                                 description: classicLoadBalancerParameters holds configuration
                                   parameters for an AWS classic load balancer. Present
                                   only if type is Classic.
+                                properties:
+                                  connectionIdleTimeout:
+                                    description: connectionIdleTimeout specifies the
+                                      maximum time period that a connection may be
+                                      idle before the load balancer closes the connection.  The
+                                      value must be parseable as a time duration value;
+                                      see <https://pkg.go.dev/time#ParseDuration>.  A
+                                      nil or zero value means no opinion, in which
+                                      case a default value is used.  The default value
+                                      for this field is 60s.  This default is subject
+                                      to change.
+                                    format: duration
+                                    type: string
                                 type: object
                               networkLoadBalancer:
                                 description: networkLoadBalancerParameters holds configuration
@@ -1326,12 +1518,13 @@ spec:
                           type:
                             description: type is the underlying infrastructure provider
                               for the load balancer. Allowed values are "AWS", "Azure",
-                              "BareMetal", "GCP", "OpenStack", and "VSphere".
+                              "BareMetal", "GCP", "Nutanix", "OpenStack", and "VSphere".
                             enum:
                             - AWS
                             - Azure
                             - BareMetal
                             - GCP
+                            - Nutanix
                             - OpenStack
                             - VSphere
                             - IBM
@@ -1418,10 +1611,99 @@ spec:
                 required:
                 - type
                 type: object
+              namespaceSelector:
+                description: namespaceSelector is the actual namespaceSelector in
+                  use.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: A label selector requirement is a selector that
+                        contains values, a key, and an operator that relates the key
+                        and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: operator represents a key's relationship to
+                            a set of values. Valid operators are In, NotIn, Exists
+                            and DoesNotExist.
+                          type: string
+                        values:
+                          description: values is an array of string values. If the
+                            operator is In or NotIn, the values array must be non-empty.
+                            If the operator is Exists or DoesNotExist, the values
+                            array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: matchLabels is a map of {key,value} pairs. A single
+                      {key,value} in the matchLabels map is equivalent to an element
+                      of matchExpressions, whose key field is "key", the operator
+                      is "In", and the values array contains only "value". The requirements
+                      are ANDed.
+                    type: object
+                type: object
               observedGeneration:
                 description: observedGeneration is the most recent generation observed.
                 format: int64
                 type: integer
+              routeSelector:
+                description: routeSelector is the actual routeSelector in use.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: A label selector requirement is a selector that
+                        contains values, a key, and an operator that relates the key
+                        and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: operator represents a key's relationship to
+                            a set of values. Valid operators are In, NotIn, Exists
+                            and DoesNotExist.
+                          type: string
+                        values:
+                          description: values is an array of string values. If the
+                            operator is In or NotIn, the values array must be non-empty.
+                            If the operator is Exists or DoesNotExist, the values
+                            array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: matchLabels is a map of {key,value} pairs. A single
+                      {key,value} in the matchLabels map is equivalent to an element
+                      of matchExpressions, whose key field is "key", the operator
+                      is "In", and the values array contains only "value". The requirements
+                      are ANDed.
+                    type: object
+                type: object
               selector:
                 description: selector is a label selector, in string format, for ingress
                   controller pods corresponding to the IngressController. The number

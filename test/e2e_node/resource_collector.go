@@ -23,7 +23,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"sort"
@@ -56,7 +56,7 @@ import (
 
 const (
 	// resource monitoring
-	cadvisorImageName = "google/cadvisor:latest"
+	cadvisorImageName = "gcr.io/cadvisor/cadvisor:v0.43.0"
 	cadvisorPodName   = "cadvisor"
 	cadvisorPort      = 8090
 	// housekeeping interval of Cadvisor (second)
@@ -95,7 +95,7 @@ func (r *ResourceCollector) Start() {
 	// Get the cgroup container names for kubelet and runtime
 	kubeletContainer, err1 := getContainerNameForProcess(kubeletProcessName, "")
 	runtimeContainer, err2 := getContainerNameForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
-	if err1 == nil && err2 == nil {
+	if err1 == nil && err2 == nil && kubeletContainer != "" && runtimeContainer != "" {
 		systemContainers = map[string]string{
 			kubeletstatsv1alpha1.SystemContainerKubelet: kubeletContainer,
 			kubeletstatsv1alpha1.SystemContainerRuntime: runtimeContainer,
@@ -486,7 +486,7 @@ func getPidFromPidFile(pidFile string) (int, error) {
 	}
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return 0, fmt.Errorf("error reading pid file %s: %v", pidFile, err)
 	}

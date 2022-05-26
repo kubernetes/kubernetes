@@ -371,17 +371,10 @@ type cinderVolume struct {
 
 func (b *cinderVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         !b.readOnly,
-		SupportsSELinux: true,
+		ReadOnly:       b.readOnly,
+		Managed:        !b.readOnly,
+		SELinuxRelabel: true,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *cinderVolumeMounter) CanMount() error {
-	return nil
 }
 
 func (b *cinderVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {

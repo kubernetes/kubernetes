@@ -27,7 +27,6 @@ import (
 	"github.com/onsi/gomega/types"
 
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -117,8 +116,8 @@ func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		timeout := time.Minute
 		pollInterval := time.Second
 		matchSC := HaveCapacitiesForClass(sc.Name)
-		listAll := gomega.Eventually(func() (*storagev1beta1.CSIStorageCapacityList, error) {
-			return f.ClientSet.StorageV1beta1().CSIStorageCapacities("").List(context.Background(), metav1.ListOptions{})
+		listAll := gomega.Eventually(func() (*storagev1.CSIStorageCapacityList, error) {
+			return f.ClientSet.StorageV1().CSIStorageCapacities("").List(context.Background(), metav1.ListOptions{})
 		}, timeout, pollInterval)
 
 		// If we have further information about what storage
@@ -152,7 +151,7 @@ func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, patt
 	})
 }
 
-func formatCapacities(capacities []storagev1beta1.CSIStorageCapacity) []string {
+func formatCapacities(capacities []storagev1.CSIStorageCapacity) []string {
 	lines := []string{}
 	for _, capacity := range capacities {
 		lines = append(lines, fmt.Sprintf("   %+v", capacity))
@@ -160,7 +159,7 @@ func formatCapacities(capacities []storagev1beta1.CSIStorageCapacity) []string {
 	return lines
 }
 
-// MatchCapacities runs some kind of check against *storagev1beta1.CSIStorageCapacityList.
+// MatchCapacities runs some kind of check against *storagev1.CSIStorageCapacityList.
 // In case of failure, all actual objects are appended to the failure message.
 func MatchCapacities(match types.GomegaMatcher) types.GomegaMatcher {
 	return matchCSIStorageCapacities{match: match}
@@ -185,7 +184,7 @@ func (m matchCSIStorageCapacities) NegatedFailureMessage(actual interface{}) (me
 }
 
 func (m matchCSIStorageCapacities) dump(actual interface{}) string {
-	capacities, ok := actual.(*storagev1beta1.CSIStorageCapacityList)
+	capacities, ok := actual.(*storagev1.CSIStorageCapacityList)
 	if !ok || capacities == nil {
 		return ""
 	}
@@ -203,10 +202,10 @@ type CapacityMatcher interface {
 	types.GomegaMatcher
 	// MatchedCapacities returns all CSICapacityObjects which were
 	// found during the preceding Match call.
-	MatchedCapacities() []storagev1beta1.CSIStorageCapacity
+	MatchedCapacities() []storagev1.CSIStorageCapacity
 }
 
-// HaveCapacitiesForClass filters all storage capacity objects in a *storagev1beta1.CSIStorageCapacityList
+// HaveCapacitiesForClass filters all storage capacity objects in a *storagev1.CSIStorageCapacityList
 // by storage class. Success is when when there is at least one.
 func HaveCapacitiesForClass(scName string) CapacityMatcher {
 	return &haveCSIStorageCapacities{scName: scName}
@@ -214,15 +213,15 @@ func HaveCapacitiesForClass(scName string) CapacityMatcher {
 
 type haveCSIStorageCapacities struct {
 	scName             string
-	matchingCapacities []storagev1beta1.CSIStorageCapacity
+	matchingCapacities []storagev1.CSIStorageCapacity
 }
 
 var _ CapacityMatcher = &haveCSIStorageCapacities{}
 
 func (h *haveCSIStorageCapacities) Match(actual interface{}) (success bool, err error) {
-	capacities, ok := actual.(*storagev1beta1.CSIStorageCapacityList)
+	capacities, ok := actual.(*storagev1.CSIStorageCapacityList)
 	if !ok {
-		return false, fmt.Errorf("expected *storagev1beta1.CSIStorageCapacityList, got: %T", actual)
+		return false, fmt.Errorf("expected *storagev1.CSIStorageCapacityList, got: %T", actual)
 	}
 	h.matchingCapacities = nil
 	for _, capacity := range capacities.Items {
@@ -233,7 +232,7 @@ func (h *haveCSIStorageCapacities) Match(actual interface{}) (success bool, err 
 	return len(h.matchingCapacities) > 0, nil
 }
 
-func (h *haveCSIStorageCapacities) MatchedCapacities() []storagev1beta1.CSIStorageCapacity {
+func (h *haveCSIStorageCapacities) MatchedCapacities() []storagev1.CSIStorageCapacity {
 	return h.matchingCapacities
 }
 
@@ -266,8 +265,8 @@ type haveLocalStorageCapacities struct {
 	topologyKey string
 
 	matchSuccess          bool
-	expectedCapacities    []storagev1beta1.CSIStorageCapacity
-	unexpectedCapacities  []storagev1beta1.CSIStorageCapacity
+	expectedCapacities    []storagev1.CSIStorageCapacity
+	unexpectedCapacities  []storagev1.CSIStorageCapacity
 	missingTopologyValues []string
 }
 
@@ -342,7 +341,7 @@ func (h *haveLocalStorageCapacities) Match(actual interface{}) (success bool, er
 	return len(h.unexpectedCapacities) == 0 && len(h.missingTopologyValues) == 0, nil
 }
 
-func (h *haveLocalStorageCapacities) MatchedCapacities() []storagev1beta1.CSIStorageCapacity {
+func (h *haveLocalStorageCapacities) MatchedCapacities() []storagev1.CSIStorageCapacity {
 	return h.match.MatchedCapacities()
 }
 

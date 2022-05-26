@@ -29,9 +29,15 @@ export KUBE_CACHE_MUTATION_DETECTOR
 KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
+KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
+if [[ ${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY} -gt 0 ]]; then
+  GOMAXPROCS=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}
+  export GOMAXPROCS
+  kube::log::status "Setting parallelism to ${GOMAXPROCS}"
+fi
+
 # Give integration tests longer to run by default.
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=600s}
-KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
 KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
 # Default glog module settings.
@@ -72,7 +78,7 @@ runTests() {
   make -C "${KUBE_ROOT}" test \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
-      KUBE_TEST_ARGS="--alsologtostderr=true ${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE}" \
+      KUBE_TEST_ARGS="--alsologtostderr=true ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} ${KUBE_TEST_ARGS:-}" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_RACE=""
 

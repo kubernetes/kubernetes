@@ -3,9 +3,7 @@
 reviewers:
   - bowei
   - cjcullen
-  - vishh
   - mwielgus
-  - MaciekPytel
   - yujuhong
   - mtaufen
   - ibabou
@@ -14,9 +12,7 @@ reviewers:
 approvers:
   - bowei
   - cjcullen
-  - vishh
   - mwielgus
-  - MaciekPytel
   - yujuhong
   - mtaufen
   - ibabou
@@ -26,6 +22,8 @@ emeritus_approvers:
   - gmarek
   - jingax10
   - jszczepkowski
+  - vishh
+  - MaciekPytel
 labels:
-- sig/cloud-provider
-- area/provider/gcp
+  - sig/cloud-provider
+  - area/provider/gcp

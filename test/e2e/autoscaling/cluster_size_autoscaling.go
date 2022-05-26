@@ -19,7 +19,7 @@ package autoscaling
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math"
 	"net/http"
 	"os"
@@ -186,7 +186,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 				}
 			}
 		}
-		framework.ExpectEqual(eventFound, true)
+		if !eventFound {
+			framework.Failf("Expected event with kind 'Pod' and reason 'NotTriggerScaleUp' not found.")
+		}
 		// Verify that cluster size is not changed
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size <= nodeCount }, time.Second))
@@ -853,7 +855,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, nodeCount-minSize+1, resizeTimeout))
 		ngNodes, err := framework.GetGroupNodes(minMig)
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(ngNodes) == 1, true)
+		if len(ngNodes) != 1 {
+			framework.Failf("Expected one node, got instead: %v", ngNodes)
+		}
 		node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), ngNodes[0], metav1.GetOptions{})
 		ginkgo.By(fmt.Sprintf("Target node for scale-down: %s", node.Name))
 		framework.ExpectNoError(err)
@@ -909,7 +913,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(nodesToBreakCount <= len(nodes.Items), true)
+		if nodesToBreakCount > len(nodes.Items) {
+			framework.Failf("Expected at most %d nodes to break, got %d", len(nodes.Items), nodesToBreakCount)
+		}
 		nodesToBreak := nodes.Items[:nodesToBreakCount]
 
 		// TestUnderTemporaryNetworkFailure only removes connectivity to a single node,
@@ -1097,7 +1103,7 @@ func getCluster(apiVersion string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -1946,7 +1952,9 @@ func createPriorityClasses(f *framework.Framework) func() {
 		if err != nil {
 			klog.Errorf("Error creating priority class: %v", err)
 		}
-		framework.ExpectEqual(err == nil || apierrors.IsAlreadyExists(err), true)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.Failf("unexpected error while creating priority class: %v", err)
+		}
 	}
 
 	return func() {

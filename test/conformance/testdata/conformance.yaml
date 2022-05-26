@@ -251,8 +251,8 @@
     works for CRD preserving unknown fields at the schema root [Conformance]'
   description: Register a custom resource definition with x-preserve-unknown-fields
     in the schema root. Attempt to create and apply a change a custom resource, via
-    kubectl; client-side validation MUST accept unknown properties. Attempt kubectl
-    explain; the output MUST show the custom resource KIND.
+    kubectl; kubectl validation MUST accept unknown properties. Attempt kubectl explain;
+    the output MUST show the custom resource KIND.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in embedded
@@ -261,7 +261,7 @@
     works for CRD preserving unknown fields in an embedded object [Conformance]'
   description: Register a custom resource definition with x-preserve-unknown-fields
     in an embedded object. Attempt to create and apply a change a custom resource,
-    via kubectl; client-side validation MUST accept unknown properties. Attempt kubectl
+    via kubectl; kubectl validation MUST accept unknown properties. Attempt kubectl
     explain; the output MUST show that x-preserve-unknown-properties is used on the
     nested field.
   release: v1.16
@@ -271,12 +271,12 @@
     works for CRD with validation schema [Conformance]'
   description: Register a custom resource definition with a validating schema consisting
     of objects, arrays and primitives. Attempt to create and apply a change a custom
-    resource using valid properties, via kubectl; client-side validation MUST pass.
-    Attempt both operations with unknown properties and without required properties;
-    client-side validation MUST reject the operations. Attempt kubectl explain; the
-    output MUST explain the custom resource properties. Attempt kubectl explain on
-    custom resource properties; the output MUST explain the nested custom resource
-    properties.
+    resource using valid properties, via kubectl; kubectl validation MUST pass. Attempt
+    both operations with unknown properties and without required properties; kubectl
+    validation MUST reject the operations. Attempt kubectl explain; the output MUST
+    explain the custom resource properties. Attempt kubectl explain on custom resource
+    properties; the output MUST explain the nested custom resource properties. All
+    validation should be the same.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in object
@@ -284,7 +284,7 @@
     works for CRD without validation schema [Conformance]'
   description: Register a custom resource definition with x-preserve-unknown-fields
     in the top level object. Attempt to create and apply a change a custom resource,
-    via kubectl; client-side validation MUST accept unknown properties. Attempt kubectl
+    via kubectl; kubectl validation MUST accept unknown properties. Attempt kubectl
     explain; the output MUST contain a valid DESCRIPTION stanza.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
@@ -588,7 +588,7 @@
   description: CronJob MUST support suspension, which suppresses creation of new jobs.
   release: v1.21
   file: test/e2e/apps/cronjob.go
-- testname: CronJob FrobidConcurrent
+- testname: CronJob ForbidConcurrent
   codename: '[sig-apps] CronJob should not schedule new jobs when ForbidConcurrent
     [Slow] [Conformance]'
   description: CronJob MUST support ForbidConcurrent policy, allowing to run single,
@@ -763,6 +763,22 @@
     pod. Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
   release: v1.16
   file: test/e2e/apps/job.go
+- testname: Jobs, apply changes to status
+  codename: '[sig-apps] Job should apply changes to a job status [Conformance]'
+  description: Attempt to create a running Job which MUST succeed. Attempt to patch
+    the Job status to include a new start time which MUST succeed. An annotation for
+    the job that was patched MUST be found. Attempt to replace the job status with
+    a new start time which MUST succeed. Attempt to read its status sub-resource which
+    MUST succeed
+  release: v1.24
+  file: test/e2e/apps/job.go
+- testname: Ensure Pods of an Indexed Job get a unique index.
+  codename: '[sig-apps] Job should create pods for an Indexed job with completion
+    indexes and specified hostname [Conformance]'
+  description: Create an Indexed job. Job MUST complete successfully. Ensure that
+    created pods have completion index annotation and environment variable.
+  release: v1.24
+  file: test/e2e/apps/job.go
 - testname: Jobs, active pods, graceful termination
   codename: '[sig-apps] Job should delete a job [Conformance]'
   description: Create a job. Ensure the active pods reflect paralellism in the namespace
@@ -933,6 +949,13 @@
     visible to subsequent reads.
   release: v1.22
   file: test/e2e/apps/statefulset.go
+- testname: Conformance tests minimum number of nodes.
+  codename: '[sig-architecture] Conformance Tests should have at least two untainted
+    nodes [Conformance]'
+  description: Conformance tests requires at least two untainted nodes where pods
+    can be scheduled.
+  release: v1.23
+  file: test/e2e/architecture/conformance.go
 - testname: CertificateSigningRequest API
   codename: '[sig-auth] Certificates API [Privileged:ClusterAdmin] should support
     CSR API operations [Conformance]'
@@ -1184,8 +1207,7 @@
   release: v1.20
   file: test/e2e/instrumentation/core_events.go
 - testname: DNS, cluster
-  codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [LinuxOnly]
-    [Conformance]'
+  codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [Conformance]'
   description: When a Pod is created, the pod MUST be able to resolve cluster dns
     entries such as kubernetes.default via /etc/hosts.
   release: v1.14
@@ -1199,8 +1221,7 @@
   release: v1.15
   file: test/e2e/network/dns.go
 - testname: DNS, resolve the hostname
-  codename: '[sig-network] DNS should provide DNS for pods for Hostname [LinuxOnly]
-    [Conformance]'
+  codename: '[sig-network] DNS should provide DNS for pods for Hostname [Conformance]'
   description: Create a headless service with label. Create a Pod with label to match
     service's label, with hostname and a subdomain same as service name. Pod MUST
     be able to resolve its fully qualified domain name as well as hostname by serving
@@ -1359,8 +1380,8 @@
     the each of service proxy endpoints in the cluster using a http post(protocol=tcp)  and
     the request MUST be successful. Container will execute curl command to reach the
     service port within specified max retry limit and MUST result in reporting unique
-    hostnames. This test is marked LinuxOnly since HostNetwork is not supported on
-    other platforms like Windows.
+    hostnames. This test is marked LinuxOnly it breaks when using Overlay networking
+    with Windows.
   release: v1.9
   file: test/e2e/common/network/networking.go
 - testname: Networking, intra pod http, from node
@@ -1373,10 +1394,18 @@
     the each of service proxy endpoints in the cluster using a http post(protocol=udp)  and
     the request MUST be successful. Container will execute curl command to reach the
     service port within specified max retry limit and MUST result in reporting unique
-    hostnames. This test is marked LinuxOnly since HostNetwork is not supported on
-    other platforms like Windows.
+    hostnames. This test is marked LinuxOnly it breaks when using Overlay networking
+    with Windows.
   release: v1.9
   file: test/e2e/common/network/networking.go
+- testname: Proxy, validate Proxy responses
+  codename: '[sig-network] Proxy version v1 A set of valid responses are returned
+    for both pod and service Proxy [Conformance]'
+  description: Attempt to create a pod and a service. A set of pod and service endpoints
+    MUST be accessed via Proxy using a list of http methods. A valid response MUST
+    be returned for each endpoint.
+  release: v1.24
+  file: test/e2e/network/proxy.go
 - testname: Proxy, validate ProxyWithPath responses
   codename: '[sig-network] Proxy version v1 A set of valid responses are returned
     for both pod and service ProxyWithPath [Conformance]'
@@ -1675,47 +1704,43 @@
     server pod to validate that the pre-stop is executed.
   release: v1.9
   file: test/e2e/common/node/lifecycle_hook.go
-- testname: Container Runtime, TerminationMessagePath, non-root user and non-default
-    path
-  codename: '[sig-node] Container Runtime blackbox test on terminated container should
-    report termination message [LinuxOnly] if TerminationMessagePath is set as non-root
-    user and at a non-default path [NodeConformance] [Conformance]'
-  description: 'Create a pod with a container to run it as a non-root user with a
-    custom TerminationMessagePath set. Pod redirects the output to the provided path
-    successfully. When the container is terminated, the termination message MUST match
-    the expected output logged in the provided custom path. [LinuxOnly]: Tagged LinuxOnly
-    due to use of ''uid'' and unable to mount files in Windows Containers.'
-  release: v1.15
-  file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, TerminationMessage, from log output of succeeding container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message as empty when pod succeeds and TerminationMessagePolicy
-    FallbackToLogsOnError is set [Excluded:WindowsDocker] [NodeConformance] [Conformance]'
-  description: 'Create a pod with an container. Container''s output is recorded in
-    log and container exits successfully without an error. When container is terminated,
-    terminationMessage MUST have no content as container succeed. [Excluded:WindowsDocker]:
-    Cannot mount files in Windows Containers created by Docker.'
+    FallbackToLogsOnError is set [NodeConformance] [Conformance]'
+  description: Create a pod with an container. Container's output is recorded in log
+    and container exits successfully without an error. When container is terminated,
+    terminationMessage MUST have no content as container succeed.
   release: v1.15
   file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, TerminationMessage, from file of succeeding container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message from file when pod succeeds and TerminationMessagePolicy
-    FallbackToLogsOnError is set [Excluded:WindowsDocker] [NodeConformance] [Conformance]'
-  description: 'Create a pod with an container. Container''s output is recorded in
-    a file and the container exits successfully without an error. When container is
-    terminated, terminationMessage MUST match with the content from file. [Excluded:WindowsDocker]:
-    Cannot mount files in Windows Containers created by Docker.'
+    FallbackToLogsOnError is set [NodeConformance] [Conformance]'
+  description: Create a pod with an container. Container's output is recorded in a
+    file and the container exits successfully without an error. When container is
+    terminated, terminationMessage MUST match with the content from file.
   release: v1.15
   file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, TerminationMessage, from container's log output of
     failing container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message from log output if TerminationMessagePolicy FallbackToLogsOnError
-    is set [Excluded:WindowsDocker] [NodeConformance] [Conformance]'
-  description: 'Create a pod with an container. Container''s output is recorded in
-    log and container exits with an error. When container is terminated, termination
-    message MUST match the expected output recorded from container''s log. [Excluded:WindowsDocker]:
-    Cannot mount files in Windows Containers created by Docker.'
+    is set [NodeConformance] [Conformance]'
+  description: Create a pod with an container. Container's output is recorded in log
+    and container exits with an error. When container is terminated, termination message
+    MUST match the expected output recorded from container's log.
+  release: v1.15
+  file: test/e2e/common/node/runtime.go
+- testname: Container Runtime, TerminationMessagePath, non-root user and non-default
+    path
+  codename: '[sig-node] Container Runtime blackbox test on terminated container should
+    report termination message if TerminationMessagePath is set as non-root user and
+    at a non-default path [NodeConformance] [Conformance]'
+  description: Create a pod with a container to run it as a non-root user with a custom
+    TerminationMessagePath set. Pod redirects the output to the provided path successfully.
+    When the container is terminated, the termination message MUST match the expected
+    output logged in the provided custom path.
   release: v1.15
   file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, Restart Policy, Pod Phases
@@ -1728,37 +1753,37 @@
     accordingly.
   release: v1.13
   file: test/e2e/common/node/runtime.go
-- testname: Docker containers, with arguments
-  codename: '[sig-node] Docker Containers should be able to override the image''s
-    default arguments (docker cmd) [NodeConformance] [Conformance]'
-  description: Default command and  from the docker image entrypoint MUST be used
+- testname: Containers, with arguments
+  codename: '[sig-node] Containers should be able to override the image''s default
+    arguments (container cmd) [NodeConformance] [Conformance]'
+  description: Default command and  from the container image entrypoint MUST be used
     when Pod does not specify the container command but the arguments from Pod spec
     MUST override when specified.
   release: v1.9
-  file: test/e2e/common/node/docker_containers.go
-- testname: Docker containers, with command
-  codename: '[sig-node] Docker Containers should be able to override the image''s
-    default command (docker entrypoint) [NodeConformance] [Conformance]'
-  description: Default command from the docker image entrypoint MUST NOT be used when
-    Pod specifies the container command.  Command from Pod spec MUST override the
-    command in the image.
+  file: test/e2e/common/node/containers.go
+- testname: Containers, with command
+  codename: '[sig-node] Containers should be able to override the image''s default
+    command (container entrypoint) [NodeConformance] [Conformance]'
+  description: Default command from the container image entrypoint MUST NOT be used
+    when Pod specifies the container command.  Command from Pod spec MUST override
+    the command in the image.
   release: v1.9
-  file: test/e2e/common/node/docker_containers.go
-- testname: Docker containers, with command and arguments
-  codename: '[sig-node] Docker Containers should be able to override the image''s
-    default command and arguments [NodeConformance] [Conformance]'
-  description: Default command and arguments from the docker image entrypoint MUST
+  file: test/e2e/common/node/containers.go
+- testname: Containers, with command and arguments
+  codename: '[sig-node] Containers should be able to override the image''s default
+    command and arguments [NodeConformance] [Conformance]'
+  description: Default command and arguments from the container image entrypoint MUST
     NOT be used when Pod specifies the container command and arguments.  Command and
     arguments from Pod spec MUST override the command and arguments in the image.
   release: v1.9
-  file: test/e2e/common/node/docker_containers.go
-- testname: Docker containers, without command and arguments
-  codename: '[sig-node] Docker Containers should use the image defaults if command
-    and args are blank [NodeConformance] [Conformance]'
-  description: Default command and arguments from the docker image entrypoint MUST
+  file: test/e2e/common/node/containers.go
+- testname: Containers, without command and arguments
+  codename: '[sig-node] Containers should use the image defaults if command and args
+    are blank [NodeConformance] [Conformance]'
+  description: Default command and arguments from the container image entrypoint MUST
     be used when Pod does not specify the container command
   release: v1.9
-  file: test/e2e/common/node/docker_containers.go
+  file: test/e2e/common/node/containers.go
 - testname: DownwardAPI, environment for CPU and memory limits and requests
   codename: '[sig-node] Downward API should provide container''s limits.cpu/memory
     and requests.cpu/memory as env vars [NodeConformance] [Conformance]'
@@ -1914,6 +1939,13 @@
     be found when listed. The set of Pod Templates is deleted and MUST NOT show up
     when listed by its label selector.
   release: v1.19
+  file: test/e2e/common/node/podtemplates.go
+- testname: PodTemplate, replace
+  codename: '[sig-node] PodTemplates should replace a pod template [Conformance]'
+  description: Attempt to create a PodTemplate which MUST succeed. Attempt to replace
+    the PodTemplate to include a new annotation which MUST succeed. The annotation
+    MUST be found in the new PodTemplate.
+  release: v1.24
   file: test/e2e/common/node/podtemplates.go
 - testname: PodTemplate lifecycle
   codename: '[sig-node] PodTemplates should run the lifecycle of PodTemplates [Conformance]'
@@ -2091,6 +2123,36 @@
     document. The runtimeclasses resource MUST exist in the /apis/node.k8s.io/v1 discovery
     document. The runtimeclasses resource must support create, get, list, watch, update,
     patch, delete, and deletecollection.'
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
+- testname: Pod with the deleted RuntimeClass is rejected.
+  codename: '[sig-node] RuntimeClass should reject a Pod requesting a deleted RuntimeClass
+    [NodeConformance] [Conformance]'
+  description: Pod requesting the deleted RuntimeClass must be rejected.
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
+- testname: Pod with the non-existing RuntimeClass is rejected.
+  codename: '[sig-node] RuntimeClass should reject a Pod requesting a non-existent
+    RuntimeClass [NodeConformance] [Conformance]'
+  description: The Pod requesting the non-existing RuntimeClass must be rejected.
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
+- testname: RuntimeClass Overhead field must be respected.
+  codename: '[sig-node] RuntimeClass should schedule a Pod requesting a RuntimeClass
+    and initialize its Overhead [NodeConformance] [Conformance]'
+  description: The Pod requesting the existing RuntimeClass must be scheduled. This
+    test doesn't validate that the Pod will actually start because this functionality
+    depends on container runtime and preconfigured handler. Runtime-specific functionality
+    is not being tested here.
+  release: v1.24
+  file: test/e2e/common/node/runtimeclass.go
+- testname: Can schedule a pod requesting existing RuntimeClass.
+  codename: '[sig-node] RuntimeClass should schedule a Pod requesting a RuntimeClass
+    without PodOverhead [NodeConformance] [Conformance]'
+  description: The Pod requesting the existing RuntimeClass must be scheduled. This
+    test doesn't validate that the Pod will actually start because this functionality
+    depends on container runtime and preconfigured handler. Runtime-specific functionality
+    is not being tested here.
   release: v1.20
   file: test/e2e/common/node/runtimeclass.go
 - testname: Secrets, pod environment field
@@ -2327,6 +2389,16 @@
     pod.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
+- testname: CSIStorageCapacity API
+  codename: '[sig-storage] CSIStorageCapacity  should support CSIStorageCapacities
+    API operations [Conformance]'
+  description: ' The storage.k8s.io API group MUST exist in the /apis discovery document.
+    The storage.k8s.io/v1 API group/version MUST exist in the /apis/mode.k8s.io discovery
+    document. The csistoragecapacities resource MUST exist in the /apis/storage.k8s.io/v1
+    discovery document. The csistoragecapacities resource must support create, get,
+    list, watch, update, patch, delete, and deletecollection.'
+  release: v1.24
+  file: test/e2e/storage/csistoragecapacity.go
 - testname: ConfigMap Volume, text data, binary data
   codename: '[sig-storage] ConfigMap binary data should be reflected in volume [NodeConformance]
     [Conformance]'
@@ -3049,46 +3121,38 @@
   file: test/e2e/common/storage/secrets_volume.go
 - testname: 'SubPath: Reading content from a configmap volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    configmap pod [Excluded:WindowsDocker] [Conformance]'
+    configmap pod [Conformance]'
   description: Containers in a pod can read content from a configmap mounted volume
-    which was configured with a subpath. This test is marked [Excluded:WindowsDocker]
-    since Docker does not support creating individual file mounts for containers on
-    Windows.
+    which was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a configmap volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    configmap pod with mountPath of existing file [Excluded:WindowsDocker] [Conformance]'
+    configmap pod with mountPath of existing file [Conformance]'
   description: Containers in a pod can read content from a configmap mounted volume
     which was configured with a subpath and also using a mountpath that is a specific
-    file. This test is marked [Excluded:WindowsDocker] since Docker does not support
-    creating individual file mounts for containers on Windows.
+    file.
   release: v1.12
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a downwardAPI volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    downward pod [Excluded:WindowsDocker] [Conformance]'
+    downward pod [Conformance]'
   description: Containers in a pod can read content from a downwardAPI mounted volume
-    which was configured with a subpath. This test is marked [Excluded:WindowsDocker]
-    since Docker does not support creating individual file mounts for containers on
-    Windows.
+    which was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a projected volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    projected pod [Excluded:WindowsDocker] [Conformance]'
+    projected pod [Conformance]'
   description: Containers in a pod can read content from a projected mounted volume
-    which was configured with a subpath. This test is marked [Excluded:WindowsDocker]
-    since Docker does not support creating individual file mounts for containers on
-    Windows.
+    which was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
 - testname: 'SubPath: Reading content from a secret volume.'
   codename: '[sig-storage] Subpath Atomic writer volumes should support subpaths with
-    secret pod [Excluded:WindowsDocker] [Conformance]'
+    secret pod [Conformance]'
   description: Containers in a pod can read content from a secret mounted volume which
-    was configured with a subpath. This test is marked [Excluded:WindowsDocker] since
-    Docker does not support creating individual file mounts for containers on Windows.
+    was configured with a subpath.
   release: v1.12
   file: test/e2e/storage/subpath.go
 

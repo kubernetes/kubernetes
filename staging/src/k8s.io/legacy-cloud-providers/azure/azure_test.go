@@ -3248,13 +3248,12 @@ func TestUpdateNodeCaches(t *testing.T) {
 			Name: "prevNode",
 		},
 	}
-	// node is deleted from the cluster
+
 	az.updateNodeCaches(&prevNode, nil)
 	assert.Equal(t, 0, len(az.nodeZones[zone]))
 	assert.Equal(t, 0, len(az.nodeResourceGroups))
 	assert.Equal(t, 0, len(az.unmanagedNodes))
-	// deleted node should be excluded from load balancer
-	assert.Equal(t, 1, len(az.excludeLoadBalancerNodes))
+	assert.Equal(t, 0, len(az.excludeLoadBalancerNodes))
 	assert.Equal(t, 0, len(az.nodeNames))
 
 	newNode := v1.Node{
@@ -3268,12 +3267,12 @@ func TestUpdateNodeCaches(t *testing.T) {
 			Name: "newNode",
 		},
 	}
-	// new node is added to the cluster
+
 	az.updateNodeCaches(nil, &newNode)
 	assert.Equal(t, 1, len(az.nodeZones[zone]))
 	assert.Equal(t, 1, len(az.nodeResourceGroups))
 	assert.Equal(t, 1, len(az.unmanagedNodes))
-	assert.Equal(t, 2, len(az.excludeLoadBalancerNodes))
+	assert.Equal(t, 1, len(az.excludeLoadBalancerNodes))
 	assert.Equal(t, 1, len(az.nodeNames))
 }
 
@@ -3310,48 +3309,6 @@ func TestUpdateNodeCacheExcludeLoadBalancer(t *testing.T) {
 	}
 	az.updateNodeCaches(&prevNode, &newNode)
 	assert.Equal(t, 1, len(az.excludeLoadBalancerNodes))
-
-	// non-ready node should be excluded
-	az.unmanagedNodes = sets.NewString()
-	az.excludeLoadBalancerNodes = sets.NewString()
-	az.nodeNames = sets.NewString()
-	nonReadyNode := v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				v1.LabelTopologyZone: zone,
-			},
-			Name: "aNode",
-		},
-		Status: v1.NodeStatus{
-			Conditions: []v1.NodeCondition{
-				{
-					Type:   v1.NodeReady,
-					Status: v1.ConditionFalse,
-				},
-			},
-		},
-	}
-	az.updateNodeCaches(nil, &nonReadyNode)
-	assert.Equal(t, 1, len(az.excludeLoadBalancerNodes))
-	// node becomes ready
-	readyNode := v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				v1.LabelTopologyZone: zone,
-			},
-			Name: "aNode",
-		},
-		Status: v1.NodeStatus{
-			Conditions: []v1.NodeCondition{
-				{
-					Type:   v1.NodeReady,
-					Status: v1.ConditionTrue,
-				},
-			},
-		},
-	}
-	az.updateNodeCaches(&nonReadyNode, &readyNode)
-	assert.Equal(t, 0, len(az.excludeLoadBalancerNodes))
 
 }
 

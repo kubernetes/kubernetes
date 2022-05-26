@@ -25,18 +25,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	cgroupfs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
+	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-	utilio "k8s.io/utils/io"
 	utilpath "k8s.io/utils/path"
 
 	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
@@ -44,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -65,25 +61,10 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/util/oom"
-	"k8s.io/kubernetes/pkg/util/procfs"
-)
-
-const (
-	dockerProcessName = "dockerd"
-	// dockerd option --pidfile can specify path to use for daemon PID file, pid file path is default "/var/run/docker.pid"
-	dockerPidFile         = "/var/run/docker.pid"
-	containerdProcessName = "containerd"
-	maxPidFileLength      = 1 << 10 // 1KB
-)
-
-var (
-	// The docker version in which containerd was introduced.
-	containerdAPIVersion = utilversion.MustParseGeneric("1.23")
 )
 
 // A non-user container tracked by the Kubelet.
@@ -275,8 +256,8 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		// of note, we always use the cgroupfs driver when performing this check since
 		// the input is provided in that format.
 		// this is important because we do not want any name conversion to occur.
-		if !cgroupManager.Exists(cgroupRoot) {
-			return nil, fmt.Errorf("invalid configuration: cgroup-root %q doesn't exist", cgroupRoot)
+		if err := cgroupManager.Validate(cgroupRoot); err != nil {
+			return nil, fmt.Errorf("invalid configuration: %w", err)
 		}
 		klog.InfoS("Container manager verified user specified cgroup-root exists", "cgroupRoot", cgroupRoot)
 		// Include the top level cgroup for enforcing node allocatable into cgroup-root.
@@ -398,13 +379,10 @@ func createManager(containerName string) (cgroups.Manager, error) {
 		Resources: &configs.Resources{
 			SkipDevices: true,
 		},
+		Systemd: false,
 	}
 
-	if cgroups.IsCgroup2UnifiedMode() {
-		return cgroupfs2.NewManager(cg, "", false)
-
-	}
-	return cgroupfs.NewManager(cg, nil, false), nil
+	return manager.New(cg)
 }
 
 type KernelTunableBehavior string
@@ -496,24 +474,6 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 	}
 
 	systemContainers := []*systemContainer{}
-	if cm.ContainerRuntime == "docker" {
-		// With the docker-CRI integration, dockershim manages the cgroups
-		// and oom score for the docker processes.
-		// Check the cgroup for docker periodically, so kubelet can serve stats for the docker runtime.
-		// TODO(KEP#866): remove special processing for CRI "docker" enablement
-		cm.periodicTasks = append(cm.periodicTasks, func() {
-			klog.V(4).InfoS("Adding periodic tasks for docker CRI integration")
-			cont, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
-			if err != nil {
-				klog.ErrorS(err, "Failed to get container name for process")
-				return
-			}
-			klog.V(2).InfoS("Discovered runtime cgroup name", "cgroupName", cont)
-			cm.Lock()
-			defer cm.Unlock()
-			cm.RuntimeCgroupsName = cont
-		})
-	}
 
 	if cm.SystemCgroupsName != "" {
 		if cm.SystemCgroupsName == "/" {
@@ -536,12 +496,12 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 		}
 
 		cont.ensureStateFunc = func(_ cgroups.Manager) error {
-			return ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, cont.manager)
+			return ensureProcessInContainerWithOOMScore(os.Getpid(), int(cm.KubeletOOMScoreAdj), cont.manager)
 		}
 		systemContainers = append(systemContainers, cont)
 	} else {
 		cm.periodicTasks = append(cm.periodicTasks, func() {
-			if err := ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, nil); err != nil {
+			if err := ensureProcessInContainerWithOOMScore(os.Getpid(), int(cm.KubeletOOMScoreAdj), nil); err != nil {
 				klog.ErrorS(err, "Failed to ensure process in container with oom score")
 				return
 			}
@@ -559,21 +519,6 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 
 	cm.systemContainers = systemContainers
 	return nil
-}
-
-func getContainerNameForProcess(name, pidFile string) (string, error) {
-	pids, err := getPidsForProcess(name, pidFile)
-	if err != nil {
-		return "", fmt.Errorf("failed to detect process id for %q - %v", name, err)
-	}
-	if len(pids) == 0 {
-		return "", nil
-	}
-	cont, err := getContainer(pids[0])
-	if err != nil {
-		return "", err
-	}
-	return cont, nil
 }
 
 func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
@@ -613,11 +558,8 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 
 	// Initialize CPU manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
-		containerMap, err := buildContainerMapFromRuntime(runtimeService)
-		if err != nil {
-			return fmt.Errorf("failed to build map of initial containers from runtime: %v", err)
-		}
-		err = cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
+		containerMap := buildContainerMapFromRuntime(runtimeService)
+		err := cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
 		if err != nil {
 			return fmt.Errorf("start cpu manager error: %v", err)
 		}
@@ -625,11 +567,8 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 
 	// Initialize memory manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryManager) {
-		containerMap, err := buildContainerMapFromRuntime(runtimeService)
-		if err != nil {
-			return fmt.Errorf("failed to build map of initial containers from runtime: %v", err)
-		}
-		err = cm.memoryManager.Start(memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
+		containerMap := buildContainerMapFromRuntime(runtimeService)
+		err := cm.memoryManager.Start(memorymanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
 		if err != nil {
 			return fmt.Errorf("start memory manager error: %v", err)
 		}
@@ -786,7 +725,7 @@ func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
 	}
 }
 
-func buildContainerMapFromRuntime(runtimeService internalapi.RuntimeService) (containermap.ContainerMap, error) {
+func buildContainerMapFromRuntime(runtimeService internalapi.RuntimeService) containermap.ContainerMap {
 	podSandboxMap := make(map[string]string)
 	podSandboxList, _ := runtimeService.ListPodSandbox(nil)
 	for _, p := range podSandboxList {
@@ -797,12 +736,13 @@ func buildContainerMapFromRuntime(runtimeService internalapi.RuntimeService) (co
 	containerList, _ := runtimeService.ListContainers(nil)
 	for _, c := range containerList {
 		if _, exists := podSandboxMap[c.PodSandboxId]; !exists {
-			return nil, fmt.Errorf("no PodsandBox found with Id '%s'", c.PodSandboxId)
+			klog.InfoS("no PodSandBox found for the container", "podSandboxId", c.PodSandboxId, "containerName", c.Metadata.Name, "containerId", c.Id)
+			continue
 		}
 		containerMap.Add(podSandboxMap[c.PodSandboxId], c.Metadata.Name, c.Id)
 	}
 
-	return containerMap, nil
+	return containerMap
 }
 
 func isProcessRunningInHost(pid int) (bool, error) {
@@ -818,78 +758,6 @@ func isProcessRunningInHost(pid int) (bool, error) {
 	}
 	klog.V(10).InfoS("Process info", "pid", pid, "namespace", processPidNs)
 	return initPidNs == processPidNs, nil
-}
-
-func getPidFromPidFile(pidFile string) (int, error) {
-	file, err := os.Open(pidFile)
-	if err != nil {
-		return 0, fmt.Errorf("error opening pid file %s: %v", pidFile, err)
-	}
-	defer file.Close()
-
-	data, err := utilio.ReadAtMost(file, maxPidFileLength)
-	if err != nil {
-		return 0, fmt.Errorf("error reading pid file %s: %v", pidFile, err)
-	}
-
-	pid, err := strconv.Atoi(string(data))
-	if err != nil {
-		return 0, fmt.Errorf("error parsing %s as a number: %v", string(data), err)
-	}
-
-	return pid, nil
-}
-
-func getPidsForProcess(name, pidFile string) ([]int, error) {
-	if len(pidFile) == 0 {
-		return procfs.PidOf(name)
-	}
-
-	pid, err := getPidFromPidFile(pidFile)
-	if err == nil {
-		return []int{pid}, nil
-	}
-
-	// Try to lookup pid by process name
-	pids, err2 := procfs.PidOf(name)
-	if err2 == nil {
-		return pids, nil
-	}
-
-	// Return error from getPidFromPidFile since that should have worked
-	// and is the real source of the problem.
-	klog.V(4).InfoS("Unable to get pid from file", "path", pidFile, "err", err)
-	return []int{}, err
-}
-
-// Ensures that the Docker daemon is in the desired container.
-// Temporarily export the function to be used by dockershim.
-// TODO(yujuhong): Move this function to dockershim once kubelet migrates to
-// dockershim as the default.
-func EnsureDockerInContainer(dockerAPIVersion *utilversion.Version, oomScoreAdj int, manager cgroups.Manager) error {
-	type process struct{ name, file string }
-	dockerProcs := []process{{dockerProcessName, dockerPidFile}}
-	if dockerAPIVersion.AtLeast(containerdAPIVersion) {
-		// By default containerd is started separately, so there is no pid file.
-		containerdPidFile := ""
-		dockerProcs = append(dockerProcs, process{containerdProcessName, containerdPidFile})
-	}
-	var errs []error
-	for _, proc := range dockerProcs {
-		pids, err := getPidsForProcess(proc.name, proc.file)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to get pids for %q: %v", proc.name, err))
-			continue
-		}
-
-		// Move if the pid is not already in the desired container.
-		for _, pid := range pids {
-			if err := ensureProcessInContainerWithOOMScore(pid, oomScoreAdj, manager); err != nil {
-				errs = append(errs, fmt.Errorf("errors moving %q pid: %v", proc.name, err))
-			}
-		}
-	}
-	return utilerrors.NewAggregate(errs)
 }
 
 func ensureProcessInContainerWithOOMScore(pid int, oomScoreAdj int, manager cgroups.Manager) error {

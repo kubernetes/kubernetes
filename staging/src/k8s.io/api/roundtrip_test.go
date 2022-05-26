@@ -33,6 +33,7 @@ import (
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchv1 "k8s.io/api/batch/v1"
@@ -89,6 +90,7 @@ var groups = []runtime.SchemeBuilder{
 	authorizationv1beta1.SchemeBuilder,
 	authorizationv1.SchemeBuilder,
 	autoscalingv1.SchemeBuilder,
+	autoscalingv2.SchemeBuilder,
 	autoscalingv2beta1.SchemeBuilder,
 	autoscalingv2beta2.SchemeBuilder,
 	batchv1beta1.SchemeBuilder,

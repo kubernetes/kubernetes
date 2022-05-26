@@ -4,6 +4,7 @@
 package loader
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -158,8 +159,8 @@ func demandDirectoryRoot(
 	}
 	if f != "" {
 		return "", fmt.Errorf(
-			"got file '%s', but '%s' must be a directory to be a root",
-			f, path)
+			"'%s' must be a directory so that it can used as a build root",
+			path)
 	}
 	return d, nil
 }
@@ -298,7 +299,7 @@ func (fl *fileLoader) errIfRepoCycle(newRepoSpec *git.RepoSpec) error {
 }
 
 // Load returns the content of file at the given path,
-// else an error.  Relative paths are taken relative
+// else an error. Relative paths are taken relative
 // to the root.
 func (fl *fileLoader) Load(path string) ([]byte, error) {
 	if u, err := url.Parse(path); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
@@ -313,6 +314,13 @@ func (fl *fileLoader) Load(path string) ([]byte, error) {
 			return nil, err
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode < 200 || resp.StatusCode > 299 {
+			_, err := git.NewRepoSpecFromUrl(path)
+			if err == nil {
+				return nil, errors.New("URL is a git repository")
+			}
+			return nil, fmt.Errorf("%w: status code %d (%s)", ErrorHTTP, resp.StatusCode, http.StatusText(resp.StatusCode))
+		}
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err

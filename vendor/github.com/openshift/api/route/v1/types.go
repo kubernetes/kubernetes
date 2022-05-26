@@ -187,7 +187,7 @@ const (
 // router.
 type RouteIngressCondition struct {
 	// Type is the type of the condition.
-	// Currently only Ready.
+	// Currently only Admitted.
 	Type RouteIngressConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RouteIngressConditionType"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.

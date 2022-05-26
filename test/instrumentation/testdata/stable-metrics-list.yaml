@@ -1,3 +1,11 @@
+- name: evictions_total
+  subsystem: node_collector
+  help: Number of Node evictions that happened since current instance of NodeController
+    started.
+  type: Counter
+  stabilityLevel: STABLE
+  labels:
+  - zone
 - name: framework_extension_point_duration_seconds
   subsystem: scheduler
   help: Latency for running all plugins of a specific extension point.
@@ -24,7 +32,7 @@
   subsystem: scheduler
   help: Number of pending pods, by the queue type. 'active' means number of pods in
     activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number
-    of pods in unschedulableQ.
+    of pods in unschedulablePods.
   type: Gauge
   stabilityLevel: STABLE
   labels:

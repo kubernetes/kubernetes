@@ -22,6 +22,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
+	"k8s.io/klog/v2"
 )
 
 // BuildArgumentListFromMap takes two string-string maps, one with the base arguments and one
@@ -63,7 +65,7 @@ func ParseArgumentListToMap(arguments []string) map[string]string {
 		// Warn in all other cases, but don't error out. This can happen only if the user has edited the argument list by hand, so they might know what they are doing
 		if err != nil {
 			if i != 0 {
-				fmt.Printf("[kubeadm] WARNING: The component argument %q could not be parsed correctly. The argument must be of the form %q. Skipping...\n", arg, "--")
+				klog.Warningf("[kubeadm] WARNING: The component argument %q could not be parsed correctly. The argument must be of the form %q. Skipping...\n", arg, "--")
 			}
 			continue
 		}
