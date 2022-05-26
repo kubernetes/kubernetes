@@ -155,8 +155,9 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		return fmt.Errorf("unable to register configz: %s", err)
 	}
 
-	// Prepare the event broadcaster.
+	// Start events processing pipeline.
 	cc.EventBroadcaster.StartRecordingToSink(ctx.Done())
+	defer cc.EventBroadcaster.Shutdown()
 
 	// Setup healthz checks.
 	var checks []healthz.HealthChecker
