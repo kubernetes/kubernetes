@@ -26,11 +26,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	core "k8s.io/client-go/testing"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -48,13 +47,14 @@ import (
 
 func pluginPVOmittingClient(dswp *desiredStateOfWorldPopulator) {
 	fakeClient := &fake.Clientset{}
-	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-		return false, nil, nil
-	})
-	fakeClient.AddReactor("get", "persistentvolumes", func(action core.Action) (bool, runtime.Object, error) {
-		return false, nil, nil
-	})
+
+	kubeInformers := informers.NewSharedInformerFactory(fakeClient, 0)
+	pvcLister := kubeInformers.Core().V1().PersistentVolumeClaims().Lister()
+	pvLister := kubeInformers.Core().V1().PersistentVolumes().Lister()
+
 	dswp.kubeClient = fakeClient
+	dswp.pvcLister = pvcLister
+	dswp.pvLister = pvLister
 }
 
 func prepareDswpWithVolume(t *testing.T) (*desiredStateOfWorldPopulator, kubepod.Manager) {
@@ -65,11 +65,15 @@ func prepareDswpWithVolume(t *testing.T) (*desiredStateOfWorldPopulator, kubepod
 			Name: "dswp-test-volume-name",
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			ClaimRef:   &v1.ObjectReference{Namespace: "dswp-test", Name: "file-bound"},
 			VolumeMode: &mode,
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "file-bound",
+			Namespace: "dswp-test",
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "dswp-test-volume-name",
 		},
@@ -109,7 +113,7 @@ func TestFindAndAddNewPods_WithRescontructedVolume(t *testing.T) {
 			Name: fakeOuterVolumeName,
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			ClaimRef:   &v1.ObjectReference{Namespace: "dswp-test", Name: "file-bound"},
 			VolumeMode: &mode,
 		},
 	}
@@ -402,11 +406,15 @@ func prepareDSWPWithPodPV(t *testing.T) (*desiredStateOfWorldPopulator, *fakePod
 			Name: "dswp-test-volume-name",
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			ClaimRef:   &v1.ObjectReference{Namespace: "dswp-test", Name: "file-bound"},
 			VolumeMode: &mode,
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "file-bound",
+			Namespace: "dswp-test",
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "dswp-test-volume-name",
 		},
@@ -471,11 +479,15 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 			Name: "dswp-test-volume-name",
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			ClaimRef:   &v1.ObjectReference{Namespace: "dswp-test", Name: "file-bound"},
 			VolumeMode: &mode,
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "file-bound",
+			Namespace: "dswp-test",
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "dswp-test-volume-name",
 		},
@@ -573,11 +585,15 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 			Name: "dswp-test-volume-name",
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "block-bound"},
+			ClaimRef:   &v1.ObjectReference{Namespace: "dswp-test", Name: "block-bound"},
 			VolumeMode: &mode,
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "block-bound",
+			Namespace: "dswp-test",
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "dswp-test-volume-name",
 		},
@@ -680,11 +696,15 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 			Name: "dswp-test-volume-name",
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			ClaimRef:   &v1.ObjectReference{Namespace: "dswp-test", Name: "file-bound"},
 			VolumeMode: &mode,
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "file-bound",
+			Namespace: "dswp-test",
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "dswp-test-volume-name",
 			VolumeMode: &mode,
@@ -726,11 +746,15 @@ func TestCreateVolumeSpec_Valid_Nil_VolumeMounts(t *testing.T) {
 			Name: "dswp-test-volume-name",
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			ClaimRef:   &v1.ObjectReference{Namespace: "dswp-test", Name: "file-bound"},
 			VolumeMode: nil,
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "file-bound",
+			Namespace: "dswp-test",
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "dswp-test-volume-name",
 			VolumeMode: nil,
@@ -773,11 +797,15 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 			Name: "dswp-test-volume-name",
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "block-bound"},
+			ClaimRef:   &v1.ObjectReference{Namespace: "dswp-test", Name: "block-bound"},
 			VolumeMode: &mode,
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "block-bound",
+			Namespace: "dswp-test",
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "dswp-test-volume-name",
 		},
@@ -819,11 +847,15 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 			Name: "dswp-test-volume-name",
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			ClaimRef:   &v1.ObjectReference{Namespace: "dswp-test", Name: "file-bound"},
 			VolumeMode: &mode,
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "file-bound",
+			Namespace: "dswp-test",
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "dswp-test-volume-name",
 		},
@@ -865,11 +897,15 @@ func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 			Name: "dswp-test-volume-name",
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "block-bound"},
+			ClaimRef:   &v1.ObjectReference{Namespace: "dswp-test", Name: "block-bound"},
 			VolumeMode: &mode,
 		},
 	}
 	pvc := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "block-bound",
+			Namespace: "dswp-test",
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: "dswp-test-volume-name",
 		},
@@ -1075,11 +1111,15 @@ func createResizeRelatedVolumes(volumeMode *v1.PersistentVolumeMode) (pv *v1.Per
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{RBD: &v1.RBDPersistentVolumeSource{}},
 			Capacity:               volumeCapacity(1),
-			ClaimRef:               &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			ClaimRef:               &v1.ObjectReference{Namespace: "dswp-test", Name: "file-bound"},
 			VolumeMode:             volumeMode,
 		},
 	}
 	pvc = &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "file-bound",
+			Namespace: "dswp-test",
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			VolumeName: pv.Name,
 			Resources: v1.ResourceRequirements{
@@ -1238,7 +1278,7 @@ func createEphemeralVolumeObjects(podName, volumeName string, owned bool, volume
 			Name: volumeName,
 		},
 		Spec: v1.PersistentVolumeSpec{
-			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			ClaimRef:   &v1.ObjectReference{Namespace: "dswp-test", Name: "file-bound"},
 			Capacity:   volumeCapacity(1),
 			VolumeMode: volumeMode,
 		},
@@ -1296,12 +1336,14 @@ func (p *fakePodStateProvider) ShouldPodRuntimeBeRemoved(uid kubetypes.UID) bool
 func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim,
 	fakeVolumePluginMgr *volume.VolumePluginMgr) (*desiredStateOfWorldPopulator, kubepod.Manager, cache.DesiredStateOfWorld, *containertest.FakeRuntime, *fakePodStateProvider) {
 	fakeClient := &fake.Clientset{}
-	fakeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
-		return true, pvc, nil
-	})
-	fakeClient.AddReactor("get", "persistentvolumes", func(action core.Action) (bool, runtime.Object, error) {
-		return true, pv, nil
-	})
+
+	kubeInformers := informers.NewSharedInformerFactory(fakeClient, 0)
+	pvcLister := kubeInformers.Core().V1().PersistentVolumeClaims().Lister()
+	pvcHasSynced := func() bool { return true }
+	_ = kubeInformers.Core().V1().PersistentVolumeClaims().Informer().GetStore().Add(pvc)
+	pvLister := kubeInformers.Core().V1().PersistentVolumes().Lister()
+	pvHasSynced := func() bool { return true }
+	_ = kubeInformers.Core().V1().PersistentVolumes().Informer().GetStore().Add(pv)
 
 	fakeSecretManager := secret.NewFakeManager()
 	fakeConfigMapManager := configmap.NewFakeManager()
@@ -1316,6 +1358,10 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 	csiTranslator := csitrans.New()
 	dswp := &desiredStateOfWorldPopulator{
 		kubeClient:                fakeClient,
+		pvcLister:                 pvcLister,
+		pvcHasSynced:              pvcHasSynced,
+		pvLister:                  pvLister,
+		pvHasSynced:               pvHasSynced,
 		loopSleepDuration:         100 * time.Millisecond,
 		getPodStatusRetryDuration: 2 * time.Second,
 		podManager:                fakePodManager,

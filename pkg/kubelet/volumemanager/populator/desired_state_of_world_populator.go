@@ -21,7 +21,6 @@ caches in sync with the "ground truth".
 package populator
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -30,11 +29,13 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	clientgocache "k8s.io/client-go/tools/cache"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -96,7 +97,7 @@ func NewDesiredStateOfWorldPopulator(
 	csiMigratedPluginManager csimigration.PluginManager,
 	intreeToCSITranslator csimigration.InTreeToCSITranslator,
 	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
-	return &desiredStateOfWorldPopulator{
+	dswp := &desiredStateOfWorldPopulator{
 		kubeClient:                kubeClient,
 		loopSleepDuration:         loopSleepDuration,
 		getPodStatusRetryDuration: getPodStatusRetryDuration,
@@ -114,10 +115,22 @@ func NewDesiredStateOfWorldPopulator(
 		intreeToCSITranslator:    intreeToCSITranslator,
 		volumePluginMgr:          volumePluginMgr,
 	}
+	kubeInformers := informers.NewSharedInformerFactory(kubeClient, 0)
+	dswp.pvcLister = kubeInformers.Core().V1().PersistentVolumeClaims().Lister()
+	dswp.pvcHasSynced = kubeInformers.Core().V1().PersistentVolumeClaims().Informer().HasSynced
+	dswp.pvLister = kubeInformers.Core().V1().PersistentVolumes().Lister()
+	dswp.pvHasSynced = kubeInformers.Core().V1().PersistentVolumes().Informer().HasSynced
+	kubeInformers.Start(wait.NeverStop)
+
+	return dswp
 }
 
 type desiredStateOfWorldPopulator struct {
 	kubeClient                clientset.Interface
+	pvcLister                 corelisters.PersistentVolumeClaimLister
+	pvcHasSynced              clientgocache.InformerSynced
+	pvLister                  corelisters.PersistentVolumeLister
+	pvHasSynced               clientgocache.InformerSynced
 	loopSleepDuration         time.Duration
 	getPodStatusRetryDuration time.Duration
 	podManager                pod.Manager
@@ -143,6 +156,9 @@ type processedPods struct {
 func (dswp *desiredStateOfWorldPopulator) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	// Wait for the completion of a loop that started after sources are all ready, then set hasAddedPods accordingly
 	klog.InfoS("Desired state populator starts to run")
+	if !clientgocache.WaitForCacheSync(stopCh, dswp.pvcHasSynced, dswp.pvHasSynced) {
+		klog.Fatalf("Unable to sync cache for pvc and pv")
+	}
 	wait.PollUntil(dswp.loopSleepDuration, func() (bool, error) {
 		done := sourcesReady.AllReady()
 		dswp.populatorLoop()
@@ -544,10 +560,9 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 // An error is returned if the PVC object's phase is not "Bound".
 func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 	namespace string, claimName string) (*v1.PersistentVolumeClaim, error) {
-	pvc, err :=
-		dswp.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
+	pvc, err := dswp.pvcLister.PersistentVolumeClaims(namespace).Get(claimName)
 	if err != nil || pvc == nil {
-		return nil, fmt.Errorf("failed to fetch PVC from API server: %v", err)
+		return nil, fmt.Errorf("failed to fetch PVC from Informer: %v", err)
 	}
 
 	// Pods that uses a PVC that is being deleted must not be started.
@@ -579,10 +594,10 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 	name string,
 	pvcReadOnly bool,
 	expectedClaimUID types.UID) (*volume.Spec, string, error) {
-	pv, err := dswp.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), name, metav1.GetOptions{})
+	pv, err := dswp.pvLister.Get(name)
 	if err != nil || pv == nil {
 		return nil, "", fmt.Errorf(
-			"failed to fetch PV %s from API server: %v", name, err)
+			"failed to fetch PV %s from Informer: %v", name, err)
 	}
 
 	if pv.Spec.ClaimRef == nil {

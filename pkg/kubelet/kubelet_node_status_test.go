@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -155,6 +156,17 @@ func (lcm *localCM) GetNodeAllocatableReservation() v1.ResourceList {
 
 func (lcm *localCM) GetCapacity() v1.ResourceList {
 	return lcm.capacity
+}
+
+func filterNodeActions(actions []core.Action) []core.Action {
+	nodeActions := []core.Action{}
+	nodeResource := schema.GroupVersionResource{Version: "v1", Resource: "nodes"}
+	for _, action := range actions {
+		if action.GetResource() == nodeResource {
+			nodeActions = append(nodeActions, action)
+		}
+	}
+	return nodeActions
 }
 
 func TestUpdateNewNodeStatus(t *testing.T) {
@@ -289,6 +301,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			kubelet.updateRuntimeUp()
 			assert.NoError(t, kubelet.updateNodeStatus())
 			actions := kubeClient.Actions()
+			actions = filterNodeActions(actions)
 			require.Len(t, actions, 2)
 			require.True(t, actions[1].Matches("patch", "nodes"))
 			require.Equal(t, actions[1].GetSubresource(), "status")
@@ -478,6 +491,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	assert.NoError(t, kubelet.updateNodeStatus())
 
 	actions := kubeClient.Actions()
+	actions = filterNodeActions(actions)
 	assert.Len(t, actions, 2)
 
 	assert.IsType(t, core.PatchActionImpl{}, actions[1])
