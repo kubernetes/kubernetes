@@ -85,6 +85,16 @@ func GetTestImageID(id imageutils.ImageID) imageutils.ImageID {
 	return id
 }
 
+// GetDefaultNonRootUser returns default non root user
+// If the Node OS is windows, we return nill due to issue with invalid permissions set on projected volumes
+// https://github.com/kubernetes/kubernetes/issues/102849
+func GetDefaultNonRootUser() *int64 {
+	if NodeOSDistroIs("windows") {
+		return nil
+	}
+	return pointer.Int64(DefaultNonRootUser)
+}
+
 // GeneratePodSecurityContext generates the corresponding pod security context with the given inputs
 // If the Node OS is windows, currently we will ignore the inputs and return nil.
 // TODO: Will modify it after windows has its own security context
@@ -123,15 +133,25 @@ func GetLinuxLabel() *v1.SELinuxOptions {
 // DefaultNonRootUser is the default user ID used for running restricted (non-root) containers.
 const DefaultNonRootUser = 1000
 
+// DefaultNonRootUserName is the default username in Windows used for running restricted (non-root) containers
+const DefaultNonRootUserName = "ContainerUser"
+
 // GetRestrictedPodSecurityContext returns a restricted pod security context.
 // This includes setting RunAsUser for convenience, to pass the RunAsNonRoot check.
 // Tests that require a specific user ID should override this.
 func GetRestrictedPodSecurityContext() *v1.PodSecurityContext {
-	return &v1.PodSecurityContext{
+	psc := &v1.PodSecurityContext{
 		RunAsNonRoot:   pointer.BoolPtr(true),
-		RunAsUser:      pointer.Int64(DefaultNonRootUser),
+		RunAsUser:      GetDefaultNonRootUser(),
 		SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault},
 	}
+
+	if NodeOSDistroIs("windows") {
+		psc.WindowsOptions = &v1.WindowsSecurityContextOptions{}
+		psc.WindowsOptions.RunAsUserName = pointer.StringPtr(DefaultNonRootUserName)
+	}
+
+	return psc
 }
 
 // GetRestrictedContainerSecurityContext returns a minimal restricted container security context.
@@ -164,10 +184,14 @@ func MixinRestrictedPodSecurity(pod *v1.Pod) error {
 			pod.Spec.SecurityContext.RunAsNonRoot = pointer.BoolPtr(true)
 		}
 		if pod.Spec.SecurityContext.RunAsUser == nil {
-			pod.Spec.SecurityContext.RunAsUser = pointer.Int64Ptr(DefaultNonRootUser)
+			pod.Spec.SecurityContext.RunAsUser = GetDefaultNonRootUser()
 		}
 		if pod.Spec.SecurityContext.SeccompProfile == nil {
 			pod.Spec.SecurityContext.SeccompProfile = &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}
+		}
+		if NodeOSDistroIs("windows") && pod.Spec.SecurityContext.WindowsOptions == nil {
+			pod.Spec.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{}
+			pod.Spec.SecurityContext.WindowsOptions.RunAsUserName = pointer.StringPtr(DefaultNonRootUserName)
 		}
 	}
 	for i := range pod.Spec.Containers {
