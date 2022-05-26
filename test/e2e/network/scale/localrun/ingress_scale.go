@@ -135,7 +135,6 @@ func main() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: testNamespace,
 			Labels: map[string]string{
-				// TODO(https://github.com/kubernetes/kubernetes/issues/108298): route namespace creation via framework.Framework.CreateNamespace in 1.24
 				admissionapi.EnforceLevelLabel: string(admissionapi.LevelPrivileged),
 			},
 		},

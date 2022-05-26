@@ -55,7 +55,7 @@ func NewWindowsModel(namespaces []string, podNames []string, ports []int32, dnsD
 // The *total* number of containers is namespaces x pods x ports x protocols.
 func NewModel(namespaces []string, podNames []string, ports []int32, protocols []v1.Protocol, dnsDomain string) *Model {
 	model := &Model{
-		NamespaceNames: namespaces,
+		NamespaceNames: []string{},
 		PodNames:       podNames,
 		Ports:          ports,
 		Protocols:      protocols,
@@ -78,7 +78,6 @@ func NewModel(namespaces []string, podNames []string, ports []int32, protocols [
 				}
 			}
 			pods = append(pods, &Pod{
-				Namespace:  ns,
 				Name:       podName,
 				Containers: containers,
 			})

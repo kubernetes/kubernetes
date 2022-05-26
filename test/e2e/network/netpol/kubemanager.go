@@ -66,13 +66,19 @@ func newKubeManager(framework *framework.Framework) *kubeManager {
 func (k *kubeManager) initializeCluster(model *Model) error {
 	var createdPods []*v1.Pod
 	for _, ns := range model.Namespaces {
-		_, err := k.createNamespace(ns.Spec())
+		namespace, err := k.framework.CreateNamespace(ns.Name, nil)
 		if err != nil {
 			return err
 		}
+		ns.Name = namespace.Name
+		labelSelector := ns.LabelSelector()
+		labelSelector[admissionapi.EnforceLevelLabel] = string(admissionapi.LevelBaseline)
+		UpdateNamespaceLabels(k, ns.Name, labelSelector)
+		model.NamespaceNames = append(model.NamespaceNames, ns.Name)
 
 		for _, pod := range ns.Pods {
 			framework.Logf("creating/updating pod %s/%s", ns.Name, pod.Name)
+			pod.Namespace = ns.Name
 
 			// note that we defer the logic of pod (i.e. node selector) specifics to the model
 			// which is aware of linux vs windows pods
@@ -174,16 +180,6 @@ func (k *kubeManager) executeRemoteCommand(namespace string, pod string, contain
 	})
 }
 
-// createNamespace is a convenience function for namespace setup.
-func (k *kubeManager) createNamespace(ns *v1.Namespace) (*v1.Namespace, error) {
-	enforcePodSecurityBaseline(ns)
-	createdNamespace, err := k.clientSet.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("unable to create namespace %s: %w", ns.Name, err)
-	}
-	return createdNamespace, nil
-}
-
 // createService is a convenience function for service setup.
 func (k *kubeManager) createService(service *v1.Service) (*v1.Service, error) {
 	ns := service.Namespace
@@ -265,7 +261,6 @@ func (k *kubeManager) setNamespaceLabels(ns string, labels map[string]string) er
 		return err
 	}
 	selectedNameSpace.ObjectMeta.Labels = labels
-	enforcePodSecurityBaseline(selectedNameSpace)
 	_, err = k.clientSet.CoreV1().Namespaces().Update(context.TODO(), selectedNameSpace, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to update namespace %s: %w", ns, err)
@@ -282,12 +277,4 @@ func (k *kubeManager) deleteNamespaces(namespaces []string) error {
 		}
 	}
 	return nil
-}
-
-func enforcePodSecurityBaseline(ns *v1.Namespace) {
-	if len(ns.ObjectMeta.Labels) == 0 {
-		ns.ObjectMeta.Labels = make(map[string]string)
-	}
-	// TODO(https://github.com/kubernetes/kubernetes/issues/108298): route namespace creation via framework.Framework.CreateNamespace
-	ns.ObjectMeta.Labels[admissionapi.EnforceLevelLabel] = string(admissionapi.LevelBaseline)
 }
