@@ -139,14 +139,6 @@ const (
 	// Deprecates and removes SelfLink from ObjectMeta and ListMeta.
 	RemoveSelfLink featuregate.Feature = "RemoveSelfLink"
 
-	// owner: @shaloulcy, @wojtek-t
-	// alpha: v1.18
-	// beta: v1.19
-	// GA: v1.20
-	//
-	// Allows label and field based indexes in apiserver watch cache to accelerate list operations.
-	SelectorIndex featuregate.Feature = "SelectorIndex"
-
 	// owner: @apelisse, @lavalamp
 	// alpha: v1.14
 	// beta: v1.16
@@ -218,8 +210,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RemainingItemCount: {Default: true, PreRelease: featuregate.Beta},
 
 	RemoveSelfLink: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-
-	SelectorIndex: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	ServerSideApply: {Default: true, PreRelease: featuregate.GA},
 
