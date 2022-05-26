@@ -394,6 +394,57 @@ testCases:
       mergingList:
         - name: 2
           value: a
+  - description: merge merging list with empty map item to empty merging list
+    original:
+      mergingList: []
+    twoWay:
+      mergingList:
+      - {}
+    modified:
+      mergingList:
+       - name: null
+  - description: merge merging list with non-empty map item to merging list with empty map item
+    original:
+      mergingList:
+      - {}
+    twoWay:
+      mergingList:
+      - name: 1
+    modified:
+      mergingList:
+      - name: 1
+      - name: null
+  - description: update empty map item in merging list with key
+    original:
+      mergingList:
+      - {}
+    twoWay:
+      mergingList:
+      - name: 1
+      - name: null
+        $patch: delete
+    modified:
+      mergingList:
+      - name: 1
+  - description: update non-empty map item with empty map item in merging list
+    original:
+      mergingList:
+      - name: 1
+    twoWay:
+      mergingList: 
+      - {}
+      - name: 1
+        $patch: delete
+    modified:
+      mergingList:
+      - name: null
+  - description: delete the empty map item in merging list
+    original:
+      mergingList:
+      - {}
+    twoWay:
+      mergingList: null
+    modified: {}
   - description: retainKeys map can add a field when no retainKeys directive present
     original:
       retainKeysMap:
@@ -758,6 +809,20 @@ nonMergingIntList:
   - 1
   - 3
 `),
+		},
+	},
+	{
+		Description: "Invaid merge causes merge key to be deleted",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - {}
+`),
+			TwoWay: []byte(`
+mergingList:
+  - {}
+`),
+			ExpectedError: "does not contain declared merge key",
 		},
 	},
 }
