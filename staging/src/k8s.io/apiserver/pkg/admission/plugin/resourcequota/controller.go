@@ -115,7 +115,7 @@ func NewQuotaEvaluator(quotaAccessor QuotaAccessor, ignoredResources map[schema.
 		config = &resourcequotaapi.Configuration{}
 	}
 
-	return &quotaEvaluator{
+	evaluator := &quotaEvaluator{
 		quotaAccessor:       quotaAccessor,
 		lockAcquisitionFunc: lockAcquisitionFunc,
 
@@ -131,15 +131,28 @@ func NewQuotaEvaluator(quotaAccessor QuotaAccessor, ignoredResources map[schema.
 		stopCh:  stopCh,
 		config:  config,
 	}
+
+	// The queue underneath is starting a goroutine for metrics
+	// exportint that is only stopped on calling ShutDown.
+	// Given that QuotaEvaluator is created for each layer of apiserver
+	// and often not started for some of those (e.g. aggregated apiserver)
+	// we explicitly shut it down on stopCh signal even if it wasn't
+	// effectively started.
+	go evaluator.shutdownOnStop()
+
+	return evaluator
 }
 
-// Run begins watching and syncing.
-func (e *quotaEvaluator) run() {
+// start begins watching and syncing.
+func (e *quotaEvaluator) start() {
 	defer utilruntime.HandleCrash()
 
 	for i := 0; i < e.workers; i++ {
 		go wait.Until(e.doWork, time.Second, e.stopCh)
 	}
+}
+
+func (e *quotaEvaluator) shutdownOnStop() {
 	<-e.stopCh
 	klog.Infof("Shutting down quota evaluator")
 	e.queue.ShutDown()
@@ -590,9 +603,7 @@ func getScopeSelectorsFromQuota(quota corev1.ResourceQuota) []corev1.ScopedResou
 }
 
 func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
-	e.init.Do(func() {
-		go e.run()
-	})
+	e.init.Do(e.start)
 
 	// is this resource ignored?
 	gvr := a.GetResource()
