@@ -328,17 +328,17 @@ func (a *HorizontalController) computeReplicasForMetric(ctx context.Context, hpa
 	case autoscalingv2.ResourceMetricSourceType:
 		replicaCountProposal, timestampProposal, metricNameProposal, condition, err = a.computeStatusForResourceMetric(ctx, specReplicas, spec, hpa, selector, status)
 		if err != nil {
-			return 0, "", time.Time{}, condition, err
+			return 0, "", time.Time{}, condition, fmt.Errorf("failed to get %s resource metric value: %v", spec.Resource.Name, err)
 		}
 	case autoscalingv2.ContainerResourceMetricSourceType:
 		replicaCountProposal, timestampProposal, metricNameProposal, condition, err = a.computeStatusForContainerResourceMetric(ctx, specReplicas, spec, hpa, selector, status)
 		if err != nil {
-			return 0, "", time.Time{}, condition, err
+			return 0, "", time.Time{}, condition, fmt.Errorf("failed to get %s container metric value: %v", spec.ContainerResource.Container, err)
 		}
 	case autoscalingv2.ExternalMetricSourceType:
 		replicaCountProposal, timestampProposal, metricNameProposal, condition, err = a.computeStatusForExternalMetric(specReplicas, statusReplicas, spec, hpa, selector, status)
 		if err != nil {
-			return 0, "", time.Time{}, condition, err
+			return 0, "", time.Time{}, condition, fmt.Errorf("failed to get %s external metric value: %v", spec.External.Metric.Name, err)
 		}
 	default:
 		errMsg := fmt.Sprintf("unknown metric source type %q", string(spec.Type))
@@ -459,7 +459,7 @@ func (a *HorizontalController) computeStatusForResourceMetricGeneric(ctx context
 	}
 
 	if target.AverageUtilization == nil {
-		errMsg := "invalid resource metric source: neither a utilization target nor a value target was set"
+		errMsg := "invalid resource metric source: neither an average utilization target nor an average value target was set"
 		return 0, nil, time.Time{}, "", condition, fmt.Errorf(errMsg)
 	}
 
@@ -979,7 +979,7 @@ func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinRep
 
 	minimumAllowedReplicas = hpaMinReplicas
 
-	// Do not upscale too much to prevent incorrect rapid increase of the number of master replicas caused by
+	// Do not scaleup too much to prevent incorrect rapid increase of the number of master replicas caused by
 	// bogus CPU usage report from heapster/kubelet (like in issue #32304).
 	scaleUpLimit := calculateScaleUpLimit(currentReplicas)
 
