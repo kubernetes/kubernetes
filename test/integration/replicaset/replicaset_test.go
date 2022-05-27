@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
@@ -116,38 +117,38 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 	}
 }
 
-func rmSetup(t *testing.T) (framework.CloseFunc, *replicaset.ReplicaSetController, informers.SharedInformerFactory, clientset.Interface) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+func rmSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.ReplicaSetController, informers.SharedInformerFactory, clientset.Interface) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
-	config := restclient.Config{Host: s.URL}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "rs-informers")), resyncPeriod)
+	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "rs-informers")), resyncPeriod)
 
 	rm := replicaset.NewReplicaSetController(
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),
 		replicaset.BurstReplicas,
 	)
 
-	return closeFn, rm, informers, clientSet
+	return server.TearDownFn, rm, informers, clientSet
 }
 
-func rmSimpleSetup(t *testing.T) (framework.CloseFunc, clientset.Interface) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+func rmSimpleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, clientset.Interface) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
-	config := restclient.Config{Host: s.URL}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
-	return closeFn, clientSet
+	return server.TearDownFn, clientSet
 }
 
 // Run RS controller and informers
@@ -424,8 +425,8 @@ func TestAdoption(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			closeFn, rm, informers, clientSet := rmSetup(t)
 			defer closeFn()
-			ns := framework.CreateTestingNamespace(fmt.Sprintf("rs-adoption-%d", i), t)
-			defer framework.DeleteTestingNamespace(ns, t)
+			ns := framework.CreateNamespaceOrDie(clientSet, fmt.Sprintf("rs-adoption-%d", i), t)
+			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 			podClient := clientSet.CoreV1().Pods(ns.Name)
@@ -468,8 +469,8 @@ func TestAdoption(t *testing.T) {
 func TestRSSelectorImmutability(t *testing.T) {
 	closeFn, clientSet := rmSimpleSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("rs-selector-immutability", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(clientSet, "rs-selector-immutability", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 	rs := newRS("rs", ns.Name, 0)
 	createRSsPods(t, clientSet, []*apps.ReplicaSet{rs}, []*v1.Pod{})
 
@@ -495,8 +496,8 @@ func TestRSSelectorImmutability(t *testing.T) {
 func TestSpecReplicasChange(t *testing.T) {
 	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-spec-replicas-change", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-spec-replicas-change", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	stopControllers := runControllerAndInformers(t, rm, informers, 0)
 	defer stopControllers()
 
@@ -537,8 +538,8 @@ func TestSpecReplicasChange(t *testing.T) {
 func TestDeletingAndFailedPods(t *testing.T) {
 	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-deleting-and-failed-pods", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-deleting-and-failed-pods", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	stopControllers := runControllerAndInformers(t, rm, informers, 0)
 	defer stopControllers()
 
@@ -640,8 +641,8 @@ func TestPodDeletionCost(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, tc.enabled)()
 			closeFn, rm, informers, c := rmSetup(t)
 			defer closeFn()
-			ns := framework.CreateTestingNamespace(tc.name, t)
-			defer framework.DeleteTestingNamespace(ns, t)
+			ns := framework.CreateNamespaceOrDie(c, tc.name, t)
+			defer framework.DeleteNamespaceOrDie(c, ns, t)
 			stopControllers := runControllerAndInformers(t, rm, informers, 0)
 			defer stopControllers()
 
@@ -699,8 +700,8 @@ func TestPodDeletionCost(t *testing.T) {
 func TestOverlappingRSs(t *testing.T) {
 	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-overlapping-rss", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-overlapping-rss", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	stopControllers := runControllerAndInformers(t, rm, informers, 0)
 	defer stopControllers()
 
@@ -734,8 +735,8 @@ func TestOverlappingRSs(t *testing.T) {
 func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-pod-orphaning-and-adoption-when-labels-change", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-pod-orphaning-and-adoption-when-labels-change", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	stopControllers := runControllerAndInformers(t, rm, informers, 0)
 	defer stopControllers()
 
@@ -811,8 +812,8 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 func TestGeneralPodAdoption(t *testing.T) {
 	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-general-pod-adoption", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-general-pod-adoption", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	stopControllers := runControllerAndInformers(t, rm, informers, 0)
 	defer stopControllers()
 
@@ -843,8 +844,8 @@ func TestGeneralPodAdoption(t *testing.T) {
 func TestReadyAndAvailableReplicas(t *testing.T) {
 	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-ready-and-available-replicas", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-ready-and-available-replicas", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	stopControllers := runControllerAndInformers(t, rm, informers, 0)
 	defer stopControllers()
 
@@ -895,8 +896,8 @@ func TestReadyAndAvailableReplicas(t *testing.T) {
 func TestRSScaleSubresource(t *testing.T) {
 	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-rs-scale-subresource", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-rs-scale-subresource", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	stopControllers := runControllerAndInformers(t, rm, informers, 0)
 	defer stopControllers()
 
@@ -914,8 +915,8 @@ func TestRSScaleSubresource(t *testing.T) {
 func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-extra-pods-adoption-and-deletion", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-extra-pods-adoption-and-deletion", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	rs := newRS("rs", ns.Name, 2)
 	// Create 3 pods, RS should adopt only 2 of them
@@ -946,8 +947,8 @@ func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 func TestFullyLabeledReplicas(t *testing.T) {
 	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-fully-labeled-replicas", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-fully-labeled-replicas", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	stopControllers := runControllerAndInformers(t, rm, informers, 0)
 	defer stopControllers()
 
@@ -989,8 +990,8 @@ func TestFullyLabeledReplicas(t *testing.T) {
 func TestReplicaSetsAppsV1DefaultGCPolicy(t *testing.T) {
 	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-default-gc-v1", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-default-gc-v1", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	stopControllers := runControllerAndInformers(t, rm, informers, 0)
 	defer stopControllers()
 
