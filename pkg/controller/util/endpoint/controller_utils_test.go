@@ -99,7 +99,7 @@ func TestDetermineNeededServiceUpdates(t *testing.T) {
 	}
 }
 
-func TestShouldPodBeInEndpointSlice(t *testing.T) {
+func TestShouldPodBeInEndpoints(t *testing.T) {
 	testCases := []struct {
 		name               string
 		pod                *v1.Pod
@@ -263,7 +263,7 @@ func TestShouldPodBeInEndpointSlice(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
-			result := ShouldPodBeInEndpointSlice(test.pod, test.includeTerminating)
+			result := ShouldPodBeInEndpoints(test.pod, test.includeTerminating)
 			if result != test.expected {
 				t.Errorf("expected: %t, got: %t", test.expected, result)
 			}
