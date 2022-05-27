@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -40,7 +40,7 @@ type ProxySocket interface {
 	// while sessions are active.
 	Close() error
 	// ProxyLoop proxies incoming connections for the specified service to the service endpoints.
-	ProxyLoop(service proxy.ServicePortName, info *ServiceInfo, loadBalancer LoadBalancer)
+	ProxyLoop(service proxy.ServicePortName, info *ServicePortInfo, loadBalancer LoadBalancer)
 	// ListenPort returns the host port that the ProxySocket is listening on
 	ListenPort() int
 }
@@ -115,7 +115,7 @@ func TryConnectEndpoints(service proxy.ServicePortName, srcAddr net.Addr, protoc
 	return nil, fmt.Errorf("failed to connect to an endpoint")
 }
 
-func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *ServiceInfo, loadBalancer LoadBalancer) {
+func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *ServicePortInfo, loadBalancer LoadBalancer) {
 	for {
 		if !myInfo.IsAlive() {
 			// The service port was closed or replaced.
@@ -201,7 +201,7 @@ func newClientCache() *ClientCache {
 	return &ClientCache{Clients: map[string]net.Conn{}}
 }
 
-func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *ServiceInfo, loadBalancer LoadBalancer) {
+func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *ServicePortInfo, loadBalancer LoadBalancer) {
 	var buffer [4096]byte // 4KiB should be enough for most whole-packets
 	for {
 		if !myInfo.IsAlive() {
