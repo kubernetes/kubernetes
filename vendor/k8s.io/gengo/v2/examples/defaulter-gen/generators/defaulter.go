@@ -242,10 +242,51 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	buffer := &bytes.Buffer{}
 	sw := generator.NewSnippetWriter(buffer, context, "$", "$")
 
-	// We are generating defaults only for packages that are explicitly
-	// passed as InputDir.
+	// First load other "input" packages.  We do this as a single call because
+	// it is MUCH faster.
+	inputPkgs := make([]string, 0, len(context.Inputs))
+	pkgToInput := map[string]string{}
 	for _, i := range context.Inputs {
 		klog.V(5).Infof("considering pkg %q", i)
+
+		pkg := context.Universe[i]
+		if pkg == nil {
+			// If the input had no Go files, for example.
+			continue
+		}
+
+		// if the types are not in the same package where the defaulter functions to be generated
+		inputTags := extractInputTag(pkg.Comments)
+		if len(inputTags) > 1 {
+			panic(fmt.Sprintf("there may only be one input tag, got %#v", inputTags))
+		}
+		if len(inputTags) == 1 {
+			inputPath := inputTags[0]
+			if strings.HasPrefix(inputPath, "./") || strings.HasPrefix(inputPath, "../") {
+				// this is a relative dir, which will not work under gomodules.
+				// join with the local package path, but warn
+				klog.Warningf("relative path %s=%s will not work under gomodule mode; use full package path (as used by 'import') instead", inputTagName, inputPath)
+				inputPath = filepath.Join(pkg.Path, inputTags[0])
+			}
+
+			klog.V(5).Infof("  input pkg %v", inputPath)
+			inputPkgs = append(inputPkgs, inputPath)
+			pkgToInput[i] = inputPath
+		} else {
+			pkgToInput[i] = i
+		}
+	}
+	if len(inputPkgs) > 0 {
+		if err := context.AddDirs(inputPkgs); err != nil {
+			//FIXME:
+			klog.Fatalf("cannot load input packages:", err)
+		}
+	}
+	// update context.Order to the latest context.Universe
+	orderer := namer.Orderer{Namer: namer.NewPublicNamer(1)}
+	context.Order = orderer.OrderUniverse(context.Universe)
+
+	for _, i := range context.Inputs {
 		pkg := context.Universe[i]
 		if pkg == nil {
 			// If the input had no Go files, for example.
@@ -262,7 +303,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		var peerPkgs []string
 		if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
+			//FIXME: do we even need this now?
 			for _, pkg := range customArgs.ExtraPeerDirs {
+				//FIXME: HACK
 				if i := strings.Index(pkg, "/vendor/"); i != -1 {
 					pkg = pkg[i+len("/vendor/"):]
 				}
@@ -271,7 +314,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 		// Make sure our peer-packages are added and fully parsed.
 		for _, pp := range peerPkgs {
+			//FIXME: don't seem to need this at all any more?
 			context.AddDir(pp)
+			//FIXME: pp maay not be canon form
 			getManualDefaultingFunctions(context, context.Universe[pp], existingDefaulters)
 		}
 
@@ -311,29 +356,13 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			return false
 		}
 
-		// if the types are not in the same package where the defaulter functions to be generated
-		inputTags := extractInputTag(pkg.Comments)
-		if len(inputTags) > 1 {
-			panic(fmt.Sprintf("there could only be one input tag, got %#v", inputTags))
-		}
-		if len(inputTags) == 1 {
-			var err error
-
-			inputPath := inputTags[0]
-			if strings.HasPrefix(inputPath, "./") || strings.HasPrefix(inputPath, "../") {
-				// this is a relative dir, which will not work under gomodules.
-				// join with the local package path, but warn
-				klog.Warningf("relative path %s=%s will not work under gomodule mode; use full package path (as used by 'import') instead", inputTagName, inputPath)
-				inputPath = filepath.Join(pkg.Path, inputTags[0])
-			}
-
-			typesPkg, err = context.AddDirectory(inputPath)
-			if err != nil {
-				klog.Fatalf("cannot import package %s", inputPath)
-			}
-			// update context.Order to the latest context.Universe
-			orderer := namer.Orderer{Namer: namer.NewPublicNamer(1)}
-			context.Order = orderer.OrderUniverse(context.Universe)
+		// Find the right input pkg, which might not be this one.
+		inputPath := pkgToInput[i]
+		//FIXME: just need a lookup
+		//FIXME: name canonicalize
+		typesPkg, err = context.AddDirectory(inputPath)
+		if err != nil {
+			klog.Fatalf("cannot import package %s", inputPath)
 		}
 
 		newDefaulters := defaulterFuncMap{}
@@ -401,6 +430,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		// in the output directory.
 		// TODO: build a more fundamental concept in gengo for dealing with modifications
 		// to vendored packages.
+		//FIXME: HACK
 		if strings.HasPrefix(pkg.SourcePath, arguments.OutputBase) {
 			expandedPath := strings.TrimPrefix(pkg.SourcePath, arguments.OutputBase)
 			if strings.Contains(expandedPath, "/vendor/") {
@@ -413,6 +443,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 				PackageName: filepath.Base(pkg.Path),
 				PackagePath: path,
 				HeaderText:  header,
+				Source:      pkg.SourcePath,
 				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
 						NewGenDefaulter(arguments.OutputFileBaseName, typesPkg.Path, pkg.Path, existingDefaulters, newDefaulters, peerPkgs),
