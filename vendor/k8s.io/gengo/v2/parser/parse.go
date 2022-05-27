@@ -525,73 +525,7 @@ func (b *Builder) processPkg(pkg *packages.Package, userRequested bool) {
 		//  codegen from happening to fix the situation.  chicken-egg.  Can I
 		//  load without parsing code (or per-generator choose to ignore some
 		//  errors)?
-	} else {
-		/*
-			c := spew.ConfigState{
-				DisableMethods: true,
-				MaxDepth:       2,
-				Indent:         "  ",
-			}
-			c.Dump(*pkg)
-		*/
 	}
-	/*
-		var pkgPath = importPathString(dir)
-
-		// Get the canonical path if we can.
-		if buildPkg, _ := b.getLoadedBuildPackage(dir); buildPkg != nil {
-			canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
-			klog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
-			pkgPath = canonicalPackage
-		}
-
-		// If we have not seen this before, process it now.
-		ignoreError := false
-		if _, found := b.parsed[pkgPath]; !found {
-			// Ignore errors in paths that we're importing solely because
-			// they're referenced by other packages.
-			ignoreError = true
-
-			// Add it.
-			if err := b.addDir(dir, userRequested); err != nil {
-				if isErrPackageNotFound(err) {
-					klog.V(6).Info(err)
-					return nil, nil
-				}
-
-				return nil, err
-			}
-
-			// Get the canonical path now that it has been added.
-			if buildPkg, _ := b.getLoadedBuildPackage(dir); buildPkg != nil {
-				canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
-				klog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
-				pkgPath = canonicalPackage
-			}
-		}
-
-		// If it was previously known, just check that the user-requestedness hasn't
-		// changed.
-		b.userRequested[pkgPath] = userRequested || b.userRequested[pkgPath]
-
-		// Run the type checker.  We may end up doing this to pkgs that are already
-		// done, or are in the queue to be done later, but it will short-circuit,
-		// and we can't miss pkgs that are only depended on.
-		pkg, err := b.typeCheckPackage(pkgPath, !ignoreError)
-		if err != nil {
-			switch {
-			case ignoreError && pkg != nil:
-				klog.V(4).Infof("type checking encountered some issues in %q, but ignoring.\n", pkgPath)
-			case !ignoreError && pkg != nil:
-				klog.V(3).Infof("type checking encountered some errors in %q\n", pkgPath)
-				return nil, err
-			default:
-				return nil, err
-			}
-		}
-
-		return pkg, nil
-	*/
 }
 
 // importPackage is a function that will be called by the type check package when it
@@ -800,17 +734,7 @@ func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error
 	u.Package(string(pkgPath)).Path = pkg.ID // FIXME or pkgPath?  see go core vendor weirdness (handled in go2make)
 	u.Package(string(pkgPath)).SourcePath = absPath
 
-	//for _, f := range b.parsed[pkgPath] {
 	for i, f := range pkg.Syntax {
-		/*
-			c := spew.ConfigState{
-				DisableMethods: true,
-				MaxDepth:       2,
-				Indent:         "  ",
-			}
-			c.Dump(*f)
-		*/
-
 		//FIXME: this is hacky and not obvious how to support - do we need it?
 		//FIXME: something like this is safer?  Or index from CompiledGoFiles?
 		//   s := pkg.Syntax[0]
@@ -856,16 +780,6 @@ func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error
 		}
 	}
 
-	/* FIXNME - need this?
-	importedPkgs := []string{}
-	for k := range b.importGraph[pkgPath] {
-		importedPkgs = append(importedPkgs, string(k))
-	}
-	sort.Strings(importedPkgs)
-	for _, p := range importedPkgs {
-		u.AddImports(string(pkgPath), p)
-	}
-	*/
 	return nil
 }
 
