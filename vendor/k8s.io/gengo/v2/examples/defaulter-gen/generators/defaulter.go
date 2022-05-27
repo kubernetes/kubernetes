@@ -358,10 +358,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		// Find the right input pkg, which might not be this one.
 		inputPath := pkgToInput[i]
-		//FIXME: just need a lookup
 		//FIXME: name canonicalize
-		typesPkg, err = context.AddDirectory(inputPath)
-		if err != nil {
+		typesPkg = context.Universe.Package(inputPath)
+		if typesPkg == nil {
 			klog.Fatalf("cannot import package %s", inputPath)
 		}
 
