@@ -904,3 +904,97 @@ func TestUpdatePodCondition(t *testing.T) {
 		assert.Equal(t, test.expected, resultStatus, test.desc)
 	}
 }
+
+func TestGetContainersReadyCondition(t *testing.T) {
+	time := metav1.Now()
+
+	containersReadyCondition := v1.PodCondition{
+		Type:               v1.ContainersReady,
+		Status:             v1.ConditionTrue,
+		Reason:             "successfully",
+		Message:            "sync pod successfully",
+		LastProbeTime:      time,
+		LastTransitionTime: metav1.NewTime(time.Add(1000)),
+	}
+
+	tests := []struct {
+		desc              string
+		podStatus         v1.PodStatus
+		expectedCondition *v1.PodCondition
+	}{
+		{
+			desc: "containers ready condition exists",
+			podStatus: v1.PodStatus{
+				Conditions: []v1.PodCondition{containersReadyCondition},
+			},
+			expectedCondition: &containersReadyCondition,
+		},
+		{
+			desc: "containers ready condition does not exist",
+			podStatus: v1.PodStatus{
+				Conditions: []v1.PodCondition{},
+			},
+			expectedCondition: nil,
+		},
+	}
+
+	for _, test := range tests {
+		containersReadyCondition := GetContainersReadyCondition(test.podStatus)
+		assert.Equal(t, test.expectedCondition, containersReadyCondition, test.desc)
+	}
+}
+
+func TestIsContainersReadyConditionTrue(t *testing.T) {
+	time := metav1.Now()
+
+	tests := []struct {
+		desc      string
+		podStatus v1.PodStatus
+		expected  bool
+	}{
+		{
+			desc: "containers ready condition is true",
+			podStatus: v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:               v1.ContainersReady,
+						Status:             v1.ConditionTrue,
+						Reason:             "successfully",
+						Message:            "sync pod successfully",
+						LastProbeTime:      time,
+						LastTransitionTime: metav1.NewTime(time.Add(1000)),
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			desc: "containers ready condition is false",
+			podStatus: v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:               v1.ContainersReady,
+						Status:             v1.ConditionFalse,
+						Reason:             "successfully",
+						Message:            "sync pod successfully",
+						LastProbeTime:      time,
+						LastTransitionTime: metav1.NewTime(time.Add(1000)),
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "containers ready condition is empty",
+			podStatus: v1.PodStatus{
+				Conditions: []v1.PodCondition{},
+			},
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		isContainersReady := IsContainersReadyConditionTrue(test.podStatus)
+		assert.Equal(t, test.expected, isContainersReady, test.desc)
+	}
+}
