@@ -1114,9 +1114,12 @@ func (proxier *Proxier) syncProxyRules() {
 				proxier.natRules.Write(
 					"-A", string(externalTrafficChain),
 <<<<<<< HEAD
+<<<<<<< HEAD
 					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade traffic for %s external destinations"`, svcNameString),
 					"-j", string(kubeMarkMasqChain))
 =======
+=======
+>>>>>>> origin/master
 					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade traffic for %s external destinations"`, svcptNameString),
 					"-j", string(KubeMarkMasqChain))
 >>>>>>> Update proxier.go
@@ -1393,9 +1396,12 @@ func (proxier *Proxier) syncProxyRules() {
 			if len(localEndpoints) != 0 {
 				// Write rules jumping from localPolicyChain to localEndpointChains
 <<<<<<< HEAD
+<<<<<<< HEAD
 				proxier.writeServiceToEndpointRules(svcNameString, svcInfo, localPolicyChain, localEndpoints, args)
 			} else if hasEndpoints {
 =======
+=======
+>>>>>>> origin/master
 				proxier.writeServiceToEndpointRules(svcptNameString, svcInfo, localPolicyChain, localEndpoints, args)
 			} else {
 >>>>>>> Update proxier.go
