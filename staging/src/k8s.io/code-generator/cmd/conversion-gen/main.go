@@ -114,6 +114,7 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
+	//FIXME: haack to put this on inputs
 	// k8s.io/apimachinery/pkg/runtime contains a number of manual conversions,
 	// that we need to generate conversions.
 	// Packages being dependencies of explicitly requested packages are only

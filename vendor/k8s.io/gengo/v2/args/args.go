@@ -166,9 +166,6 @@ func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem str
 		return fmt.Errorf("Failed making a parser: %v", err)
 	}
 
-	// pass through the flag on whether to include *_test.go files
-	b.IncludeTestFiles = g.IncludeTestFiles
-
 	c, err := generator.NewContext(b, nameSystems, defaultSystem)
 	if err != nil {
 		return fmt.Errorf("Failed making a context: %v", err)

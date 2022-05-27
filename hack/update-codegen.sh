@@ -431,14 +431,10 @@ function codegen::conversions() {
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: finding all +k8s:conversion-gen tags"
     fi
-    # FIXME: This tool needs inputs in the form:
-    # 'k8s.io/kubernetes/vendor/k8s.io/foo' rather than 'k8s.io/foo' or
-    # 'k8s.io/kubernetes/staging/src/k8s.io/foo' or './staging/src/k8s.io/foo'.
     local tag_dirs=()
     kube::util::read-array tag_dirs < <(\
         grep -l --null '^// *+k8s:conversion-gen=' "${ALL_K8S_TAG_FILES[@]}" \
             | xargs -0 -n1 dirname \
-            | sed 's|staging/src|vendor|g' \
             | sort -u)
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: found ${#tag_dirs[@]} +k8s:conversion-gen tagged dirs"
@@ -446,7 +442,7 @@ function codegen::conversions() {
 
     local tag_pkgs=()
     for dir in "${tag_dirs[@]}"; do
-        tag_pkgs+=("${PRJ_SRC_PATH}/$dir")
+        tag_pkgs+=("./$dir")
     done
 
     local extra_peer_pkgs=(
@@ -465,13 +461,12 @@ function codegen::conversions() {
 
     git_find -z ':(glob)**'/"${output_base}.go" | xargs -0 rm -f
 
-    ./hack/run-in-gopath.sh "${gen_conversion_bin}" \
+    "${gen_conversion_bin}" \
         --v "${KUBE_VERBOSE}" \
         --logtostderr \
         -h "${BOILERPLATE_FILENAME}" \
         -O "${output_base}" \
         $(printf -- " --extra-peer-dirs %s" "${extra_peer_pkgs[@]}") \
-        $(printf -- " --extra-dirs %s" "${tag_pkgs[@]}") \
         $(printf -- " -i %s" "${tag_pkgs[@]}") \
         "$@"
 

@@ -305,10 +305,12 @@ func (b *Builder) loadDirs(dirs []string) ([]*packages.Package, error) {
 			return p, nil
 		},
 	}
+	klog.V(3).Infof("loading %d packages", len(netNewDirs))
 	pkgs, err := packages.Load(&cfg, netNewDirs...)
 	if err != nil {
 		return nil, fmt.Errorf("error loading packages: %w\n", err)
 	}
+	klog.V(3).Infof("loaded %d packages", len(pkgs))
 
 	for _, p := range pkgs {
 		b.processPkg(p, true)

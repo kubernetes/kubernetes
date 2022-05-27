@@ -25,10 +25,10 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 
 	"k8s.io/klog/v2"
 
@@ -136,7 +136,7 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 		klog.Warning("Skipping nil package passed to getManualConversionFunctions")
 		return
 	}
-	klog.V(5).Infof("Scanning for conversion functions in %v", pkg.Name)
+	klog.V(5).Infof("Scanning for conversion functions in %v", pkg.Path)
 
 	scopeName := types.Ref(conversionPackagePath, "Scope").Name
 	errorName := types.Ref("", "error").Name
@@ -219,58 +219,53 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	//   have non-trivial conversion
 	memoryEquivalentTypes := equalMemoryTypes{}
 
-	// We are generating conversions only for packages that are explicitly
-	// passed as InputDir.
+	// First load other "input" packages.  We do this as a single call because
+	// it is MUCH faster.
 	processed := map[string]bool{}
+	filteredInputs := make([]string, 0, len(context.Inputs))
+	otherPkgs := make([]string, 0, len(context.Inputs))
+	pkgToPeers := map[string][]string{}
+	pkgToExternal := map[string]string{}
 	for _, i := range context.Inputs {
 		// skip duplicates
+		//FIXME: gengo should handle this?
 		if processed[i] {
 			continue
 		}
 		processed[i] = true
 
-		klog.V(5).Infof("considering pkg %q", i)
+		klog.V(5).Infof("pre-processing pkg %q", i)
+
 		pkg := context.Universe[i]
-		// typesPkg is where the versioned types are defined. Sometimes it is
-		// different from pkg. For example, kubernetes core/v1 types are defined
-		// in vendor/k8s.io/api/core/v1, while pkg is at pkg/api/v1.
-		typesPkg := pkg
 		if pkg == nil {
 			// If the input had no Go files, for example.
 			continue
 		}
 
-		// Add conversion and defaulting functions.
-		getManualConversionFunctions(context, pkg, manualConversions)
-
 		// Only generate conversions for packages which explicitly request it
 		// by specifying one or more "+k8s:conversion-gen=<peer-pkg>"
 		// in their doc.go file.
 		peerPkgs := extractTag(pkg.Comments)
-		if peerPkgs != nil {
-			klog.V(5).Infof("  tags: %q", peerPkgs)
-			if len(peerPkgs) == 1 && peerPkgs[0] == "false" {
-				// If a single +k8s:conversion-gen=false tag is defined, we still want
-				// the generator to fire for this package for explicit conversions, but
-				// we are clearing the peerPkgs to not generate any standard conversions.
-				peerPkgs = nil
-			}
-		} else {
+		if peerPkgs == nil {
 			klog.V(5).Infof("  no tag")
 			continue
 		}
-		skipUnsafe := false
-		extraDirs := []string{}
-		if customArgs, ok := arguments.CustomArgs.(*conversionargs.CustomArgs); ok {
-			if len(peerPkgs) > 0 {
-				peerPkgs = append(peerPkgs, customArgs.BasePeerDirs...)
-				peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
-			}
-			extraDirs = customArgs.ExtraDirs
-			skipUnsafe = customArgs.SkipUnsafe
+		klog.V(5).Infof("  tags: %q", peerPkgs)
+		if len(peerPkgs) == 1 && peerPkgs[0] == "false" {
+			// If a single +k8s:conversion-gen=false tag is defined, we still want
+			// the generator to fire for this package for explicit conversions, but
+			// we are clearing the peerPkgs to not generate any standard conversions.
+			peerPkgs = nil
+		} else {
+			// Save peers for each input
+			pkgToPeers[i] = peerPkgs
 		}
+		otherPkgs = append(otherPkgs, peerPkgs...)
+		// Keep this one for further processing.
+		filteredInputs = append(filteredInputs, i)
 
-		// if the external types are not in the same package where the conversion functions to be generated
+		// if the external types are not in the same package where the
+		// conversion functions to be generated
 		externalTypesValues := extractExternalTypesTag(pkg.Comments)
 		if externalTypesValues != nil {
 			if len(externalTypesValues) != 1 {
@@ -278,38 +273,78 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			}
 			externalTypes := externalTypesValues[0]
 			klog.V(5).Infof("  external types tags: %q", externalTypes)
-			var err error
-			typesPkg, err = context.AddDirectory(externalTypes)
-			if err != nil {
-				klog.Fatalf("cannot import package %s", externalTypes)
-			}
-			// update context.Order to the latest context.Universe
-			orderer := namer.Orderer{Namer: namer.NewPublicNamer(1)}
-			context.Order = orderer.OrderUniverse(context.Universe)
+			otherPkgs = append(otherPkgs, externalTypes)
+			pkgToExternal[i] = externalTypes
+		} else {
+			pkgToExternal[i] = i
 		}
+	}
 
-		// if the source path is within a /vendor/ directory (for example,
-		// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1), allow
-		// generation to output to the proper relative path (under vendor).
-		// Otherwise, the generator will create the file in the wrong location
-		// in the output directory.
-		// TODO: build a more fundamental concept in gengo for dealing with modifications
-		// to vendored packages.
-		for i := range peerPkgs {
-			peerPkgs[i] = genutil.Vendorless(peerPkgs[i])
-		}
-		for i := range extraDirs {
-			extraDirs[i] = genutil.Vendorless(extraDirs[i])
-		}
+	if customArgs, ok := arguments.CustomArgs.(*conversionargs.CustomArgs); ok {
+		otherPkgs = append(otherPkgs, customArgs.BasePeerDirs...)
+		otherPkgs = append(otherPkgs, customArgs.ExtraPeerDirs...)
 
+		// for each pkg, add "extras", too
+		for k := range pkgToPeers {
+			pkgToPeers[k] = append(pkgToPeers[k], customArgs.BasePeerDirs...)
+			pkgToPeers[k] = append(pkgToPeers[k], customArgs.ExtraPeerDirs...)
+		}
+	}
+
+	// if the source path is within a /vendor/ directory (for example,
+	// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1), allow
+	// generation to output to the proper relative path (under vendor).
+	// Otherwise, the generator will create the file in the wrong location
+	// in the output directory.
+	// TODO: build a more fundamental concept in gengo for dealing with modifications
+	// to vendored packages.
+	//FIXME: redundant now?
+	for i := range otherPkgs {
+		otherPkgs[i] = genutil.Vendorless(otherPkgs[i])
+	}
+	if len(otherPkgs) > 0 {
+		if err := context.AddDirs(otherPkgs); err != nil {
+			klog.Fatalf("cannot load input packages:", err)
+		}
 		// Make sure our peer-packages are added and fully parsed.
-		for _, pp := range append(peerPkgs, extraDirs...) {
-			context.AddDir(pp)
+		for _, pp := range otherPkgs {
 			p := context.Universe[pp]
-			if nil == p {
+			if p == nil {
 				klog.Fatalf("failed to find pkg: %s", pp)
 			}
 			getManualConversionFunctions(context, p, manualConversions)
+		}
+	}
+
+	// update context.Order to the latest context.Universe
+	orderer := namer.Orderer{Namer: namer.NewPublicNamer(1)}
+	context.Order = orderer.OrderUniverse(context.Universe)
+
+	skipUnsafe := false
+	if customArgs, ok := arguments.CustomArgs.(*conversionargs.CustomArgs); ok {
+		skipUnsafe = customArgs.SkipUnsafe
+	}
+
+	// We are generating conversions only for packages that are explicitly
+	// passed as InputDir.
+	for _, i := range filteredInputs {
+		klog.V(5).Infof("considering pkg %q", i)
+		pkg := context.Universe[i]
+		// typesPkg is where the versioned types are defined. Sometimes it is
+		// different from pkg. For example, kubernetes core/v1 types are defined
+		// in vendor/k8s.io/api/core/v1, while pkg is at pkg/api/v1.
+		typesPkg := pkg
+
+		// Add conversion and defaulting functions.
+		getManualConversionFunctions(context, pkg, manualConversions)
+
+		// Find the right input pkg, which might not be this one.
+		externalTypes := pkgToExternal[i]
+		//FIXME: just need a lookup
+		//FIXME: name canonicalize
+		typesPkg, err = context.AddDirectory(externalTypes)
+		if err != nil {
+			klog.Fatalf("cannot import package %s", externalTypes)
 		}
 
 		unsafeEquality := TypesEqual(memoryEquivalentTypes)
@@ -325,20 +360,23 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		// in the output directory.
 		// TODO: build a more fundamental concept in gengo for dealing with modifications
 		// to vendored packages.
+		//FIXME: hack
 		if strings.HasPrefix(pkg.SourcePath, arguments.OutputBase) {
 			expandedPath := strings.TrimPrefix(pkg.SourcePath, arguments.OutputBase)
 			if strings.Contains(expandedPath, "/vendor/") {
 				path = expandedPath
 			}
 		}
+
 		packages = append(packages,
 			&generator.DefaultPackage{
 				PackageName: filepath.Base(pkg.Path),
 				PackagePath: path,
 				HeaderText:  header,
+				Source:      pkg.SourcePath,
 				GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 					return []generator.Generator{
-						NewGenConversion(arguments.OutputFileBaseName, typesPkg.Path, pkg.Path, manualConversions, peerPkgs, unsafeEquality),
+						NewGenConversion(arguments.OutputFileBaseName, typesPkg.Path, pkg.Path, manualConversions, pkgToPeers[path], unsafeEquality),
 					}
 				},
 				FilterFunc: func(c *generator.Context, t *types.Type) bool {
@@ -638,10 +676,11 @@ func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, boo
 }
 
 func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
-	klogV := klog.V(5)
+	klogV := klog.V(6)
 	if klogV.Enabled() {
 		if m, ok := g.useUnsafe.(equalMemoryTypes); ok {
 			var result []string
+			//FIXME: this seems to track all sorts of things unrelated
 			klogV.Info("All objects without identical memory layout:")
 			for k, v := range m {
 				if v {
