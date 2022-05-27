@@ -52,7 +52,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 	ginkgo.Context("when gracefully shutting down", func() {
 
 		const (
-			pollInterval                        = 1 * time.Second
+			pollInterval                        = 10 * time.Millisecond
 			podStatusUpdateTimeout              = 30 * time.Second
 			nodeStatusUpdateTimeout             = 30 * time.Second
 			nodeShutdownGracePeriod             = 20 * time.Second
@@ -548,5 +548,9 @@ func isPodShutdown(pod *v1.Pod) bool {
 
 // Pods should never report failed phase and have ready condition = true (https://github.com/kubernetes/kubernetes/issues/108594)
 func isPodStatusAffectedByIssue108594(pod *v1.Pod) bool {
+	framework.Logf("ruiwen-zhao: pod phase %s", pod.Status.Phase)
+	for _, c := range pod.Status.Conditions {
+		framework.Logf("ruiwen-zhao: pod condition %+v", c)
+	}
 	return pod.Status.Phase == v1.PodFailed && podutils.IsPodReady(pod)
 }
