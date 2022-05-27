@@ -1548,7 +1548,11 @@ func TestMergePodStatus(t *testing.T) {
 				Conditions: []v1.PodCondition{
 					{
 						Type:   v1.PodReady,
-						Status: v1.ConditionTrue,
+						Status: v1.ConditionFalse,
+					},
+					{
+						Type:   v1.ContainersReady,
+						Status: v1.ConditionFalse,
 					},
 					{
 						Type:   v1.PodScheduled,
