@@ -346,8 +346,12 @@ func retryAfterResponse() *http.Response {
 }
 
 func retryAfterResponseWithDelay(delay string) *http.Response {
+	return retryAfterResponseWithCodeAndDelay(http.StatusInternalServerError, delay)
+}
+
+func retryAfterResponseWithCodeAndDelay(code int, delay string) *http.Response {
 	return &http.Response{
-		StatusCode: http.StatusInternalServerError,
+		StatusCode: code,
 		Header:     http.Header{"Retry-After": []string{delay}},
 	}
 }
