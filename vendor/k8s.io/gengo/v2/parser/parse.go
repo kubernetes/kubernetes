@@ -19,13 +19,11 @@ package parser
 import (
 	"fmt"
 	"go/ast"
-	"go/build"
 	"go/constant"
 	"go/parser"
 	"go/token"
 	tc "go/types"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -57,7 +55,8 @@ type Builder struct {
 	// If true, include *_test.go
 	IncludeTestFiles bool
 
-	context *build.Context //FIXME: is this really needed?
+	// Tags to use when parsing code.
+	BuildTags []string
 
 	// All comments from everywhere in every parsed file.
 	commentLineLock       sync.Mutex
@@ -72,30 +71,17 @@ type fileLine struct {
 
 // New constructs a new builder.
 func New() *Builder {
-	c := build.Default
-	if c.GOROOT == "" {
-		if p, err := exec.Command("which", "go").CombinedOutput(); err == nil {
-			// The returned string will have some/path/bin/go, so remove the last two elements.
-			c.GOROOT = filepath.Dir(filepath.Dir(strings.Trim(string(p), "\n")))
-		} else {
-			klog.Warningf("Warning: $GOROOT not set, and unable to run `which go` to find it: %v\n", err)
-		}
-	}
-	// Force this to off, since we don't properly parse CGo.  All symbols must
-	// have non-CGo equivalents.
-	c.CgoEnabled = false
 	return &Builder{
 		pkgMap:                map[importPathString]*packages.Package{},
 		userRequested:         map[importPathString]bool{},
 		fset:                  token.NewFileSet(),
 		endLineToCommentGroup: map[fileLine]*ast.CommentGroup{},
-		context:               &c,
 	}
 }
 
-// AddBuildTags adds the specified build tags to the parse context.
+// AddBuildTags adds the specified builder.
 func (b *Builder) AddBuildTags(tags ...string) {
-	b.context.BuildTags = append(b.context.BuildTags, tags...)
+	b.BuildTags = append(b.BuildTags, tags...)
 }
 
 //FIXME: comment
@@ -125,8 +111,8 @@ func (b *Builder) loadDirs(dirs []string) ([]*packages.Package, error) {
 	//FIXME: does -i take directories, pkgs, or both?  e.g. sahould I add leading ./ ?
 	cfg := packages.Config{
 		Mode:       packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedTypes | packages.NeedTypesSizes | packages.NeedTypesInfo | packages.NeedSyntax,
-		Tests:      b.IncludeTestFiles,                                        // FIXME: is this set yet?
-		BuildFlags: []string{"-tags", strings.Join(b.context.BuildTags, ",")}, //FIXME: is this the only reasonm to keep b.context?
+		Tests:      b.IncludeTestFiles, // FIXME: is this set yet?
+		BuildFlags: []string{"-tags", strings.Join(b.BuildTags, ",")},
 		Fset:       b.fset,
 		ParseFile: func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
 			const mode = parser.DeclarationErrors | parser.ParseComments
