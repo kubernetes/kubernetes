@@ -171,6 +171,7 @@ func TestPreemption(t *testing.T) {
 
 	testCtx := testutils.InitTestSchedulerWithOptions(t,
 		testutils.InitTestAPIServer(t, "preemption", nil),
+		0,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	testutils.SyncInformerFactory(testCtx)
@@ -1436,7 +1437,7 @@ func TestPDBInPreemption(t *testing.T) {
 }
 
 func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutils.TestContext {
-	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestAPIServer(t, nsPrefix, nil), opts...)
+	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestAPIServer(t, nsPrefix, nil), 0, opts...)
 	testutils.SyncInformerFactory(testCtx)
 	// wraps the NextPod() method to make it appear the preemption has been done already and the nominated node has been set.
 	f := testCtx.Scheduler.NextPod
