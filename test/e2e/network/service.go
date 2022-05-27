@@ -33,6 +33,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -2022,6 +2023,97 @@ var _ = common.SIGDescribe("Services", func() {
 		cmd := fmt.Sprintf("/agnhost connect --timeout=3s %s", serviceAddress)
 
 		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v", serviceAddress, podName, nodeName))
+		expectedErr := "REFUSED"
+		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
+			_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+
+			if err != nil {
+				if strings.Contains(err.Error(), expectedErr) {
+					framework.Logf("error contained '%s', as expected: %s", expectedErr, err.Error())
+					return true, nil
+				}
+				framework.Logf("error didn't contain '%s', keep trying: %s", expectedErr, err.Error())
+				return false, nil
+			}
+			return true, errors.New("expected connect call to fail")
+		}); pollErr != nil {
+			framework.ExpectNoError(pollErr)
+		}
+	})
+
+	// regression test for https://issues.k8s.io/109414 and https://issues.k8s.io/109718
+	ginkgo.It("should be rejected for evicted pods (no endpoints exist)", func() {
+		namespace := f.Namespace.Name
+		serviceName := "evicted-pods"
+		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		framework.ExpectNoError(err)
+		nodeName := nodes.Items[0].Name
+
+		port := 80
+
+		ginkgo.By("creating a service with no endpoints")
+		_, err = jig.CreateTCPServiceWithPort(func(s *v1.Service) {
+			// set publish not ready addresses to cover edge cases too
+			s.Spec.PublishNotReadyAddresses = true
+		}, int32(port))
+		framework.ExpectNoError(err)
+
+		// Create a pod in one node to get evicted
+		ginkgo.By("creating a client pod that is going to be evicted for the service " + serviceName)
+		evictedPod := e2epod.NewAgnhostPod(namespace, "evicted-pod", nil, nil, nil)
+		evictedPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "sleep 10; fallocate -l 10M file; sleep 10000"}
+		evictedPod.Spec.Containers[0].Name = "evicted-pod"
+		evictedPod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+			Limits: v1.ResourceList{"ephemeral-storage": resource.MustParse("5Mi")},
+		}
+		f.PodClient().Create(evictedPod)
+		err = e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, evictedPod.Name, "Evicted", f.Namespace.Name)
+		if err != nil {
+			framework.Failf("error waiting for pod to be evicted: %v", err)
+		}
+
+		podName := "execpod-evictedpods"
+		ginkgo.By(fmt.Sprintf("creating %v on node %v", podName, nodeName))
+		execPod := e2epod.CreateExecPodOrFail(f.ClientSet, namespace, podName, func(pod *v1.Pod) {
+			nodeSelection := e2epod.NodeSelection{Name: nodeName}
+			e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
+		})
+
+		if epErr := wait.PollImmediate(framework.Poll, e2eservice.ServiceEndpointsTimeout, func() (bool, error) {
+			endpoints, err := cs.CoreV1().Endpoints(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
+			if err != nil {
+				framework.Logf("error fetching '%s/%s' Endpoints: %s", namespace, serviceName, err.Error())
+				return false, err
+			}
+			if len(endpoints.Subsets) > 0 {
+				framework.Logf("expected '%s/%s' Endpoints to be empty, got: %v", namespace, serviceName, endpoints.Subsets)
+				return false, nil
+			}
+			epsList, err := cs.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serviceName)})
+			if err != nil {
+				framework.Logf("error fetching '%s/%s' EndpointSlices: %s", namespace, serviceName, err.Error())
+				return false, err
+			}
+			if len(epsList.Items) != 1 {
+				framework.Logf("expected exactly 1 EndpointSlice, got: %d", len(epsList.Items))
+				return false, nil
+			}
+			endpointSlice := epsList.Items[0]
+			if len(endpointSlice.Endpoints) > 0 {
+				framework.Logf("expected EndpointSlice to be empty, got %d endpoints", len(endpointSlice.Endpoints))
+				return false, nil
+			}
+			return true, nil
+		}); epErr != nil {
+			framework.ExpectNoError(epErr)
+		}
+
+		serviceAddress := net.JoinHostPort(serviceName, strconv.Itoa(port))
+		framework.Logf("waiting up to %v to connect to %v", e2eservice.KubeProxyEndpointLagTimeout, serviceAddress)
+		cmd := fmt.Sprintf("/agnhost connect --timeout=3s %s", serviceAddress)
+
+		ginkgo.By(fmt.Sprintf("hitting service %v from pod %v on node %v expected to be refused", serviceAddress, podName, nodeName))
 		expectedErr := "REFUSED"
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyEndpointLagTimeout, func() (bool, error) {
 			_, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
