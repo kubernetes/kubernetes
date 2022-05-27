@@ -213,22 +213,7 @@ func (c *Context) addNameSystems(namers namer.NameSystems) *Context {
 // import path. e.g.: '/path/to/home/path/to/gopath/src/' The package knows its
 // import path already, this will be appended to 'outDir'.
 func (c *Context) ExecutePackage(outDir string, p Package) error {
-	path := filepath.Join(outDir, p.Path())
-
-	// When working outside of GOPATH, we typically won't want to generate the
-	// full path for a package. For example, if our current project's root/base
-	// package is github.com/foo/bar, outDir=., p.Path()=github.com/foo/bar/generated,
-	// then we really want to be writing files to ./generated, not ./github.com/foo/bar/generated.
-	// The following will trim a path prefix (github.com/foo/bar) from p.Path() to arrive at
-	// a relative path that works with projects not in GOPATH.
-	if c.TrimPathPrefix != "" {
-		separator := string(filepath.Separator)
-		if !strings.HasSuffix(c.TrimPathPrefix, separator) {
-			c.TrimPathPrefix += separator
-		}
-
-		path = strings.TrimPrefix(path, c.TrimPathPrefix)
-	}
+	path := p.SourcePath()
 	klog.V(5).Infof("Processing package %q, disk location %q", p.Name(), path)
 	// Filter out any types the *package* doesn't care about.
 	packageContext := c.filteredBy(p.Filter)

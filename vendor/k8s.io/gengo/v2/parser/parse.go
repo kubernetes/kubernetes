@@ -32,7 +32,9 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
+	"golang.org/x/tools/go/packages"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
 )
@@ -43,6 +45,22 @@ type importPathString string
 // Builder lets you add all the go files in all the packages that you care
 // about, then constructs the type source data.
 type Builder struct {
+	// Map of package ID to definitions.  These keys should be canonical
+	// Go pkg names (example.com/foo/bar) and not local paths (./foo/bar).
+	// FIXME: evaluate: previously said "This must only be accessed via getLoadedBuildPackage and setLoadedBuildPackage"
+	pkgMap map[importPathString]*packages.Package
+
+	// Map of package ID to whether the user requested it or it was from
+	// an import.
+	userRequested map[importPathString]bool
+
+	// Tracks accumulated parsed files, so we don't have to re-parse.
+	fset *token.FileSet
+
+	////////////////////////
+	// everything below this seems to not be needed any more
+	////////////////////////
+
 	context *build.Context
 
 	// If true, include *_test.go
@@ -56,7 +74,6 @@ type Builder struct {
 	// This must only be accessed via getLoadedBuildPackage and setLoadedBuildPackage
 	buildPackages map[importPathString]*build.Package
 
-	fset *token.FileSet
 	// map of package path to list of parsed files
 	parsed map[importPathString][]parsedFile
 	// map of package path to absolute path (to prevent overlap)
@@ -64,10 +81,6 @@ type Builder struct {
 
 	// Set by typeCheckPackage(), used by importPackage() and friends.
 	typeCheckedPackages map[importPathString]*tc.Package
-
-	// Map of package path to whether the user requested it or it was from
-	// an import.
-	userRequested map[importPathString]bool
 
 	// All comments from everywhere in every parsed file.
 	endLineToCommentGroup map[fileLine]*ast.CommentGroup
@@ -103,13 +116,15 @@ func New() *Builder {
 	// have non-CGo equivalents.
 	c.CgoEnabled = false
 	return &Builder{
+		pkgMap:        map[importPathString]*packages.Package{},
+		userRequested: map[importPathString]bool{},
+		fset:          token.NewFileSet(),
+		//// Everything else may not be needed
 		context:               &c,
 		buildPackages:         map[importPathString]*build.Package{},
 		typeCheckedPackages:   map[importPathString]*tc.Package{},
-		fset:                  token.NewFileSet(),
 		parsed:                map[importPathString][]parsedFile{},
 		absPaths:              map[importPathString]string{},
-		userRequested:         map[importPathString]bool{},
 		endLineToCommentGroup: map[fileLine]*ast.CommentGroup{},
 		importGraph:           map[importPathString]map[string]struct{}{},
 	}
@@ -208,6 +223,7 @@ func (b *Builder) addFile(pkgPath importPathString, path string, src []byte, use
 		return err
 	}
 
+	//FIXME: new path doesn't handle this
 	// This is redundant with addDir, but some tests call AddFileForTest, which
 	// call into here without calling addDir.
 	b.userRequested[pkgPath] = userRequested || b.userRequested[pkgPath]
@@ -218,6 +234,7 @@ func (b *Builder) addFile(pkgPath importPathString, path string, src []byte, use
 		b.endLineToCommentGroup[fileLine{position.Filename, position.Line}] = c
 	}
 
+	//FIXME: new path doesn't handle this
 	// We have to get the packages from this specific file, in case the
 	// user added individual files instead of entire directories.
 	if b.importGraph[pkgPath] == nil {
@@ -233,14 +250,77 @@ func (b *Builder) addFile(pkgPath importPathString, path string, src []byte, use
 // AddDir adds an entire directory, scanning it for go files. 'dir' should have
 // a single go package in it. GOPATH, GOROOT, and the location of your go
 // binary (`which go`) will all be searched if dir doesn't literally resolve.
+//FIXME: remove
 func (b *Builder) AddDir(dir string) error {
 	_, err := b.importPackage(dir, true)
 	return err
 }
 
+// HACK!!  at least put into Builder
+var lock sync.Mutex
+
+func (b *Builder) AddDirs(dirs []string) error {
+	_, err := b.loadDirs(dirs)
+	return err
+}
+
+func (b *Builder) loadDirs(dirs []string) ([]*packages.Package, error) {
+	netNewDirs := make([]string, 0, len(dirs))
+	existingPkgs := make([]*packages.Package, 0, len(dirs))
+	for _, d := range dirs {
+		ip := importPathString(d)
+		if b.pkgMap[ip] == nil {
+			netNewDirs = append(netNewDirs, d)
+		} else {
+			//FIXME: streamline wrt processPkg - sett8ing in 2 plaaces is ick
+			b.userRequested[ip] = true
+			existingPkgs = append(existingPkgs, b.pkgMap[ip])
+		}
+	}
+	if len(netNewDirs) == 0 {
+		return existingPkgs, nil
+	}
+
+	//FIXME: are all these "need" right?
+	//FIXME: does -i take directories, pkgs, or both?  e.g. sahould I add leading ./ ?
+	cfg := packages.Config{
+		Mode:       packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedTypes | packages.NeedTypesSizes | packages.NeedTypesInfo | packages.NeedSyntax,
+		Tests:      b.IncludeTestFiles, // FIXME: is this set yet?
+		BuildFlags: []string{"-tags", strings.Join(b.context.BuildTags, ",")},
+		Fset:       b.fset,
+		ParseFile: func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
+			const mode = parser.DeclarationErrors | parser.ParseComments
+			p, err := parser.ParseFile(b.fset, filename, src, mode)
+			if err != nil {
+				return nil, err
+			}
+			//FIXME: is this the best way?
+			for _, c := range p.Comments {
+				position := b.fset.Position(c.End())
+				lock.Lock()
+				//FIXME: only do this if it is user-requested
+				b.endLineToCommentGroup[fileLine{position.Filename, position.Line}] = c
+				lock.Unlock()
+			}
+			return p, nil
+		},
+	}
+	pkgs, err := packages.Load(&cfg, netNewDirs...)
+	if err != nil {
+		return nil, fmt.Errorf("error loading packages: %w\n", err)
+	}
+
+	for _, p := range pkgs {
+		b.processPkg(p, true)
+		//FIXME: err?
+	}
+	return pkgs, nil
+}
+
 // AddDirRecursive is just like AddDir, but it also recursively adds
 // subdirectories; it returns an error only if the path couldn't be resolved;
 // any directories recursed into without go source are ignored.
+//FIXME: remove
 func (b *Builder) AddDirRecursive(dir string) error {
 	// Add the root.
 	if _, err := b.importPackage(dir, true); err != nil {
@@ -302,6 +382,26 @@ func (b *Builder) AddDirTo(dir string, u *types.Universe) error {
 	return b.findTypesIn(canonicalizeImportPath(pkg.ImportPath), u)
 }
 
+//FIXME: this should be "addPkgsTo"?
+func (b *Builder) AddDirsTo(dirs []string, u *types.Universe) error {
+	pkgs, err := b.loadDirs(dirs)
+	if err != nil {
+		return err
+	}
+	//FIXME: should we just do this in loadDirs?
+	for _, pkg := range pkgs {
+		// FIXME: name or ID?
+		pkgPath := importPathString(pkg.ID)
+		if b.userRequested[pkgPath] {
+			if err := b.findTypesIn(pkgPath, u); err != nil {
+				//FIXME: what to do?
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // AddDirectoryTo adds an entire directory to a given Universe. Unlike AddDir,
 // this processes the package immediately, which makes it safe to use from
 // within a generator (rather than just at init time. 'dir' must be a single go
@@ -322,6 +422,27 @@ func (b *Builder) AddDirectoryTo(dir string, u *types.Universe) (*types.Package,
 		return nil, err
 	}
 	return u.Package(string(path)), nil
+}
+
+//FIXME: shjould be pluraal return
+func (b *Builder) AddDirectoriesTo(dirs []string, u *types.Universe) (*types.Package, error) {
+	pkgs, err := b.loadDirs(dirs)
+	if err != nil {
+		return nil, err
+	}
+	//FIXME: should we just do this in loadDirs?
+	for _, pkg := range pkgs {
+		// FIXME: name or ID?
+		pkgPath := importPathString(pkg.ID)
+		if b.userRequested[pkgPath] {
+			if err := b.findTypesIn(pkgPath, u); err != nil {
+				//FIXME: what to do?
+				return nil, err
+			}
+		}
+	}
+	//FIXME: is [0] right?
+	return u.Package(pkgs[0].ID), nil
 }
 
 // The implementation of AddDir. A flag indicates whether this directory was
@@ -375,6 +496,100 @@ var regexErrPackageNotFound = regexp.MustCompile(`^unable to import ".*?":.*`)
 
 func isErrPackageNotFound(err error) bool {
 	return regexErrPackageNotFound.MatchString(err.Error())
+}
+
+//FIXME: comment
+func (b *Builder) processPkg(pkg *packages.Package, userRequested bool) {
+	klog.V(5).Infof("processPkg %q", pkg.ID)
+
+	pkgPath := importPathString(pkg.ID)
+	b.pkgMap[pkgPath] = pkg
+	if userRequested {
+		b.userRequested[pkgPath] = true
+	}
+
+	if len(pkg.Errors) != 0 {
+		if pkg.Errors[0].Kind == packages.ListError {
+			//FIXME: do this in load (if at all)
+			fmt.Printf("Error(s) in %q:\n", pkg.ID)
+			for _, e := range pkg.Errors {
+				fmt.Printf("  %s\n", e)
+			}
+			os.Exit(1)
+		}
+		//FIXME: return error
+		//FIXME: this can flag things like "missing method DeepCopyObject"
+		//  which happens if the deepcopy file is removed, but doesn't prevent
+		//  codegen from happening to fix the situation.  chicken-egg.  Can I
+		//  load without parsing code (or per-generator choose to ignore some
+		//  errors)?
+	} else {
+		/*
+			c := spew.ConfigState{
+				DisableMethods: true,
+				MaxDepth:       2,
+				Indent:         "  ",
+			}
+			c.Dump(*pkg)
+		*/
+	}
+	/*
+		var pkgPath = importPathString(dir)
+
+		// Get the canonical path if we can.
+		if buildPkg, _ := b.getLoadedBuildPackage(dir); buildPkg != nil {
+			canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
+			klog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
+			pkgPath = canonicalPackage
+		}
+
+		// If we have not seen this before, process it now.
+		ignoreError := false
+		if _, found := b.parsed[pkgPath]; !found {
+			// Ignore errors in paths that we're importing solely because
+			// they're referenced by other packages.
+			ignoreError = true
+
+			// Add it.
+			if err := b.addDir(dir, userRequested); err != nil {
+				if isErrPackageNotFound(err) {
+					klog.V(6).Info(err)
+					return nil, nil
+				}
+
+				return nil, err
+			}
+
+			// Get the canonical path now that it has been added.
+			if buildPkg, _ := b.getLoadedBuildPackage(dir); buildPkg != nil {
+				canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
+				klog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
+				pkgPath = canonicalPackage
+			}
+		}
+
+		// If it was previously known, just check that the user-requestedness hasn't
+		// changed.
+		b.userRequested[pkgPath] = userRequested || b.userRequested[pkgPath]
+
+		// Run the type checker.  We may end up doing this to pkgs that are already
+		// done, or are in the queue to be done later, but it will short-circuit,
+		// and we can't miss pkgs that are only depended on.
+		pkg, err := b.typeCheckPackage(pkgPath, !ignoreError)
+		if err != nil {
+			switch {
+			case ignoreError && pkg != nil:
+				klog.V(4).Infof("type checking encountered some issues in %q, but ignoring.\n", pkgPath)
+			case !ignoreError && pkg != nil:
+				klog.V(3).Infof("type checking encountered some errors in %q\n", pkgPath)
+				return nil, err
+			default:
+				return nil, err
+			}
+		}
+
+		return pkg, nil
+	*/
 }
 
 // importPackage is a function that will be called by the type check package when it
@@ -495,9 +710,10 @@ func (b *Builder) typeCheckPackage(pkgPath importPathString, logErr bool) (*tc.P
 func (b *Builder) FindPackages() []string {
 	// Iterate packages in a predictable order.
 	pkgPaths := []string{}
-	for k := range b.typeCheckedPackages {
+	for k := range b.pkgMap {
 		pkgPaths = append(pkgPaths, string(k))
 	}
+	//FIXME: save this index
 	sort.Strings(pkgPaths)
 
 	result := []string{}
@@ -518,7 +734,7 @@ func (b *Builder) FindTypes() (types.Universe, error) {
 	// Take a snapshot of pkgs to iterate, since this will recursively mutate
 	// b.parsed. Iterate in a predictable order.
 	pkgPaths := []string{}
-	for pkgPath := range b.parsed {
+	for pkgPath := range b.pkgMap {
 		pkgPaths = append(pkgPaths, string(pkgPath))
 	}
 	sort.Strings(pkgPaths)
@@ -545,11 +761,20 @@ func (b *Builder) addCommentsToType(obj tc.Object, t *types.Type) {
 	}
 }
 
+//FIXME: hack - store in Builder
+var typesFound = map[importPathString]bool{}
+
 // findTypesIn finalizes the package import and searches through the package
 // for types.
 func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error {
+	if typesFound[pkgPath] {
+		return nil
+	}
+	typesFound[pkgPath] = true
+
 	klog.V(5).Infof("findTypesIn %s", pkgPath)
-	pkg := b.typeCheckedPackages[pkgPath]
+	//pkg := b.typeCheckedPackages[pkgPath]
+	pkg := b.pkgMap[pkgPath]
 	if pkg == nil {
 		return fmt.Errorf("findTypesIn(%s): package is not known", pkgPath)
 	}
@@ -561,28 +786,49 @@ func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error
 		klog.V(5).Infof("findTypesIn %s: package is not user requested", pkgPath)
 		return nil
 	}
+	if len(pkg.GoFiles) == 0 {
+		klog.V(5).Infof("findTypesIn %s: package has no go files", pkgPath)
+		return nil
+	}
+	absPath, _ := filepath.Split(pkg.GoFiles[0])
 
 	// We're keeping this package.  This call will create the record.
-	u.Package(string(pkgPath)).Name = pkg.Name()
-	u.Package(string(pkgPath)).Path = pkg.Path()
-	u.Package(string(pkgPath)).SourcePath = b.absPaths[pkgPath]
+	//FIXME: store the pkg instead of these fields
+	u.Package(string(pkgPath)).Name = pkg.Name
+	u.Package(string(pkgPath)).Path = pkg.ID // FIXME or pkgPath?  see go core vendor weirdness (handled in go2make)
+	u.Package(string(pkgPath)).SourcePath = absPath
 
-	for _, f := range b.parsed[pkgPath] {
-		if _, fileName := filepath.Split(f.name); fileName == "doc.go" {
+	//for _, f := range b.parsed[pkgPath] {
+	for i, f := range pkg.Syntax {
+		/*
+			c := spew.ConfigState{
+				DisableMethods: true,
+				MaxDepth:       2,
+				Indent:         "  ",
+			}
+			c.Dump(*f)
+		*/
+
+		//FIXME: this is hacky and not obvious how to support - do we need it?
+		//FIXME: something like this is safer?  Or index from CompiledGoFiles?
+		//   s := pkg.Syntax[0]
+		//   pos := s.Package
+		//   file := pkg.Fset.File(pos).Name()
+		if _, fileName := filepath.Split(pkg.GoFiles[i]); fileName == "doc.go" {
 			tp := u.Package(string(pkgPath))
 			// findTypesIn might be called multiple times. Clean up tp.Comments
 			// to avoid repeatedly fill same comments to it.
 			tp.Comments = []string{}
-			for i := range f.file.Comments {
-				tp.Comments = append(tp.Comments, splitLines(f.file.Comments[i].Text())...)
+			for i := range f.Comments {
+				tp.Comments = append(tp.Comments, splitLines(f.Comments[i].Text())...)
 			}
-			if f.file.Doc != nil {
-				tp.DocComments = splitLines(f.file.Doc.Text())
+			if f.Doc != nil {
+				tp.DocComments = splitLines(f.Doc.Text())
 			}
 		}
 	}
 
-	s := pkg.Scope()
+	s := pkg.Types.Scope()
 	for _, n := range s.Names() {
 		obj := s.Lookup(n)
 		tn, ok := obj.(*tc.TypeName)
@@ -608,6 +854,7 @@ func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error
 		}
 	}
 
+	/* FIXNME - need this?
 	importedPkgs := []string{}
 	for k := range b.importGraph[pkgPath] {
 		importedPkgs = append(importedPkgs, string(k))
@@ -616,6 +863,7 @@ func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error
 	for _, p := range importedPkgs {
 		u.AddImports(string(pkgPath), p)
 	}
+	*/
 	return nil
 }
 
@@ -688,6 +936,7 @@ func tcNameToName(in string) types.Name {
 	if n := len(nameParts); n >= 2 {
 		// The final "." is the name of the type--previous ones must
 		// have been in the package path.
+		//FIXME: why is deepcopy checking .package to be it s own?
 		name.Package, name.Name = strings.Join(nameParts[:n-1], "."), nameParts[n-1]
 	}
 	return name
