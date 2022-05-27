@@ -1135,17 +1135,26 @@ func (proxier *Proxier) syncProxyRules() {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade traffic for %s external destinations"`, svcNameString),
+=======
+					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade traffic for %s external destinations"`, svcptNameString),
+					"-j", string(KubeMarkMasqChain))
+>>>>>>> origin/master
 =======
 					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade traffic for %s external destinations"`, svcPortNameString),
 >>>>>>> upstream/master
 					"-j", string(kubeMarkMasqChain))
+<<<<<<< HEAD
 =======
 =======
 >>>>>>> origin/master
 					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade traffic for %s external destinations"`, svcptNameString),
 					"-j", string(KubeMarkMasqChain))
 >>>>>>> Update proxier.go
+=======
+>>>>>>> upstream/master
+>>>>>>> origin/master
 			} else {
 				// If we are only using same-node endpoints, we can retain the
 				// source IP in most cases.
@@ -1303,7 +1312,10 @@ func (proxier *Proxier) syncProxyRules() {
 				// chain.
 				nextChain = svcInfo.firewallChainName
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> origin/master
 			}
 
 			for _, lbip := range svcInfo.LoadBalancerIPStrings() {
@@ -1314,13 +1326,19 @@ func (proxier *Proxier) syncProxyRules() {
 					"-d", lbip,
 					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", string(nextChain))
+<<<<<<< HEAD
 >>>>>>> Update proxier.go
+=======
+=======
+>>>>>>> upstream/master
+>>>>>>> origin/master
 
 				// The service firewall rules are created based on the
 				// loadBalancerSourceRanges field.  This only works for
 				// VIP-like loadbalancers that preserve source IPs.  For
 				// loadbalancers which direct traffic to service NodePort, the
 				// firewall rules will not apply.
+<<<<<<< HEAD
 <<<<<<< HEAD
 				args = append(args[:0],
 					"-A", string(nextChain),
@@ -1337,6 +1355,8 @@ func (proxier *Proxier) syncProxyRules() {
 					} else if cidr.Contains(proxier.nodeIP) {
 						allowFromNode = true
 =======
+=======
+>>>>>>> origin/master
 				if len(svcInfo.LoadBalancerSourceRanges()) > 0 {
 					args = append(args[:0],
 						"-A", string(nextChain),
@@ -1353,7 +1373,26 @@ func (proxier *Proxier) syncProxyRules() {
 						} else if cidr.Contains(proxier.nodeIP) {
 							allowFromNode = true
 						}
+<<<<<<< HEAD
 >>>>>>> Update proxier.go
+=======
+=======
+				args = append(args[:0],
+					"-A", string(nextChain),
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcPortNameString),
+				)
+
+				// firewall filter based on each source range
+				allowFromNode := false
+				for _, src := range svcInfo.LoadBalancerSourceRanges() {
+					proxier.natRules.Write(args, "-s", src, "-j", string(externalTrafficChain))
+					_, cidr, err := netutils.ParseCIDRSloppy(src)
+					if err != nil {
+						klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
+					} else if cidr.Contains(proxier.nodeIP) {
+						allowFromNode = true
+>>>>>>> upstream/master
+>>>>>>> origin/master
 					}
 				}
 				// For VIP-like LBs, the VIP is often added as a local
@@ -1469,23 +1508,33 @@ func (proxier *Proxier) syncProxyRules() {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 				proxier.writeServiceToEndpointRules(svcNameString, svcInfo, localPolicyChain, localEndpoints, args)
+=======
+				proxier.writeServiceToEndpointRules(svcptNameString, svcInfo, localPolicyChain, localEndpoints, args)
+			} else {
+>>>>>>> origin/master
 =======
 				proxier.writeServiceToEndpointRules(svcPortNameString, svcInfo, localPolicyChain, localEndpoints, args)
 >>>>>>> upstream/master
 			} else if hasEndpoints {
+<<<<<<< HEAD
 =======
 =======
 >>>>>>> origin/master
 				proxier.writeServiceToEndpointRules(svcptNameString, svcInfo, localPolicyChain, localEndpoints, args)
 			} else {
 >>>>>>> Update proxier.go
+=======
+>>>>>>> upstream/master
+>>>>>>> origin/master
 				if svcInfo.InternalPolicyLocal() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
 					serviceNoLocalEndpointsTotalInternal++
 				}
 				if svcInfo.ExternalPolicyLocal() {
 					serviceNoLocalEndpointsTotalExternal++
 				}
+<<<<<<< HEAD
 <<<<<<< HEAD
 				// Blackhole all traffic since there are no local endpoints
 				proxier.natRules.Write(
@@ -1494,6 +1543,8 @@ func (proxier *Proxier) syncProxyRules() {
 					fmt.Sprintf(`"%s has no local endpoints"`, svcPortNameString),
 					"-j", string(kubeMarkDropChain))
 =======
+=======
+>>>>>>> origin/master
 				if hasEndpoints {
 					// Blackhole all traffic since there are no local endpoints
 					args = append(args[:0],
@@ -1505,7 +1556,18 @@ func (proxier *Proxier) syncProxyRules() {
 					)
 					proxier.natRules.Write(args)
 				}
+<<<<<<< HEAD
 >>>>>>> Update proxier.go
+=======
+=======
+				// Blackhole all traffic since there are no local endpoints
+				proxier.natRules.Write(
+					"-A", string(localPolicyChain),
+					"-m", "comment", "--comment",
+					fmt.Sprintf(`"%s has no local endpoints"`, svcPortNameString),
+					"-j", string(kubeMarkDropChain))
+>>>>>>> upstream/master
+>>>>>>> origin/master
 			}
 		}
 	}
