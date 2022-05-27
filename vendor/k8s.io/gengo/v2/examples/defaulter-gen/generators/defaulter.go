@@ -37,6 +37,7 @@ import (
 // CustomArgs is used tby the go2idl framework to pass args specific to this
 // generator.
 type CustomArgs struct {
+	//FIXME: get rid of this
 	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
 }
 
