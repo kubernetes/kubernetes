@@ -42,7 +42,6 @@ type importPathString string
 type Builder struct {
 	// Map of package ID to definitions.  These keys should be canonical
 	// Go pkg names (example.com/foo/bar) and not local paths (./foo/bar).
-	// FIXME: evaluate: previously said "This must only be accessed via getLoadedBuildPackage and setLoadedBuildPackage"
 	pkgMap map[importPathString]*packages.Package
 
 	// Map of package ID to whether the user requested it or it was from
