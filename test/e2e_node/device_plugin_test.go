@@ -97,7 +97,8 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 		var devicePluginPod, dptemplate *v1.Pod
 
 		ginkgo.BeforeEach(func() {
-			e2eskipper.Skipf("Device Plugin tests are currently broken and being investigated")
+
+			e2eskipper.Skipf("Device Plugin tests are currently broken and being investigated - and maybe a lane is broken as well?")
 
 			ginkgo.By("Wait for node to be ready")
 			gomega.Eventually(func() bool {
