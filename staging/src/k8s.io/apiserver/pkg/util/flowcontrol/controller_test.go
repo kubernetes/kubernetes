@@ -105,7 +105,7 @@ type ctlrTestRequest struct {
 	descr1, descr2 interface{}
 }
 
-func (cts *ctlrTestState) BeginConstruction(qc fq.QueuingConfig, rip metrics.RatioedChangeObserverPair, eso metrics.RatioedChangeObserver) (fq.QueueSetCompleter, error) {
+func (cts *ctlrTestState) BeginConstruction(qc fq.QueuingConfig, rip metrics.RatioedGaugePair, eso metrics.RatioedGauge) (fq.QueueSetCompleter, error) {
 	return ctlrTestQueueSetCompleter{cts, nil, qc}, nil
 }
 
@@ -261,8 +261,8 @@ func TestConfigConsumer(t *testing.T) {
 				FlowcontrolClient:      flowcontrolClient,
 				ServerConcurrencyLimit: 100,         // server concurrency limit
 				RequestWaitLimit:       time.Minute, // request wait limit
-				ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
-				ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
+				ReqsGaugePairVec:       metrics.PriorityLevelConcurrencyPairVec,
+				ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 				QueueSetFactory:        cts,
 			})
 			cts.cfgCtlr = ctlr
@@ -393,8 +393,8 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 		FlowcontrolClient:      flowcontrolClient,
 		ServerConcurrencyLimit: 100,
 		RequestWaitLimit:       time.Minute,
-		ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
+		ReqsGaugePairVec:       metrics.PriorityLevelConcurrencyPairVec,
+		ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 		QueueSetFactory:        cts,
 	})
 

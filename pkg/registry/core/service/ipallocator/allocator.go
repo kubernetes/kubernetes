@@ -40,6 +40,7 @@ type Interface interface {
 	IPFamily() api.IPFamily
 	Has(ip net.IP) bool
 	Destroy()
+	EnableMetrics()
 
 	// DryRun offers a way to try operations without persisting them.
 	DryRun() Interface
@@ -86,12 +87,12 @@ type Range struct {
 	family api.IPFamily
 
 	alloc allocator.Interface
+	// metrics is a metrics recorder that can be disabled
+	metrics metricsRecorderInterface
 }
 
 // New creates a Range over a net.IPNet, calling allocatorFactory to construct the backing store.
 func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorWithOffsetFactory) (*Range, error) {
-	registerMetrics()
-
 	max := netutils.RangeSize(cidr)
 	base := netutils.BigForIP(cidr.IP)
 	rangeSpec := cidr.String()
@@ -116,10 +117,11 @@ func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorWithOffsetFactory)
 	max--
 
 	r := Range{
-		net:    cidr,
-		base:   base,
-		max:    maximum(0, int(max)),
-		family: family,
+		net:     cidr,
+		base:    base,
+		max:     maximum(0, int(max)),
+		family:  family,
+		metrics: &emptyMetricsRecorder{}, // disabled by default
 	}
 
 	offset := 0
@@ -201,8 +203,10 @@ func (r *Range) allocate(ip net.IP, dryRun bool) error {
 	label := r.CIDR()
 	ok, offset := r.contains(ip)
 	if !ok {
-		// update metrics
-		clusterIPAllocationErrors.WithLabelValues(label.String(), "static").Inc()
+		if !dryRun {
+			// update metrics
+			r.metrics.incrementAllocationErrors(label.String(), "static")
+		}
 		return &ErrNotInRange{ip, r.net.String()}
 	}
 	if dryRun {
@@ -214,20 +218,20 @@ func (r *Range) allocate(ip net.IP, dryRun bool) error {
 	allocated, err := r.alloc.Allocate(offset)
 	if err != nil {
 		// update metrics
-		clusterIPAllocationErrors.WithLabelValues(label.String(), "static").Inc()
+		r.metrics.incrementAllocationErrors(label.String(), "static")
 
 		return err
 	}
 	if !allocated {
 		// update metrics
-		clusterIPAllocationErrors.WithLabelValues(label.String(), "static").Inc()
+		r.metrics.incrementAllocationErrors(label.String(), "static")
 
 		return ErrAllocated
 	}
 	// update metrics
-	clusterIPAllocations.WithLabelValues(label.String(), "static").Inc()
-	clusterIPAllocated.WithLabelValues(label.String()).Set(float64(r.Used()))
-	clusterIPAvailable.WithLabelValues(label.String()).Set(float64(r.Free()))
+	r.metrics.incrementAllocations(label.String(), "static")
+	r.metrics.setAllocated(label.String(), r.Used())
+	r.metrics.setAvailable(label.String(), r.Free())
 
 	return nil
 }
@@ -249,20 +253,20 @@ func (r *Range) allocateNext(dryRun bool) (net.IP, error) {
 	offset, ok, err := r.alloc.AllocateNext()
 	if err != nil {
 		// update metrics
-		clusterIPAllocationErrors.WithLabelValues(label.String(), "dynamic").Inc()
+		r.metrics.incrementAllocationErrors(label.String(), "dynamic")
 
 		return nil, err
 	}
 	if !ok {
 		// update metrics
-		clusterIPAllocationErrors.WithLabelValues(label.String(), "dynamic").Inc()
+		r.metrics.incrementAllocationErrors(label.String(), "dynamic")
 
 		return nil, ErrFull
 	}
 	// update metrics
-	clusterIPAllocations.WithLabelValues(label.String(), "dynamic").Inc()
-	clusterIPAllocated.WithLabelValues(label.String()).Set(float64(r.Used()))
-	clusterIPAvailable.WithLabelValues(label.String()).Set(float64(r.Free()))
+	r.metrics.incrementAllocations(label.String(), "dynamic")
+	r.metrics.setAllocated(label.String(), r.Used())
+	r.metrics.setAvailable(label.String(), r.Free())
 
 	return netutils.AddIPOffset(r.base, offset), nil
 }
@@ -287,8 +291,8 @@ func (r *Range) release(ip net.IP, dryRun bool) error {
 	if err == nil {
 		// update metrics
 		label := r.CIDR()
-		clusterIPAllocated.WithLabelValues(label.String()).Set(float64(r.Used()))
-		clusterIPAvailable.WithLabelValues(label.String()).Set(float64(r.Free()))
+		r.metrics.setAllocated(label.String(), r.Used())
+		r.metrics.setAvailable(label.String(), r.Free())
 	}
 	return err
 }
@@ -364,6 +368,12 @@ func (r *Range) Destroy() {
 	r.alloc.Destroy()
 }
 
+// EnableMetrics enables metrics recording.
+func (r *Range) EnableMetrics() {
+	registerMetrics()
+	r.metrics = &metricsRecorder{}
+}
+
 // calculateIPOffset calculates the integer offset of ip from base such that
 // base + offset = ip. It requires ip >= base.
 func calculateIPOffset(base *big.Int, ip net.IP) int {
@@ -435,4 +445,7 @@ func (dry dryRunRange) Has(ip net.IP) bool {
 }
 
 func (dry dryRunRange) Destroy() {
+}
+
+func (dry dryRunRange) EnableMetrics() {
 }

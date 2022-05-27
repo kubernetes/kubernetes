@@ -28,7 +28,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	clientgokubescheme "k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
@@ -430,12 +429,14 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, err
 	}
 
-	eventRecorder := createRecorder(client, KubeControllerManagerUserAgent)
+	eventBroadcaster := record.NewBroadcaster()
+	eventRecorder := eventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: KubeControllerManagerUserAgent})
 
 	c := &kubecontrollerconfig.Config{
-		Client:        client,
-		Kubeconfig:    kubeconfig,
-		EventRecorder: eventRecorder,
+		Client:           client,
+		Kubeconfig:       kubeconfig,
+		EventBroadcaster: eventBroadcaster,
+		EventRecorder:    eventRecorder,
 	}
 	if err := s.ApplyTo(c); err != nil {
 		return nil, err
@@ -443,11 +444,4 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 	s.Metrics.Apply()
 
 	return c, nil
-}
-
-func createRecorder(kubeClient clientset.Interface, userAgent string) record.EventRecorder {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	return eventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: userAgent})
 }

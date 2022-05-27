@@ -53,10 +53,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 		t.Fatalf("parse duration failed: %v", err)
 	}
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
-	baseClient, baseConfig := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
+	baseClient, baseConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceAccountSigningKeyFile = tmpfile.Name()
 			opts.ServiceAccountTokenMaxExpiration = maxExpirationDuration
@@ -75,6 +72,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 			config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 		},
 	})
+	defer tearDownFn()
 
 	// We want to test if the token rotation works fine here.
 	// To minimize the time this test would consume, we use the minimial token expiration.

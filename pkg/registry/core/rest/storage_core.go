@@ -213,6 +213,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster IP allocator: %v", err)
 	}
+	serviceClusterIPAllocator.EnableMetrics()
 	restStorage.ServiceClusterIPAllocator = serviceClusterIPRegistry
 
 	// allocator for secondary service ip range
@@ -233,6 +234,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 		if err != nil {
 			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
 		}
+		secondaryServiceClusterIPAllocator.EnableMetrics()
 		restStorage.SecondaryServiceClusterIPAllocator = secondaryServiceClusterIPRegistry
 	}
 

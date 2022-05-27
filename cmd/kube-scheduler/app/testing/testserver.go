@@ -32,6 +32,8 @@ import (
 	"k8s.io/kubernetes/cmd/kube-scheduler/app"
 	kubeschedulerconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
+
+	"k8s.io/klog/v2"
 )
 
 // TearDownFunc is to be called to tear down a test server.
@@ -61,8 +63,19 @@ type Logger interface {
 // 		 enough time to remove temporary files.
 func StartTestServer(t Logger, customFlags []string) (result TestServer, err error) {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	var errCh chan error
 	tearDown := func() {
 		cancel()
+
+		// If the scheduler was started, let's wait for it to
+		// shutdown clearly.
+		if errCh != nil {
+			err, ok := <-errCh
+			if ok && err != nil {
+				klog.ErrorS(err, "Failed to shutdown test server clearly")
+			}
+		}
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
 		}
@@ -103,8 +116,9 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}
 
-	errCh := make(chan error)
+	errCh = make(chan error)
 	go func(ctx context.Context) {
+		defer close(errCh)
 		if err := app.Run(ctx, cc, sched); err != nil {
 			errCh <- err
 		}

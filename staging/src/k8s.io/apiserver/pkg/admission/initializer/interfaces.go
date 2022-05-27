@@ -49,6 +49,14 @@ type WantsQuotaConfiguration interface {
 	admission.InitializationValidator
 }
 
+// WantsDrainedNotification defines a function which sets the notification of where the apiserver
+// has already been drained for admission plugins that need it.
+// After receiving that notification, Admit/Validate calls won't be called anymore.
+type WantsDrainedNotification interface {
+	SetDrainedNotification(<-chan struct{})
+	admission.InitializationValidator
+}
+
 // WantsFeatureGate defines a function which passes the featureGates for inspection by an admission plugin.
 // Admission plugins should not hold a reference to the featureGates.  Instead, they should query a particular one
 // and assign it to a simple bool in the admission plugin struct.
