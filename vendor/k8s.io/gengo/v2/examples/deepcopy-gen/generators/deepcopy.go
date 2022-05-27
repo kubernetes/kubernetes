@@ -190,25 +190,12 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		if pkgNeedsGeneration {
 			klog.V(3).Infof("Package %q needs generation", i)
-			path := pkg.Path
-			// if the source path is within a /vendor/ directory (for example,
-			// k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/apis/meta/v1), allow
-			// generation to output to the proper relative path (under vendor).
-			// Otherwise, the generator will create the file in the wrong location
-			// in the output directory.
-			// TODO: build a more fundamental concept in gengo for dealing with modifications
-			// to vendored packages.
-			if strings.HasPrefix(pkg.SourcePath, arguments.OutputBase) {
-				expandedPath := strings.TrimPrefix(pkg.SourcePath, arguments.OutputBase)
-				if strings.Contains(expandedPath, "/vendor/") {
-					path = expandedPath
-				}
-			}
 			packages = append(packages,
 				&generator.DefaultPackage{
 					PackageName: strings.Split(filepath.Base(pkg.Path), ".")[0],
-					PackagePath: path,
+					PackagePath: pkg.Path,
 					HeaderText:  header,
+					Source:      pkg.SourcePath,
 					GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 						return []generator.Generator{
 							NewGenDeepCopy(arguments.OutputFileBaseName, pkg.Path, boundingDirs, (ptagValue == tagValuePackage), ptagRegister),
@@ -268,10 +255,10 @@ func (g *genDeepCopy) Filter(c *generator.Context, t *types.Type) bool {
 		return false
 	}
 	if !copyableType(t) {
-		klog.V(2).Infof("Type %v is not copyable", t)
+		klog.V(3).Infof("Type %v is not copyable", t)
 		return false
 	}
-	klog.V(4).Infof("Type %v is copyable", t)
+	klog.V(2).Infof("Type %v is copyable", t)
 	g.typesForInit = append(g.typesForInit, t)
 	return true
 }
@@ -530,6 +517,7 @@ func (g *genDeepCopy) deepCopyableInterfacesInner(c *generator.Context, t *types
 	var ts []*types.Type
 	for _, intf := range intfs {
 		t := types.ParseFullyQualifiedName(intf)
+		klog.V(5).Infof("Loading package for interface %v", intf)
 		err := c.AddDir(t.Package)
 		if err != nil {
 			return nil, err
@@ -586,7 +574,7 @@ func (g *genDeepCopy) GenerateType(c *generator.Context, t *types.Type, w io.Wri
 	if !g.needsGeneration(t) {
 		return nil
 	}
-	klog.V(5).Infof("Generating deepcopy function for type %v", t)
+	klog.V(5).Infof("Generating deepcopy functions for type %v", t)
 
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	args := argsFromType(t)
