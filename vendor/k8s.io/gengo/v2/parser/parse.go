@@ -53,10 +53,10 @@ type Builder struct {
 	fset *token.FileSet
 
 	// If true, include *_test.go
-	IncludeTestFiles bool
+	includeTestFiles bool
 
 	// Tags to use when parsing code.
-	BuildTags []string
+	buildTags []string
 
 	// All comments from everywhere in every parsed file.
 	commentLineLock       sync.Mutex
@@ -70,18 +70,15 @@ type fileLine struct {
 }
 
 // New constructs a new builder.
-func New() *Builder {
+func New(includeTestFiles bool, buildTags ...string) *Builder {
 	return &Builder{
 		pkgMap:                map[importPathString]*packages.Package{},
 		userRequested:         map[importPathString]bool{},
 		fset:                  token.NewFileSet(),
 		endLineToCommentGroup: map[fileLine]*ast.CommentGroup{},
+		includeTestFiles:      includeTestFiles,
+		buildTags:             buildTags,
 	}
-}
-
-// AddBuildTags adds the specified builder.
-func (b *Builder) AddBuildTags(tags ...string) {
-	b.BuildTags = append(b.BuildTags, tags...)
 }
 
 //FIXME: comment
@@ -111,8 +108,8 @@ func (b *Builder) loadDirs(dirs []string) ([]*packages.Package, error) {
 	//FIXME: does -i take directories, pkgs, or both?  e.g. sahould I add leading ./ ?
 	cfg := packages.Config{
 		Mode:       packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedDeps | packages.NeedModule | packages.NeedTypes | packages.NeedTypesSizes | packages.NeedTypesInfo | packages.NeedSyntax,
-		Tests:      b.IncludeTestFiles, // FIXME: is this set yet?
-		BuildFlags: []string{"-tags", strings.Join(b.BuildTags, ",")},
+		Tests:      b.includeTestFiles,
+		BuildFlags: []string{"-tags", strings.Join(b.buildTags, ",")},
 		Fset:       b.fset,
 		ParseFile: func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
 			const mode = parser.DeclarationErrors | parser.ParseComments
