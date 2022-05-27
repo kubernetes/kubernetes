@@ -240,7 +240,6 @@ func (ctxt *Context) TransitiveIncomingImports() map[string][]string {
 	return ctxt.incomingTransitiveImports
 }
 
-//FIXME: dup of AddDirectory?
 // AddDir adds a Go package to the context. The specified path must be a single
 // go package import path.  GOPATH, GOROOT, and the location of your go binary
 // (`which go`) will all be searched, in the normal Go fashion.
@@ -255,19 +254,4 @@ func (ctxt *Context) AddDirs(paths []string) error {
 	ctxt.incomingImports = nil
 	ctxt.incomingTransitiveImports = nil
 	return ctxt.builder.AddDirsTo(paths, &ctxt.Universe)
-}
-
-// AddDirectory adds a Go package to the context. The specified path must be a
-// single go package import path.  GOPATH, GOROOT, and the location of your go
-// binary (`which go`) will all be searched, in the normal Go fashion.
-func (ctxt *Context) AddDirectory(path string) (*types.Package, error) {
-	ctxt.incomingImports = nil
-	ctxt.incomingTransitiveImports = nil
-	//FIXME: what are the above?
-	pkg, err := ctxt.builder.AddDirectoriesTo([]string{path}, &ctxt.Universe)
-	if err != nil {
-		return nil, err
-	}
-	//FIXME: should be plural, which one to return?
-	return pkg, nil
 }
