@@ -22,25 +22,23 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestAdmission(t *testing.T) {
-	controlPlaneConfig := framework.NewControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.EnableProfiling = true
-	controlPlaneConfig.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	client, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerConfig: func(cfg *controlplane.Config) {
+			cfg.GenericConfig.EnableProfiling = true
+			cfg.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
+		},
+	})
+	defer tearDownFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-
-	ns := framework.CreateTestingNamespace("default-toleration-seconds", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(client, "default-toleration-seconds", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	pod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
