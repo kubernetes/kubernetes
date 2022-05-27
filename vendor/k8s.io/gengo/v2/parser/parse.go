@@ -54,13 +54,14 @@ type Builder struct {
 	// Tracks accumulated parsed files, so we don't have to re-parse.
 	fset *token.FileSet
 
-	// All comments from everywhere in every parsed file.
-	endLineToCommentGroup map[fileLine]*ast.CommentGroup
-
 	// If true, include *_test.go
 	IncludeTestFiles bool
 
 	context *build.Context //FIXME: is this really needed?
+
+	// All comments from everywhere in every parsed file.
+	commentLineLock       sync.Mutex
+	endLineToCommentGroup map[fileLine]*ast.CommentGroup
 }
 
 // key type for finding comments.
@@ -103,9 +104,6 @@ func (b *Builder) AddDirs(dirs []string) error {
 	return err
 }
 
-// HACK!!  at least put into Builder
-var lock sync.Mutex
-
 func (b *Builder) loadDirs(dirs []string) ([]*packages.Package, error) {
 	netNewDirs := make([]string, 0, len(dirs))
 	existingPkgs := make([]*packages.Package, 0, len(dirs))
@@ -139,10 +137,10 @@ func (b *Builder) loadDirs(dirs []string) ([]*packages.Package, error) {
 			//FIXME: is this the best way?
 			for _, c := range p.Comments {
 				position := b.fset.Position(c.End())
-				lock.Lock()
+				b.commentLineLock.Lock()
 				//FIXME: only do this if it is user-requested
 				b.endLineToCommentGroup[fileLine{position.Filename, position.Line}] = c
-				lock.Unlock()
+				b.commentLineLock.Unlock()
 			}
 			return p, nil
 		},
@@ -355,6 +353,8 @@ func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error
 func (b *Builder) priorCommentLines(pos token.Pos, lines int) *ast.CommentGroup {
 	position := b.fset.Position(pos)
 	key := fileLine{position.Filename, position.Line - lines}
+	b.commentLineLock.Lock()
+	defer b.commentLineLock.Unlock()
 	return b.endLineToCommentGroup[key]
 }
 
