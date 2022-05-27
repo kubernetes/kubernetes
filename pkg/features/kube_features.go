@@ -164,7 +164,7 @@ const (
 
 	// owner: @humblec, @zhucan
 	// kep: http://kep.k8s.io/3171
-	// alpha: v1.24
+	// alpha: v1.25
 	//
 	// Enables SecretRef field in CSI NodeExpandVolume request.
 	CSINodeExpandSecret featuregate.Feature = "CSINodeExpandSecret"
