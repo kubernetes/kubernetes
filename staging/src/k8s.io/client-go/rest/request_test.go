@@ -3771,3 +3771,219 @@ func TestTransportConcurrency(t *testing.T) {
 		})
 	}
 }
+
+func TestRetryableConditions(t *testing.T) {
+	var (
+		methods = map[string]func(ctx context.Context, r *Request){
+			"Do": func(ctx context.Context, r *Request) {
+				r.Do(ctx)
+			},
+			"DoRaw": func(ctx context.Context, r *Request) {
+				r.DoRaw(ctx)
+			},
+			"Stream": func(ctx context.Context, r *Request) {
+				r.Stream(ctx)
+			},
+			"Watch": func(ctx context.Context, r *Request) {
+				w, err := r.Watch(ctx)
+				if err == nil {
+					// we need to wait here to avoid race condition.
+					<-w.ResultChan()
+				}
+			},
+		}
+
+		alwaysRetry = map[string]bool{
+			"Do":     true,
+			"DoRaw":  true,
+			"Watch":  true,
+			"Stream": true,
+		}
+
+		neverRetry = map[string]bool{
+			"Do":     false,
+			"DoRaw":  false,
+			"Watch":  false,
+			"Stream": false,
+		}
+
+		alwaysRetryExceptStream = map[string]bool{
+			"Do":     true,
+			"DoRaw":  true,
+			"Watch":  true,
+			"Stream": false,
+		}
+	)
+
+	tests := []struct {
+		name             string
+		verbs            []string
+		serverReturns    responseErr
+		retryExpectation map[string]bool
+	}{
+		// {429, Retry-After: N} - we expect retry
+		{
+			name:             "server returns {429, Retry-After}",
+			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+			serverReturns:    responseErr{response: retryAfterResponseWithCodeAndDelay(http.StatusTooManyRequests, "0"), err: nil},
+			retryExpectation: alwaysRetry,
+		},
+		// {5xx, Retry-After: N} - we expect retry
+		{
+			name:             "server returns {503, Retry-After}",
+			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+			serverReturns:    responseErr{response: retryAfterResponseWithCodeAndDelay(http.StatusServiceUnavailable, "0"), err: nil},
+			retryExpectation: alwaysRetry,
+		},
+		// 5xx, but Retry-After: N is missing - no retry is expected
+		{
+			name:             "server returns 5xx, but no Retry-After",
+			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+			serverReturns:    responseErr{response: &http.Response{StatusCode: http.StatusInternalServerError}, err: nil},
+			retryExpectation: neverRetry,
+		},
+		// 429, but Retry-After: N is missing - no retry is expected
+		{
+			name:             "server returns 429 but no Retry-After",
+			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+			serverReturns:    responseErr{response: &http.Response{StatusCode: http.StatusTooManyRequests}, err: nil},
+			retryExpectation: neverRetry,
+		},
+		// response is nil, but error is set
+		{
+			name:             "server returns connection reset error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: syscall.ECONNRESET},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		{
+			name:             "server returns EOF error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: io.EOF},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		{
+			name:             "server returns unexpected EOF error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: io.ErrUnexpectedEOF},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		{
+			name:             "server returns broken connection error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: errors.New("http: can't write HTTP request on broken connection")},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		{
+			name:             "server returns GOAWAY error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: errors.New("http2: server sent GOAWAY and closed the connection")},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		{
+			name:             "server returns connection reset by peer error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: errors.New("connection reset by peer")},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		{
+			name:             "server returns use of closed network connection error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: errors.New("use of closed network connection")},
+			retryExpectation: alwaysRetryExceptStream,
+		},
+		// connection refused error never gets retried
+		{
+			name:             "server returns connection refused error",
+			verbs:            []string{"GET"},
+			serverReturns:    responseErr{response: nil, err: syscall.ECONNREFUSED},
+			retryExpectation: neverRetry,
+		},
+		{
+			name:             "server returns connection refused error",
+			verbs:            []string{"POST"},
+			serverReturns:    responseErr{response: nil, err: syscall.ECONNREFUSED},
+			retryExpectation: neverRetry,
+		},
+		{
+			name:          "server returns EOF error",
+			verbs:         []string{"POST"},
+			serverReturns: responseErr{response: nil, err: io.EOF},
+			retryExpectation: map[string]bool{
+				"Do":     false,
+				"DoRaw":  false,
+				"Watch":  true, // not applicable, Watch should always be GET only
+				"Stream": false,
+			},
+		},
+		// Timeout error gets retries by watch only
+		{
+			name:          "server returns net.Timeout() == true error",
+			verbs:         []string{"GET"},
+			serverReturns: responseErr{response: nil, err: &net.DNSError{IsTimeout: true}},
+			retryExpectation: map[string]bool{
+				"Do":     false,
+				"DoRaw":  false,
+				"Watch":  true,
+				"Stream": false,
+			},
+		},
+		{
+			name:             "server returns OK, never retry",
+			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+			serverReturns:    responseErr{response: &http.Response{StatusCode: http.StatusOK}, err: nil},
+			retryExpectation: neverRetry,
+		},
+		{
+			name:             "server returns {3xx, Retry-After}",
+			verbs:            []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+			serverReturns:    responseErr{response: &http.Response{StatusCode: http.StatusMovedPermanently, Header: http.Header{"Retry-After": []string{"0"}}}, err: nil},
+			retryExpectation: neverRetry,
+		},
+	}
+
+	for _, test := range tests {
+		for method, retryExpected := range test.retryExpectation {
+			fn, ok := methods[method]
+			if !ok {
+				t.Fatalf("Wrong test setup, unknown method: %s", method)
+			}
+
+			for _, verb := range test.verbs {
+				t.Run(fmt.Sprintf("%s/%s/%s", test.name, method, verb), func(t *testing.T) {
+					var attemptsGot int
+					client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+						attemptsGot++
+						return test.serverReturns.response, test.serverReturns.err
+					})
+
+					u, _ := url.Parse("http://localhost:123" + "/apis")
+					req := &Request{
+						verb: verb,
+						c: &RESTClient{
+							base:    u,
+							content: defaultContentConfig(),
+							Client:  client,
+						},
+						backoff:    &noSleepBackOff{},
+						maxRetries: 2,
+						retryFn:    defaultRequestRetryFn,
+					}
+
+					fn(context.Background(), req)
+
+					if retryExpected {
+						if attemptsGot != 3 {
+							t.Errorf("Expected attempt count: %d, but got: %d", 3, attemptsGot)
+						}
+						return
+					}
+					// we don't expect retry, so we should see the first attempt only.
+					if attemptsGot > 1 {
+						t.Errorf("Expected no retry, but got %d attempts", attemptsGot)
+					}
+				})
+			}
+		}
+	}
+}
