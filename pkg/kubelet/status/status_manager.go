@@ -867,6 +867,20 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 		}
 	}
 
+	// If the new phase is terminal, explicitly set the ready condition to false for v1.PodReady and v1.ContainersReady.
+	// It may take some time for kubelet to reconcile the ready condition, so explicitly set ready conditions to false if the phase is terminal.
+	// This is done to ensure kubelet does not report a status update with terminal pod phase and ready=true.
+	// See https://issues.k8s.io/108594 for more details.
+	if podutil.IsPodPhaseTerminal(newPodStatus.Phase) {
+		if podutil.IsPodReadyConditionTrue(newPodStatus) || podutil.IsContainersReadyConditionTrue(newPodStatus) {
+			containersReadyCondition := generateContainersReadyConditionForTerminalPhase(newPodStatus.Phase)
+			podutil.UpdatePodCondition(&newPodStatus, &containersReadyCondition)
+
+			podReadyCondition := generatePodReadyConditionForTerminalPhase(newPodStatus.Phase)
+			podutil.UpdatePodCondition(&newPodStatus, &podReadyCondition)
+		}
+	}
+
 	return newPodStatus
 }
 
