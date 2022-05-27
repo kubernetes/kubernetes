@@ -154,7 +154,7 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 
 	for _, pod := range pods {
 		includeTerminating := service.Spec.PublishNotReadyAddresses || utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
-		if !endpointutil.ShouldPodBeInEndpointSlice(pod, includeTerminating) {
+		if !endpointutil.ShouldPodBeInEndpoints(pod, includeTerminating) {
 			continue
 		}
 
