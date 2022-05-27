@@ -19,7 +19,6 @@ package ttlcontroller
 import (
 	"context"
 	"fmt"
-	"net/http/httptest"
 	"strconv"
 	"sync"
 	"testing"
@@ -33,17 +32,16 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	listers "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func createClientAndInformers(t *testing.T, server *httptest.Server) (*clientset.Clientset, informers.SharedInformerFactory) {
-	config := restclient.Config{
-		Host:  server.URL,
-		QPS:   500,
-		Burst: 500,
-	}
-	testClient := clientset.NewForConfigOrDie(&config)
+func createClientAndInformers(t *testing.T, server *kubeapiservertesting.TestServer) (*clientset.Clientset, informers.SharedInformerFactory) {
+	config := restclient.CopyConfig(server.ClientConfig)
+	config.QPS = 500
+	config.Burst = 500
+	testClient := clientset.NewForConfigOrDie(config)
 
 	informers := informers.NewSharedInformerFactory(testClient, time.Second)
 	return testClient, informers
@@ -134,8 +132,8 @@ func waitForNodesWithTTLAnnotation(t *testing.T, nodeLister listers.NodeLister, 
 
 // Test whether ttlcontroller sets correct ttl annotations.
 func TestTTLAnnotations(t *testing.T) {
-	_, server, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
 	testClient, informers := createClientAndInformers(t, server)
 	nodeInformer := informers.Core().V1().Nodes()

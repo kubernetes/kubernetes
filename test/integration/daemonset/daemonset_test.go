@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon"
@@ -50,30 +51,30 @@ import (
 
 var zero = int64(0)
 
-func setup(t *testing.T) (framework.CloseFunc, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+func setup(t *testing.T) (kubeapiservertesting.TearDownFunc, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
 
-	config := restclient.Config{Host: server.URL}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error in creating clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-informers")), resyncPeriod)
+	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "daemonset-informers")), resyncPeriod)
 	dc, err := daemon.NewDaemonSetsController(
 		informers.Apps().V1().DaemonSets(),
 		informers.Apps().V1().ControllerRevisions(),
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "daemonset-controller")),
 		flowcontrol.NewBackOff(5*time.Second, 15*time.Minute),
 	)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
 
-	return closeFn, dc, informers, clientSet
+	return server.TearDownFn, dc, informers, clientSet
 }
 
 func setupScheduler(
@@ -255,7 +256,7 @@ func validateDaemonSetPodsAndMarkReady(
 	numberPods int,
 	t *testing.T,
 ) {
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) != numberPods {
 			return false, nil
@@ -384,7 +385,7 @@ func validateDaemonSetStatus(
 	dsName string,
 	expectedNumberReady int32,
 	t *testing.T) {
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
 		ds, err := dsClient.Get(context.TODO(), dsName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -422,8 +423,8 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
-		ns := framework.CreateTestingNamespace("one-node-daemonset-test", t)
-		defer framework.DeleteTestingNamespace(ns, t)
+		ns := framework.CreateNamespaceOrDie(clientset, "one-node-daemonset-test", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		podClient := clientset.CoreV1().Pods(ns.Name)
@@ -461,8 +462,8 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
-		ns := framework.CreateTestingNamespace("simple-daemonset-test", t)
-		defer framework.DeleteTestingNamespace(ns, t)
+		ns := framework.CreateNamespaceOrDie(clientset, "simple-daemonset-test", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		podClient := clientset.CoreV1().Pods(ns.Name)
@@ -497,8 +498,8 @@ func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
-		ns := framework.CreateTestingNamespace("simple-daemonset-test", t)
-		defer framework.DeleteTestingNamespace(ns, t)
+		ns := framework.CreateNamespaceOrDie(clientset, "simple-daemonset-test", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		podClient := clientset.CoreV1().Pods(ns.Name)
@@ -566,8 +567,8 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
-		ns := framework.CreateTestingNamespace("simple-daemonset-test", t)
-		defer framework.DeleteTestingNamespace(ns, t)
+		ns := framework.CreateNamespaceOrDie(clientset, "simple-daemonset-test", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		podClient := clientset.CoreV1().Pods(ns.Name)
@@ -613,8 +614,8 @@ func TestInsufficientCapacityNode(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
-		ns := framework.CreateTestingNamespace("insufficient-capacity", t)
-		defer framework.DeleteTestingNamespace(ns, t)
+		ns := framework.CreateNamespaceOrDie(clientset, "insufficient-capacity", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		podClient := clientset.CoreV1().Pods(ns.Name)
@@ -677,8 +678,8 @@ func TestInsufficientCapacityNode(t *testing.T) {
 func TestLaunchWithHashCollision(t *testing.T) {
 	closeFn, dc, informers, clientset := setup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("one-node-daemonset-test", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(clientset, "one-node-daemonset-test", t)
+	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 	dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 	podInformer := informers.Core().V1().Pods().Informer()
@@ -788,8 +789,8 @@ func TestLaunchWithHashCollision(t *testing.T) {
 func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 	closeFn, dc, informers, clientset := setup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("one-node-daemonset-test", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(clientset, "one-node-daemonset-test", t)
+	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 	dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 	podInformer := informers.Core().V1().Pods().Informer()
@@ -916,8 +917,8 @@ func TestTaintedNode(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
-		ns := framework.CreateTestingNamespace("tainted-node", t)
-		defer framework.DeleteTestingNamespace(ns, t)
+		ns := framework.CreateNamespaceOrDie(clientset, "tainted-node", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		podClient := clientset.CoreV1().Pods(ns.Name)
@@ -981,8 +982,8 @@ func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
-		ns := framework.CreateTestingNamespace("daemonset-unschedulable-test", t)
-		defer framework.DeleteTestingNamespace(ns, t)
+		ns := framework.CreateNamespaceOrDie(clientset, "daemonset-unschedulable-test", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		podClient := clientset.CoreV1().Pods(ns.Name)
