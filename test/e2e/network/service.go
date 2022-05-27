@@ -2080,6 +2080,35 @@ var _ = common.SIGDescribe("Services", func() {
 			e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 		})
 
+		if epErr := wait.PollImmediate(framework.Poll, e2eservice.ServiceEndpointsTimeout, func() (bool, error) {
+			endpoints, err := cs.CoreV1().Endpoints(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
+			if err != nil {
+				framework.Logf("error fetching '%s/%s' Endpoints: %s", namespace, serviceName, err.Error())
+				return false, err
+			}
+			if len(endpoints.Subsets) > 0 {
+				framework.Logf("expected '%s/%s' Endpoints to be empty, got: %v", namespace, serviceName, endpoints.Subsets)
+				return false, nil
+			}
+			epsList, err := cs.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serviceName)})
+			if err != nil {
+				framework.Logf("error fetching '%s/%s' EndpointSlices: %s", namespace, serviceName, err.Error())
+				return false, err
+			}
+			if len(epsList.Items) != 1 {
+				framework.Logf("expected exactly 1 EndpointSlice, got: %d", len(epsList.Items))
+				return false, nil
+			}
+			endpointSlice := epsList.Items[0]
+			if len(endpointSlice.Endpoints) > 0 {
+				framework.Logf("expected EndpointSlice to be empty, got %d endpoints", len(endpointSlice.Endpoints))
+				return false, nil
+			}
+			return true, nil
+		}); epErr != nil {
+			framework.ExpectNoError(epErr)
+		}
+
 		serviceAddress := net.JoinHostPort(serviceName, strconv.Itoa(port))
 		framework.Logf("waiting up to %v to connect to %v", e2eservice.KubeProxyEndpointLagTimeout, serviceAddress)
 		cmd := fmt.Sprintf("/agnhost connect --timeout=3s %s", serviceAddress)
