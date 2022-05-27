@@ -413,7 +413,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 	var totalNotReadyEps int
 
 	for _, pod := range pods {
-		if !endpointutil.ShouldPodBeInEndpointSlice(pod, service.Spec.PublishNotReadyAddresses) {
+		if !endpointutil.ShouldPodBeInEndpoints(pod, service.Spec.PublishNotReadyAddresses) {
 			klog.V(5).Infof("Pod %s/%s is not included on endpoints for Service %s/%s", pod.Namespace, pod.Name, service.Namespace, service.Name)
 			continue
 		}
@@ -587,7 +587,7 @@ func (e *Controller) checkLeftoverEndpoints() {
 // addEndpointSubset add the endpoints addresses and ports to the EndpointSubset.
 // The addresses are added to the corresponding field, ready or not ready, depending
 // on the pod status and the Service PublishNotReadyAddresses field value.
-// The pod passed to this function must have already been filtered through ShouldPodBeInEndpointSlice.
+// The pod passed to this function must have already been filtered through ShouldPodBeInEndpoints.
 func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.EndpointAddress,
 	epp *v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
 	var readyEps int
