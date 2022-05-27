@@ -268,3 +268,35 @@ func TestGetCapacity(t *testing.T) {
 		})
 	}
 }
+func TestNewSystemCgroups(t *testing.T) {
+	cases := []struct {
+		name   string
+		cmName string
+	}{
+		// Not sure what tests should fail here
+		{
+			name:   "Create cgroup container manager with name 'kube'",
+			cmName: "kube",
+		},
+		{
+			name:   "Create cgroup container manager with name '1234'",
+			cmName: "1234",
+		},
+		// I think this should fail but there is no check for system container name
+		{
+			name:   "Create cgroup container manager with name ''",
+			cmName: "",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			sc, err := newSystemCgroups(c.cmName)
+			if err != nil {
+				t.Errorf("Failed to create cgroup container manager 'kube': %s", err)
+			}
+			if c.cmName != sc.name {
+				t.Errorf("SystemContainer name mismatch. Expected %s, got %s.", c.cmName, sc.name)
+			}
+		})
+	}
+}
