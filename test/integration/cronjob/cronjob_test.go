@@ -19,7 +19,6 @@ package cronjob
 import (
 	"context"
 	"fmt"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -31,29 +30,30 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientbatchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	restclient "k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *cronjob.ControllerV2, *job.Controller, informers.SharedInformerFactory, clientset.Interface, restclient.Config) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+func setup(t *testing.T) (kubeapiservertesting.TearDownFunc, *cronjob.ControllerV2, *job.Controller, informers.SharedInformerFactory, clientset.Interface) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
-	config := restclient.Config{Host: server.URL}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "cronjob-informers")), resyncPeriod)
+	informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "cronjob-informers")), resyncPeriod)
 	cjc, err := cronjob.NewControllerV2(informerSet.Batch().V1().Jobs(), informerSet.Batch().V1().CronJobs(), clientSet)
 	if err != nil {
 		t.Fatalf("Error creating CronJob controller: %v", err)
 	}
 	jc := job.NewController(informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
 
-	return server, closeFn, cjc, jc, informerSet, clientSet, config
+	return server.TearDownFn, cjc, jc, informerSet, clientSet
 }
 
 func newCronJob(name, namespace, schedule string) *batchv1.CronJob {
@@ -144,14 +144,14 @@ func validateJobAndPod(t *testing.T, clientSet clientset.Interface, namespace st
 }
 
 func TestCronJobLaunchesPodAndCleansUp(t *testing.T) {
-	server, closeFn, cjc, jc, informerSet, clientSet, _ := setup(t)
+	closeFn, cjc, jc, informerSet, clientSet := setup(t)
 	defer closeFn()
 
 	cronJobName := "foo"
 	namespaceName := "simple-cronjob-test"
 
-	ns := framework.CreateTestingNamespace(namespaceName, server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateNamespaceOrDie(clientSet, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 	cjClient := clientSet.BatchV1().CronJobs(ns.Name)
 

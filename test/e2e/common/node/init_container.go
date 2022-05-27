@@ -235,7 +235,9 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 
 		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			framework.ExpectEqual(status.Ready, true)
+			if !status.Ready {
+				framework.Failf("init container %s should be in Ready status", status.Name)
+			}
 			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
 			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
 		}
@@ -312,7 +314,9 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 
 		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			framework.ExpectEqual(status.Ready, true)
+			if !status.Ready {
+				framework.Failf("init container %s should be in Ready status", status.Name)
+			}
 			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
 			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
 		}

@@ -366,10 +366,6 @@ CUSTOM_INGRESS_YAML="${CUSTOM_INGRESS_YAML:-}"
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,RuntimeClass
 
-if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
-  ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
-fi
-
 # MutatingAdmissionWebhook should be the last controller that modifies the
 # request object, otherwise users will be confused if the mutating webhooks'
 # modification is overwritten.

@@ -388,7 +388,11 @@ func (s *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 			klog.V(2).Infof("Deleting existing load balancer for service %s", key)
 			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
 			if err := s.balancer.EnsureLoadBalancerDeleted(ctx, s.clusterName, service); err != nil {
-				return op, fmt.Errorf("failed to delete load balancer: %v", err)
+				if err == cloudprovider.ImplementedElsewhere {
+					klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error on deletion", key, s.cloud.ProviderName())
+				} else {
+					return op, fmt.Errorf("failed to delete load balancer: %v", err)
+				}
 			}
 		}
 		// Always remove finalizer when load balancer is deleted, this ensures Services

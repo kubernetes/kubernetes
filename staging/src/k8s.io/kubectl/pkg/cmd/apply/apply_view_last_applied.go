@@ -81,7 +81,7 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(cmd, f, args))
-			cmdutil.CheckErr(options.Validate(cmd))
+			cmdutil.CheckErr(options.Validate())
 			cmdutil.CheckErr(options.RunApplyViewLastApplied(cmd))
 		},
 	}
@@ -141,7 +141,7 @@ func (o *ViewLastAppliedOptions) Complete(cmd *cobra.Command, f cmdutil.Factory,
 }
 
 // Validate checks ViewLastAppliedOptions for validity.
-func (o *ViewLastAppliedOptions) Validate(cmd *cobra.Command) error {
+func (o *ViewLastAppliedOptions) Validate() error {
 	return nil
 }
 

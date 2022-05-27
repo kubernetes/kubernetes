@@ -77,6 +77,9 @@ func (f *fakeLeases) GetUpdatedKeys() []string {
 	return res
 }
 
+func (f *fakeLeases) Destroy() {
+}
+
 func TestLeaseEndpointReconciler(t *testing.T) {
 	ns := corev1.NamespaceDefault
 	om := func(name string, skipMirrorLabel bool) metav1.ObjectMeta {

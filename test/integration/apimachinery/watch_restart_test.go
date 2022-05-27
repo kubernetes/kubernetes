@@ -77,8 +77,8 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 		Host: s.URL,
 	}
 
-	namespaceObject := framework.CreateTestingNamespace("retry-watch", s, t)
-	defer framework.DeleteTestingNamespace(namespaceObject, s, t)
+	namespaceObject := framework.CreateTestingNamespace("retry-watch", t)
+	defer framework.DeleteTestingNamespace(namespaceObject, t)
 
 	getListFunc := func(c *kubernetes.Clientset, secret *corev1.Secret) func(options metav1.ListOptions) *corev1.SecretList {
 		return func(options metav1.ListOptions) *corev1.SecretList {
@@ -198,7 +198,12 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 						return getWatchFunc(c, secret)(options)
 					},
 				}
-				_, _, w, done := watchtools.NewIndexerInformerWatcher(lw, &corev1.Secret{})
+				// there is an inherent race between a producer (generateEvents) and a consumer (the watcher) that needs to be solved here
+				// since the watcher is driven by an informer it is crucial to start producing only after the informer has synced
+				// otherwise we might not get all expected events since the informer LIST (or watchelist) and only then WATCHES
+				// all events received during the initial LIST (or watchlist) will be seen as a single event (to most recent version of an obj)
+				_, informer, w, done := watchtools.NewIndexerInformerWatcher(lw, &corev1.Secret{})
+				cache.WaitForCacheSync(context.TODO().Done(), informer.HasSynced)
 				return w, nil, func() { <-done }
 			},
 			normalizeOutputFunc: normalizeInformerOutputFunc(initialCount),

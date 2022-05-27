@@ -408,7 +408,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 		successfulList = true
 		c.ready.set(true)
 		klog.V(1).Infof("cacher (%v): initialized", c.objectType.String())
-		watchCacheInitializations.WithLabelValues(c.objectType.String()).Inc()
+		metrics.WatchCacheInitializations.WithLabelValues(c.objectType.String()).Inc()
 	})
 	defer func() {
 		if successfulList {
@@ -462,7 +462,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, err
 	}
 
-	c.ready.wait()
+	if err := c.ready.wait(); err != nil {
+		return nil, errors.NewServiceUnavailable(err.Error())
+	}
 
 	triggerValue, triggerSupported := "", false
 	if c.indexedTrigger != nil {
@@ -559,7 +561,9 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 
 	// Do not create a trace - it's not for free and there are tons
 	// of Get requests. We can add it if it will be really needed.
-	c.ready.wait()
+	if err := c.ready.wait(); err != nil {
+		return errors.NewServiceUnavailable(err.Error())
+	}
 
 	objVal, err := conversion.EnforcePtr(objPtr)
 	if err != nil {
@@ -644,7 +648,9 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	trace := utiltrace.New("cacher list", utiltrace.Field{Key: "type", Value: c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
-	c.ready.wait()
+	if err := c.ready.wait(); err != nil {
+		return errors.NewServiceUnavailable(err.Error())
+	}
 	trace.Step("Ready")
 
 	// List elements with at least 'listRV' from cache.
@@ -693,7 +699,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 
 // GuaranteedUpdate implements storage.Interface.
 func (c *Cacher) GuaranteedUpdate(
-	ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
+	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, _ runtime.Object) error {
 	// Ignore the suggestion and try to pass down the current version of the object
 	// read from cache.
@@ -703,10 +709,10 @@ func (c *Cacher) GuaranteedUpdate(
 		// DeepCopy the object since we modify resource version when serializing the
 		// current object.
 		currObj := elem.(*storeElement).Object.DeepCopyObject()
-		return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, currObj)
+		return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, currObj)
 	}
 	// If we couldn't get the object, fallback to no-suggestion.
-	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, nil)
+	return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)
 }
 
 // Count implements storage.Interface.
@@ -773,7 +779,7 @@ func (c *Cacher) dispatchEvents() {
 				c.dispatchEvent(&event)
 			}
 			lastProcessedResourceVersion = event.ResourceVersion
-			eventsCounter.WithLabelValues(c.objectType.String()).Inc()
+			metrics.EventsCounter.WithLabelValues(c.objectType.String()).Inc()
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
 			// Never send a bookmark event if we did not see an event here, this is fine
@@ -1011,6 +1017,7 @@ func (c *Cacher) Stop() {
 		return
 	}
 	c.stopped = true
+	c.ready.stop()
 	c.stopLock.Unlock()
 	close(c.stopCh)
 	c.stopWg.Wait()
@@ -1040,7 +1047,9 @@ func filterWithAttrsFunction(key string, p storage.SelectionPredicate) filterWit
 
 // LastSyncResourceVersion returns resource version to which the underlying cache is synced.
 func (c *Cacher) LastSyncResourceVersion() (uint64, error) {
-	c.ready.wait()
+	if err := c.ready.wait(); err != nil {
+		return 0, errors.NewServiceUnavailable(err.Error())
+	}
 
 	resourceVersion := c.reflector.LastSyncResourceVersion()
 	return c.versioner.ParseResourceVersion(resourceVersion)
@@ -1212,7 +1221,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
 		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v", c.objectType.String(), c.identifier, len(c.input), len(c.result))
-		terminatedWatchersCounter.WithLabelValues(c.objectType.String()).Inc()
+		metrics.TerminatedWatchersCounter.WithLabelValues(c.objectType.String()).Inc()
 		c.forget()
 	}
 
@@ -1392,7 +1401,7 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 
 	objType := c.objectType.String()
 	if initEventCount > 0 {
-		initCounter.WithLabelValues(objType).Add(float64(initEventCount))
+		metrics.InitCounter.WithLabelValues(objType).Add(float64(initEventCount))
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
@@ -1425,37 +1434,4 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 			return
 		}
 	}
-}
-
-type ready struct {
-	ok bool
-	c  *sync.Cond
-}
-
-func newReady() *ready {
-	return &ready{c: sync.NewCond(&sync.RWMutex{})}
-}
-
-func (r *ready) wait() {
-	r.c.L.Lock()
-	for !r.ok {
-		r.c.Wait()
-	}
-	r.c.L.Unlock()
-}
-
-// TODO: Make check() function more sophisticated, in particular
-// allow it to behave as "waitWithTimeout".
-func (r *ready) check() bool {
-	rwMutex := r.c.L.(*sync.RWMutex)
-	rwMutex.RLock()
-	defer rwMutex.RUnlock()
-	return r.ok
-}
-
-func (r *ready) set(ok bool) {
-	r.c.L.Lock()
-	defer r.c.L.Unlock()
-	r.ok = ok
-	r.c.Broadcast()
 }

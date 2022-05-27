@@ -243,6 +243,11 @@ func (in *CSIPersistentVolumeSource) DeepCopyInto(out *CSIPersistentVolumeSource
 		*out = new(SecretReference)
 		**out = **in
 	}
+	if in.NodeExpandSecretRef != nil {
+		in, out := &in.NodeExpandSecretRef, &out.NodeExpandSecretRef
+		*out = new(SecretReference)
+		**out = **in
+	}
 	return
 }
 
@@ -5632,6 +5637,16 @@ func (in *TopologySpreadConstraint) DeepCopyInto(out *TopologySpreadConstraint) 
 	if in.MinDomains != nil {
 		in, out := &in.MinDomains, &out.MinDomains
 		*out = new(int32)
+		**out = **in
+	}
+	if in.NodeAffinityPolicy != nil {
+		in, out := &in.NodeAffinityPolicy, &out.NodeAffinityPolicy
+		*out = new(NodeInclusionPolicy)
+		**out = **in
+	}
+	if in.NodeTaintsPolicy != nil {
+		in, out := &in.NodeTaintsPolicy, &out.NodeTaintsPolicy
+		*out = new(NodeInclusionPolicy)
 		**out = **in
 	}
 	return

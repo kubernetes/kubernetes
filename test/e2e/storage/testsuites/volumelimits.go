@@ -55,7 +55,7 @@ const (
 	testSlowMultiplier = 10
 
 	// How long to wait until CSINode gets attach limit from installed CSI driver.
-	csiNodeInfoTimeout = 1 * time.Minute
+	csiNodeInfoTimeout = 2 * time.Minute
 )
 
 var _ storageframework.TestSuite = &volumeLimitsTestSuite{}

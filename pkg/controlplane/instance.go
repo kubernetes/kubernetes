@@ -65,12 +65,12 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
+	eventsv1client "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -259,13 +259,12 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
 	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
-		klog.Fatalf("Error determining service IP ranges: %v", err)
+		klog.Fatalf("Error creating storage factory config: %v", err)
 	}
-	leaseStorage, _, err := storagefactory.Create(*config, nil)
+	masterLeases, err := reconcilers.NewLeases(config, "/masterleases/", ttl)
 	if err != nil {
-		klog.Fatalf("Error creating storage factory: %v", err)
+		klog.Fatalf("Error creating leases: %v", err)
 	}
-	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
 
 	return reconcilers.NewLeaseEndpointReconciler(endpointsAdapter, masterLeases)
 }
@@ -545,7 +544,8 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 
 	controllerName := "bootstrap-controller"
 	coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	bootstrapController, err := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient, coreClient.RESTClient())
+	eventsClient := eventsv1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	bootstrapController, err := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, eventsClient, coreClient.RESTClient())
 	if err != nil {
 		return fmt.Errorf("error creating bootstrap controller: %v", err)
 	}
@@ -678,15 +678,7 @@ var (
 	// see https://github.com/kubernetes/enhancements/tree/master/keps/sig-architecture/3136-beta-apis-off-by-default
 	// for more details.
 	legacyBetaEnabledByDefaultResources = []schema.GroupVersionResource{
-		autoscalingapiv2beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"), // remove in 1.25
 		autoscalingapiv2beta2.SchemeGroupVersion.WithResource("horizontalpodautoscalers"), // remove in 1.26
-		batchapiv1beta1.SchemeGroupVersion.WithResource("cronjobs"),                       // remove in 1.25
-		discoveryv1beta1.SchemeGroupVersion.WithResource("endpointslices"),                // remove in 1.25
-		eventsv1beta1.SchemeGroupVersion.WithResource("events"),                           // remove in 1.25
-		nodev1beta1.SchemeGroupVersion.WithResource("runtimeclasses"),                     // remove in 1.25
-		policyapiv1beta1.SchemeGroupVersion.WithResource("poddisruptionbudgets"),          // remove in 1.25
-		policyapiv1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies"),           // remove in 1.25
-		storageapiv1beta1.SchemeGroupVersion.WithResource("csinodes"),                     // remove in 1.25
 		storageapiv1beta1.SchemeGroupVersion.WithResource("csistoragecapacities"),         // remove in 1.27
 		flowcontrolv1beta1.SchemeGroupVersion.WithResource("flowschemas"),                 // remove in 1.26
 		flowcontrolv1beta1.SchemeGroupVersion.WithResource("prioritylevelconfigurations"), // remove in 1.26

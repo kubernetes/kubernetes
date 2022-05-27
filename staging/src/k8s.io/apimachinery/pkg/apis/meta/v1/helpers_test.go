@@ -205,7 +205,6 @@ func TestResetObjectMetaForStatus(t *testing.T) {
 	existingMeta.SetUID(types.UID(""))
 	existingMeta.SetName("")
 	existingMeta.SetNamespace("")
-	existingMeta.SetZZZ_DeprecatedClusterName("")
 	existingMeta.SetCreationTimestamp(Time{})
 	existingMeta.SetDeletionTimestamp(nil)
 	existingMeta.SetDeletionGracePeriodSeconds(nil)

@@ -19,14 +19,12 @@ package volume
 import (
 	"context"
 	"fmt"
-	"net/http/httptest"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgoinformers "k8s.io/client-go/informers"
@@ -34,6 +32,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	fakecloud "k8s.io/cloud-provider/fake"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
@@ -144,8 +143,10 @@ var defaultTimerConfig = attachdetach.TimerConfig{
 // event is somehow missed by AttachDetach controller - it still
 // gets cleaned up by Desired State of World populator.
 func TestPodDeletionWithDswp(t *testing.T) {
-	_, server, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
 	namespaceName := "test-pod-deletion"
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -156,10 +157,11 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		},
 	}
 
-	ns := framework.CreateTestingNamespace(namespaceName, server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	testClient, ctrl, _, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 
-	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
+
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
@@ -218,8 +220,9 @@ func initCSIObjects(stopCh <-chan struct{}, informers clientgoinformers.SharedIn
 }
 
 func TestPodUpdateWithWithADC(t *testing.T) {
-	_, server, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 	namespaceName := "test-pod-update"
 
 	node := &v1.Node{
@@ -231,10 +234,10 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 		},
 	}
 
-	ns := framework.CreateTestingNamespace(namespaceName, server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	testClient, ctrl, _, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 
-	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
@@ -287,8 +290,9 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 }
 
 func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
-	_, server, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 	namespaceName := "test-pod-update"
 
 	node := &v1.Node{
@@ -301,10 +305,10 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 		},
 	}
 
-	ns := framework.CreateTestingNamespace(namespaceName, server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	testClient, ctrl, _, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 
-	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
@@ -397,15 +401,12 @@ func waitForPodFuncInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld, ch
 	}
 }
 
-func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, syncPeriod time.Duration, timers attachdetach.TimerConfig) (*clientset.Clientset, attachdetach.AttachDetachController, *persistentvolume.PersistentVolumeController, clientgoinformers.SharedInformerFactory) {
-	config := restclient.Config{
-		Host:          server.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
-		QPS:           1000000,
-		Burst:         1000000,
-	}
+func createAdClients(t *testing.T, server *kubeapiservertesting.TestServer, syncPeriod time.Duration, timers attachdetach.TimerConfig) (*clientset.Clientset, attachdetach.AttachDetachController, *persistentvolume.PersistentVolumeController, clientgoinformers.SharedInformerFactory) {
+	config := restclient.CopyConfig(server.ClientConfig)
+	config.QPS = 1000000
+	config.Burst = 1000000
 	resyncPeriod := 12 * time.Hour
-	testClient := clientset.NewForConfigOrDie(&config)
+	testClient := clientset.NewForConfigOrDie(server.ClientConfig)
 
 	host := volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil)
 	plugin := &volumetest.FakeVolumePlugin{
@@ -471,8 +472,9 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 // event is somehow missed by AttachDetach controller - it still
 // gets added by Desired State of World populator.
 func TestPodAddedByDswp(t *testing.T) {
-	_, server, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 	namespaceName := "test-pod-deletion"
 
 	node := &v1.Node{
@@ -483,11 +485,10 @@ func TestPodAddedByDswp(t *testing.T) {
 			},
 		},
 	}
+	testClient, ctrl, _, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 
-	ns := framework.CreateTestingNamespace(namespaceName, server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
-
-	testClient, ctrl, _, informers := createAdClients(ns, t, server, defaultSyncPeriod, defaultTimerConfig)
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
@@ -546,20 +547,21 @@ func TestPodAddedByDswp(t *testing.T) {
 }
 
 func TestPVCBoundWithADC(t *testing.T) {
-	_, server, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 	namespaceName := "test-pod-deletion"
 
-	ns := framework.CreateTestingNamespace(namespaceName, server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
-
-	testClient, ctrl, pvCtrl, informers := createAdClients(ns, t, server, defaultSyncPeriod, attachdetach.TimerConfig{
+	testClient, ctrl, pvCtrl, informers := createAdClients(t, server, defaultSyncPeriod, attachdetach.TimerConfig{
 		ReconcilerLoopPeriod:                        100 * time.Millisecond,
 		ReconcilerMaxWaitForUnmountDuration:         6 * time.Second,
 		DesiredStateOfWorldPopulatorLoopSleepPeriod: 24 * time.Hour,
 		// Use high duration to disable DesiredStateOfWorldPopulator.findAndAddActivePods loop in test.
 		DesiredStateOfWorldPopulatorListPodsRetryDuration: 24 * time.Hour,
 	})
+
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{

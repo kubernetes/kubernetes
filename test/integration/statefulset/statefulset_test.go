@@ -30,10 +30,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/controller/statefulset"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -120,12 +123,12 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 }
 
 func TestSpecReplicasChange(t *testing.T) {
-	s, closeFn, rm, informers, c := scSetup(t)
+	closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-spec-replicas-change", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(rm, informers)
-	defer close(stopCh)
+	ns := framework.CreateTestingNamespace("test-spec-replicas-change", t)
+	defer framework.DeleteTestingNamespace(ns, t)
+	cancel := runControllerAndInformers(rm, informers)
+	defer cancel()
 
 	createHeadlessService(t, c, newHeadlessService(ns.Name))
 	sts := newSTS("sts", ns.Name, 2)
@@ -163,12 +166,12 @@ func TestSpecReplicasChange(t *testing.T) {
 }
 
 func TestDeletingAndFailedPods(t *testing.T) {
-	s, closeFn, rm, informers, c := scSetup(t)
+	closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-deleting-and-failed-pods", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(rm, informers)
-	defer close(stopCh)
+	ns := framework.CreateTestingNamespace("test-deleting-and-failed-pods", t)
+	defer framework.DeleteTestingNamespace(ns, t)
+	cancel := runControllerAndInformers(rm, informers)
+	defer cancel()
 
 	labelMap := labelMap()
 	sts := newSTS("sts", ns.Name, 2)
@@ -262,53 +265,55 @@ func TestStatefulSetAvailable(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, test.enabled)()
-		s, closeFn, rm, informers, c := scSetup(t)
-		defer closeFn()
-		ns := framework.CreateTestingNamespace("test-available-pods", s, t)
-		defer framework.DeleteTestingNamespace(ns, s, t)
-		stopCh := runControllerAndInformers(rm, informers)
-		defer close(stopCh)
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, test.enabled)()
+			closeFn, rm, informers, c := scSetup(t)
+			defer closeFn()
+			ns := framework.CreateTestingNamespace("test-available-pods", t)
+			defer framework.DeleteTestingNamespace(ns, t)
+			cancel := runControllerAndInformers(rm, informers)
+			defer cancel()
 
-		labelMap := labelMap()
-		sts := newSTS("sts", ns.Name, 4)
-		sts.Spec.MinReadySeconds = int32(3600)
-		stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
-		sts = stss[0]
-		waitSTSStable(t, c, sts)
+			labelMap := labelMap()
+			sts := newSTS("sts", ns.Name, 4)
+			sts.Spec.MinReadySeconds = int32(3600)
+			stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
+			sts = stss[0]
+			waitSTSStable(t, c, sts)
 
-		// Verify STS creates 4 pods
-		podClient := c.CoreV1().Pods(ns.Name)
-		pods := getPods(t, podClient, labelMap)
-		if len(pods.Items) != 4 {
-			t.Fatalf("len(pods) = %d, want 4", len(pods.Items))
-		}
-
-		// Separate 3 pods into their own list
-		firstPodList := &v1.PodList{Items: pods.Items[:1]}
-		secondPodList := &v1.PodList{Items: pods.Items[1:2]}
-		thirdPodList := &v1.PodList{Items: pods.Items[2:]}
-		// First pod: Running, but not Ready
-		// by setting the Ready condition to false with LastTransitionTime to be now
-		setPodsReadyCondition(t, c, firstPodList, v1.ConditionFalse, time.Now())
-		// Second pod: Running and Ready, but not Available
-		// by setting LastTransitionTime to now
-		setPodsReadyCondition(t, c, secondPodList, v1.ConditionTrue, time.Now())
-		// Third pod: Running, Ready, and Available
-		// by setting LastTransitionTime to more than 3600 seconds ago
-		setPodsReadyCondition(t, c, thirdPodList, v1.ConditionTrue, time.Now().Add(-120*time.Minute))
-
-		stsClient := c.AppsV1().StatefulSets(ns.Name)
-		if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-			newSts, err := stsClient.Get(context.TODO(), sts.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, err
+			// Verify STS creates 4 pods
+			podClient := c.CoreV1().Pods(ns.Name)
+			pods := getPods(t, podClient, labelMap)
+			if len(pods.Items) != 4 {
+				t.Fatalf("len(pods) = %d, want 4", len(pods.Items))
 			}
-			// Verify 4 pods exist, 3 pods are Ready, and 2 pods are Available
-			return newSts.Status.Replicas == test.totalReplicas && newSts.Status.ReadyReplicas == test.readyReplicas && newSts.Status.AvailableReplicas == test.activeReplicas, nil
-		}); err != nil {
-			t.Fatalf("Failed to verify number of Replicas, ReadyReplicas and AvailableReplicas of rs %s to be as expected: %v", sts.Name, err)
-		}
+
+			// Separate 3 pods into their own list
+			firstPodList := &v1.PodList{Items: pods.Items[:1]}
+			secondPodList := &v1.PodList{Items: pods.Items[1:2]}
+			thirdPodList := &v1.PodList{Items: pods.Items[2:]}
+			// First pod: Running, but not Ready
+			// by setting the Ready condition to false with LastTransitionTime to be now
+			setPodsReadyCondition(t, c, firstPodList, v1.ConditionFalse, time.Now())
+			// Second pod: Running and Ready, but not Available
+			// by setting LastTransitionTime to now
+			setPodsReadyCondition(t, c, secondPodList, v1.ConditionTrue, time.Now())
+			// Third pod: Running, Ready, and Available
+			// by setting LastTransitionTime to more than 3600 seconds ago
+			setPodsReadyCondition(t, c, thirdPodList, v1.ConditionTrue, time.Now().Add(-120*time.Minute))
+
+			stsClient := c.AppsV1().StatefulSets(ns.Name)
+			if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+				newSts, err := stsClient.Get(context.TODO(), sts.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				// Verify 4 pods exist, 3 pods are Ready, and 2 pods are Available
+				return newSts.Status.Replicas == test.totalReplicas && newSts.Status.ReadyReplicas == test.readyReplicas && newSts.Status.AvailableReplicas == test.activeReplicas, nil
+			}); err != nil {
+				t.Fatalf("Failed to verify number of Replicas, ReadyReplicas and AvailableReplicas of rs %s to be as expected: %v", sts.Name, err)
+			}
+		})
 	}
 }
 
@@ -347,5 +352,59 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 	})
 	if err != nil {
 		t.Fatalf("failed to mark all StatefulSet pods to ready: %v", err)
+	}
+}
+
+// add for issue: https://github.com/kubernetes/kubernetes/issues/108837
+func TestStatefulSetStatusWithPodFail(t *testing.T) {
+	limitedPodNumber := 2
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	controlPlaneConfig.GenericConfig.AdmissionControl = &fakePodFailAdmission{
+		limitedPodNumber: limitedPodNumber,
+	}
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	defer closeFn()
+
+	config := restclient.Config{Host: s.URL}
+	c, err := clientset.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("Could not create clientset: %v", err)
+	}
+	resyncPeriod := 12 * time.Hour
+	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "statefulset-informers")), resyncPeriod)
+
+	ssc := statefulset.NewStatefulSetController(
+		informers.Core().V1().Pods(),
+		informers.Apps().V1().StatefulSets(),
+		informers.Core().V1().PersistentVolumeClaims(),
+		informers.Apps().V1().ControllerRevisions(),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "statefulset-controller")),
+	)
+
+	ns := framework.CreateTestingNamespace("test-pod-fail", t)
+	defer framework.DeleteTestingNamespace(ns, t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informers.Start(ctx.Done())
+	go ssc.Run(ctx, 5)
+
+	sts := newSTS("sts", ns.Name, 4)
+	_, err = c.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Could not create statefuleSet %s: %v", sts.Name, err)
+	}
+
+	wantReplicas := limitedPodNumber
+	var gotReplicas int32
+	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		newSTS, err := c.AppsV1().StatefulSets(sts.Namespace).Get(context.TODO(), sts.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		gotReplicas = newSTS.Status.Replicas
+		return gotReplicas == int32(wantReplicas), nil
+	}); err != nil {
+		t.Fatalf("StatefulSet %s status has %d replicas, want replicas %d: %v", sts.Name, gotReplicas, wantReplicas, err)
 	}
 }

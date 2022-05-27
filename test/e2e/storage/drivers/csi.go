@@ -147,6 +147,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapBlock:               true,
 		storageframework.CapPVCDataSource:       true,
 		storageframework.CapControllerExpansion: true,
+		storageframework.CapOfflineExpansion:    true,
 		storageframework.CapOnlineExpansion:     true,
 		storageframework.CapSingleNodeVolume:    true,
 
@@ -810,6 +811,7 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapVolumeLimits:        false,
 				storageframework.CapTopology:            true,
 				storageframework.CapControllerExpansion: true,
+				storageframework.CapOfflineExpansion:    true,
 				storageframework.CapOnlineExpansion:     true,
 				storageframework.CapNodeExpansion:       true,
 				storageframework.CapSnapshotDataSource:  true,

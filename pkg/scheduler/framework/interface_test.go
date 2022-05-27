@@ -34,6 +34,8 @@ func TestStatus(t *testing.T) {
 		expectedCode      Code
 		expectedMessage   string
 		expectedIsSuccess bool
+		expectedIsWait    bool
+		expectedIsSkip    bool
 		expectedAsError   error
 	}{
 		{
@@ -42,6 +44,18 @@ func TestStatus(t *testing.T) {
 			expectedCode:      Success,
 			expectedMessage:   "",
 			expectedIsSuccess: true,
+			expectedIsWait:    false,
+			expectedIsSkip:    false,
+			expectedAsError:   nil,
+		},
+		{
+			name:              "wait status",
+			status:            NewStatus(Wait, ""),
+			expectedCode:      Wait,
+			expectedMessage:   "",
+			expectedIsSuccess: false,
+			expectedIsWait:    true,
+			expectedIsSkip:    false,
 			expectedAsError:   nil,
 		},
 		{
@@ -50,7 +64,19 @@ func TestStatus(t *testing.T) {
 			expectedCode:      Error,
 			expectedMessage:   "unknown error",
 			expectedIsSuccess: false,
+			expectedIsWait:    false,
+			expectedIsSkip:    false,
 			expectedAsError:   errors.New("unknown error"),
+		},
+		{
+			name:              "skip status",
+			status:            NewStatus(Skip, ""),
+			expectedCode:      Skip,
+			expectedMessage:   "",
+			expectedIsSuccess: false,
+			expectedIsWait:    false,
+			expectedIsSkip:    true,
+			expectedAsError:   nil,
 		},
 		{
 			name:              "nil status",
@@ -58,6 +84,7 @@ func TestStatus(t *testing.T) {
 			expectedCode:      Success,
 			expectedMessage:   "",
 			expectedIsSuccess: true,
+			expectedIsSkip:    false,
 			expectedAsError:   nil,
 		},
 	}
@@ -74,6 +101,14 @@ func TestStatus(t *testing.T) {
 
 			if test.status.IsSuccess() != test.expectedIsSuccess {
 				t.Errorf("expect status.IsSuccess() returns %v, but %v", test.expectedIsSuccess, test.status.IsSuccess())
+			}
+
+			if test.status.IsWait() != test.expectedIsWait {
+				t.Errorf("status.IsWait() returns %v, but want %v", test.status.IsWait(), test.expectedIsWait)
+			}
+
+			if test.status.IsSkip() != test.expectedIsSkip {
+				t.Errorf("status.IsSkip() returns %v, but want %v", test.status.IsSkip(), test.expectedIsSkip)
 			}
 
 			if test.status.AsError() == test.expectedAsError {

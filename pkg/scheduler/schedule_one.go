@@ -164,7 +164,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 
 	// Run "permit" plugins.
 	runPermitStatus := fwk.RunPermitPlugins(schedulingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-	if runPermitStatus.Code() != framework.Wait && !runPermitStatus.IsSuccess() {
+	if !runPermitStatus.IsWait() && !runPermitStatus.IsSuccess() {
 		var reason string
 		if runPermitStatus.IsUnschedulable() {
 			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))

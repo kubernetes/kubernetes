@@ -319,20 +319,6 @@ func newCmdConfigImagesPull() *cobra.Command {
 	return cmd
 }
 
-// ImagesPull is the struct used to hold information relating to image pulling
-type ImagesPull struct {
-	runtime utilruntime.ContainerRuntime
-	images  []string
-}
-
-// NewImagesPull initializes and returns the `kubeadm config images pull` command
-func NewImagesPull(runtime utilruntime.ContainerRuntime, images []string) *ImagesPull {
-	return &ImagesPull{
-		runtime: runtime,
-		images:  images,
-	}
-}
-
 // PullControlPlaneImages pulls all images that the ImagesPull knows about
 func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmapi.ClusterConfiguration) error {
 	images := images.GetControlPlaneImages(cfg)
@@ -371,7 +357,7 @@ func newCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
-				return err
+				return errors.Wrap(err, "could not construct output printer")
 			}
 
 			imagesList, err := NewImagesList(cfgPath, externalcfg)
@@ -424,7 +410,7 @@ func (itp *imageTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) erro
 // imageTextPrintFlags provides flags necessary for printing image in a text form.
 type imageTextPrintFlags struct{}
 
-// ToPrinter returns kubeadm printer for the text output format
+// ToPrinter returns a kubeadm printer for the text output format
 func (ipf *imageTextPrintFlags) ToPrinter(outputFormat string) (output.Printer, error) {
 	if outputFormat == output.TextOutput {
 		return &imageTextPrinter{}, nil

@@ -37,6 +37,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // applyFlags holds the information about the flags that can be passed to apply
@@ -103,7 +104,7 @@ func runApply(flags *applyFlags, args []string) error {
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
 	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
-	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, args, flags.dryRun, true)
+	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, args, flags.dryRun, true, &output.TextPrinter{})
 	if err != nil {
 		return err
 	}
@@ -155,20 +156,13 @@ func runApply(flags *applyFlags, args []string) error {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
+	// Clean this up in 1.26
 	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-	fmt.Printf("[upgrade/postupgrade] Removing the deprecated label %s='' from all control plane Nodes. "+
-		"After this step only the label %s='' will be present on control plane Nodes.\n",
-		kubeadmconstants.LabelNodeRoleOldControlPlane, kubeadmconstants.LabelNodeRoleControlPlane)
-	if err := upgrade.RemoveOldControlPlaneLabel(client); err != nil {
-		return err
-	}
-
-	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-	fmt.Printf("[upgrade/postupgrade] Adding the new taint %s to all control plane Nodes. "+
-		"After this step both taints %s and %s should be present on control plane Nodes.\n",
-		kubeadmconstants.ControlPlaneTaint.String(), kubeadmconstants.ControlPlaneTaint.String(),
-		kubeadmconstants.OldControlPlaneTaint.String())
-	if err := upgrade.AddNewControlPlaneTaint(client); err != nil {
+	fmt.Printf("[upgrade/postupgrade] Removing the old taint %s from all control plane Nodes. "+
+		"After this step only the %s taint will be present on control plane Nodes.\n",
+		kubeadmconstants.OldControlPlaneTaint.String(),
+		kubeadmconstants.ControlPlaneTaint.String())
+	if err := upgrade.RemoveOldControlPlaneTaint(client); err != nil {
 		return err
 	}
 

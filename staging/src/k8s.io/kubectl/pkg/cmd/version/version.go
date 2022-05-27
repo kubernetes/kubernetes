@@ -57,6 +57,8 @@ type Options struct {
 	Short      bool
 	Output     string
 
+	args []string
+
 	discoveryClient discovery.CachedDiscoveryInterface
 
 	genericclioptions.IOStreams
@@ -79,8 +81,8 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 		Long:    i18n.T("Print the client and server version information for the current context."),
 		Example: versionExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd))
-			cmdutil.CheckErr(o.Validate(args))
+			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -92,7 +94,7 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 }
 
 // Complete completes all the required options
-func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	var err error
 	if o.ClientOnly {
 		return nil
@@ -103,13 +105,15 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil && !clientcmd.IsEmptyConfig(err) {
 		return err
 	}
+
+	o.args = args
 	return nil
 }
 
 // Validate validates the provided options
-func (o *Options) Validate(args []string) error {
-	if len(args) != 0 {
-		return errors.New(fmt.Sprintf("extra arguments: %v", args))
+func (o *Options) Validate() error {
+	if len(o.args) != 0 {
+		return errors.New(fmt.Sprintf("extra arguments: %v", o.args))
 	}
 
 	if o.Output != "" && o.Output != "yaml" && o.Output != "json" {
@@ -179,14 +183,21 @@ func (o *Options) Run() error {
 }
 
 func getKustomizeVersion() string {
+	if modVersion, ok := GetKustomizeModVersion(); ok {
+		return modVersion
+	}
+	return kustomizeVersion // other clients should provide their own fallback
+}
+
+func GetKustomizeModVersion() (string, bool) {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
-		return kustomizeVersion
+		return "", false
 	}
 	for _, dep := range info.Deps {
 		if dep.Path == "sigs.k8s.io/kustomize/kustomize/v4" {
-			return dep.Version
+			return dep.Version, true
 		}
 	}
-	return kustomizeVersion
+	return "", false
 }

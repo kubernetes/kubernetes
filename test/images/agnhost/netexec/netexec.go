@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -39,6 +38,7 @@ import (
 	"github.com/spf13/cobra"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	netutils "k8s.io/utils/net"
 )
@@ -90,9 +90,13 @@ var CmdNetexec = &cobra.Command{
 		shutdown.
 	- "wait": The amount of time to wait before starting shutdown. Acceptable values are
 	  golang durations. If 0 the process will start shutdown immediately.
-- "/healthz": Returns "200 OK" if the server is ready, "412 Status Precondition Failed"
+- "/healthz": Returns "200 OK" if the server is healthy, "412 Status Precondition Failed"
   otherwise. The server is considered not ready if the UDP server did not start yet or
   it exited.
+- "/readyz": Returns "200 OK" if the server is ready to receive traffic, "412 Status Precondition Failed", if the
+  server is not yet ready to receive traffic, but may be ready later, and "503" if the server is shutting down.
+  When a sig-term is observed, the /readyz will report 503, but healthz will report 200 to indicate that the
+  server is healthy (don't kill it), but the it should not be sent traffic (remove from endpoints).
 - "/hostname": Returns the server's hostname.
 - "/hostName": Returns the server's hostname.
 - "/redirect": Returns a redirect response to the given "location", with the optional status "code"
@@ -162,20 +166,27 @@ func (a *atomicBool) get() bool {
 func main(cmd *cobra.Command, args []string) {
 	exitCh := make(chan shutdownRequest)
 
-	if delayShutdown > 0 {
+	sigTermReceived := make(chan struct{})
+	go func() {
 		termCh := make(chan os.Signal, 1)
 		signal.Notify(termCh, syscall.SIGTERM)
-		go func() {
-			<-termCh
+
+		<-termCh
+		close(sigTermReceived)
+	}()
+
+	go func() {
+		<-sigTermReceived
+		if delayShutdown > 0 {
 			log.Printf("Sleeping %d seconds before terminating...", delayShutdown)
 			time.Sleep(time.Duration(delayShutdown) * time.Second)
-			os.Exit(0)
-		}()
-	}
+		}
+		os.Exit(0)
+	}()
 
 	if httpOverride != "" {
 		mux := http.NewServeMux()
-		addRoutes(mux, exitCh)
+		addRoutes(mux, sigTermReceived, exitCh)
 
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			overrideReq, err := http.NewRequestWithContext(r.Context(), "GET", httpOverride, nil)
@@ -186,7 +197,7 @@ func main(cmd *cobra.Command, args []string) {
 			mux.ServeHTTP(w, overrideReq)
 		})
 	} else {
-		addRoutes(http.DefaultServeMux, exitCh)
+		addRoutes(http.DefaultServeMux, sigTermReceived, exitCh)
 	}
 
 	// UDP server
@@ -214,7 +225,7 @@ func main(cmd *cobra.Command, args []string) {
 	}
 }
 
-func addRoutes(mux *http.ServeMux, exitCh chan shutdownRequest) {
+func addRoutes(mux *http.ServeMux, sigTermReceived chan struct{}, exitCh chan shutdownRequest) {
 	mux.HandleFunc("/", rootHandler)
 	mux.HandleFunc("/clientip", clientIPHandler)
 	mux.HandleFunc("/header", headerHandler)
@@ -222,6 +233,7 @@ func addRoutes(mux *http.ServeMux, exitCh chan shutdownRequest) {
 	mux.HandleFunc("/echo", echoHandler)
 	mux.HandleFunc("/exit", func(w http.ResponseWriter, req *http.Request) { exitHandler(w, req, exitCh) })
 	mux.HandleFunc("/healthz", healthzHandler)
+	mux.HandleFunc("/readyz", readyzHandler(sigTermReceived))
 	mux.HandleFunc("/hostname", hostnameHandler)
 	mux.HandleFunc("/redirect", redirectHandler)
 	mux.HandleFunc("/shell", shellHandler)
@@ -340,6 +352,32 @@ func healthzHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusPreconditionFailed)
 }
 
+// readyzHandler response with a 200 if the UDP server is ready. It serves as a readyz that will return a 503
+// once a sig-term has been received.   This allows for graceful removal from endpoints during a pod delete flow.
+func readyzHandler(sigTermReceived chan struct{}) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("GET /readyz")
+
+		select {
+		case <-sigTermReceived:
+			w.WriteHeader(http.StatusServiceUnavailable)
+			if _, err := w.Write([]byte("shutting down")); err != nil {
+				utilruntime.HandleError(err)
+			}
+			return
+
+		default:
+			if serverReady.get() {
+				if _, err := w.Write([]byte("ok")); err != nil {
+					utilruntime.HandleError(err)
+				}
+				return
+			}
+			w.WriteHeader(http.StatusPreconditionFailed)
+		}
+	}
+}
+
 func shutdownHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("GET /shutdown")
 	os.Exit(0)
@@ -426,7 +464,7 @@ func dialHTTP(request string, addr net.Addr) (string, error) {
 	defer transport.CloseIdleConnections()
 	if err == nil {
 		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err == nil {
 			return string(body), nil
 		}
@@ -524,7 +562,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	f, err := ioutil.TempFile("/uploads", "upload")
+	f, err := os.CreateTemp("/uploads", "upload")
 	if err != nil {
 		result["error"] = "Unable to open file for write"
 		bytes, err := json.Marshal(result)

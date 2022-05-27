@@ -89,6 +89,14 @@ type APIGroupInfo struct {
 	StaticOpenAPISpec *spec.Swagger
 }
 
+func (a *APIGroupInfo) destroyStorage() {
+	for _, stores := range a.VersionedResourcesStorageMap {
+		for _, store := range stores {
+			store.Destroy()
+		}
+	}
+}
+
 // GenericAPIServer contains state for a Kubernetes cluster api server.
 type GenericAPIServer struct {
 	// discoveryAddresses is used to build cluster IPs for discovery.
@@ -183,7 +191,7 @@ type GenericAPIServer struct {
 	livezGracePeriod      time.Duration
 	livezClock            clock.Clock
 
-	// auditing. The backend is started after the server starts listening.
+	// auditing. The backend is started before the server starts listening.
 	AuditBackend audit.Backend
 
 	// Authorizer determines whether a user is allowed to make a certain request. The Handler does a preliminary
@@ -221,6 +229,9 @@ type GenericAPIServer struct {
 
 	// lifecycleSignals provides access to the various signals that happen during the life cycle of the apiserver.
 	lifecycleSignals lifecycleSignals
+
+	// destroyFns contains a list of functions that should be called on shutdown to clean up resources.
+	destroyFns []func()
 
 	// muxAndDiscoveryCompleteSignals holds signals that indicate all known HTTP paths have been registered.
 	// it exists primarily to avoid returning a 404 response when a resource actually exists but we haven't installed the path to a handler.
@@ -264,6 +275,11 @@ type DelegationTarget interface {
 
 	// MuxAndDiscoveryCompleteSignals exposes registered signals that indicate if all known HTTP paths have been installed.
 	MuxAndDiscoveryCompleteSignals() map[string]<-chan struct{}
+
+	// Destroy cleans up its resources on shutdown.
+	// Destroy has to be implemented in thread-safe way and be prepared
+	// for being called more than once.
+	Destroy()
 }
 
 func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
@@ -299,6 +315,24 @@ func (s *GenericAPIServer) RegisterMuxAndDiscoveryCompleteSignal(signalName stri
 
 func (s *GenericAPIServer) MuxAndDiscoveryCompleteSignals() map[string]<-chan struct{} {
 	return s.muxAndDiscoveryCompleteSignals
+}
+
+// RegisterDestroyFunc registers a function that will be called during Destroy().
+// The function have to be idempotent and prepared to be called more than once.
+func (s *GenericAPIServer) RegisterDestroyFunc(destroyFn func()) {
+	s.destroyFns = append(s.destroyFns, destroyFn)
+}
+
+// Destroy cleans up all its and its delegation target resources on shutdown.
+// It starts with destroying its own resources and later proceeds with
+// its delegation target.
+func (s *GenericAPIServer) Destroy() {
+	for _, destroyFn := range s.destroyFns {
+		destroyFn()
+	}
+	if s.delegationTarget != nil {
+		s.delegationTarget.Destroy()
+	}
 }
 
 type emptyDelegate struct {
@@ -340,6 +374,8 @@ func (s emptyDelegate) PrepareRun() preparedGenericAPIServer {
 func (s emptyDelegate) MuxAndDiscoveryCompleteSignals() map[string]<-chan struct{} {
 	return map[string]<-chan struct{}{}
 }
+func (s emptyDelegate) Destroy() {
+}
 
 // preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
 type preparedGenericAPIServer struct {
@@ -375,25 +411,54 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	}
 	s.installReadyz()
 
-	// Register audit backend preShutdownHook.
-	if s.AuditBackend != nil {
-		err := s.AddPreShutdownHook("audit-backend", func() error {
-			s.AuditBackend.Shutdown()
-			return nil
-		})
-		if err != nil {
-			klog.Errorf("Failed to add pre-shutdown hook for audit-backend %s", err)
-		}
-	}
-
 	return preparedGenericAPIServer{s}
 }
 
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
+// This is the diagram of what channels/signals are dependent on each other:
+//
+//                                  stopCh
+//                                    |
+//           ---------------------------------------------------------
+//           |                                                       |
+//    ShutdownInitiated (shutdownInitiatedCh)                        |
+//           |                                                       |
+// (ShutdownDelayDuration)                                    (PreShutdownHooks)
+//           |                                                       |
+//  AfterShutdownDelayDuration (delayedStopCh)   PreShutdownHooksStopped (preShutdownHooksHasStoppedCh)
+//           |                                                       |
+//           |-------------------------------------------------------|
+//                                    |
+//                                    |
+//               NotAcceptingNewRequest (notAcceptingNewRequestCh)
+//                                    |
+//                                    |
+//           |---------------------------------------------------------|
+//           |                        |              |                 |
+//        [without                 [with             |                 |
+// ShutdownSendRetryAfter]  ShutdownSendRetryAfter]  |                 |
+//           |                        |              |                 |
+//           |                        ---------------|                 |
+//           |                                       |                 |
+//           |                         (HandlerChainWaitGroup::Wait)   |
+//           |                                       |                 |
+//           |                    InFlightRequestsDrained (drainedCh)  |
+//           |                                       |                 |
+//           ----------------------------------------|-----------------|
+//                                 |                 |
+//                       stopHttpServerCh     (AuditBackend::Shutdown())
+//                                 |
+//                       listenerStoppedCh
+//                                 |
+//      HTTPServerStoppedListening (httpServerStoppedListeningCh)
+//
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
 	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
+
+	// Clean up resources on shutdown.
+	defer s.Destroy()
 
 	// spawn a new goroutine for closing the MuxAndDiscoveryComplete signal
 	// registration happens during construction of the generic api server
@@ -428,8 +493,6 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	}()
 
 	// close socket after delayed stopCh
-	drainedCh := s.lifecycleSignals.InFlightRequestsDrained
-	delayedStopOrDrainedCh := delayedStopCh.Signaled()
 	shutdownTimeout := s.ShutdownTimeout
 	if s.ShutdownSendRetryAfter {
 		// when this mode is enabled, we do the following:
@@ -438,24 +501,38 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		// - once drained, http Server Shutdown is invoked with a timeout of 2s,
 		//   net/http waits for 1s for the peer to respond to a GO_AWAY frame, so
 		//   we should wait for a minimum of 2s
-		delayedStopOrDrainedCh = drainedCh.Signaled()
 		shutdownTimeout = 2 * time.Second
 		klog.V(1).InfoS("[graceful-termination] using HTTP Server shutdown timeout", "ShutdownTimeout", shutdownTimeout)
 	}
 
-	// pre-shutdown hooks need to finish before we stop the http server
-	preShutdownHooksHasStoppedCh, stopHttpServerCh := make(chan struct{}), make(chan struct{})
+	notAcceptingNewRequestCh := s.lifecycleSignals.NotAcceptingNewRequest
+	drainedCh := s.lifecycleSignals.InFlightRequestsDrained
+	stopHttpServerCh := make(chan struct{})
 	go func() {
 		defer close(stopHttpServerCh)
 
-		<-delayedStopOrDrainedCh
-		<-preShutdownHooksHasStoppedCh
+		timeToStopHttpServerCh := notAcceptingNewRequestCh.Signaled()
+		if s.ShutdownSendRetryAfter {
+			timeToStopHttpServerCh = drainedCh.Signaled()
+		}
+
+		<-timeToStopHttpServerCh
 	}()
+
+	// Start the audit backend before any request comes in. This means we must call Backend.Run
+	// before http server start serving. Otherwise the Backend.ProcessEvents call might block.
+	// AuditBackend.Run will stop as soon as all in-flight requests are drained.
+	if s.AuditBackend != nil {
+		if err := s.AuditBackend.Run(drainedCh.Signaled()); err != nil {
+			return fmt.Errorf("failed to run the audit backend: %v", err)
+		}
+	}
 
 	stoppedCh, listenerStoppedCh, err := s.NonBlockingRun(stopHttpServerCh, shutdownTimeout)
 	if err != nil {
 		return err
 	}
+
 	httpServerStoppedListeningCh := s.lifecycleSignals.HTTPServerStoppedListening
 	go func() {
 		<-listenerStoppedCh
@@ -463,14 +540,42 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		klog.V(1).InfoS("[graceful-termination] shutdown event", "name", httpServerStoppedListeningCh.Name())
 	}()
 
+	// we don't accept new request as soon as both ShutdownDelayDuration has
+	// elapsed and preshutdown hooks have completed.
+	preShutdownHooksHasStoppedCh := s.lifecycleSignals.PreShutdownHooksStopped
 	go func() {
-		defer drainedCh.Signal()
-		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", drainedCh.Name())
+		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", notAcceptingNewRequestCh.Name())
+		defer notAcceptingNewRequestCh.Signal()
 
-		// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
+		// wait for the delayed stopCh before closing the handler chain
 		<-delayedStopCh.Signaled()
 
+		// Additionally wait for preshutdown hooks to also be finished, as some of them need
+		// to send API calls to clean up after themselves (e.g. lease reconcilers removing
+		// itself from the active servers).
+		<-preShutdownHooksHasStoppedCh.Signaled()
+	}()
+
+	go func() {
+		defer klog.V(1).InfoS("[graceful-termination] shutdown event", "name", drainedCh.Name())
+		defer drainedCh.Signal()
+
+		// wait for the delayed stopCh before closing the handler chain (it rejects everything after Wait has been called).
+		<-notAcceptingNewRequestCh.Signaled()
+
 		// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
+		// once HandlerChainWaitGroup.Wait is invoked, the apiserver is
+		// expected to reject any incoming request with a {503, Retry-After}
+		// response via the WithWaitGroup filter. On the contrary, we observe
+		// that incoming request(s) get a 'connection refused' error, this is
+		// because, at this point, we have called 'Server.Shutdown' and
+		// net/http server has stopped listening. This causes incoming
+		// request to get a 'connection refused' error.
+		// On the other hand, if 'ShutdownSendRetryAfter' is enabled incoming
+		// requests will be rejected with a {429, Retry-After} since
+		// 'Server.Shutdown' will be invoked only after in-flight requests
+		// have been drained.
+		// TODO: can we consolidate these two modes of graceful termination?
 		s.HandlerChainWaitGroup.Wait()
 	}()
 
@@ -480,17 +585,26 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	// run shutdown hooks directly. This includes deregistering from
 	// the kubernetes endpoint in case of kube-apiserver.
 	func() {
-		defer close(preShutdownHooksHasStoppedCh)
+		defer func() {
+			preShutdownHooksHasStoppedCh.Signal()
+			klog.V(1).InfoS("[graceful-termination] pre-shutdown hooks completed", "name", preShutdownHooksHasStoppedCh.Name())
+		}()
 		err = s.RunPreShutdownHooks()
 	}()
 	if err != nil {
 		return err
 	}
-	klog.V(1).Info("[graceful-termination] RunPreShutdownHooks has completed")
 
 	// Wait for all requests in flight to drain, bounded by the RequestTimeout variable.
 	<-drainedCh.Signaled()
+
+	if s.AuditBackend != nil {
+		s.AuditBackend.Shutdown()
+		klog.V(1).InfoS("[graceful-termination] audit backend shutdown completed")
+	}
+
 	// wait for stoppedCh that is closed when the graceful termination (server.Shutdown) is finished.
+	<-listenerStoppedCh
 	<-stoppedCh
 
 	klog.V(1).Info("[graceful-termination] apiserver is exiting")
@@ -501,18 +615,6 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 // returned if the secure port cannot be listened on.
 // The returned channel is closed when the (asynchronous) termination is finished.
 func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdownTimeout time.Duration) (<-chan struct{}, <-chan struct{}, error) {
-	// Use an stop channel to allow graceful shutdown without dropping audit events
-	// after http server shutdown.
-	auditStopCh := make(chan struct{})
-
-	// Start the audit backend before any request comes in. This means we must call Backend.Run
-	// before http server start serving. Otherwise the Backend.ProcessEvents call might block.
-	if s.AuditBackend != nil {
-		if err := s.AuditBackend.Run(auditStopCh); err != nil {
-			return nil, nil, fmt.Errorf("failed to run the audit backend: %v", err)
-		}
-	}
-
 	// Use an internal stop channel to allow cleanup of the listeners on error.
 	internalStopCh := make(chan struct{})
 	var stoppedCh <-chan struct{}
@@ -522,7 +624,6 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 		stoppedCh, listenerStoppedCh, err = s.SecureServingInfo.Serve(s.Handler, shutdownTimeout, internalStopCh)
 		if err != nil {
 			close(internalStopCh)
-			close(auditStopCh)
 			return nil, nil, err
 		}
 	}
@@ -533,11 +634,6 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}, shutdow
 	go func() {
 		<-stopCh
 		close(internalStopCh)
-		if stoppedCh != nil {
-			<-stoppedCh
-		}
-		s.HandlerChainWaitGroup.Wait()
-		close(auditStopCh)
 	}()
 
 	s.RunPostStartHooks(stopCh)
@@ -584,6 +680,8 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		resourceInfos = append(resourceInfos, r...)
 	}
 
+	s.RegisterDestroyFunc(apiGroupInfo.destroyStorage)
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
 		// API installation happens before we start listening on the handlers,
@@ -595,6 +693,9 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 	return nil
 }
 
+// InstallLegacyAPIGroup exposes the given legacy api group in the API.
+// The <apiGroupInfo> passed into this function shouldn't be used elsewhere as the
+// underlying storage will be destroyed on this servers shutdown.
 func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo *APIGroupInfo) error {
 	if !s.legacyAPIGroupPrefixes.Has(apiPrefix) {
 		return fmt.Errorf("%q is not in the allowed legacy API prefixes: %v", apiPrefix, s.legacyAPIGroupPrefixes.List())
@@ -616,7 +717,9 @@ func (s *GenericAPIServer) InstallLegacyAPIGroup(apiPrefix string, apiGroupInfo 
 	return nil
 }
 
-// Exposes given api groups in the API.
+// InstallAPIGroups exposes given api groups in the API.
+// The <apiGroupInfos> passed into this function shouldn't be used elsewhere as the
+// underlying storage will be destroyed on this servers shutdown.
 func (s *GenericAPIServer) InstallAPIGroups(apiGroupInfos ...*APIGroupInfo) error {
 	for _, apiGroupInfo := range apiGroupInfos {
 		// Do not register empty group or empty version.  Doing so claims /apis/ for the wrong entity to be returned.
@@ -669,7 +772,9 @@ func (s *GenericAPIServer) InstallAPIGroups(apiGroupInfos ...*APIGroupInfo) erro
 	return nil
 }
 
-// Exposes the given api group in the API.
+// InstallAPIGroup exposes the given api group in the API.
+// The <apiGroupInfo> passed into this function shouldn't be used elsewhere as the
+// underlying storage will be destroyed on this servers shutdown.
 func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
 	return s.InstallAPIGroups(apiGroupInfo)
 }

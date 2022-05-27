@@ -3,7 +3,6 @@ kind: Pod
 metadata:
   annotations:
     annotationsKey: annotationsValue
-  clusterName: clusterNameValue
   creationTimestamp: "2008-01-01T01:01:01Z"
   deletionGracePeriodSeconds: 10
   deletionTimestamp: "2009-01-01T01:01:01Z"
@@ -805,6 +804,8 @@ spec:
         matchLabelsKey: matchLabelsValue
     maxSkew: 1
     minDomains: 5
+    nodeAffinityPolicy: nodeAffinityPolicyValue
+    nodeTaintsPolicy: nodeTaintsPolicyValue
     topologyKey: topologyKeyValue
     whenUnsatisfiable: whenUnsatisfiableValue
   volumes:
@@ -875,7 +876,6 @@ spec:
         metadata:
           annotations:
             annotationsKey: annotationsValue
-          clusterName: clusterNameValue
           creationTimestamp: "2008-01-01T01:01:01Z"
           deletionGracePeriodSeconds: 10
           deletionTimestamp: "2009-01-01T01:01:01Z"

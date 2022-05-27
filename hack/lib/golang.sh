@@ -111,7 +111,7 @@ readonly KUBE_SERVER_IMAGE_BINARIES=("${KUBE_SERVER_IMAGE_TARGETS[@]##*/}")
 kube::golang::conformance_image_targets() {
   # NOTE: this contains cmd targets for kube::release::build_conformance_image
   local targets=(
-    vendor/github.com/onsi/ginkgo/ginkgo
+    github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
     test/conformance/image/go-runner
     cmd/kubectl
@@ -274,7 +274,7 @@ kube::golang::test_targets() {
     cmd/genyaml
     cmd/genswaggertypedocs
     cmd/linkcheck
-    vendor/github.com/onsi/ginkgo/ginkgo
+    github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
     test/conformance/image/go-runner
   )
@@ -301,7 +301,7 @@ readonly KUBE_TEST_PORTABLE=(
 kube::golang::server_test_targets() {
   local targets=(
     cmd/kubemark
-    vendor/github.com/onsi/ginkgo/ginkgo
+    github.com/onsi/ginkgo/ginkgo
   )
 
   if [[ "${OSTYPE:-}" == "linux"* ]]; then
@@ -382,11 +382,14 @@ kube::golang::is_statically_linked_library() {
 kube::golang::binaries_from_targets() {
   local target
   for target; do
-    # If the target starts with what looks like a domain name, assume it has a
-    # fully-qualified package name rather than one that needs the Kubernetes
-    # package prepended.
     if [[ "${target}" =~ ^([[:alnum:]]+".")+[[:alnum:]]+"/" ]]; then
+      # If the target starts with what looks like a domain name, assume it has a
+      # fully-qualified package name rather than one that needs the Kubernetes
+      # package prepended.
       echo "${target}"
+    elif [[ "${target}" =~ ^vendor/ ]]; then
+      # Strip vendor/ prefix, since we're building in gomodule mode.
+      echo "${target#"vendor/"}"
     else
       echo "${KUBE_GO_PACKAGE}/${target}"
     fi
@@ -668,13 +671,13 @@ kube::golang::build_some_binaries() {
     done
     if [[ "${#uncovered[@]}" != 0 ]]; then
       V=2 kube::log::info "Building ${uncovered[*]} without coverage..."
-      go install "${build_args[@]}" "${uncovered[@]}"
+      GO111MODULE=on GOPROXY=off go install "${build_args[@]}" "${uncovered[@]}"
     else
       V=2 kube::log::info "Nothing to build without coverage."
      fi
    else
     V=2 kube::log::info "Coverage is disabled."
-    go install "${build_args[@]}" "$@"
+    GO111MODULE=on GOPROXY=off go install "${build_args[@]}" "$@"
    fi
 }
 

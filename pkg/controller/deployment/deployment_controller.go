@@ -67,9 +67,11 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("Deployment")
 // in the system with actual running replica sets and pods.
 type DeploymentController struct {
 	// rsControl is used for adopting/releasing replica sets.
-	rsControl     controller.RSControlInterface
-	client        clientset.Interface
-	eventRecorder record.EventRecorder
+	rsControl controller.RSControlInterface
+	client    clientset.Interface
+
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
 
 	// To allow injection of syncDeployment for testing.
 	syncHandler func(ctx context.Context, dKey string) error
@@ -100,8 +102,6 @@ type DeploymentController struct {
 // NewDeploymentController creates a new DeploymentController.
 func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("deployment_controller", client.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -109,9 +109,10 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 		}
 	}
 	dc := &DeploymentController{
-		client:        client,
-		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
+		client:           client,
+		eventBroadcaster: eventBroadcaster,
+		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
+		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
 	}
 	dc.rsControl = controller.RealRSControl{
 		KubeClient: client,
@@ -148,6 +149,12 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 // Run begins watching and syncing.
 func (dc *DeploymentController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
+
+	// Start events processing pipeline.
+	dc.eventBroadcaster.StartStructuredLogging(0)
+	dc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dc.client.CoreV1().Events("")})
+	defer dc.eventBroadcaster.Shutdown()
+
 	defer dc.queue.ShutDown()
 
 	klog.InfoS("Starting controller", "controller", "deployment")

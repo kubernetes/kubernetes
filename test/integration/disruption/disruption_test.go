@@ -466,7 +466,7 @@ func newCustomResourceDefinition() *apiextensionsv1.CustomResourceDefinition {
 
 func waitPDBStable(ctx context.Context, t *testing.T, clientSet clientset.Interface, podNum int32, ns, pdbName string) {
 	if err := wait.PollImmediate(2*time.Second, 60*time.Second, func() (bool, error) {
-		pdb, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns).Get(ctx, pdbName, metav1.GetOptions{})
+		pdb, err := clientSet.PolicyV1().PodDisruptionBudgets(ns).Get(ctx, pdbName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

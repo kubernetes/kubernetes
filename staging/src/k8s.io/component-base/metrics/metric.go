@@ -22,6 +22,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	promext "k8s.io/component-base/metrics/prometheusextension"
 
 	"k8s.io/klog/v2"
 )
@@ -203,6 +204,7 @@ func (c *selfCollector) Collect(ch chan<- prometheus.Metric) {
 // no-op vecs for convenience
 var noopCounterVec = &prometheus.CounterVec{}
 var noopHistogramVec = &prometheus.HistogramVec{}
+var noopTimingHistogramVec = &promext.TimingHistogramVec{}
 var noopGaugeVec = &prometheus.GaugeVec{}
 var noopObserverVec = &noopObserverVector{}
 
@@ -211,17 +213,18 @@ var noop = &noopMetric{}
 
 type noopMetric struct{}
 
-func (noopMetric) Inc()                             {}
-func (noopMetric) Add(float64)                      {}
-func (noopMetric) Dec()                             {}
-func (noopMetric) Set(float64)                      {}
-func (noopMetric) Sub(float64)                      {}
-func (noopMetric) Observe(float64)                  {}
-func (noopMetric) SetToCurrentTime()                {}
-func (noopMetric) Desc() *prometheus.Desc           { return nil }
-func (noopMetric) Write(*dto.Metric) error          { return nil }
-func (noopMetric) Describe(chan<- *prometheus.Desc) {}
-func (noopMetric) Collect(chan<- prometheus.Metric) {}
+func (noopMetric) Inc()                              {}
+func (noopMetric) Add(float64)                       {}
+func (noopMetric) Dec()                              {}
+func (noopMetric) Set(float64)                       {}
+func (noopMetric) Sub(float64)                       {}
+func (noopMetric) Observe(float64)                   {}
+func (noopMetric) ObserveWithWeight(float64, uint64) {}
+func (noopMetric) SetToCurrentTime()                 {}
+func (noopMetric) Desc() *prometheus.Desc            { return nil }
+func (noopMetric) Write(*dto.Metric) error           { return nil }
+func (noopMetric) Describe(chan<- *prometheus.Desc)  {}
+func (noopMetric) Collect(chan<- prometheus.Metric)  {}
 
 type noopObserverVector struct{}
 

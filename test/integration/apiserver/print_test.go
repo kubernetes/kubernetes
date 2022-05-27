@@ -142,8 +142,8 @@ func TestServerSidePrint(t *testing.T) {
 	)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("server-print", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("server-print", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	tableParam := fmt.Sprintf("application/json;as=Table;g=%s;v=%s, application/json", metav1beta1.GroupName, metav1beta1.SchemeGroupVersion.Version)
 	printer := newFakePrinter(printersinternal.AddHandlers)

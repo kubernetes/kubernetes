@@ -144,7 +144,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		localDetector:         proxyutiliptables.NewNoOpLocalDetector(),
 		hostname:              testHostname,
 		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
-		ipvsScheduler:         DefaultScheduler,
+		ipvsScheduler:         defaultScheduler,
 		ipGetter:              &fakeIPGetter{nodeIPs: nodeIPs},
 		iptablesData:          bytes.NewBuffer(nil),
 		filterChainsData:      bytes.NewBuffer(nil),
@@ -655,15 +655,15 @@ func TestNodePortIPv4(t *testing.T) {
 				}},
 			},
 			expectedIptablesChains: netlinktest.ExpectedIptablesChain{
-				string(KubeNodePortChain): {{
-					JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetUDP,
+				string(kubeNodePortChain): {{
+					JumpChain: string(kubeMarkMasqChain), MatchSet: kubeNodePortSetUDP,
 				}, {
 					JumpChain: "ACCEPT", MatchSet: kubeHealthCheckNodePortSet,
 				}},
 				string(kubeServicesChain): {{
-					JumpChain: string(KubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+					JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 				}, {
-					JumpChain: string(KubeNodePortChain), MatchSet: "",
+					JumpChain: string(kubeNodePortChain), MatchSet: "",
 				}, {
 					JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 				}},
@@ -982,10 +982,10 @@ func TestNodePortIPv4(t *testing.T) {
 				},
 			},
 			expectedIptablesChains: netlinktest.ExpectedIptablesChain{
-				string(KubeNodePortChain): {{
+				string(kubeNodePortChain): {{
 					JumpChain: "RETURN", MatchSet: kubeNodePortLocalSetSCTP,
 				}, {
-					JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetSCTP,
+					JumpChain: string(kubeMarkMasqChain), MatchSet: kubeNodePortSetSCTP,
 				}, {
 					JumpChain: "ACCEPT", MatchSet: kubeHealthCheckNodePortSet,
 				}},
@@ -1947,18 +1947,18 @@ func TestLoadBalancer(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
-			JumpChain: string(KubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
+			JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 		}, {
-			JumpChain: string(KubeNodePortChain), MatchSet: "",
+			JumpChain: string(kubeNodePortChain), MatchSet: "",
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet,
 		}},
 		string(kubeLoadBalancerSet): {{
-			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+			JumpChain: string(kubeMarkMasqChain), MatchSet: "",
 		}},
 	}
 	checkIptables(t, ipt, epIpt)
@@ -2047,16 +2047,16 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 		}, {
-			JumpChain: string(KubeNodePortChain), MatchSet: "",
+			JumpChain: string(kubeNodePortChain), MatchSet: "",
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 		}},
-		string(KubeNodePortChain): {{
+		string(kubeNodePortChain): {{
 			JumpChain: "RETURN", MatchSet: kubeNodePortLocalSetTCP,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetTCP,
+			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeNodePortSetTCP,
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeHealthCheckNodePortSet,
 		}},
@@ -2126,10 +2126,10 @@ func TestHealthCheckNodePort(t *testing.T) {
 
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
-		string(KubeNodePortChain): {{
+		string(kubeNodePortChain): {{
 			JumpChain: "RETURN", MatchSet: kubeNodePortLocalSetTCP,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetTCP,
+			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeNodePortSetTCP,
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeHealthCheckNodePortSet,
 		}},
@@ -2219,25 +2219,25 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
-			JumpChain: string(KubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
+			JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 		}, {
-			JumpChain: string(KubeNodePortChain), MatchSet: "",
+			JumpChain: string(kubeNodePortChain), MatchSet: "",
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet,
 		}},
-		string(KubeLoadBalancerChain): {{
-			JumpChain: string(KubeFireWallChain), MatchSet: kubeLoadbalancerFWSet,
+		string(kubeLoadBalancerChain): {{
+			JumpChain: string(kubeFirewallChain), MatchSet: kubeLoadbalancerFWSet,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+			JumpChain: string(kubeMarkMasqChain), MatchSet: "",
 		}},
-		string(KubeFireWallChain): {{
+		string(kubeFirewallChain): {{
 			JumpChain: "RETURN", MatchSet: kubeLoadBalancerSourceCIDRSet,
 		}, {
-			JumpChain: string(KubeMarkDropChain), MatchSet: "",
+			JumpChain: string(kubeMarkDropChain), MatchSet: "",
 		}},
 	}
 	checkIptables(t, ipt, epIpt)
@@ -2300,12 +2300,12 @@ func TestAcceptIPVSTraffic(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {
-			{JumpChain: string(KubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet},
-			{JumpChain: string(KubeMarkMasqChain), MatchSet: kubeClusterIPSet},
-			{JumpChain: string(KubeMarkMasqChain), MatchSet: kubeExternalIPSet},
+			{JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet},
+			{JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet},
+			{JumpChain: string(kubeMarkMasqChain), MatchSet: kubeExternalIPSet},
 			{JumpChain: "ACCEPT", MatchSet: kubeExternalIPSet}, // With externalTrafficOnlyArgs
 			{JumpChain: "ACCEPT", MatchSet: kubeExternalIPSet}, // With dstLocalOnlyArgs
-			{JumpChain: string(KubeNodePortChain), MatchSet: ""},
+			{JumpChain: string(kubeNodePortChain), MatchSet: ""},
 			{JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet},
 			{JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet},
 		},
@@ -2398,20 +2398,20 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	// Check iptables chain and rules
 	epIpt := netlinktest.ExpectedIptablesChain{
 		string(kubeServicesChain): {{
-			JumpChain: string(KubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
+			JumpChain: string(kubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeClusterIPSet,
+			JumpChain: string(kubeMarkMasqChain), MatchSet: kubeClusterIPSet,
 		}, {
-			JumpChain: string(KubeNodePortChain), MatchSet: "",
+			JumpChain: string(kubeNodePortChain), MatchSet: "",
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeClusterIPSet,
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet,
 		}},
-		string(KubeLoadBalancerChain): {{
+		string(kubeLoadBalancerChain): {{
 			JumpChain: "RETURN", MatchSet: kubeLoadBalancerLocalSet,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+			JumpChain: string(kubeMarkMasqChain), MatchSet: "",
 		}},
 	}
 	checkIptables(t, ipt, epIpt)
@@ -3079,6 +3079,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		// previousEndpoints and currentEndpoints are used to call appropriate
 		// handlers OnEndpoints* (based on whether corresponding values are nil
 		// or non-nil) and must be of equal length.
+		name                      string
 		previousEndpoints         []*discovery.EndpointSlice
 		currentEndpoints          []*discovery.EndpointSlice
 		oldEndpoints              map[proxy.ServicePortName][]*proxy.BaseEndpointInfo
@@ -3088,6 +3089,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks      map[types.NamespacedName]int
 	}{{
 		// Case[0]: nothing
+		name:                      "nothing",
 		oldEndpoints:              map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{},
 		expectedResult:            map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
@@ -3095,6 +3097,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[1]: no change, named port, local
+		name:              "no change, named port, local",
 		previousEndpoints: namedPortLocal,
 		currentEndpoints:  namedPortLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
@@ -3114,6 +3117,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[2]: no change, multiple subsets
+		name:              "no change, multiple subsets",
 		previousEndpoints: multipleSubsets,
 		currentEndpoints:  multipleSubsets,
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
@@ -3137,6 +3141,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[3]: no change, multiple subsets, multiple ports, local
+		name:              "no change, multiple subsets, multiple ports, local",
 		previousEndpoints: multipleSubsetsMultiplePortsLocal,
 		currentEndpoints:  multipleSubsetsMultiplePortsLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
@@ -3168,6 +3173,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[4]: no change, multiple endpoints, subsets, IPs, and ports
+		name:              "no change, multiple endpoints, subsets, IPs, and ports",
 		previousEndpoints: multipleSubsetsIPsPorts,
 		currentEndpoints:  multipleSubsetsIPsPorts,
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
@@ -3230,6 +3236,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[5]: add an Endpoints
+		name:              "add an Endpoints",
 		previousEndpoints: []*discovery.EndpointSlice{nil},
 		currentEndpoints:  namedPortLocal,
 		oldEndpoints:      map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{},
@@ -3247,6 +3254,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[6]: remove an Endpoints
+		name:              "remove an Endpoints",
 		previousEndpoints: namedPortLocal,
 		currentEndpoints:  []*discovery.EndpointSlice{nil},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
@@ -3263,6 +3271,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[7]: add an IP and port
+		name:              "add an IP and port",
 		previousEndpoints: namedPort,
 		currentEndpoints:  namedPortsLocalNoLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
@@ -3289,6 +3298,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[8]: remove an IP and port
+		name:              "remove an IP and port",
 		previousEndpoints: namedPortsLocalNoLocal,
 		currentEndpoints:  namedPort,
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
@@ -3320,6 +3330,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[9]: add a subset
+		name:              "add a subset",
 		previousEndpoints: []*discovery.EndpointSlice{namedPort[0], nil},
 		currentEndpoints:  multipleSubsetsWithLocal,
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
@@ -3344,6 +3355,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 	}, {
 		// Case[10]: remove a subset
+		name:              "remove a subset",
 		previousEndpoints: multipleSubsets,
 		currentEndpoints:  []*discovery.EndpointSlice{namedPort[0], nil},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
@@ -3367,6 +3379,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[11]: rename a port
+		name:              "rename a port",
 		previousEndpoints: namedPort,
 		currentEndpoints:  namedPortRenamed,
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
@@ -3389,6 +3402,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks: map[types.NamespacedName]int{},
 	}, {
 		// Case[12]: renumber a port
+		name:              "renumber a port",
 		previousEndpoints: namedPort,
 		currentEndpoints:  namedPortRenumbered,
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
@@ -3409,6 +3423,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		expectedHealthchecks:      map[types.NamespacedName]int{},
 	}, {
 		// Case[13]: complex add and remove
+		name:              "complex add and remove",
 		previousEndpoints: complexBefore,
 		currentEndpoints:  complexAfter,
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
@@ -3473,7 +3488,8 @@ func Test_updateEndpointsMap(t *testing.T) {
 			makeNSN("ns4", "ep4"): 1,
 		},
 	}, {
-		// Case[15]: change from 0 endpoint address to 1 named port
+		// Case[14]: change from 0 endpoint address to 1 named port
+		name:              "change from 0 endpoint address to 1 named port",
 		previousEndpoints: emptyEndpointSlices,
 		currentEndpoints:  namedPort,
 		oldEndpoints:      map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{},
@@ -3491,75 +3507,76 @@ func Test_updateEndpointsMap(t *testing.T) {
 	}
 
 	for tci, tc := range testCases {
-		ipt := iptablestest.NewFake()
-		ipvs := ipvstest.NewFake()
-		ipset := ipsettest.NewFake(testIPSetVersion)
-		fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
-		fp.hostname = nodeName
+		t.Run(tc.name, func(t *testing.T) {
+			ipt := iptablestest.NewFake()
+			ipvs := ipvstest.NewFake()
+			ipset := ipsettest.NewFake(testIPSetVersion)
+			fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+			fp.hostname = nodeName
 
-		// First check that after adding all previous versions of endpoints,
-		// the fp.oldEndpoints is as we expect.
-		for i := range tc.previousEndpoints {
-			if tc.previousEndpoints[i] != nil {
-				fp.OnEndpointSliceAdd(tc.previousEndpoints[i])
-			}
-		}
-		fp.endpointsMap.Update(fp.endpointsChanges)
-		compareEndpointsMaps(t, tci, fp.endpointsMap, tc.oldEndpoints)
-
-		// Now let's call appropriate handlers to get to state we want to be.
-		if len(tc.previousEndpoints) != len(tc.currentEndpoints) {
-			t.Fatalf("[%d] different lengths of previous and current endpoints", tci)
-			continue
-		}
-
-		for i := range tc.previousEndpoints {
-			prev, curr := tc.previousEndpoints[i], tc.currentEndpoints[i]
-			switch {
-			case prev == nil:
-				fp.OnEndpointSliceAdd(curr)
-			case curr == nil:
-				fp.OnEndpointSliceDelete(prev)
-			default:
-				fp.OnEndpointSliceUpdate(prev, curr)
-			}
-		}
-		result := fp.endpointsMap.Update(fp.endpointsChanges)
-		newMap := fp.endpointsMap
-		compareEndpointsMaps(t, tci, newMap, tc.expectedResult)
-		if len(result.StaleEndpoints) != len(tc.expectedStaleEndpoints) {
-			t.Errorf("[%d] expected %d staleEndpoints, got %d: %v", tci, len(tc.expectedStaleEndpoints), len(result.StaleEndpoints), result.StaleEndpoints)
-		}
-		for _, x := range tc.expectedStaleEndpoints {
-			found := false
-			for _, stale := range result.StaleEndpoints {
-				if stale == x {
-					found = true
-					break
+			// First check that after adding all previous versions of endpoints,
+			// the fp.oldEndpoints is as we expect.
+			for i := range tc.previousEndpoints {
+				if tc.previousEndpoints[i] != nil {
+					fp.OnEndpointSliceAdd(tc.previousEndpoints[i])
 				}
 			}
-			if !found {
-				t.Errorf("[%d] expected staleEndpoints[%v], but didn't find it: %v", tci, x, result.StaleEndpoints)
+			fp.endpointsMap.Update(fp.endpointsChanges)
+			compareEndpointsMaps(t, tci, fp.endpointsMap, tc.oldEndpoints)
+
+			// Now let's call appropriate handlers to get to state we want to be.
+			if len(tc.previousEndpoints) != len(tc.currentEndpoints) {
+				t.Fatalf("[%d] different lengths of previous and current endpoints", tci)
 			}
-		}
-		if len(result.StaleServiceNames) != len(tc.expectedStaleServiceNames) {
-			t.Errorf("[%d] expected %d staleServiceNames, got %d: %v", tci, len(tc.expectedStaleServiceNames), len(result.StaleServiceNames), result.StaleServiceNames)
-		}
-		for svcName := range tc.expectedStaleServiceNames {
-			found := false
-			for _, stale := range result.StaleServiceNames {
-				if stale == svcName {
-					found = true
-					break
+
+			for i := range tc.previousEndpoints {
+				prev, curr := tc.previousEndpoints[i], tc.currentEndpoints[i]
+				switch {
+				case prev == nil:
+					fp.OnEndpointSliceAdd(curr)
+				case curr == nil:
+					fp.OnEndpointSliceDelete(prev)
+				default:
+					fp.OnEndpointSliceUpdate(prev, curr)
 				}
 			}
-			if !found {
-				t.Errorf("[%d] expected staleServiceNames[%v], but didn't find it: %v", tci, svcName, result.StaleServiceNames)
+			result := fp.endpointsMap.Update(fp.endpointsChanges)
+			newMap := fp.endpointsMap
+			compareEndpointsMaps(t, tci, newMap, tc.expectedResult)
+			if len(result.StaleEndpoints) != len(tc.expectedStaleEndpoints) {
+				t.Errorf("[%d] expected %d staleEndpoints, got %d: %v", tci, len(tc.expectedStaleEndpoints), len(result.StaleEndpoints), result.StaleEndpoints)
 			}
-		}
-		if !reflect.DeepEqual(result.HCEndpointsLocalIPSize, tc.expectedHealthchecks) {
-			t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedHealthchecks, result.HCEndpointsLocalIPSize)
-		}
+			for _, x := range tc.expectedStaleEndpoints {
+				found := false
+				for _, stale := range result.StaleEndpoints {
+					if stale == x {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("[%d] expected staleEndpoints[%v], but didn't find it: %v", tci, x, result.StaleEndpoints)
+				}
+			}
+			if len(result.StaleServiceNames) != len(tc.expectedStaleServiceNames) {
+				t.Errorf("[%d] expected %d staleServiceNames, got %d: %v", tci, len(tc.expectedStaleServiceNames), len(result.StaleServiceNames), result.StaleServiceNames)
+			}
+			for svcName := range tc.expectedStaleServiceNames {
+				found := false
+				for _, stale := range result.StaleServiceNames {
+					if stale == svcName {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("[%d] expected staleServiceNames[%v], but didn't find it: %v", tci, svcName, result.StaleServiceNames)
+				}
+			}
+			if !reflect.DeepEqual(result.HCEndpointsLocalIPSize, tc.expectedHealthchecks) {
+				t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedHealthchecks, result.HCEndpointsLocalIPSize)
+			}
+		})
 	}
 }
 
@@ -3769,7 +3786,7 @@ func Test_syncService(t *testing.T) {
 		ipset := ipsettest.NewFake(testIPSetVersion)
 		proxier := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
 
-		proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+		proxier.netlinkHandle.EnsureDummyDevice(defaultDummyDevice)
 		if testCases[i].oldVirtualServer != nil {
 			if err := proxier.ipvs.AddVirtualServer(testCases[i].oldVirtualServer); err != nil {
 				t.Errorf("Case [%d], unexpected add IPVS virtual server error: %v", i, err)
@@ -3950,12 +3967,12 @@ func TestCleanLegacyService(t *testing.T) {
 		fp.ipvs.AddVirtualServer(currentServices[v])
 	}
 
-	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	fp.netlinkHandle.EnsureDummyDevice(defaultDummyDevice)
 	activeBindAddrs := map[string]bool{"1.1.1.1": true, "2.2.2.2": true, "3.3.3.3": true, "4.4.4.4": true}
 	// This is ipv4-only so ipv6 addresses should be ignored
 	currentBindAddrs := []string{"1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5", "6.6.6.6", "fd80::1:2:3", "fd80::1:2:4"}
 	for i := range currentBindAddrs {
-		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], defaultDummyDevice)
 	}
 
 	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"5.5.5.5": true, "6.6.6.6": true})
@@ -3975,7 +3992,7 @@ func TestCleanLegacyService(t *testing.T) {
 	}
 
 	// Addresses 5.5.5.5 and 6.6.6.6 should not be bound any more, but the ipv6 addresses should remain
-	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	if len(remainingAddrs) != 6 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 6, len(remainingAddrs))
 	}
@@ -4049,11 +4066,11 @@ func TestCleanLegacyServiceWithRealServers(t *testing.T) {
 		fp.ipvs.AddRealServer(v, r)
 	}
 
-	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	fp.netlinkHandle.EnsureDummyDevice(defaultDummyDevice)
 	activeBindAddrs := map[string]bool{"3.3.3.3": true}
 	currentBindAddrs := []string{"1.1.1.1", "2.2.2.2", "3.3.3.3"}
 	for i := range currentBindAddrs {
-		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], defaultDummyDevice)
 	}
 
 	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"1.1.1.1": true, "2.2.2.2": true})
@@ -4068,7 +4085,7 @@ func TestCleanLegacyServiceWithRealServers(t *testing.T) {
 		t.Errorf("unexpected IPVS service")
 	}
 
-	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	if len(remainingAddrs) != 1 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
 	}
@@ -4123,9 +4140,9 @@ func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
 		fp.ipvs.AddRealServer(vs, rs)
 	}
 
-	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	fp.netlinkHandle.EnsureDummyDevice(defaultDummyDevice)
 
-	fp.netlinkHandle.EnsureAddressBind("4.4.4.4", DefaultDummyDevice)
+	fp.netlinkHandle.EnsureAddressBind("4.4.4.4", defaultDummyDevice)
 
 	fp.cleanLegacyService(
 		map[string]bool{},
@@ -4207,12 +4224,12 @@ func TestCleanLegacyService6(t *testing.T) {
 		fp.ipvs.AddVirtualServer(currentServices[v])
 	}
 
-	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+	fp.netlinkHandle.EnsureDummyDevice(defaultDummyDevice)
 	activeBindAddrs := map[string]bool{"1000::1": true, "1000::2": true, "3000::1": true, "4000::1": true}
 	// This is ipv6-only so ipv4 addresses should be ignored
 	currentBindAddrs := []string{"1000::1", "1000::2", "3000::1", "4000::1", "5000::1", "1000::6", "1.1.1.1", "2.2.2.2"}
 	for i := range currentBindAddrs {
-		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], DefaultDummyDevice)
+		fp.netlinkHandle.EnsureAddressBind(currentBindAddrs[i], defaultDummyDevice)
 	}
 
 	fp.cleanLegacyService(activeServices, currentServices, map[string]bool{"5000::1": true, "1000::6": true})
@@ -4232,7 +4249,7 @@ func TestCleanLegacyService6(t *testing.T) {
 	}
 
 	// Addresses 5000::1 and 1000::6 should not be bound any more, but the ipv4 addresses should remain
-	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	if len(remainingAddrs) != 6 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 6, len(remainingAddrs))
 	}
@@ -4280,7 +4297,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 	// first, add multi-port service1
 	fp.OnServiceAdd(service1)
 	fp.syncProxyRules()
-	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ := fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	// should only remain address "172.16.55.4"
 	if len(remainingAddrs) != 1 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
@@ -4292,7 +4309,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 	// update multi-port service1 to single-port service2
 	fp.OnServiceUpdate(service1, service2)
 	fp.syncProxyRules()
-	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	// should still only remain address "172.16.55.4"
 	if len(remainingAddrs) != 1 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
@@ -4303,7 +4320,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 	// update single-port service2 to multi-port service3
 	fp.OnServiceUpdate(service2, service3)
 	fp.syncProxyRules()
-	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	// should still only remain address "172.16.55.4"
 	if len(remainingAddrs) != 1 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 1, len(remainingAddrs))
@@ -4314,7 +4331,7 @@ func TestMultiPortServiceBindAddr(t *testing.T) {
 	// delete multi-port service3
 	fp.OnServiceDelete(service3)
 	fp.syncProxyRules()
-	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(DefaultDummyDevice)
+	remainingAddrs, _ = fp.netlinkHandle.ListBindAddress(defaultDummyDevice)
 	// all addresses should be unbound
 	if len(remainingAddrs) != 0 {
 		t.Errorf("Expected number of remaining bound addrs after cleanup to be %v. Got %v", 0, len(remainingAddrs))
@@ -5821,7 +5838,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 		expectedSyncProxyRulesNoLocalEndpointsTotalExternal int
 	}{
 		{
-			name:                  "internalTrafficPolicy is set and there is non-zero local endpoints",
+			name:                  "internalTrafficPolicy is set and there are local endpoints",
 			internalTrafficPolicy: &internalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
@@ -5830,7 +5847,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			},
 		},
 		{
-			name:                  "externalTrafficPolicy is set and there is non-zero local endpoints",
+			name:                  "externalTrafficPolicy is set and there are local endpoints",
 			externalTrafficPolicy: externalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", testHostname},
@@ -5839,7 +5856,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			},
 		},
 		{
-			name:                  "both policies are set and there is non-zero local endpoints",
+			name:                  "both policies are set and there are local endpoints",
 			internalTrafficPolicy: &internalTrafficPolicyLocal,
 			externalTrafficPolicy: externalTrafficPolicyLocal,
 			endpoints: []endpoint{
@@ -5849,7 +5866,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			},
 		},
 		{
-			name:                  "internalTrafficPolicy is set and there is zero local endpoint",
+			name:                  "internalTrafficPolicy is set and there are no local endpoints",
 			internalTrafficPolicy: &internalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
@@ -5859,7 +5876,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 1,
 		},
 		{
-			name:                  "externalTrafficPolicy is set and there is zero local endpoint",
+			name:                  "externalTrafficPolicy is set and there are no local endpoints",
 			externalTrafficPolicy: externalTrafficPolicyLocal,
 			endpoints: []endpoint{
 				{"10.0.1.1", "host0"},
@@ -5869,7 +5886,7 @@ func TestNoEndpointsMetric(t *testing.T) {
 			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 1,
 		},
 		{
-			name:                  "Both policies are set and there is zero local endpoint",
+			name:                  "Both policies are set and there are no local endpoints",
 			internalTrafficPolicy: &internalTrafficPolicyLocal,
 			externalTrafficPolicy: externalTrafficPolicyLocal,
 			endpoints: []endpoint{
@@ -5879,6 +5896,14 @@ func TestNoEndpointsMetric(t *testing.T) {
 			},
 			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 1,
 			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 1,
+		},
+		{
+			name:                  "Both policies are set and there are no endpoints at all",
+			internalTrafficPolicy: &internalTrafficPolicyLocal,
+			externalTrafficPolicy: externalTrafficPolicyLocal,
+			endpoints:             []endpoint{},
+			expectedSyncProxyRulesNoLocalEndpointsTotalInternal: 0,
+			expectedSyncProxyRulesNoLocalEndpointsTotalExternal: 0,
 		},
 	}
 	for _, tc := range testCases {

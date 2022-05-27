@@ -1118,12 +1118,34 @@ function WaitFor_KubeletAndKubeProxyReady {
 }
 
 # Runs 'kubectl get nodes'.
-# TODO(pjh): run more verification commands.
+# Runs additional verification commands to ensure node successfully joined cluster
+# and that it connects to the API Server.
 function Verify-WorkerServices {
-  Log-Output ("kubectl get nodes:`n" +
-              $(& "${env:NODE_DIR}\kubectl.exe" get nodes | Out-String))
+  $timeout = 12
+  $retries = 0
+  $retryDelayInSeconds = 5
+  
+  Log-Output ("Testing node connection to API server...")
+  do {
+      $retries++
+      $nodes_list = & "${env:NODE_DIR}\kubectl.exe" get nodes -o=custom-columns=:.metadata.name -A | Out-String
+      $host_status = & "${env:NODE_DIR}\kubectl.exe" get nodes (hostname) -o=custom-columns=:.status.conditions[4].type | Out-String
+      Start-Sleep $retryDelayInSeconds
+  } while (((-Not $nodes_list) -or (-Not $nodes_list.contains((hostname))) -or (-Not $host_status.contains("Ready")))-and ($retries -le $timeout))
+  
+  If (-Not $nodes_list){
+      Throw ("Node: '$(hostname)' failed to connect to API server")
+  
+  }ElseIf (-Not $nodes_list.contains((hostname))) {
+      Throw ("Node: '$(hostname)' failed to join the cluster; NODES: '`n $($nodes_list)'")
+
+  }ELseIf (-Not $host_status.contains("Ready")) {
+      Throw ("Node: '$(hostname)' is not in Ready state")
+  }
+  
+  Log-Output ("Node: $(hostname) successfully joined cluster `n NODES: `n $($nodes_list)")
   Verify_GceMetadataServerRouteIsPresent
-  Log_Todo "run more verification commands."
+
 }
 
 # Downloads the Windows crictl package and installs its contents (e.g.
@@ -1368,7 +1390,7 @@ function Install_Containerd {
       -Algorithm SHA256
 
   tar xzvf $tmp_dir\containerd.tar.gz -C $tmp_dir
-  Move-Item -Force $tmp_dir\cni\*.exe "${env:CNI_DIR}\"
+  Move-Item -Force $tmp_dir\cni\bin\*.exe "${env:CNI_DIR}\"
   Move-Item -Force $tmp_dir\*.exe "${env:NODE_DIR}\"
   Remove-Item -Force -Recurse $tmp_dir
 

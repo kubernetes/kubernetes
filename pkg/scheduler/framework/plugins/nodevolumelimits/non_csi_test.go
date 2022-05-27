@@ -18,6 +18,7 @@ package nodevolumelimits
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -29,7 +30,52 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	utilpointer "k8s.io/utils/pointer"
+)
+
+var (
+	oneVolPod = st.MakePod().Volume(v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp"},
+		},
+	}).Obj()
+	twoVolPod = st.MakePod().Volume(v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp1"},
+		},
+	}).Volume(v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp2"},
+		},
+	}).Obj()
+	splitVolsPod = st.MakePod().Volume(v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{},
+		},
+	}).Volume(v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "svp"},
+		},
+	}).Obj()
+	nonApplicablePod = st.MakePod().Volume(v1.Volume{
+		VolumeSource: v1.VolumeSource{
+			HostPath: &v1.HostPathVolumeSource{},
+		},
+	}).Obj()
+
+	deletedPVCPod    = st.MakePod().PVC("deletedPVC").Obj()
+	twoDeletedPVCPod = st.MakePod().PVC("deletedPVC").PVC("anotherDeletedPVC").Obj()
+	deletedPVPod     = st.MakePod().PVC("pvcWithDeletedPV").Obj()
+	// deletedPVPod2 is a different pod than deletedPVPod but using the same PVC
+	deletedPVPod2       = st.MakePod().PVC("pvcWithDeletedPV").Obj()
+	anotherDeletedPVPod = st.MakePod().PVC("anotherPVCWithDeletedPV").Obj()
+	emptyPod            = st.MakePod().Obj()
+	unboundPVCPod       = st.MakePod().PVC("unboundPVC").Obj()
+	// Different pod than unboundPVCPod, but using the same unbound PVC
+	unboundPVCPod2 = st.MakePod().PVC("unboundPVC").Obj()
+	// pod with unbound PVC that's different to unboundPVC
+	anotherUnboundPVCPod = st.MakePod().PVC("anotherUnboundPVC").Obj()
 )
 
 func TestEphemeralLimits(t *testing.T) {
@@ -38,23 +84,13 @@ func TestEphemeralLimits(t *testing.T) {
 	filterName := gcePDVolumeFilterType
 	driverName := csilibplugins.GCEPDInTreePluginName
 
-	ephemeralVolumePod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "test",
-			Name:      "abc",
-			UID:       "12345",
+	ephemeralVolumePod := st.MakePod().Name("abc").Namespace("test").UID("12345").Volume(v1.Volume{
+		Name: "xyz",
+		VolumeSource: v1.VolumeSource{
+			Ephemeral: &v1.EphemeralVolumeSource{},
 		},
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					Name: "xyz",
-					VolumeSource: v1.VolumeSource{
-						Ephemeral: &v1.EphemeralVolumeSource{},
-					},
-				},
-			},
-		},
-	}
+	}).Obj()
+
 	controller := true
 	ephemeralClaim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -130,180 +166,6 @@ func TestEphemeralLimits(t *testing.T) {
 }
 
 func TestAzureDiskLimits(t *testing.T) {
-	oneVolPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp"},
-					},
-				},
-			},
-		},
-	}
-	twoVolPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp1"},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp2"},
-					},
-				},
-			},
-		},
-	}
-	splitVolsPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						HostPath: &v1.HostPathVolumeSource{},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "svp"},
-					},
-				},
-			},
-		},
-	}
-	nonApplicablePod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						HostPath: &v1.HostPathVolumeSource{},
-					},
-				},
-			},
-		},
-	}
-	deletedPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "deletedPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-	twoDeletedPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "deletedPVC",
-						},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "anotherDeletedPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-	deletedPVPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvcWithDeletedPV",
-						},
-					},
-				},
-			},
-		},
-	}
-	// deletedPVPod2 is a different pod than deletedPVPod but using the same PVC
-	deletedPVPod2 := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvcWithDeletedPV",
-						},
-					},
-				},
-			},
-		},
-	}
-	// anotherDeletedPVPod is a different pod than deletedPVPod and uses another PVC
-	anotherDeletedPVPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "anotherPVCWithDeletedPV",
-						},
-					},
-				},
-			},
-		},
-	}
-	emptyPod := &v1.Pod{
-		Spec: v1.PodSpec{},
-	}
-	unboundPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "unboundPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-	// Different pod than unboundPVCPod, but using the same unbound PVC
-	unboundPVCPod2 := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "unboundPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// pod with unbound PVC that's different to unboundPVC
-	anotherUnboundPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "anotherUnboundPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-
 	tests := []struct {
 		newPod       *v1.Pod
 		existingPods []*v1.Pod
@@ -468,205 +330,8 @@ func TestAzureDiskLimits(t *testing.T) {
 }
 
 func TestEBSLimits(t *testing.T) {
-	oneVolPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp"},
-					},
-				},
-			},
-		},
-	}
-	twoVolPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp1"},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp2"},
-					},
-				},
-			},
-		},
-	}
-	unboundPVCwithInvalidSCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "unboundPVCwithInvalidSCPod",
-						},
-					},
-				},
-			},
-		},
-	}
-	unboundPVCwithDefaultSCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "unboundPVCwithDefaultSCPod",
-						},
-					},
-				},
-			},
-		},
-	}
-	splitVolsPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						HostPath: &v1.HostPathVolumeSource{},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "svp"},
-					},
-				},
-			},
-		},
-	}
-	nonApplicablePod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						HostPath: &v1.HostPathVolumeSource{},
-					},
-				},
-			},
-		},
-	}
-	deletedPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "deletedPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-	twoDeletedPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "deletedPVC",
-						},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "anotherDeletedPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-	deletedPVPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvcWithDeletedPV",
-						},
-					},
-				},
-			},
-		},
-	}
-	// deletedPVPod2 is a different pod than deletedPVPod but using the same PVC
-	deletedPVPod2 := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvcWithDeletedPV",
-						},
-					},
-				},
-			},
-		},
-	}
-	// anotherDeletedPVPod is a different pod than deletedPVPod and uses another PVC
-	anotherDeletedPVPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "anotherPVCWithDeletedPV",
-						},
-					},
-				},
-			},
-		},
-	}
-	emptyPod := &v1.Pod{
-		Spec: v1.PodSpec{},
-	}
-	unboundPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "unboundPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-	// Different pod than unboundPVCPod, but using the same unbound PVC
-	unboundPVCPod2 := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "unboundPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// pod with unbound PVC that's different to unboundPVC
-	anotherUnboundPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "anotherUnboundPVC",
-						},
-					},
-				},
-			},
-		},
-	}
+	unboundPVCWithInvalidSCPod := st.MakePod().PVC("unboundPVCWithInvalidSCPod").Obj()
+	unboundPVCWithDefaultSCPod := st.MakePod().PVC("unboundPVCWithDefaultSCPod").Obj()
 
 	tests := []struct {
 		newPod       *v1.Pod
@@ -777,7 +442,7 @@ func TestEBSLimits(t *testing.T) {
 			test:         "two missing PVCs are not counted towards the PV limit twice",
 		},
 		{
-			newPod:       unboundPVCwithInvalidSCPod,
+			newPod:       unboundPVCWithInvalidSCPod,
 			existingPods: []*v1.Pod{oneVolPod},
 			filterName:   ebsVolumeFilterType,
 			driverName:   csilibplugins.AWSEBSInTreePluginName,
@@ -785,14 +450,13 @@ func TestEBSLimits(t *testing.T) {
 			test:         "unbound PVC with invalid SC is not counted towards the PV limit",
 		},
 		{
-			newPod:       unboundPVCwithDefaultSCPod,
+			newPod:       unboundPVCWithDefaultSCPod,
 			existingPods: []*v1.Pod{oneVolPod},
 			filterName:   ebsVolumeFilterType,
 			driverName:   csilibplugins.AWSEBSInTreePluginName,
 			maxVols:      1,
 			test:         "unbound PVC from different provisioner is not counted towards the PV limit",
 		},
-
 		{
 			newPod:       onePVCPod(ebsVolumeFilterType),
 			existingPods: []*v1.Pod{oneVolPod, deletedPVPod},
@@ -876,180 +540,6 @@ func TestEBSLimits(t *testing.T) {
 }
 
 func TestGCEPDLimits(t *testing.T) {
-	oneVolPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "ovp"},
-					},
-				},
-			},
-		},
-	}
-	twoVolPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp1"},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "tvp2"},
-					},
-				},
-			},
-		},
-	}
-	splitVolsPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						HostPath: &v1.HostPathVolumeSource{},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{VolumeID: "svp"},
-					},
-				},
-			},
-		},
-	}
-	nonApplicablePod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						HostPath: &v1.HostPathVolumeSource{},
-					},
-				},
-			},
-		},
-	}
-	deletedPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "deletedPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-	twoDeletedPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "deletedPVC",
-						},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "anotherDeletedPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-	deletedPVPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvcWithDeletedPV",
-						},
-					},
-				},
-			},
-		},
-	}
-	// deletedPVPod2 is a different pod than deletedPVPod but using the same PVC
-	deletedPVPod2 := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "pvcWithDeletedPV",
-						},
-					},
-				},
-			},
-		},
-	}
-	// anotherDeletedPVPod is a different pod than deletedPVPod and uses another PVC
-	anotherDeletedPVPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "anotherPVCWithDeletedPV",
-						},
-					},
-				},
-			},
-		},
-	}
-	emptyPod := &v1.Pod{
-		Spec: v1.PodSpec{},
-	}
-	unboundPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "unboundPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-	// Different pod than unboundPVCPod, but using the same unbound PVC
-	unboundPVCPod2 := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "unboundPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// pod with unbound PVC that's different to unboundPVC
-	anotherUnboundPVCPod := &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "anotherUnboundPVC",
-						},
-					},
-				},
-			},
-		},
-	}
-
 	tests := []struct {
 		newPod       *v1.Pod
 		existingPods []*v1.Pod
@@ -1299,14 +789,14 @@ func getFakePVCLister(filterName string) fakeframework.PersistentVolumeClaimList
 			},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCwithDefaultSCPod"},
+			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCWithDefaultSCPod"},
 			Spec: v1.PersistentVolumeClaimSpec{
 				VolumeName:       "",
 				StorageClassName: utilpointer.StringPtr("standard-sc"),
 			},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCwithInvalidSCPod"},
+			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCWithInvalidSCPod"},
 			Spec: v1.PersistentVolumeClaimSpec{
 				VolumeName:       "",
 				StorageClassName: utilpointer.StringPtr("invalid-sc"),
@@ -1335,40 +825,9 @@ func getFakePVLister(filterName string) fakeframework.PersistentVolumeLister {
 }
 
 func onePVCPod(filterName string) *v1.Pod {
-	return &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "some" + filterName + "Vol",
-						},
-					},
-				},
-			},
-		},
-	}
+	return st.MakePod().PVC(fmt.Sprintf("some%sVol", filterName)).Obj()
 }
 
 func splitPVCPod(filterName string) *v1.Pod {
-	return &v1.Pod{
-		Spec: v1.PodSpec{
-			Volumes: []v1.Volume{
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "someNon" + filterName + "Vol",
-						},
-					},
-				},
-				{
-					VolumeSource: v1.VolumeSource{
-						PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-							ClaimName: "some" + filterName + "Vol",
-						},
-					},
-				},
-			},
-		},
-	}
+	return st.MakePod().PVC(fmt.Sprintf("someNon%sVol", filterName)).PVC(fmt.Sprintf("some%sVol", filterName)).Obj()
 }

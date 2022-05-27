@@ -896,11 +896,6 @@ func (p *csiPlugin) getVolumeLifecycleMode(spec *volume.Spec) (storage.VolumeLif
 // getFSGroupPolicy returns if the CSI driver supports a volume in the given mode.
 // An error indicates that it isn't supported and explains why.
 func (p *csiPlugin) getFSGroupPolicy(driver string) (storage.FSGroupPolicy, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
-		// feature is disabled, default to ReadWriteOnceWithFSTypeFSGroupPolicy
-		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, nil
-	}
-
 	// Retrieve CSIDriver. It's not an error if that isn't
 	// possible (we don't have the lister if CSIDriverRegistry is
 	// disabled) or the driver isn't found (CSIDriver is

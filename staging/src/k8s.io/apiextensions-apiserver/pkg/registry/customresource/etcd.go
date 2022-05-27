@@ -43,43 +43,7 @@ type CustomResourceStorage struct {
 }
 
 func NewStorage(resource schema.GroupResource, kind, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string, tableConvertor rest.TableConvertor, replicasPathMapping fieldmanager.ResourcePathMappings) CustomResourceStorage {
-	customResourceREST, customResourceStatusREST := newREST(resource, kind, listKind, strategy, optsGetter, categories, tableConvertor)
-
-	s := CustomResourceStorage{
-		CustomResource: customResourceREST,
-	}
-
-	if strategy.status != nil {
-		s.Status = customResourceStatusREST
-	}
-
-	if scale := strategy.scale; scale != nil {
-		var labelSelectorPath string
-		if scale.LabelSelectorPath != nil {
-			labelSelectorPath = *scale.LabelSelectorPath
-		}
-
-		s.Scale = &ScaleREST{
-			store:               customResourceREST.Store,
-			specReplicasPath:    scale.SpecReplicasPath,
-			statusReplicasPath:  scale.StatusReplicasPath,
-			labelSelectorPath:   labelSelectorPath,
-			parentGV:            kind.GroupVersion(),
-			replicasPathMapping: replicasPathMapping,
-		}
-	}
-
-	return s
-}
-
-// REST implements a RESTStorage for API services against etcd
-type REST struct {
-	*genericregistry.Store
-	categories []string
-}
-
-// newREST returns a RESTStorage object that will work against API services.
-func newREST(resource schema.GroupResource, kind, listKind schema.GroupVersionKind, strategy customResourceStrategy, optsGetter generic.RESTOptionsGetter, categories []string, tableConvertor rest.TableConvertor) (*REST, *StatusREST) {
+	var storage CustomResourceStorage
 	store := &genericregistry.Store{
 		NewFunc: func() runtime.Object {
 			// set the expected group/version/kind in the new object as a signal to the versioning decoder
@@ -107,12 +71,39 @@ func newREST(resource schema.GroupResource, kind, listKind schema.GroupVersionKi
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
+	storage.CustomResource = &REST{store, categories}
 
-	statusStore := *store
-	statusStrategy := NewStatusStrategy(strategy)
-	statusStore.UpdateStrategy = statusStrategy
-	statusStore.ResetFieldsStrategy = statusStrategy
-	return &REST{store, categories}, &StatusREST{store: &statusStore}
+	if strategy.status != nil {
+		statusStore := *store
+		statusStrategy := NewStatusStrategy(strategy)
+		statusStore.UpdateStrategy = statusStrategy
+		statusStore.ResetFieldsStrategy = statusStrategy
+		storage.Status = &StatusREST{store: &statusStore}
+	}
+
+	if scale := strategy.scale; scale != nil {
+		var labelSelectorPath string
+		if scale.LabelSelectorPath != nil {
+			labelSelectorPath = *scale.LabelSelectorPath
+		}
+
+		storage.Scale = &ScaleREST{
+			store:               store,
+			specReplicasPath:    scale.SpecReplicasPath,
+			statusReplicasPath:  scale.StatusReplicasPath,
+			labelSelectorPath:   labelSelectorPath,
+			parentGV:            kind.GroupVersion(),
+			replicasPathMapping: replicasPathMapping,
+		}
+	}
+
+	return storage
+}
+
+// REST implements a RESTStorage for API services against etcd
+type REST struct {
+	*genericregistry.Store
+	categories []string
 }
 
 // Implement CategoriesProvider

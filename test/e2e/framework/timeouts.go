@@ -31,7 +31,7 @@ const (
 	pvReclaimTimeout                 = 3 * time.Minute
 	pvBoundTimeout                   = 3 * time.Minute
 	pvCreateTimeout                  = 3 * time.Minute
-	pvDeleteTimeout                  = 3 * time.Minute
+	pvDeleteTimeout                  = 5 * time.Minute
 	pvDeleteSlowTimeout              = 20 * time.Minute
 	snapshotCreateTimeout            = 5 * time.Minute
 	snapshotDeleteTimeout            = 5 * time.Minute

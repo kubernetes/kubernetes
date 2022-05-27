@@ -49,7 +49,7 @@ const (
 	// is expected to fail.
 	ExpectProvisionFailureKey = "expect-provision-failure"
 	// The node is marked as uncertain. The attach operation will fail and return timeout error
-	// for the first attach call. The following call will return sucesssfully.
+	// for the first attach call. The following call will return successfully.
 	UncertainAttachNode = "uncertain-attach-node"
 	// The detach operation will keep failing on the node.
 	FailDetachNode = "fail-detach-node"

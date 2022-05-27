@@ -30,7 +30,7 @@ import (
 	"os"
 )
 
-const success = "\033[0;32mSUCESS\033[0m"
+const success = "\033[0;32mSUCCESS\033[0m"
 const failed = "\033[0;31mFAILED\033[0m"
 const notConfigured = "\033[0;34mNOT CONFIGURED\033[0m"
 const skipped = "\033[0;34mSKIPPED\033[0m"

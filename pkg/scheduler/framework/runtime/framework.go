@@ -227,9 +227,9 @@ func WithCaptureProfile(c CaptureProfile) Option {
 	}
 }
 
-func defaultFrameworkOptions() frameworkOptions {
+func defaultFrameworkOptions(stopCh <-chan struct{}) frameworkOptions {
 	return frameworkOptions{
-		metricsRecorder: newMetricsRecorder(1000, time.Second),
+		metricsRecorder: newMetricsRecorder(1000, time.Second, stopCh),
 		clusterEventMap: make(map[framework.ClusterEvent]sets.String),
 		parallelizer:    parallelize.NewParallelizer(parallelize.DefaultParallelism),
 	}
@@ -245,8 +245,8 @@ func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
 var _ framework.Framework = &frameworkImpl{}
 
 // NewFramework initializes plugins given the configuration and the registry.
-func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Option) (framework.Framework, error) {
-	options := defaultFrameworkOptions()
+func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-chan struct{}, opts ...Option) (framework.Framework, error) {
+	options := defaultFrameworkOptions(stopCh)
 	for _, opt := range opts {
 		opt(&options)
 	}
@@ -295,7 +295,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 	pluginsMap := make(map[string]framework.Plugin)
 	for name, factory := range r {
 		// initialize only needed plugins.
-		if _, ok := pg[name]; !ok {
+		if !pg.Has(name) {
 			continue
 		}
 
@@ -1038,7 +1038,7 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state *framework.Cyc
 	}
 	for _, bp := range f.bindPlugins {
 		status = f.runBindPlugin(ctx, bp, state, pod, nodeName)
-		if status != nil && status.Code() == framework.Skip {
+		if status.IsSkip() {
 			continue
 		}
 		if !status.IsSuccess() {
@@ -1158,7 +1158,7 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 				status.SetFailedPlugin(pl.Name())
 				return status
 			}
-			if status.Code() == framework.Wait {
+			if status.IsWait() {
 				// Not allowed to be greater than maxTimeout.
 				if timeout > maxTimeout {
 					timeout = maxTimeout

@@ -231,7 +231,12 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
 		// We have feature gating in APIServer to strip the spec
 		// so don't need to re-check feature gate, just check length of Constraints.
-		constraints, err = filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.DoNotSchedule, pl.enableMinDomainsInPodTopologySpread)
+		constraints, err = filterTopologySpreadConstraints(
+			pod.Spec.TopologySpreadConstraints,
+			v1.DoNotSchedule,
+			pl.enableMinDomainsInPodTopologySpread,
+			pl.enableNodeInclusionPolicyInPodTopologySpread,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("obtaining pod's hard topology spread constraints: %w", err)
 		}
@@ -251,8 +256,8 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 		TpPairToMatchNum:     make(map[topologyPair]int, sizeHeuristic(len(allNodes), constraints)),
 	}
 
-	requiredSchedulingTerm := nodeaffinity.GetRequiredNodeAffinity(pod)
 	tpCountsByNode := make([]map[topologyPair]int, len(allNodes))
+	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
@@ -260,13 +265,15 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 			klog.ErrorS(nil, "Node not found")
 			return
 		}
-		// In accordance to design, if NodeAffinity or NodeSelector is defined,
-		// spreading is applied to nodes that pass those filters.
-		// Ignore parsing errors for backwards compatibility.
-		match, _ := requiredSchedulingTerm.Match(node)
-		if !match {
-			return
+
+		if !pl.enableNodeInclusionPolicyInPodTopologySpread {
+			// spreading is applied to nodes that pass those filters.
+			// Ignore parsing errors for backwards compatibility.
+			if match, _ := requiredNodeAffinity.Match(node); !match {
+				return
+			}
 		}
+
 		// Ensure current node's labels contains all topologyKeys in 'Constraints'.
 		if !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
 			return
@@ -274,6 +281,11 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 
 		tpCounts := make(map[topologyPair]int, len(constraints))
 		for _, c := range constraints {
+			if pl.enableNodeInclusionPolicyInPodTopologySpread &&
+				!c.matchNodeInclusionPolicies(pod, node, requiredNodeAffinity) {
+				continue
+			}
+
 			pair := topologyPair{key: c.TopologyKey, value: node.Labels[c.TopologyKey]}
 			count := countPodsMatchSelector(nodeInfo.Pods, c.Selector, pod.Namespace)
 			tpCounts[pair] = count

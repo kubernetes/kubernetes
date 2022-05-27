@@ -549,7 +549,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		Allocatable:      n.Allocatable.Clone(),
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      n.ImageStates,
-		PVCRefCounts:     n.PVCRefCounts,
+		PVCRefCounts:     make(map[string]int),
 		Generation:       n.Generation,
 	}
 	if len(n.Pods) > 0 {
@@ -570,6 +570,9 @@ func (n *NodeInfo) Clone() *NodeInfo {
 	}
 	if len(n.PodsWithRequiredAntiAffinity) > 0 {
 		clone.PodsWithRequiredAntiAffinity = append([]*PodInfo(nil), n.PodsWithRequiredAntiAffinity...)
+	}
+	for key, value := range n.PVCRefCounts {
+		clone.PVCRefCounts[key] = value
 	}
 	return clone
 }
@@ -770,7 +773,7 @@ func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
 			continue
 		}
 
-		key := pod.Namespace + "/" + v.PersistentVolumeClaim.ClaimName
+		key := GetNamespacedName(pod.Namespace, v.PersistentVolumeClaim.ClaimName)
 		if add {
 			n.PVCRefCounts[key] += 1
 		} else {
@@ -795,40 +798,6 @@ func (n *NodeInfo) RemoveNode() {
 	n.Generation = nextGeneration()
 }
 
-// FilterOutPods receives a list of pods and filters out those whose node names
-// are equal to the node of this NodeInfo, but are not found in the pods of this NodeInfo.
-//
-// Preemption logic simulates removal of pods on a node by removing them from the
-// corresponding NodeInfo. In order for the simulation to work, we call this method
-// on the pods returned from SchedulerCache, so that predicate functions see
-// only the pods that are not removed from the NodeInfo.
-func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
-	node := n.Node()
-	if node == nil {
-		return pods
-	}
-	filtered := make([]*v1.Pod, 0, len(pods))
-	for _, p := range pods {
-		if p.Spec.NodeName != node.Name {
-			filtered = append(filtered, p)
-			continue
-		}
-		// If pod is on the given node, add it to 'filtered' only if it is present in nodeInfo.
-		podKey, err := GetPodKey(p)
-		if err != nil {
-			continue
-		}
-		for _, np := range n.Pods {
-			npodkey, _ := GetPodKey(np.Pod)
-			if npodkey == podKey {
-				filtered = append(filtered, p)
-				break
-			}
-		}
-	}
-	return filtered
-}
-
 // GetPodKey returns the string key of a pod.
 func GetPodKey(pod *v1.Pod) (string, error) {
 	uid := string(pod.UID)
@@ -836,6 +805,11 @@ func GetPodKey(pod *v1.Pod) (string, error) {
 		return "", errors.New("cannot get cache key for pod with empty UID")
 	}
 	return uid, nil
+}
+
+// GetNamespacedName returns the string format of a namespaced resource name.
+func GetNamespacedName(namespace, name string) string {
+	return fmt.Sprintf("%s/%s", namespace, name)
 }
 
 // DefaultBindAllHostIP defines the default ip address used to bind to all host.

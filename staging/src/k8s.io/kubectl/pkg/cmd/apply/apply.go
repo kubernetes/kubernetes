@@ -193,7 +193,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(cmd, baseName, args)
 			cmdutil.CheckErr(err)
-			cmdutil.CheckErr(o.Validate(cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -230,6 +230,10 @@ func (flags *ApplyFlags) AddFlags(cmd *cobra.Command) {
 
 // ToOptions converts from CLI inputs to runtime inputs
 func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []string) (*ApplyOptions, error) {
+	if len(args) != 0 {
+		return nil, cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
+	}
+
 	serverSideApply := cmdutil.GetServerSideApplyFlag(cmd)
 	forceConflicts := cmdutil.GetForceConflictsFlag(cmd)
 	dryRunStrategy, err := cmdutil.GetDryRunStrategy(cmd)
@@ -344,11 +348,7 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 }
 
 // Validate verifies if ApplyOptions are valid and without conflicts.
-func (o *ApplyOptions) Validate(cmd *cobra.Command, args []string) error {
-	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
-	}
-
+func (o *ApplyOptions) Validate() error {
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}

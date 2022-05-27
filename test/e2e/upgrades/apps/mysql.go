@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -32,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -181,7 +183,7 @@ func (t *MySQLUpgradeTest) Teardown(f *framework.Framework) {
 func (t *MySQLUpgradeTest) addName(name string) error {
 	val := map[string][]string{"name": {name}}
 	t.nextWrite++
-	r, err := http.PostForm(fmt.Sprintf("http://%s:8080/addName", t.ip), val)
+	r, err := http.PostForm(fmt.Sprintf("http://%s/addName", net.JoinHostPort(t.ip, "8080")), val)
 	if err != nil {
 		return err
 	}
@@ -199,7 +201,7 @@ func (t *MySQLUpgradeTest) addName(name string) error {
 // countNames checks to make sure the values in testing.users are available, and returns
 // the count of them.
 func (t *MySQLUpgradeTest) countNames() (int, error) {
-	r, err := http.Get(fmt.Sprintf("http://%s:8080/countNames", t.ip))
+	r, err := http.Get(fmt.Sprintf("http://%s/countNames", net.JoinHostPort(t.ip, "8080")))
 	if err != nil {
 		return 0, err
 	}

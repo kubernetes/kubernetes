@@ -2423,6 +2423,7 @@ func autoConvert_v1_CSIPersistentVolumeSource_To_core_CSIPersistentVolumeSource(
 	out.NodeStageSecretRef = (*core.SecretReference)(unsafe.Pointer(in.NodeStageSecretRef))
 	out.NodePublishSecretRef = (*core.SecretReference)(unsafe.Pointer(in.NodePublishSecretRef))
 	out.ControllerExpandSecretRef = (*core.SecretReference)(unsafe.Pointer(in.ControllerExpandSecretRef))
+	out.NodeExpandSecretRef = (*core.SecretReference)(unsafe.Pointer(in.NodeExpandSecretRef))
 	return nil
 }
 
@@ -2441,6 +2442,7 @@ func autoConvert_core_CSIPersistentVolumeSource_To_v1_CSIPersistentVolumeSource(
 	out.NodeStageSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.NodeStageSecretRef))
 	out.NodePublishSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.NodePublishSecretRef))
 	out.ControllerExpandSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.ControllerExpandSecretRef))
+	out.NodeExpandSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.NodeExpandSecretRef))
 	return nil
 }
 
@@ -7995,6 +7997,8 @@ func autoConvert_v1_TopologySpreadConstraint_To_core_TopologySpreadConstraint(in
 	out.WhenUnsatisfiable = core.UnsatisfiableConstraintAction(in.WhenUnsatisfiable)
 	out.LabelSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
 	out.MinDomains = (*int32)(unsafe.Pointer(in.MinDomains))
+	out.NodeAffinityPolicy = (*core.NodeInclusionPolicy)(unsafe.Pointer(in.NodeAffinityPolicy))
+	out.NodeTaintsPolicy = (*core.NodeInclusionPolicy)(unsafe.Pointer(in.NodeTaintsPolicy))
 	return nil
 }
 
@@ -8009,6 +8013,8 @@ func autoConvert_core_TopologySpreadConstraint_To_v1_TopologySpreadConstraint(in
 	out.WhenUnsatisfiable = v1.UnsatisfiableConstraintAction(in.WhenUnsatisfiable)
 	out.LabelSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
 	out.MinDomains = (*int32)(unsafe.Pointer(in.MinDomains))
+	out.NodeAffinityPolicy = (*v1.NodeInclusionPolicy)(unsafe.Pointer(in.NodeAffinityPolicy))
+	out.NodeTaintsPolicy = (*v1.NodeInclusionPolicy)(unsafe.Pointer(in.NodeTaintsPolicy))
 	return nil
 }
 

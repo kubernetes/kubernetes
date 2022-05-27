@@ -179,7 +179,7 @@ func (k *kubeManager) createNamespace(ns *v1.Namespace) (*v1.Namespace, error) {
 	enforcePodSecurityBaseline(ns)
 	createdNamespace, err := k.clientSet.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("unable to update namespace %s: %w", ns.Name, err)
+		return nil, fmt.Errorf("unable to create namespace %s: %w", ns.Name, err)
 	}
 	return createdNamespace, nil
 }
@@ -203,7 +203,7 @@ func (k *kubeManager) createPod(pod *v1.Pod) (*v1.Pod, error) {
 
 	createdPod, err := k.clientSet.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("unable to update pod %s/%s: %w", ns, pod.Name, err)
+		return nil, fmt.Errorf("unable to create pod %s/%s: %w", ns, pod.Name, err)
 	}
 	return createdPod, nil
 }

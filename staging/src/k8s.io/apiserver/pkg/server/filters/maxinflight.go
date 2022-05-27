@@ -61,13 +61,13 @@ func handleError(w http.ResponseWriter, r *http.Request, err error) {
 // requestWatermark is used to track maximal numbers of requests in a particular phase of handling
 type requestWatermark struct {
 	phase                                string
-	readOnlyObserver, mutatingObserver   fcmetrics.RatioedChangeObserver
+	readOnlyObserver, mutatingObserver   fcmetrics.RatioedGauge
 	lock                                 sync.Mutex
 	readOnlyWatermark, mutatingWatermark int
 }
 
 func (w *requestWatermark) recordMutating(mutatingVal int) {
-	w.mutatingObserver.Observe(float64(mutatingVal))
+	w.mutatingObserver.Set(float64(mutatingVal))
 
 	w.lock.Lock()
 	defer w.lock.Unlock()
@@ -78,7 +78,7 @@ func (w *requestWatermark) recordMutating(mutatingVal int) {
 }
 
 func (w *requestWatermark) recordReadOnly(readOnlyVal int) {
-	w.readOnlyObserver.Observe(float64(readOnlyVal))
+	w.readOnlyObserver.Set(float64(readOnlyVal))
 
 	w.lock.Lock()
 	defer w.lock.Unlock()
@@ -91,8 +91,8 @@ func (w *requestWatermark) recordReadOnly(readOnlyVal int) {
 // watermark tracks requests being executed (not waiting in a queue)
 var watermark = &requestWatermark{
 	phase:            metrics.ExecutingPhase,
-	readOnlyObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{metrics.ReadOnlyKind}).RequestsExecuting,
-	mutatingObserver: fcmetrics.ReadWriteConcurrencyObserverPairGenerator.Generate(1, 1, []string{metrics.MutatingKind}).RequestsExecuting,
+	readOnlyObserver: fcmetrics.ReadWriteConcurrencyGaugeVec.NewForLabelValuesSafe(0, 1, []string{fcmetrics.LabelValueExecuting, metrics.ReadOnlyKind}),
+	mutatingObserver: fcmetrics.ReadWriteConcurrencyGaugeVec.NewForLabelValuesSafe(0, 1, []string{fcmetrics.LabelValueExecuting, metrics.MutatingKind}),
 }
 
 // startWatermarkMaintenance starts the goroutines to observe and maintain the specified watermark.

@@ -19,22 +19,23 @@ package statefulset
 import (
 	"context"
 	"fmt"
-	"net/http/httptest"
 	"testing"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	typedappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	//svc "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
@@ -158,7 +159,7 @@ func newStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 }
 
 // scSetup sets up necessities for Statefulset integration test, including control plane, apiserver, informers, and clientset
-func scSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
+func scSetup(t *testing.T) (framework.CloseFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
@@ -178,15 +179,15 @@ func scSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *statefulset.
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "statefulset-controller")),
 	)
 
-	return s, closeFn, sc, informers, clientSet
+	return closeFn, sc, informers, clientSet
 }
 
 // Run STS controller and informers
-func runControllerAndInformers(sc *statefulset.StatefulSetController, informers informers.SharedInformerFactory) chan struct{} {
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go sc.Run(context.TODO(), 5)
-	return stopCh
+func runControllerAndInformers(sc *statefulset.StatefulSetController, informers informers.SharedInformerFactory) context.CancelFunc {
+	ctx, cancel := context.WithCancel(context.Background())
+	informers.Start(ctx.Done())
+	go sc.Run(ctx, 5)
+	return cancel
 }
 
 func createHeadlessService(t *testing.T, clientSet clientset.Interface, headlessService *v1.Service) {
@@ -308,4 +309,27 @@ func scaleSTS(t *testing.T, c clientset.Interface, sts *appsv1.StatefulSet, repl
 		t.Fatalf("failed to update .Spec.Replicas to %d for sts %s: %v", replicas, sts.Name, err)
 	}
 	waitSTSStable(t, c, sts)
+}
+
+var _ admission.ValidationInterface = &fakePodFailAdmission{}
+
+type fakePodFailAdmission struct {
+	limitedPodNumber int
+	succeedPodsCount int
+}
+
+func (f *fakePodFailAdmission) Handles(operation admission.Operation) bool {
+	return operation == admission.Create
+}
+
+func (f *fakePodFailAdmission) Validate(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	if attr.GetKind().GroupKind() != api.Kind("Pod") {
+		return nil
+	}
+
+	if f.succeedPodsCount >= f.limitedPodNumber {
+		return fmt.Errorf("fakePodFailAdmission error")
+	}
+	f.succeedPodsCount++
+	return nil
 }

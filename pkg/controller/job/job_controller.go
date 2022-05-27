@@ -114,7 +114,8 @@ type Controller struct {
 	// Orphan deleted pods that still have a Job tracking finalizer to be removed
 	orphanQueue workqueue.RateLimitingInterface
 
-	recorder record.EventRecorder
+	broadcaster record.EventBroadcaster
+	recorder    record.EventRecorder
 
 	podUpdateBatchPeriod time.Duration
 }
@@ -123,8 +124,6 @@ type Controller struct {
 // in sync with their corresponding Job objects.
 func NewController(podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) *Controller {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("job_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
@@ -140,6 +139,7 @@ func NewController(podInformer coreinformers.PodInformer, jobInformer batchinfor
 		finalizerExpectations: newUIDTrackingExpectations(),
 		queue:                 workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff), "job"),
 		orphanQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff), "job_orphan_pod"),
+		broadcaster:           eventBroadcaster,
 		recorder:              eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 	}
 	if feature.DefaultFeatureGate.Enabled(features.JobReadyPods) {
@@ -178,6 +178,12 @@ func NewController(podInformer coreinformers.PodInformer, jobInformer batchinfor
 // Run the main goroutine responsible for watching and syncing jobs.
 func (jm *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
+
+	// Start events processing pipeline.
+	jm.broadcaster.StartStructuredLogging(0)
+	jm.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: jm.kubeClient.CoreV1().Events("")})
+	defer jm.broadcaster.Shutdown()
+
 	defer jm.queue.ShutDown()
 	defer jm.orphanQueue.ShutDown()
 
@@ -384,7 +390,8 @@ func (jm *Controller) deletePod(obj interface{}, final bool) {
 		return
 	}
 	job := jm.resolveControllerRef(pod.Namespace, controllerRef)
-	if job == nil {
+	if job == nil || IsJobFinished(job) {
+		// syncJob will not remove this finalizer.
 		if hasFinalizer {
 			jm.enqueueOrphanPod(pod)
 		}
@@ -585,7 +592,7 @@ func (jm Controller) syncOrphanPod(ctx context.Context, key string) error {
 	// Make sure the pod is still orphaned.
 	if controllerRef := metav1.GetControllerOf(sharedPod); controllerRef != nil {
 		job := jm.resolveControllerRef(sharedPod.Namespace, controllerRef)
-		if job != nil {
+		if job != nil && !IsJobFinished(job) {
 			// The pod was adopted. Do not remove finalizer.
 			return nil
 		}
@@ -725,7 +732,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 	// Check the expectations of the job before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
 	// the store after we've checked the expectation, the job sync is just deferred till the next relist.
-	jobNeedsSync := jm.expectations.SatisfiedExpectations(key)
+	satisfiedExpectations := jm.expectations.SatisfiedExpectations(key)
 
 	pods, err := jm.getPodsForJob(ctx, &job, uncounted != nil)
 	if err != nil {
@@ -782,9 +789,9 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		if uncounted == nil {
 			// Legacy behavior: pretend all active pods were successfully removed.
 			deleted = active
-		} else if deleted != active {
+		} else if deleted != active || !satisfiedExpectations {
 			// Can't declare the Job as finished yet, as there might be remaining
-			// pod finalizers.
+			// pod finalizers or pods that are not in the informer's cache yet.
 			finishedCondition = nil
 		}
 		active -= deleted
@@ -792,7 +799,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		manageJobErr = err
 	} else {
 		manageJobCalled := false
-		if jobNeedsSync && job.DeletionTimestamp == nil {
+		if satisfiedExpectations && job.DeletionTimestamp == nil {
 			active, action, manageJobErr = jm.manageJob(ctx, &job, activePods, succeeded, succeededIndexes)
 			manageJobCalled = true
 		}

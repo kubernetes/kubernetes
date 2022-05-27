@@ -87,6 +87,19 @@ func TestHistogram(t *testing.T) {
 			})
 			c := NewHistogram(test.HistogramOpts)
 			registry.MustRegister(c)
+			cm := c.ObserverMetric.(prometheus.Metric)
+
+			metricChan := make(chan prometheus.Metric, 2)
+			c.Collect(metricChan)
+			close(metricChan)
+			m1 := <-metricChan
+			if m1 != cm {
+				t.Error("Unexpected metric", m1, cm)
+			}
+			m2, ok := <-metricChan
+			if ok {
+				t.Error("Unexpected second metric", m2)
+			}
 
 			ms, err := registry.Gather()
 			assert.Equalf(t, test.expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
@@ -179,7 +192,24 @@ func TestHistogramVec(t *testing.T) {
 			})
 			c := NewHistogramVec(test.HistogramOpts, test.labels)
 			registry.MustRegister(c)
-			c.WithLabelValues("1", "2").Observe(1.0)
+			ov12 := c.WithLabelValues("1", "2")
+			cm1 := ov12.(prometheus.Metric)
+			ov12.Observe(1.0)
+
+			if test.expectedMetricCount > 0 {
+				metricChan := make(chan prometheus.Metric, 2)
+				c.Collect(metricChan)
+				close(metricChan)
+				m1 := <-metricChan
+				if m1 != cm1 {
+					t.Error("Unexpected metric", m1, cm1)
+				}
+				m2, ok := <-metricChan
+				if ok {
+					t.Error("Unexpected second metric", m2)
+				}
+			}
+
 			ms, err := registry.Gather()
 			assert.Equalf(t, test.expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
 			assert.Nil(t, err, "Gather failed %v", err)
@@ -218,12 +248,12 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 	var tests = []struct {
 		desc               string
 		labelValues        [][]string
-		expectMetricValues map[string]int
+		expectMetricValues map[string]uint64
 	}{
 		{
 			desc:        "Test no unexpected input",
 			labelValues: [][]string{{"allowed", "b1"}, {"allowed", "b2"}},
-			expectMetricValues: map[string]int{
+			expectMetricValues: map[string]uint64{
 				"allowed b1": 1.0,
 				"allowed b2": 1.0,
 			},
@@ -231,7 +261,7 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 		{
 			desc:        "Test unexpected input",
 			labelValues: [][]string{{"allowed", "b1"}, {"not_allowed", "b1"}},
-			expectMetricValues: map[string]int{
+			expectMetricValues: map[string]uint64{
 				"allowed b1":    1.0,
 				"unexpected b1": 1.0,
 			},
@@ -274,7 +304,7 @@ func TestHistogramWithLabelValueAllowList(t *testing.T) {
 					labelValuePair := aValue + " " + bValue
 					expectedValue, ok := test.expectMetricValues[labelValuePair]
 					assert.True(t, ok, "Got unexpected label values, lable_a is %v, label_b is %v", aValue, bValue)
-					actualValue := int(m.GetHistogram().GetSampleCount())
+					actualValue := m.GetHistogram().GetSampleCount()
 					assert.Equalf(t, expectedValue, actualValue, "Got %v, wanted %v as the count while setting label_a to %v and label b to %v", actualValue, expectedValue, aValue, bValue)
 				}
 			}

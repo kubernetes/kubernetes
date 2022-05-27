@@ -18,6 +18,7 @@ package group
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -26,10 +27,14 @@ import (
 )
 
 func TestTokenGroupAdder(t *testing.T) {
+	capacity := make([]string, 0, 1024)
+	response := &authenticator.Response{User: &user.DefaultInfo{Name: "user", Groups: append(capacity, "original")}}
+	orig := toJson(response)
+
 	adder := authenticator.Token(
 		NewTokenGroupAdder(
 			authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
-				return &authenticator.Response{User: &user.DefaultInfo{Name: "user", Groups: []string{"original"}}}, true, nil
+				return response, true, nil
 			}),
 			[]string{"added"},
 		),
@@ -39,4 +44,13 @@ func TestTokenGroupAdder(t *testing.T) {
 	if !reflect.DeepEqual(r.User.GetGroups(), []string{"original", "added"}) {
 		t.Errorf("Expected original,added groups, got %#v", r.User.GetGroups())
 	}
+
+	if got := toJson(response); got != orig {
+		t.Errorf("Expected response from delegate to be unmodified: orig=%v got=%v", orig, got)
+	}
+}
+
+func toJson(x interface{}) string {
+	b, _ := json.Marshal(x)
+	return string(b)
 }
