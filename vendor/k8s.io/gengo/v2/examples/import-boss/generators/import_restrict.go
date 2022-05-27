@@ -64,7 +64,7 @@ func Packages(c *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 	}
 
 	for _, p := range c.Universe {
-		if !arguments.InputIncludes(p) {
+		if !inputIncludes(arguments.InputDirs, p) {
 			// Don't run on e.g. third party dependencies.
 			continue
 		}
@@ -87,6 +87,21 @@ func Packages(c *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 	}
 
 	return pkgs
+}
+
+// inputIncludes returns true if the given package is a (sub) package of one of
+// the InputDirs.
+func inputIncludes(inputs []string, p *types.Package) bool {
+	for _, dir := range inputs {
+		d := dir
+		if strings.HasSuffix(d, "...") {
+			d = strings.TrimSuffix(d, "...")
+		}
+		if strings.HasPrefix(p.Path, d) {
+			return true
+		}
+	}
+	return false
 }
 
 // A single import restriction rule.
