@@ -27,7 +27,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -68,13 +67,12 @@ func TestTaintNodeByCondition(t *testing.T) {
 	// Build PodToleration Admission.
 	admission := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})
 
-	testCtx := testutils.InitTestAPIServer(t, "default", admission)
+	testCtx := testutils.InitTestAPIServer(t, "taint-node-by-condition", admission)
 
 	// Build clientset and informers for controllers.
-	externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
-		QPS:           -1,
-		Host:          testCtx.HTTPServer.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
+	externalClientConfig.QPS = -1
+	externalClientset := kubernetes.NewForConfigOrDie(externalClientConfig)
 	externalInformers := informers.NewSharedInformerFactory(externalClientset, 0)
 
 	admission.SetExternalKubeClientSet(externalClientset)
