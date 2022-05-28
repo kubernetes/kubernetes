@@ -283,14 +283,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		}
 	default:
 		if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
-			fmt.Fprintf(o.ErrOut, "You must specify the type of resource to get. %s\n\n", cmdutil.SuggestAPIResources(o.CmdParent))
-			fullCmdName := cmd.Parent().CommandPath()
-			usageString := "Required resource not specified."
-			if len(fullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "explain") {
-				usageString = fmt.Sprintf("%s\nUse \"%s explain <resource>\" for a detailed description of that resource (e.g. %[2]s explain pods).", usageString, fullCmdName)
-			}
-
-			return cmdutil.UsageErrorf(cmd, usageString)
+			return fmt.Errorf("You must specify the type of resource to get. %s\n", cmdutil.SuggestAPIResources(o.CmdParent))
 		}
 	}
 
