@@ -135,23 +135,23 @@ func DeepHashObjectToString(objectToWrite interface{}) string {
 	return hex.EncodeToString(hasher.Sum(nil)[0:])
 }
 
-// ShouldPodBeInEndpointSlice returns true if a specified pod should be in an EndpointSlice object.
-// Terminating pods are only included if includeTerminating is true
-func ShouldPodBeInEndpointSlice(pod *v1.Pod, includeTerminating bool) bool {
+// ShouldPodBeInEndpoints returns true if a specified pod should be in an
+// Endpoints or EndpointSlice resource. Terminating pods are only included if
+// includeTerminating is true.
+func ShouldPodBeInEndpoints(pod *v1.Pod, includeTerminating bool) bool {
+	// "Terminal" describes when a Pod is complete (in a succeeded or failed phase).
+	// This is distinct from the "Terminating" condition which represents when a Pod
+	// is being terminated (metadata.deletionTimestamp is non nil).
+	if podutil.IsPodTerminal(pod) {
+		return false
+	}
+
 	if len(pod.Status.PodIP) == 0 && len(pod.Status.PodIPs) == 0 {
 		return false
 	}
 
 	if !includeTerminating && pod.DeletionTimestamp != nil {
 		return false
-	}
-
-	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
-		return pod.Status.Phase != v1.PodFailed && pod.Status.Phase != v1.PodSucceeded
-	}
-
-	if pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure {
-		return pod.Status.Phase != v1.PodSucceeded
 	}
 
 	return true
