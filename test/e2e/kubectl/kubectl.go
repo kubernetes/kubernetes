@@ -1191,7 +1191,6 @@ metadata:
 		"kind": "Deployment",
 		"metadata": {
 			"name": "my-dep",
-			"namespace": "my-ns",
 			"unknownMeta": "foo",
 			"labels": {"app": "nginx"}
 		},
