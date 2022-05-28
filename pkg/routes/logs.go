@@ -46,7 +46,7 @@ func logFileHandler(req *restful.Request, resp *restful.Response) {
 	actual := path.Join(logdir, req.PathParameter("logpath"))
 
 	// check filename length first, return 404 if it's oversize.
-	if logFileNameIsTooLong(actual) {
+	if tooLong, _ := logFileNameIsTooLong(actual); tooLong {
 		http.Error(resp, "file not found", http.StatusNotFound)
 		return
 	}
@@ -60,12 +60,13 @@ func logFileListHandler(req *restful.Request, resp *restful.Response) {
 
 // logFileNameIsTooLong checks filename length, returns true if it's longer than 255.
 // cause http.ServeFile returns default error code 500 except for NotExist and Forbidden, but we need to separate the real 500 from oversize filename here.
-func logFileNameIsTooLong(filePath string) bool {
+func logFileNameIsTooLong(filePath string) (bool, error) {
 	_, err := os.Stat(filePath)
 	if err != nil {
 		if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENAMETOOLONG {
-			return true
+			return true, nil
 		}
+		return false, err
 	}
-	return false
+	return false, nil
 }
