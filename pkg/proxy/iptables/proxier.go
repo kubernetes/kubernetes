@@ -1020,10 +1020,14 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
 <<<<<<< HEAD
+<<<<<<< HEAD
 		svcptNameString := svcInfo.svcPortNameString
 =======
 		svcPortNameString := svcInfo.nameString
 >>>>>>> upstream/master
+=======
+		svcptNameString := svcInfo.svcPortNameString
+>>>>>>> Update proxier.go
 
 		allEndpoints := proxier.endpointsMap[svcName]
 
@@ -1053,10 +1057,14 @@ func (proxier *Proxier) syncProxyRules() {
 
 			args = append(args[:0], "-A", string(endpointChain))
 <<<<<<< HEAD
+<<<<<<< HEAD
 			args = proxier.appendServiceCommentLocked(args, svcptNameString)
 =======
 			args = proxier.appendServiceCommentLocked(args, svcPortNameString)
 >>>>>>> upstream/master
+=======
+			args = proxier.appendServiceCommentLocked(args, svcptNameString)
+>>>>>>> Update proxier.go
 			// Handle traffic that loops back to the originator with SNAT.
 			proxier.natRules.Write(
 				args,
@@ -1133,12 +1141,21 @@ func (proxier *Proxier) syncProxyRules() {
 				proxier.natRules.Write(
 					"-A", string(externalTrafficChain),
 <<<<<<< HEAD
+<<<<<<< HEAD
 					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade traffic for %s external destinations"`, svcptNameString),
 					"-j", string(KubeMarkMasqChain))
 =======
 					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade traffic for %s external destinations"`, svcPortNameString),
 					"-j", string(kubeMarkMasqChain))
 >>>>>>> upstream/master
+=======
+					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade traffic for %s external destinations"`, svcNameString),
+					"-j", string(kubeMarkMasqChain))
+=======
+					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade traffic for %s external destinations"`, svcptNameString),
+					"-j", string(KubeMarkMasqChain))
+>>>>>>> Update proxier.go
+>>>>>>> Update proxier.go
 			} else {
 				// If we are only using same-node endpoints, we can retain the
 				// source IP in most cases.
@@ -1151,10 +1168,14 @@ func (proxier *Proxier) syncProxyRules() {
 					proxier.natRules.Write(
 						"-A", string(externalTrafficChain),
 <<<<<<< HEAD
+<<<<<<< HEAD
 						"-m", "comment", "--comment", fmt.Sprintf(`"pod traffic for %s external destinations"`, svcptNameString),
 =======
 						"-m", "comment", "--comment", fmt.Sprintf(`"pod traffic for %s external destinations"`, svcPortNameString),
 >>>>>>> upstream/master
+=======
+						"-m", "comment", "--comment", fmt.Sprintf(`"pod traffic for %s external destinations"`, svcptNameString),
+>>>>>>> Update proxier.go
 						proxier.localDetector.IfLocal(),
 						"-j", string(clusterPolicyChain))
 				}
@@ -1165,10 +1186,14 @@ func (proxier *Proxier) syncProxyRules() {
 				proxier.natRules.Write(
 					"-A", string(externalTrafficChain),
 <<<<<<< HEAD
+<<<<<<< HEAD
 					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade LOCAL traffic for %s external destinations"`, svcptNameString),
 =======
 					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade LOCAL traffic for %s external destinations"`, svcPortNameString),
 >>>>>>> upstream/master
+=======
+					"-m", "comment", "--comment", fmt.Sprintf(`"masquerade LOCAL traffic for %s external destinations"`, svcptNameString),
+>>>>>>> Update proxier.go
 					"-m", "addrtype", "--src-type", "LOCAL",
 					"-j", string(kubeMarkMasqChain))
 
@@ -1178,10 +1203,14 @@ func (proxier *Proxier) syncProxyRules() {
 				proxier.natRules.Write(
 					"-A", string(externalTrafficChain),
 <<<<<<< HEAD
+<<<<<<< HEAD
 					"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s external destinations"`, svcptNameString),
 =======
 					"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s external destinations"`, svcPortNameString),
 >>>>>>> upstream/master
+=======
+					"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s external destinations"`, svcptNameString),
+>>>>>>> Update proxier.go
 					"-m", "addrtype", "--src-type", "LOCAL",
 					"-j", string(clusterPolicyChain))
 			}
@@ -1196,10 +1225,14 @@ func (proxier *Proxier) syncProxyRules() {
 		if hasEndpoints {
 			args = append(args[:0],
 <<<<<<< HEAD
+<<<<<<< HEAD
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcptNameString),
 =======
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcPortNameString),
 >>>>>>> upstream/master
+=======
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcptNameString),
+>>>>>>> Update proxier.go
 				"-m", protocol, "-p", protocol,
 				"-d", svcInfo.ClusterIP().String(),
 				"--dport", strconv.Itoa(svcInfo.Port()),
@@ -1229,10 +1262,14 @@ func (proxier *Proxier) syncProxyRules() {
 			proxier.filterRules.Write(
 				"-A", string(kubeServicesChain),
 <<<<<<< HEAD
+<<<<<<< HEAD
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcptNameString),
 =======
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcPortNameString),
 >>>>>>> upstream/master
+=======
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcptNameString),
+>>>>>>> Update proxier.go
 				"-m", protocol, "-p", protocol,
 				"-d", svcInfo.ClusterIP().String(),
 				"--dport", strconv.Itoa(svcInfo.Port()),
@@ -1248,10 +1285,14 @@ func (proxier *Proxier) syncProxyRules() {
 				proxier.natRules.Write(
 					"-A", string(kubeServicesChain),
 <<<<<<< HEAD
+<<<<<<< HEAD
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcptNameString),
 =======
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcPortNameString),
 >>>>>>> upstream/master
+=======
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcptNameString),
+>>>>>>> Update proxier.go
 					"-m", protocol, "-p", protocol,
 					"-d", externalIP,
 					"--dport", strconv.Itoa(svcInfo.Port()),
@@ -1262,10 +1303,14 @@ func (proxier *Proxier) syncProxyRules() {
 				proxier.filterRules.Write(
 					"-A", string(kubeExternalServicesChain),
 <<<<<<< HEAD
+<<<<<<< HEAD
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcptNameString),
 =======
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcPortNameString),
 >>>>>>> upstream/master
+=======
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcptNameString),
+>>>>>>> Update proxier.go
 					"-m", protocol, "-p", protocol,
 					"-d", externalIP,
 					"--dport", strconv.Itoa(svcInfo.Port()),
@@ -1296,6 +1341,10 @@ func (proxier *Proxier) syncProxyRules() {
 				// chain.
 				nextChain = svcInfo.firewallChainName
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+=======
+>>>>>>> Update proxier.go
 			}
 
 			for _, lbip := range svcInfo.LoadBalancerIPStrings() {
@@ -1306,14 +1355,19 @@ func (proxier *Proxier) syncProxyRules() {
 					"-d", lbip,
 					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", string(nextChain))
+<<<<<<< HEAD
 =======
 >>>>>>> upstream/master
+=======
+>>>>>>> Update proxier.go
+>>>>>>> Update proxier.go
 
 				// The service firewall rules are created based on the
 				// loadBalancerSourceRanges field.  This only works for
 				// VIP-like loadbalancers that preserve source IPs.  For
 				// loadbalancers which direct traffic to service NodePort, the
 				// firewall rules will not apply.
+<<<<<<< HEAD
 <<<<<<< HEAD
 				if len(svcInfo.LoadBalancerSourceRanges()) > 0 {
 					args = append(args[:0],
@@ -1332,6 +1386,8 @@ func (proxier *Proxier) syncProxyRules() {
 							allowFromNode = true
 						}
 =======
+=======
+>>>>>>> Update proxier.go
 				args = append(args[:0],
 					"-A", string(nextChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcPortNameString),
@@ -1346,7 +1402,28 @@ func (proxier *Proxier) syncProxyRules() {
 						klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
 					} else if cidr.Contains(proxier.nodeIP) {
 						allowFromNode = true
+<<<<<<< HEAD
 >>>>>>> upstream/master
+=======
+=======
+				if len(svcInfo.LoadBalancerSourceRanges()) > 0 {
+					args = append(args[:0],
+						"-A", string(nextChain),
+						"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcptNameString),
+					)
+
+					// firewall filter based on each source range
+					allowFromNode := false
+					for _, src := range svcInfo.LoadBalancerSourceRanges() {
+						proxier.natRules.Write(args, "-s", src, "-j", string(externalTrafficChain))
+						_, cidr, err := netutils.ParseCIDRSloppy(src)
+						if err != nil {
+							klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
+						} else if cidr.Contains(proxier.nodeIP) {
+							allowFromNode = true
+						}
+>>>>>>> Update proxier.go
+>>>>>>> Update proxier.go
 					}
 				}
 				// For VIP-like LBs, the VIP is often added as a local
@@ -1385,10 +1462,14 @@ func (proxier *Proxier) syncProxyRules() {
 				proxier.filterRules.Write(
 					"-A", string(kubeExternalServicesChain),
 <<<<<<< HEAD
+<<<<<<< HEAD
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcptNameString),
 =======
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcPortNameString),
 >>>>>>> upstream/master
+=======
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcptNameString),
+>>>>>>> Update proxier.go
 					"-m", protocol, "-p", protocol,
 					"-d", lbip,
 					"--dport", strconv.Itoa(svcInfo.Port()),
@@ -1406,10 +1487,14 @@ func (proxier *Proxier) syncProxyRules() {
 				proxier.natRules.Write(
 					"-A", string(kubeNodePortsChain),
 <<<<<<< HEAD
+<<<<<<< HEAD
 					"-m", "comment", "--comment", svcptNameString,
 =======
 					"-m", "comment", "--comment", svcPortNameString,
 >>>>>>> upstream/master
+=======
+					"-m", "comment", "--comment", svcptNameString,
+>>>>>>> Update proxier.go
 					"-m", protocol, "-p", protocol,
 					"--dport", strconv.Itoa(svcInfo.NodePort()),
 					"-j", string(externalTrafficChain))
@@ -1418,10 +1503,14 @@ func (proxier *Proxier) syncProxyRules() {
 				proxier.filterRules.Write(
 					"-A", string(kubeExternalServicesChain),
 <<<<<<< HEAD
+<<<<<<< HEAD
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcptNameString),
 =======
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcPortNameString),
 >>>>>>> upstream/master
+=======
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcptNameString),
+>>>>>>> Update proxier.go
 					"-m", "addrtype", "--dst-type", "LOCAL",
 					"-m", protocol, "-p", protocol,
 					"--dport", strconv.Itoa(svcInfo.NodePort()),
@@ -1437,10 +1526,14 @@ func (proxier *Proxier) syncProxyRules() {
 			proxier.filterRules.Write(
 				"-A", string(kubeNodePortsChain),
 <<<<<<< HEAD
+<<<<<<< HEAD
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s health check node port"`, svcptNameString),
 =======
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s health check node port"`, svcPortNameString),
 >>>>>>> upstream/master
+=======
+				"-m", "comment", "--comment", fmt.Sprintf(`"%s health check node port"`, svcptNameString),
+>>>>>>> Update proxier.go
 				"-m", "tcp", "-p", "tcp",
 				"--dport", strconv.Itoa(svcInfo.HealthCheckNodePort()),
 				"-j", "ACCEPT",
@@ -1450,15 +1543,20 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo.UsesClusterEndpoints() {
 			// Write rules jumping from clusterPolicyChain to clusterEndpoints
 <<<<<<< HEAD
+<<<<<<< HEAD
 			proxier.writeServiceToEndpointRules(svcptNameString, svcInfo, clusterPolicyChain, clusterEndpoints, args)
 =======
 			proxier.writeServiceToEndpointRules(svcPortNameString, svcInfo, clusterPolicyChain, clusterEndpoints, args)
 >>>>>>> upstream/master
+=======
+			proxier.writeServiceToEndpointRules(svcptNameString, svcInfo, clusterPolicyChain, clusterEndpoints, args)
+>>>>>>> Update proxier.go
 		}
 
 		if svcInfo.UsesLocalEndpoints() {
 			if len(localEndpoints) != 0 {
 				// Write rules jumping from localPolicyChain to localEndpointChains
+<<<<<<< HEAD
 <<<<<<< HEAD
 				proxier.writeServiceToEndpointRules(svcptNameString, svcInfo, localPolicyChain, localEndpoints, args)
 			} else {
@@ -1466,12 +1564,21 @@ func (proxier *Proxier) syncProxyRules() {
 				proxier.writeServiceToEndpointRules(svcPortNameString, svcInfo, localPolicyChain, localEndpoints, args)
 			} else if hasEndpoints {
 >>>>>>> upstream/master
+=======
+				proxier.writeServiceToEndpointRules(svcNameString, svcInfo, localPolicyChain, localEndpoints, args)
+			} else if hasEndpoints {
+=======
+				proxier.writeServiceToEndpointRules(svcptNameString, svcInfo, localPolicyChain, localEndpoints, args)
+			} else {
+>>>>>>> Update proxier.go
+>>>>>>> Update proxier.go
 				if svcInfo.InternalPolicyLocal() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
 					serviceNoLocalEndpointsTotalInternal++
 				}
 				if svcInfo.ExternalPolicyLocal() {
 					serviceNoLocalEndpointsTotalExternal++
 				}
+<<<<<<< HEAD
 <<<<<<< HEAD
 				if hasEndpoints {
 					// Blackhole all traffic since there are no local endpoints
@@ -1485,13 +1592,31 @@ func (proxier *Proxier) syncProxyRules() {
 					proxier.natRules.Write(args)
 				}
 =======
+=======
+>>>>>>> Update proxier.go
 				// Blackhole all traffic since there are no local endpoints
 				proxier.natRules.Write(
 					"-A", string(localPolicyChain),
 					"-m", "comment", "--comment",
 					fmt.Sprintf(`"%s has no local endpoints"`, svcPortNameString),
 					"-j", string(kubeMarkDropChain))
+<<<<<<< HEAD
 >>>>>>> upstream/master
+=======
+=======
+				if hasEndpoints {
+					// Blackhole all traffic since there are no local endpoints
+					args = append(args[:0],
+						"-A", string(localPolicyChain),
+						"-m", "comment", "--comment",
+						fmt.Sprintf(`"%s has no local endpoints"`, svcptNameString),
+						"-j",
+						string(KubeMarkDropChain),
+					)
+					proxier.natRules.Write(args)
+				}
+>>>>>>> Update proxier.go
+>>>>>>> Update proxier.go
 			}
 		}
 	}
@@ -1651,10 +1776,14 @@ func (proxier *Proxier) syncProxyRules() {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 func (proxier *Proxier) writeServiceToEndpointRules(svcptNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpoints []proxy.Endpoint, args []string) {
 =======
 func (proxier *Proxier) writeServiceToEndpointRules(svcPortNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpoints []proxy.Endpoint, args []string) {
 >>>>>>> upstream/master
+=======
+func (proxier *Proxier) writeServiceToEndpointRules(svcptNameString string, svcInfo proxy.ServicePort, svcChain utiliptables.Chain, endpoints []proxy.Endpoint, args []string) {
+>>>>>>> Update proxier.go
 	// First write session affinity rules, if applicable.
 	if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 		for _, ep := range endpoints {
@@ -1663,10 +1792,14 @@ func (proxier *Proxier) writeServiceToEndpointRules(svcPortNameString string, sv
 				continue
 			}
 <<<<<<< HEAD
+<<<<<<< HEAD
 			comment := fmt.Sprintf(`"%s -> %s"`, svcptNameString, epInfo.Endpoint)
 =======
 			comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.Endpoint)
 >>>>>>> upstream/master
+=======
+			comment := fmt.Sprintf(`"%s -> %s"`, svcptNameString, epInfo.Endpoint)
+>>>>>>> Update proxier.go
 
 			args = append(args[:0],
 				"-A", string(svcChain),
@@ -1689,10 +1822,14 @@ func (proxier *Proxier) writeServiceToEndpointRules(svcPortNameString string, sv
 			continue
 		}
 <<<<<<< HEAD
+<<<<<<< HEAD
 		comment := fmt.Sprintf(`"%s -> %s"`, svcptNameString, epInfo.Endpoint)
 =======
 		comment := fmt.Sprintf(`"%s -> %s"`, svcPortNameString, epInfo.Endpoint)
 >>>>>>> upstream/master
+=======
+		comment := fmt.Sprintf(`"%s -> %s"`, svcptNameString, epInfo.Endpoint)
+>>>>>>> Update proxier.go
 
 		args = append(args[:0], "-A", string(svcChain))
 		args = proxier.appendServiceCommentLocked(args, comment)
