@@ -830,8 +830,9 @@ func (j *TestJig) waitForPodsReady(pods []string) error {
 	return nil
 }
 
-func testReachabilityOverServiceName(serviceName string, sp v1.ServicePort, execPod *v1.Pod) error {
-	return testEndpointReachability(serviceName, sp.Port, sp.Protocol, execPod)
+func testReachabilityOverServiceName(serviceName, serviceNamespace string, sp v1.ServicePort, execPod *v1.Pod) error {
+	endpoint := fmt.Sprintf("%s.%s.svc.%s", serviceName, serviceNamespace, framework.TestContext.ClusterDNSDomain)
+	return testEndpointReachability(endpoint, sp.Port, sp.Protocol, execPod)
 }
 
 func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod *v1.Pod) error {
@@ -940,7 +941,7 @@ func (j *TestJig) checkClusterIPServiceReachability(svc *v1.Service, pod *v1.Pod
 	}
 
 	for _, servicePort := range servicePorts {
-		err = testReachabilityOverServiceName(svc.Name, servicePort, pod)
+		err = testReachabilityOverServiceName(svc.Name, svc.Namespace, servicePort, pod)
 		if err != nil {
 			return err
 		}
@@ -981,7 +982,7 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 	}
 
 	for _, servicePort := range servicePorts {
-		err = testReachabilityOverServiceName(svc.Name, servicePort, pod)
+		err = testReachabilityOverServiceName(svc.Name, svc.Namespace, servicePort, pod)
 		if err != nil {
 			return err
 		}
