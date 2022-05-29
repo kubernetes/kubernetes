@@ -1,8 +1,7 @@
 /*
 Copyright 2017 The Kubernetes Authors.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
+Licensed under the Apache License, Version 2.0 (the "License");ot xcept in compliance with the License.
 You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
@@ -577,12 +576,8 @@ func filterCIDRs(wantIPv6 bool, cidrs []string) []string {
 // internal struct for string service information
 type servicePortInfo struct {
 	*proxy.BaseServiceInfo
-	// The following fields are computed and stored for performance reasons.
-<<<<<<< HEAD
-	svcPortNameString string
-=======
-	nameString string
->>>>>>> upstream/master
+	// The following fields are computed and stored for 
+	svcPortNameString  string
 }
 
 // returns a new proxy.ServicePort which abstracts a serviceInfo
@@ -592,12 +587,7 @@ func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.B
 	// Store the following for performance reasons.
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	svcPortName := proxy.ServicePortName{NamespacedName: svcName, Port: port.Name}
-<<<<<<< HEAD
 	info.svcPortNameString = svcPortName.String()
-=======
-	svcPort.nameString = svcPortName.String()
->>>>>>> upstream/master
-
 	return svcPort
 }
 
