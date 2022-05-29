@@ -506,16 +506,15 @@ func (cache *cacheImpl) AddPod(pod *v1.Pod) error {
 	currState, ok := cache.podStates[key]
 	switch {
 	case ok && cache.assumedPods.Has(key):
+		// When assuming, we've already added the Pod to cache,
+		// Just update here to make sure the Pod's status is up-to-date.
+		if err = cache.updatePod(currState.pod, pod); err != nil {
+			klog.ErrorS(err, "Error occurred while updating pod")
+		}
 		if currState.pod.Spec.NodeName != pod.Spec.NodeName {
 			// The pod was added to a different node than it was assumed to.
 			klog.InfoS("Pod was added to a different node than it was assumed", "podKey", key, "pod", klog.KObj(pod), "assumedNode", klog.KRef("", pod.Spec.NodeName), "currentNode", klog.KRef("", currState.pod.Spec.NodeName))
-			if err = cache.updatePod(currState.pod, pod); err != nil {
-				klog.ErrorS(err, "Error occurred while updating pod")
-			}
-		} else {
-			delete(cache.assumedPods, key)
-			cache.podStates[key].deadline = nil
-			cache.podStates[key].pod = pod
+			return nil
 		}
 	case !ok:
 		// Pod was expired. We should add it back.
