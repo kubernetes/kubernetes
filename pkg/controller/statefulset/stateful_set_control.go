@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -611,17 +610,12 @@ func updateStatefulSetAfterInvariantEstablished(
 		updateMin = int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
 
 		// if the feature was enabled and then later disabled, MaxUnavailable may have a value
-		// other than 1. Ignore the passed in value and Use maxUnavailable as 1 to enforce
+		// more than 1. Ignore the passed in value and Use maxUnavailable as 1 to enforce
 		// expected behavior when feature gate is not enabled.
 		var err error
-		maxUnavailable, err = intstrutil.GetValueFromIntOrPercent(intstrutil.ValueOrDefault(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, intstrutil.FromInt(1)), int(replicaCount), false)
+		maxUnavailable, err = getStatefulSetMaxUnavailable(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, replicaCount)
 		if err != nil {
 			return &status, err
-		}
-		// maxUnavailable might be zero for small percentage without round up.
-		// So we have to enforce it not to be less than 1.
-		if maxUnavailable < 1 {
-			maxUnavailable = 1
 		}
 	}
 
