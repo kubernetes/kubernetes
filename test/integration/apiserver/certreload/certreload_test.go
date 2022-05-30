@@ -135,9 +135,6 @@ func TestClientCARecreate(t *testing.T) {
 }
 
 func testClientCA(t *testing.T, recreate bool) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	frontProxyCA, err := newTestCAWithClient(
 		pkix.Name{
 			CommonName: "test-front-proxy-ca",
@@ -173,7 +170,7 @@ func testClientCA(t *testing.T, recreate bool) {
 	clientCAFilename := ""
 	frontProxyCAFilename := ""
 
-	kubeClient, kubeconfig := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
+	kubeClient, kubeconfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			clientCAFilename = opts.Authentication.ClientCert.ClientCA
@@ -181,6 +178,7 @@ func testClientCA(t *testing.T, recreate bool) {
 			opts.Authentication.RequestHeader.AllowedNames = append(opts.Authentication.RequestHeader.AllowedNames, "test-aggregated-apiserver")
 		},
 	})
+	defer tearDownFn()
 
 	// wait for request header info
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "-----BEGIN CERTIFICATE-----", 1))
@@ -470,17 +468,15 @@ func TestServingCertRecreate(t *testing.T) {
 }
 
 func testServingCert(t *testing.T, recreate bool) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	var servingCertPath string
 
-	_, kubeconfig := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
+	_, kubeconfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			servingCertPath = opts.SecureServing.ServerCert.CertDirectory
 		},
 	})
+	defer tearDownFn()
 
 	if recreate {
 		if err := os.Remove(path.Join(servingCertPath, "apiserver.key")); err != nil {
@@ -511,12 +507,9 @@ func testServingCert(t *testing.T, recreate bool) {
 }
 
 func TestSNICert(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
 	var servingCertPath string
 
-	_, kubeconfig := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
+	_, kubeconfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			servingCertPath = opts.SecureServing.ServerCert.CertDirectory
@@ -535,6 +528,7 @@ func TestSNICert(t *testing.T) {
 			}}
 		},
 	})
+	defer tearDownFn()
 
 	// When we run this the second time, we know which one we are expecting.
 	_, actualCerts, err := cert.GetServingCertificatesForURL(kubeconfig.Host, "foo")

@@ -91,8 +91,8 @@ func (w *requestWatermark) recordReadOnly(readOnlyVal int) {
 // watermark tracks requests being executed (not waiting in a queue)
 var watermark = &requestWatermark{
 	phase:            metrics.ExecutingPhase,
-	readOnlyObserver: fcmetrics.ReadWriteConcurrencyPairVec.NewForLabelValuesSafe(1, 1, []string{metrics.ReadOnlyKind}).RequestsExecuting,
-	mutatingObserver: fcmetrics.ReadWriteConcurrencyPairVec.NewForLabelValuesSafe(1, 1, []string{metrics.MutatingKind}).RequestsExecuting,
+	readOnlyObserver: fcmetrics.ReadWriteConcurrencyGaugeVec.NewForLabelValuesSafe(0, 1, []string{fcmetrics.LabelValueExecuting, metrics.ReadOnlyKind}),
+	mutatingObserver: fcmetrics.ReadWriteConcurrencyGaugeVec.NewForLabelValuesSafe(0, 1, []string{fcmetrics.LabelValueExecuting, metrics.MutatingKind}),
 }
 
 // startWatermarkMaintenance starts the goroutines to observe and maintain the specified watermark.

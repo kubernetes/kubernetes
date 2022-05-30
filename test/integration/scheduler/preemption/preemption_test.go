@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -621,10 +620,9 @@ func TestPodPriorityResolution(t *testing.T) {
 	cs := testCtx.ClientSet
 
 	// Build clientset and informers for controllers.
-	externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
-		QPS:           -1,
-		Host:          testCtx.HTTPServer.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
+	externalClientConfig.QPS = -1
+	externalClientset := kubernetes.NewForConfigOrDie(externalClientConfig)
 	externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
@@ -1444,7 +1442,10 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 	f := testCtx.Scheduler.NextPod
 	testCtx.Scheduler.NextPod = func() (podInfo *framework.QueuedPodInfo) {
 		podInfo = f()
-		podInfo.Pod.Status.NominatedNodeName = "node-1"
+		// Scheduler.Next() may return nil when scheduler is shutting down.
+		if podInfo != nil {
+			podInfo.Pod.Status.NominatedNodeName = "node-1"
+		}
 		return podInfo
 	}
 	go testCtx.Scheduler.Run(testCtx.Ctx)

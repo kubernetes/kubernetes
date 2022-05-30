@@ -402,6 +402,9 @@ func NewControlPlaneConfigWithOptions(opts *ControlPlaneConfigOptions) *controlp
 // CloseFunc can be called to cleanup the API server
 type CloseFunc func()
 
+// DEPRECATED: Use StartTestServer or directly StartTestServer directly
+// from cmd/kube-apiserver/app/testing.
+//
 // RunAnAPIServer starts a API server with the provided config.
 func RunAnAPIServer(controlPlaneConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	if controlPlaneConfig == nil {

@@ -85,6 +85,7 @@ func wrapLifecycleSignalsWithRecorer(t *testing.T, signals *lifecycleSignals, be
 	// an asynchronous process.
 	signals.AfterShutdownDelayDuration = wrapLifecycleSignal(t, signals.AfterShutdownDelayDuration, before, nil)
 	signals.PreShutdownHooksStopped = wrapLifecycleSignal(t, signals.PreShutdownHooksStopped, before, nil)
+	signals.NotAcceptingNewRequest = wrapLifecycleSignal(t, signals.NotAcceptingNewRequest, before, nil)
 	signals.HTTPServerStoppedListening = wrapLifecycleSignal(t, signals.HTTPServerStoppedListening, before, nil)
 	signals.InFlightRequestsDrained = wrapLifecycleSignal(t, signals.InFlightRequestsDrained, before, nil)
 	signals.ShutdownInitiated = wrapLifecycleSignal(t, signals.ShutdownInitiated, before, nil)
@@ -139,6 +140,7 @@ func newSignalInterceptingTestStep() *signalInterceptingTestStep {
 //              |                                            |
 //              |--------------------------------------------|
 //              |                                            |
+//              |                                 (NotAcceptingNewRequest)
 //              |                                            |
 //              |                       |-------------------------------------------------|
 //              |                       |                                                 |
@@ -154,12 +156,16 @@ func newSignalInterceptingTestStep() *signalInterceptingTestStep {
 //              |          |                                                              |
 //              |    wait up to 60s                                                       |
 //              |          |                                                  (InFlightRequestsDrained)
-//              |          |                                                              |
-//              |          |                                                              |
-//              |	stoppedCh is closed                                        s.AuditBackend.Shutdown()
+//              |          |
+//              |          |
+//              |	stoppedCh is closed
 //              |
 //              |
 //    <-drainedCh.Signaled()
+//              |
+//   s.AuditBackend.Shutdown()
+//              |
+//      <-listenerStoppedCh
 //              |
 //         <-stoppedCh
 //              |
@@ -248,25 +254,23 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 
 	// preshutdown hook has not completed yet, new incomng request should succeed
 	resultGot = doer.Do(newClient(true), shouldUseNewConnection(t), "/echo?message=request-on-a-new-tcp-connection-should-succeed", time.Second)
-	// TODO: we expect the request to succeed with http.StatusOK,
-	//  https://github.com/kubernetes/kubernetes/pull/110026 will fix it.
-	if err := assertResponseStatusCode(resultGot, http.StatusServiceUnavailable); err != nil {
+	if err := assertResponseStatusCode(resultGot, http.StatusOK); err != nil {
 		t.Errorf("%s", err.Error())
 	}
 
-	// let the preshutdown hook issue an API call now, and then let's wait
-	// for it to return the result, it should succeed.
+	// let the preshutdown hook issue an API call now, and then
+	// let's wait for it to return the result.
 	close(preShutdownHook.blockedCh)
 	preShutdownHookResult := <-preShutdownHook.resultCh
 	waitForeverUntilSignaled(t, signals.PreShutdownHooksStopped)
-	// TODO: the API call from the preshutdown hook is expected to pass wth
-	//  http.StatusOK, https://github.com/kubernetes/kubernetes/pull/110026
-	//  will fix it.
-	if err := assertResponseStatusCode(preShutdownHookResult, http.StatusServiceUnavailable); err != nil {
+	if err := assertResponseStatusCode(preShutdownHookResult, http.StatusOK); err != nil {
 		t.Errorf("%s", err.Error())
 	}
 
 	waitForeverUntilSignaled(t, signals.PreShutdownHooksStopped)
+	// both AfterShutdownDelayDuration and PreShutdownHooksCompleted
+	// have been signaled, we should not be accepting new request
+	waitForeverUntilSignaled(t, signals.NotAcceptingNewRequest)
 	waitForeverUntilSignaled(t, signals.HTTPServerStoppedListening)
 
 	resultGot = doer.Do(newClient(true), shouldUseNewConnection(t), "/echo?message=request-on-a-new-tcp-connection-should-fail-with-503", time.Second)
@@ -313,10 +317,15 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	t.Log("Waiting for the apiserver Run method to return")
 	waitForeverUntil(t, runCompletedCh, "the apiserver Run method did not return")
 
+	if !fakeAudit.shutdownCompleted() {
+		t.Errorf("Expected AuditBackend.Shutdown to be completed")
+	}
+
 	if err := recorder.verify([]string{
 		"ShutdownInitiated",
 		"AfterShutdownDelayDuration",
 		"PreShutdownHooksStopped",
+		"NotAcceptingNewRequest",
 		"HTTPServerStoppedListening",
 		"InFlightRequestsDrained",
 	}); err != nil {
@@ -328,7 +337,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 //  described in the following diagram
 //    - every vertical line is an independent timeline
 //    - the leftmost vertical line represents the go routine that
-//      is executing GenericAPIServer.Run methos
+//      is executing GenericAPIServer.Run method
 //    - (signal) indicates that the given lifecycle signal has been fired
 //
 //                                  stopCh
@@ -344,26 +353,28 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 //              |                                            |
 //              |--------------------------------------------|
 //              |                                            |
+//              |                               (NotAcceptingNewRequest)
 //              |                                            |
 //              |                              HandlerChainWaitGroup.Wait()
 //              |                                            |
 //              |                                (InFlightRequestsDrained)
 //              |                                            |
 //              |                                            |
-//              |                      |-------------------------------------|
-//              |                      |                                     |
-//              |                      |                          close(stopHttpServerCh)
-//              |                      |                                     |
-//              |        s.AuditBackend.Shutdown()                server.Shutdown(timeout=2s)
+//              |------------------------------------------------------------|
 //              |                                                            |
+//      <-drainedCh.Signaled()                                     close(stopHttpServerCh)
+//              |                                                            |
+//     s.AuditBackend.Shutdown()                                 server.Shutdown(timeout=2s)
 //              |                                                            |
 //              |                                                   stop listener (net/http)
 //              |                                                            |
 //              |                                         |-------------------------------------|
-//    <-drainedCh.Signaled()                              |                                     |
+//              |                                         |                                     |
 //              |                                   wait up to 2s                 (HTTPServerStoppedListening)
-//         <-stoppedCh                                    |
+//     <-listenerStoppedCh                                |
 //              |                                stoppedCh is closed
+//         <-stoppedCh
+//              |
 //          return nil
 //
 func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t *testing.T) {
@@ -449,9 +460,7 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 
 	// preshutdown hook has not completed yet, new incomng request should succeed
 	resultGot = doer.Do(newClient(true), shouldUseNewConnection(t), "/echo?message=request-on-a-new-tcp-connection-should-succeed", time.Second)
-	// TODO: we expect the request to succeed with http.StatusOK,
-	//  https://github.com/kubernetes/kubernetes/pull/110026 will fix it.
-	if err := assertResponseStatusCode(resultGot, http.StatusTooManyRequests); err != nil {
+	if err := assertResponseStatusCode(resultGot, http.StatusOK); err != nil {
 		t.Errorf("%s", err.Error())
 	}
 
@@ -460,12 +469,11 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	close(preShutdownHook.blockedCh)
 	preShutdownHookResult := <-preShutdownHook.resultCh
 	waitForeverUntilSignaled(t, signals.PreShutdownHooksStopped)
-	// TODO: the API call from the preshutdown hook is expected to pass wth
-	//  http.StatusOK, https://github.com/kubernetes/kubernetes/pull/110026
-	//  will fix it.
-	if err := assertResponseStatusCode(preShutdownHookResult, http.StatusTooManyRequests); err != nil {
+	if err := assertResponseStatusCode(preShutdownHookResult, http.StatusOK); err != nil {
 		t.Errorf("%s", err.Error())
 	}
+
+	waitForeverUntilSignaled(t, signals.NotAcceptingNewRequest)
 
 	// both AfterShutdownDelayDuration and PreShutdownHooksCompleted
 	// have been signaled, any incoming request should receive 429
@@ -494,10 +502,15 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	t.Log("Waiting for the apiserver Run method to return")
 	waitForeverUntil(t, runCompletedCh, "the apiserver Run method did not return")
 
+	if !fakeAudit.shutdownCompleted() {
+		t.Errorf("Expected AuditBackend.Shutdown to be completed")
+	}
+
 	if err := recorder.verify([]string{
 		"ShutdownInitiated",
 		"AfterShutdownDelayDuration",
 		"PreShutdownHooksStopped",
+		"NotAcceptingNewRequest",
 		"InFlightRequestsDrained",
 		"HTTPServerStoppedListening",
 	}); err != nil {
@@ -584,9 +597,9 @@ func TestPreShutdownHooks(t *testing.T) {
 				client := newClient(true)
 				for i := 0; i < 5; i++ {
 					r := doer.Do(client, func(httptrace.GotConnInfo) {}, fmt.Sprintf("/echo?message=attempt-%d", i), 1*time.Second)
-					// TODO: this is broken, we should check the response for a status code of 200
-					//  https://github.com/kubernetes/kubernetes/pull/110026 fixes this issue.
-					if r.err != nil {
+					err = r.err
+					if err == nil && r.response.StatusCode != http.StatusOK {
+						err = fmt.Errorf("did not get status code 200 - %#v", r.response)
 						break
 					}
 					time.Sleep(time.Second)
@@ -715,6 +728,7 @@ type fakeAudit struct {
 	shutdownCh chan struct{}
 	lock       sync.Mutex
 	audits     map[string]struct{}
+	completed  bool
 }
 
 func (a *fakeAudit) Run(stopCh <-chan struct{}) error {
@@ -727,12 +741,22 @@ func (a *fakeAudit) Run(stopCh <-chan struct{}) error {
 }
 
 func (a *fakeAudit) Shutdown() {
-	// TODO: uncomment it in https://github.com/kubernetes/kubernetes/pull/110026
-	// <-a.shutdownCh
+	<-a.shutdownCh
+
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	a.completed = true
 }
 
 func (a *fakeAudit) String() string {
 	return "fake-audit"
+}
+
+func (a *fakeAudit) shutdownCompleted() bool {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+
+	return a.completed
 }
 
 func (a *fakeAudit) ProcessEvents(events ...*auditinternal.Event) bool {

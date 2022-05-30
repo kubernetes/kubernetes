@@ -147,8 +147,8 @@ var (
 		},
 		[]string{priorityLevel},
 	)
-	// ReadWriteConcurrencyPairVec creates pairs that observe concurrency broken down by mutating vs readonly
-	ReadWriteConcurrencyPairVec = NewSampleAndWaterMarkHistogramsPairVec(clock.RealClock{}, time.Millisecond,
+	// ReadWriteConcurrencyGaugeVec creates gauges of number of requests broken down by phase and mutating vs readonly
+	ReadWriteConcurrencyGaugeVec = NewSampleAndWaterMarkHistogramsVec(clock.RealClock{}, time.Millisecond,
 		&compbasemetrics.HistogramOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
@@ -165,7 +165,7 @@ var (
 			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{requestKind},
+		[]string{LabelNamePhase, requestKind},
 	)
 	apiserverCurrentR = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -357,7 +357,7 @@ var (
 	}.
 		Append(PriorityLevelExecutionSeatsGaugeVec.metrics()...).
 		Append(PriorityLevelConcurrencyPairVec.metrics()...).
-		Append(ReadWriteConcurrencyPairVec.metrics()...)
+		Append(ReadWriteConcurrencyGaugeVec.metrics()...)
 )
 
 // AddRequestsInQueues adds the given delta to the gauge of the # of requests in the queues of the specified flowSchema and priorityLevel
