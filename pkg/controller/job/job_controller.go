@@ -1205,16 +1205,7 @@ func (jm *Controller) enactJobFinished(job *batch.Job, finishedCond *batch.JobCo
 	if isIndexedJob(job) {
 		completionMode = string(*job.Spec.CompletionMode)
 	}
-	// append the finished condition or update if there was already a finished condition with non-true status
-	if preExistingCondition := findConditionByType(job.Status.Conditions, finishedCond.Type); preExistingCondition == nil {
-		job.Status.Conditions = append(job.Status.Conditions, *finishedCond)
-	} else if preExistingCondition.Status != v1.ConditionTrue {
-		preExistingCondition.LastProbeTime = finishedCond.LastProbeTime
-		preExistingCondition.LastTransitionTime = finishedCond.LastTransitionTime
-		preExistingCondition.Message = finishedCond.Message
-		preExistingCondition.Reason = finishedCond.Reason
-		preExistingCondition.Status = finishedCond.Status
-	}
+	ensureJobConditionStatus(job.Status.Conditions, finishedCond.Type, finishedCond.Status, finishedCond.Reason, finishedCond.Message)
 	if finishedCond.Type == batch.JobComplete {
 		if job.Spec.Completions != nil && job.Status.Succeeded > *job.Spec.Completions {
 			jm.recorder.Event(job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
