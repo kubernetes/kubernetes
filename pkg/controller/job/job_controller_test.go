@@ -1864,7 +1864,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	}
 }
 
-func TestSyncPastDeadlineForJobWithConditionStatusFalse(t *testing.T) {
+func TestSingleJobFailedCondition(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
 	fakePodControl := controller.FakePodControl{}
