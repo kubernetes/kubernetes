@@ -666,6 +666,9 @@ const (
 	// Allow users to recover from volume expansion failure
 	RecoverVolumeExpansionFailure featuregate.Feature = "RecoverVolumeExpansionFailure"
 
+	// TODO: add details
+	ResizeStatefulSetPVCs featuregate.Feature = "ResizeStatefulSetPVCs"
+
 	// owner: @mikedanese
 	// alpha: v1.7
 	// beta: v1.12
@@ -977,6 +980,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ReadWriteOncePod: {Default: false, PreRelease: featuregate.Alpha},
 
 	RecoverVolumeExpansionFailure: {Default: false, PreRelease: featuregate.Alpha},
+
+	ResizeStatefulSetPVCs: {Default: false, PreRelease: featuregate.Alpha},
 
 	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
 

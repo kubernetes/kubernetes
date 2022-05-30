@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -981,10 +982,11 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 	}
 
 	type testCase struct {
-		name   string
-		old    apps.StatefulSet
-		update apps.StatefulSet
-		errs   field.ErrorList
+		name     string
+		old      apps.StatefulSet
+		update   apps.StatefulSet
+		features map[featuregate.Feature]bool
+		errs     field.ErrorList
 	}
 
 	successCases := []testCase{
@@ -1165,6 +1167,32 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 					MinReadySeconds:     10,
 				},
+			},
+		},
+		{
+			name: "update pvc template size (flag enabled)",
+			old: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy:  apps.OrderedReadyPodManagement,
+					Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:             validPodTemplate.Template,
+					UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+					VolumeClaimTemplates: []api.PersistentVolumeClaim{validPVCTemplate},
+				},
+			},
+			update: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.StatefulSetSpec{
+					PodManagementPolicy:  apps.OrderedReadyPodManagement,
+					Selector:             &metav1.LabelSelector{MatchLabels: validLabels},
+					Template:             validPodTemplate.Template,
+					UpdateStrategy:       apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+					VolumeClaimTemplates: []api.PersistentVolumeClaim{validPVCTemplateChangedSize},
+				},
+			},
+			features: map[featuregate.Feature]bool{
+				features.ResizeStatefulSetPVCs: true,
 			},
 		},
 	}
@@ -1405,6 +1433,9 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		}
 
 		t.Run(testTitle, func(t *testing.T) {
+			revert := enableFeaturesForTest(t, testCase.features)
+			defer revert()
+
 			testCase.old.ObjectMeta.ResourceVersion = "1"
 			testCase.update.ObjectMeta.ResourceVersion = "1"
 
@@ -3807,5 +3838,23 @@ func TestDaemonSetUpdateMaxSurge(t *testing.T) {
 				t.Errorf("Unexpected error(s): %v", errs)
 			}
 		})
+	}
+}
+
+func enableFeaturesForTest(t *testing.T, features map[featuregate.Feature]bool) func() {
+	if features == nil {
+		return func() {}
+	}
+	currentValues := make(map[featuregate.Feature]bool)
+	for feature, _ := range features {
+		currentValues[feature] = utilfeature.DefaultFeatureGate.Enabled(feature)
+	}
+	for feature, value := range features {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, value)
+	}
+	return func() {
+		for feature, value := range currentValues {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, value)
+		}
 	}
 }

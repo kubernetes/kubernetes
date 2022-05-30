@@ -179,11 +179,13 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, op
 	newStatefulSetClone.Spec.Template = oldStatefulSet.Spec.Template             // +k8s:verify-mutation:reason=clone
 	newStatefulSetClone.Spec.UpdateStrategy = oldStatefulSet.Spec.UpdateStrategy // +k8s:verify-mutation:reason=clone
 
-	oldStatefulSetPVCRequestsMap := getPVCTemplatesRequestsMap(oldStatefulSet.Spec.VolumeClaimTemplates)
-	for idx, _ := range newStatefulSetClone.Spec.VolumeClaimTemplates {
-		oldRequests, ok := oldStatefulSetPVCRequestsMap[newStatefulSetClone.Spec.VolumeClaimTemplates[idx].Name]
-		if ok {
-			newStatefulSetClone.Spec.VolumeClaimTemplates[idx].Spec.Resources.Requests = oldRequests.DeepCopy()
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResizeStatefulSetPVCs) {
+		oldStatefulSetPVCRequestsMap := getPVCTemplatesRequestsMap(oldStatefulSet.Spec.VolumeClaimTemplates)
+		for idx, _ := range newStatefulSetClone.Spec.VolumeClaimTemplates {
+			oldRequests, ok := oldStatefulSetPVCRequestsMap[newStatefulSetClone.Spec.VolumeClaimTemplates[idx].Name]
+			if ok {
+				newStatefulSetClone.Spec.VolumeClaimTemplates[idx].Spec.Resources.Requests = oldRequests.DeepCopy()
+			}
 		}
 	}
 
