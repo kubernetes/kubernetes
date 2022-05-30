@@ -1864,6 +1864,49 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	}
 }
 
+func TestSyncPastDeadlineForJobWithConditionStatusFalse(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	fakePodControl := controller.FakePodControl{}
+	manager.podControl = &fakePodControl
+	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
+	var actual *batch.Job
+	manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
+		actual = job
+		return job, nil
+	}
+
+	job := newJob(1, 1, 6, batch.NonIndexedCompletion)
+	activeDeadlineSeconds := int64(10)
+	job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+	start := metav1.Unix(metav1.Now().Time.Unix()-15, 0)
+	job.Status.StartTime = &start
+	job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobFailed, v1.ConditionFalse, "DeadlineExceeded", "Job was active longer than specified deadline"))
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+	forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
+	if err != nil {
+		t.Errorf("Unexpected error when syncing jobs %v", err)
+	}
+	if !forget {
+		t.Errorf("Unexpected forget value. Expected %v, saw %v\n", true, forget)
+	}
+	if len(fakePodControl.DeletePodName) != 0 {
+		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", 0, len(fakePodControl.DeletePodName))
+	}
+	if actual == nil {
+		t.Error("Expected job modification\n")
+	}
+	failedConditions := getConditionsByType(actual.Status.Conditions, batch.JobFailed)
+	if len(failedConditions) != 1 {
+		t.Error("Unexpected number of failed conditions\n")
+	}
+	if failedConditions[0].Status != v1.ConditionTrue {
+		t.Errorf("Unexpected status for the failed condition. Expected: %v, saw %v\n", v1.ConditionTrue, failedConditions[0].Status)
+	}
+
+}
+
 func TestSyncJobComplete(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
@@ -3302,6 +3345,16 @@ func buildPod() podBuilder {
 			UID: types.UID(rand.String(5)),
 		},
 	}}
+}
+
+func getConditionsByType(list []batch.JobCondition, cType batch.JobConditionType) []*batch.JobCondition {
+	var result []*batch.JobCondition
+	for i := range list {
+		if list[i].Type == cType {
+			result = append(result, &list[i])
+		}
+	}
+	return result
 }
 
 func (pb podBuilder) name(n string) podBuilder {
