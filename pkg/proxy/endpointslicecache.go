@@ -80,6 +80,7 @@ type endpointSliceInfo struct {
 type endpointInfo struct {
 	Addresses []string
 	NodeName  *string
+	Topology  map[string]string
 	Zone      *string
 	ZoneHints sets.String
 
@@ -132,6 +133,7 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 				Addresses: endpoint.Addresses,
 				Zone:      endpoint.Zone,
 				NodeName:  endpoint.NodeName,
+				Topology:  endpoint.DeprecatedTopology,
 
 				// conditions
 				Ready:       endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready,
@@ -284,6 +286,12 @@ func (cache *EndpointSliceCache) addEndpoints(serviceNN types.NamespacedName, po
 		if endpoint.NodeName != nil {
 			isLocal = cache.isLocal(*endpoint.NodeName)
 			nodeName = *endpoint.NodeName
+		} else {
+			deprecatedHostname, ok := endpoint.Topology[v1.LabelHostname]
+			if ok {
+				isLocal = cache.isLocal(deprecatedHostname)
+				nodeName = deprecatedHostname
+			}
 		}
 
 		zone := ""
