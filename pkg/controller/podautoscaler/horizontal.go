@@ -629,12 +629,7 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 
 	rescale := true
 
-	if scale.Spec.Replicas == 0 && minReplicas != 0 {
-		// Autoscaling is disabled for this resource
-		desiredReplicas = 0
-		rescale = false
-		setCondition(hpa, autoscalingv2.ScalingActive, v1.ConditionFalse, "ScalingDisabled", "scaling is disabled since the replica count of the target is zero")
-	} else if currentReplicas > hpa.Spec.MaxReplicas {
+	if currentReplicas > hpa.Spec.MaxReplicas {
 		rescaleReason = "Current number of replicas above Spec.MaxReplicas"
 		desiredReplicas = hpa.Spec.MaxReplicas
 	} else if currentReplicas < minReplicas {

@@ -2026,14 +2026,13 @@ func TestZeroReplicas(t *testing.T) {
 		maxReplicas:             5,
 		specReplicas:            0,
 		statusReplicas:          0,
-		expectedDesiredReplicas: 0,
+		expectedDesiredReplicas: 3,
 		CPUTarget:               90,
 		reportedLevels:          []uint64{},
 		reportedCPURequests:     []resource.Quantity{},
 		useMetricsAPI:           true,
 		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
 		},
 	}
 	tc.runTest(t)
