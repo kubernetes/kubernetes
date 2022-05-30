@@ -25,16 +25,11 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-kube::golang::old::setup_env
+kube::golang::setup_env
 
-BINS=(
-	cmd/clicheck
-)
-make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
+hack/make-rules/build.sh ./cmd/clicheck
 
-clicheck=$(kube::util::find-binary "clicheck")
-
-if ! output=$($clicheck 2>&1)
+if ! output=$(clicheck 2>&1)
 then
 	echo "$output"
 	echo
