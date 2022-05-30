@@ -37,11 +37,11 @@ import (
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 )
 
-// BaseServiceInfo contains base information that defines a service.
+// BaseServicePort contains base information that defines a service.
 // This could be used directly by proxier while processing services,
 // or can be used for constructing a more specific ServiceInfo struct
 // defined by the proxier if needed.
-type BaseServiceInfo struct {
+type BaseServicePort struct {
 	clusterIP                net.IP
 	port                     int
 	protocol                 v1.Protocol
@@ -58,106 +58,106 @@ type BaseServiceInfo struct {
 	hintsAnnotation          string
 }
 
-var _ ServicePort = &BaseServiceInfo{}
+var _ ServicePort = &BaseServicePort{}
 
 // String is part of ServicePort interface.
-func (info *BaseServiceInfo) String() string {
-	return fmt.Sprintf("%s:%d/%s", info.clusterIP, info.port, info.protocol)
+func (svcPort *BaseServicePort) String() string {
+	return fmt.Sprintf("%s:%d/%s", svcPort.clusterIP, svcPort.port, svcPort.protocol)
 }
 
 // ClusterIP is part of ServicePort interface.
-func (info *BaseServiceInfo) ClusterIP() net.IP {
-	return info.clusterIP
+func (svcPort *BaseServicePort) ClusterIP() net.IP {
+	return svcPort.clusterIP
 }
 
 // Port is part of ServicePort interface.
-func (info *BaseServiceInfo) Port() int {
-	return info.port
+func (svcPort *BaseServicePort) Port() int {
+	return svcPort.port
 }
 
 // SessionAffinityType is part of the ServicePort interface.
-func (info *BaseServiceInfo) SessionAffinityType() v1.ServiceAffinity {
-	return info.sessionAffinityType
+func (svcPort *BaseServicePort) SessionAffinityType() v1.ServiceAffinity {
+	return svcPort.sessionAffinityType
 }
 
 // StickyMaxAgeSeconds is part of the ServicePort interface
-func (info *BaseServiceInfo) StickyMaxAgeSeconds() int {
-	return info.stickyMaxAgeSeconds
+func (svcPort *BaseServicePort) StickyMaxAgeSeconds() int {
+	return svcPort.stickyMaxAgeSeconds
 }
 
 // Protocol is part of ServicePort interface.
-func (info *BaseServiceInfo) Protocol() v1.Protocol {
-	return info.protocol
+func (svcPort *BaseServicePort) Protocol() v1.Protocol {
+	return svcPort.protocol
 }
 
 // LoadBalancerSourceRanges is part of ServicePort interface
-func (info *BaseServiceInfo) LoadBalancerSourceRanges() []string {
-	return info.loadBalancerSourceRanges
+func (svcPort *BaseServicePort) LoadBalancerSourceRanges() []string {
+	return svcPort.loadBalancerSourceRanges
 }
 
 // HealthCheckNodePort is part of ServicePort interface.
-func (info *BaseServiceInfo) HealthCheckNodePort() int {
-	return info.healthCheckNodePort
+func (svcPort *BaseServicePort) HealthCheckNodePort() int {
+	return svcPort.healthCheckNodePort
 }
 
 // NodePort is part of the ServicePort interface.
-func (info *BaseServiceInfo) NodePort() int {
-	return info.nodePort
+func (svcPort *BaseServicePort) NodePort() int {
+	return svcPort.nodePort
 }
 
 // ExternalIPStrings is part of ServicePort interface.
-func (info *BaseServiceInfo) ExternalIPStrings() []string {
-	return info.externalIPs
+func (svcPort *BaseServicePort) ExternalIPStrings() []string {
+	return svcPort.externalIPs
 }
 
 // LoadBalancerIPStrings is part of ServicePort interface.
-func (info *BaseServiceInfo) LoadBalancerIPStrings() []string {
+func (svcPort *BaseServicePort) LoadBalancerIPStrings() []string {
 	var ips []string
-	for _, ing := range info.loadBalancerStatus.Ingress {
+	for _, ing := range svcPort.loadBalancerStatus.Ingress {
 		ips = append(ips, ing.IP)
 	}
 	return ips
 }
 
 // ExternalPolicyLocal is part of ServicePort interface.
-func (info *BaseServiceInfo) ExternalPolicyLocal() bool {
-	return info.externalPolicyLocal
+func (svcPort *BaseServicePort) ExternalPolicyLocal() bool {
+	return svcPort.externalPolicyLocal
 }
 
 // InternalPolicyLocal is part of ServicePort interface
-func (info *BaseServiceInfo) InternalPolicyLocal() bool {
-	return info.internalPolicyLocal
+func (svcPort *BaseServicePort) InternalPolicyLocal() bool {
+	return svcPort.internalPolicyLocal
 }
 
 // InternalTrafficPolicy is part of ServicePort interface
-func (info *BaseServiceInfo) InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicyType {
-	return info.internalTrafficPolicy
+func (svcPort *BaseServicePort) InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicyType {
+	return svcPort.internalTrafficPolicy
 }
 
 // HintsAnnotation is part of ServicePort interface.
-func (info *BaseServiceInfo) HintsAnnotation() string {
-	return info.hintsAnnotation
+func (svcPort *BaseServicePort) HintsAnnotation() string {
+	return svcPort.hintsAnnotation
 }
 
 // ExternallyAccessible is part of ServicePort interface.
-func (info *BaseServiceInfo) ExternallyAccessible() bool {
-	return info.nodePort != 0 || len(info.loadBalancerStatus.Ingress) != 0 || len(info.externalIPs) != 0
+func (svcPort *BaseServicePort) ExternallyAccessible() bool {
+	return svcPort.nodePort != 0 || len(svcPort.loadBalancerStatus.Ingress) != 0 || len(svcPort.externalIPs) != 0
 }
 
 // UsesClusterEndpoints is part of ServicePort interface.
-func (info *BaseServiceInfo) UsesClusterEndpoints() bool {
+func (svcPort *BaseServicePort) UsesClusterEndpoints() bool {
 	// The service port uses Cluster endpoints if the internal traffic policy is "Cluster",
 	// or if it accepts external traffic at all. (Even if the external traffic policy is
 	// "Local", we need Cluster endpoints to implement short circuiting.)
-	return !info.internalPolicyLocal || info.ExternallyAccessible()
+	return !svcPort.internalPolicyLocal || svcPort.ExternallyAccessible()
 }
 
 // UsesLocalEndpoints is part of ServicePort interface.
-func (info *BaseServiceInfo) UsesLocalEndpoints() bool {
-	return info.internalPolicyLocal || (info.externalPolicyLocal && info.ExternallyAccessible())
+func (svcPort *BaseServicePort) UsesLocalEndpoints() bool {
+	return svcPort.internalPolicyLocal || (svcPort.externalPolicyLocal && svcPort.ExternallyAccessible())
 }
 
-func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
+func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServicePort {
 	externalPolicyLocal := false
 	if apiservice.ExternalPolicyLocal(service) {
 		externalPolicyLocal = true
@@ -173,7 +173,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	}
 
 	clusterIP := utilproxy.GetClusterIPByFamily(sct.ipFamily, service)
-	info := &BaseServiceInfo{
+	info := &BaseServicePort{
 		clusterIP:             netutils.ParseIPSloppy(clusterIP),
 		port:                  int(port.Port),
 		protocol:              port.Protocol,
@@ -245,18 +245,18 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	return info
 }
 
-type makeServicePortFunc func(*v1.ServicePort, *v1.Service, *BaseServiceInfo) ServicePort
+type makeServicePortFunc func(*v1.ServicePort, *v1.Service, *BaseServicePort) ServicePort
 
 // This handler is invoked by the apply function on every change. This function should not modify the
-// ServiceMap's but just use the changes for any Proxier specific cleanup.
-type processServiceMapChangeFunc func(previous, current ServiceMap)
+// ServicePortMap's but just use the changes for any Proxier specific cleanup.
+type processServiceMapChangeFunc func(previous, current ServicePortMap)
 
-// serviceChange contains all changes to services that happened since proxy rules were synced.  For a single object,
+// serviceChange contains all changes to service that happened since proxy rules were synced.  For a single object,
 // changes are accumulated, i.e. previous is state from before applying the changes,
-// current is state after applying all of the changes.
+// current is state after applying all the changes.
 type serviceChange struct {
-	previous ServiceMap
-	current  ServiceMap
+	previous ServicePortMap
+	current  ServicePortMap
 }
 
 // ServiceChangeTracker carries state about uncommitted changes to an arbitrary number of
@@ -335,13 +335,13 @@ type UpdateServiceMapResult struct {
 	UDPStaleClusterIP sets.String
 }
 
-// Update updates ServiceMap base on the given changes.
-func (sm ServiceMap) Update(changes *ServiceChangeTracker) (result UpdateServiceMapResult) {
+// Update updates ServicePortMap base on the given changes.
+func (sm ServicePortMap) Update(changes *ServiceChangeTracker) (result UpdateServiceMapResult) {
 	result.UDPStaleClusterIP = sets.NewString()
 	sm.apply(changes, result.UDPStaleClusterIP)
 
 	// TODO: If this will appear to be computationally expensive, consider
-	// computing this incrementally similarly to serviceMap.
+	// computing this incrementally similarly to svcPortMap.
 	result.HCServiceNodePorts = make(map[types.NamespacedName]uint16)
 	for svcPortName, info := range sm {
 		if info.HealthCheckNodePort() != 0 {
@@ -352,13 +352,13 @@ func (sm ServiceMap) Update(changes *ServiceChangeTracker) (result UpdateService
 	return result
 }
 
-// ServiceMap maps a service to its ServicePort.
-type ServiceMap map[ServicePortName]ServicePort
+// ServicePortMap maps a service to its ServicePort.
+type ServicePortMap map[ServicePortName]ServicePort
 
-// serviceToServiceMap translates a single Service object to a ServiceMap.
+// serviceToServiceMap translates a single Service object to a ServicePortMap.
 //
 // NOTE: service object should NOT be modified.
-func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) ServiceMap {
+func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) ServicePortMap {
 	if service == nil {
 		return nil
 	}
@@ -372,25 +372,25 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 		return nil
 	}
 
-	serviceMap := make(ServiceMap)
+	svcPortMap := make(ServicePortMap)
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 		svcPortName := ServicePortName{NamespacedName: svcName, Port: servicePort.Name, Protocol: servicePort.Protocol}
 		baseSvcInfo := sct.newBaseServiceInfo(servicePort, service)
 		if sct.makeServiceInfo != nil {
-			serviceMap[svcPortName] = sct.makeServiceInfo(servicePort, service, baseSvcInfo)
+			svcPortMap[svcPortName] = sct.makeServiceInfo(servicePort, service, baseSvcInfo)
 		} else {
-			serviceMap[svcPortName] = baseSvcInfo
+			svcPortMap[svcPortName] = baseSvcInfo
 		}
 	}
-	return serviceMap
+	return svcPortMap
 }
 
-// apply the changes to ServiceMap and update the stale udp cluster IP set. The UDPStaleClusterIP argument is passed in to store the
-// udp protocol service cluster ip when service is deleted from the ServiceMap.
+// apply the changes to ServicePortMap and update the stale udp cluster IP set. The UDPStaleClusterIP argument is passed in to store the
+// udp protocol service cluster ip when service is deleted from the ServicePortMap.
 // apply triggers processServiceMapChange on every change.
-func (sm *ServiceMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP sets.String) {
+func (sm *ServicePortMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP sets.String) {
 	changes.lock.Lock()
 	defer changes.lock.Unlock()
 	for _, change := range changes.items {
@@ -403,20 +403,20 @@ func (sm *ServiceMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP set
 		change.previous.filter(change.current)
 		sm.unmerge(change.previous, UDPStaleClusterIP)
 	}
-	// clear changes after applying them to ServiceMap.
+	// clear changes after applying them to ServicePortMap.
 	changes.items = make(map[types.NamespacedName]*serviceChange)
 	metrics.ServiceChangesPending.Set(0)
 }
 
-// merge adds other ServiceMap's elements to current ServiceMap.
+// merge adds other ServicePortMap's elements to current ServicePortMap.
 // If collision, other ALWAYS win. Otherwise add the other to current.
 // In other words, if some elements in current collisions with other, update the current by other.
 // It returns a string type set which stores all the newly merged services' identifier, ServicePortName.String(), to help users
 // tell if a service is deleted or updated.
-// The returned value is one of the arguments of ServiceMap.unmerge().
-// ServiceMap A Merge ServiceMap B will do following 2 things:
-//   * update ServiceMap A.
-//   * produce a string set which stores all other ServiceMap's ServicePortName.String().
+// The returned value is one of the arguments of ServicePortMap.unmerge().
+// ServicePortMap A Merge ServicePortMap B will do following 2 things:
+//   * update ServicePortMap A.
+//   * produce a string set which stores all other ServicePortMap's ServicePortName.String().
 // For example,
 //   - A{}
 //   - B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
@@ -426,8 +426,8 @@ func (sm *ServiceMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP set
 //   - B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
 //     - A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
 //     - produce string set {"ns/cluster-ip:http"}
-func (sm *ServiceMap) merge(other ServiceMap) sets.String {
-	// existingPorts is going to store all identifiers of all services in `other` ServiceMap.
+func (sm *ServicePortMap) merge(other ServicePortMap) sets.String {
+	// existingPorts is going to store all identifiers of all services in `other` ServicePortMap.
 	existingPorts := sets.NewString()
 	for svcPortName, info := range other {
 		// Take ServicePortName.String() as the newly merged service's identifier and put it into existingPorts.
@@ -443,8 +443,8 @@ func (sm *ServiceMap) merge(other ServiceMap) sets.String {
 	return existingPorts
 }
 
-// filter filters out elements from ServiceMap base on given ports string sets.
-func (sm *ServiceMap) filter(other ServiceMap) {
+// filter filters out elements from ServicePortMap base on given ports string sets.
+func (sm *ServicePortMap) filter(other ServicePortMap) {
 	for svcPortName := range *sm {
 		// skip the delete for Update event.
 		if _, ok := other[svcPortName]; ok {
@@ -453,9 +453,9 @@ func (sm *ServiceMap) filter(other ServiceMap) {
 	}
 }
 
-// unmerge deletes all other ServiceMap's elements from current ServiceMap.  We pass in the UDPStaleClusterIP strings sets
+// unmerge deletes all other ServicePortMap's elements from current ServicePortMap.  We pass in the UDPStaleClusterIP strings sets
 // for storing the stale udp service cluster IPs. We will clear stale udp connection base on UDPStaleClusterIP later
-func (sm *ServiceMap) unmerge(other ServiceMap, UDPStaleClusterIP sets.String) {
+func (sm *ServicePortMap) unmerge(other ServicePortMap, UDPStaleClusterIP sets.String) {
 	for svcPortName := range other {
 		info, exists := (*sm)[svcPortName]
 		if exists {

@@ -115,7 +115,7 @@ const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 
 // internal struct for string service information
 type servicePortInfo struct {
-	*proxy.BaseServiceInfo
+	*proxy.BaseServicePort
 	// The following fields are computed and stored for performance reasons.
 	nameString             string
 	clusterPolicyChainName utiliptables.Chain
@@ -125,8 +125,8 @@ type servicePortInfo struct {
 }
 
 // returns a new proxy.ServicePort which abstracts a serviceInfo
-func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.BaseServiceInfo) proxy.ServicePort {
-	svcPort := &servicePortInfo{BaseServiceInfo: baseInfo}
+func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseSvcPort *proxy.BaseServicePort) proxy.ServicePort {
+	svcPort := &servicePortInfo{BaseServicePort: baseSvcPort}
 
 	// Store the following for performance reasons.
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
@@ -180,7 +180,7 @@ type Proxier struct {
 	serviceChanges   *proxy.ServiceChangeTracker
 
 	mu           sync.Mutex // protects the following fields
-	serviceMap   proxy.ServiceMap
+	svcPortMap   proxy.ServicePortMap
 	endpointsMap proxy.EndpointsMap
 	nodeLabels   map[string]string
 	// endpointSlicesSynced, and servicesSynced are set to true
@@ -289,7 +289,7 @@ func NewProxier(ipt utiliptables.Interface,
 	}
 
 	proxier := &Proxier{
-		serviceMap:               make(proxy.ServiceMap),
+		svcPortMap:               make(proxy.ServicePortMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, ipFamily, recorder, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
 		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
@@ -756,7 +756,7 @@ func isServiceChainName(chainString string) bool {
 // TODO: move it to util
 func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceEndpoint) {
 	for _, epSvcPair := range connectionMap {
-		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
+		if svcInfo, ok := proxier.svcPortMap[epSvcPair.ServicePortName]; ok && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
 			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
 			nodePort := svcInfo.NodePort()
 			svcProto := svcInfo.Protocol()
@@ -823,7 +823,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
-	serviceUpdateResult := proxier.serviceMap.Update(proxier.serviceChanges)
+	serviceUpdateResult := proxier.svcPortMap.Update(proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
 	// We need to detect stale connections to UDP Services so we
@@ -833,7 +833,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// merge stale services gathered from updateEndpointsMap
 	// an UDP service that changes from 0 to non-0 endpoints is considered stale.
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
-		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
+		if svcInfo, ok := proxier.svcPortMap[svcPortName]; ok && svcInfo != nil && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
 			klog.V(2).InfoS("Stale service", "protocol", strings.ToLower(string(svcInfo.Protocol())), "servicePortName", svcPortName, "clusterIP", svcInfo.ClusterIP())
 			conntrackCleanupServiceIPs.Insert(svcInfo.ClusterIP().String())
 			for _, extIP := range svcInfo.ExternalIPStrings() {
@@ -976,7 +976,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Compute total number of endpoint chains across all services.
 	proxier.endpointChainsNumber = 0
-	for svcName := range proxier.serviceMap {
+	for svcName := range proxier.svcPortMap {
 		proxier.endpointChainsNumber += len(proxier.endpointsMap[svcName])
 	}
 
@@ -1001,7 +1001,7 @@ func (proxier *Proxier) syncProxyRules() {
 	serviceNoLocalEndpointsTotalExternal := 0
 
 	// Build rules for each service-port.
-	for svcName, svc := range proxier.serviceMap {
+	for svcName, svc := range proxier.svcPortMap {
 		svcInfo, ok := svc.(*servicePortInfo)
 		if !ok {
 			klog.ErrorS(nil, "Failed to cast serviceInfo", "serviceName", svcName)
@@ -1459,7 +1459,7 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.iptablesData.WriteString("COMMIT\n")
 
 	klog.V(2).InfoS("Reloading service iptables data",
-		"numServices", len(proxier.serviceMap),
+		"numServices", len(proxier.svcPortMap),
 		"numEndpoints", proxier.endpointChainsNumber,
 		"numFilterChains", proxier.filterChains.Lines(),
 		"numFilterRules", proxier.filterRules.Lines(),
