@@ -163,7 +163,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
+			if !eventFound {
+				framework.Failf("failed to find RC %v event", watch.Added)
+			}
 
 			ginkgo.By("waiting for available Replicas")
 			eventFound = false
@@ -186,7 +188,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait for condition with watch events should not return an error")
-			framework.ExpectEqual(eventFound, true, "RC has not reached ReadyReplicas count of %v", testRcInitialReplicaCount)
+			if !eventFound {
+				framework.Failf("RC has not reached ReadyReplicas count of %v", testRcInitialReplicaCount)
+			}
 
 			rcLabelPatchPayload, err := json.Marshal(v1.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{
@@ -212,7 +216,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
+			if !eventFound {
+				framework.Failf("failed to find RC %v event", watch.Added)
+			}
 
 			rcStatusPatchPayload, err := json.Marshal(map[string]interface{}{
 				"status": map[string]interface{}{
@@ -240,7 +246,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
+			if !eventFound {
+				framework.Failf("failed to find RC %v event", watch.Added)
+			}
 
 			ginkgo.By("waiting for available Replicas")
 			_, err = watchUntilWithoutRetry(context.TODO(), retryWatcher, func(watchEvent watch.Event) (bool, error) {
@@ -259,7 +267,6 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Failed to find updated ready replica count")
-			framework.ExpectEqual(eventFound, true, "Failed to find updated ready replica count")
 
 			ginkgo.By("fetching ReplicationController status")
 			rcStatusUnstructured, err := dc.Resource(rcResource).Namespace(testRcNamespace).Get(context.TODO(), testRcName, metav1.GetOptions{}, "status")
@@ -294,7 +301,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
+			if !eventFound {
+				framework.Failf("failed to find RC %v event", watch.Added)
+			}
 
 			ginkgo.By("waiting for ReplicationController's scale to be the max amount")
 			eventFound = false
@@ -315,7 +324,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-			framework.ExpectEqual(eventFound, true, "Failed to find updated ready replica count")
+			if !eventFound {
+				framework.Failf("Failed to find updated ready replica count")
+			}
 
 			// Get the ReplicationController
 			ginkgo.By("fetching ReplicationController; ensuring that it's patched")
@@ -345,13 +356,16 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
+			if !eventFound {
+				framework.Failf("failed to find RC %v event", watch.Added)
+			}
 
 			ginkgo.By("listing all ReplicationControllers")
 			rcs, err := f.ClientSet.CoreV1().ReplicationControllers("").List(context.TODO(), metav1.ListOptions{LabelSelector: "test-rc-static=true"})
 			framework.ExpectNoError(err, "failed to list ReplicationController")
-			framework.ExpectEqual(len(rcs.Items) > 0, true)
-
+			if len(rcs.Items) <= 0 {
+				framework.Failf("got no ReplicationController")
+			}
 			ginkgo.By("checking that ReplicationController has expected values")
 			foundRc := false
 			for _, rcItem := range rcs.Items {
@@ -362,7 +376,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 					foundRc = true
 				}
 			}
-			framework.ExpectEqual(foundRc, true)
+			if !foundRc {
+				framework.Failf("failed to find RC: %s in Namespace: %s with Labels 'test-rc-static'=%s and 'test-rc'=%s", testRcName, testRcNamespace, "true", "patched")
+			}
 
 			// Delete ReplicationController
 			ginkgo.By("deleting ReplicationControllers by collection")
@@ -382,7 +398,9 @@ var _ = SIGDescribe("ReplicationController", func() {
 				return true, nil
 			})
 			framework.ExpectNoError(err, "Wait until condition with watch events should not return an error")
-			framework.ExpectEqual(eventFound, true, "failed to find RC %v event", watch.Added)
+			if !eventFound {
+				framework.Failf("failed to find RC %v event", watch.Added)
+			}
 
 			return actualWatchEvents
 		}, func() (err error) {
