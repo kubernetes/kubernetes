@@ -101,7 +101,9 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 func TestPDBWithScaleSubresource(t *testing.T) {
 	s, pdbc, informers, clientSet, apiExtensionClient, dynamicClient := setup(t)
 	defer s.TearDownFn()
-	ctx := context.TODO()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	nsName := "pdb-scale-subresource"
 	createNs(ctx, t, nsName, clientSet)
 
@@ -187,16 +189,14 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 }
 
 func TestEmptySelector(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	testcases := []struct {
 		name                   string
-		createPDBFunc          func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error
+		createPDBFunc          func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error
 		expectedCurrentHealthy int32
 	}{
 		{
 			name: "v1beta1 should not target any pods",
-			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &v1beta1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -213,7 +213,7 @@ func TestEmptySelector(t *testing.T) {
 		},
 		{
 			name: "v1 should target all pods",
-			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &policyv1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -235,6 +235,9 @@ func TestEmptySelector(t *testing.T) {
 			s, pdbc, informers, clientSet, _, _ := setup(t)
 			defer s.TearDownFn()
 
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			nsName := fmt.Sprintf("pdb-empty-selector-%d", i)
 			createNs(ctx, t, nsName, clientSet)
 
@@ -252,7 +255,7 @@ func TestEmptySelector(t *testing.T) {
 			waitToObservePods(t, informers.Core().V1().Pods().Informer(), 4, v1.PodRunning)
 
 			pdbName := "test-pdb"
-			if err := tc.createPDBFunc(clientSet, pdbName, nsName, minAvailable); err != nil {
+			if err := tc.createPDBFunc(ctx, clientSet, pdbName, nsName, minAvailable); err != nil {
 				t.Errorf("Error creating PodDisruptionBudget: %v", err)
 			}
 
@@ -271,16 +274,14 @@ func TestEmptySelector(t *testing.T) {
 }
 
 func TestSelectorsForPodsWithoutLabels(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	testcases := []struct {
 		name                   string
-		createPDBFunc          func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error
+		createPDBFunc          func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error
 		expectedCurrentHealthy int32
 	}{
 		{
 			name: "pods with no labels can be targeted by v1 PDBs with empty selector",
-			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &policyv1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -297,7 +298,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 		},
 		{
 			name: "pods with no labels can be targeted by v1 PDBs with DoesNotExist selector",
-			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &policyv1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -321,7 +322,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 		},
 		{
 			name: "pods with no labels can be targeted by v1beta1 PDBs with DoesNotExist selector",
-			createPDBFunc: func(clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
+			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, name, nsName string, minAvailable intstr.IntOrString) error {
 				pdb := &v1beta1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
@@ -350,6 +351,9 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 			s, pdbc, informers, clientSet, _, _ := setup(t)
 			defer s.TearDownFn()
 
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
 			nsName := fmt.Sprintf("pdb-selectors-%d", i)
 			createNs(ctx, t, nsName, clientSet)
 
@@ -360,7 +364,7 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 
 			// Create the PDB first and wait for it to settle.
 			pdbName := "test-pdb"
-			if err := tc.createPDBFunc(clientSet, pdbName, nsName, minAvailable); err != nil {
+			if err := tc.createPDBFunc(ctx, clientSet, pdbName, nsName, minAvailable); err != nil {
 				t.Errorf("Error creating PodDisruptionBudget: %v", err)
 			}
 			waitPDBStable(ctx, t, clientSet, 0, nsName, pdbName)
@@ -498,8 +502,14 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 }
 
 func TestPatchCompatibility(t *testing.T) {
-	s, _, _, clientSet, _, _ := setup(t)
+	s, pdbc, _, clientSet, _, _ := setup(t)
 	defer s.TearDownFn()
+
+	// Even though pdbc isn't used in this test, its creation is already
+	// spawning some goroutines. So we need to run it to ensure they won't leak.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	pdbc.Run(ctx)
 
 	testcases := []struct {
 		name             string
@@ -634,5 +644,4 @@ func TestPatchCompatibility(t *testing.T) {
 			}
 		})
 	}
-
 }
