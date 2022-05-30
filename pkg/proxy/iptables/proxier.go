@@ -117,8 +117,8 @@ const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 type servicePortInfo struct {
 	*proxy.BaseServiceInfo
 	// The following fields are computed and stored for performance reasons.
-	nameString	string
-	svcptNameString             string
+	nameString             string
+	svcptNameString        string
 	clusterPolicyChainName utiliptables.Chain
 	localPolicyChainName   utiliptables.Chain
 	firewallChainName      utiliptables.Chain
@@ -127,7 +127,7 @@ type servicePortInfo struct {
 
 // returns a new proxy.ServicePort which abstracts a serviceInfo
 func newServiceInfo(port *v1.ServicePort, service *v1.Service, baseInfo *proxy.BaseServiceInfo) proxy.ServicePort {
-	svcPort := &servicePortInfo{BaseServiceInfo: baseInfo}
+	info := &servicePortInfo{BaseServiceInfo: baseInfo}
 
 	// Store the following for performance reasons.
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
