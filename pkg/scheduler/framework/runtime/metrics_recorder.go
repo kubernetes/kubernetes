@@ -41,8 +41,7 @@ type metricsRecorder struct {
 	// how often the recorder runs to flush the metrics.
 	interval time.Duration
 
-	// stopCh is used to stop the goroutine which periodically flushes metrics. It's currently only
-	// used in tests.
+	// stopCh is used to stop the goroutine which periodically flushes metrics.
 	stopCh <-chan struct{}
 	// isStoppedCh indicates whether the goroutine is stopped. It's used in tests only to make sure
 	// the metric flushing goroutine is stopped so that tests can collect metrics for verification.
