@@ -50,7 +50,7 @@ const (
 // NewLoggingConfiguration returns a struct holding the default logging configuration.
 func NewLoggingConfiguration() *LoggingConfiguration {
 	c := LoggingConfiguration{}
-	c.SetRecommendedLoggingConfiguration()
+	SetRecommendedLoggingConfiguration(&c)
 	return &c
 }
 
@@ -61,26 +61,26 @@ func NewLoggingConfiguration() *LoggingConfiguration {
 //
 // The optional FeatureGate controls logging features. If nil, the default for
 // these features is used.
-func (c *LoggingConfiguration) ValidateAndApply(featureGate featuregate.FeatureGate) error {
-	return c.ValidateAndApplyAsField(featureGate, nil)
+func ValidateAndApply(c *LoggingConfiguration, featureGate featuregate.FeatureGate) error {
+	return ValidateAndApplyAsField(c, featureGate, nil)
 }
 
 // ValidateAndApplyAsField is a variant of ValidateAndApply that should be used
 // when the LoggingConfiguration is embedded in some larger configuration
 // structure.
-func (c *LoggingConfiguration) ValidateAndApplyAsField(featureGate featuregate.FeatureGate, fldPath *field.Path) error {
-	errs := c.Validate(featureGate, fldPath)
+func ValidateAndApplyAsField(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldPath *field.Path) error {
+	errs := Validate(c, featureGate, fldPath)
 	if len(errs) > 0 {
 		return errs.ToAggregate()
 	}
-	return c.apply(featureGate)
+	return apply(c, featureGate)
 }
 
 // Validate can be used to check for invalid settings without applying them.
 // Most binaries should validate and apply the logging configuration as soon
 // as possible via ValidateAndApply. The field path is optional: nil
 // can be passed when the struct is not embedded in some larger struct.
-func (c *LoggingConfiguration) Validate(featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
+func Validate(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
 	errs := field.ErrorList{}
 	if c.Format != DefaultLogFormat {
 		// WordSepNormalizeFunc is just a guess. Commands should use it,
@@ -127,17 +127,17 @@ func (c *LoggingConfiguration) Validate(featureGate featuregate.FeatureGate, fld
 		}
 	}
 
-	errs = append(errs, c.validateFormatOptions(featureGate, fldPath.Child("options"))...)
+	errs = append(errs, validateFormatOptions(c, featureGate, fldPath.Child("options"))...)
 	return errs
 }
 
-func (c *LoggingConfiguration) validateFormatOptions(featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
+func validateFormatOptions(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
 	errs := field.ErrorList{}
-	errs = append(errs, c.validateJSONOptions(featureGate, fldPath.Child("json"))...)
+	errs = append(errs, validateJSONOptions(c, featureGate, fldPath.Child("json"))...)
 	return errs
 }
 
-func (c *LoggingConfiguration) validateJSONOptions(featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
+func validateJSONOptions(c *LoggingConfiguration, featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
 	errs := field.ErrorList{}
 	if gate := LoggingAlphaOptions; c.Options.JSON.SplitStream && !featureEnabled(featureGate, gate) {
 		errs = append(errs, field.Forbidden(fldPath.Child("splitStream"), fmt.Sprintf("Feature %s is disabled", gate)))
@@ -156,7 +156,7 @@ func featureEnabled(featureGate featuregate.FeatureGate, feature featuregate.Fea
 	return enabled
 }
 
-func (c *LoggingConfiguration) apply(featureGate featuregate.FeatureGate) error {
+func apply(c *LoggingConfiguration, featureGate featuregate.FeatureGate) error {
 	contextualLoggingEnabled := contextualLoggingDefault
 	if featureGate != nil {
 		contextualLoggingEnabled = featureGate.Enabled(ContextualLogging)
@@ -182,7 +182,7 @@ func (c *LoggingConfiguration) apply(featureGate featuregate.FeatureGate) error 
 }
 
 // AddFlags adds command line flags for the configuration.
-func (c *LoggingConfiguration) AddFlags(fs *pflag.FlagSet) {
+func AddFlags(c *LoggingConfiguration, fs *pflag.FlagSet) {
 	// The help text is generated assuming that flags will eventually use
 	// hyphens, even if currently no normalization function is set for the
 	// flag set yet.
@@ -210,7 +210,7 @@ func (c *LoggingConfiguration) AddFlags(fs *pflag.FlagSet) {
 // Consumers who embed LoggingConfiguration in their own configuration structs
 // may set custom defaults and then should call this function to add the
 // global defaults.
-func (c *LoggingConfiguration) SetRecommendedLoggingConfiguration() {
+func SetRecommendedLoggingConfiguration(c *LoggingConfiguration) {
 	if c.Format == "" {
 		c.Format = "text"
 	}

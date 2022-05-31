@@ -40,6 +40,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/config/options"
 	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -194,7 +195,7 @@ func (o *Options) initFlags() {
 	options.BindLeaderElectionFlags(o.LeaderElection, nfs.FlagSet("leader election"))
 	utilfeature.DefaultMutableFeatureGate.AddFlag(nfs.FlagSet("feature gate"))
 	o.Metrics.AddFlags(nfs.FlagSet("metrics"))
-	o.Logs.AddFlags(nfs.FlagSet("logs"))
+	logsapi.AddFlags(o.Logs, nfs.FlagSet("logs"))
 
 	o.Flags = &nfs
 }

@@ -151,7 +151,7 @@ func TestValidation(t *testing.T) {
 			if featureGate == nil {
 				featureGate = defaultFeatureGate
 			}
-			err := test.config.Validate(featureGate, test.path)
+			err := Validate(&test.config, featureGate, test.path)
 			if len(err) == 0 {
 				if test.expectErrors != "" {
 					t.Fatalf("did not get expected error(s): %s", test.expectErrors)

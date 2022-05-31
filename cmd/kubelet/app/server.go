@@ -215,7 +215,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 
 			// Config and flags parsed, now we can initialize logging.
 			logs.InitLogs()
-			if err := kubeletConfig.Logging.ValidateAndApplyAsField(utilfeature.DefaultFeatureGate, field.NewPath("logging")); err != nil {
+			if err := logsapi.ValidateAndApplyAsField(&kubeletConfig.Logging, utilfeature.DefaultFeatureGate, field.NewPath("logging")); err != nil {
 				return fmt.Errorf("initialize logging: %v", err)
 			}
 			cliflag.PrintFlags(cleanFlagSet)

@@ -29,6 +29,7 @@ import (
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 
+	logsapi "k8s.io/component-base/logs/api/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -155,7 +156,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	s.EgressSelector.AddFlags(fss.FlagSet("egress selector"))
 	s.Admission.AddFlags(fss.FlagSet("admission"))
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
-	s.Logs.AddFlags(fss.FlagSet("logs"))
+	logsapi.AddFlags(s.Logs, fss.FlagSet("logs"))
 	s.Traces.AddFlags(fss.FlagSet("traces"))
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to

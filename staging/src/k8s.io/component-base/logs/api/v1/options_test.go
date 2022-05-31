@@ -35,7 +35,7 @@ func TestFlags(t *testing.T) {
 	c := NewLoggingConfiguration()
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	output := bytes.Buffer{}
-	c.AddFlags(fs)
+	AddFlags(c, fs)
 	fs.SetOutput(&output)
 	fs.PrintDefaults()
 	want := `      --log-flush-frequency duration   Maximum number of seconds between log flushes (default 5s)
@@ -88,12 +88,12 @@ func TestOptions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := NewLoggingConfiguration()
 			fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-			c.AddFlags(fs)
+			AddFlags(c, fs)
 			fs.Parse(tc.args)
 			if !assert.Equal(t, tc.want, c) {
 				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, c)
 			}
-			errs := c.ValidateAndApply(nil /* We don't care about feature gates here. */)
+			errs := ValidateAndApply(c, nil /* We don't care about feature gates here. */)
 			defer klog.StopFlushDaemon()
 			if !assert.ElementsMatch(t, tc.errs, errs) {
 				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, errs)
@@ -120,7 +120,7 @@ func testContextualLogging(t *testing.T, enabled bool) {
 	AddFeatureGates(featureGate)
 	err = featureGate.SetFromMap(map[string]bool{string(ContextualLogging): enabled})
 	require.NoError(t, err)
-	err = c.ValidateAndApply(featureGate)
+	err = ValidateAndApply(c, featureGate)
 	require.NoError(t, err)
 	defer klog.StopFlushDaemon()
 	defer klog.EnableContextualLogging(true)
