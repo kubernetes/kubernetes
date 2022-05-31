@@ -202,6 +202,19 @@
   stabilityLevel: STABLE
   labels:
   - request_kind
+- name: apiserver_longrunning_requests
+  help: Gauge of all active long-running apiserver requests broken out by verb, group,
+    version, resource, scope and component. Not all requests are tracked this way.
+  type: Gauge
+  stabilityLevel: STABLE
+  labels:
+  - component
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
 - name: apiserver_request_duration_seconds
   help: Response latency distribution in seconds for each verb, dry run value, group,
     version, resource, subresource, scope and component.
