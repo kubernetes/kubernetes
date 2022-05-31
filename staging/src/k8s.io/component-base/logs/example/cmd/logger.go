@@ -53,7 +53,7 @@ func NewLoggerCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Run: func(cmd *cobra.Command, args []string) {
 			logs.InitLogs()
-			if err := c.ValidateAndApply(featureGate); err != nil {
+			if err := logsapi.ValidateAndApply(c, featureGate); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -67,7 +67,7 @@ func NewLoggerCommand() *cobra.Command {
 	}
 	logsapi.AddFeatureGates(featureGate)
 	featureGate.AddFlag(cmd.Flags())
-	c.AddFlags(cmd.Flags())
+	logsapi.AddFlags(c, cmd.Flags())
 	return cmd
 }
 

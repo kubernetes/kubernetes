@@ -34,7 +34,7 @@ func TestJSONFlag(t *testing.T) {
 	c := logsapi.NewLoggingConfiguration()
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	output := bytes.Buffer{}
-	c.AddFlags(fs)
+	logsapi.AddFlags(c, fs)
 	fs.SetOutput(&output)
 	fs.PrintDefaults()
 	wantSubstring := `Permitted formats: "json" (gated by LoggingBetaOptions), "text".`
@@ -142,7 +142,7 @@ func TestJSONFormatRegister(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := logsapi.NewLoggingConfiguration()
 			fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-			c.AddFlags(fs)
+			logsapi.AddFlags(c, fs)
 			fs.Parse(tc.args)
 			if !assert.Equal(t, tc.want, c) {
 				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, c)
@@ -155,7 +155,7 @@ func TestJSONFormatRegister(t *testing.T) {
 			err := mutable.SetFromMap(map[string]bool{string(logsapi.ContextualLogging): tc.contextualLogging})
 			require.NoError(t, err)
 			featureGate = mutable
-			errs := c.ValidateAndApply(featureGate)
+			errs := logsapi.ValidateAndApply(c, featureGate)
 			defer klog.ClearLogger()
 			if !assert.ElementsMatch(t, tc.errs, errs) {
 				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, errs)
