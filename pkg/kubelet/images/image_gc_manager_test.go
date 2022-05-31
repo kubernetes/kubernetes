@@ -35,7 +35,7 @@ import (
 )
 
 var zero time.Time
-var sandboxImage = "k8s.gcr.io/pause-amd64:latest"
+var sandboxImage = "registry.k8s.io/pause-amd64:latest"
 
 func newRealImageGCManager(policy ImageGCPolicy, mockStatsProvider stats.Provider) (*realImageGCManager, *containertest.FakeRuntime) {
 	fakeRuntime := &containertest.FakeRuntime{}

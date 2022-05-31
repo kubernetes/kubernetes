@@ -80,7 +80,7 @@ etcd:
   local:
     dataDir: %%s
     image: ""
-imageRepository: k8s.gcr.io
+imageRepository: registry.k8s.io
 kubernetesVersion: %%s
 networking:
   dnsDomain: cluster.local
@@ -997,7 +997,7 @@ metadata:
 spec:
   containers:
   - name: etcd
-    image: k8s.gcr.io/etcd:` + expectedEtcdVersion
+    image: registry.k8s.io/etcd:` + expectedEtcdVersion
 
 	manifestsDir, err := os.MkdirTemp("", "GetEtcdImageTagFromStaticPod-test-manifests")
 	if err != nil {
