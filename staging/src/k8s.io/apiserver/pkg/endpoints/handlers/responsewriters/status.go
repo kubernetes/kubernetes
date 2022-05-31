@@ -58,11 +58,10 @@ func ErrorToAPIStatus(err error) *metav1.Status {
 		//TODO: check for invalid responses
 		return &status
 	default:
-		status := http.StatusInternalServerError
+		statusCode := http.StatusInternalServerError
 		switch {
-		//TODO: replace me with NewConflictErr
 		case storage.IsConflict(err):
-			status = http.StatusConflict
+			statusCode = http.StatusConflict
 		}
 		// Log errors that were not converted to an error status
 		// by REST storage - these typically indicate programmer
@@ -75,7 +74,7 @@ func ErrorToAPIStatus(err error) *metav1.Status {
 				APIVersion: "v1",
 			},
 			Status:  metav1.StatusFailure,
-			Code:    int32(status),
+			Code:    int32(statusCode),
 			Reason:  metav1.StatusReasonUnknown,
 			Message: err.Error(),
 		}
