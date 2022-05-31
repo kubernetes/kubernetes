@@ -365,6 +365,47 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, stopCh <-cha
 			outputProfile.PluginConfig = nil
 		}
 		options.captureProfile(outputProfile)
+
+		// initialize list of omitted plugins
+		visitedPlugin := make(map[string]bool)
+		i := 0
+		for k := range r {
+			visitedPlugin[k] = false
+			i++
+		}
+
+		// log all plugin status by extension point
+		for _, e := range f.getExtensionPoints(profile.Plugins) {
+			plugins := reflect.ValueOf(e.slicePtr).Elem()
+			pluginType := plugins.Type().Elem()
+
+			for _, p := range e.plugins.Enabled {
+				klog.V(2).InfoS("Plugin enabled", "plugin", p.Name, "extension", pluginType)
+				visitedPlugin[p.Name] = true
+			}
+
+			for _, p := range e.plugins.Disabled {
+				klog.V(2).InfoS("Plugin disabled", "plugin", p.Name, "extension", pluginType)
+				visitedPlugin[p.Name] = true
+			}
+		}
+
+		for _, p := range profile.Plugins.MultiPoint.Enabled {
+			klog.V(2).InfoS("Plugin enabled", "plugin", p.Name, "extension", "MultiPoint")
+			visitedPlugin[p.Name] = true
+		}
+
+		for _, p := range profile.Plugins.MultiPoint.Disabled {
+			klog.V(2).InfoS("Plugin disabled", "plugin", p.Name, "extension", "MultiPoint")
+			visitedPlugin[p.Name] = true
+		}
+
+		// log all plugins not enabled by default or declared explicitly in the configuration
+		for k, v := range visitedPlugin {
+			if !v {
+				klog.V(2).InfoS("Plugin disabled, not declared in configuration", "plugin", k, "extension", "MultiPoint")
+			}
+		}
 	}
 
 	return f, nil

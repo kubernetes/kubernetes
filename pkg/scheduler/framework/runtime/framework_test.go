@@ -794,10 +794,13 @@ func TestNewFrameworkMultiPointExpansion(t *testing.T) {
 			wantErr: "already registered",
 		},
 	}
-
+	captureProfileOpt := WithCaptureProfile(func(profile config.KubeSchedulerProfile) {
+		println() // fake callback for CaptureProfile func
+	})
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			fw, err := NewFramework(registry, &config.KubeSchedulerProfile{Plugins: tc.plugins}, wait.NeverStop)
+
+			fw, err := NewFramework(registry, &config.KubeSchedulerProfile{Plugins: tc.plugins}, wait.NeverStop, captureProfileOpt)
 			if err != nil {
 				if tc.wantErr == "" || !strings.Contains(err.Error(), tc.wantErr) {
 					t.Fatalf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
@@ -1159,7 +1162,9 @@ func TestRunScorePlugins(t *testing.T) {
 			},
 		},
 	}
-
+	captureProfileOpt := WithCaptureProfile(func(profile config.KubeSchedulerProfile) {
+		println()
+	})
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Inject the results via Args in PluginConfig.
@@ -1167,7 +1172,7 @@ func TestRunScorePlugins(t *testing.T) {
 				Plugins:      tt.plugins,
 				PluginConfig: tt.pluginConfigs,
 			}
-			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile, captureProfileOpt)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
