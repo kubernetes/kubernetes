@@ -126,7 +126,9 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats", func() {
 				framework.Logf("Using node: %v", targetNode.Name)
 
 				ginkgo.By("Getting bootid")
-				framework.ExpectEqual(len(targetNode.Status.NodeInfo.BootID) != 0, true, "Should find bootId in kubelet stats")
+				if len(targetNode.Status.NodeInfo.BootID) == 0 {
+					framework.Failf("expected bootId in kubelet stats, got none")
+				}
 			})
 		})
 

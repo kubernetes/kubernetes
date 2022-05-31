@@ -19,6 +19,7 @@ package windows
 import (
 	"context"
 	"fmt"
+	"github.com/onsi/gomega"
 	"strings"
 	"time"
 
@@ -568,10 +569,10 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		// Note: This test performs relative comparisons to ensure metrics values were logged and does not validate specific values.
 		// This done so the test can be run in parallel with other tests which may start HostProcess containers on the same node.
 		ginkgo.By("Ensuring metrics were updated")
-		framework.ExpectEqual(beforeMetrics.StartedContainersCount < afterMetrics.StartedContainersCount, true, "Count of started HostProcess containers should increase")
-		framework.ExpectEqual(beforeMetrics.StartedContainersErrorCount < afterMetrics.StartedContainersErrorCount, true, "Count of started HostProcess errors containers should increase")
-		framework.ExpectEqual(beforeMetrics.StartedInitContainersCount < afterMetrics.StartedInitContainersCount, true, "Count of started HostProcess init containers should increase")
-		framework.ExpectEqual(beforeMetrics.StartedInitContainersErrorCount < afterMetrics.StartedInitContainersErrorCount, true, "Count of started HostProcess errors init containers should increase")
+		gomega.Expect(beforeMetrics.StartedContainersCount).To(gomega.BeNumerically("<", afterMetrics.StartedContainersCount), "Count of started HostProcess containers should increase")
+		gomega.Expect(beforeMetrics.StartedContainersErrorCount).To(gomega.BeNumerically("<", afterMetrics.StartedContainersErrorCount), "Count of started HostProcess errors containers should increase")
+		gomega.Expect(beforeMetrics.StartedInitContainersCount).To(gomega.BeNumerically("<", afterMetrics.StartedInitContainersCount), "Count of started HostProcess init containers should increase")
+		gomega.Expect(beforeMetrics.StartedInitContainersErrorCount).To(gomega.BeNumerically("<", afterMetrics.StartedInitContainersErrorCount), "Count of started HostProcess errors init containers should increase")
 	})
 
 })
