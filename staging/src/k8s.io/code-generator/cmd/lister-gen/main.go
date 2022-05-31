@@ -32,7 +32,6 @@ func main() {
 	genericArgs, customArgs := generatorargs.NewDefaults()
 
 	// Override defaults.
-	// TODO: move this out of lister-gen
 	genericArgs.OutputPackagePath = "k8s.io/kubernetes/pkg/client/listers"
 
 	genericArgs.AddFlags(pflag.CommandLine)

@@ -22,10 +22,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/args"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
@@ -124,6 +124,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			PackageName: strings.ToLower(gv.Version.NonEmpty()),
 			PackagePath: packagePath,
 			HeaderText:  boilerplate,
+			Source:      filepath.Join(arguments.OutputBase, packagePath),
 			GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {
 				generators = append(generators, &expansionGenerator{
 					DefaultGen: generator.DefaultGen{
