@@ -410,7 +410,7 @@ var _ = SIGDescribe("CronJob", func() {
 			metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err)
 		if !patchedStatus.Status.LastScheduleTime.Equal(&now1) {
-			framework.Fail("patched object should have the applied lastScheduleTime status")
+			framework.Failf("patched object should have the applied lastScheduleTime %#v, got %#v instead", cjStatus.LastScheduleTime, patchedStatus.Status.LastScheduleTime)
 		}
 		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
 

@@ -495,8 +495,8 @@ var _ = SIGDescribe("Job", func() {
 			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":`+string(jStatusJSON)+`}`),
 			metav1.PatchOptions{}, "status")
 		framework.ExpectNoError(err)
-		if patchedStatus.Status.StartTime.Equal(&now1) {
-			framework.Fail("patched object should have the applied StartTime status")
+		if !patchedStatus.Status.StartTime.Equal(&now1) {
+			framework.Failf("patched object should have the applied StartTime %#v, got %#v instead", jStatus.StartTime, patchedStatus.Status.StartTime)
 		}
 		framework.ExpectEqual(patchedStatus.Annotations["patchedstatus"], "true", "patched object should have the applied annotation")
 
