@@ -468,10 +468,12 @@ func TestSortingPrinter(t *testing.T) {
 			obj: &corev1.EventList{
 				Items: []corev1.Event{
 					{
+						TypeMeta:      metav1.TypeMeta{Kind: "Event", APIVersion: "v1"},
 						ObjectMeta:    metav1.ObjectMeta{CreationTimestamp: metav1.Unix(300, 0)},
 						LastTimestamp: metav1.Unix(300, 0),
 					},
 					{
+						TypeMeta:   metav1.TypeMeta{Kind: "Event", APIVersion: "v1"},
 						ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.Unix(200, 0)},
 					},
 				},
@@ -479,9 +481,11 @@ func TestSortingPrinter(t *testing.T) {
 			sort: &corev1.EventList{
 				Items: []corev1.Event{
 					{
+						TypeMeta:   metav1.TypeMeta{Kind: "Event", APIVersion: "v1"},
 						ObjectMeta: metav1.ObjectMeta{CreationTimestamp: metav1.Unix(200, 0)},
 					},
 					{
+						TypeMeta:      metav1.TypeMeta{Kind: "Event", APIVersion: "v1"},
 						ObjectMeta:    metav1.ObjectMeta{CreationTimestamp: metav1.Unix(300, 0)},
 						LastTimestamp: metav1.Unix(300, 0),
 					},

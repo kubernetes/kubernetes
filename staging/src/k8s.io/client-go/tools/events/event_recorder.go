@@ -74,6 +74,10 @@ func (recorder *recorderImpl) makeEvent(refRegarding *v1.ObjectReference, refRel
 		namespace = metav1.NamespaceDefault
 	}
 	return &eventsv1.Event{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Event",
+			APIVersion: "events.k8s.io/v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", refRegarding.Name, t.UnixNano()),
 			Namespace: namespace,

@@ -280,6 +280,10 @@ func (e *EventAggregator) EventAggregate(newEvent *v1.Event) (*v1.Event, string)
 	// create a new aggregate event, and return the aggregateKey as the cache key
 	// (so that it can be overwritten.)
 	eventCopy := &v1.Event{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Event",
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", newEvent.InvolvedObject.Name, now.UnixNano()),
 			Namespace: newEvent.Namespace,

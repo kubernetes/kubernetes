@@ -41,6 +41,10 @@ import (
 func newTestEvent(namespace, name, label string) *eventsv1.Event {
 	someTime := metav1.MicroTime{Time: time.Unix(1505828956, 0)}
 	return &eventsv1.Event{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Event",
+			APIVersion: "events.k8s.io/v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{

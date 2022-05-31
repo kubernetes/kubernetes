@@ -43,6 +43,10 @@ func makeObjectReference(kind, name, namespace string) v1.ObjectReference {
 func makeEvent(reason, message string, involvedObject v1.ObjectReference) v1.Event {
 	eventTime := metav1.Now()
 	event := v1.Event{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Event",
+			APIVersion: "v1",
+		},
 		Reason:         reason,
 		Message:        message,
 		InvolvedObject: involvedObject,

@@ -478,6 +478,10 @@ func TestEventValidation(t *testing.T) {
 		name := fmt.Sprintf("%v-%v-event", ver, ns)
 		namespace := createNamespace(ns)
 		return &v1.Event{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Event",
+				APIVersion: "v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      name,
@@ -498,6 +502,10 @@ func TestEventValidation(t *testing.T) {
 		name := fmt.Sprintf("%v-%v-event", ver, ns)
 		namespace := createNamespace(ns)
 		return &eventsv1.Event{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Event",
+				APIVersion: "events.k8s.io/v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      name,
@@ -577,6 +585,10 @@ func TestEventCompatibility(t *testing.T) {
 
 	coreevents := []*v1.Event{
 		{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Event",
+				APIVersion: "v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pass-core-default-cluster-scoped",
 				Namespace: "default",
@@ -589,6 +601,10 @@ func TestEventCompatibility(t *testing.T) {
 			InvolvedObject:      v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
 		},
 		{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Event",
+				APIVersion: "v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "fail-core-kube-system-cluster-scoped",
 				Namespace: "kube-system",
@@ -601,6 +617,10 @@ func TestEventCompatibility(t *testing.T) {
 			InvolvedObject:      v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
 		},
 		{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Event",
+				APIVersion: "v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "fail-core-other-ns-cluster-scoped",
 				Namespace: "test-ns",
@@ -627,6 +647,10 @@ func TestEventCompatibility(t *testing.T) {
 
 	v1events := []*eventsv1.Event{
 		{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Event",
+				APIVersion: "events.k8s.io/v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pass-events-default-cluster-scoped",
 				Namespace: "default",
@@ -640,6 +664,10 @@ func TestEventCompatibility(t *testing.T) {
 			Regarding:           v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
 		},
 		{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Event",
+				APIVersion: "events.k8s.io/v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pass-events-kube-system-cluster-scoped",
 				Namespace: "kube-system",
@@ -653,6 +681,10 @@ func TestEventCompatibility(t *testing.T) {
 			Regarding:           v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
 		},
 		{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Event",
+				APIVersion: "events.k8s.io/v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "fail-events-other-ns-cluster-scoped",
 				Namespace: "test-ns",
@@ -688,6 +720,10 @@ func TestSingleWatch(t *testing.T) {
 	mkEvent := func(i int) *v1.Event {
 		name := fmt.Sprintf("event-%v", i)
 		return &v1.Event{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Event",
+				APIVersion: "v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      name,
@@ -772,6 +808,10 @@ func TestMultiWatch(t *testing.T) {
 	dummyEvent := func(i int) *v1.Event {
 		name := fmt.Sprintf("unrelated-%v", i)
 		return &v1.Event{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Event",
+				APIVersion: "v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%v.%x", name, time.Now().UnixNano()),
 				Namespace: "default",

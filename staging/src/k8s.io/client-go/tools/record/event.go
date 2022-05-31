@@ -378,6 +378,10 @@ func (recorder *recorderImpl) makeEvent(ref *v1.ObjectReference, annotations map
 		namespace = metav1.NamespaceDefault
 	}
 	return &v1.Event{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Event",
+			APIVersion: "v1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
 			Namespace:   namespace,

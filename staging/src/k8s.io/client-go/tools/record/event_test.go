@@ -166,6 +166,10 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -194,6 +198,10 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some other verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -221,6 +229,10 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -249,6 +261,10 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -277,6 +293,10 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -305,6 +325,10 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -333,6 +357,10 @@ func TestEventf(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -577,6 +605,10 @@ func TestEventfNoNamespace(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "default",
@@ -685,6 +717,10 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -713,6 +749,10 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some other verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -740,6 +780,10 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -768,6 +812,10 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -796,6 +844,10 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -824,6 +876,10 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",
@@ -852,6 +908,10 @@ func TestMultiSinkCache(t *testing.T) {
 			messageFmt: "some verbose message: %v",
 			elements:   []interface{}{1},
 			expect: &v1.Event{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "foo",
 					Namespace: "baz",

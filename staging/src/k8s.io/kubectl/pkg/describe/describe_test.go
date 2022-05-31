@@ -736,6 +736,7 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 		&corev1.EventList{
 			Items: []corev1.Event{
 				{
+					TypeMeta:       metav1.TypeMeta{Kind: "Event", APIVersion: "v1"},
 					ObjectMeta:     metav1.ObjectMeta{Name: "one"},
 					Source:         corev1.EventSource{Component: "kubelet"},
 					Message:        "Item 1",
@@ -745,6 +746,7 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 					Type:           corev1.EventTypeNormal,
 				},
 				{
+					TypeMeta:       metav1.TypeMeta{Kind: "Event", APIVersion: "v1"},
 					ObjectMeta:     metav1.ObjectMeta{Name: "two"},
 					Source:         corev1.EventSource{Component: "scheduler"},
 					Message:        "Item 2",
@@ -754,6 +756,7 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 					Type:           corev1.EventTypeNormal,
 				},
 				{
+					TypeMeta:       metav1.TypeMeta{Kind: "Event", APIVersion: "v1"},
 					ObjectMeta:     metav1.ObjectMeta{Name: "three"},
 					Source:         corev1.EventSource{Component: "kubelet"},
 					Message:        "Item 3",
@@ -2177,6 +2180,10 @@ func TestDescribeDeployment(t *testing.T) {
 						AvailableReplicas: 1,
 					},
 				}, &corev1.Event{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Event",
+						APIVersion: "v1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar-000",
 						Namespace: "foo",
@@ -2198,6 +2205,10 @@ func TestDescribeDeployment(t *testing.T) {
 						LastObservedTime: metav1.NewMicroTime(time.Now().Add(-12 * time.Minute)),
 					},
 				}, &corev1.Event{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Event",
+						APIVersion: "v1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar-001",
 						Namespace: "foo",
@@ -2217,6 +2228,10 @@ func TestDescribeDeployment(t *testing.T) {
 					},
 					FirstTimestamp: metav1.NewTime(time.Now().Add(-10 * time.Minute)),
 				}, &corev1.Event{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Event",
+						APIVersion: "v1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar-002",
 						Namespace: "foo",
@@ -2236,6 +2251,10 @@ func TestDescribeDeployment(t *testing.T) {
 					},
 					FirstTimestamp: metav1.NewTime(time.Now().Add(-2 * time.Minute)),
 				}, &corev1.Event{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Event",
+						APIVersion: "v1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "bar-003",
 						Namespace: "foo",
@@ -3948,6 +3967,10 @@ func TestDescribeEvents(t *testing.T) {
 	events := &corev1.EventList{
 		Items: []corev1.Event{
 			{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "event-1",
 					Namespace: "foo",
@@ -3960,6 +3983,10 @@ func TestDescribeEvents(t *testing.T) {
 				Type:           corev1.EventTypeNormal,
 			},
 			{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Event",
+					APIVersion: "v1",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "event-2",
 					Namespace: "foo",
@@ -5024,6 +5051,10 @@ func TestDescribeNode(t *testing.T) {
 		&corev1.EventList{
 			Items: []corev1.Event{
 				{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Event",
+						APIVersion: "v1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "event-1",
 						Namespace: "default",
@@ -5040,6 +5071,10 @@ func TestDescribeNode(t *testing.T) {
 					Type:           corev1.EventTypeNormal,
 				},
 				{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Event",
+						APIVersion: "v1",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "event-2",
 						Namespace: "default",

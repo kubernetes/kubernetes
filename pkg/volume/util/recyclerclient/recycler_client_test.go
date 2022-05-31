@@ -55,6 +55,7 @@ func newEvent(eventtype, message string) watch.Event {
 	return watch.Event{
 		Type: watch.Added,
 		Object: &v1.Event{
+			TypeMeta: metav1.TypeMeta{Kind: "Event", APIVersion: "v1"},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: metav1.NamespaceDefault,
 			},

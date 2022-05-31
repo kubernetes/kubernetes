@@ -139,6 +139,10 @@ func TestDynamicClientWatch(t *testing.T) {
 	mkEvent := func(i int) *v1.Event {
 		name := fmt.Sprintf("event-%v", i)
 		return &v1.Event{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Event",
+				APIVersion: "v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      name,
