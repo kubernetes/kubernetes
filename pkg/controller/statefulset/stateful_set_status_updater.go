@@ -56,8 +56,7 @@ func (ssu *realStatefulSetStatusUpdater) UpdateStatefulSetStatus(
 	// don't wait due to limited number of clients, but backoff after the default number of steps
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		set.Status = *status
-		// TODO: This context.TODO should use a real context once we have RetryOnConflictWithContext
-		_, updateErr := ssu.client.AppsV1().StatefulSets(set.Namespace).UpdateStatus(context.TODO(), set, metav1.UpdateOptions{})
+		_, updateErr := ssu.client.AppsV1().StatefulSets(set.Namespace).UpdateStatus(ctx, set, metav1.UpdateOptions{})
 		if updateErr == nil {
 			return nil
 		}

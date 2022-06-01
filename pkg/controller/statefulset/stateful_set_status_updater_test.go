@@ -144,3 +144,29 @@ func TestStatefulSetStatusUpdaterGetAvailableReplicas(t *testing.T) {
 		t.Errorf("UpdateStatefulSetStatus mutated the sets replicas %d", set.Status.AvailableReplicas)
 	}
 }
+
+func TestStatefulSetUpdaterUpdateExceedDeadline(t *testing.T) {
+	set := newStatefulSet(3)
+	status := apps.StatefulSetStatus{ObservedGeneration: 1, Replicas: 2}
+	fakeClient := &fake.Clientset{}
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	indexer.Add(set)
+	setLister := appslisters.NewStatefulSetLister(indexer)
+	updater := NewRealStatefulSetStatusUpdater(fakeClient, setLister)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	fakeClient.AddReactor("update", "statefulsets", func(action core.Action) (bool, runtime.Object, error) {
+		update := action.(core.UpdateAction)
+		select {
+		case <-ctx.Done():
+			return true, update.GetObject(), context.DeadlineExceeded
+		default:
+			return true, update.GetObject(), nil
+		}
+	})
+
+	if err := updater.UpdateStatefulSetStatus(ctx, set, &status); err == nil || err != context.DeadlineExceeded {
+		t.Errorf("expected error: %#v, but got: %#v", context.DeadlineExceeded, err)
+	}
+}
