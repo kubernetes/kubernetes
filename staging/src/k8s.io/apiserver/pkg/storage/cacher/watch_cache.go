@@ -17,14 +17,19 @@ limitations under the License.
 package cacher
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math"
+	"path"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/btree"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -92,11 +97,11 @@ type storeElement struct {
 	Fields fields.Set
 }
 
-func (t storeElement) Less(than btree.Item) bool {
-	return t.Key < than.(storeElement).Key
+func (t *storeElement) Less(than btree.Item) bool {
+	return t.Key < than.(*storeElement).Key
 }
 
-var _ btree.Item = storeElement{}
+var _ btree.Item = (*storeElement)(nil)
 
 func storeElementKey(obj interface{}) (string, error) {
 	elem, ok := obj.(*storeElement)
@@ -201,6 +206,8 @@ type watchCache struct {
 
 	// For testing cache interval invalidation.
 	indexValidator indexValidator
+
+	continueCache *continueCache
 }
 
 func newWatchCache(
@@ -228,6 +235,7 @@ func newWatchCache(
 		clock:               clock,
 		versioner:           versioner,
 		groupResource:       groupResource,
+		continueCache:       newContinueCache(),
 	}
 	metrics.WatchCacheCapacity.WithLabelValues(groupResource.String()).Set(float64(wc.capacity))
 	wc.cond = sync.NewCond(wc.RLocker())
@@ -349,6 +357,8 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 func (w *watchCache) updateCache(event *watchCacheEvent) {
 	w.resizeCacheLocked(event.RecordTime)
 	if w.isCacheFullLocked() {
+		oldestRV := w.cache[w.startIndex%w.capacity].ResourceVersion
+		w.continueCache.cleanup(oldestRV)
 		// Cache is full - remove the oldest element.
 		w.startIndex++
 	}
@@ -475,10 +485,18 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
-func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues []storage.MatchValue, trace *utiltrace.Trace) ([]interface{}, uint64, string, error) {
+func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, key string, listOpts storage.ListOptions, trace *utiltrace.Trace) ([]interface{}, uint64, string, error) {
 	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
 	if err != nil {
 		return nil, 0, "", err
+	}
+
+	pred := listOpts.Predicate
+	hasContinuation := len(pred.Continue) > 0
+	hasLimit := pred.Limit > 0
+
+	if !hasLimit {
+		return w.store.List(), w.resourceVersion, "", nil
 	}
 
 	// Perform a clone under the lock, this should be a relatively
@@ -486,22 +504,55 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues [
 	// copy on write semantics. Once cloned, serve the list from the
 	// cloned copy to avoid building the response under a lock.
 	var storeClone btreeIndexer
-	func() {
+	if err := func() error {
 		defer w.RUnlock()
-		storeClone = w.store.Clone()
-	}()
-
-	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
-	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
-	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
-	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
-	for _, matchValue := range matchValues {
-		if result, err := storeClone.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
-			return result, w.resourceVersion, matchValue.IndexName, nil
+		if hasContinuation {
+			if _, ok := w.continueCache.cache[resourceVersion]; !ok {
+				// We return a 410 Gone here for the following reason:
+				//
+				// Before the LIST request reaches the watchCache, we
+				// check if it should be delegated to etcd directly. In
+				// this check, we see if the request has a continuation,
+				// if it does, we check if the RV of the continuation
+				// token is still present in the watchCache or not, if
+				// it isn't then we let etcd serve the request.
+				//
+				// As and when events are removed from the watchCache
+				// (when it becomes full), we also check and evict the
+				// cached copy of the tree for the resource version whose
+				// event is going to be removed.
+				//
+				// Due to this, in case the cached clone is evicted, we
+				// return a 410 Gone similar to when a continue token
+				// expires. On receiving this error, the client can retry
+				// and on this retry, the check for delegation will route
+				// the request to etcd and things proceed accordingly.
+				return errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
+			}
+			storeClone = w.continueCache.cache[resourceVersion]
+			return nil
 		}
+		storeClone = w.store.Clone()
+		w.continueCache.cache[resourceVersion] = storeClone
+
+		return nil
+	}(); err != nil {
+		return nil, 0, "", err
 	}
 
-	return storeClone.List(), w.resourceVersion, "", nil
+	if !strings.HasSuffix(key, "/") {
+		key += "/"
+	}
+
+	if hasContinuation {
+		continueKey, _, err := decodeContinue(pred.Continue, key)
+		if err != nil {
+			return nil, 0, "", apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
+		}
+		key = continueKey
+	}
+
+	return storeClone.LimitPrefixRead(listOpts.Predicate.Limit, key), w.resourceVersion, "", nil
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
@@ -705,4 +756,78 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64) (*watchCach
 	}
 	ci := newCacheInterval(w.startIndex+first, w.endIndex, indexerFunc, w.indexValidator, &w.RWMutex)
 	return ci, nil
+}
+
+// isRVValid checks if rv is still in the watchCache.
+func (w *watchCache) isRVValid(rv uint64) bool {
+	w.RLock()
+	defer w.Unlock()
+
+	// Binary search if the rv is present in the watchCache.
+	f := func(i int) bool {
+		return w.cache[(w.startIndex+i)%w.capacity].ResourceVersion == rv
+	}
+	size := w.endIndex - w.startIndex
+	return sort.Search(size, f) != size
+}
+
+type continueToken struct {
+	APIVersion      string `json:"v"`
+	ResourceVersion int64  `json:"rv"`
+	StartKey        string `json:"start"`
+}
+
+// parseFrom transforms an encoded predicate from into a versioned struct.
+// TODO: return a typed error that instructs clients that they must relist
+func decodeContinue(continueValue, keyPrefix string) (fromKey string, rv int64, err error) {
+	data, err := base64.RawURLEncoding.DecodeString(continueValue)
+	if err != nil {
+		return "", 0, fmt.Errorf("continue key is not valid: %v", err)
+	}
+	var c continueToken
+	if err := json.Unmarshal(data, &c); err != nil {
+		return "", 0, fmt.Errorf("continue key is not valid: %v", err)
+	}
+	switch c.APIVersion {
+	case "meta.k8s.io/v1":
+		if c.ResourceVersion == 0 {
+			return "", 0, fmt.Errorf("continue key is not valid: incorrect encoded start resourceVersion (version meta.k8s.io/v1)")
+		}
+		if len(c.StartKey) == 0 {
+			return "", 0, fmt.Errorf("continue key is not valid: encoded start key empty (version meta.k8s.io/v1)")
+		}
+		// defend against path traversal attacks by clients - path.Clean will ensure that startKey cannot
+		// be at a higher level of the hierarchy, and so when we append the key prefix we will end up with
+		// continue start key that is fully qualified and cannot range over anything less specific than
+		// keyPrefix.
+		key := c.StartKey
+		if !strings.HasPrefix(key, "/") {
+			key = "/" + key
+		}
+		cleaned := path.Clean(key)
+		if cleaned != key {
+			return "", 0, fmt.Errorf("continue key is not valid: %s", c.StartKey)
+		}
+		return keyPrefix + cleaned[1:], c.ResourceVersion, nil
+	default:
+		return "", 0, fmt.Errorf("continue key is not valid: server does not recognize this encoded version %q", c.APIVersion)
+	}
+}
+
+func getRVFromContinue(continueValue string) (uint64, error) {
+	data, err := base64.RawURLEncoding.DecodeString(continueValue)
+	if err != nil {
+		return 0, fmt.Errorf("continue key is not valid: %v", err)
+	}
+
+	var c continueToken
+	if err := json.Unmarshal(data, &c); err != nil {
+		return 0, fmt.Errorf("continue key is not valid: %v", err)
+	}
+
+	if c.APIVersion != "meta.k8s.io/v1" {
+		return 0, fmt.Errorf("continue key is not valid: server does not recognize this encoded version %q", c.APIVersion)
+	}
+
+	return uint64(c.ResourceVersion), nil
 }

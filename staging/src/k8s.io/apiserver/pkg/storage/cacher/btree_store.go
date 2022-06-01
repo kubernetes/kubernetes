@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/google/btree"
@@ -25,8 +26,9 @@ import (
 )
 
 type btreeIndexer interface {
-	cache.Indexer
+	cache.Store
 	Clone() btreeIndexer
+	LimitPrefixRead(limit int64, key string) []interface{}
 }
 
 type btreeStore struct {
@@ -58,7 +60,7 @@ func (t *btreeStore) Delete(obj interface{}) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	storeElem, ok := obj.(storeElement)
+	storeElem, ok := obj.(*storeElement)
 	if !ok {
 		return fmt.Errorf("obj not a storeElement: %#v", obj)
 	}
@@ -89,7 +91,7 @@ func (t *btreeStore) ListKeys() []string {
 
 	items := make([]string, 0, t.tree.Len())
 	t.tree.Ascend(func(i btree.Item) bool {
-		items = append(items, i.(storeElement).Key)
+		items = append(items, i.(*storeElement).Key)
 		return true
 	})
 
@@ -100,7 +102,7 @@ func (t *btreeStore) Get(obj interface{}) (item interface{}, exists bool, err er
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	storeElem, ok := obj.(storeElement)
+	storeElem, ok := obj.(*storeElement)
 	if !ok {
 		return nil, false, fmt.Errorf("obj is not a storeElement")
 	}
@@ -117,7 +119,7 @@ func (t *btreeStore) GetByKey(key string) (item interface{}, exists bool, err er
 	defer t.lock.RUnlock()
 
 	t.tree.Ascend(func(i btree.Item) bool {
-		if key == i.(storeElement).Key {
+		if key == i.(*storeElement).Key {
 			item = i
 			exists = true
 			return false
@@ -148,42 +150,6 @@ func (t *btreeStore) Resync() error {
 	return nil
 }
 
-// TODO(MadhavJivrajani): This is un-implemented for now. Stubbing this out
-// to implement cacher.Indexer
-func (t *btreeStore) Index(indexName string, obj interface{}) ([]interface{}, error) {
-	return nil, fmt.Errorf("yet to implement")
-}
-
-// TODO(MadhavJivrajani): This is un-implemented for now. Stubbing this out
-// to implement cacher.Indexer
-func (t *btreeStore) IndexKeys(indexName, indexedValue string) ([]string, error) {
-	return nil, fmt.Errorf("yet to implement")
-}
-
-// TODO(MadhavJivrajani): This is un-implemented for now. Stubbing this out
-// to implement cacher.Indexer
-func (t *btreeStore) ListIndexFuncValues(indexName string) []string {
-	return nil
-}
-
-// TODO(MadhavJivrajani): This is un-implemented for now. Stubbing this out
-// to implement cacher.Indexer
-func (t *btreeStore) ByIndex(indexName, indexedValue string) ([]interface{}, error) {
-	return nil, fmt.Errorf("yet to implement")
-}
-
-// TODO(MadhavJivrajani): This is un-implemented for now. Stubbing this out
-// to implement cacher.Indexer
-func (t *btreeStore) GetIndexers() cache.Indexers {
-	return nil
-}
-
-// TODO(MadhavJivrajani): This is un-implemented for now. Stubbing this out
-// to implement cacher.Indexer
-func (t *btreeStore) AddIndexers(newIndexers cache.Indexers) error {
-	return fmt.Errorf("yet to implement")
-}
-
 func (t *btreeStore) Clone() btreeIndexer {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -199,7 +165,7 @@ func (t *btreeStore) addOrUpdateLocked(obj interface{}) error {
 	if obj == nil {
 		return fmt.Errorf("obj cannot be nil")
 	}
-	storeElem, ok := obj.(storeElement)
+	storeElem, ok := obj.(*storeElement)
 	if !ok {
 		return fmt.Errorf("obj not a storeElement: %#v", obj)
 	}
@@ -208,8 +174,48 @@ func (t *btreeStore) addOrUpdateLocked(obj interface{}) error {
 	return nil
 }
 
-// TODO: The goal is to make an acutal btreeIndexer.
-// For now, only cache.Store methods are implemented,
-// and the remaining methods of cache.Indexer are only
-// stubbed out.
+func (t *btreeStore) LimitPrefixRead(limit int64, key string) []interface{} {
+	t.lock.RLock()
+	defer t.lock.Unlock()
+
+	var result []interface{}
+	var elementsRetrieved int64
+	t.tree.AscendGreaterOrEqual(&storeElement{Key: key}, func(i btree.Item) bool {
+		elementKey := i.(*storeElement).Key
+		if elementsRetrieved == limit {
+			return false
+		}
+		if !strings.HasPrefix(elementKey, key) {
+			return false
+		}
+		elementsRetrieved++
+		result = append(result, i.(interface{}))
+		return true
+	})
+
+	return result
+}
+
 var _ btreeIndexer = (*btreeStore)(nil)
+
+// continueCache caches roots of trees that were created as
+// clones to serve LIST requests. When a continue request is
+// meant to be served for a certain LIST request, we retreive
+// the tree that served the LIST request and serve the continue
+// request from there.
+//
+// A tree is removed from this cache when the RV at which it was
+// created is removed from the watchCache.
+type continueCache struct {
+	cache map[uint64]btreeIndexer
+}
+
+func newContinueCache() *continueCache {
+	return &continueCache{cache: make(map[uint64]btreeIndexer)}
+}
+
+func (c *continueCache) cleanup(rv uint64) {
+	if _, ok := c.cache[rv]; ok {
+		delete(c.cache, rv)
+	}
+}

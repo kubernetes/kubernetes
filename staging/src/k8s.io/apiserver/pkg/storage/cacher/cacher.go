@@ -614,25 +614,40 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 }
 
 // NOTICE: Keep in sync with shouldListFromStorage function in
-//
-//	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
-func shouldDelegateList(opts storage.ListOptions) bool {
+//  staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
+func (c *Cacher) shouldDelegateList(opts storage.ListOptions) (bool, error) {
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(pred.Continue) > 0
-	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
+	hasLimit := pagingEnabled && pred.Limit > 0
 
 	// If resourceVersion is not specified, serve it from underlying
-	// storage (for backward compatibility). If a continuation is
-	// requested, serve it from the underlying storage as well.
-	// Limits are only sent to storage when resourceVersion is non-zero
-	// since the watch cache isn't able to perform continuations, and
-	// limits are ignored when resource version is zero
-	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
+	// storage (for backward compatibility). If a limit or a continuation
+	// is requested, serve from watch cache. In all other cases, serve it
+	// from underlying storage.
+	switch {
+	case resourceVersion == "":
+		return true, nil
+	case hasLimit:
+		if hasContinuation {
+			rv, err := getRVFromContinue(pred.Continue)
+			if err != nil {
+				return false, err
+			}
+			if !c.watchCache.isRVValid(rv) {
+				return true, nil
+			}
+		}
+		return false, nil
+	case opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact:
+		return true, nil
+	}
+
+	return true, nil
 }
 
-func (c *Cacher) listItems(listRV uint64, key string, pred storage.SelectionPredicate, trace *utiltrace.Trace, recursive bool) ([]interface{}, uint64, string, error) {
+func (c *Cacher) listItems(listRV uint64, key string, listOpts storage.ListOptions, trace *utiltrace.Trace, recursive bool) ([]interface{}, uint64, string, error) {
 	if !recursive {
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(listRV, key, trace)
 		if err != nil {
@@ -643,7 +658,7 @@ func (c *Cacher) listItems(listRV uint64, key string, pred storage.SelectionPred
 		}
 		return nil, readResourceVersion, "", nil
 	}
-	return c.watchCache.WaitUntilFreshAndList(listRV, pred.MatcherIndex(), trace)
+	return c.watchCache.WaitUntilFreshAndList(listRV, key, listOpts, trace)
 }
 
 // GetList implements storage.Interface
@@ -651,7 +666,12 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	recursive := opts.Recursive
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
-	if shouldDelegateList(opts) {
+
+	delegate, err := c.shouldDelegateList(opts)
+	if err != nil {
+		return err
+	}
+	if delegate {
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
@@ -693,7 +713,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 	filter := filterWithAttrsFunction(key, pred)
 
-	objs, readResourceVersion, indexUsed, err := c.listItems(listRV, key, pred, trace, recursive)
+	objs, readResourceVersion, indexUsed, err := c.listItems(listRV, key, opts, trace, recursive)
 	if err != nil {
 		return err
 	}

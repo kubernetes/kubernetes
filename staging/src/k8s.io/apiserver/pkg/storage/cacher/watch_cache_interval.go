@@ -117,7 +117,7 @@ func newCacheInterval(startIndex, endIndex int, indexer indexerFunc, indexValida
 // newCacheIntervalFromStore is meant to handle the case of rv=0, such that the events
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
-func newCacheIntervalFromStore(resourceVersion uint64, store cache.Indexer, getAttrsFunc attrFunc) (*watchCacheInterval, error) {
+func newCacheIntervalFromStore(resourceVersion uint64, store cache.Store, getAttrsFunc attrFunc) (*watchCacheInterval, error) {
 	buffer := &watchCacheIntervalBuffer{}
 	allItems := store.List()
 	buffer.buffer = make([]*watchCacheEvent, len(allItems))
