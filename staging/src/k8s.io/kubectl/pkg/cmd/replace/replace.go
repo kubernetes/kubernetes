@@ -227,6 +227,10 @@ func (o *ReplaceOptions) Validate() error {
 		return fmt.Errorf("--timeout must have --force specified")
 	}
 
+	if o.DeleteOptions.ForceDeletion && o.DryRunStrategy != cmdutil.DryRunNone {
+		return fmt.Errorf("dry-run can not be used when --force is set")
+	}
+
 	if cmdutil.IsFilenameSliceEmpty(o.DeleteOptions.FilenameOptions.Filenames, o.DeleteOptions.FilenameOptions.Kustomize) {
 		return fmt.Errorf("Must specify --filename to replace")
 	}
