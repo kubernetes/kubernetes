@@ -120,7 +120,6 @@ require (
 	k8s.io/legacy-cloud-providers v0.0.0
 	k8s.io/metrics v0.0.0
 	k8s.io/mount-utils v0.0.0
-	k8s.io/noderesourcetopology-api v0.0.0
 	k8s.io/pod-security-admission v0.0.0
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/system-validators v1.8.0
