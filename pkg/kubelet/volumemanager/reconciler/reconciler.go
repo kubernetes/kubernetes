@@ -454,14 +454,6 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	if err != nil {
 		return nil, err
 	}
-	attachablePlugin, err := rc.volumePluginMgr.FindAttachablePluginByName(volume.pluginName)
-	if err != nil {
-		return nil, err
-	}
-	deviceMountablePlugin, err := rc.volumePluginMgr.FindDeviceMountablePluginByName(volume.pluginName)
-	if err != nil {
-		return nil, err
-	}
 
 	// Create pod object
 	pod := &v1.Pod{
@@ -486,6 +478,20 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		volume.volumeSpecName,
 		volume.volumePath,
 		volume.pluginName)
+	if err != nil {
+		return nil, err
+	}
+
+	// We have to find the plugins by volume spec (NOT by plugin name) here
+	// in order to correctly reconstruct ephemeral volume types.
+	// Searching by spec checks whether the volume is actually attachable
+	// (i.e. has a PV) whereas searching by plugin name can only tell whether
+	// the plugin supports attachable volumes.
+	attachablePlugin, err := rc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	if err != nil {
+		return nil, err
+	}
+	deviceMountablePlugin, err := rc.volumePluginMgr.FindDeviceMountablePluginBySpec(volumeSpec)
 	if err != nil {
 		return nil, err
 	}
