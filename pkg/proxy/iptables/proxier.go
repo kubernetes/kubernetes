@@ -431,16 +431,16 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain} {
 			if _, found := existingNATChains[chain]; found {
 				chainString := string(chain)
-				natChains.WriteBytes(existingNATChains[chain]) // flush
-				natRules.Write("-X", chainString)              // delete
+				natChains.Write(utiliptables.MakeChainLine(chain)) // flush
+				natRules.Write("-X", chainString)                  // delete
 			}
 		}
 		// Hunt for service and endpoint chains.
 		for chain := range existingNATChains {
 			chainString := string(chain)
 			if isServiceChainName(chainString) {
-				natChains.WriteBytes(existingNATChains[chain]) // flush
-				natRules.Write("-X", chainString)              // delete
+				natChains.Write(utiliptables.MakeChainLine(chain)) // flush
+				natRules.Write("-X", chainString)                  // delete
 			}
 		}
 		natRules.Write("COMMIT")
@@ -467,7 +467,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
 			if _, found := existingFilterChains[chain]; found {
 				chainString := string(chain)
-				filterChains.WriteBytes(existingFilterChains[chain])
+				filterChains.Write(utiliptables.MakeChainLine(chain))
 				filterRules.Write("-X", chainString)
 			}
 		}
@@ -890,22 +890,13 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
-	existingFilterChains := make(map[utiliptables.Chain][]byte)
-	proxier.existingFilterChainsData.Reset()
-	err := proxier.iptables.SaveInto(utiliptables.TableFilter, proxier.existingFilterChainsData)
-	if err != nil { // if we failed to get any rules
-		klog.ErrorS(err, "Failed to execute iptables-save, syncing all rules")
-	} else { // otherwise parse the output
-		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, proxier.existingFilterChainsData.Bytes())
-	}
-
 	// IMPORTANT: existingNATChains may share memory with proxier.iptablesData.
 	existingNATChains := make(map[utiliptables.Chain][]byte)
 	proxier.iptablesData.Reset()
-	err = proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData)
-	if err != nil { // if we failed to get any rules
-		klog.ErrorS(err, "Failed to execute iptables-save, syncing all rules")
-	} else { // otherwise parse the output
+	err := proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData)
+	if err != nil {
+		klog.ErrorS(err, "Failed to execute iptables-save: stale chains will not be deleted")
+	} else {
 		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, proxier.iptablesData.Bytes())
 	}
 
@@ -919,18 +910,10 @@ func (proxier *Proxier) syncProxyRules() {
 	// Make sure we keep stats for the top-level chains, if they existed
 	// (which most should have because we created them above).
 	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
-		if chain, ok := existingFilterChains[chainName]; ok {
-			proxier.filterChains.WriteBytes(chain)
-		} else {
-			proxier.filterChains.Write(utiliptables.MakeChainLine(chainName))
-		}
+		proxier.filterChains.Write(utiliptables.MakeChainLine(chainName))
 	}
 	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, kubeMarkMasqChain} {
-		if chain, ok := existingNATChains[chainName]; ok {
-			proxier.natChains.WriteBytes(chain)
-		} else {
-			proxier.natChains.Write(utiliptables.MakeChainLine(chainName))
-		}
+		proxier.natChains.Write(utiliptables.MakeChainLine(chainName))
 	}
 
 	// Install the kubernetes-specific postrouting rules. We use a whole chain for
@@ -1028,12 +1011,8 @@ func (proxier *Proxier) syncProxyRules() {
 
 			endpointChain := epInfo.ChainName
 
-			// Create the endpoint chain, retaining counters if possible.
-			if chain, ok := existingNATChains[endpointChain]; ok {
-				proxier.natChains.WriteBytes(chain)
-			} else {
-				proxier.natChains.Write(utiliptables.MakeChainLine(endpointChain))
-			}
+			// Create the endpoint chain
+			proxier.natChains.Write(utiliptables.MakeChainLine(endpointChain))
 			activeNATChains[endpointChain] = true
 
 			args = append(args[:0], "-A", string(endpointChain))
@@ -1077,22 +1056,14 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Declare the clusterPolicyChain if needed.
 		if hasEndpoints && svcInfo.UsesClusterEndpoints() {
-			// Create the Cluster traffic policy chain, retaining counters if possible.
-			if chain, ok := existingNATChains[clusterPolicyChain]; ok {
-				proxier.natChains.WriteBytes(chain)
-			} else {
-				proxier.natChains.Write(utiliptables.MakeChainLine(clusterPolicyChain))
-			}
+			// Create the Cluster traffic policy chain
+			proxier.natChains.Write(utiliptables.MakeChainLine(clusterPolicyChain))
 			activeNATChains[clusterPolicyChain] = true
 		}
 
 		// Declare the localPolicyChain if needed.
 		if hasEndpoints && svcInfo.UsesLocalEndpoints() {
-			if chain, ok := existingNATChains[localPolicyChain]; ok {
-				proxier.natChains.WriteBytes(chain)
-			} else {
-				proxier.natChains.Write(utiliptables.MakeChainLine(localPolicyChain))
-			}
+			proxier.natChains.Write(utiliptables.MakeChainLine(localPolicyChain))
 			activeNATChains[localPolicyChain] = true
 		}
 
@@ -1101,11 +1072,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// jump to externalTrafficChain, which will handle some special-cases
 		// and then jump to externalPolicyChain.
 		if hasEndpoints && svcInfo.ExternallyAccessible() {
-			if chain, ok := existingNATChains[externalTrafficChain]; ok {
-				proxier.natChains.WriteBytes(chain)
-			} else {
-				proxier.natChains.Write(utiliptables.MakeChainLine(externalTrafficChain))
-			}
+			proxier.natChains.Write(utiliptables.MakeChainLine(externalTrafficChain))
 			activeNATChains[externalTrafficChain] = true
 
 			if !svcInfo.ExternalPolicyLocal() {
@@ -1233,11 +1200,7 @@ func (proxier *Proxier) syncProxyRules() {
 				fwChain := svcInfo.firewallChainName
 
 				// Declare the service firewall chain.
-				if chain, ok := existingNATChains[fwChain]; ok {
-					proxier.natChains.WriteBytes(chain)
-				} else {
-					proxier.natChains.Write(utiliptables.MakeChainLine(fwChain))
-				}
+				proxier.natChains.Write(utiliptables.MakeChainLine(fwChain))
 				activeNATChains[fwChain] = true
 
 				// The firewall chain will jump to the "external destination"
@@ -1384,7 +1347,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// We must (as per iptables) write a chain-line for it, which has
 			// the nice effect of flushing the chain.  Then we can remove the
 			// chain.
-			proxier.natChains.WriteBytes(existingNATChains[chain])
+			proxier.natChains.Write(utiliptables.MakeChainLine(chain))
 			proxier.natRules.Write("-X", chainString)
 		}
 	}
