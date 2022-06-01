@@ -196,6 +196,7 @@ type Proxier struct {
 	initialized          int32
 	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 	syncPeriod           time.Duration
+	lastIPTablesCleanup  time.Time
 
 	// These are effectively const and do not need the mutex to be held.
 	iptables       utiliptables.Interface
@@ -890,17 +891,6 @@ func (proxier *Proxier) syncProxyRules() {
 	// Below this point we will not return until we try to write the iptables rules.
 	//
 
-	// Get iptables-save output so we can check for existing chains and rules.
-	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
-	existingNATChains := make(map[utiliptables.Chain]struct{})
-	proxier.iptablesData.Reset()
-	err := proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData)
-	if err != nil {
-		klog.ErrorS(err, "Failed to execute iptables-save: stale chains will not be deleted")
-	} else {
-		existingNATChains = utiliptables.GetChainsFromTable(proxier.iptablesData.Bytes())
-	}
-
 	// Reset all buffers used later.
 	// This is to avoid memory reallocations and thus improve performance.
 	proxier.filterChains.Reset()
@@ -1339,19 +1329,34 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	// Delete chains no longer in use.
-	for chain := range existingNATChains {
-		if !activeNATChains[chain] {
-			chainString := string(chain)
-			if !isServiceChainName(chainString) {
-				// Ignore chains that aren't ours.
-				continue
+	// Delete chains no longer in use. Since "iptables-save" can take several seconds
+	// to run on hosts with lots of iptables rules, we don't bother to do this on
+	// every sync in large clusters. (Stale chains will not be referenced by any
+	// active rules, so they're harmless other than taking up memory.)
+	if !proxier.largeClusterMode || time.Since(proxier.lastIPTablesCleanup) > proxier.syncPeriod {
+		var existingNATChains map[utiliptables.Chain]struct{}
+
+		proxier.iptablesData.Reset()
+		if err := proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData); err == nil {
+			existingNATChains = utiliptables.GetChainsFromTable(proxier.iptablesData.Bytes())
+
+			for chain := range existingNATChains {
+				if !activeNATChains[chain] {
+					chainString := string(chain)
+					if !isServiceChainName(chainString) {
+						// Ignore chains that aren't ours.
+						continue
+					}
+					// We must (as per iptables) write a chain-line
+					// for it, which has the nice effect of flushing
+					// the chain. Then we can remove the chain.
+					proxier.natChains.Write(utiliptables.MakeChainLine(chain))
+					proxier.natRules.Write("-X", chainString)
+				}
 			}
-			// We must (as per iptables) write a chain-line for it, which has
-			// the nice effect of flushing the chain.  Then we can remove the
-			// chain.
-			proxier.natChains.Write(utiliptables.MakeChainLine(chain))
-			proxier.natRules.Write("-X", chainString)
+			proxier.lastIPTablesCleanup = time.Now()
+		} else {
+			klog.ErrorS(err, "Failed to execute iptables-save: stale chains will not be deleted")
 		}
 	}
 

@@ -7438,6 +7438,7 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.masqueradeAll = true
+	fp.syncPeriod = 30 * time.Second
 
 	makeServiceMap(fp,
 		makeTestService("ns1", "svc1", func(svc *v1.Service) {
@@ -7535,6 +7536,65 @@ func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 	if numComments != 0 {
 		t.Errorf("numComments (%d) != 0 when numEndpoints (%d) > threshold (%d)", numComments, numEndpoints, largeClusterEndpointsThreshold)
 	}
+
+	// Now test service deletion; we have to create another service to do this though,
+	// because if we deleted any of the existing services, we'd fall back out of large
+	// cluster mode.
+	svc4 := makeTestService("ns4", "svc4", func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeClusterIP
+		svc.Spec.ClusterIP = "172.30.0.44"
+		svc.Spec.Ports = []v1.ServicePort{{
+			Name:     "p8082",
+			Port:     8082,
+			Protocol: v1.ProtocolTCP,
+		}}
+	})
+	fp.OnServiceAdd(svc4)
+	fp.OnEndpointSliceAdd(makeTestEndpointSlice("ns4", "svc4", 1, func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"10.4.0.1"},
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     utilpointer.StringPtr("p8082"),
+			Port:     utilpointer.Int32(8082),
+			Protocol: &tcpProtocol,
+		}}
+	}))
+	fp.syncProxyRules()
+	expectedEndpoints += 1
+
+	svc4Endpoint, numEndpoints, _ := countEndpointsAndComments(fp.iptablesData.String(), "10.4.0.1")
+	assert.Equal(t, "-A KUBE-SEP-SU5STNODRYEWJAUF -m tcp -p tcp -j DNAT --to-destination 10.4.0.1:8082", svc4Endpoint, "svc4 endpoint was not created")
+	if numEndpoints != expectedEndpoints {
+		t.Errorf("Found wrong number of endpoints after svc4 creation: expected %d, got %d", expectedEndpoints, numEndpoints)
+	}
+
+	// In large-cluster mode, if we delete a service, it will not re-sync its chains
+	// but it will not delete them immediately either.
+	fp.lastIPTablesCleanup = time.Now()
+	fp.OnServiceDelete(svc4)
+	fp.syncProxyRules()
+	expectedEndpoints -= 1
+
+	svc4Endpoint, numEndpoints, _ = countEndpointsAndComments(fp.iptablesData.String(), "10.4.0.1")
+	assert.Equal(t, "", svc4Endpoint, "svc4 endpoint was still created!")
+	if numEndpoints != expectedEndpoints {
+		t.Errorf("Found wrong number of endpoints after service deletion: expected %d, got %d", expectedEndpoints, numEndpoints)
+	}
+	assert.NotContains(t, fp.iptablesData.String(), "-X ", "iptables data unexpectedly contains chain deletions")
+
+	// But resyncing after a long-enough delay will delete the stale chains
+	fp.lastIPTablesCleanup = time.Now().Add(-fp.syncPeriod).Add(-1)
+	fp.syncProxyRules()
+
+	svc4Endpoint, numEndpoints, _ = countEndpointsAndComments(fp.iptablesData.String(), "10.4.0.1")
+	assert.Equal(t, "", svc4Endpoint, "svc4 endpoint was still created!")
+	if numEndpoints != expectedEndpoints {
+		t.Errorf("Found wrong number of endpoints after delayed resync: expected %d, got %d", expectedEndpoints, numEndpoints)
+	}
+	assert.Contains(t, fp.iptablesData.String(), "-X KUBE-SVC-EBDQOQU5SJFXRIL3", "iptables data does not contain chain deletion")
+	assert.Contains(t, fp.iptablesData.String(), "-X KUBE-SEP-SU5STNODRYEWJAUF", "iptables data does not contain endpoint deletions")
 }
 
 // Test calling syncProxyRules() multiple times with various changes
