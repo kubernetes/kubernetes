@@ -95,6 +95,8 @@ function set-windows-node-image() {
     WINDOWS_NODE_IMAGE="windows-server-2004-dc-core-v20210914"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION,,}" == "win20h2" ]]; then
     WINDOWS_NODE_IMAGE="windows-server-20h2-dc-core-v20210914"
+  elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION,,}" == "win2022" ]]; then
+    WINDOWS_NODE_IMAGE="windows-server-2022-dc-core-v20220513"
   else
     echo "Unknown WINDOWS_NODE_OS_DISTRIBUTION ${WINDOWS_NODE_OS_DISTRIBUTION}" >&2
     exit 1
