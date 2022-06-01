@@ -105,7 +105,7 @@ func testFinishedJob(f *framework.Framework) {
 	framework.ExpectNotEqual(deleteAtUTC, nil)
 
 	expireAtUTC := finishTimeUTC.Add(time.Duration(ttl) * time.Second)
-	if !deleteAtUTC.Before(expireAtUTC) {
+	if deleteAtUTC.Before(expireAtUTC) {
 		framework.Fail("Expected job's deletion time to be after expiration time.")
 	}
 }
