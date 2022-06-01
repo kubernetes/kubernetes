@@ -35,6 +35,7 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
 	"k8s.io/utils/pointer"
 
 	v1 "k8s.io/api/core/v1"
@@ -2266,12 +2267,17 @@ func TestConflictingData(t *testing.T) {
 			attemptToOrphan := newTrackingWorkqueue()
 			graphChanges := newTrackingWorkqueue()
 
+			attemptToDeleteMetrics := metrics.NewQueueMetrics()
+			attemptToOrphanMetrics := metrics.NewQueueMetrics()
+
 			gc := &GarbageCollector{
-				metadataClient:   metadataClient,
-				restMapper:       restMapper,
-				attemptToDelete:  attemptToDelete,
-				attemptToOrphan:  attemptToOrphan,
-				absentOwnerCache: absentOwnerCache,
+				metadataClient:         metadataClient,
+				restMapper:             restMapper,
+				attemptToDelete:        attemptToDelete,
+				attemptToOrphan:        attemptToOrphan,
+				absentOwnerCache:       absentOwnerCache,
+				attemptToDeleteMetrics: attemptToDeleteMetrics,
+				attemptToOrphanMetrics: attemptToOrphanMetrics,
 				dependencyGraphBuilder: &GraphBuilder{
 					eventRecorder:    eventRecorder,
 					metadataClient:   metadataClient,

@@ -80,6 +80,9 @@ type GarbageCollector struct {
 	kubeClient       clientset.Interface
 	eventBroadcaster record.EventBroadcaster
 
+	attemptToDeleteMetrics metrics.QueueMetrics
+	attemptToOrphanMetrics metrics.QueueMetrics
+
 	workerLock sync.RWMutex
 }
 
@@ -102,14 +105,19 @@ func NewGarbageCollector(
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewReferenceCache(500)
+
+	attemptToDeleteMetrics := metrics.NewQueueMetrics()
+	attemptToOrphanMetrics := metrics.NewQueueMetrics()
 	gc := &GarbageCollector{
-		metadataClient:   metadataClient,
-		restMapper:       mapper,
-		attemptToDelete:  attemptToDelete,
-		attemptToOrphan:  attemptToOrphan,
-		absentOwnerCache: absentOwnerCache,
-		kubeClient:       kubeClient,
-		eventBroadcaster: eventBroadcaster,
+		metadataClient:         metadataClient,
+		restMapper:             mapper,
+		attemptToDelete:        attemptToDelete,
+		attemptToOrphan:        attemptToOrphan,
+		absentOwnerCache:       absentOwnerCache,
+		kubeClient:             kubeClient,
+		eventBroadcaster:       eventBroadcaster,
+		attemptToDeleteMetrics: attemptToDeleteMetrics,
+		attemptToOrphanMetrics: attemptToOrphanMetrics,
 	}
 	gc.dependencyGraphBuilder = &GraphBuilder{
 		eventRecorder:    eventRecorder,
@@ -127,7 +135,7 @@ func NewGarbageCollector(
 		ignoredResources: ignoredResources,
 	}
 
-	metrics.Register()
+	metrics.Register(attemptToDeleteMetrics, attemptToOrphanMetrics)
 
 	return gc, nil
 }
@@ -324,8 +332,10 @@ func (gc *GarbageCollector) processAttemptToDeleteWorker(ctx context.Context) bo
 	switch action {
 	case forgetItem:
 		gc.attemptToDelete.Forget(item)
+		gc.attemptToDeleteMetrics.Forget(item)
 	case requeueItem:
 		gc.attemptToDelete.AddRateLimited(item)
+		gc.attemptToDeleteMetrics.AddRateLimited(item)
 	}
 
 	return true
@@ -697,8 +707,10 @@ func (gc *GarbageCollector) processAttemptToOrphanWorker() bool {
 	switch action {
 	case forgetItem:
 		gc.attemptToOrphan.Forget(item)
+		gc.attemptToOrphanMetrics.Forget(item)
 	case requeueItem:
 		gc.attemptToOrphan.AddRateLimited(item)
+		gc.attemptToOrphanMetrics.AddRateLimited(item)
 	}
 
 	return true
