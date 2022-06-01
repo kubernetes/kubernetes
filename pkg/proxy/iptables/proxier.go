@@ -423,7 +423,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		klog.ErrorS(err, "Failed to execute iptables-save", "table", utiliptables.TableNAT)
 		encounteredError = true
 	} else {
-		existingNATChains := utiliptables.GetChainLines(utiliptables.TableNAT, iptablesData.Bytes())
+		existingNATChains := utiliptables.GetChainsFromTable(iptablesData.Bytes())
 		natChains := &utilproxy.LineBuffer{}
 		natRules := &utilproxy.LineBuffer{}
 		natChains.Write("*nat")
@@ -460,7 +460,7 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		klog.ErrorS(err, "Failed to execute iptables-save", "table", utiliptables.TableFilter)
 		encounteredError = true
 	} else {
-		existingFilterChains := utiliptables.GetChainLines(utiliptables.TableFilter, iptablesData.Bytes())
+		existingFilterChains := utiliptables.GetChainsFromTable(iptablesData.Bytes())
 		filterChains := &utilproxy.LineBuffer{}
 		filterRules := &utilproxy.LineBuffer{}
 		filterChains.Write("*filter")
@@ -890,14 +890,13 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
-	// IMPORTANT: existingNATChains may share memory with proxier.iptablesData.
-	existingNATChains := make(map[utiliptables.Chain][]byte)
+	existingNATChains := make(map[utiliptables.Chain]struct{})
 	proxier.iptablesData.Reset()
 	err := proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData)
 	if err != nil {
 		klog.ErrorS(err, "Failed to execute iptables-save: stale chains will not be deleted")
 	} else {
-		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, proxier.iptablesData.Bytes())
+		existingNATChains = utiliptables.GetChainsFromTable(proxier.iptablesData.Bytes())
 	}
 
 	// Reset all buffers used later.
