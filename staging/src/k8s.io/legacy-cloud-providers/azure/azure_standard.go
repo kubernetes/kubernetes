@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -29,7 +30,7 @@ import (
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-08-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 
 	v1 "k8s.io/api/core/v1"
@@ -254,9 +255,9 @@ func getIPConfigByIPFamily(nic network.Interface, IPv6 bool) (*network.Interface
 
 	var ipVersion network.IPVersion
 	if IPv6 {
-		ipVersion = network.IPv6
+		ipVersion = network.IPVersionIPv6
 	} else {
-		ipVersion = network.IPv4
+		ipVersion = network.IPVersionIPv4
 	}
 	for _, ref := range *nic.IPConfigurations {
 		if ref.PrivateIPAddress != nil && ref.PrivateIPAddressVersion == ipVersion {
@@ -828,7 +829,7 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 		return "", "", "", nil, err
 	}
 
-	if nic.ProvisioningState != nil && *nic.ProvisioningState == nicFailedState {
+	if nic.ProvisioningState == network.ProvisioningStateFailed {
 		klog.Warningf("EnsureHostInPool skips node %s because its primary nic %s is in Failed state", nodeName, *nic.Name)
 		return "", "", "", nil, nil
 	}
@@ -1005,7 +1006,7 @@ func (as *availabilitySet) EnsureBackendPoolDeleted(service *v1.Service, backend
 			continue
 		}
 
-		if nic.ProvisioningState != nil && *nic.ProvisioningState == nicFailedState {
+		if nic.ProvisioningState == network.ProvisioningStateFailed {
 			klog.Warningf("EnsureBackendPoolDeleted skips node %s because its primary nic %s is in Failed state", nodeName, *nic.Name)
 			return nil
 		}

@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -28,7 +29,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-08-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -152,8 +153,8 @@ func setMockPublicIPs(az *Cloud, ctrl *gomock.Controller, serviceCount int) {
 			Name:     to.StringPtr("testCluster-aservicea"),
 			Location: &az.Location,
 			PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
-				PublicIPAllocationMethod: network.Static,
-				PublicIPAddressVersion:   network.IPv4,
+				PublicIPAllocationMethod: network.IPAllocationMethodStatic,
+				PublicIPAddressVersion:   network.IPVersionIPv4,
 				IPAddress:                to.StringPtr("1.2.3.4"),
 			},
 			Tags: map[string]*string{
@@ -966,8 +967,8 @@ func TestServiceDefaultsToNoSessionPersistence(t *testing.T) {
 		Name:     to.StringPtr("testCluster-aservicesaomitted1"),
 		Location: &az.Location,
 		PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
-			PublicIPAllocationMethod: network.Static,
-			PublicIPAddressVersion:   network.IPv4,
+			PublicIPAllocationMethod: network.IPAllocationMethodStatic,
+			PublicIPAddressVersion:   network.IPVersionIPv4,
 		},
 		Tags: map[string]*string{
 			serviceTagKey:  to.StringPtr("aservicesaomitted1"),
@@ -1016,8 +1017,8 @@ func TestServiceRespectsNoSessionAffinity(t *testing.T) {
 		Name:     to.StringPtr("testCluster-aservicesanone"),
 		Location: &az.Location,
 		PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
-			PublicIPAllocationMethod: network.Static,
-			PublicIPAddressVersion:   network.IPv4,
+			PublicIPAllocationMethod: network.IPAllocationMethodStatic,
+			PublicIPAddressVersion:   network.IPVersionIPv4,
 		},
 		Tags: map[string]*string{
 			serviceTagKey:  to.StringPtr("aservicesanone"),
@@ -1068,8 +1069,8 @@ func TestServiceRespectsClientIPSessionAffinity(t *testing.T) {
 		Name:     to.StringPtr("testCluster-aservicesaclientip"),
 		Location: &az.Location,
 		PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
-			PublicIPAllocationMethod: network.Static,
-			PublicIPAddressVersion:   network.IPv4,
+			PublicIPAllocationMethod: network.IPAllocationMethodStatic,
+			PublicIPAddressVersion:   network.IPVersionIPv4,
 		},
 		Tags: map[string]*string{
 			serviceTagKey:  to.StringPtr("aservicesaclientip"),
@@ -1285,7 +1286,7 @@ func TestReconcilePublicIPWithNewService(t *testing.T) {
 	}
 	validatePublicIP(t, pip2, &svc, true)
 	if pip.Name != pip2.Name ||
-		pip.PublicIPAddressPropertiesFormat.IPAddress != pip2.PublicIPAddressPropertiesFormat.IPAddress {
+			pip.PublicIPAddressPropertiesFormat.IPAddress != pip2.PublicIPAddressPropertiesFormat.IPAddress {
 		t.Errorf("We should get the exact same public ip resource after a second reconcile")
 	}
 }
@@ -1613,8 +1614,8 @@ func validateLoadBalancer(t *testing.T, loadBalancer *network.LoadBalancer, serv
 			foundRule := false
 			for _, actualRule := range *loadBalancer.LoadBalancingRules {
 				if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
-					*actualRule.FrontendPort == wantedRule.Port &&
-					*actualRule.BackendPort == wantedRule.Port {
+						*actualRule.FrontendPort == wantedRule.Port &&
+						*actualRule.BackendPort == wantedRule.Port {
 					foundRule = true
 					break
 				}
@@ -1634,9 +1635,9 @@ func validateLoadBalancer(t *testing.T, loadBalancer *network.LoadBalancer, serv
 				path, port := servicehelpers.GetServiceHealthCheckPathPort(&svc)
 				for _, actualProbe := range *loadBalancer.Probes {
 					if strings.EqualFold(*actualProbe.Name, wantedRuleName) &&
-						*actualProbe.Port == port &&
-						*actualProbe.RequestPath == path &&
-						actualProbe.Protocol == network.ProbeProtocolHTTP {
+							*actualProbe.Port == port &&
+							*actualProbe.RequestPath == path &&
+							actualProbe.Protocol == network.ProbeProtocolHTTP {
 						foundProbe = true
 						break
 					}
@@ -1644,7 +1645,7 @@ func validateLoadBalancer(t *testing.T, loadBalancer *network.LoadBalancer, serv
 			} else {
 				for _, actualProbe := range *loadBalancer.Probes {
 					if strings.EqualFold(*actualProbe.Name, wantedRuleName) &&
-						*actualProbe.Port == wantedRule.NodePort {
+							*actualProbe.Port == wantedRule.NodePort {
 						foundProbe = true
 						break
 					}

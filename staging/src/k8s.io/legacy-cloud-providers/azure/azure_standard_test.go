@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -25,7 +26,7 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-08-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -743,14 +744,14 @@ func TestGetIPConfigByIPFamily(t *testing.T) {
 	ipv4IPconfig := network.InterfaceIPConfiguration{
 		Name: to.StringPtr("ipconfig1"),
 		InterfaceIPConfigurationPropertiesFormat: &network.InterfaceIPConfigurationPropertiesFormat{
-			PrivateIPAddressVersion: network.IPv4,
+			PrivateIPAddressVersion: network.IPVersionIPv4,
 			PrivateIPAddress:        to.StringPtr("10.10.0.12"),
 		},
 	}
 	ipv6IPconfig := network.InterfaceIPConfiguration{
 		Name: to.StringPtr("ipconfig2"),
 		InterfaceIPConfigurationPropertiesFormat: &network.InterfaceIPConfigurationPropertiesFormat{
-			PrivateIPAddressVersion: network.IPv6,
+			PrivateIPAddressVersion: network.IPVersionIPv6,
 			PrivateIPAddress:        to.StringPtr("1111:11111:00:00:1111:1111:000:111"),
 		},
 	}
@@ -806,7 +807,7 @@ func TestGetIPConfigByIPFamily(t *testing.T) {
 						{
 							Name: to.StringPtr("ipconfig1"),
 							InterfaceIPConfigurationPropertiesFormat: &network.InterfaceIPConfigurationPropertiesFormat{
-								PrivateIPAddressVersion: network.IPv4,
+								PrivateIPAddressVersion: network.IPVersionIPv4,
 							},
 						},
 					},
@@ -1387,7 +1388,7 @@ func TestStandardEnsureHostInPool(t *testing.T) {
 		testNIC := buildDefaultTestInterface(false, []string{backendAddressPoolID})
 		testNIC.Name = to.StringPtr(test.nicName)
 		testNIC.ID = to.StringPtr(test.nicID)
-		testNIC.ProvisioningState = to.StringPtr(test.nicProvisionState)
+		testNIC.ProvisioningState = network.ProvisioningState(test.nicProvisionState)
 
 		mockVMClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		mockVMClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, string(test.nodeName), gomock.Any()).Return(testVM, nil).AnyTimes()
@@ -1757,7 +1758,7 @@ func TestStandardEnsureBackendPoolDeleted(t *testing.T) {
 func buildDefaultTestInterface(isPrimary bool, lbBackendpoolIDs []string) network.Interface {
 	expectedNIC := network.Interface{
 		InterfacePropertiesFormat: &network.InterfacePropertiesFormat{
-			ProvisioningState: to.StringPtr("Succeeded"),
+			ProvisioningState: network.ProvisioningStateSucceeded,
 			IPConfigurations: &[]network.InterfaceIPConfiguration{
 				{
 					InterfaceIPConfigurationPropertiesFormat: &network.InterfaceIPConfigurationPropertiesFormat{

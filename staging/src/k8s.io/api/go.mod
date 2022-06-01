@@ -11,6 +11,7 @@ require (
 )
 
 replace (
+	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 )

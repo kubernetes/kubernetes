@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -21,13 +22,13 @@ package interfaceclient
 import (
 	"context"
 
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-08-01/network"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
 const (
 	// APIVersion is the API version for network.
-	APIVersion = "2019-06-01"
+	APIVersion = "2021-08-01"
 
 	// ComputeAPIVersion is the API version for compute. It is required to get VMSS network interface.
 	ComputeAPIVersion = "2017-03-30"

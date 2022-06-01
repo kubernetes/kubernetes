@@ -33,7 +33,7 @@ require (
 	go.etcd.io/bbolt v1.3.5 // indirect
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
+	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20211209124913-491a49abca63
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1
@@ -56,6 +56,10 @@ require (
 )
 
 replace (
+	github.com/Azure/go-autorest/autorest/adal => github.com/Azure/go-autorest/autorest/adal v0.9.5
+	github.com/Azure/go-autorest/autorest/mocks => github.com/Azure/go-autorest/autorest/mocks v0.4.1
+	github.com/Azure/go-autorest/logger => github.com/Azure/go-autorest/logger v0.2.0
+	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
