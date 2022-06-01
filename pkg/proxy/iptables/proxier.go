@@ -80,6 +80,11 @@ const (
 
 	// kube proxy canary chain is used for monitoring rule reload
 	kubeProxyCanaryChain utiliptables.Chain = "KUBE-PROXY-CANARY"
+
+	// largeClusterEndpointsThreshold is the number of endpoints at which
+	// we switch into "large cluster mode" and optimize for iptables
+	// performance over iptables debuggability
+	largeClusterEndpointsThreshold = 1000
 )
 
 // KernelCompatTester tests whether the required kernel capabilities are
@@ -219,11 +224,10 @@ type Proxier struct {
 	natChains                utilproxy.LineBuffer
 	natRules                 utilproxy.LineBuffer
 
-	// endpointChainsNumber is the total amount of endpointChains across all
-	// services that we will generate (it is computed at the beginning of
-	// syncProxyRules method). If that is large enough, comments in some
-	// iptable rules are dropped to improve performance.
-	endpointChainsNumber int
+	// largeClusterMode is set at the beginning of syncProxyRules if we are
+	// going to end up outputting "lots" of iptables rules and so we need to
+	// optimize for performance over debuggability.
+	largeClusterMode bool
 
 	// Values are as a parameter to select the interfaces where nodeport works.
 	nodePortAddresses []string
@@ -787,14 +791,12 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 	}
 }
 
-const endpointChainsNumberThreshold = 1000
-
 // Assumes proxier.mu is held.
 func (proxier *Proxier) appendServiceCommentLocked(args []string, svcName string) []string {
 	// Not printing these comments, can reduce size of iptables (in case of large
 	// number of endpoints) even by 40%+. So if total number of endpoint chains
 	// is large enough, we simply drop those comments.
-	if proxier.endpointChainsNumber > endpointChainsNumberThreshold {
+	if proxier.largeClusterMode {
 		return args
 	}
 	return append(args, "-m", "comment", "--comment", svcName)
@@ -956,11 +958,13 @@ func (proxier *Proxier) syncProxyRules() {
 	// is just for efficiency, not correctness.
 	args := make([]string, 64)
 
-	// Compute total number of endpoint chains across all services.
-	proxier.endpointChainsNumber = 0
+	// Compute total number of endpoint chains across all services to get
+	// a sense of how big the cluster is.
+	totalEndpoints := 0
 	for svcName := range proxier.serviceMap {
-		proxier.endpointChainsNumber += len(proxier.endpointsMap[svcName])
+		totalEndpoints += len(proxier.endpointsMap[svcName])
 	}
+	proxier.largeClusterMode = (totalEndpoints > largeClusterEndpointsThreshold)
 
 	nodeAddresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
 	if err != nil {
@@ -1422,7 +1426,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	klog.V(2).InfoS("Reloading service iptables data",
 		"numServices", len(proxier.serviceMap),
-		"numEndpoints", proxier.endpointChainsNumber,
+		"numEndpoints", totalEndpoints,
 		"numFilterChains", proxier.filterChains.Lines(),
 		"numFilterRules", proxier.filterRules.Lines(),
 		"numNATChains", proxier.natChains.Lines(),

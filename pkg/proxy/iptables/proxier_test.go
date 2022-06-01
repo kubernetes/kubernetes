@@ -7434,7 +7434,7 @@ func countEndpointsAndComments(iptablesData string, matchEndpoint string) (strin
 	return matched, numEndpoints, numComments
 }
 
-func TestEndpointCommentElision(t *testing.T) {
+func TestSyncProxyRulesLargeClusterMode(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.masqueradeAll = true
@@ -7473,7 +7473,7 @@ func TestEndpointCommentElision(t *testing.T) {
 	populateEndpointSlices(fp,
 		makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
-			eps.Endpoints = make([]discovery.Endpoint, endpointChainsNumberThreshold/2-1)
+			eps.Endpoints = make([]discovery.Endpoint, largeClusterEndpointsThreshold/2-1)
 			for i := range eps.Endpoints {
 				eps.Endpoints[i].Addresses = []string{fmt.Sprintf("10.0.%d.%d", i%256, i/256)}
 			}
@@ -7485,7 +7485,7 @@ func TestEndpointCommentElision(t *testing.T) {
 		}),
 		makeTestEndpointSlice("ns2", "svc2", 1, func(eps *discovery.EndpointSlice) {
 			eps.AddressType = discovery.AddressTypeIPv4
-			eps.Endpoints = make([]discovery.Endpoint, endpointChainsNumberThreshold/2-1)
+			eps.Endpoints = make([]discovery.Endpoint, largeClusterEndpointsThreshold/2-1)
 			for i := range eps.Endpoints {
 				eps.Endpoints[i].Addresses = []string{fmt.Sprintf("10.1.%d.%d", i%256, i/256)}
 			}
@@ -7498,15 +7498,15 @@ func TestEndpointCommentElision(t *testing.T) {
 	)
 
 	fp.syncProxyRules()
+	expectedEndpoints := 2 * (largeClusterEndpointsThreshold/2 - 1)
 
-	expectedEndpoints := 2 * (endpointChainsNumberThreshold/2 - 1)
 	firstEndpoint, numEndpoints, numComments := countEndpointsAndComments(fp.iptablesData.String(), "10.0.0.0")
 	assert.Equal(t, "-A KUBE-SEP-DKGQUZGBKLTPAR56 -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.0.0:80", firstEndpoint)
 	if numEndpoints != expectedEndpoints {
 		t.Errorf("Found wrong number of endpoints: expected %d, got %d", expectedEndpoints, numEndpoints)
 	}
 	if numComments != numEndpoints {
-		t.Errorf("numComments (%d) != numEndpoints (%d) when numEndpoints < threshold (%d)", numComments, numEndpoints, endpointChainsNumberThreshold)
+		t.Errorf("numComments (%d) != numEndpoints (%d) when numEndpoints < threshold (%d)", numComments, numEndpoints, largeClusterEndpointsThreshold)
 	}
 
 	fp.OnEndpointSliceAdd(makeTestEndpointSlice("ns3", "svc3", 1, func(eps *discovery.EndpointSlice) {
@@ -7525,15 +7525,15 @@ func TestEndpointCommentElision(t *testing.T) {
 		}}
 	}))
 	fp.syncProxyRules()
-
 	expectedEndpoints += 3
+
 	firstEndpoint, numEndpoints, numComments = countEndpointsAndComments(fp.iptablesData.String(), "10.0.0.0")
 	assert.Equal(t, "-A KUBE-SEP-DKGQUZGBKLTPAR56 -m tcp -p tcp -j DNAT --to-destination 10.0.0.0:80", firstEndpoint)
 	if numEndpoints != expectedEndpoints {
 		t.Errorf("Found wrong number of endpoints: expected %d, got %d", expectedEndpoints, numEndpoints)
 	}
 	if numComments != 0 {
-		t.Errorf("numComments (%d) != 0 when numEndpoints (%d) > threshold (%d)", numComments, numEndpoints, endpointChainsNumberThreshold)
+		t.Errorf("numComments (%d) != 0 when numEndpoints (%d) > threshold (%d)", numComments, numEndpoints, largeClusterEndpointsThreshold)
 	}
 }
 
