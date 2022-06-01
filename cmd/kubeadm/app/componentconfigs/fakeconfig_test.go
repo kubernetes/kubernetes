@@ -361,8 +361,7 @@ func TestGeneratedConfigFromCluster(t *testing.T) {
 				}
 
 				client := clientsetfake.NewSimpleClientset(configMap)
-				legacyKubeletConfigMap := true
-				cfg, err := clusterConfigHandler.FromCluster(client, testClusterCfg(legacyKubeletConfigMap))
+				cfg, err := clusterConfigHandler.FromCluster(client, testClusterCfg())
 				if err != nil {
 					t.Fatalf("unexpected failure of FromCluster: %v", err)
 				}
@@ -487,8 +486,7 @@ func TestLoadingFromCluster(t *testing.T) {
 			testClusterConfigMap(in, false),
 		)
 
-		legacyKubeletConfigMap := true
-		return clusterConfigHandler.FromCluster(client, testClusterCfg(legacyKubeletConfigMap))
+		return clusterConfigHandler.FromCluster(client, testClusterCfg())
 	})
 }
 
@@ -581,8 +579,7 @@ func TestFetchFromClusterWithLocalOverwrites(t *testing.T) {
 					t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 				}
 
-				legacyKubeletConfigMap := true
-				clusterCfg := testClusterCfg(legacyKubeletConfigMap)
+				clusterCfg := testClusterCfg()
 
 				err = FetchFromClusterWithLocalOverwrites(clusterCfg, client, docmap)
 				if err != nil {
@@ -716,8 +713,7 @@ func TestGetVersionStates(t *testing.T) {
 					t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 				}
 
-				legacyKubeletConfigMap := true
-				clusterCfg := testClusterCfg(legacyKubeletConfigMap)
+				clusterCfg := testClusterCfg()
 
 				got, err := GetVersionStates(clusterCfg, client, docmap)
 				if err != nil {
