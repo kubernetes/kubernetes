@@ -166,4 +166,56 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 			framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 		}
 	})
+
+	ginkgo.It("MUST fail create of a custom resource definition that contains an x-kubernetes-validations rule that contains a syntax error", func() {
+		ginkgo.By("Defining a custom resource definition that contains a validation rule with a syntax error")
+		var schemaWithSyntaxErrorRule = unmarshallSchema([]byte(`{
+			"type":"object",
+			"properties":{
+			   "spec":{
+				  "type":"object",
+				  "x-kubernetes-validations":[
+					{ "rule":"self = 42" }
+				  ]
+			   }
+			}
+		}`))
+		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithSyntaxErrorRule, false)
+		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		framework.ExpectError(err, "creating a CustomResourceDefinition with a validation rule that contains a syntax error")
+		expectedErrMsg := "syntax error"
+		if !strings.Contains(err.Error(), expectedErrMsg) {
+			framework.Failf("expected error message to contain %q, got %q", expectedErrMsg, err.Error())
+		}
+	})
+
+	ginkgo.It("MUST fail create of a custom resource definition that contains an x-kubernetes-validations rule that exceeds the estimated cost limit", func() {
+		ginkgo.By("Defining a custom resource definition that contains a validation rule that exceeds the cost limit")
+		var schemaWithExpensiveRule = unmarshallSchema([]byte(`{
+			"type": "object",
+			"properties": {
+				"spec": {
+					"type": "object",
+					"x-kubernetes-validations": [{
+						"rule": "self.x.all(s, s == \"string constant\")"
+					}],
+					"properties": {
+						"x": {
+							"type": "list",
+							"items": {
+								"type": "string"
+							}
+						}
+					}
+				}
+			}
+		}`))
+		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithExpensiveRule, false)
+		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		framework.ExpectError(err, "creating a CustomResourceDefinition with a validation rule that exceeds the cost limit")
+		expectedErrMsg := "syntax error"
+		if !strings.Contains(err.Error(), expectedErrMsg) {
+			framework.Failf("expected error message to contain %q, got %q", expectedErrMsg, err.Error())
+		}
+	})
 })
