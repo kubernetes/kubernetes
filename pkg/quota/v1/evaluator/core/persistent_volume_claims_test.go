@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -180,4 +181,46 @@ func getPVCWithAllocatedResource(pvcSize, allocatedSize string) *api.PersistentV
 		api.ResourceName(api.ResourceStorage): resource.MustParse(allocatedSize),
 	}
 	return validPVCWithAllocatedResources
+}
+
+func TestPersistentVolumeClaimEvaluatorMatchingResources(t *testing.T) {
+	evaluator := NewPersistentVolumeClaimEvaluator(nil)
+	testCases := map[string]struct {
+		items []corev1.ResourceName
+		want  []corev1.ResourceName
+	}{
+		"supported-resources": {
+			items: []corev1.ResourceName{
+				"count/persistentvolumeclaims",
+				"requests.storage",
+				"persistentvolumeclaims",
+				"gold.storageclass.storage.k8s.io/requests.storage",
+				"gold.storageclass.storage.k8s.io/persistentvolumeclaims",
+			},
+
+			want: []corev1.ResourceName{
+				"count/persistentvolumeclaims",
+				"requests.storage",
+				"persistentvolumeclaims",
+				"gold.storageclass.storage.k8s.io/requests.storage",
+				"gold.storageclass.storage.k8s.io/persistentvolumeclaims",
+			},
+		},
+		"unsupported-resources": {
+			items: []corev1.ResourceName{
+				"storage",
+				"ephemeral-storage",
+				"bronze.storageclass.storage.k8s.io/storage",
+				"gold.storage.k8s.io/requests.storage",
+			},
+			want: []corev1.ResourceName{},
+		},
+	}
+	for testName, testCase := range testCases {
+		actual := evaluator.MatchingResources(testCase.items)
+
+		if !reflect.DeepEqual(testCase.want, actual) {
+			t.Errorf("%s expected:\n%v\n, actual:\n%v", testName, testCase.want, actual)
+		}
+	}
 }
