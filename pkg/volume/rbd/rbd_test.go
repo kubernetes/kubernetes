@@ -397,8 +397,8 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		expectedDevicePath:      "/dev/rbd1",
-		expectedDeviceMountPath: fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/pool1-image-image1", tmpDir),
-		expectedPodMountPath:    fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~rbd/vol1", tmpDir, podUID),
+		expectedDeviceMountPath: filepath.Join(tmpDir, "plugins/kubernetes.io/rbd/mounts/pool1-image-image1"),
+		expectedPodMountPath:    filepath.Join(tmpDir, "pods", string(podUID), "volumes/kubernetes.io~rbd/vol1"),
 	})
 	cases = append(cases, &testcase{
 		spec: volume.NewSpecFromPersistentVolume(&v1.PersistentVolume{
@@ -426,8 +426,8 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		expectedDevicePath:      "/dev/rbd1",
-		expectedDeviceMountPath: fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/pool2-image-image2", tmpDir),
-		expectedPodMountPath:    fmt.Sprintf("%s/pods/%s/volumes/kubernetes.io~rbd/vol2", tmpDir, podUID),
+		expectedDeviceMountPath: filepath.Join(tmpDir, "plugins/kubernetes.io/rbd/mounts/pool2-image-image2"),
+		expectedPodMountPath:    filepath.Join(tmpDir, "pods", string(podUID), "volumes/kubernetes.io~rbd/vol2"),
 	})
 
 	for i := 0; i < len(cases); i++ {
@@ -560,8 +560,8 @@ func TestGetDeviceMountPath(t *testing.T) {
 		},
 	})
 
-	deprecatedDir := fmt.Sprintf("%s/plugins/kubernetes.io/rbd/rbd/%s-image-%s", tmpDir, pool, image)
-	canonicalDir := fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/%s-image-%s", tmpDir, pool, image)
+	deprecatedDir := filepath.Join(tmpDir, fmt.Sprintf("plugins/kubernetes.io/rbd/rbd/%s-image-%s", pool, image))
+	canonicalDir := filepath.Join(tmpDir, fmt.Sprintf("plugins/kubernetes.io/rbd/mounts/%s-image-%s", pool, image))
 
 	type testCase struct {
 		deprecated bool
@@ -609,9 +609,9 @@ func TestConstructVolumeSpec(t *testing.T) {
 	fakeMounter := fakeVolumeHost.GetMounter(plug.GetPluginName()).(*mount.FakeMounter)
 
 	pool, image, volumeName := "pool", "image", "vol"
-	podMountPath := fmt.Sprintf("%s/pods/pod123/volumes/kubernetes.io~rbd/%s", tmpDir, volumeName)
-	deprecatedDir := fmt.Sprintf("%s/plugins/kubernetes.io/rbd/rbd/%s-image-%s", tmpDir, pool, image)
-	canonicalDir := fmt.Sprintf("%s/plugins/kubernetes.io/rbd/mounts/%s-image-%s", tmpDir, pool, image)
+	podMountPath := filepath.Join(tmpDir, "pods/pod123/volumes/kubernetes.io~rbd", volumeName)
+	deprecatedDir := filepath.Join(tmpDir, "plugins/kubernetes.io/rbd/rbd", fmt.Sprintf("%s-image-%s", pool, image))
+	canonicalDir := filepath.Join(tmpDir, "plugins/kubernetes.io/rbd/mounts", fmt.Sprintf("%s-image-%s", pool, image))
 
 	type testCase struct {
 		volumeName string

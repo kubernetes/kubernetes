@@ -22,6 +22,8 @@ package cinder
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -89,7 +91,7 @@ func TestGetDeviceMountPath(t *testing.T) {
 	if err != nil {
 		t.Errorf("Get device mount path error")
 	}
-	expectedPath := rootDir + "plugins/kubernetes.io/cinder/mounts/" + name
+	expectedPath := filepath.Join(rootDir, "plugins/kubernetes.io/cinder/mounts", name)
 	if path != expectedPath {
 		t.Errorf("Device mount path error: expected %s, got %s ", expectedPath, path)
 	}
@@ -357,7 +359,7 @@ func serializeAttachments(attachments map[*volume.Spec]bool) string {
 // newPlugin creates a new gcePersistentDiskPlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
 func newPlugin(t *testing.T) *cinderPlugin {
-	host := volumetest.NewFakeVolumeHost(t, "/tmp", nil, nil)
+	host := volumetest.NewFakeVolumeHost(t, os.TempDir(), nil, nil)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)
