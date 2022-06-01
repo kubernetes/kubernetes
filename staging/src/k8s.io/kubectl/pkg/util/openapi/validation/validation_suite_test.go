@@ -26,9 +26,9 @@ import (
 	"testing"
 )
 
-func TestOpenapi(t *testing.T) {
+func TestOpenapiValidation(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecsWithDefaultAndCustomReporters(t, "Openapi Suite", []Reporter{newlineReporter{}})
+	RunSpecsWithDefaultAndCustomReporters(t, "Openapi Validation Suite", []Reporter{newlineReporter{}})
 }
 
 // Print a newline after the default newlineReporter due to issue
