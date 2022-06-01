@@ -428,7 +428,7 @@ var _ = SIGDescribe("CronJob", func() {
 			return err
 		})
 		framework.ExpectNoError(err)
-		if updatedStatus.Status.LastScheduleTime.Equal(&now2) {
+		if !updatedStatus.Status.LastScheduleTime.Equal(&now2) {
 			framework.Failf("updated object status expected to have updated lastScheduleTime %#v, got %#v", statusToUpdate.Status.LastScheduleTime, updatedStatus.Status.LastScheduleTime)
 		}
 

@@ -326,7 +326,7 @@ var _ = SIGDescribe("Deployment", func() {
 			}
 		}
 		if !foundDeployment {
-			framework.Failf("unable to find the Deployment in list", deploymentsList)
+			framework.Failf("unable to find the Deployment in the following list %v", deploymentsList)
 		}
 
 		ginkgo.By("updating the Deployment")
