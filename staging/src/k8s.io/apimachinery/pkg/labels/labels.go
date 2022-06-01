@@ -133,10 +133,7 @@ func Equals(labels1, labels2 Set) bool {
 
 	for k, v := range labels1 {
 		value, ok := labels2[k]
-		if !ok {
-			return false
-		}
-		if value != v {
+		if !ok || value != v {
 			return false
 		}
 	}
