@@ -61,7 +61,7 @@ func TestGCMetricsCollector(t *testing.T) {
 	})
 
 	expectedMetrics := `
-		# HELP garbagecollector_controller_attempt_to_delete_queue_retry_since_seconds How long in seconds an item has been retrying in attempt to delete workqueue.
+		# HELP garbagecollector_controller_attempt_to_delete_queue_retry_since_seconds [ALPHA] How long in seconds an item has been retrying in attempt to delete workqueue.
         # TYPE garbagecollector_controller_attempt_to_delete_queue_retry_since_seconds histogram
         garbagecollector_controller_attempt_to_delete_queue_retry_since_seconds_bucket{le="0.001"} 1
         garbagecollector_controller_attempt_to_delete_queue_retry_since_seconds_bucket{le="0.01"} 1
@@ -76,7 +76,7 @@ func TestGCMetricsCollector(t *testing.T) {
         garbagecollector_controller_attempt_to_delete_queue_retry_since_seconds_bucket{le="+Inf"} 6
         garbagecollector_controller_attempt_to_delete_queue_retry_since_seconds_sum 10811.101
         garbagecollector_controller_attempt_to_delete_queue_retry_since_seconds_count 6
-        # HELP garbagecollector_controller_attempt_to_orphan_queue_retry_since_seconds How long in seconds an item has been retrying in attempt to orphan workqueue.
+        # HELP garbagecollector_controller_attempt_to_orphan_queue_retry_since_seconds [ALPHA] How long in seconds an item has been retrying in attempt to orphan workqueue.
         # TYPE garbagecollector_controller_attempt_to_orphan_queue_retry_since_seconds histogram
         garbagecollector_controller_attempt_to_orphan_queue_retry_since_seconds_bucket{le="0.001"} 0
         garbagecollector_controller_attempt_to_orphan_queue_retry_since_seconds_bucket{le="0.01"} 0

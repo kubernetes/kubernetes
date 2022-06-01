@@ -19,10 +19,9 @@ package metrics
 import (
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 )
 
 const GarbageCollectorControllerSubsystem = "garbagecollector_controller"
@@ -36,31 +35,33 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		})
 
-	deleteQueueRetrySinceSecondsOpts = prometheus.HistogramOpts{
-		Subsystem: GarbageCollectorControllerSubsystem,
-		Name:      "attempt_to_delete_queue_retry_since_seconds",
-		Help:      "How long in seconds an item has been retrying in attempt to delete workqueue.",
-		Buckets:   metrics.ExponentialBuckets(0.001, 10, 10),
+	deleteQueueRetrySinceSecondsOpts = &metrics.HistogramOpts{
+		Subsystem:      GarbageCollectorControllerSubsystem,
+		Name:           "attempt_to_delete_queue_retry_since_seconds",
+		Help:           "How long in seconds an item has been retrying in attempt to delete workqueue.",
+		Buckets:        metrics.ExponentialBuckets(0.001, 10, 10),
+		StabilityLevel: metrics.ALPHA,
 	}
-	orphanQueueRetrySinceSecondsOpts = prometheus.HistogramOpts{
-		Subsystem: GarbageCollectorControllerSubsystem,
-		Name:      "attempt_to_orphan_queue_retry_since_seconds",
-		Help:      "How long in seconds an item has been retrying in attempt to orphan workqueue.",
-		Buckets:   metrics.ExponentialBuckets(0.001, 10, 10),
+	orphanQueueRetrySinceSecondsOpts = &metrics.HistogramOpts{
+		Subsystem:      GarbageCollectorControllerSubsystem,
+		Name:           "attempt_to_orphan_queue_retry_since_seconds",
+		Help:           "How long in seconds an item has been retrying in attempt to orphan workqueue.",
+		Buckets:        metrics.ExponentialBuckets(0.001, 10, 10),
+		StabilityLevel: metrics.ALPHA,
 	}
 
 	deleteQueueRetrySinceSecondsDesc = metrics.NewDesc(metrics.BuildFQName(deleteQueueRetrySinceSecondsOpts.Namespace, deleteQueueRetrySinceSecondsOpts.Subsystem, deleteQueueRetrySinceSecondsOpts.Name),
 		deleteQueueRetrySinceSecondsOpts.Help,
 		nil,
-		nil,
-		metrics.ALPHA,
-		"")
+		deleteQueueRetrySinceSecondsOpts.ConstLabels,
+		deleteQueueRetrySinceSecondsOpts.StabilityLevel,
+		deleteQueueRetrySinceSecondsOpts.DeprecatedVersion)
 	orphanQueueRetrySinceSecondsDesc = metrics.NewDesc(metrics.BuildFQName(orphanQueueRetrySinceSecondsOpts.Namespace, orphanQueueRetrySinceSecondsOpts.Subsystem, orphanQueueRetrySinceSecondsOpts.Name),
 		orphanQueueRetrySinceSecondsOpts.Help,
 		nil,
-		nil,
-		metrics.ALPHA,
-		"")
+		orphanQueueRetrySinceSecondsOpts.ConstLabels,
+		orphanQueueRetrySinceSecondsOpts.StabilityLevel,
+		orphanQueueRetrySinceSecondsOpts.DeprecatedVersion)
 )
 
 var registerMetrics sync.Once
@@ -91,32 +92,26 @@ func (g *gcMetricsCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 	ch <- orphanQueueRetrySinceSecondsDesc
 }
 func (g *gcMetricsCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	g.collectDeleteQueue(ch)
-	g.collectOrphanQueue(ch)
+	g.collect(ch, deleteQueueRetrySinceSecondsDesc, deleteQueueRetrySinceSecondsOpts, g.attemptToDeleteMetrics)
+	g.collect(ch, orphanQueueRetrySinceSecondsDesc, orphanQueueRetrySinceSecondsOpts, g.attemptToOrphanMetrics)
 }
 
-func (g *gcMetricsCollector) collectDeleteQueue(ch chan<- metrics.Metric) {
-	if deleteQueueRetrySinceSecondsDesc.IsHidden() {
+func (g *gcMetricsCollector) collect(ch chan<- metrics.Metric, desc *metrics.Desc, histogramOpts *metrics.HistogramOpts, qMetrics QueueMetrics) {
+	if !desc.IsCreated() || desc.IsHidden() {
 		return
 	}
+	// use this just as a wrapper of prometheus.Histogram
+	histogram := metrics.NewHistogram(histogramOpts)
+	// no need to pass version or check result as this is handled by desc
+	histogram.Create(nil)
 
-	histogram := prometheus.NewHistogram(deleteQueueRetrySinceSecondsOpts)
-	for _, startRetryTime := range g.attemptToDeleteMetrics.GetRetrySinceDurations() {
+	for _, startRetryTime := range qMetrics.GetRetrySinceDurations() {
 		histogram.Observe(startRetryTime.Seconds())
 	}
 
-	ch <- histogram
-}
-
-func (g *gcMetricsCollector) collectOrphanQueue(ch chan<- metrics.Metric) {
-	if orphanQueueRetrySinceSecondsDesc.IsHidden() {
-		return
+	if h, ok := histogram.ObserverMetric.(metrics.Metric); ok {
+		ch <- h
+	} else {
+		klog.Warningf("%v metric is not collecting properly\n", histogramOpts.Name)
 	}
-
-	histogram := prometheus.NewHistogram(orphanQueueRetrySinceSecondsOpts)
-	for _, startRetryTime := range g.attemptToOrphanMetrics.GetRetrySinceDurations() {
-		histogram.Observe(startRetryTime.Seconds())
-	}
-
-	ch <- histogram
 }
