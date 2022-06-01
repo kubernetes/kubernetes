@@ -11,7 +11,7 @@
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
+# See the License for the specific language governwindows-server-20h2-dc-core-v20210914ing permissions and
 # limitations under the License.
 
 # A library of helper functions and constant for the local config.
@@ -95,6 +95,8 @@ function set-windows-node-image() {
     WINDOWS_NODE_IMAGE="windows-server-2004-dc-core-v20210914"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION,,}" == "win20h2" ]]; then
     WINDOWS_NODE_IMAGE="windows-server-20h2-dc-core-v20210914"
+  elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION,,}" == "win2022" ]]; then
+    WINDOWS_NODE_IMAGE="windows-server-2022-dc-core-v20220513"
   else
     echo "Unknown WINDOWS_NODE_OS_DISTRIBUTION ${WINDOWS_NODE_OS_DISTRIBUTION}" >&2
     exit 1
