@@ -334,7 +334,7 @@ func (rc *reconciler) unmountDetachDevices() {
 // it will try to clean up the mount paths with operation executor.
 func (rc *reconciler) sync() {
 	defer rc.updateLastSyncTime()
-	rc.syncStates()
+	rc.syncStates(rc.kubeletPodsDir)
 }
 
 func (rc *reconciler) updateLastSyncTime() {
@@ -366,19 +366,36 @@ type reconstructedVolume struct {
 	blockVolumeMapper   volumepkg.BlockVolumeMapper
 }
 
+type globalVolumeInfo struct {
+	volumeName        v1.UniqueVolumeName
+	volumeSpec        *volumepkg.Spec
+	devicePath        string
+	mounter           volumepkg.Mounter
+	deviceMounter     volumepkg.DeviceMounter
+	blockVolumeMapper volumepkg.BlockVolumeMapper
+	podVolumes        map[volumetypes.UniquePodName]*reconstructedVolume
+}
+
+func (gvi *globalVolumeInfo) addPodVolume(rcv *reconstructedVolume) {
+	if gvi.podVolumes == nil {
+		gvi.podVolumes = map[volumetypes.UniquePodName]*reconstructedVolume{}
+	}
+	gvi.podVolumes[rcv.podName] = rcv
+}
+
 // syncStates scans the volume directories under the given pod directory.
 // If the volume is not in desired state of world, this function will reconstruct
 // the volume related information and put it in both the actual and desired state of worlds.
 // For some volume plugins that cannot support reconstruction, it will clean up the existing
 // mount points since the volume is no long needed (removed from desired state)
-func (rc *reconciler) syncStates() {
+func (rc *reconciler) syncStates(kubeletPodDir string) {
 	// Get volumes information by reading the pod's directory
-	podVolumes, err := getVolumesFromPodDir(rc.kubeletPodsDir)
+	podVolumes, err := getVolumesFromPodDir(kubeletPodDir)
 	if err != nil {
 		klog.ErrorS(err, "Cannot get volumes from disk, skip sync states for volume reconstruction")
 		return
 	}
-	volumesNeedUpdate := make(map[v1.UniqueVolumeName]*reconstructedVolume)
+	volumesNeedUpdate := make(map[v1.UniqueVolumeName]*globalVolumeInfo)
 	volumeNeedReport := []v1.UniqueVolumeName{}
 	for _, volume := range podVolumes {
 		if rc.actualStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
@@ -416,7 +433,19 @@ func (rc *reconciler) syncStates() {
 			klog.InfoS("Volume is in pending operation, skip cleaning up mounts")
 		}
 		klog.V(2).InfoS("Reconciler sync states: could not find pod information in desired state, update it in actual state", "reconstructedVolume", reconstructedVolume)
-		volumesNeedUpdate[reconstructedVolume.volumeName] = reconstructedVolume
+		gvl := &globalVolumeInfo{
+			volumeName:        reconstructedVolume.volumeName,
+			volumeSpec:        reconstructedVolume.volumeSpec,
+			devicePath:        reconstructedVolume.devicePath,
+			deviceMounter:     reconstructedVolume.deviceMounter,
+			blockVolumeMapper: reconstructedVolume.blockVolumeMapper,
+			mounter:           reconstructedVolume.mounter,
+		}
+		if cachedInfo, ok := volumesNeedUpdate[reconstructedVolume.volumeName]; ok {
+			gvl = cachedInfo
+		}
+		gvl.addPodVolume(reconstructedVolume)
+		volumesNeedUpdate[reconstructedVolume.volumeName] = gvl
 	}
 
 	if len(volumesNeedUpdate) > 0 {
@@ -590,7 +619,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 }
 
 // updateDevicePath gets the node status to retrieve volume device path information.
-func (rc *reconciler) updateDevicePath(volumesNeedUpdate map[v1.UniqueVolumeName]*reconstructedVolume) {
+func (rc *reconciler) updateDevicePath(volumesNeedUpdate map[v1.UniqueVolumeName]*globalVolumeInfo) {
 	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		klog.ErrorS(fetchErr, "UpdateStates in reconciler: could not get node status with error")
@@ -608,19 +637,19 @@ func (rc *reconciler) updateDevicePath(volumesNeedUpdate map[v1.UniqueVolumeName
 // getDeviceMountPath returns device mount path for block volume which
 // implements BlockVolumeMapper or filesystem volume which implements
 // DeviceMounter
-func getDeviceMountPath(volume *reconstructedVolume) (string, error) {
-	if volume.blockVolumeMapper != nil {
-		// for block volume, we return its global map path
-		return volume.blockVolumeMapper.GetGlobalMapPath(volume.volumeSpec)
-	} else if volume.deviceMounter != nil {
-		// for filesystem volume, we return its device mount path if the plugin implements DeviceMounter
-		return volume.deviceMounter.GetDeviceMountPath(volume.volumeSpec)
+func getDeviceMountPath(gvi *globalVolumeInfo) (string, error) {
+	if gvi.blockVolumeMapper != nil {
+		// for block gvi, we return its global map path
+		return gvi.blockVolumeMapper.GetGlobalMapPath(gvi.volumeSpec)
+	} else if gvi.deviceMounter != nil {
+		// for filesystem gvi, we return its device mount path if the plugin implements DeviceMounter
+		return gvi.deviceMounter.GetDeviceMountPath(gvi.volumeSpec)
 	} else {
 		return "", fmt.Errorf("blockVolumeMapper or deviceMounter required")
 	}
 }
 
-func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*reconstructedVolume) error {
+func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*globalVolumeInfo) error {
 	// Get the node status to retrieve volume device path information.
 	// Skip reporting devicePath in node objects if kubeClient is nil.
 	// In standalone mode, kubelet is not expected to mount any attachable volume types or secret, configmaps etc.
@@ -628,44 +657,46 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 		rc.updateDevicePath(volumesNeedUpdate)
 	}
 
-	for _, volume := range volumesNeedUpdate {
+	for _, gvl := range volumesNeedUpdate {
 		err := rc.actualStateOfWorld.MarkVolumeAsAttached(
 			//TODO: the devicePath might not be correct for some volume plugins: see issue #54108
-			volume.volumeName, volume.volumeSpec, "" /* nodeName */, volume.devicePath)
+			gvl.volumeName, gvl.volumeSpec, "" /* nodeName */, gvl.devicePath)
 		if err != nil {
-			klog.ErrorS(err, "Could not add volume information to actual state of world", "pod", klog.KObj(volume.pod))
+			klog.ErrorS(err, "Could not add volume information to actual state of world", "volumeName", gvl.volumeName)
 			continue
 		}
-		markVolumeOpts := operationexecutor.MarkVolumeOpts{
-			PodName:             volume.podName,
-			PodUID:              types.UID(volume.podName),
-			VolumeName:          volume.volumeName,
-			Mounter:             volume.mounter,
-			BlockVolumeMapper:   volume.blockVolumeMapper,
-			OuterVolumeSpecName: volume.outerVolumeSpecName,
-			VolumeGidVolume:     volume.volumeGidValue,
-			VolumeSpec:          volume.volumeSpec,
-			VolumeMountState:    operationexecutor.VolumeMounted,
+		for _, volume := range gvl.podVolumes {
+			markVolumeOpts := operationexecutor.MarkVolumeOpts{
+				PodName:             volume.podName,
+				PodUID:              types.UID(volume.podName),
+				VolumeName:          volume.volumeName,
+				Mounter:             volume.mounter,
+				BlockVolumeMapper:   volume.blockVolumeMapper,
+				OuterVolumeSpecName: volume.outerVolumeSpecName,
+				VolumeGidVolume:     volume.volumeGidValue,
+				VolumeSpec:          volume.volumeSpec,
+				VolumeMountState:    operationexecutor.VolumeMounted,
+			}
+			err = rc.actualStateOfWorld.MarkVolumeAsMounted(markVolumeOpts)
+			if err != nil {
+				klog.ErrorS(err, "Could not add pod to volume information to actual state of world", "pod", klog.KObj(volume.pod))
+				continue
+			}
+			klog.V(4).InfoS("Volume is marked as mounted and added into the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName)
 		}
-		err = rc.actualStateOfWorld.MarkVolumeAsMounted(markVolumeOpts)
-		if err != nil {
-			klog.ErrorS(err, "Could not add pod to volume information to actual state of world", "pod", klog.KObj(volume.pod))
-			continue
-		}
-		klog.V(4).InfoS("Volume is marked as mounted and added into the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName)
 		// If the volume has device to mount, we mark its device as mounted.
-		if volume.deviceMounter != nil || volume.blockVolumeMapper != nil {
-			deviceMountPath, err := getDeviceMountPath(volume)
+		if gvl.deviceMounter != nil || gvl.blockVolumeMapper != nil {
+			deviceMountPath, err := getDeviceMountPath(gvl)
 			if err != nil {
-				klog.ErrorS(err, "Could not find device mount path for volume", "volumeName", volume.volumeName, "pod", klog.KObj(volume.pod))
+				klog.ErrorS(err, "Could not find device mount path for volume", "volumeName", gvl.volumeName)
 				continue
 			}
-			err = rc.actualStateOfWorld.MarkDeviceAsMounted(volume.volumeName, volume.devicePath, deviceMountPath)
+			err = rc.actualStateOfWorld.MarkDeviceAsMounted(gvl.volumeName, gvl.devicePath, deviceMountPath)
 			if err != nil {
-				klog.ErrorS(err, "Could not mark device is mounted to actual state of world", "pod", klog.KObj(volume.pod))
+				klog.ErrorS(err, "Could not mark device is mounted to actual state of world", "volume", gvl.volumeName)
 				continue
 			}
-			klog.V(4).InfoS("Volume is marked device as mounted and added into the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName)
+			klog.V(4).InfoS("Volume is marked device as mounted and added into the actual state", "volumeName", gvl.volumeName)
 		}
 	}
 	return nil

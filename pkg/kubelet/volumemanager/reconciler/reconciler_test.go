@@ -21,6 +21,9 @@ import (
 	"fmt"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
+	"os"
+	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -2180,4 +2183,129 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 
 	<-finished
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
+}
+
+func getFakeNode() *v1.Node {
+	return &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: string(nodeName),
+		},
+		Status: v1.NodeStatus{
+			VolumesAttached: []v1.AttachedVolume{
+				{
+					Name:       "fake-plugin/fake-device1",
+					DevicePath: "/fake/path",
+				},
+			},
+		},
+	}
+}
+
+func getReconciler(kubeletDir string, t *testing.T, volumePaths []string) (Reconciler, *volumetesting.FakeVolumePlugin) {
+	node := getFakeNode()
+	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNodeAndRoot(t, node, kubeletDir)
+	tmpKubeletPodDir := filepath.Join(kubeletDir, "pods")
+
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
+	kubeClient := createTestClient()
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		kubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		fakeHandler))
+	mountPoints := []mount.MountPoint{}
+	for _, volumePath := range volumePaths {
+		mountPoints = append(mountPoints, mount.MountPoint{Path: volumePath})
+	}
+	rc := NewReconciler(
+		kubeClient,
+		true, /* controllerAttachDetachEnabled */
+		reconcilerLoopSleepDuration,
+		waitForAttachTimeout,
+		nodeName,
+		dsw,
+		asw,
+		hasAddedPods,
+		oex,
+		mount.NewFakeMounter(mountPoints),
+		hostutil.NewFakeHostUtil(nil),
+		volumePluginMgr,
+		tmpKubeletPodDir)
+	return rc, fakePlugin
+}
+
+func TestSyncStates(t *testing.T) {
+	tests := []struct {
+		name             string
+		volumePaths      []string
+		createMountPoint bool
+		verifyFunc       func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error
+	}{
+		{
+			name: "when two pods are using same volume and both are deleted",
+			volumePaths: []string{
+				path.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
+				path.Join("pod2", "volumes", "fake-plugin", "pvc-abcdef"),
+			},
+			createMountPoint: true,
+			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
+				mountedPods := rcInstance.actualStateOfWorld.GetMountedVolumes()
+				if len(mountedPods) != 2 {
+					return fmt.Errorf("expected 2 pods to in asw got %d", len(mountedPods))
+				}
+				return nil
+			},
+		},
+		{
+			name: "when reconstruction fails for a volume, volumes should be cleaned up",
+			volumePaths: []string{
+				path.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
+			},
+			createMountPoint: false,
+			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
+				return retryWithExponentialBackOff(reconcilerSyncWaitDuration, func() (bool, error) {
+					err := volumetesting.VerifyTearDownCallCount(1, fakePlugin)
+					if err != nil {
+						return false, nil
+					}
+					return true, nil
+				})
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpKubeletDir, err := os.MkdirTemp("", "")
+			if err != nil {
+				t.Fatalf("can't make a temp directory for kubeletPods: %v", err)
+			}
+			defer os.RemoveAll(tmpKubeletDir)
+
+			// create kubelet pod directory
+			tmpKubeletPodDir := filepath.Join(tmpKubeletDir, "pods")
+			os.MkdirAll(tmpKubeletPodDir, 0755)
+
+			mountPaths := []string{}
+
+			// create pod and volume directories so as reconciler can find them.
+			for _, volumePath := range tc.volumePaths {
+				vp := filepath.Join(tmpKubeletPodDir, volumePath)
+				if tc.createMountPoint {
+					mountPaths = append(mountPaths, vp)
+				}
+				os.MkdirAll(vp, 0755)
+			}
+
+			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths)
+			rcInstance, _ := rc.(*reconciler)
+			rcInstance.syncStates(tmpKubeletPodDir)
+			if err := tc.verifyFunc(rcInstance, fakePlugin); err != nil {
+				t.Errorf("test %s failed: %v", tc.name, err)
+			}
+		})
+	}
+
 }
