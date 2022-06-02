@@ -278,7 +278,6 @@ type Controller struct {
 	nodeHealthMap *nodeHealthMap
 
 	// evictorLock protects zonePodEvictor and zoneNoExecuteTainter.
-	// TODO(#83954): API calls shouldn't be executed under the lock.
 	evictorLock     sync.Mutex
 	nodeEvictionMap *nodeEvictionMap
 	// workers that evicts pods from unresponsive nodes.
@@ -664,11 +663,32 @@ func (nc *Controller) doNoScheduleTaintingPass(ctx context.Context, nodeName str
 }
 
 func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
-	nc.evictorLock.Lock()
-	defer nc.evictorLock.Unlock()
-	for k := range nc.zoneNoExecuteTainter {
+	// Extract out the keys of the map in order to not hold
+	// the evictorLock for the entire function and hold it
+	// only when nescessary.
+	var zoneNoExecuteTainterKeys []string
+	func() {
+		nc.evictorLock.Lock()
+		defer nc.evictorLock.Unlock()
+
+		zoneNoExecuteTainterKeys = make([]string, 0, len(nc.zoneNoExecuteTainter))
+		for k := range nc.zoneNoExecuteTainter {
+			zoneNoExecuteTainterKeys = append(zoneNoExecuteTainterKeys, k)
+		}
+	}()
+	for _, k := range zoneNoExecuteTainterKeys {
+		var zoneNoExecuteTainterWorker *scheduler.RateLimitedTimedQueue
+		func() {
+			nc.evictorLock.Lock()
+			defer nc.evictorLock.Unlock()
+			// Extracting the value without checking if the key
+			// exists or not is safe to do here since zones do
+			// not get removed, and consequently pod evictors for
+			// these zones also do not get removed, only added.
+			zoneNoExecuteTainterWorker = nc.zoneNoExecuteTainter[k]
+		}()
 		// Function should return 'false' and a time after which it should be retried, or 'true' if it shouldn't (it succeeded).
-		nc.zoneNoExecuteTainter[k].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
+		zoneNoExecuteTainterWorker.Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 			node, err := nc.nodeLister.Get(value.Value)
 			if apierrors.IsNotFound(err) {
 				klog.Warningf("Node %v no longer present in nodeLister!", value.Value)
@@ -708,11 +728,34 @@ func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {
 }
 
 func (nc *Controller) doEvictionPass(ctx context.Context) {
-	nc.evictorLock.Lock()
-	defer nc.evictorLock.Unlock()
-	for k := range nc.zonePodEvictor {
+	// Extract out the keys of the map in order to not hold
+	// the evictorLock for the entire function and hold it
+	// only when nescessary.
+	var zonePodEvictorKeys []string
+	func() {
+		nc.evictorLock.Lock()
+		defer nc.evictorLock.Unlock()
+
+		zonePodEvictorKeys = make([]string, 0, len(nc.zonePodEvictor))
+		for k := range nc.zonePodEvictor {
+			zonePodEvictorKeys = append(zonePodEvictorKeys, k)
+		}
+	}()
+
+	for _, k := range zonePodEvictorKeys {
+		var zonePodEvictionWorker *scheduler.RateLimitedTimedQueue
+		func() {
+			nc.evictorLock.Lock()
+			defer nc.evictorLock.Unlock()
+			// Extracting the value without checking if the key
+			// exists or not is safe to do here since zones do
+			// not get removed, and consequently pod evictors for
+			// these zones also do not get removed, only added.
+			zonePodEvictionWorker = nc.zonePodEvictor[k]
+		}()
+
 		// Function should return 'false' and a time after which it should be retried, or 'true' if it shouldn't (it succeeded).
-		nc.zonePodEvictor[k].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
+		zonePodEvictionWorker.Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 			node, err := nc.nodeLister.Get(value.Value)
 			if apierrors.IsNotFound(err) {
 				klog.Warningf("Node %v no longer present in nodeLister!", value.Value)
@@ -1406,11 +1449,11 @@ func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
 // returns true if an eviction was queued.
 func (nc *Controller) cancelPodEviction(node *v1.Node) bool {
 	zone := nodetopology.GetZoneKey(node)
-	nc.evictorLock.Lock()
-	defer nc.evictorLock.Unlock()
 	if !nc.nodeEvictionMap.setStatus(node.Name, unmarked) {
 		klog.V(2).Infof("node %v was unregistered in the meantime - skipping setting status", node.Name)
 	}
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
 	wasDeleting := nc.zonePodEvictor[zone].Remove(node.Name)
 	if wasDeleting {
 		klog.V(2).Infof("Cancelling pod Eviction on Node: %v", node.Name)
@@ -1425,8 +1468,6 @@ func (nc *Controller) cancelPodEviction(node *v1.Node) bool {
 // - deletes pods immediately if node is already marked as evicted.
 //   Returns false, because the node wasn't added to the queue.
 func (nc *Controller) evictPods(ctx context.Context, node *v1.Node, pods []*v1.Pod) (bool, error) {
-	nc.evictorLock.Lock()
-	defer nc.evictorLock.Unlock()
 	status, ok := nc.nodeEvictionMap.getStatus(node.Name)
 	if ok && status == evicted {
 		// Node eviction already happened for this node.
@@ -1440,6 +1481,10 @@ func (nc *Controller) evictPods(ctx context.Context, node *v1.Node, pods []*v1.P
 	if !nc.nodeEvictionMap.setStatus(node.Name, toBeEvicted) {
 		klog.V(2).Infof("node %v was unregistered in the meantime - skipping setting status", node.Name)
 	}
+
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
+
 	return nc.zonePodEvictor[nodetopology.GetZoneKey(node)].Add(node.Name, string(node.UID)), nil
 }
 
@@ -1462,8 +1507,6 @@ func (nc *Controller) markNodeForTainting(node *v1.Node, status v1.ConditionStat
 }
 
 func (nc *Controller) markNodeAsReachable(ctx context.Context, node *v1.Node) (bool, error) {
-	nc.evictorLock.Lock()
-	defer nc.evictorLock.Unlock()
 	err := controller.RemoveTaintOffNode(ctx, nc.kubeClient, node.Name, node, UnreachableTaintTemplate)
 	if err != nil {
 		klog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
@@ -1474,6 +1517,9 @@ func (nc *Controller) markNodeAsReachable(ctx context.Context, node *v1.Node) (b
 		klog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
 		return false, err
 	}
+	nc.evictorLock.Lock()
+	defer nc.evictorLock.Unlock()
+
 	return nc.zoneNoExecuteTainter[nodetopology.GetZoneKey(node)].Remove(node.Name), nil
 }
 
