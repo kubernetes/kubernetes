@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -73,6 +74,14 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	// This is probably 90% of the time. So we handle it first.
 	if cfgPath == "" {
 		cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, logPrefix, false, skipComponentConfigs)
+		// In case we fetch a configuration from the cluster, mutate the ImageRepository field
+		// to be 'registry.k8s.io', if it was 'k8s.gcr.io'.
+		// https://github.com/kubernetes/kubeadm/issues/2671
+		if err == nil {
+			if err := uploadconfig.MutateImageRepository(cfg, client); err != nil {
+				return nil, false, err
+			}
+		}
 		return cfg, false, err
 	}
 
