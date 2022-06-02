@@ -66,6 +66,9 @@ func TestParseResolvConf(t *testing.T) {
 		{"\t\n\t", []string{}, []string{}, []string{}, false},
 		{"#comment\n", []string{}, []string{}, []string{}, false},
 		{" #comment\n", []string{}, []string{}, []string{}, false},
+		{"domain example.com\n", []string{}, []string{"example.com"}, []string{}, false},
+		{"domain local", []string{}, []string{"local"}, []string{}, false},
+		{"domain .", []string{}, []string{"."}, []string{}, false},
 		{"#comment\n#comment", []string{}, []string{}, []string{}, false},
 		{"#comment\nnameserver", []string{}, []string{}, []string{}, true},                           // nameserver empty
 		{"#comment\nnameserver\nsearch", []string{}, []string{}, []string{}, true},                   // nameserver and search empty
@@ -91,6 +94,11 @@ func TestParseResolvConf(t *testing.T) {
 		{"options ndots:5 attempts:2", []string{}, []string{}, []string{"ndots:5", "attempts:2"}, false},
 		{"options ndots:1\noptions ndots:5 attempts:3", []string{}, []string{}, []string{"ndots:5", "attempts:3"}, false},
 		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar\noptions ndots:5 attempts:4", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}, []string{"ndots:5", "attempts:4"}, false},
+		{"domain baz\nnameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar\noptions ndots:5 attempts:4", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}, []string{"ndots:5", "attempts:4"}, false},        // domain overwritten by search
+		{"domain bar\nnameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar\noptions ndots:5 attempts:4", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}, []string{"ndots:5", "attempts:4"}, false},        // domain overwritten by search
+		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar\ndomain bar\noptions ndots:5 attempts:4", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}, []string{"ndots:5", "attempts:4"}, false},        // domain also in search
+		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar\ndomain baz\noptions ndots:5 attempts:4", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar", "baz"}, []string{"ndots:5", "attempts:4"}, false}, // domain unique from search
+		{"domain baz\nnameserver 1.2.3.4\nnameserver 5.6.7.8", []string{"1.2.3.4", "5.6.7.8"}, []string{"baz"}, []string{}, false},                                                                                   // domain only, no search
 	}
 	for i, tc := range testCases {
 		ns, srch, opts, err := parseResolvConf(strings.NewReader(tc.data))
