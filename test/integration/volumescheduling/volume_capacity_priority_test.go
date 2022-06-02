@@ -31,6 +31,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	testutil "k8s.io/kubernetes/test/integration/util"
 )
 
 var (
@@ -46,28 +47,31 @@ func mergeNodeLabels(node *v1.Node, labels map[string]string) *v1.Node {
 }
 
 func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
-	textCtx := initTestSchedulerWithOptions(t, initTestAPIServer(t, nsName, nil), resyncPeriod)
-	clientset := textCtx.clientSet
-	ns := textCtx.ns.Name
+	testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, nsName, nil), resyncPeriod)
+	testutil.SyncInformerFactory(testCtx)
+	go testCtx.Scheduler.Run(testCtx.Ctx)
 
-	ctrl, informerFactory, err := initPVController(t, textCtx, provisionDelaySeconds)
+	clientset := testCtx.ClientSet
+	ns := testCtx.NS.Name
+
+	ctrl, informerFactory, err := initPVController(t, testCtx, provisionDelaySeconds)
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(textCtx.ctx)
+	go ctrl.Run(testCtx.Ctx)
 
 	// Start informer factory after all controllers are configured and running.
-	informerFactory.Start(textCtx.ctx.Done())
-	informerFactory.WaitForCacheSync(textCtx.ctx.Done())
+	informerFactory.Start(testCtx.Ctx.Done())
+	informerFactory.WaitForCacheSync(testCtx.Ctx.Done())
 
 	return &testConfig{
 		client: clientset,
 		ns:     ns,
-		stop:   textCtx.ctx.Done(),
+		stop:   testCtx.Ctx.Done(),
 		teardown: func() {
 			klog.Infof("test cluster %q start to tear down", ns)
 			deleteTestObjects(clientset, ns, metav1.DeleteOptions{})
-			cleanupTest(t, textCtx)
+			testutil.CleanupTest(t, testCtx)
 		},
 	}
 }

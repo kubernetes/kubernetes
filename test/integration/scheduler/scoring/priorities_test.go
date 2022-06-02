@@ -92,6 +92,7 @@ func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *tes
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
 		testutils.InitTestAPIServer(t, strings.ToLower(scorePluginName), nil),
+		0,
 		scheduler.WithProfiles(cfg.Profiles...),
 	)
 	testutils.SyncInformerFactory(testCtx)
@@ -127,6 +128,7 @@ func initTestSchedulerForNodeResourcesTest(t *testing.T) *testutils.TestContext 
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
 		testutils.InitTestAPIServer(t, strings.ToLower(noderesources.Name), nil),
+		0,
 		scheduler.WithProfiles(cfg.Profiles...),
 	)
 	testutils.SyncInformerFactory(testCtx)

@@ -342,7 +342,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 
 	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(options *options.ServerRunOptions) {
-			options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority"}
+			options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority", "StorageObjectInUseProtection"}
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
 			if admission != nil {
@@ -380,7 +380,7 @@ func InitTestScheduler(
 	testCtx *TestContext,
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration.
-	return InitTestSchedulerWithOptions(t, testCtx)
+	return InitTestSchedulerWithOptions(t, testCtx, 0)
 }
 
 // InitTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -388,10 +388,11 @@ func InitTestScheduler(
 func InitTestSchedulerWithOptions(
 	t *testing.T,
 	testCtx *TestContext,
+	resyncPeriod time.Duration,
 	opts ...scheduler.Option,
 ) *TestContext {
 	// 1. Create scheduler
-	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, 0)
+	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, resyncPeriod)
 	if testCtx.KubeConfig != nil {
 		dynClient := dynamic.NewForConfigOrDie(testCtx.KubeConfig)
 		testCtx.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, v1.NamespaceAll, nil)
@@ -489,7 +490,7 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 // InitTestSchedulerWithNS initializes a test environment and creates API server and scheduler with default
 // configuration.
 func InitTestSchedulerWithNS(t *testing.T, nsPrefix string, opts ...scheduler.Option) *TestContext {
-	testCtx := InitTestSchedulerWithOptions(t, InitTestAPIServer(t, nsPrefix, nil), opts...)
+	testCtx := InitTestSchedulerWithOptions(t, InitTestAPIServer(t, nsPrefix, nil), 0, opts...)
 	SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
@@ -512,6 +513,7 @@ func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	})
 	testCtx := InitTestSchedulerWithOptions(
 		t, InitTestAPIServer(t, nsPrefix, nil),
+		0,
 		scheduler.WithProfiles(cfg.Profiles...))
 	SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
