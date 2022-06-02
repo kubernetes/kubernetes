@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -229,7 +229,7 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 
 // parseResolvConf reads a resolv.conf file from the given reader, and parses
 // it into nameservers, searches and options, possibly returning an error.
-func parseResolvConf(reader io.Reader) (nameservers []string, searches []string, options []string, err error) {
+func parseResolvConf(reader io.Reader) (nameservers []string, _searches []string, options []string, err error) {
 	file, err := utilio.ReadAtMost(reader, maxResolvConfLength)
 	if err != nil {
 		return nil, nil, nil, err
@@ -239,7 +239,7 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	nameservers = []string{}
 
 	// Lines of the form "search example.com" overrule - last one wins.
-	searches = []string{}
+	_searches = []string{}
 
 	// Lines of the form "option ndots:5 attempts:2" overrule - last one wins.
 	// Each option is recorded as an element in the array.
@@ -264,20 +264,37 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 			}
 		}
 		if fields[0] == "search" {
-			// Normalise search fields so the same domain with and without trailing dot will only count once, to avoid hitting search validation limits.
-			searches = []string{}
+			// flatten searches if there are multiple lines in the file, the last one wins
+			_searches = []string{}
+			for _, s := range fields[1:] {
+				// Normalise search fields so the same domain with and without trailing dot will only count once, to avoid hitting search validation limits.
+				if s != "." {
+					s = strings.TrimSuffix(s, ".")
+				}
+				_searches = append(_searches, s)
+			}
+		}
+		if fields[0] == "domain" {
 			for _, s := range fields[1:] {
 				if s != "." {
 					s = strings.TrimSuffix(s, ".")
 				}
-				searches = append(searches, s)
+				_searches = append(_searches, s)
 			}
 		}
 		if fields[0] == "options" {
 			options = fields[1:]
 		}
 	}
-
+	// remove duplicate search domains from searches in case they show up in domain as well
+	_keys := make(map[string]bool)
+	searches := []string{}
+	for _, entry := range _searches {
+		if _, value := _keys[entry]; !value {
+			_keys[entry] = true
+			searches = append(searches, entry)
+		}
+	}
 	return nameservers, searches, options, utilerrors.NewAggregate(allErrors)
 }
 
