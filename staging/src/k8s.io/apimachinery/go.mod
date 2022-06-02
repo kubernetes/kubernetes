@@ -22,7 +22,7 @@ require (
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/klog/v2 v2.60.1
-	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42
+	k8s.io/kube-openapi v0.0.0-20220603121420-31174f50af60
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1

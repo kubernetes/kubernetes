@@ -1,4 +1,4 @@
-= vendor/github.com/emicklei/go-restful licensed under: =
+= vendor/github.com/emicklei/go-restful/v3 licensed under: =
 
 Copyright (c) 2012,2013 Ernest Micklei
 
@@ -22,4 +22,4 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-= vendor/github.com/emicklei/go-restful/LICENSE 2ebc1c12a0f4eae5394522e31961e1de
+= vendor/github.com/emicklei/go-restful/v3/LICENSE 2ebc1c12a0f4eae5394522e31961e1de

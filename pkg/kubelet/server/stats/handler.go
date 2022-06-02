@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/klog/v2"
