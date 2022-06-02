@@ -3101,12 +3101,18 @@ oom_score = -999
   default_runtime_name = "runc"
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
   runtime_type = "io.containerd.runc.v2"
-[plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
-  endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+[plugins."io.containerd.grpc.v1.cri".registry]
+  config_path = "/etc/containerd/certs.d"
+EOF
+  mkdir -p "/etc/containerd/certs.d/docker.io"
+  cat > "/etc/containerd/certs.d/docker.io/hosts.toml" <<EOF
+server = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+EOF
+  mkdir -p "/etc/containerd/certs.d/k8s.gcr.io"
+  cat > "/etc/containerd/certs.d/k8s.gcr.io/hosts.toml" <<EOF
 # Enable registry.k8s.io as the primary mirror for k8s.gcr.io
 # See: https://github.com/kubernetes/k8s.io/issues/3411
-[plugins."io.containerd.grpc.v1.cri".registry.mirrors."k8s.gcr.io"]
-  endpoint = ["https://registry.k8s.io", "https://k8s.gcr.io",]
+server = ["https://registry.k8s.io", "https://k8s.gcr.io"]
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
   SystemdCgroup = ${systemdCgroup}
 EOF
