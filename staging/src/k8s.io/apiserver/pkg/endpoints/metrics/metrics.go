@@ -136,16 +136,6 @@ var (
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
-	// droppedRequests is a number of requests dropped with 'Try again later' response"
-	droppedRequests = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:              "apiserver_dropped_requests_total",
-			Help:              "Number of requests dropped with 'Try again later' response. Use apiserver_request_total and/or apiserver_request_terminations_total metrics instead.",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.24.0",
-		},
-		[]string{"request_kind"},
-	)
 	// TLSHandshakeErrors is a number of requests dropped with 'TLS handshake error from' error
 	TLSHandshakeErrors = compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
@@ -153,16 +143,6 @@ var (
 			Help:           "Number of requests dropped with 'TLS handshake error from' error",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-	)
-	// RegisteredWatchers is a number of currently registered watchers splitted by resource.
-	RegisteredWatchers = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:              "apiserver_registered_watchers",
-			Help:              "Number of currently registered watchers for a given resources",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.23.0",
-		},
-		[]string{"group", "version", "kind"},
 	)
 	WatchEvents = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
@@ -266,9 +246,7 @@ var (
 		requestSloLatencies,
 		fieldValidationRequestLatencies,
 		responseSizes,
-		droppedRequests,
 		TLSHandshakeErrors,
-		RegisteredWatchers,
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,
@@ -426,12 +404,6 @@ func RecordDroppedRequest(req *http.Request, requestInfo *request.RequestInfo, c
 		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests)).Inc()
 	} else {
 		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, "", "", "", requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests)).Inc()
-	}
-
-	if isMutatingRequest {
-		droppedRequests.WithContext(req.Context()).WithLabelValues(MutatingKind).Inc()
-	} else {
-		droppedRequests.WithContext(req.Context()).WithLabelValues(ReadOnlyKind).Inc()
 	}
 }
 
