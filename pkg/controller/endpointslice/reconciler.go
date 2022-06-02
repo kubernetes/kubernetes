@@ -26,6 +26,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -215,12 +216,18 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 
 	// When no endpoint slices would usually exist, we need to add a placeholder.
 	if len(existingSlices) == len(slicesToDelete) && len(slicesToCreate) < 1 {
+		// Check for existing placeholder slice outside of the core control flow
 		placeholderSlice := newEndpointSlice(service, &endpointMeta{Ports: []discovery.EndpointPort{}, AddressType: addressType})
-		slicesToCreate = append(slicesToCreate, placeholderSlice)
-		spMetrics.Set(endpointutil.NewPortMapKey(placeholderSlice.Ports), metrics.EfficiencyInfo{
-			Endpoints: 0,
-			Slices:    1,
-		})
+		if len(slicesToDelete) == 1 && placeholderSliceCompare.DeepEqual(slicesToDelete[0], placeholderSlice) {
+			// We are about to unnecessarily delete/recreate the placeholder, remove it now.
+			slicesToDelete = slicesToDelete[:0]
+		} else {
+			slicesToCreate = append(slicesToCreate, placeholderSlice)
+			spMetrics.Set(endpointutil.NewPortMapKey(placeholderSlice.Ports), metrics.EfficiencyInfo{
+				Endpoints: 0,
+				Slices:    1,
+			})
+		}
 	}
 
 	metrics.EndpointsAddedPerSync.WithLabelValues().Observe(float64(totalAdded))
@@ -250,6 +257,30 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 
 	return r.finalize(service, slicesToCreate, slicesToUpdate, slicesToDelete, triggerTime)
 }
+
+// placeholderSliceCompare is a conversion func for comparing two placeholder endpoint slices.
+// It only compares the specific fields we care about.
+var placeholderSliceCompare = conversion.EqualitiesOrDie(
+	func(a, b metav1.OwnerReference) bool {
+		return a.String() == b.String()
+	},
+	func(a, b metav1.ObjectMeta) bool {
+		if a.Namespace != b.Namespace {
+			return false
+		}
+		for k, v := range a.Labels {
+			if b.Labels[k] != v {
+				return false
+			}
+		}
+		for k, v := range b.Labels {
+			if a.Labels[k] != v {
+				return false
+			}
+		}
+		return true
+	},
+)
 
 // finalize creates, updates, and deletes slices as specified
 func (r *reconciler) finalize(
