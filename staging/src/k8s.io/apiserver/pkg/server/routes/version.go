@@ -19,7 +19,7 @@ package routes
 import (
 	"net/http"
 
-	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/v3"
 
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"

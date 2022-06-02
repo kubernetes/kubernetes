@@ -12,19 +12,20 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/emicklei/go-restful/log"
+	"github.com/emicklei/go-restful/v3/log"
 )
 
 // RouteBuilder is a helper to construct Routes.
 type RouteBuilder struct {
-	rootPath    string
-	currentPath string
-	produces    []string
-	consumes    []string
-	httpMethod  string        // required
-	function    RouteFunction // required
-	filters     []FilterFunction
-	conditions  []RouteSelectionConditionFunction
+	rootPath                         string
+	currentPath                      string
+	produces                         []string
+	consumes                         []string
+	httpMethod                       string        // required
+	function                         RouteFunction // required
+	filters                          []FilterFunction
+	conditions                       []RouteSelectionConditionFunction
+	allowedMethodsWithoutContentType []string // see Route
 
 	typeNameHandleFunc TypeNameHandleFunction // required
 
@@ -37,6 +38,7 @@ type RouteBuilder struct {
 	errorMap                map[int]ResponseError
 	defaultResponse         *ResponseError
 	metadata                map[string]interface{}
+	extensions              map[string]interface{}
 	deprecated              bool
 	contentEncodingEnabled  *bool
 }
@@ -176,6 +178,15 @@ func (b *RouteBuilder) Returns(code int, message string, model interface{}) *Rou
 	return b
 }
 
+// ReturnsWithHeaders is similar to Returns, but can specify response headers
+func (b *RouteBuilder) ReturnsWithHeaders(code int, message string, model interface{}, headers map[string]Header) *RouteBuilder {
+	b.Returns(code, message, model)
+	err := b.errorMap[code]
+	err.Headers = headers
+	b.errorMap[code] = err
+	return b
+}
+
 // DefaultReturns is a special Returns call that sets the default of the response.
 func (b *RouteBuilder) DefaultReturns(message string, model interface{}) *RouteBuilder {
 	b.defaultResponse = &ResponseError{
@@ -194,18 +205,55 @@ func (b *RouteBuilder) Metadata(key string, value interface{}) *RouteBuilder {
 	return b
 }
 
+// AddExtension adds or updates a key=value pair to the extensions map.
+func (b *RouteBuilder) AddExtension(key string, value interface{}) *RouteBuilder {
+	if b.extensions == nil {
+		b.extensions = map[string]interface{}{}
+	}
+	b.extensions[key] = value
+	return b
+}
+
 // Deprecate sets the value of deprecated to true.  Deprecated routes have a special UI treatment to warn against use
 func (b *RouteBuilder) Deprecate() *RouteBuilder {
 	b.deprecated = true
 	return b
 }
 
+// AllowedMethodsWithoutContentType overrides the default list GET,HEAD,OPTIONS,DELETE,TRACE
+// If a request does not include a content-type header then
+// depending on the method, it may return a 415 Unsupported Media.
+// Must have uppercase HTTP Method names such as GET,HEAD,OPTIONS,...
+func (b *RouteBuilder) AllowedMethodsWithoutContentType(methods []string) *RouteBuilder {
+	b.allowedMethodsWithoutContentType = methods
+	return b
+}
+
 // ResponseError represents a response; not necessarily an error.
 type ResponseError struct {
+	ExtensionProperties
 	Code      int
 	Message   string
 	Model     interface{}
+	Headers   map[string]Header
 	IsDefault bool
+}
+
+// Header describes a header for a response of the API
+//
+// For more information: http://goo.gl/8us55a#headerObject
+type Header struct {
+	*Items
+	Description string
+}
+
+// Items describe swagger simple schemas for headers
+type Items struct {
+	Type             string
+	Format           string
+	Items            *Items
+	CollectionFormat string
+	Default          interface{}
 }
 
 func (b *RouteBuilder) servicePath(path string) *RouteBuilder {
@@ -276,27 +324,29 @@ func (b *RouteBuilder) Build() Route {
 		operationName = nameOfFunction(b.function)
 	}
 	route := Route{
-		Method:                 b.httpMethod,
-		Path:                   concatPath(b.rootPath, b.currentPath),
-		Produces:               b.produces,
-		Consumes:               b.consumes,
-		Function:               b.function,
-		Filters:                b.filters,
-		If:                     b.conditions,
-		relativePath:           b.currentPath,
-		pathExpr:               pathExpr,
-		Doc:                    b.doc,
-		Notes:                  b.notes,
-		Operation:              operationName,
-		ParameterDocs:          b.parameters,
-		ResponseErrors:         b.errorMap,
-		DefaultResponse:        b.defaultResponse,
-		ReadSample:             b.readSample,
-		WriteSample:            b.writeSample,
-		Metadata:               b.metadata,
-		Deprecated:             b.deprecated,
-		contentEncodingEnabled: b.contentEncodingEnabled,
+		Method:                           b.httpMethod,
+		Path:                             concatPath(b.rootPath, b.currentPath),
+		Produces:                         b.produces,
+		Consumes:                         b.consumes,
+		Function:                         b.function,
+		Filters:                          b.filters,
+		If:                               b.conditions,
+		relativePath:                     b.currentPath,
+		pathExpr:                         pathExpr,
+		Doc:                              b.doc,
+		Notes:                            b.notes,
+		Operation:                        operationName,
+		ParameterDocs:                    b.parameters,
+		ResponseErrors:                   b.errorMap,
+		DefaultResponse:                  b.defaultResponse,
+		ReadSample:                       b.readSample,
+		WriteSample:                      b.writeSample,
+		Metadata:                         b.metadata,
+		Deprecated:                       b.deprecated,
+		contentEncodingEnabled:           b.contentEncodingEnabled,
+		allowedMethodsWithoutContentType: b.allowedMethodsWithoutContentType,
 	}
+	route.Extensions = b.extensions
 	route.postBuild()
 	return route
 }
