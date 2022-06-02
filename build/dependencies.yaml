@@ -168,6 +168,10 @@ dependencies:
       match: validTmplOut\s+=
     - path: cmd/kubeadm/app/util/template_test.go
       match: doNothing\s+=
+
+  - name: "k8s.gcr.io/pause: dependents"
+    version: 3.7
+    refPaths:
     - path: cmd/kubelet/app/options/container_runtime.go
       match: defaultPodSandboxImageVersion\s+=
     - path: hack/testdata/pod-with-precision.json
