@@ -25,6 +25,7 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -52,7 +53,6 @@ import (
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
-	"k8s.io/utils/pointer"
 )
 
 var (
@@ -122,6 +122,7 @@ type DebugOptions struct {
 	ShareProcesses  bool
 	TargetContainer string
 	TTY             bool
+	Profile         string
 
 	attachChanged         bool
 	shareProcessedChanged bool
@@ -130,6 +131,8 @@ type DebugOptions struct {
 
 	genericclioptions.IOStreams
 	warningPrinter *printers.WarningPrinter
+
+	applier ProfileApplier
 }
 
 // NewDebugOptions returns a DebugOptions initialized with default values.
@@ -179,6 +182,7 @@ func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 	cmd.Flags().BoolVar(&opt.ShareProcesses, "share-processes", opt.ShareProcesses, i18n.T("When used with '--copy-to', enable process namespace sharing in the copy."))
 	cmd.Flags().StringVar(&opt.TargetContainer, "target", "", i18n.T("When using an ephemeral container, target processes in this container name."))
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, i18n.T("Allocate a TTY for the debugging container."))
+	cmd.Flags().StringVar(&opt.Profile, "profile", ProfileLegacy, i18n.T("Debugging profile."))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
@@ -222,6 +226,10 @@ func (o *DebugOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 	// Warning printer
 	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
+	o.applier, err = NewProfileApplier(o.Profile)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -383,7 +391,11 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 // Returns an already created pod and container name for subsequent attach, if applicable.
 func (o *DebugOptions) visitNode(ctx context.Context, node *corev1.Node) (*corev1.Pod, string, error) {
 	pods := o.podClient.Pods(o.Namespace)
-	newPod, err := pods.Create(ctx, o.generateNodeDebugPod(node), metav1.CreateOptions{})
+	debugPod, err := o.generateNodeDebugPod(node)
+	if err != nil {
+		return nil, "", err
+	}
+	newPod, err := pods.Create(ctx, debugPod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, "", err
 	}
@@ -410,10 +422,12 @@ func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev
 		return nil, "", fmt.Errorf("error creating JSON for pod: %v", err)
 	}
 
-	debugContainer := o.generateDebugContainer(pod)
+	debugPod, debugContainer, err := o.generateDebugContainer(pod)
+	if err != nil {
+		return nil, "", err
+	}
 	klog.V(2).Infof("new ephemeral container: %#v", debugContainer)
-	debugPod := pod.DeepCopy()
-	debugPod.Spec.EphemeralContainers = append(debugPod.Spec.EphemeralContainers, *debugContainer)
+
 	debugJS, err := json.Marshal(debugPod)
 	if err != nil {
 		return nil, "", fmt.Errorf("error creating JSON for debug container: %v", err)
@@ -500,11 +514,10 @@ func (o *DebugOptions) debugByCopy(ctx context.Context, pod *corev1.Pod) (*corev
 	return created, dc, nil
 }
 
-// generateDebugContainer returns an EphemeralContainer suitable for use as a debug container
+// generateDebugContainer returns a debugging pod and an EphemeralContainer suitable for use as a debug container
 // in the given pod.
-func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) *corev1.EphemeralContainer {
+func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) (*corev1.Pod, *corev1.EphemeralContainer, error) {
 	name := o.computeDebugContainerName(pod)
-
 	ec := &corev1.EphemeralContainer{
 		EphemeralContainerCommon: corev1.EphemeralContainerCommon{
 			Name:                     name,
@@ -524,12 +537,18 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) *corev1.Ephemeral
 		ec.Command = o.Args
 	}
 
-	return ec
+	copied := pod.DeepCopy()
+	copied.Spec.EphemeralContainers = append(copied.Spec.EphemeralContainers, *ec)
+	if err := o.applier.Apply(copied, name, copied); err != nil {
+		return nil, nil, err
+	}
+
+	return copied, ec, nil
 }
 
 // generateNodeDebugPod generates a debugging pod that schedules on the specified node.
 // The generated pod will run in the host PID, Network & IPC namespaces, and it will have the node's filesystem mounted at /host.
-func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) *corev1.Pod {
+func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) (*corev1.Pod, error) {
 	cn := "debugger"
 	// Setting a user-specified container name doesn't make much difference when there's only one container,
 	// but the argument exists for pod debugging so it might be confusing if it didn't work here.
@@ -559,27 +578,10 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) *corev1.Pod {
 					Stdin:                    o.Interactive,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 					TTY:                      o.TTY,
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							MountPath: "/host",
-							Name:      "host-root",
-						},
-					},
 				},
 			},
-			HostIPC:       true,
-			HostNetwork:   true,
-			HostPID:       true,
 			NodeName:      node.Name,
 			RestartPolicy: corev1.RestartPolicyNever,
-			Volumes: []corev1.Volume{
-				{
-					Name: "host-root",
-					VolumeSource: corev1.VolumeSource{
-						HostPath: &corev1.HostPathVolumeSource{Path: "/"},
-					},
-				},
-			},
 			Tolerations: []corev1.Toleration{
 				{
 					Operator: corev1.TolerationOpExists,
@@ -594,7 +596,11 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) *corev1.Pod {
 		p.Spec.Containers[0].Command = o.Args
 	}
 
-	return p
+	if err := o.applier.Apply(p, cn, node); err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }
 
 // generatePodCopyWithDebugContainer takes a Pod and returns a copy and the debug container name of that copy
@@ -672,6 +678,11 @@ func (o *DebugOptions) generatePodCopyWithDebugContainer(pod *corev1.Pod) (*core
 	}
 	c.Stdin = o.Interactive
 	c.TTY = o.TTY
+
+	err := o.applier.Apply(copied, c.Name, pod)
+	if err != nil {
+		return nil, "", err
+	}
 
 	return copied, name, nil
 }
