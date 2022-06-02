@@ -64,9 +64,10 @@ func (topo *CPUTopology) CPUsPerSocket() int {
 
 // CPUInfo contains the NUMA, socket, and core IDs associated with a CPU.
 type CPUInfo struct {
-	NUMANodeID int
-	SocketID   int
-	CoreID     int
+	NUMANodeID    int
+	SocketID      int
+	CoreID        int
+	UnCoreCacheID int
 }
 
 // KeepOnly returns a new CPUDetails object with only the supplied cpus.
@@ -232,9 +233,10 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 			if coreID, err := getUniqueCoreID(core.Threads); err == nil {
 				for _, cpu := range core.Threads {
 					CPUDetails[cpu] = CPUInfo{
-						CoreID:     coreID,
-						SocketID:   core.SocketID,
-						NUMANodeID: node.Id,
+						CoreID:        coreID,
+						SocketID:      core.SocketID,
+						NUMANodeID:    node.Id,
+						UnCoreCacheID: getCacheID(core.UncoreCaches, cacheLevel3),
 					}
 				}
 			} else {
@@ -273,4 +275,74 @@ func getUniqueCoreID(threads []int) (coreID int, err error) {
 	}
 
 	return min, nil
+}
+
+// get specific level cache
+func getCacheID(caches []cadvisorapi.Cache, level int) int {
+	for _, cn := range caches {
+		if cn.Level == level {
+			return cn.Id
+		}
+	}
+	return invalidCacheID
+}
+
+// FIXME everything below this line is not needed?
+const (
+	cacheLevel3    = 3
+	invalidCacheID = 0
+)
+
+// UncoreCachesInSocket returns all of the logical uncore cache IDs associated with the
+// given Socket IDs in this CPUDetails.
+func (d CPUDetails) UncoreCachesInSocket(ids ...int) cpuset.CPUSet {
+	b := cpuset.NewBuilder()
+	for _, id := range ids {
+		for _, info := range d {
+			if info.SocketID == id {
+				b.Add(info.UnCoreCacheID)
+			}
+		}
+	}
+	return b.Result()
+}
+
+// UncoreCaches returns all of the uncore cache IDs associated with the CPUs in this
+// CPUDetails.
+func (d CPUDetails) UncoreCaches() cpuset.CPUSet {
+	b := cpuset.NewBuilder()
+	for _, info := range d {
+		if info.UnCoreCacheID != invalidCacheID {
+			b.Add(info.UnCoreCacheID)
+		}
+	}
+	return b.Result()
+}
+
+// CPUsInUncoreCaches returns all of the logical cpu IDs associated with the given
+// uncore cache ID in this CPUDetails.
+func (d CPUDetails) CPUsInUncoreCaches(ids ...int) cpuset.CPUSet {
+	b := cpuset.NewBuilder()
+	for _, id := range ids {
+		for cpu, info := range d {
+			if info.UnCoreCacheID == id {
+				b.Add(cpu)
+			}
+		}
+	}
+	return b.Result()
+}
+
+// CoresInUncoreCaches returns all of the logical core IDs associated with the given
+// uncore cache ID in this CPUDetails.
+func (d CPUDetails) CoresInUncoreCaches(ids ...int) cpuset.CPUSet {
+	b := cpuset.NewBuilder()
+	for _, id := range ids {
+		for _, info := range d {
+			if info.UnCoreCacheID == id {
+				b.Add(info.CoreID)
+			}
+		}
+	}
+	return b.Result()
 }
