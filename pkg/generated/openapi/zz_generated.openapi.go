@@ -46289,7 +46289,7 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 					},
 					"level": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AuditLevel at which event was generated",
+							Description: "Audit level at which event was generated. Valid values include: 'None', 'Metadata', 'Request' and 'RequestResponse'.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -46305,7 +46305,7 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 					},
 					"stage": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Stage of the request handling when this event instance was generated.",
+							Description: "Stage of the request handling when this event instance was generated. The value can be one of: - 'RequestReceived': The stage for events generated as soon as the audit handler receives\n  the request, and before it is delegated down the handler chain.\n- 'ResponseStarted': The stage for events generated once the response headers are sent,\n  but before the response body is sent. This stage is only generated for long-running requests\n  (e.g. watch).\n- 'ResponseComplete': The stage for events generated once the response body has been completed,\n  and no more bytes will be sent.\n- 'Panic': The stage for events generated when a panic occurred.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -46313,7 +46313,7 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 					},
 					"requestURI": {
 						SchemaProps: spec.SchemaProps{
-							Description: "RequestURI is the request URI as sent by the client to a server.",
+							Description: "The request URI as sent by the client to a server.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -46321,7 +46321,7 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 					},
 					"verb": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Verb is the kubernetes verb associated with the request. For non-resource requests, this is the lower-cased HTTP method.",
+							Description: "The kubernetes verb associated with the request. For non-resource requests, this is the lower-cased HTTP method.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -46342,7 +46342,7 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 					},
 					"sourceIPs": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Source IPs, from where the request originated and intermediate proxies. The source IPs are listed from (in order): 1. X-Forwarded-For request header IPs 2. X-Real-Ip header, if not present in the X-Forwarded-For list 3. The remote address for the connection, if it doesn't match the last\n   IP in the list up to here (X-Forwarded-For or X-Real-Ip).\nNote: All but the last IP can be arbitrarily set by the client.",
+							Description: "Source IPs, from where the request originated and intermediate proxies. The source IPs are listed from (in order): 1. `X-Forwarded-For` request header IPs 2. `X-Real-Ip` header, if not present in the `X-Forwarded-For` list 3. The remote address for the connection, if it doesn't match the last\n   IP in the list up to here (`X-Forwarded-For` or `X-Real-Ip`).\nNote: All but the last IP can be arbitrarily set by the client.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46357,7 +46357,7 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 					},
 					"userAgent": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UserAgent records the user agent string reported by the client. Note that the UserAgent is provided by the client, and must not be trusted.",
+							Description: "The user agent string as reported by the client. Note that the user agent is provided by the client, and must not be trusted.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -46370,19 +46370,19 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 					},
 					"responseStatus": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The response status, populated even when the ResponseObject is not a Status type. For successful responses, this will only include the Code and StatusSuccess. For non-status type error responses, this will be auto-populated with the error Message.",
+							Description: "The response status, populated even when the `responseObject` is not a Status type. For successful responses, this will only include the code and success status. For non-status type error responses, this will be auto-populated with the error message.",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Status"),
 						},
 					},
 					"requestObject": {
 						SchemaProps: spec.SchemaProps{
-							Description: "API object from the request, in JSON format. The RequestObject is recorded as-is in the request (possibly re-encoded as JSON), prior to version conversion, defaulting, admission or merging. It is an external versioned object type, and may not be a valid object on its own. Omitted for non-resource requests.  Only logged at Request Level and higher.",
+							Description: "API object from the request, in JSON format. The request object is recorded as-is in the request (possibly re-encoded as JSON), prior to version conversion, defaulting, admission or merging. It is an external versioned object type, and may not be a valid object on its own. Omitted for non-resource requests. Only logged at 'Request' level and higher.",
 							Ref:         ref("k8s.io/apimachinery/pkg/runtime.Unknown"),
 						},
 					},
 					"responseObject": {
 						SchemaProps: spec.SchemaProps{
-							Description: "API object returned in the response, in JSON. The ResponseObject is recorded after conversion to the external type, and serialized as JSON.  Omitted for non-resource requests.  Only logged at Response Level.",
+							Description: "API object returned in the response, in JSON. The response object is recorded after conversion to the external type, and serialized as JSON.  Omitted for non-resource requests. Only logged at 'RequestResponse' Level.",
 							Ref:         ref("k8s.io/apimachinery/pkg/runtime.Unknown"),
 						},
 					},
@@ -46402,7 +46402,7 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 					},
 					"annotations": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Annotations is an unstructured key value map stored with an audit event that may be set by plugins invoked in the request serving chain, including authentication, authorization and admission plugins. Note that these annotations are for the audit event, and do not correspond to the metadata.annotations of the submitted object. Keys should uniquely identify the informing component to avoid name collisions (e.g. podsecuritypolicy.admission.k8s.io/policy). Values should be short. Annotations are included in the Metadata level.",
+							Description: "An unstructured key value map stored with an audit event that may be set by plugins invoked in the request serving chain, including authentication, authorization and admission plugins. Note that these annotations are for the audit event, and do not correspond to the metadata.annotations of the submitted object. Keys should uniquely identify the informing component to avoid name collisions (e.g. `podsecuritypolicy.admission.k8s.io/policy`). Values should be short. Annotations are included in the 'Metadata' level.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -46448,13 +46448,15 @@ func schema_pkg_apis_audit_v1_EventList(ref common.ReferenceCallback) common.Ope
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Description: "Standard list metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
 						},
 					},
 					"items": {
 						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
+							Description: "A list of Event objects.",
+							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -46483,14 +46485,14 @@ func schema_pkg_apis_audit_v1_GroupResources(ref common.ReferenceCallback) commo
 				Properties: map[string]spec.Schema{
 					"group": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Group is the name of the API group that contains the resources. The empty string represents the core API group.",
+							Description: "The name of the API group that contains the resources. An empty string represents the core API group.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"resources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Resources is a list of resources this rule applies to.\n\nFor example: 'pods' matches pods. 'pods/log' matches the log subresource of pods. '*' matches all resources and their subresources. 'pods/*' matches all subresources of pods. '*/scale' matches all scale subresources.\n\nIf wildcard is present, the validation rule will ensure resources do not overlap with each other.\n\nAn empty list implies all resources and subresources in this API groups apply.",
+							Description: "Resources is a list of resources this rule applies to.\n\nFor example: - `pods` matches pods. - `pods/log` matches the log subresource of pods. - `*` matches all resources and their subresources. - `pods/*` matches all subresources of pods. - `*/scale` matches all scale subresources.\n\nIf wildcard is present, the validation rule will ensure resources do not overlap with each other.\n\nAn empty list implies all resources and subresources in this API groups apply.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46505,7 +46507,7 @@ func schema_pkg_apis_audit_v1_GroupResources(ref common.ReferenceCallback) commo
 					},
 					"resourceNames": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceNames is a list of resource instance names that the policy matches. Using this field requires Resources to be specified. An empty list implies that every instance of the resource is matched.",
+							Description: "A list of resource instance names that the policy matches. Using this field requires `resources` to be specified. An empty list implies that every instance of the resource is matched.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46533,52 +46535,58 @@ func schema_pkg_apis_audit_v1_ObjectReference(ref common.ReferenceCallback) comm
 				Properties: map[string]spec.Schema{
 					"resource": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "The kind of the referred object.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"namespace": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "The namespace of the referred object.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"name": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "The name of the referred object.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"uid": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "The unique ID of the referred object.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"apiGroup": {
 						SchemaProps: spec.SchemaProps{
-							Description: "APIGroup is the name of the API group that contains the referred object. The empty string represents the core API group.",
+							Description: "The name of the API group that contains the referred object. An empty string represents the core API group.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"apiVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion is the version of the API group that contains the referred object.",
+							Description: "The version of the API group that contains the referred object.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"resourceVersion": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "The resource version of the referred object.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"subresource": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
+							Description: "The sub-resource of the referred object, if any.",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 				},
@@ -46610,14 +46618,14 @@ func schema_pkg_apis_audit_v1_Policy(ref common.ReferenceCallback) common.OpenAP
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ObjectMeta is included for interoperability with API infrastructure.",
+							Description: "Object metadata included for interoperability with API infrastructure.",
 							Default:     map[string]interface{}{},
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
 					"rules": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Rules specify the audit Level a request should be recorded at. A request may match multiple rules, in which case the FIRST matching rule is used. The default audit level is None, but can be overridden by a catch-all rule at the end of the list. PolicyRules are strictly ordered.",
+							Description: "The audit Level a request should be recorded at. A request may match multiple rules, in which case the FIRST matching rule is used. The default audit level is 'None', but can be overridden by a catch-all rule at the end of the list. PolicyRules are strictly ordered.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46631,7 +46639,7 @@ func schema_pkg_apis_audit_v1_Policy(ref common.ReferenceCallback) common.OpenAP
 					},
 					"omitStages": {
 						SchemaProps: spec.SchemaProps{
-							Description: "OmitStages is a list of stages for which no events are created. Note that this can also be specified per rule in which case the union of both are omitted.",
+							Description: "A list of stages for which no events are created. Note that this can also be specified per rule in which case the union of both are omitted. Valid values for each stage are: - 'RequestReceived': The stage for events generated as soon as the audit handler receives\n  the request, and before it is delegated down the handler chain.\n- 'ResponseStarted': The stage for events generated once the response headers are sent,\n  but before the response body is sent. This stage is only generated for long-running requests\n  (e.g. watch).\n- 'ResponseComplete': The stage for events generated once the response body has been completed,\n  and no more bytes will be sent.\n- 'Panic': The stage for events generated when a panic occurred.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46646,7 +46654,7 @@ func schema_pkg_apis_audit_v1_Policy(ref common.ReferenceCallback) common.OpenAP
 					},
 					"omitManagedFields": {
 						SchemaProps: spec.SchemaProps{
-							Description: "OmitManagedFields indicates whether to omit the managed fields of the request and response bodies from being written to the API audit log. This is used as a global default - a value of 'true' will omit the managed fileds, otherwise the managed fields will be included in the API audit log. Note that this can also be specified per rule in which case the value specified in a rule will override the global default.",
+							Description: "This indicates whether to omit the managed fields of the request and response bodies from being written to the API audit log. This is used as a global default - a value of 'true' will omit the managed fileds, otherwise the managed fields will be included in the API audit log. Note that this can also be specified per rule in which case the value specified in a rule will override the global default.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -46683,13 +46691,15 @@ func schema_pkg_apis_audit_v1_PolicyList(ref common.ReferenceCallback) common.Op
 					},
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Description: "Standard list metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
 						},
 					},
 					"items": {
 						SchemaProps: spec.SchemaProps{
-							Type: []string{"array"},
+							Description: "List of Policy objects.",
+							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
@@ -46718,7 +46728,7 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 				Properties: map[string]spec.Schema{
 					"level": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The Level that requests matching this rule are recorded at.",
+							Description: "The Level that requests matching this rule are recorded at. Valid values include: 'None', 'Metadata', 'Request' and 'RequestResponse'.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -46726,7 +46736,7 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 					},
 					"users": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The users (by authenticated user name) this rule applies to. An empty list implies every user.",
+							Description: "The list of users (by authenticated user name) this rule applies to. An empty list implies every user.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46741,7 +46751,7 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 					},
 					"userGroups": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The user groups this rule applies to. A user is considered matching if it is a member of any of the UserGroups. An empty list implies every user group.",
+							Description: "The list of user groups this rule applies to. A user is considered matching if it is a member of any of the user groups. An empty list implies every user group.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46756,7 +46766,7 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 					},
 					"verbs": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The verbs that match this rule. An empty list implies every verb.",
+							Description: "The list of verbs that match this rule. An empty list implies every verb.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46771,7 +46781,7 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 					},
 					"resources": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Resources that this rule matches. An empty list implies all kinds in all API groups.",
+							Description: "This list of resources that this rule matches. An empty list implies all kinds in all API groups.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46785,7 +46795,7 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 					},
 					"namespaces": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Namespaces that this rule matches. The empty string \"\" matches non-namespaced resources. An empty list implies every namespace.",
+							Description: "The  list of namespace names that this rule matches. The empty string \"\" matches non-namespaced resources. An empty list implies every namespace.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46800,7 +46810,7 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 					},
 					"nonResourceURLs": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NonResourceURLs is a set of URL paths that should be audited. *s are allowed, but only as the full, final step in the path. Examples:\n \"/metrics\" - Log requests for apiserver metrics\n \"/healthz*\" - Log all health checks",
+							Description: "A set of URL paths that should be audited. `*` is allowed, but only as the full, final step in the path. Examples:\n \"/metrics\" - Log requests for API server metrics\n \"/healthz*\" - Log all health checks",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46815,7 +46825,7 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 					},
 					"omitStages": {
 						SchemaProps: spec.SchemaProps{
-							Description: "OmitStages is a list of stages for which no events are created. Note that this can also be specified policy wide in which case the union of both are omitted. An empty list means no restrictions will apply.",
+							Description: "A list of stages for which no events are created. Note that this can also be specified policy wide in which case the union of both are omitted. An empty list means no restrictions will apply. Each item in the list can be one of: - 'RequestReceived': The stage for events generated as soon as the audit handler receives\n  the request, and before it is delegated down the handler chain.\n- 'ResponseStarted': The stage for events generated once the response headers are sent,\n  but before the response body is sent. This stage is only generated for long-running requests\n  (e.g. watch).\n- 'ResponseComplete': The stage for events generated once the response body has been completed,\n  and no more bytes will be sent.\n- 'Panic': The stage for events generated when a panic occurred.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -46830,7 +46840,7 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 					},
 					"omitManagedFields": {
 						SchemaProps: spec.SchemaProps{
-							Description: "OmitManagedFields indicates whether to omit the managed fields of the request and response bodies from being written to the API audit log. - a value of 'true' will drop the managed fields from the API audit log - a value of 'false' indicates that the managed fileds should be included\n  in the API audit log\nNote that the value, if specified, in this rule will override the global default If a value is not specified then the global default specified in Policy.OmitManagedFields will stand.",
+							Description: "This  indicates whether to omit the managed fields of the request and response bodies from being written to the API audit log. - a value of 'true' will drop the managed fields from the API audit log - a value of 'false' indicates that the managed fileds should be included\n  in the API audit log\nNote that the value, if specified, in this rule will override the global default If a value is not specified then the global default specified in `policy.omitManagedFields` will stand.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},

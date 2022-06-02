@@ -31,19 +31,29 @@ option go_package = "k8s.io/apiserver/pkg/apis/audit/v1";
 
 // Event captures all the information that can be included in an API audit log.
 message Event {
-  // AuditLevel at which event was generated
+  // Audit level at which event was generated. Valid values include: 'None',
+  // 'Metadata', 'Request' and 'RequestResponse'.
   optional string level = 1;
 
   // Unique audit ID, generated for each request.
   optional string auditID = 2;
 
   // Stage of the request handling when this event instance was generated.
+  // The value can be one of:
+  // - 'RequestReceived': The stage for events generated as soon as the audit handler receives
+  //   the request, and before it is delegated down the handler chain.
+  // - 'ResponseStarted': The stage for events generated once the response headers are sent,
+  //   but before the response body is sent. This stage is only generated for long-running requests
+  //   (e.g. watch).
+  // - 'ResponseComplete': The stage for events generated once the response body has been completed,
+  //   and no more bytes will be sent.
+  // - 'Panic': The stage for events generated when a panic occurred.
   optional string stage = 3;
 
-  // RequestURI is the request URI as sent by the client to a server.
+  // The request URI as sent by the client to a server.
   optional string requestURI = 4;
 
-  // Verb is the kubernetes verb associated with the request.
+  // The kubernetes verb associated with the request.
   // For non-resource requests, this is the lower-cased HTTP method.
   optional string verb = 5;
 
@@ -56,16 +66,16 @@ message Event {
 
   // Source IPs, from where the request originated and intermediate proxies.
   // The source IPs are listed from (in order):
-  // 1. X-Forwarded-For request header IPs
-  // 2. X-Real-Ip header, if not present in the X-Forwarded-For list
+  // 1. `X-Forwarded-For` request header IPs
+  // 2. `X-Real-Ip` header, if not present in the `X-Forwarded-For` list
   // 3. The remote address for the connection, if it doesn't match the last
-  //    IP in the list up to here (X-Forwarded-For or X-Real-Ip).
+  //    IP in the list up to here (`X-Forwarded-For` or `X-Real-Ip`).
   // Note: All but the last IP can be arbitrarily set by the client.
   // +optional
   repeated string sourceIPs = 8;
 
-  // UserAgent records the user agent string reported by the client.
-  // Note that the UserAgent is provided by the client, and must not be trusted.
+  // The user agent string as reported by the client.
+  // Note that the user agent is provided by the client, and must not be trusted.
   // +optional
   optional string userAgent = 16;
 
@@ -74,22 +84,22 @@ message Event {
   // +optional
   optional ObjectReference objectRef = 9;
 
-  // The response status, populated even when the ResponseObject is not a Status type.
-  // For successful responses, this will only include the Code and StatusSuccess.
-  // For non-status type error responses, this will be auto-populated with the error Message.
+  // The response status, populated even when the `responseObject` is not a Status type.
+  // For successful responses, this will only include the code and success status.
+  // For non-status type error responses, this will be auto-populated with the error message.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Status responseStatus = 10;
 
-  // API object from the request, in JSON format. The RequestObject is recorded as-is in the request
+  // API object from the request, in JSON format. The request object is recorded as-is in the request
   // (possibly re-encoded as JSON), prior to version conversion, defaulting, admission or
   // merging. It is an external versioned object type, and may not be a valid object on its own.
-  // Omitted for non-resource requests.  Only logged at Request Level and higher.
+  // Omitted for non-resource requests. Only logged at 'Request' level and higher.
   // +optional
   optional k8s.io.apimachinery.pkg.runtime.Unknown requestObject = 11;
 
-  // API object returned in the response, in JSON. The ResponseObject is recorded after conversion
-  // to the external type, and serialized as JSON.  Omitted for non-resource requests.  Only logged
-  // at Response Level.
+  // API object returned in the response, in JSON. The response object is recorded after conversion
+  // to the external type, and serialized as JSON.  Omitted for non-resource requests. Only logged
+  // at 'RequestResponse' Level.
   // +optional
   optional k8s.io.apimachinery.pkg.runtime.Unknown responseObject = 12;
 
@@ -101,39 +111,41 @@ message Event {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime stageTimestamp = 14;
 
-  // Annotations is an unstructured key value map stored with an audit event that may be set by
+  // An unstructured key value map stored with an audit event that may be set by
   // plugins invoked in the request serving chain, including authentication, authorization and
   // admission plugins. Note that these annotations are for the audit event, and do not correspond
   // to the metadata.annotations of the submitted object. Keys should uniquely identify the informing
-  // component to avoid name collisions (e.g. podsecuritypolicy.admission.k8s.io/policy). Values
-  // should be short. Annotations are included in the Metadata level.
+  // component to avoid name collisions (e.g. `podsecuritypolicy.admission.k8s.io/policy`). Values
+  // should be short. Annotations are included in the 'Metadata' level.
   // +optional
   map<string, string> annotations = 15;
 }
 
 // EventList is a list of audit Events.
 message EventList {
+  // Standard list metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
+  // A list of Event objects.
   repeated Event items = 2;
 }
 
 // GroupResources represents resource kinds in an API group.
 message GroupResources {
-  // Group is the name of the API group that contains the resources.
-  // The empty string represents the core API group.
+  // The name of the API group that contains the resources.
+  // An empty string represents the core API group.
   // +optional
   optional string group = 1;
 
   // Resources is a list of resources this rule applies to.
   //
   // For example:
-  // 'pods' matches pods.
-  // 'pods/log' matches the log subresource of pods.
-  // '*' matches all resources and their subresources.
-  // 'pods/*' matches all subresources of pods.
-  // '*/scale' matches all scale subresources.
+  // - `pods` matches pods.
+  // - `pods/log` matches the log subresource of pods.
+  // - `*` matches all resources and their subresources.
+  // - `pods/*` matches all subresources of pods.
+  // - `*/scale` matches all scale subresources.
   //
   // If wildcard is present, the validation rule will ensure resources do not
   // overlap with each other.
@@ -142,8 +154,8 @@ message GroupResources {
   // +optional
   repeated string resources = 2;
 
-  // ResourceNames is a list of resource instance names that the policy matches.
-  // Using this field requires Resources to be specified.
+  // A list of resource instance names that the policy matches.
+  // Using this field requires `resources` to be specified.
   // An empty list implies that every instance of the resource is matched.
   // +optional
   repeated string resourceNames = 3;
@@ -151,30 +163,36 @@ message GroupResources {
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 message ObjectReference {
+  // The kind of the referred object.
   // +optional
   optional string resource = 1;
 
+  // The namespace of the referred object.
   // +optional
   optional string namespace = 2;
 
+  // The name of the referred object.
   // +optional
   optional string name = 3;
 
+  // The unique ID of the referred object.
   // +optional
   optional string uid = 4;
 
-  // APIGroup is the name of the API group that contains the referred object.
-  // The empty string represents the core API group.
+  // The name of the API group that contains the referred object.
+  // An empty string represents the core API group.
   // +optional
   optional string apiGroup = 5;
 
-  // APIVersion is the version of the API group that contains the referred object.
+  // The version of the API group that contains the referred object.
   // +optional
   optional string apiVersion = 6;
 
+  // The resource version of the referred object.
   // +optional
   optional string resourceVersion = 7;
 
+  // The sub-resource of the referred object, if any.
   // +optional
   optional string subresource = 8;
 }
@@ -182,22 +200,31 @@ message ObjectReference {
 // Policy defines the configuration of audit logging, and the rules for how different request
 // categories are logged.
 message Policy {
-  // ObjectMeta is included for interoperability with API infrastructure.
+  // Object metadata included for interoperability with API infrastructure.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Rules specify the audit Level a request should be recorded at.
+  // The audit Level a request should be recorded at.
   // A request may match multiple rules, in which case the FIRST matching rule is used.
-  // The default audit level is None, but can be overridden by a catch-all rule at the end of the list.
+  // The default audit level is 'None', but can be overridden by a catch-all rule at the end of the list.
   // PolicyRules are strictly ordered.
   repeated PolicyRule rules = 2;
 
-  // OmitStages is a list of stages for which no events are created. Note that this can also
+  // A list of stages for which no events are created. Note that this can also
   // be specified per rule in which case the union of both are omitted.
+  // Valid values for each stage are:
+  // - 'RequestReceived': The stage for events generated as soon as the audit handler receives
+  //   the request, and before it is delegated down the handler chain.
+  // - 'ResponseStarted': The stage for events generated once the response headers are sent,
+  //   but before the response body is sent. This stage is only generated for long-running requests
+  //   (e.g. watch).
+  // - 'ResponseComplete': The stage for events generated once the response body has been completed,
+  //   and no more bytes will be sent.
+  // - 'Panic': The stage for events generated when a panic occurred.
   // +optional
   repeated string omitStages = 3;
 
-  // OmitManagedFields indicates whether to omit the managed fields of the request
+  // This indicates whether to omit the managed fields of the request
   // and response bodies from being written to the API audit log.
   // This is used as a global default - a value of 'true' will omit the managed fileds,
   // otherwise the managed fields will be included in the API audit log.
@@ -209,9 +236,11 @@ message Policy {
 
 // PolicyList is a list of audit Policies.
 message PolicyList {
+  // Standard list metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
+  // List of Policy objects.
   repeated Policy items = 2;
 }
 
@@ -219,56 +248,66 @@ message PolicyList {
 // Requests must match the rules of every field (an intersection of rules).
 message PolicyRule {
   // The Level that requests matching this rule are recorded at.
+  // Valid values include: 'None', 'Metadata', 'Request' and 'RequestResponse'.
   optional string level = 1;
 
-  // The users (by authenticated user name) this rule applies to.
+  // The list of users (by authenticated user name) this rule applies to.
   // An empty list implies every user.
   // +optional
   repeated string users = 2;
 
-  // The user groups this rule applies to. A user is considered matching
-  // if it is a member of any of the UserGroups.
+  // The list of user groups this rule applies to. A user is considered matching
+  // if it is a member of any of the user groups.
   // An empty list implies every user group.
   // +optional
   repeated string userGroups = 3;
 
-  // The verbs that match this rule.
+  // The list of verbs that match this rule.
   // An empty list implies every verb.
   // +optional
   repeated string verbs = 4;
 
-  // Resources that this rule matches. An empty list implies all kinds in all API groups.
+  // This list of resources that this rule matches. An empty list implies all kinds in all API groups.
   // +optional
   repeated GroupResources resources = 5;
 
-  // Namespaces that this rule matches.
+  // The  list of namespace names that this rule matches.
   // The empty string "" matches non-namespaced resources.
   // An empty list implies every namespace.
   // +optional
   repeated string namespaces = 6;
 
-  // NonResourceURLs is a set of URL paths that should be audited.
-  // *s are allowed, but only as the full, final step in the path.
+  // A set of URL paths that should be audited.
+  // `*` is allowed, but only as the full, final step in the path.
   // Examples:
-  //  "/metrics" - Log requests for apiserver metrics
+  //  "/metrics" - Log requests for API server metrics
   //  "/healthz*" - Log all health checks
   // +optional
   repeated string nonResourceURLs = 7;
 
-  // OmitStages is a list of stages for which no events are created. Note that this can also
+  // A list of stages for which no events are created. Note that this can also
   // be specified policy wide in which case the union of both are omitted.
   // An empty list means no restrictions will apply.
+  // Each item in the list can be one of:
+  // - 'RequestReceived': The stage for events generated as soon as the audit handler receives
+  //   the request, and before it is delegated down the handler chain.
+  // - 'ResponseStarted': The stage for events generated once the response headers are sent,
+  //   but before the response body is sent. This stage is only generated for long-running requests
+  //   (e.g. watch).
+  // - 'ResponseComplete': The stage for events generated once the response body has been completed,
+  //   and no more bytes will be sent.
+  // - 'Panic': The stage for events generated when a panic occurred.
   // +optional
   repeated string omitStages = 8;
 
-  // OmitManagedFields indicates whether to omit the managed fields of the request
+  // This  indicates whether to omit the managed fields of the request
   // and response bodies from being written to the API audit log.
   // - a value of 'true' will drop the managed fields from the API audit log
   // - a value of 'false' indicates that the managed fileds should be included
   //   in the API audit log
   // Note that the value, if specified, in this rule will override the global default
   // If a value is not specified then the global default specified in
-  // Policy.OmitManagedFields will stand.
+  // `policy.omitManagedFields` will stand.
   // +optional
   optional bool omitManagedFields = 9;
 }
