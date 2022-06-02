@@ -58,7 +58,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -477,7 +476,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				time.Duration(c.ExtraConfig.IdentityLeaseRenewIntervalSeconds)*time.Second,
 				metav1.NamespaceSystem,
 				labelAPIServerHeartbeat)
-			go controller.Run(wait.NeverStop)
+			go controller.Run(hookContext.StopCh)
 			return nil
 		})
 		m.GenericAPIServer.AddPostStartHookOrDie("start-kube-apiserver-identity-lease-garbage-collector", func(hookContext genericapiserver.PostStartHookContext) error {
@@ -490,7 +489,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 				time.Duration(c.ExtraConfig.IdentityLeaseDurationSeconds)*time.Second,
 				metav1.NamespaceSystem,
 				KubeAPIServerIdentityLeaseLabelSelector,
-			).Run(wait.NeverStop)
+			).Run(hookContext.StopCh)
 			return nil
 		})
 	}
