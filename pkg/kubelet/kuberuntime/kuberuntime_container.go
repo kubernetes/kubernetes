@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"os"
@@ -139,7 +138,7 @@ func calcRestartCountByLogDir(path string) (int, error) {
 		return 0, nil
 	}
 	restartCount := int(0)
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		return 0, err
 	}
