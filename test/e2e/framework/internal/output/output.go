@@ -44,14 +44,19 @@ func TestGinkgoOutput(t *testing.T, runTests func(t *testing.T, reporter ginkgo.
 	// Now check the output.
 	actual := normalizeReport(*reporter)
 
-	// assert.Equal prints a useful diff if the slices are not
-	// equal. However, the diff does not show changes inside the
-	// strings. Therefore we also compare the individual fields.
-	if !assert.Equal(t, expected, actual) {
-		for i := 0; i < len(expected) && i < len(actual); i++ {
-			assert.Equal(t, expected[i].Output, actual[i].Output, "output from test #%d (%s)", i, expected[i].Name)
+	if assert.Equal(t, len(expected), len(actual), "Should have %d test results, got: %v", actual) {
+		for i := 0; i < len(expected); i++ {
+			output := actual[i].Output
+			if expected[i].NormalizeOutput != nil {
+				output = expected[i].NormalizeOutput(output)
+			}
+			assert.Equal(t, expected[i].Output, output, "output from test #%d (%s)", i, expected[i].Name)
 			assert.Equal(t, expected[i].Stack, actual[i].Stack, "stack from test #%d (%s)", i, expected[i].Name)
-			assert.Equal(t, expected[i].Failure, actual[i].Failure, "failure from test #%d (%s)", i, expected[i].Name)
+			failure := actual[i].Failure
+			if expected[i].NormalizeFailure != nil {
+				failure = expected[i].NormalizeFailure(failure)
+			}
+			assert.Equal(t, expected[i].Failure, failure, "failure from test #%d (%s)", i, expected[i].Name)
 		}
 	}
 }
@@ -67,6 +72,10 @@ type TestResult struct {
 	// Stack is a normalized version (just file names, function parametes stripped) of
 	// Ginkgo's FullStackTrace of a failure. Empty if no failure.
 	Stack string
+	// Called to normalize the actual output string before comparison if non-nil.
+	NormalizeOutput func(string) string
+	// Called to normalize the actual failure string before comparison if non-nil.
+	NormalizeFailure func(string) string
 }
 
 type SuiteResults []TestResult
