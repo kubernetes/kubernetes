@@ -1813,7 +1813,7 @@ var _ = common.SIGDescribe("Services", func() {
 							},
 						},
 						ReadinessProbe: &v1.Probe{
-							ProbeHandler: v1.ProbeHandler{
+							Handler: v1.Handler{
 								HTTPGet: &v1.HTTPGetAction{
 									Path: "/readyz",
 									Port: intstr.IntOrString{
@@ -1823,8 +1823,9 @@ var _ = common.SIGDescribe("Services", func() {
 								},
 							},
 						},
+
 						LivenessProbe: &v1.Probe{
-							ProbeHandler: v1.ProbeHandler{
+							Handler: v1.Handler{
 								HTTPGet: &v1.HTTPGetAction{
 									Path: "/healthz",
 									Port: intstr.IntOrString{
@@ -1932,7 +1933,7 @@ var _ = common.SIGDescribe("Services", func() {
 							},
 						},
 						ReadinessProbe: &v1.Probe{
-							ProbeHandler: v1.ProbeHandler{
+							Handler: v1.Handler{
 								HTTPGet: &v1.HTTPGetAction{
 									Path: "/readyz",
 									Port: intstr.IntOrString{
@@ -1943,7 +1944,7 @@ var _ = common.SIGDescribe("Services", func() {
 							},
 						},
 						LivenessProbe: &v1.Probe{
-							ProbeHandler: v1.ProbeHandler{
+							Handler: v1.Handler{
 								HTTPGet: &v1.HTTPGetAction{
 									Path: "/healthz",
 									Port: intstr.IntOrString{
