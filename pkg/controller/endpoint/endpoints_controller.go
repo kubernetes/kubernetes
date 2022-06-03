@@ -440,12 +440,8 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 	var totalNotReadyEps int
 
 	for _, pod := range pods {
-		if len(pod.Status.PodIP) == 0 {
-			klog.V(5).Infof("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
-			continue
-		}
-		if !tolerateUnreadyEndpoints && pod.DeletionTimestamp != nil {
-			klog.V(5).Infof("Pod is being deleted %s/%s", pod.Namespace, pod.Name)
+		if !endpointutil.ShouldPodBeInEndpoints(pod, tolerateUnreadyEndpoints) {
+			klog.V(5).Infof("Pod %s/%s is not included on endpoints for Service %s/%s", pod.Namespace, pod.Name, service.Namespace, service.Name)
 			continue
 		}
 
@@ -613,6 +609,10 @@ func (e *Controller) checkLeftoverEndpoints() {
 	}
 }
 
+// addEndpointSubset add the endpoints addresses and ports to the EndpointSubset.
+// The addresses are added to the corresponding field, ready or not ready, depending
+// on the pod status and the Service PublishNotReadyAddresses field value.
+// The pod passed to this function must have already been filtered through ShouldPodBeInEndpoints.
 func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.EndpointAddress,
 	epp *v1.EndpointPort, tolerateUnreadyEndpoints bool) ([]v1.EndpointSubset, int, int) {
 	var readyEps int
@@ -627,7 +627,7 @@ func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.Endpoint
 			Ports:     ports,
 		})
 		readyEps++
-	} else if shouldPodBeInEndpoints(pod) {
+	} else { // if it is not a ready address it has to be not ready
 		klog.V(5).Infof("Pod is out of service: %s/%s", pod.Namespace, pod.Name)
 		subsets = append(subsets, v1.EndpointSubset{
 			NotReadyAddresses: []v1.EndpointAddress{epa},
@@ -636,17 +636,6 @@ func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.Endpoint
 		notReadyEps++
 	}
 	return subsets, readyEps, notReadyEps
-}
-
-func shouldPodBeInEndpoints(pod *v1.Pod) bool {
-	switch pod.Spec.RestartPolicy {
-	case v1.RestartPolicyNever:
-		return pod.Status.Phase != v1.PodFailed && pod.Status.Phase != v1.PodSucceeded
-	case v1.RestartPolicyOnFailure:
-		return pod.Status.Phase != v1.PodSucceeded
-	default:
-		return true
-	}
 }
 
 func endpointPortFromServicePort(servicePort *v1.ServicePort, portNum int) *v1.EndpointPort {
