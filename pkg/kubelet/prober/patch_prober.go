@@ -29,8 +29,16 @@ func (pb *prober) maybeProbeForBody(prober httpprobe.Prober, url *url.URL, heade
 		klog.Infof("interesting pod/%s container/%s namespace/%s: %s probe status=%v output=%q start-of-body=%s",
 			pod.Name, container.Name, pod.Namespace, probeType, result, output, body)
 
+		reason := "ProbeError" // this is the normal value
+		if pod.DeletionTimestamp != nil {
+			// If the container was sent a sig-term, we want to have a different reason so we can distinguish this in our
+			// monitoring and watching code.
+			// Pod delete does this, but there are other possible reasons as well.  We'll start with pod delete to improve the state of the world.
+			reason = "TerminatingPodProbeError"
+		}
+
 		// in fact, they are so interesting we'll try to send events for them
-		pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, "ProbeError", "%s probe error: %s\nbody: %s\n", probeType, output, body)
+		pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, reason, "%s probe error: %s\nbody: %s\n", probeType, output, body)
 		return result, output, probeError
 	default:
 		return result, output, probeError
