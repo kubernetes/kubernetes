@@ -146,7 +146,7 @@ dependencies:
       match: __default_go_runner_version=
 
   - name: "registry.k8s.io/pause"
-    version: 3.7
+    version: 3.8
     refPaths:
     - path: build/pause/Makefile
       match: TAG\s*\?=

@@ -1,3 +1,8 @@
+# 3.8
+
+* Updating base image for Windows container images from nanoserver to `mcr.microsoft.com/oss/kubernetes/windows-pause-image-base` which gets built on a Windows machine.
+This addresses [Cannot modify registry keys during Windows pause image build process #109161](https://github.com/kubernetes/kubernetes/issues/109161)
+
 # 3.7
 
 * Unsupported Windows Semi-Annual container images removed (OS Versions removed: 1903, 1909, 2004) . ([#107056](https://github.com/kubernetes/kubernetes/pull/107056), [@jsturtevant](https://github.com/jsturtevant/))
