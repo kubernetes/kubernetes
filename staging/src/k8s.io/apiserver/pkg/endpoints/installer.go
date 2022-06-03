@@ -649,7 +649,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, nil, fmt.Errorf("unknown action verb for discovery: %s", action.Verb)
 		}
 
-		routes := []*restful.RouteBuilder{}
+		var route *restful.RouteBuilder
 
 		// If there is a subresource, kind should be the parent's kind.
 		if isSubresource {
@@ -706,7 +706,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if isSubresource {
 				doc = "read " + subresource + " of the specified " + kind
 			}
-			route := ws.GET(action.Path).To(handler).
+			route = ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("read"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -719,7 +719,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				}
 			}
 			addParams(route, action.Params)
-			routes = append(routes, route)
 		case "LIST": // List all resources of a kind.
 			doc := "list objects of kind " + kind
 			if isSubresource {
@@ -727,7 +726,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulListResource(lister, watcher, reqScope, false, a.minRequestTimeout))
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
-			route := ws.GET(action.Path).To(handler).
+			route = ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("list"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -752,7 +751,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				route.Doc(doc)
 			}
 			addParams(route, action.Params)
-			routes = append(routes, route)
 		case "PUT": // Update a resource.
 			doc := "replace the specified " + kind
 			if isSubresource {
@@ -760,7 +758,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulUpdateResource(updater, reqScope, admit))
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
-			route := ws.PUT(action.Path).To(handler).
+			route = ws.PUT(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("replace"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -775,7 +773,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				return nil, nil, err
 			}
 			addParams(route, action.Params)
-			routes = append(routes, route)
 		case "PATCH": // Partially update a resource
 			doc := "partially update the specified " + kind
 			if isSubresource {
@@ -791,7 +788,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulPatchResource(patcher, reqScope, admit, supportedTypes))
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
-			route := ws.PATCH(action.Path).To(handler).
+			route = ws.PATCH(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Consumes(supportedTypes...).
@@ -806,7 +803,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				return nil, nil, err
 			}
 			addParams(route, action.Params)
-			routes = append(routes, route)
 		case "POST": // Create a resource.
 			var handler restful.RouteFunction
 			if isNamedCreater {
@@ -821,7 +817,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if isSubresource {
 				doc = "create " + subresource + " of" + article + kind
 			}
-			route := ws.POST(action.Path).To(handler).
+			route = ws.POST(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("create"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -837,7 +833,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				return nil, nil, err
 			}
 			addParams(route, action.Params)
-			routes = append(routes, route)
 		case "DELETE": // Delete a resource.
 			article := GetArticleForNoun(kind, " ")
 			doc := "delete" + article + kind
@@ -850,7 +845,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
-			route := ws.DELETE(action.Path).To(handler).
+			route = ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -866,7 +861,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				}
 			}
 			addParams(route, action.Params)
-			routes = append(routes, route)
 		case "DELETECOLLECTION":
 			doc := "delete collection of " + kind
 			if isSubresource {
@@ -874,7 +868,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulDeleteCollection(collectionDeleter, isCollectionDeleter, reqScope, admit))
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
-			route := ws.DELETE(action.Path).To(handler).
+			route = ws.DELETE(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -892,7 +886,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				return nil, nil, err
 			}
 			addParams(route, action.Params)
-			routes = append(routes, route)
 		// deprecated in 1.11
 		case "WATCH": // Watch a resource.
 			doc := "watch changes to an object of kind " + kind
@@ -902,7 +895,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			doc += ". deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter."
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
-			route := ws.GET(action.Path).To(handler).
+			route = ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+operationSuffix).
@@ -913,7 +906,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				return nil, nil, err
 			}
 			addParams(route, action.Params)
-			routes = append(routes, route)
 		// deprecated in 1.11
 		case "WATCHLIST": // Watch all resources of a kind.
 			doc := "watch individual changes to a list of " + kind
@@ -923,7 +915,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			doc += ". deprecated: use the 'watch' parameter with a list operation instead."
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulListResource(lister, watcher, reqScope, true, a.minRequestTimeout))
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
-			route := ws.GET(action.Path).To(handler).
+			route = ws.GET(action.Path).To(handler).
 				Doc(doc).
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("watch"+namespaced+kind+strings.Title(subresource)+"List"+operationSuffix).
@@ -934,7 +926,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				return nil, nil, err
 			}
 			addParams(route, action.Params)
-			routes = append(routes, route)
 		case "CONNECT":
 			for _, method := range connecter.ConnectMethods() {
 				connectProducedObject := storageMeta.ProducesObject(method)
@@ -947,7 +938,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				}
 				handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulConnectResource(connecter, reqScope, admit, path, isSubresource))
 				handler = utilwarning.AddWarningsHandler(handler, warnings)
-				route := ws.Method(method).Path(action.Path).
+				route = ws.Method(method).Path(action.Path).
 					To(handler).
 					Doc(doc).
 					Operation("connect" + strings.Title(strings.ToLower(method)) + namespaced + kind + strings.Title(subresource) + operationSuffix).
@@ -960,7 +951,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 					}
 				}
 				addParams(route, action.Params)
-				routes = append(routes, route)
 
 				// transform ConnectMethods to kube verbs
 				if kubeVerb, found := toDiscoveryKubeVerb[method]; found {
@@ -972,15 +962,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		default:
 			return nil, nil, fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}
-		for _, route := range routes {
-			route.Metadata(ROUTE_META_GVK, metav1.GroupVersionKind{
-				Group:   reqScope.Kind.Group,
-				Version: reqScope.Kind.Version,
-				Kind:    reqScope.Kind.Kind,
-			})
-			route.Metadata(ROUTE_META_ACTION, strings.ToLower(action.Verb))
-			ws.Route(route)
-		}
+		route.Metadata(ROUTE_META_GVK, metav1.GroupVersionKind{
+			Group:   reqScope.Kind.Group,
+			Version: reqScope.Kind.Version,
+			Kind:    reqScope.Kind.Kind,
+		})
+		route.Metadata(ROUTE_META_ACTION, strings.ToLower(action.Verb))
+		ws.Route(route)
 		// Note: update GetAuthorizerAttributes() when adding a custom handler.
 	}
 
