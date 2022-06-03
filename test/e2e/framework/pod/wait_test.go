@@ -17,6 +17,7 @@ limitations under the License.
 package pod_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -34,7 +35,6 @@ import (
 // Be careful when moving it around or changing the import statements above.
 // Here are some intentionally blank lines that can be removed to compensate
 // for future additional import statements.
-//
 //
 //
 //
@@ -76,10 +76,10 @@ func TestFailureOutput(t *testing.T) {
 	expected := output.SuiteResults{
 		output.TestResult{
 			Name: "[Top Level] pod not found",
+			// "Ignoring NotFound..." will normally occur every two seconds,
+			// but we reduce it to one line because it might occur less often
+			// on a loaded system.
 			Output: `INFO: Waiting up to 5s for pod "no-such-pod" in namespace "default" to be "running"
-INFO: Ignoring NotFound error while getting pod default/no-such-pod
-INFO: Ignoring NotFound error while getting pod default/no-such-pod
-INFO: Ignoring NotFound error while getting pod default/no-such-pod
 INFO: Ignoring NotFound error while getting pod default/no-such-pod
 INFO: Unexpected error: 
     <*fmt.wrapError>: {
@@ -110,6 +110,9 @@ k8s.io/kubernetes/test/e2e/framework/pod_test.runTests()
 	wait_test.go:51
 
 `,
+			NormalizeOutput: func(output string) string {
+				return trimDuplicateLines(output, "INFO: Ignoring NotFound error while getting pod default/no-such-pod")
+			},
 			Failure: `error while waiting for pod default/no-such-pod to be running: pods "no-such-pod" not found`,
 			Stack: `k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.1()
 	wait_test.go:56
@@ -119,10 +122,10 @@ k8s.io/kubernetes/test/e2e/framework/pod_test.runTests()
 		},
 		output.TestResult{
 			Name: "[Top Level] pod not running",
+			// "INFO: Pod ..." will normally occur every two seconds,
+			// but we reduce it to one line because it might occur less often
+			// on a loaded system.
 			Output: `INFO: Waiting up to 5s for pod "pending-pod" in namespace "default" to be "running"
-INFO: Pod "pending-pod": Phase="", Reason="", readiness=false. Elapsed: <elapsed>
-INFO: Pod "pending-pod": Phase="", Reason="", readiness=false. Elapsed: <elapsed>
-INFO: Pod "pending-pod": Phase="", Reason="", readiness=false. Elapsed: <elapsed>
 INFO: Pod "pending-pod": Phase="", Reason="", readiness=false. Elapsed: <elapsed>
 INFO: Unexpected error: wait for pod pending-pod running: 
     <*pod.timeoutError>: {
@@ -214,6 +217,9 @@ k8s.io/kubernetes/test/e2e/framework/pod_test.runTests()
 	wait_test.go:51
 
 `,
+			NormalizeOutput: func(output string) string {
+				return trimDuplicateLines(output, `INFO: Pod "pending-pod": Phase="", Reason="", readiness=false. Elapsed: <elapsed>`)
+			},
 			Failure: `wait for pod pending-pod running: timed out while waiting for pod default/pending-pod to be running`,
 			Stack: `k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.2()
 	wait_test.go:60
@@ -224,4 +230,25 @@ k8s.io/kubernetes/test/e2e/framework/pod_test.runTests()
 	}
 
 	output.TestGinkgoOutput(t, runTests, expected)
+}
+
+func trimDuplicateLines(output, prefix string) string {
+	lines := strings.Split(output, "\n")
+	trimming := false
+	validLines := 0
+	for i := 0; i < len(lines); i++ {
+		if strings.HasPrefix(lines[i], prefix) {
+			// Keep the first line, and only that one.
+			if !trimming {
+				trimming = true
+				lines[validLines] = lines[i]
+				validLines++
+			}
+		} else {
+			trimming = false
+			lines[validLines] = lines[i]
+			validLines++
+		}
+	}
+	return strings.Join(lines[0:validLines], "\n")
 }
