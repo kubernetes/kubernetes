@@ -49,3 +49,13 @@ func (re RawExtension) MarshalJSON() ([]byte, error) {
 	// TODO: Check whether ContentType is actually JSON before returning it.
 	return re.Raw, nil
 }
+
+// OpenAPISchemaType is used by the kube-openapi generator when constructing
+// the OpenAPI spec of this type.
+//
+// See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
+func (_ RawExtension) OpenAPISchemaType() []string { return []string{"object"} }
+
+// OpenAPISchemaFormat is used by the kube-openapi generator when constructing
+// the OpenAPI spec of this type.
+func (_ RawExtension) OpenAPISchemaFormat() string { return "" }
