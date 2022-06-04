@@ -381,7 +381,8 @@ var _ = SIGDescribe("ReplicationController", func() {
 				}
 			}
 			if !foundRc {
-				framework.Fail("could not find ReplicationController")
+				framework.Logf("Got unexpected replication controller list %v", rcs.Items)
+				framework.Failf("could not find ReplicationController %s", testRcName)
 			}
 
 			// Delete ReplicationController

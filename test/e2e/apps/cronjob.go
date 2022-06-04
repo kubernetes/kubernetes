@@ -471,6 +471,7 @@ var _ = SIGDescribe("CronJob", func() {
 		framework.ExpectNoError(err)
 		// Should have <= 2 items since some cronjobs might not have been deleted yet due to finalizers
 		if len(cjs.Items) > 2 {
+			framework.Logf("got unexpected filtered list: %v", cjs.Items)
 			framework.Fail("filtered list should be <= 2")
 		}
 		// Validate finalizers

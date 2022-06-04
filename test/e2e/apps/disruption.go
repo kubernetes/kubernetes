@@ -364,7 +364,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
 		framework.ExpectError(err, "pod eviction should fail")
 		if !apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause) {
-			framework.Fail("pod eviction should fail with DisruptionBudget cause")
+			framework.Failf("pod eviction should fail with DisruptionBudget cause. The error was \"%v\"", err)
 		}
 
 		ginkgo.By("Updating the pdb to allow a pod to be evicted")
@@ -404,7 +404,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
 		framework.ExpectError(err, "pod eviction should fail")
 		if !apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause) {
-			framework.Fail("pod eviction should fail with DisruptionBudget cause")
+			framework.Failf("pod eviction should fail with DisruptionBudget cause. The error was \"%v\"", err)
 		}
 
 		ginkgo.By("Deleting the pdb to allow a pod to be evicted")
