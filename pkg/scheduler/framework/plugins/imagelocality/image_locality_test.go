@@ -35,10 +35,12 @@ func TestImageLocalityPriority(t *testing.T) {
 		Containers: []v1.Container{
 			{
 
-				Image: "gcr.io/40",
+				Image:           "gcr.io/40",
+				ImagePullPolicy: v1.PullIfNotPresent,
 			},
 			{
-				Image: "gcr.io/250",
+				Image:           "gcr.io/250",
+				ImagePullPolicy: v1.PullIfNotPresent,
 			},
 		},
 	}
@@ -46,10 +48,12 @@ func TestImageLocalityPriority(t *testing.T) {
 	test40300 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
-				Image: "gcr.io/40",
+				Image:           "gcr.io/40",
+				ImagePullPolicy: v1.PullIfNotPresent,
 			},
 			{
-				Image: "gcr.io/300",
+				Image:           "gcr.io/300",
+				ImagePullPolicy: v1.PullIfNotPresent,
 			},
 		},
 	}
@@ -57,10 +61,12 @@ func TestImageLocalityPriority(t *testing.T) {
 	testMinMax := v1.PodSpec{
 		Containers: []v1.Container{
 			{
-				Image: "gcr.io/10",
+				Image:           "gcr.io/10",
+				ImagePullPolicy: v1.PullIfNotPresent,
 			},
 			{
-				Image: "gcr.io/4000",
+				Image:           "gcr.io/4000",
+				ImagePullPolicy: v1.PullIfNotPresent,
 			},
 		},
 	}
@@ -68,13 +74,33 @@ func TestImageLocalityPriority(t *testing.T) {
 	test300600900 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
-				Image: "gcr.io/300",
+				Image:           "gcr.io/300",
+				ImagePullPolicy: v1.PullIfNotPresent,
 			},
 			{
-				Image: "gcr.io/600",
+				Image:           "gcr.io/600",
+				ImagePullPolicy: v1.PullIfNotPresent,
 			},
 			{
-				Image: "gcr.io/900",
+				Image:           "gcr.io/900",
+				ImagePullPolicy: v1.PullIfNotPresent,
+			},
+		},
+	}
+
+	test3006002000_always2000 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Image:           "gcr.io/300",
+				ImagePullPolicy: v1.PullIfNotPresent,
+			},
+			{
+				Image:           "gcr.io/600",
+				ImagePullPolicy: v1.PullIfNotPresent,
+			},
+			{
+				Image:           "gcr.io/2000",
+				ImagePullPolicy: v1.PullAlways,
 			},
 		},
 	}
@@ -82,10 +108,24 @@ func TestImageLocalityPriority(t *testing.T) {
 	test3040 := v1.PodSpec{
 		Containers: []v1.Container{
 			{
-				Image: "gcr.io/30",
+				Image:           "gcr.io/30",
+				ImagePullPolicy: v1.PullIfNotPresent,
 			},
 			{
-				Image: "gcr.io/40",
+				Image:           "gcr.io/40",
+				ImagePullPolicy: v1.PullIfNotPresent,
+			},
+		},
+	}
+	test3040_always3040 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Image:           "gcr.io/30",
+				ImagePullPolicy: v1.PullAlways,
+			},
+			{
+				Image:           "gcr.io/40",
+				ImagePullPolicy: v1.PullAlways,
 			},
 		},
 	}
@@ -327,6 +367,41 @@ func TestImageLocalityPriority(t *testing.T) {
 			expectedList: []framework.NodeScore{{Name: "node1", Score: 1}, {Name: "node2", Score: 0}},
 			name:         "pod with multiple small images",
 		},
+		{
+			// Pod: gcr.io/30 (Always) gcr.io/40 (Always)
+
+			// Node1
+			// Image: gcr.io/20:latest 20MB, gcr.io/30:latest 30MB gcr.io/40:latest 40MB
+			// Score: 0 + 0 = 0
+
+			// Node2
+			// Image: gcr.io/4000:latest 4000MB, gcr.io/30:latest 30MB
+			// Score: 0 + 0 = 0
+			pod:          &v1.Pod{Spec: test3040_always3040},
+			nodes:        []*v1.Node{makeImageNode("node1", node203040), makeImageNode("node2", node400030)},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}},
+			name:         "pod with multiple small images and all ImagePullPolicy set to Always",
+		},
+		{
+			// Pod: gcr.io/300 gcr.io/600 gcr.io/2000 (Always)
+
+			// Node1
+			// Image: gcr.io/600:latest 600MB, gcr.io/900:latest 900MB
+			// Score(not support PullAlways): 100 * (300M * 2/3 + 2000M * 1/3 + 0  - 23M) / (1000M * 3 - 23M) = 28
+			// Score: 100 * (300M * 2/3 + 0 + 0 - 23M) / (1000M * 3 - 23M) = 5
+
+			// Node2
+			// Image: gcr.io/300:latest 300MB, gcr.io/600:latest 600MB, gcr.io/900:latest 900MB
+			// Score: 100 * (300M * 1/3 + 600M * 1/3 + 0 - 23M) / (1000M *3 - 23M) = 12
+
+			// Node3
+			// Image:
+			// Score: 0
+			pod:          &v1.Pod{Spec: test3006002000_always2000},
+			nodes:        []*v1.Node{makeImageNode("node1", node403002000), makeImageNode("node2", node300600900), makeImageNode("node3", nodeWithNoImages)},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 5}, {Name: "node2", Score: 12}, {Name: "node3", Score: 0}},
+			name:         "pod with multiple large images, mixture of ImagePullPolicy, node2 preferred",
+		},
 	}
 
 	for _, test := range tests {
@@ -340,8 +415,15 @@ func TestImageLocalityPriority(t *testing.T) {
 
 			p, _ := New(nil, fh)
 			var gotList framework.NodeScoreList
+
+			plugin := p.(*ImageLocality)
+
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name
+				status := plugin.PreScore(ctx, state, test.pod, test.nodes)
+				if !status.IsSuccess() {
+					t.Fatalf("unexpected error: %v", status)
+				}
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeName)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)

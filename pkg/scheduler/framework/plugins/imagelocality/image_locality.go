@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
@@ -31,8 +32,8 @@ import (
 // container images compressed and stored in registries; 90%ile of images on dockerhub drops into this range.
 const (
 	mb                    int64 = 1024 * 1024
-	minThreshold          int64 = 23 * mb
-	maxContainerThreshold int64 = 1000 * mb
+	minThreshold                = 23 * mb
+	maxContainerThreshold       = 1000 * mb
 )
 
 // ImageLocality is a score plugin that favors nodes that already have requested pod container's images.
@@ -40,18 +41,69 @@ type ImageLocality struct {
 	handle framework.Handle
 }
 
+var _ framework.PreScorePlugin = &ImageLocality{}
 var _ framework.ScorePlugin = &ImageLocality{}
 
-// Name is the name of the plugin used in the plugin registry and configurations.
-const Name = names.ImageLocality
+const (
+	// Name is the name of the plugin used in the plugin registry and configurations.
+	Name = names.ImageLocality
+
+	// preScoreStateKey is the key in CycleState to ImageLocality pre-computed data for Scoring.
+	preScoreStateKey = "PreScore" + Name
+)
+
+// preScoreState computed at PreScore and used at Score.
+type preScoreState struct {
+	notPullAlwaysContainers sets.Set[string]
+}
+
+// Clone implements the mandatory Clone interface. We don't really copy the data since
+// there is no need for that.
+func (s *preScoreState) Clone() framework.StateData {
+	return s
+}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *ImageLocality) Name() string {
 	return Name
 }
 
+// PreScore builds and writes cycle state used by Score and NormalizeScore.
+// TODO(#114827): Return Skip status when all containers' imagePullPolicy are Always.
+func (pl *ImageLocality) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) *framework.Status {
+	notPullAlwaysContainers := sets.New[string]()
+
+	// Filtering containers with ImagePullPolicy different from Always
+	// Ones with Always will score 0 point either way
+	for _, container := range pod.Spec.Containers {
+		if container.ImagePullPolicy != v1.PullAlways {
+			notPullAlwaysContainers.Insert(container.Image)
+		}
+	}
+
+	state := &preScoreState{
+		notPullAlwaysContainers: notPullAlwaysContainers,
+	}
+
+	cycleState.Write(preScoreStateKey, state)
+	return nil
+}
+
 // Score invoked at the score extension point.
 func (pl *ImageLocality) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	s, err := getPreScoreState(state)
+	if err != nil {
+		pl.PreScore(ctx, state, pod, []*v1.Node{})
+		s, err = getPreScoreState(state)
+		if err != nil {
+			return 0, framework.AsStatus(err)
+		}
+	}
+
+	if s.notPullAlwaysContainers.Len() == 0 {
+		return 0, nil
+	}
+
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil {
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
@@ -63,7 +115,7 @@ func (pl *ImageLocality) Score(ctx context.Context, state *framework.CycleState,
 	}
 	totalNumNodes := len(nodeInfos)
 
-	score := calculatePriority(sumImageScores(nodeInfo, pod.Spec.Containers, totalNumNodes), len(pod.Spec.Containers))
+	score := calculatePriority(sumImageScores(nodeInfo, s.notPullAlwaysContainers, totalNumNodes), len(pod.Spec.Containers))
 
 	return score, nil
 }
@@ -76,6 +128,19 @@ func (pl *ImageLocality) ScoreExtensions() framework.ScoreExtensions {
 // New initializes a new plugin and returns it.
 func New(_ runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	return &ImageLocality{handle: h}, nil
+}
+
+func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
+	c, err := cycleState.Read(preScoreStateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %q from cycleState: %w", preScoreStateKey, err)
+	}
+
+	s, ok := c.(*preScoreState)
+	if !ok {
+		return nil, fmt.Errorf("%+v  convert to imagelocality.preScoreState error", c)
+	}
+	return s, nil
 }
 
 // calculatePriority returns the priority of a node. Given the sumScores of requested images on the node, the node's
@@ -94,10 +159,10 @@ func calculatePriority(sumScores int64, numContainers int) int64 {
 // sumImageScores returns the sum of image scores of all the containers that are already on the node.
 // Each image receives a raw score of its size, scaled by scaledImageScore. The raw scores are later used to calculate
 // the final score. Note that the init containers are not considered for it's rare for users to deploy huge init containers.
-func sumImageScores(nodeInfo *framework.NodeInfo, containers []v1.Container, totalNumNodes int) int64 {
+func sumImageScores(nodeInfo *framework.NodeInfo, imageNames sets.Set[string], totalNumNodes int) int64 {
 	var sum int64
-	for _, container := range containers {
-		if state, ok := nodeInfo.ImageStates[normalizedImageName(container.Image)]; ok {
+	for imageName := range imageNames {
+		if state, ok := nodeInfo.ImageStates[normalizedImageName(imageName)]; ok {
 			sum += scaledImageScore(state, totalNumNodes)
 		}
 	}

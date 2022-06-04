@@ -229,6 +229,7 @@ var ExpandedPluginsV1beta3 = &config.Plugins{
 			{Name: names.NodeAffinity},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
+			{Name: names.ImageLocality},
 		},
 	},
 	Score: config.PluginSet{
@@ -400,6 +401,7 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.NodeAffinity},
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
+			{Name: names.ImageLocality},
 		},
 	},
 	Score: config.PluginSet{
