@@ -1143,6 +1143,8 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Services should be possible to connect to a service via ExternalIP when the external IP is not assigned to a node": "should be possible to connect to a service via ExternalIP when the external IP is not assigned to a node [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[Top Level] [sig-network] Services should be rejected for evicted pods (no endpoints exist)": "should be rejected for evicted pods (no endpoints exist) [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[Top Level] [sig-network] Services should be rejected when no endpoints exist": "should be rejected when no endpoints exist [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should check NodePort out-of-range": "should check NodePort out-of-range [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -1384,6 +1386,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-node] Pods Extended Pod Container Status should never report container start when an init container fails": "should never report container start when an init container fails [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-node] Pods Extended Pod Container Status should never report success for a pending container": "should never report success for a pending container [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods Extended Pod Container lifecycle evicted pods should be terminal": "evicted pods should be terminal [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-node] Pods Extended Pod Container lifecycle should not create extra sandbox if all containers are done": "should not create extra sandbox if all containers are done [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
