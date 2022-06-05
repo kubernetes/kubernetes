@@ -67,9 +67,9 @@ func TestNodeHostsFileContent(t *testing.T) {
 		expectedHostsFileContent string
 	}{
 		{
-			"hosts_test_file1",
-			[]v1.HostAlias{},
-			`# hosts file for testing.
+			hostsFileName: "hosts_test_file1",
+			hostAliases:   []v1.HostAlias{},
+			rawHostsFileContent: `# hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -78,7 +78,7 @@ fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 123.45.67.89	some.domain
 `,
-			`# Kubernetes-managed hosts file (host network).
+			expectedHostsFileContent: `# Kubernetes-managed hosts file (host network).
 # hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
@@ -90,9 +90,9 @@ fe00::2	ip6-allrouters
 `,
 		},
 		{
-			"hosts_test_file2",
-			[]v1.HostAlias{},
-			`# another hosts file for testing.
+			hostsFileName: "hosts_test_file2",
+			hostAliases:   []v1.HostAlias{},
+			rawHostsFileContent: `# another hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -101,7 +101,7 @@ fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 12.34.56.78	another.domain
 `,
-			`# Kubernetes-managed hosts file (host network).
+			expectedHostsFileContent: `# Kubernetes-managed hosts file (host network).
 # another hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
@@ -113,11 +113,11 @@ fe00::2	ip6-allrouters
 `,
 		},
 		{
-			"hosts_test_file1_with_host_aliases",
-			[]v1.HostAlias{
+			hostsFileName: "hosts_test_file1_with_host_aliases",
+			hostAliases: []v1.HostAlias{
 				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
 			},
-			`# hosts file for testing.
+			rawHostsFileContent: `# hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -126,7 +126,7 @@ fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 123.45.67.89	some.domain
 `,
-			`# Kubernetes-managed hosts file (host network).
+			expectedHostsFileContent: `# Kubernetes-managed hosts file (host network).
 # hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
@@ -141,12 +141,12 @@ fe00::2	ip6-allrouters
 `,
 		},
 		{
-			"hosts_test_file2_with_host_aliases",
-			[]v1.HostAlias{
+			hostsFileName: "hosts_test_file2_with_host_aliases",
+			hostAliases: []v1.HostAlias{
 				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
 				{IP: "456.78.90.123", Hostnames: []string{"park", "doo", "boo"}},
 			},
-			`# another hosts file for testing.
+			rawHostsFileContent: `# another hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -155,7 +155,7 @@ fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 12.34.56.78	another.domain
 `,
-			`# Kubernetes-managed hosts file (host network).
+			expectedHostsFileContent: `# Kubernetes-managed hosts file (host network).
 # another hosts file for testing.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
@@ -173,13 +173,15 @@ fe00::2	ip6-allrouters
 	}
 
 	for _, testCase := range testCases {
-		tmpdir, err := writeHostsFile(testCase.hostsFileName, testCase.rawHostsFileContent)
-		require.NoError(t, err, "could not create a temp hosts file")
-		defer os.RemoveAll(tmpdir)
+		t.Run(testCase.hostsFileName, func(t *testing.T) {
+			tmpdir, err := writeHostsFile(testCase.hostsFileName, testCase.rawHostsFileContent)
+			require.NoError(t, err, "could not create a temp hosts file")
+			defer os.RemoveAll(tmpdir)
 
-		actualContent, fileReadErr := nodeHostsFileContent(filepath.Join(tmpdir, testCase.hostsFileName), testCase.hostAliases)
-		require.NoError(t, fileReadErr, "could not create read hosts file")
-		assert.Equal(t, testCase.expectedHostsFileContent, string(actualContent), "hosts file content not expected")
+			actualContent, fileReadErr := nodeHostsFileContent(filepath.Join(tmpdir, testCase.hostsFileName), testCase.hostAliases)
+			require.NoError(t, fileReadErr, "could not create read hosts file")
+			assert.Equal(t, testCase.expectedHostsFileContent, string(actualContent), "hosts file content not expected")
+		})
 	}
 }
 
@@ -202,11 +204,10 @@ func TestManagedHostsFileContent(t *testing.T) {
 		expectedContent string
 	}{
 		{
-			[]string{"123.45.67.89"},
-			"podFoo",
-			"",
-			[]v1.HostAlias{},
-			`# Kubernetes-managed hosts file.
+			hostIPs:     []string{"123.45.67.89"},
+			hostName:    "podFoo",
+			hostAliases: []v1.HostAlias{},
+			expectedContent: `# Kubernetes-managed hosts file.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -217,11 +218,11 @@ fe00::2	ip6-allrouters
 `,
 		},
 		{
-			[]string{"203.0.113.1"},
-			"podFoo",
-			"domainFoo",
-			[]v1.HostAlias{},
-			`# Kubernetes-managed hosts file.
+			hostIPs:        []string{"203.0.113.1"},
+			hostName:       "podFoo",
+			hostDomainName: "domainFoo",
+			hostAliases:    []v1.HostAlias{},
+			expectedContent: `# Kubernetes-managed hosts file.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -232,13 +233,13 @@ fe00::2	ip6-allrouters
 `,
 		},
 		{
-			[]string{"203.0.113.1"},
-			"podFoo",
-			"domainFoo",
-			[]v1.HostAlias{
+			hostIPs:        []string{"203.0.113.1"},
+			hostName:       "podFoo",
+			hostDomainName: "domainFoo",
+			hostAliases: []v1.HostAlias{
 				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
 			},
-			`# Kubernetes-managed hosts file.
+			expectedContent: `# Kubernetes-managed hosts file.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -252,14 +253,14 @@ fe00::2	ip6-allrouters
 `,
 		},
 		{
-			[]string{"203.0.113.1"},
-			"podFoo",
-			"domainFoo",
-			[]v1.HostAlias{
+			hostIPs:        []string{"203.0.113.1"},
+			hostName:       "podFoo",
+			hostDomainName: "domainFoo",
+			hostAliases: []v1.HostAlias{
 				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
 				{IP: "456.78.90.123", Hostnames: []string{"park", "doo", "boo"}},
 			},
-			`# Kubernetes-managed hosts file.
+			expectedContent: `# Kubernetes-managed hosts file.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -274,11 +275,11 @@ fe00::2	ip6-allrouters
 `,
 		},
 		{
-			[]string{"203.0.113.1", "fd00::6"},
-			"podFoo",
-			"domainFoo",
-			[]v1.HostAlias{},
-			`# Kubernetes-managed hosts file.
+			hostIPs:        []string{"203.0.113.1", "fd00::6"},
+			hostName:       "podFoo",
+			hostDomainName: "domainFoo",
+			hostAliases:    []v1.HostAlias{},
+			expectedContent: `# Kubernetes-managed hosts file.
 127.0.0.1	localhost
 ::1	localhost ip6-localhost ip6-loopback
 fe00::0	ip6-localnet
@@ -2961,34 +2962,36 @@ func TestGetExec(t *testing.T) {
 	}}
 
 	for _, tc := range testcases {
-		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-		defer testKubelet.Cleanup()
-		kubelet := testKubelet.kubelet
-		testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
-			{Pod: &kubecontainer.Pod{
-				ID:        podUID,
-				Name:      podName,
-				Namespace: podNamespace,
-				Containers: []*kubecontainer.Container{
-					{Name: containerID,
-						ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
+		t.Run(tc.description, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kubelet := testKubelet.kubelet
+			testKubelet.fakeRuntime.PodList = []*containertest.FakePod{
+				{Pod: &kubecontainer.Pod{
+					ID:        podUID,
+					Name:      podName,
+					Namespace: podNamespace,
+					Containers: []*kubecontainer.Container{
+						{Name: containerID,
+							ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
+						},
 					},
-				},
-			}},
-		}
+				}},
+			}
 
-		description := "streaming - " + tc.description
-		fakeRuntime := &containertest.FakeStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
-		kubelet.containerRuntime = fakeRuntime
-		kubelet.streamingRuntime = fakeRuntime
+			description := "streaming - " + tc.description
+			fakeRuntime := &containertest.FakeStreamingRuntime{FakeRuntime: testKubelet.fakeRuntime}
+			kubelet.containerRuntime = fakeRuntime
+			kubelet.streamingRuntime = fakeRuntime
 
-		redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, tc.command, remotecommand.Options{})
-		if tc.expectError {
-			assert.Error(t, err, description)
-		} else {
-			assert.NoError(t, err, description)
-			assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
-		}
+			redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, tc.command, remotecommand.Options{})
+			if tc.expectError {
+				assert.Error(t, err, description)
+			} else {
+				assert.NoError(t, err, description)
+				assert.Equal(t, containertest.FakeHost, redirect.Host, description+": redirect")
+			}
+		})
 	}
 }
 
