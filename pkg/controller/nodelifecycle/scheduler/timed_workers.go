@@ -99,7 +99,9 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(ctx context.Con
 		if err == nil {
 			// To avoid duplicated calls we keep the key in the queue, to prevent
 			// subsequent additions.
-			q.workers[key] = nil
+			if _, exists := q.workers[key]; exists {
+				q.workers[key] = nil
+			}
 		} else {
 			delete(q.workers, key)
 		}
