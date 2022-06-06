@@ -189,8 +189,6 @@ func podRequestsAndLimitsByLifecycle(pod *v1.Pod, reuseReqs, reuseLimits v1.Reso
 		// unscheduled pods cannot be terminal
 	case pod.Status.Phase == v1.PodSucceeded, pod.Status.Phase == v1.PodFailed:
 		terminal = true
-		// TODO: resolve https://github.com/kubernetes/kubernetes/issues/96515 and add a condition here
-		// for checking that terminal state
 	}
 	if terminal {
 		return
