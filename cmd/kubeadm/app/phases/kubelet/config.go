@@ -29,12 +29,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
 )
 
 // WriteConfigToDisk writes the kubelet config object down to a file
@@ -52,6 +54,25 @@ func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patches
 	kubeletBytes, err := kubeletCfg.Marshal()
 	if err != nil {
 		return err
+	}
+
+	// Apply patches to the KubeletConfiguration
+	if len(patchesDir) != 0 {
+		target := "kubeletconfiguration"
+		knownTargets := []string{target}
+		patchManager, err := patches.GetPatchManagerForPath(patchesDir, knownTargets, output)
+		if err != nil {
+			return err
+		}
+		patchTarget := &patches.PatchTarget{
+			Name:                      target,
+			StrategicMergePatchObject: kubeletconfig.KubeletConfiguration{},
+			Data:                      kubeletBytes,
+		}
+		if err := patchManager.ApplyPatchesToTarget(patchTarget); err != nil {
+			return err
+		}
+		kubeletBytes = patchTarget.Data
 	}
 
 	return writeConfigBytesToDisk(kubeletBytes, kubeletDir)
