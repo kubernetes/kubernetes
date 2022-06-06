@@ -86,14 +86,16 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		newCSIDriver.Spec.VolumeLifecycleModes = nil
 	}
 
-	// Any changes to the mutable fields increment the generation number.
-	if !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.TokenRequests, newCSIDriver.Spec.TokenRequests) || !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.RequiresRepublish, newCSIDriver.Spec.RequiresRepublish) {
-		newCSIDriver.Generation = oldCSIDriver.Generation + 1
-	}
-
 	if oldCSIDriver.Spec.SELinuxMount == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		newCSIDriver.Spec.SELinuxMount = nil
+	}
+
+	// Any changes to the mutable fields increment the generation number.
+	if !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.TokenRequests, newCSIDriver.Spec.TokenRequests) ||
+		!apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.RequiresRepublish, newCSIDriver.Spec.RequiresRepublish) ||
+		!apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.SELinuxMount, newCSIDriver.Spec.SELinuxMount) {
+		newCSIDriver.Generation = oldCSIDriver.Generation + 1
 	}
 }
 
