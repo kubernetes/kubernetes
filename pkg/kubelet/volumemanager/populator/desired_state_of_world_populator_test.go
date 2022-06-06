@@ -1026,8 +1026,9 @@ func TestCheckVolumeFSResize(t *testing.T) {
 					t.Fatalf("Mark wrong volume as fsResizeRequired: %s", vols[0])
 				}
 			},
-			volumeMode: v1.PersistentVolumeFilesystem,
-			volumeType: "ephemeral",
+			enableResize: true,
+			volumeMode:   v1.PersistentVolumeFilesystem,
+			volumeType:   "ephemeral",
 		},
 	}
 
