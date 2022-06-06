@@ -620,9 +620,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		cgroupRoots = append(cgroupRoots, kubeletCgroup)
 	}
 
-	if err != nil {
-		klog.InfoS("Failed to get the container runtime's cgroup. Runtime system container metrics may be missing.", "err", err)
-	} else if s.RuntimeCgroups != "" {
+	if s.RuntimeCgroups != "" {
 		// RuntimeCgroups is optional, so ignore if it isn't specified
 		cgroupRoots = append(cgroupRoots, s.RuntimeCgroups)
 	}
