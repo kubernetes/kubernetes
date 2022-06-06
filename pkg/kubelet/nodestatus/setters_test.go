@@ -1811,7 +1811,7 @@ func makeExpectedImageList(imageList []kubecontainer.Image, maxImages, maxNames 
 func makeImageTags(num int32) []string {
 	tags := make([]string, num)
 	for i := range tags {
-		tags[i] = "k8s.gcr.io:v" + strconv.Itoa(i)
+		tags[i] = "registry.k8s.io:v" + strconv.Itoa(i)
 	}
 	return tags
 }

@@ -1720,7 +1720,7 @@ function prepare-kube-proxy-manifest-variables {
   local -r src_file=$1;
 
   local -r kubeconfig="--kubeconfig=/var/lib/kube-proxy/kubeconfig"
-  local kube_docker_registry="k8s.gcr.io"
+  local kube_docker_registry="registry.k8s.io"
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     kube_docker_registry=${KUBE_DOCKER_REGISTRY}
   fi
@@ -2057,7 +2057,7 @@ function compute-master-manifest-variables {
     CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\", \"type\": \"FileOrCreate\"}},"
     CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
   fi
-  DOCKER_REGISTRY="k8s.gcr.io"
+  DOCKER_REGISTRY="registry.k8s.io"
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY}"
   fi
@@ -2989,7 +2989,7 @@ spec:
   - name: vol
   containers:
   - name: pv-recycler
-    image: k8s.gcr.io/debian-base:v2.0.0
+    image: registry.k8s.io/debian-base:v2.0.0
     command:
     - /bin/sh
     args:
@@ -3002,7 +3002,7 @@ EOF
 
 # fixup the alternate registry if specified
 if [[ -n "${KUBE_ADDON_REGISTRY:-}" ]]; then
-  sed -i -e "s@k8s.gcr.io@${KUBE_ADDON_REGISTRY}@g" "${PV_RECYCLER_OVERRIDE_TEMPLATE}"
+  sed -i -e "s@registry.k8s.io@${KUBE_ADDON_REGISTRY}@g" "${PV_RECYCLER_OVERRIDE_TEMPLATE}"
 fi
 }
 
@@ -3074,7 +3074,7 @@ oom_score = -999
 [plugins."io.containerd.grpc.v1.cri"]
   stream_server_address = "127.0.0.1"
   max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
-  sandbox_image = "${CONTAINERD_INFRA_CONTAINER:-"k8s.gcr.io/pause:3.7"}"
+  sandbox_image = "${CONTAINERD_INFRA_CONTAINER:-"registry.k8s.io/pause:3.7"}"
 [plugins."io.containerd.grpc.v1.cri".cni]
   bin_dir = "${KUBE_HOME}/bin"
   conf_dir = "/etc/cni/net.d"

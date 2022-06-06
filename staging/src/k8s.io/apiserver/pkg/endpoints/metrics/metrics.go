@@ -83,16 +83,7 @@ var (
 		&compbasemetrics.GaugeOpts{
 			Name:           "apiserver_longrunning_requests",
 			Help:           "Gauge of all active long-running apiserver requests broken out by verb, group, version, resource, scope and component. Not all requests are tracked this way.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
-	)
-	longRunningRequestGauge = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:              "apiserver_longrunning_gauge",
-			Help:              "Gauge of all active long-running apiserver requests broken out by verb, group, version, resource, scope and component. Not all requests are tracked this way.",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.23.0",
+			StabilityLevel: compbasemetrics.STABLE,
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
@@ -145,16 +136,6 @@ var (
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
-	// droppedRequests is a number of requests dropped with 'Try again later' response"
-	droppedRequests = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:              "apiserver_dropped_requests_total",
-			Help:              "Number of requests dropped with 'Try again later' response. Use apiserver_request_total and/or apiserver_request_terminations_total metrics instead.",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.24.0",
-		},
-		[]string{"request_kind"},
-	)
 	// TLSHandshakeErrors is a number of requests dropped with 'TLS handshake error from' error
 	TLSHandshakeErrors = compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
@@ -162,16 +143,6 @@ var (
 			Help:           "Number of requests dropped with 'TLS handshake error from' error",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-	)
-	// RegisteredWatchers is a number of currently registered watchers splitted by resource.
-	RegisteredWatchers = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:              "apiserver_registered_watchers",
-			Help:              "Number of currently registered watchers for a given resources",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.23.0",
-		},
-		[]string{"group", "version", "kind"},
 	)
 	WatchEvents = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
@@ -271,14 +242,11 @@ var (
 		deprecatedRequestGauge,
 		requestCounter,
 		longRunningRequestsGauge,
-		longRunningRequestGauge,
 		requestLatencies,
 		requestSloLatencies,
 		fieldValidationRequestLatencies,
 		responseSizes,
-		droppedRequests,
 		TLSHandshakeErrors,
-		RegisteredWatchers,
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,
@@ -437,12 +405,6 @@ func RecordDroppedRequest(req *http.Request, requestInfo *request.RequestInfo, c
 	} else {
 		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, "", "", "", requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests)).Inc()
 	}
-
-	if isMutatingRequest {
-		droppedRequests.WithContext(req.Context()).WithLabelValues(MutatingKind).Inc()
-	} else {
-		droppedRequests.WithContext(req.Context()).WithLabelValues(ReadOnlyKind).Inc()
-	}
 }
 
 // RecordRequestTermination records that the request was terminated early as part of a resource
@@ -474,7 +436,7 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	if requestInfo == nil {
 		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
 	}
-	var g, e compbasemetrics.GaugeMetric
+	var g compbasemetrics.GaugeMetric
 	scope := CleanScope(requestInfo)
 
 	// We don't use verb from <requestInfo>, as this may be propagated from
@@ -484,18 +446,12 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
 
 	if requestInfo.IsResourceRequest {
-		e = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
-		g = longRunningRequestGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
+		g = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
 	} else {
-		e = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
-		g = longRunningRequestGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
+		g = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
 	}
-	e.Inc()
 	g.Inc()
-	defer func() {
-		e.Dec()
-		g.Dec()
-	}()
+	defer g.Dec()
 	fn()
 }
 

@@ -82,8 +82,6 @@ type Controller struct {
 	// ServiceIP indicates where the kubernetes service will live.  It may not be nil.
 	ServiceIP                 net.IP
 	ServicePort               int
-	ExtraServicePorts         []corev1.ServicePort
-	ExtraEndpointPorts        []corev1.EndpointPort
 	PublicServicePort         int
 	KubernetesServiceNodePort int
 
@@ -137,8 +135,6 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 
 		ServiceIP:                 c.ExtraConfig.APIServerServiceIP,
 		ServicePort:               c.ExtraConfig.APIServerServicePort,
-		ExtraServicePorts:         c.ExtraConfig.ExtraServicePorts,
-		ExtraEndpointPorts:        c.ExtraConfig.ExtraEndpointPorts,
 		PublicServicePort:         publicServicePort,
 		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
 	}, nil
@@ -164,7 +160,7 @@ func (c *Controller) Start() {
 	}
 
 	// Reconcile during first run removing itself until server is ready.
-	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
 	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err == nil {
 		klog.Error("Found stale data, removed previous endpoints on kubernetes service, apiserver didn't exit successfully previously")
 	} else if !storage.IsNotFound(err) {
@@ -216,7 +212,7 @@ func (c *Controller) Stop() {
 	if c.runner != nil {
 		c.runner.Stop()
 	}
-	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
 	finishedReconciling := make(chan struct{})
 	go func() {
 		defer close(finishedReconciling)
@@ -278,11 +274,11 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 
-	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
+	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, "https")
 	if err := c.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
 		return err
 	}
-	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
 	if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile); err != nil {
 		return err
 	}
@@ -291,34 +287,30 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 
 // createPortAndServiceSpec creates an array of service ports.
 // If the NodePort value is 0, just the servicePort is used, otherwise, a node port is exposed.
-func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort int, servicePortName string, extraServicePorts []corev1.ServicePort) ([]corev1.ServicePort, corev1.ServiceType) {
-	//Use the Cluster IP type for the service port if NodePort isn't provided.
-	//Otherwise, we will be binding the master service to a NodePort.
-	servicePorts := []corev1.ServicePort{{Protocol: corev1.ProtocolTCP,
+func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort int, servicePortName string) ([]corev1.ServicePort, corev1.ServiceType) {
+	// Use the Cluster IP type for the service port if NodePort isn't provided.
+	// Otherwise, we will be binding the master service to a NodePort.
+	servicePorts := []corev1.ServicePort{{
+		Protocol:   corev1.ProtocolTCP,
 		Port:       int32(servicePort),
 		Name:       servicePortName,
-		TargetPort: intstr.FromInt(targetServicePort)}}
+		TargetPort: intstr.FromInt(targetServicePort),
+	}}
 	serviceType := corev1.ServiceTypeClusterIP
 	if nodePort > 0 {
 		servicePorts[0].NodePort = int32(nodePort)
 		serviceType = corev1.ServiceTypeNodePort
 	}
-	if extraServicePorts != nil {
-		servicePorts = append(servicePorts, extraServicePorts...)
-	}
 	return servicePorts, serviceType
 }
 
-// createEndpointPortSpec creates an array of endpoint ports
-func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndpointPorts []corev1.EndpointPort) []corev1.EndpointPort {
-	endpointPorts := []corev1.EndpointPort{{Protocol: corev1.ProtocolTCP,
-		Port: int32(endpointPort),
-		Name: endpointPortName,
+// createEndpointPortSpec creates the endpoint ports
+func createEndpointPortSpec(endpointPort int, endpointPortName string) []corev1.EndpointPort {
+	return []corev1.EndpointPort{{
+		Protocol: corev1.ProtocolTCP,
+		Port:     int32(endpointPort),
+		Name:     endpointPortName,
 	}}
-	if extraEndpointPorts != nil {
-		endpointPorts = append(endpointPorts, extraEndpointPorts...)
-	}
-	return endpointPorts
 }
 
 // CreateOrUpdateMasterServiceIfNeeded will create the specified service if it

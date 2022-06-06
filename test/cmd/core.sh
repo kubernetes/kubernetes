@@ -537,9 +537,9 @@ run_pod_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'changed-with-yaml:'
   ## Patch pod from JSON can change image
   # Command
-  kubectl patch "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "k8s.gcr.io/pause:3.7"}]}}'
+  kubectl patch "${kube_flags[@]}" -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "registry.k8s.io/pause:3.7"}]}}'
   # Post-condition: valid-pod POD has expected image
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'k8s.gcr.io/pause:3.7:'
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'registry.k8s.io/pause:3.7:'
 
   # pod has field for kubectl patch field manager
   output_message=$(kubectl get pod valid-pod -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
@@ -656,13 +656,13 @@ __EOF__
   kubectl delete node node-v1-test "${kube_flags[@]}"
 
   ## kubectl edit can update the image field of a POD. tmp-editor.sh is a fake editor
-  echo -e "#!/usr/bin/env bash\n${SED} -i \"s/nginx/k8s.gcr.io\/serve_hostname/g\" \$1" > /tmp/tmp-editor.sh
+  echo -e "#!/usr/bin/env bash\n${SED} -i \"s/nginx/registry.k8s.io\/serve_hostname/g\" \$1" > /tmp/tmp-editor.sh
   chmod +x /tmp/tmp-editor.sh
   # Pre-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
   grep -q 'Patch:' <<< "$(EDITOR=/tmp/tmp-editor.sh kubectl edit "${kube_flags[@]}" pods/valid-pod --output-patch=true)"
-  # Post-condition: valid-pod POD has image k8s.gcr.io/serve_hostname
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'k8s.gcr.io/serve_hostname:'
+  # Post-condition: valid-pod POD has image registry.k8s.io/serve_hostname
+  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'registry.k8s.io/serve_hostname:'
   # pod has field for kubectl edit field manager
   output_message=$(kubectl get pod valid-pod -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-edit'

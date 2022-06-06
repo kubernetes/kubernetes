@@ -8,7 +8,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause
-    image: k8s.gcr.io/pause:3.7
+    image: registry.k8s.io/pause:3.7
 ---
 apiVersion: v1
 kind: Pod
@@ -17,7 +17,7 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause
-    image: k8s.gcr.io/pause:3.7
+    image: registry.k8s.io/pause:3.7
 ---
 apiVersion: v1
 kind: Pod
@@ -26,5 +26,5 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause
-    image: k8s.gcr.io/pause:3.7
+    image: registry.k8s.io/pause:3.7
 

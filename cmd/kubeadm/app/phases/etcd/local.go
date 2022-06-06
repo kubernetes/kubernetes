@@ -179,6 +179,7 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 // GetEtcdPodSpec returns the etcd static Pod actualized to the context of the current configuration
 // NB. GetEtcdPodSpec methods holds the information about how kubeadm creates etcd static pod manifests.
 func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member) v1.Pod {
+	const etcdHealthEndpoint = "/health?serializable=true"
 	pathType := v1.HostPathDirectoryOrCreate
 	etcdMounts := map[string]v1.Volume{
 		etcdVolumeName:  staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.Local.DataDir, &pathType),
@@ -203,8 +204,8 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			},
-			LivenessProbe: staticpodutil.LivenessProbe(probeHostname, "/health", probePort, probeScheme),
-			StartupProbe:  staticpodutil.StartupProbe(probeHostname, "/health", probePort, probeScheme, cfg.APIServer.TimeoutForControlPlane),
+			LivenessProbe: staticpodutil.LivenessProbe(probeHostname, etcdHealthEndpoint, probePort, probeScheme),
+			StartupProbe:  staticpodutil.StartupProbe(probeHostname, etcdHealthEndpoint, probePort, probeScheme, cfg.APIServer.TimeoutForControlPlane),
 		},
 		etcdMounts,
 		// etcd will listen on the advertise address of the API server, in a different port (2379)

@@ -751,7 +751,7 @@ func getTestPodWithSecret(podName, secretName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: "k8s.gcr.io/mounttest:0.8",
+					Image: "registry.k8s.io/mounttest:0.8",
 					Args: []string{
 						"--file_content=/etc/secret-volume/data-1",
 						"--file_mode=/etc/secret-volume/data-1"},
@@ -790,7 +790,7 @@ func getTestPodWithGCEPD(podName, pdName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "pd-volume-test",
-					Image: "k8s.gcr.io/mounttest:0.8",
+					Image: "registry.k8s.io/mounttest:0.8",
 					Args: []string{
 						"--file_content=/etc/pd-volume/data-1",
 					},

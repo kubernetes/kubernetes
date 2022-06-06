@@ -18,124 +18,14 @@ package volumescheduling
 
 import (
 	"context"
-	"net/http/httptest"
-	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/events"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/controlplane"
-	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/profile"
-	"k8s.io/kubernetes/test/integration/framework"
 )
-
-type testContext struct {
-	closeFn         framework.CloseFunc
-	httpServer      *httptest.Server
-	ns              *v1.Namespace
-	clientSet       *clientset.Clientset
-	informerFactory informers.SharedInformerFactory
-	scheduler       *scheduler.Scheduler
-
-	ctx      context.Context
-	cancelFn context.CancelFunc
-}
-
-// initTestAPIServer initializes a test environment and creates an API server with default
-// configuration. Alpha resources are enabled automatically if the corresponding feature
-// is enabled.
-func initTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interface) *testContext {
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	testCtx := testContext{
-		ctx:      ctx,
-		cancelFn: cancelFunc,
-	}
-
-	// 1. Create API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	resourceConfig := controlplane.DefaultAPIResourceConfigSource()
-	controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
-
-	if admission != nil {
-		controlPlaneConfig.GenericConfig.AdmissionControl = admission
-	}
-
-	_, testCtx.httpServer, testCtx.closeFn = framework.RunAnAPIServer(controlPlaneConfig)
-	s := testCtx.httpServer
-
-	if nsPrefix != "default" {
-		testCtx.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), t)
-	} else {
-		testCtx.ns = framework.CreateTestingNamespace("default", t)
-	}
-
-	// 2. Create kubeclient
-	testCtx.clientSet = clientset.NewForConfigOrDie(
-		&restclient.Config{
-			QPS: -1, Host: s.URL,
-			ContentConfig: restclient.ContentConfig{
-				GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"},
-			},
-		},
-	)
-	return &testCtx
-}
-
-// initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
-// configuration and other options.
-func initTestSchedulerWithOptions(
-	t *testing.T,
-	testCtx *testContext,
-	resyncPeriod time.Duration,
-) *testContext {
-	// 1. Create scheduler
-	testCtx.informerFactory = informers.NewSharedInformerFactory(testCtx.clientSet, resyncPeriod)
-
-	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
-		Interface: testCtx.clientSet.EventsV1(),
-	})
-
-	var err error
-	testCtx.scheduler, err = scheduler.New(
-		testCtx.clientSet,
-		testCtx.informerFactory,
-		nil,
-		profile.NewRecorderFactory(eventBroadcaster),
-		testCtx.ctx.Done())
-
-	if err != nil {
-		t.Fatalf("Couldn't create scheduler: %v", err)
-	}
-
-	eventBroadcaster.StartRecordingToSink(testCtx.ctx.Done())
-
-	testCtx.informerFactory.Start(testCtx.scheduler.StopEverything)
-	testCtx.informerFactory.WaitForCacheSync(testCtx.scheduler.StopEverything)
-
-	go testCtx.scheduler.Run(testCtx.ctx)
-	return testCtx
-}
-
-// cleanupTest deletes the scheduler and the test namespace. It should be called
-// at the end of a test.
-func cleanupTest(t *testing.T, testCtx *testContext) {
-	// Kill the scheduler.
-	testCtx.cancelFn()
-	// Cleanup nodes.
-	testCtx.clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-	framework.DeleteTestingNamespace(testCtx.ns, t)
-	testCtx.closeFn()
-}
 
 // waitForPodToScheduleWithTimeout waits for a pod to get scheduled and returns
 // an error if it does not scheduled within the given timeout.

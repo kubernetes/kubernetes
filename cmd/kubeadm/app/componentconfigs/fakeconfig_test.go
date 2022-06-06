@@ -218,7 +218,7 @@ var (
 			etcd:
 			  local:
 			    dataDir: /var/lib/etcd
-			imageRepository: k8s.gcr.io
+			imageRepository: registry.k8s.io
 			kind: ClusterConfiguration
 			kubernetesVersion: 1.2.3
 			networking:
@@ -234,7 +234,7 @@ var (
 			ClusterName:       "LeCluster",
 			KubernetesVersion: "1.2.3",
 			CertificatesDir:   "/etc/kubernetes/pki",
-			ImageRepository:   "k8s.gcr.io",
+			ImageRepository:   "registry.k8s.io",
 			Networking: kubeadmapiv1.Networking{
 				DNSDomain:     "cluster.local",
 				ServiceSubnet: "10.96.0.0/12",
