@@ -1797,17 +1797,13 @@ func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 
 	if gracePeriod != nil {
 		if *gracePeriod <= 1 {
-			// If we plan to terminate quickly, stop probes immediately,
-			// otherwise we will  wait until the pod is completely done. This is
-			// safe since probe periods are quantitized in seconds. Users trying
-			// to kill a pod with a <1s grace period want the pod to stop now.
+			// If we plan to terminate quickly, stop probes immediately, otherwise we will  wait until the pod is completely done
 			kl.probeManager.RemovePod(pod)
 		}
 		klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", *gracePeriod)
 	} else {
 		klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", nil)
 	}
-
 	kl.probeManager.StopLivenessAndStartup(pod)
 
 	p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
