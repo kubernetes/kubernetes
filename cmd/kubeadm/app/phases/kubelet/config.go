@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -38,7 +39,7 @@ import (
 
 // WriteConfigToDisk writes the kubelet config object down to a file
 // Used at "kubeadm init" and "kubeadm upgrade" time
-func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir string) error {
+func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patchesDir string, output io.Writer) error {
 	kubeletCfg, ok := cfg.ComponentConfigs[componentconfigs.KubeletGroup]
 	if !ok {
 		return errors.New("no kubelet component config found")
