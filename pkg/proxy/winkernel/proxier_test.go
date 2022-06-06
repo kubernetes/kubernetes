@@ -138,18 +138,19 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clust
 		networkType: networkType,
 	}
 	proxier := &Proxier{
-		serviceMap:          make(proxy.ServiceMap),
-		endpointsMap:        make(proxy.EndpointsMap),
-		clusterCIDR:         clusterCIDR,
-		hostname:            testHostName,
-		nodeIP:              nodeIP,
-		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
-		network:             *hnsNetworkInfo,
-		sourceVip:           sourceVip,
-		hostMac:             macAddress,
-		isDSR:               false,
-		hns:                 newFakeHNS(),
-		endPointsRefCount:   make(endPointsReferenceCountMap),
+		serviceMap:            make(proxy.ServiceMap),
+		endpointsMap:          make(proxy.EndpointsMap),
+		clusterCIDR:           clusterCIDR,
+		hostname:              testHostName,
+		nodeIP:                nodeIP,
+		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
+		network:               *hnsNetworkInfo,
+		sourceVip:             sourceVip,
+		hostMac:               macAddress,
+		isDSR:                 false,
+		hns:                   newFakeHNS(),
+		endPointsRefCount:     make(endPointsReferenceCountMap),
+		forwardHealthCheckVip: true,
 	}
 
 	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, v1.IPv4Protocol, nil, proxier.serviceMapChange)
