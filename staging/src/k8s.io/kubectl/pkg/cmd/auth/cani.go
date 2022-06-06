@@ -216,9 +216,6 @@ func (o *CanIOptions) Validate() error {
 		if o.Resource != (schema.GroupVersionResource{}) || o.ResourceName != "" {
 			return fmt.Errorf("NonResourceURL and ResourceName can not specified together")
 		}
-		if !isKnownNonResourceVerb(o.Verb) {
-			o.warningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
-		}
 	} else if !o.Resource.Empty() && !o.AllNamespaces && o.DiscoveryClient != nil {
 		if namespaced, err := isNamespaced(o.Resource, o.DiscoveryClient); err == nil && !namespaced {
 			if len(o.Resource.Group) == 0 {
@@ -227,9 +224,10 @@ func (o *CanIOptions) Validate() error {
 				o.warningPrinter.Print(fmt.Sprintf("resource '%s' is not namespace scoped in group '%s'\n", o.Resource.Resource, o.Resource.Group))
 			}
 		}
-		if !isKnownResourceVerb(o.Verb) {
-			o.warningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
-		}
+	}
+
+	if !isKnownResourceVerb(o.Verb) {
+		o.warningPrinter.Print(fmt.Sprintf("verb '%s' is not a known verb\n", o.Verb))
 	}
 
 	if o.NoHeaders {
