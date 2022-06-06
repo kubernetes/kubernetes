@@ -170,6 +170,7 @@ func (o *RolloutStatusOptions) Run() error {
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		ContinueOnError().
 		Latest().
+		Flatten().
 		Do()
 
 	err := r.Err()
