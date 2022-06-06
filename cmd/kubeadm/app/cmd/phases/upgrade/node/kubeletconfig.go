@@ -73,7 +73,7 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		// TODO: Checkpoint the current configuration first so that if something goes wrong it can be recovered
 
 		// Store the kubelet component configuration.
-		if err = kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir); err != nil {
+		if err = kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, data.PatchesDir(), data.OutputWriter()); err != nil {
 			return err
 		}
 

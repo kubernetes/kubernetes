@@ -168,7 +168,7 @@ func runApply(flags *applyFlags, args []string) error {
 
 	// Upgrade RBAC rules and addons.
 	klog.V(1).Infoln("[upgrade/postupgrade] upgrading RBAC rules and addons")
-	if err := upgrade.PerformPostUpgradeTasks(client, cfg, flags.dryRun); err != nil {
+	if err := upgrade.PerformPostUpgradeTasks(client, cfg, flags.patchesDir, flags.dryRun, flags.applyPlanFlags.out); err != nil {
 		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
 	}
 

@@ -19,6 +19,7 @@ package upgrade
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -48,7 +49,7 @@ import (
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the mark-control-plane phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
+func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
 	errs := []error{}
 
 	// Upload currently used configuration to the cluster
@@ -64,7 +65,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Write the new kubelet config down to disk and the env file if needed
-	if err := writeKubeletConfigFiles(client, cfg, dryRun); err != nil {
+	if err := writeKubeletConfigFiles(client, cfg, patchesDir, dryRun, out); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -158,7 +159,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	return errorsutil.NewAggregate(errs)
 }
 
-func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
+func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
 	kubeletDir, err := GetKubeletDir(dryRun)
 	if err != nil {
 		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
@@ -166,7 +167,7 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 	errs := []error{}
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
-	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir); err != nil {
+	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, out); err != nil {
 		errs = append(errs, errors.Wrap(err, "error writing kubelet configuration to file"))
 	}
 
