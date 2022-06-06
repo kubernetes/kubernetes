@@ -25,11 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func getValidVolumeAttachment(name string) *storage.VolumeAttachment {
@@ -127,7 +124,6 @@ func TestVolumeAttachmentStrategySourceInlineSpec(t *testing.T) {
 
 	volumeAttachment := getValidVolumeAttachmentWithInlineSpec("valid-attachment")
 	volumeAttachmentSaved := volumeAttachment.DeepCopy()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 	Strategy.PrepareForCreate(ctx, volumeAttachment)
 	if volumeAttachment.Spec.Source.InlineVolumeSpec == nil {
 		t.Errorf("InlineVolumeSpec unexpectedly set to nil during PrepareForCreate")
@@ -139,22 +135,9 @@ func TestVolumeAttachmentStrategySourceInlineSpec(t *testing.T) {
 	if volumeAttachmentSaved.Spec.Source.InlineVolumeSpec == nil {
 		t.Errorf("InlineVolumeSpec unexpectedly set to nil during PrepareForUpdate")
 	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
 	Strategy.PrepareForUpdate(ctx, volumeAttachmentSaved, volumeAttachment)
 	if volumeAttachmentSaved.Spec.Source.InlineVolumeSpec == nil {
 		t.Errorf("InlineVolumeSpec unexpectedly set to nil during PrepareForUpdate")
-	}
-
-	volumeAttachment = getValidVolumeAttachmentWithInlineSpec("valid-attachment")
-	volumeAttachmentNew := volumeAttachment.DeepCopy()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
-	Strategy.PrepareForCreate(ctx, volumeAttachment)
-	if volumeAttachment.Spec.Source.InlineVolumeSpec != nil {
-		t.Errorf("InlineVolumeSpec unexpectedly not dropped during PrepareForCreate")
-	}
-	Strategy.PrepareForUpdate(ctx, volumeAttachmentNew, volumeAttachment)
-	if volumeAttachmentNew.Spec.Source.InlineVolumeSpec != nil {
-		t.Errorf("InlineVolumeSpec unexpectedly not dropped during PrepareForUpdate")
 	}
 }
 

@@ -23,11 +23,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -158,7 +155,6 @@ func TestValidateStorageClass(t *testing.T) {
 }
 
 func TestVolumeAttachmentValidation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 	volumeName := "pv-name"
 	empty := ""
 	migrationEnabledSuccessCases := []storage.VolumeAttachment{
@@ -384,43 +380,9 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 			t.Errorf("expected failure for test: %v", volumeAttachment)
 		}
 	}
-
-	// validate with CSIMigration disabled
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
-
-	migrationDisabledSuccessCases := []storage.VolumeAttachment{
-		{
-			// PVName specified with migration disabled
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: storage.VolumeAttachmentSpec{
-				Attacher: "myattacher",
-				NodeName: "node",
-				Source: storage.VolumeAttachmentSource{
-					PersistentVolumeName: &volumeName,
-				},
-			},
-		},
-		{
-			// InlineSpec specified with migration disabled
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: storage.VolumeAttachmentSpec{
-				Attacher: "myattacher",
-				NodeName: "node",
-				Source: storage.VolumeAttachmentSource{
-					InlineVolumeSpec: &inlineSpec,
-				},
-			},
-		},
-	}
-	for _, volumeAttachment := range migrationDisabledSuccessCases {
-		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
-			t.Errorf("expected success: %v %v", volumeAttachment, errs)
-		}
-	}
 }
 
 func TestVolumeAttachmentUpdateValidation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 	volumeName := "foo"
 	newVolumeName := "bar"
 

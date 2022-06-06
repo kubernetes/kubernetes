@@ -127,7 +127,6 @@ func TestIsMigratable(t *testing.T) {
 	for _, test := range testCases {
 		pm := NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			migratable, err := pm.IsMigratable(test.spec)
 			if migratable != test.isMigratable {
@@ -145,37 +144,24 @@ func TestCheckMigrationFeatureFlags(t *testing.T) {
 		name                    string
 		pluginFeature           featuregate.Feature
 		pluginFeatureEnabled    bool
-		csiMigrationEnabled     bool
 		pluginUnregsiterFeature featuregate.Feature
 		pluginUnregsiterEnabled bool
 		expectMigrationComplete bool
 		expectErr               bool
 	}{
 		{
-			name:                    "plugin specific feature flag enabled with migration flag disabled",
+			name:                    "plugin specific migration feature enabled with plugin unregister disabled",
 			pluginFeature:           features.CSIMigrationvSphere,
 			pluginFeatureEnabled:    true,
-			csiMigrationEnabled:     false,
-			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
-			pluginUnregsiterEnabled: false,
-			expectMigrationComplete: false,
-			expectErr:               true,
-		},
-		{
-			name:                    "plugin specific migration feature and CSI migration flag both enabled with plugin unregister disabled",
-			pluginFeature:           features.CSIMigrationvSphere,
-			pluginFeatureEnabled:    true,
-			csiMigrationEnabled:     true,
 			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
 			pluginUnregsiterEnabled: false,
 			expectMigrationComplete: false,
 			expectErr:               false,
 		},
 		{
-			name:                    "plugin specific migration feature and plugin unregister disabled and CSI migration flag enabled",
+			name:                    "plugin specific migration feature and plugin unregister disabled",
 			pluginFeature:           features.CSIMigrationvSphere,
 			pluginFeatureEnabled:    false,
-			csiMigrationEnabled:     true,
 			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
 			pluginUnregsiterEnabled: false,
 			expectMigrationComplete: false,
@@ -185,26 +171,14 @@ func TestCheckMigrationFeatureFlags(t *testing.T) {
 			name:                    "all features enabled",
 			pluginFeature:           features.CSIMigrationvSphere,
 			pluginFeatureEnabled:    true,
-			csiMigrationEnabled:     true,
 			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
 			pluginUnregsiterEnabled: true,
 			expectMigrationComplete: true,
 			expectErr:               false,
 		},
-		{
-			name:                    "all features disabled",
-			pluginFeature:           features.CSIMigrationvSphere,
-			pluginFeatureEnabled:    false,
-			csiMigrationEnabled:     false,
-			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
-			pluginUnregsiterEnabled: false,
-			expectMigrationComplete: false,
-			expectErr:               false,
-		},
 	}
 	for _, test := range testCases {
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginUnregsiterFeature, test.pluginUnregsiterEnabled)()
 			migrationComplete, err := CheckMigrationFeatureFlags(utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginUnregsiterFeature)
@@ -326,7 +300,6 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 	for _, test := range testCases {
 		pm := NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.inTreePluginUnregister, test.inTreePluginUnregisterEnabled)()
 

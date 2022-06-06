@@ -1046,10 +1046,6 @@ func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *sto
 		return pv, nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
-		return pv, nil
-	}
-
 	pluginName, err := b.translator.GetInTreePluginNameFromSpec(pv, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not get plugin name from pv: %v", err)
