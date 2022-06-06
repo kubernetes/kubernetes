@@ -48,6 +48,7 @@ func NewKubeletStartPhase() workflow.Phase {
 			options.CfgPath,
 			options.NodeCRISocket,
 			options.NodeName,
+			options.Patches,
 		},
 	}
 }
