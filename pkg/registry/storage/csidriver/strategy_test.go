@@ -287,6 +287,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			old:                                 driverWithNothing,
 			update:                              driverWithSELinuxMountEnabled,
 			wantSELinuxMount:                    &enabled,
+			wantGeneration:                      1,
 		},
 		{
 			name:                                "SELinux mount support feature enabled, before: off, update: on",
@@ -294,6 +295,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			old:                                 driverWithSELinuxMountDisabled,
 			update:                              driverWithSELinuxMountEnabled,
 			wantSELinuxMount:                    &enabled,
+			wantGeneration:                      1,
 		},
 		{
 			name:                                "SELinux mount support feature enabled, before: on, update: off",
@@ -301,6 +303,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			old:                                 driverWithSELinuxMountEnabled,
 			update:                              driverWithSELinuxMountDisabled,
 			wantSELinuxMount:                    &disabled,
+			wantGeneration:                      1,
 		},
 		{
 			name:                                "SELinux mount support feature disabled, before: nil, update: on",
@@ -308,6 +311,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			old:                                 driverWithNothing,
 			update:                              driverWithSELinuxMountEnabled,
 			wantSELinuxMount:                    nil,
+			wantGeneration:                      0,
 		},
 		{
 			name:                                "SELinux mount support feature disabled, before: off, update: on",
@@ -315,6 +319,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			old:                                 driverWithSELinuxMountDisabled,
 			update:                              driverWithSELinuxMountEnabled,
 			wantSELinuxMount:                    &enabled,
+			wantGeneration:                      1,
 		},
 		{
 			name:                                "SELinux mount support feature enabled, before: on, update: off",
@@ -322,6 +327,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			old:                                 driverWithSELinuxMountEnabled,
 			update:                              driverWithSELinuxMountDisabled,
 			wantSELinuxMount:                    &disabled,
+			wantGeneration:                      1,
 		},
 	}
 
@@ -337,7 +343,7 @@ func TestCSIDriverPrepareForUpdate(t *testing.T) {
 			require.Equal(t, test.wantModes, csiDriver.Spec.VolumeLifecycleModes)
 			require.Equal(t, test.wantTokenRequests, csiDriver.Spec.TokenRequests)
 			require.Equal(t, test.wantRequiresRepublish, csiDriver.Spec.RequiresRepublish)
-			require.Equal(t, test.wantSELinuxMount, csiDriver.Spec.SELinuxMounted)
+			require.Equal(t, test.wantSELinuxMount, csiDriver.Spec.SELinuxMount)
 		})
 	}
 }
