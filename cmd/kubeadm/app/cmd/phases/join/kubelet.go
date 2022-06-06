@@ -76,6 +76,7 @@ func NewKubeletStartPhase() workflow.Phase {
 			options.TokenDiscoverySkipCAHash,
 			options.TLSBootstrapToken,
 			options.TokenStr,
+			options.Patches,
 		},
 	}
 }

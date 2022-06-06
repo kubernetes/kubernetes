@@ -48,6 +48,7 @@ func NewKubeletConfigPhase() workflow.Phase {
 		InheritFlags: []string{
 			options.DryRun,
 			options.KubeconfigPath,
+			options.Patches,
 		},
 	}
 	return phase
