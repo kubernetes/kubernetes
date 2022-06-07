@@ -201,7 +201,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 					}],
 					"properties": {
 						"x": {
-							"type": "list",
+							"type": "array",
 							"items": {
 								"type": "string"
 							}
@@ -213,7 +213,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithExpensiveRule, false)
 		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 		framework.ExpectError(err, "creating a CustomResourceDefinition with a validation rule that exceeds the cost limit")
-		expectedErrMsg := "syntax error"
+		expectedErrMsg := "exceeded budget"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
 			framework.Failf("expected error message to contain %q, got %q", expectedErrMsg, err.Error())
 		}
