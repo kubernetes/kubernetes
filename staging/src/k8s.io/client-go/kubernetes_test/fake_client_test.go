@@ -18,6 +18,8 @@ package kubernetes
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/watch"
+	fakeclient "k8s.io/client-go/testing"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -89,5 +91,30 @@ func TestListDecoding(t *testing.T) {
 
 	if obj.GetObjectKind().GroupVersionKind() != (schema.GroupVersionKind{}) {
 		t.Fatal(obj.GetObjectKind().GroupVersionKind())
+	}
+}
+
+type ew struct{}
+
+func (e *ew) NewFakeWatch() fakeclient.Watcher {
+	return watch.NewFakeWithChanSize(1000, false)
+}
+
+func Test_ConfigMapFakeClientExchangeWatcher(t *testing.T) {
+	fakeKubeClient := fake.NewSimpleClientset(&corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "foo-name"}})
+	fakeKubeClient.Tracker().ExchangeWatcher(&ew{})
+	cm, err := fakeKubeClient.CoreV1().ConfigMaps("foo-ns").Get(context.TODO(), "foo-name", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cm.GetObjectKind().GroupVersionKind() != (schema.GroupVersionKind{}) {
+		t.Fatal(cm.GetObjectKind().GroupVersionKind())
+	}
+	cmList, err := fakeKubeClient.CoreV1().ConfigMaps("foo-ns").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cmList.GetObjectKind().GroupVersionKind() != (schema.GroupVersionKind{}) {
+		t.Fatal(cmList.GetObjectKind().GroupVersionKind())
 	}
 }

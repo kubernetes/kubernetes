@@ -408,3 +408,61 @@ func Test_resourceCovers(t *testing.T) {
 		})
 	}
 }
+
+func Test_ExchangeWatcher(t *testing.T) {
+	testResource := schema.GroupVersionResource{Group: "", Version: "test_version", Resource: "test_kind"}
+	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
+	accessor, err := meta.Accessor(testObj)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ns := accessor.GetNamespace()
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	o.ExchangeWatcher(&ew{})
+	w, err := o.Watch(testResource, "test_namespace")
+	if err != nil {
+		t.Fatalf("test resource watch failed in test_namespace: %v", err)
+	}
+	wAll, err := o.Watch(testResource, "")
+	if err != nil {
+		t.Fatalf("test resource watch failed in all namespaces: %v", err)
+	}
+	go func() {
+		err := o.Create(testResource, testObj, ns)
+		assert.NoError(t, err, "test resource creation failed")
+	}()
+	out := <-w.ResultChan()
+	outAll := <-wAll.ResultChan()
+	assert.Equal(t, watch.Added, out.Type, "watch event mismatch")
+	assert.Equal(t, watch.Added, outAll.Type, "watch event mismatch")
+	assert.Equal(t, testObj, out.Object, "watched created object mismatch")
+	assert.Equal(t, testObj, outAll.Object, "watched created object mismatch")
+	go func() {
+		err := o.Update(testResource, testObj, ns)
+		assert.NoError(t, err, "test resource updating failed")
+	}()
+	out = <-w.ResultChan()
+	outAll = <-wAll.ResultChan()
+	assert.Equal(t, watch.Modified, out.Type, "watch event mismatch")
+	assert.Equal(t, watch.Modified, outAll.Type, "watch event mismatch")
+	assert.Equal(t, testObj, out.Object, "watched updated object mismatch")
+	assert.Equal(t, testObj, outAll.Object, "watched updated object mismatch")
+	go func() {
+		err := o.Delete(testResource, "test_namespace", "test_name")
+		assert.NoError(t, err, "test resource deletion failed")
+	}()
+	out = <-w.ResultChan()
+	outAll = <-wAll.ResultChan()
+	assert.Equal(t, watch.Deleted, out.Type, "watch event mismatch")
+	assert.Equal(t, watch.Deleted, outAll.Type, "watch event mismatch")
+	assert.Equal(t, testObj, out.Object, "watched deleted object mismatch")
+	assert.Equal(t, testObj, outAll.Object, "watched deleted object mismatch")
+}
+
+type ew struct{}
+
+func (e *ew) NewFakeWatch() Watcher {
+	return watch.NewFakeWithChanSize(1000, false)
+}
