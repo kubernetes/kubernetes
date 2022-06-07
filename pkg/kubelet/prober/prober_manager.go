@@ -247,6 +247,7 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 				w, exists := m.getWorker(podUID, c.Name, readiness)
 				ready = !exists // no readinessProbe -> always ready
 				if exists {
+					m.statusManager.GetAPIContainerStatus(podUID, kubecontainer.ParseContainerID(c.ContainerID))
 					// Trigger an immediate run of the readinessProbe to update ready state
 					select {
 					case w.manualTriggerCh <- struct{}{}:

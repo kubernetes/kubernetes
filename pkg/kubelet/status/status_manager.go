@@ -108,6 +108,7 @@ type Manager interface {
 	// triggers a status update.
 	SetContainerStartup(podUID types.UID, containerID kubecontainer.ContainerID, started bool)
 
+	GetAPIContainerStatus(podUID types.UID, containerID kubecontainer.ContainerID) bool
 	// TerminatePod resets the container status for the provided pod to terminated and triggers
 	// a status update.
 	TerminatePod(pod *v1.Pod)
@@ -306,6 +307,34 @@ func (m *manager) SetContainerStartup(podUID types.UID, containerID kubecontaine
 	containerStatus.Started = &started
 
 	m.updateStatusInternal(pod, status, false)
+}
+
+func (m *manager) GetAPIContainerStatus(podUID types.UID, containerID kubecontainer.ContainerID) bool {
+
+	pod, ok := m.podManager.GetPodByUID(podUID)
+	if !ok {
+		klog.V(4).InfoS("Pod has been deleted, no need to update startup", "podUID", string(podUID))
+		return false
+	}
+
+	apiPod, err := m.kubeClient.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return false
+	}
+	if err != nil {
+		return false
+	}
+	// Find the container to update.
+	containerStatus, _, ok := findContainerStatus(&apiPod.Status, containerID.String())
+	if !ok {
+		klog.InfoS("Container startup changed for unknown container",
+			"pod", klog.KObj(pod),
+			"containerID", containerID.String())
+		return false
+	}
+
+
+	return containerStatus.Ready
 }
 
 func findContainerStatus(status *v1.PodStatus, containerID string) (containerStatus *v1.ContainerStatus, init bool, ok bool) {

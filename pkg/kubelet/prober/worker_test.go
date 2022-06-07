@@ -170,7 +170,7 @@ func TestInitialDelay(t *testing.T) {
 		case liveness:
 			expectResult(t, w, results.Success, "during initial delay")
 		case readiness:
-			expectResult(t, w, results.Failure, "during initial delay")
+			expectUnset(t, w, results.Failure, "during initial delay")
 		case startup:
 			expectResult(t, w, results.Unknown, "during initial delay")
 		}
@@ -184,6 +184,15 @@ func TestInitialDelay(t *testing.T) {
 		// Second call should succeed (already waited).
 		expectContinue(t, w, w.doProbe(), "after initial delay")
 		expectResult(t, w, results.Success, "after initial delay")
+	}
+}
+
+func expectUnset(t *testing.T, w *worker, expectedResult results.Result, msg string) {
+	result, ok := resultsManager(w.probeManager, w.probeType).Get(w.containerID)
+	if !ok {
+		t.Error("")
+	} else if result != expectedResult {
+		t.Error("")
 	}
 }
 

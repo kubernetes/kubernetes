@@ -204,11 +204,16 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	if w.containerID.String() != c.ContainerID {
+		oldID := w.containerID
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
-		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		if oldID.IsEmpty() && w.probeType == readiness {
+
+		} else {
+			w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		}
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}
