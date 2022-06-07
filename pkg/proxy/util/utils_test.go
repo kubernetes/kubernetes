@@ -104,6 +104,7 @@ func TestIsProxyableIP(t *testing.T) {
 		ip   string
 		want error
 	}{
+		{"0.0.0.0", ErrAddressNotAllowed},
 		{"127.0.0.1", ErrAddressNotAllowed},
 		{"127.0.0.2", ErrAddressNotAllowed},
 		{"169.254.169.254", ErrAddressNotAllowed},
@@ -113,6 +114,7 @@ func TestIsProxyableIP(t *testing.T) {
 		{"192.168.0.1", nil},
 		{"172.16.0.1", nil},
 		{"8.8.8.8", nil},
+		{"::", ErrAddressNotAllowed},
 		{"::1", ErrAddressNotAllowed},
 		{"fe80::", ErrAddressNotAllowed},
 		{"ff02::", ErrAddressNotAllowed},
