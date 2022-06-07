@@ -82,6 +82,7 @@ type GetPodsByNodeNameFunc func(nodeName string) ([]*v1.Pod, error)
 // from Nodes tainted with NoExecute Taints.
 type NoExecuteTaintManager struct {
 	client                clientset.Interface
+	broadcaster           record.EventBroadcaster
 	recorder              record.EventRecorder
 	getPod                GetPodFunc
 	getNode               GetNodeFunc
@@ -158,16 +159,10 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 func NewNoExecuteTaintManager(ctx context.Context, c clientset.Interface, getPod GetPodFunc, getNode GetNodeFunc, getPodsAssignedToNode GetPodsByNodeNameFunc) *NoExecuteTaintManager {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "taint-controller"})
-	eventBroadcaster.StartStructuredLogging(0)
-	if c != nil {
-		klog.InfoS("Sending events to api server")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.CoreV1().Events("")})
-	} else {
-		klog.Fatalf("kubeClient is nil when starting NodeController")
-	}
 
 	tm := &NoExecuteTaintManager{
 		client:                c,
+		broadcaster:           eventBroadcaster,
 		recorder:              recorder,
 		getPod:                getPod,
 		getNode:               getNode,
@@ -184,7 +179,22 @@ func NewNoExecuteTaintManager(ctx context.Context, c clientset.Interface, getPod
 
 // Run starts NoExecuteTaintManager which will run in loop until `stopCh` is closed.
 func (tc *NoExecuteTaintManager) Run(ctx context.Context) {
+	defer utilruntime.HandleCrash()
+
 	klog.InfoS("Starting NoExecuteTaintManager")
+
+	// Start events processing pipeline.
+	tc.broadcaster.StartStructuredLogging(0)
+	if tc.client != nil {
+		klog.InfoS("Sending events to api server")
+		tc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: tc.client.CoreV1().Events("")})
+	} else {
+		klog.Fatalf("kubeClient is nil when starting NodeController")
+	}
+	defer tc.broadcaster.Shutdown()
+
+	defer tc.nodeUpdateQueue.ShutDown()
+	defer tc.podUpdateQueue.ShutDown()
 
 	for i := 0; i < UpdateWorkerSize; i++ {
 		tc.nodeUpdateChannels = append(tc.nodeUpdateChannels, make(chan nodeUpdateItem, NodeUpdateChannelSize))
