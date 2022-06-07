@@ -183,7 +183,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithSyntaxErrorRule, false)
 		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 		framework.ExpectError(err, "creating a CustomResourceDefinition with a validation rule that contains a syntax error")
-		expectedErrMsg := "syntax error"
+		expectedErrMsg := "Syntax error"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
 			framework.Failf("expected error message to contain %q, got %q", expectedErrMsg, err.Error())
 		}
