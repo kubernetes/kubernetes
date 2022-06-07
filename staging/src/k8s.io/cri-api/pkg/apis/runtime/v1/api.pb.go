@@ -6127,8 +6127,16 @@ func (m *ExecSyncRequest) GetTimeout() int64 {
 
 type ExecSyncResponse struct {
 	// Captured command stdout output.
+	// The runtime should cap the output of this response to 16MB.
+	// If the stdout of the command produces more than 16MB, the remaining output
+	// should be discarded, and the command should proceed with no error.
+	// See CVE-2022-1708 and CVE-2022-31030 for more information.
 	Stdout []byte `protobuf:"bytes,1,opt,name=stdout,proto3" json:"stdout,omitempty"`
 	// Captured command stderr output.
+	// The runtime should cap the output of this response to 16MB.
+	// If the stderr of the command produces more than 16MB, the remaining output
+	// should be discarded, and the command should proceed with no error.
+	// See CVE-2022-1708 and CVE-2022-31030 for more information.
 	Stderr []byte `protobuf:"bytes,2,opt,name=stderr,proto3" json:"stderr,omitempty"`
 	// Exit code the command finished with. Default: 0 (success).
 	ExitCode             int32    `protobuf:"varint,3,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`

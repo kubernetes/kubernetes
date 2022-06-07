@@ -1279,8 +1279,16 @@ message ExecSyncRequest {
 
 message ExecSyncResponse {
     // Captured command stdout output.
+	// The runtime should cap the output of this response to 16MB.
+	// If the stdout of the command produces more than 16MB, the remaining output
+	// should be discarded, and the command should proceed with no error.
+	// See CVE-2022-1708 and CVE-2022-31030 for more information.
     bytes stdout = 1;
     // Captured command stderr output.
+	// The runtime should cap the output of this response to 16MB.
+	// If the stderr of the command produces more than 16MB, the remaining output
+	// should be discarded, and the command should proceed with no error.
+	// See CVE-2022-1708 and CVE-2022-31030 for more information.
     bytes stderr = 2;
     // Exit code the command finished with. Default: 0 (success).
     int32 exit_code = 3;
