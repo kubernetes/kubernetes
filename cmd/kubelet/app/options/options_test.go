@@ -25,6 +25,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/kubernetes/pkg/kubelet/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func newKubeletServerOrDie() *KubeletServer {
@@ -171,6 +173,9 @@ func TestValidateKubeletFlags(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateKubeletFlags(&KubeletFlags{
+				ContainerRuntimeOptions: config.ContainerRuntimeOptions{
+					ContainerRuntime: kubetypes.RemoteContainerRuntime,
+				},
 				NodeLabels: tt.labels,
 			})
 

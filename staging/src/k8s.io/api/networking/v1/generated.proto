@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/api/networking/v1";
 
 // HTTPIngressPath associates a path with a backend. Incoming urls matching the
 // path are forwarded to the backend.
@@ -337,6 +337,11 @@ message NetworkPolicy {
   // Specification of the desired behavior for this NetworkPolicy.
   // +optional
   optional NetworkPolicySpec spec = 2;
+
+  // Status is the current state of the NetworkPolicy.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+  // +optional
+  optional NetworkPolicyStatus status = 3;
 }
 
 // NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods
@@ -484,6 +489,18 @@ message NetworkPolicySpec {
   // This field is beta-level in 1.8
   // +optional
   repeated string policyTypes = 4;
+}
+
+// NetworkPolicyStatus describe the current state of the NetworkPolicy.
+message NetworkPolicyStatus {
+  // Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy.
+  // Current service state
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
+  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
 
 // ServiceBackendPort is the service port being referenced.

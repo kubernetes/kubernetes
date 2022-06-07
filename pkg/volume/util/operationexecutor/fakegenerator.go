@@ -17,6 +17,7 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -108,7 +109,7 @@ func (f *fakeOGCounter) GenerateExpandAndRecoverVolumeFunc(*v1.PersistentVolumeC
 	return f.recordFuncCall("GenerateExpandVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, currentSize resource.Quantity) (volumetypes.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateExpandInUseVolumeFunc"), nil
 }
 

@@ -23,17 +23,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
 	   Release: v1.9
@@ -287,12 +287,9 @@ var _ = SIGDescribe("Downward API", func() {
 
 var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPIHugePages]", func() {
 	f := framework.NewDefaultFramework("downward-api")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("Downward API tests for hugepages", func() {
-		ginkgo.BeforeEach(func() {
-			e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.DownwardAPIHugePages)
-		})
-
 		ginkgo.It("should provide container's limits.hugepages-<pagesize> and requests.hugepages-<pagesize> as env vars", func() {
 			podName := "downward-api-" + string(uuid.NewUUID())
 			env := []v1.EnvVar{

@@ -23,6 +23,7 @@ package resolver
 import (
 	"context"
 	"net"
+	"net/url"
 
 	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/credentials"
@@ -116,8 +117,13 @@ type Address struct {
 	ServerName string
 
 	// Attributes contains arbitrary data about this address intended for
-	// consumption by the load balancing policy.
+	// consumption by the SubConn.
 	Attributes *attributes.Attributes
+
+	// BalancerAttributes contains arbitrary data about this address intended
+	// for consumption by the LB policy.  These attribes do not affect SubConn
+	// creation, connection establishment, handshaking, etc.
+	BalancerAttributes *attributes.Attributes
 
 	// Type is the type of this address.
 	//
@@ -129,6 +135,15 @@ type Address struct {
 	//
 	// Deprecated: use Attributes instead.
 	Metadata interface{}
+}
+
+// Equal returns whether a and o are identical.  Metadata is compared directly,
+// not with any recursive introspection.
+func (a *Address) Equal(o Address) bool {
+	return a.Addr == o.Addr && a.ServerName == o.ServerName &&
+		a.Attributes.Equal(o.Attributes) &&
+		a.BalancerAttributes.Equal(o.BalancerAttributes) &&
+		a.Type == o.Type && a.Metadata == o.Metadata
 }
 
 // BuildOptions includes additional information for the builder to create
@@ -204,25 +219,36 @@ type ClientConn interface {
 
 // Target represents a target for gRPC, as specified in:
 // https://github.com/grpc/grpc/blob/master/doc/naming.md.
-// It is parsed from the target string that gets passed into Dial or DialContext by the user. And
-// grpc passes it to the resolver and the balancer.
+// It is parsed from the target string that gets passed into Dial or DialContext
+// by the user. And gRPC passes it to the resolver and the balancer.
 //
-// If the target follows the naming spec, and the parsed scheme is registered with grpc, we will
-// parse the target string according to the spec. e.g. "dns://some_authority/foo.bar" will be parsed
-// into &Target{Scheme: "dns", Authority: "some_authority", Endpoint: "foo.bar"}
+// If the target follows the naming spec, and the parsed scheme is registered
+// with gRPC, we will parse the target string according to the spec. If the
+// target does not contain a scheme or if the parsed scheme is not registered
+// (i.e. no corresponding resolver available to resolve the endpoint), we will
+// apply the default scheme, and will attempt to reparse it.
 //
-// If the target does not contain a scheme, we will apply the default scheme, and set the Target to
-// be the full target string. e.g. "foo.bar" will be parsed into
-// &Target{Scheme: resolver.GetDefaultScheme(), Endpoint: "foo.bar"}.
+// Examples:
 //
-// If the parsed scheme is not registered (i.e. no corresponding resolver available to resolve the
-// endpoint), we set the Scheme to be the default scheme, and set the Endpoint to be the full target
-// string. e.g. target string "unknown_scheme://authority/endpoint" will be parsed into
-// &Target{Scheme: resolver.GetDefaultScheme(), Endpoint: "unknown_scheme://authority/endpoint"}.
+// - "dns://some_authority/foo.bar"
+//   Target{Scheme: "dns", Authority: "some_authority", Endpoint: "foo.bar"}
+// - "foo.bar"
+//   Target{Scheme: resolver.GetDefaultScheme(), Endpoint: "foo.bar"}
+// - "unknown_scheme://authority/endpoint"
+//   Target{Scheme: resolver.GetDefaultScheme(), Endpoint: "unknown_scheme://authority/endpoint"}
 type Target struct {
-	Scheme    string
+	// Deprecated: use URL.Scheme instead.
+	Scheme string
+	// Deprecated: use URL.Host instead.
 	Authority string
-	Endpoint  string
+	// Deprecated: use URL.Path or URL.Opaque instead. The latter is set when
+	// the former is empty.
+	Endpoint string
+	// URL contains the parsed dial target with an optional default scheme added
+	// to it if the original dial target contained no scheme or contained an
+	// unregistered scheme. Any query params specified in the original dial
+	// target can be accessed from here.
+	URL url.URL
 }
 
 // Builder creates a resolver that will be used to watch name resolution updates.

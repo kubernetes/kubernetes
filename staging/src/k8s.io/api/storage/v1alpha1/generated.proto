@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1alpha1";
+option go_package = "k8s.io/api/storage/v1alpha1";
 
 // CSIStorageCapacity stores the result of one CSI GetCapacity call.
 // For a given StorageClass, this describes the available capacity in a
@@ -47,9 +47,13 @@ option go_package = "v1alpha1";
 //
 // The producer of these objects can decide which approach is more suitable.
 //
-// They are consumed by the kube-scheduler if the CSIStorageCapacity beta feature gate
-// is enabled there and a CSI driver opts into capacity-aware scheduling with
-// CSIDriver.StorageCapacity.
+// They are consumed by the kube-scheduler when a CSI driver opts into
+// capacity-aware scheduling with CSIDriverSpec.StorageCapacity. The scheduler
+// compares the MaximumVolumeSize against the requested size of pending volumes
+// to filter out unsuitable nodes. If MaximumVolumeSize is unset, it falls back
+// to a comparison against the less precise Capacity. If that is also unset,
+// the scheduler assumes that capacity is insufficient and tries some other
+// node.
 message CSIStorageCapacity {
   // Standard object's metadata. The name has no particular meaning. It must be
   // be a DNS subdomain (dots allowed, 253 characters). To ensure that
@@ -87,7 +91,7 @@ message CSIStorageCapacity {
   // The semantic is currently (CSI spec 1.2) defined as:
   // The available capacity, in bytes, of the storage that can be used
   // to provision volumes. If not set, that information is currently
-  // unavailable and treated like zero capacity.
+  // unavailable.
   //
   // +optional
   optional k8s.io.apimachinery.pkg.api.resource.Quantity capacity = 4;

@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
 
@@ -41,7 +40,6 @@ const deprecated = "will be removed in a future release, see https://github.com/
 
 var (
 	packageFlags = flag.NewFlagSet("logging", flag.ContinueOnError)
-	logrFlush    func()
 
 	// Periodic flushing gets configured either via the global flag
 	// in this file or via LoggingConfiguration.
@@ -170,14 +168,28 @@ func (writer KlogWriter) Write(data []byte) (n int, err error) {
 // InitLogs initializes logs the way we want for Kubernetes.
 // It should be called after parsing flags. If called before that,
 // it will use the default log settings.
+//
+// InitLogs disables support for contextual logging in klog while
+// that Kubernetes feature is not considered stable yet. Commands
+// which want to support contextual logging can:
+// - call klog.EnableContextualLogging after calling InitLogs,
+//   with a fixed `true` or depending on some command line flag or
+//   a feature gate check
+// - set up a FeatureGate instance, the advanced logging configuration
+//   with Options and call Options.ValidateAndApply with the FeatureGate;
+//   k8s.io/component-base/logs/example/cmd demonstrates how to do that
 func InitLogs() {
 	log.SetOutput(KlogWriter{})
 	log.SetFlags(0)
 	if logFlushFreqAdded {
 		// The flag from this file was activated, so use it now.
 		// Otherwise LoggingConfiguration.Apply will do this.
-		go wait.Forever(FlushLogs, logFlushFreq)
+		klog.StartFlushDaemon(logFlushFreq)
 	}
+
+	// This is the default in Kubernetes. Options.ValidateAndApply
+	// will override this with the result of a feature gate check.
+	klog.EnableContextualLogging(false)
 }
 
 // FlushLogs flushes logs immediately. This should be called at the end of
@@ -185,9 +197,6 @@ func InitLogs() {
 // are printed before exiting the program.
 func FlushLogs() {
 	klog.Flush()
-	if logrFlush != nil {
-		logrFlush()
-	}
 }
 
 // NewLogger creates a new log.Logger which sends logs to klog.Info.

@@ -298,51 +298,6 @@ func TestResourceVersionerOfAPI(t *testing.T) {
 	}
 }
 
-func TestTypeMetaSelfLinker(t *testing.T) {
-	table := map[string]struct {
-		obj     runtime.Object
-		expect  string
-		try     string
-		succeed bool
-	}{
-		"normal": {
-			obj:     &MyAPIObject{TypeMeta: InternalTypeMeta{SelfLink: "foobar"}},
-			expect:  "foobar",
-			try:     "newbar",
-			succeed: true,
-		},
-		"fail": {
-			obj:     &MyIncorrectlyMarkedAsAPIObject{},
-			succeed: false,
-		},
-	}
-
-	linker := runtime.SelfLinker(meta.NewAccessor())
-	for name, item := range table {
-		got, err := linker.SelfLink(item.obj)
-		if e, a := item.succeed, err == nil; e != a {
-			t.Errorf("%v: expected %v, got %v", name, e, a)
-		}
-		if e, a := item.expect, got; item.succeed && e != a {
-			t.Errorf("%v: expected %v, got %v", name, e, a)
-		}
-
-		err = linker.SetSelfLink(item.obj, item.try)
-		if e, a := item.succeed, err == nil; e != a {
-			t.Errorf("%v: expected %v, got %v", name, e, a)
-		}
-		if item.succeed {
-			got, err := linker.SelfLink(item.obj)
-			if err != nil {
-				t.Errorf("%v: expected no err, got %v", name, err)
-			}
-			if e, a := item.try, got; e != a {
-				t.Errorf("%v: expected %v, got %v", name, e, a)
-			}
-		}
-	}
-}
-
 type MyAPIObject2 struct {
 	metav1.TypeMeta
 	metav1.ObjectMeta

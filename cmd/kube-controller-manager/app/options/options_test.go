@@ -97,7 +97,6 @@ var args = []string{
 	"--contention-profiling=true",
 	"--controller-start-interval=2m",
 	"--controllers=foo,bar",
-	"--deployment-controller-sync-period=45s",
 	"--disable-attach-detach-reconcile-sync=true",
 	"--enable-dynamic-provisioning=false",
 	"--enable-garbage-collector=false",
@@ -258,8 +257,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		DeploymentController: &DeploymentControllerOptions{
 			&deploymentconfig.DeploymentControllerConfiguration{
-				ConcurrentDeploymentSyncs:      10,
-				DeploymentControllerSyncPeriod: metav1.Duration{Duration: 45 * time.Second},
+				ConcurrentDeploymentSyncs: 10,
 			},
 		},
 		StatefulSetController: &StatefulSetControllerOptions{
@@ -268,10 +266,7 @@ func TestAddFlags(t *testing.T) {
 			},
 		},
 		DeprecatedFlags: &DeprecatedControllerOptions{
-			&kubectrlmgrconfig.DeprecatedControllerConfiguration{
-				DeletingPodsQPS:    0.1,
-				RegisterRetryCount: 10,
-			},
+			&kubectrlmgrconfig.DeprecatedControllerConfiguration{},
 		},
 		EndpointController: &EndpointControllerOptions{
 			&endpointconfig.EndpointControllerConfiguration{
@@ -531,16 +526,12 @@ func TestApplyTo(t *testing.T) {
 				ConcurrentDaemonSetSyncs: 2,
 			},
 			DeploymentController: deploymentconfig.DeploymentControllerConfiguration{
-				ConcurrentDeploymentSyncs:      10,
-				DeploymentControllerSyncPeriod: metav1.Duration{Duration: 45 * time.Second},
+				ConcurrentDeploymentSyncs: 10,
 			},
 			StatefulSetController: statefulsetconfig.StatefulSetControllerConfiguration{
 				ConcurrentStatefulSetSyncs: 15,
 			},
-			DeprecatedController: kubectrlmgrconfig.DeprecatedControllerConfiguration{
-				DeletingPodsQPS:    0.1,
-				RegisterRetryCount: 10,
-			},
+			DeprecatedController: kubectrlmgrconfig.DeprecatedControllerConfiguration{},
 			EndpointController: endpointconfig.EndpointControllerConfiguration{
 				ConcurrentEndpointSyncs: 10,
 			},

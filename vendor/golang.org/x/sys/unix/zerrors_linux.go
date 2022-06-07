@@ -38,7 +38,8 @@ const (
 	AF_KEY                                      = 0xf
 	AF_LLC                                      = 0x1a
 	AF_LOCAL                                    = 0x1
-	AF_MAX                                      = 0x2d
+	AF_MAX                                      = 0x2e
+	AF_MCTP                                     = 0x2d
 	AF_MPLS                                     = 0x1c
 	AF_NETBEUI                                  = 0xd
 	AF_NETLINK                                  = 0x10
@@ -1267,6 +1268,9 @@ const (
 	IP_XFRM_POLICY                              = 0x11
 	ISOFS_SUPER_MAGIC                           = 0x9660
 	ISTRIP                                      = 0x20
+	ITIMER_PROF                                 = 0x2
+	ITIMER_REAL                                 = 0x0
+	ITIMER_VIRTUAL                              = 0x1
 	IUTF8                                       = 0x4000
 	IXANY                                       = 0x800
 	JFFS2_SUPER_MAGIC                           = 0x72b6

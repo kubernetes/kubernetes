@@ -17,7 +17,10 @@ limitations under the License.
 package framework
 
 import (
+	"fmt"
+
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 )
 
 // ExpectEqual expects the specified two are the same, otherwise an exception raises
@@ -43,7 +46,34 @@ func ExpectNoError(err error, explain ...interface{}) {
 // ExpectNoErrorWithOffset checks if "err" is set, and if so, fails assertion while logging the error at "offset" levels above its caller
 // (for example, for call chain f -> g -> ExpectNoErrorWithOffset(1, ...) error would be logged for "f").
 func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
-	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
+	if err == nil {
+		return
+	}
+
+	// Errors usually contain unexported fields. We have to use
+	// a formatter here which can print those.
+	prefix := ""
+	if len(explain) > 0 {
+		if str, ok := explain[0].(string); ok {
+			prefix = fmt.Sprintf(str, explain[1:]...) + ": "
+		} else {
+			prefix = fmt.Sprintf("unexpected explain arguments, need format string: %v", explain)
+		}
+	}
+
+	// This intentionally doesn't use gomega.Expect. Instead we take
+	// full control over what information is presented where:
+	// - The complete error object is logged because it may contain
+	//   additional information that isn't included in its error
+	//   string.
+	// - It is not included in the failure message because
+	//   it might make the failure message very large and/or
+	//   cause error aggregation to work less well: two
+	//   failures at the same code line might not be matched in
+	//   https://go.k8s.io/triage because the error details are too
+	//   different.
+	Logf("Unexpected error: %s\n%s", prefix, format.Object(err, 1))
+	Fail(prefix+err.Error(), 1+offset)
 }
 
 // ExpectConsistOf expects actual contains precisely the extra elements.  The ordering of the elements does not matter.

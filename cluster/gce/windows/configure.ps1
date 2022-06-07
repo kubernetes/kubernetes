@@ -162,7 +162,6 @@ try {
   DownloadAndInstall-Crictl
   Configure-Crictl
   Setup-ContainerRuntime
-  DownloadAndInstall-AuthPlugin
   DownloadAndInstall-KubernetesBinaries
   DownloadAndInstall-NodeProblemDetector
   DownloadAndInstall-CSIProxyBinaries

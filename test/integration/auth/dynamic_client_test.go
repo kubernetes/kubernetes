@@ -18,7 +18,6 @@ package auth
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -36,13 +35,13 @@ import (
 )
 
 func TestDynamicClientBuilder(t *testing.T) {
-	tmpfile, err := ioutil.TempFile("/tmp", "key")
+	tmpfile, err := os.CreateTemp("/tmp", "key")
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
 	defer os.RemoveAll(tmpfile.Name())
 
-	if err = ioutil.WriteFile(tmpfile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+	if err = os.WriteFile(tmpfile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		t.Fatalf("write file %s failed: %v", tmpfile.Name(), err)
 	}
 
@@ -54,10 +53,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 		t.Fatalf("parse duration failed: %v", err)
 	}
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
-	baseClient, baseConfig := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
+	baseClient, baseConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.ServiceAccountSigningKeyFile = tmpfile.Name()
 			opts.ServiceAccountTokenMaxExpiration = maxExpirationDuration
@@ -76,6 +72,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 			config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 		},
 	})
+	defer tearDownFn()
 
 	// We want to test if the token rotation works fine here.
 	// To minimize the time this test would consume, we use the minimial token expiration.

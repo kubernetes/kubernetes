@@ -200,7 +200,7 @@ HEAPSTER_MACHINE_TYPE=${HEAPSTER_MACHINE_TYPE:-}
 NUM_ADDITIONAL_NODES=${NUM_ADDITIONAL_NODES:-}
 ADDITIONAL_MACHINE_TYPE=${ADDITIONAL_MACHINE_TYPE:-}
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. v3.5.1-0) if you need
+# Set etcd image (e.g. registry.k8s.io/etcd) and version (e.g. v3.5.1-0) if you need
 # non-default version.
 export ETCD_IMAGE=${TEST_ETCD_IMAGE:-}
 export ETCD_DOCKER_REPOSITORY=${TEST_ETCD_DOCKER_REPOSITORY:-}
@@ -322,9 +322,6 @@ export DNS_MEMORY_LIMIT=${KUBE_DNS_MEMORY_LIMIT:-170Mi}
 # Optional: Enable DNS horizontal autoscaler
 export ENABLE_DNS_HORIZONTAL_AUTOSCALER=${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-true}
 
-# Optional: Install Kubernetes UI
-export ENABLE_CLUSTER_UI=${KUBE_ENABLE_CLUSTER_UI:-true}
-
 # Optional: Install node problem detector.
 #   none           - Not run node problem detector.
 #   daemonset      - Run node problem detector as daemonset.
@@ -414,9 +411,6 @@ CUSTOM_INGRESS_YAML=${CUSTOM_INGRESS_YAML:-}
 
 if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
   ADMISSION_CONTROL='NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,PersistentVolumeClaimResize,RuntimeClass'
-  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" = 'true' ]]; then
-    ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
-  fi
   # ResourceQuota must come last, or a creation is recorded, but the pod may be forbidden.
   ADMISSION_CONTROL="${ADMISSION_CONTROL},MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"
 else
@@ -511,14 +505,11 @@ HEAPSTER_GCP_MEMORY_PER_NODE=${HEAPSTER_GCP_MEMORY_PER_NODE:-4}
 HEAPSTER_GCP_BASE_CPU=${HEAPSTER_GCP_BASE_CPU:-80m}
 HEAPSTER_GCP_CPU_PER_NODE=${HEAPSTER_GCP_CPU_PER_NODE:-0.5}
 
-# Optional: custom system banner for dashboard addon
-CUSTOM_KUBE_DASHBOARD_BANNER=${CUSTOM_KUBE_DASHBOARD_BANNER:-}
-
 # Default Stackdriver resources version exported by Fluentd-gcp addon
 LOGGING_STACKDRIVER_RESOURCE_TYPES=${LOGGING_STACKDRIVER_RESOURCE_TYPES:-old}
 
 # Adding to PROVIDER_VARS, since this is GCP-specific.
-PROVIDER_VARS="${PROVIDER_VARS:-} FLUENTD_GCP_YAML_VERSION FLUENTD_GCP_VERSION FLUENTD_GCP_MEMORY_LIMIT FLUENTD_GCP_CPU_REQUEST FLUENTD_GCP_MEMORY_REQUEST HEAPSTER_GCP_BASE_MEMORY HEAPSTER_GCP_MEMORY_PER_NODE HEAPSTER_GCP_BASE_CPU HEAPSTER_GCP_CPU_PER_NODE CUSTOM_KUBE_DASHBOARD_BANNER LOGGING_STACKDRIVER_RESOURCE_TYPES"
+PROVIDER_VARS="${PROVIDER_VARS:-} FLUENTD_GCP_YAML_VERSION FLUENTD_GCP_VERSION FLUENTD_GCP_MEMORY_LIMIT FLUENTD_GCP_CPU_REQUEST FLUENTD_GCP_MEMORY_REQUEST HEAPSTER_GCP_BASE_MEMORY HEAPSTER_GCP_MEMORY_PER_NODE HEAPSTER_GCP_BASE_CPU HEAPSTER_GCP_CPU_PER_NODE LOGGING_STACKDRIVER_RESOURCE_TYPES"
 
 # Fluentd configuration for node-journal
 ENABLE_NODE_JOURNAL=${ENABLE_NODE_JOURNAL:-false}
@@ -603,3 +594,7 @@ export WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${WINDOWS_NODE_PROBLEM_DETECT
 # TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver.
 # If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.
 export TLS_CIPHER_SUITES=""
+
+# CLOUD_PROVIDER_FLAG defines the cloud-provider value presented to KCM, apiserver,
+# and kubelet
+export CLOUD_PROVIDER_FLAG="${CLOUD_PROVIDER_FLAG:-gce}"

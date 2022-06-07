@@ -376,7 +376,7 @@ func (c *Controller) handleObject(obj interface{}) {
 
 		foo, err := c.foosLister.Foos(object.GetNamespace()).Get(ownerRef.Name)
 		if err != nil {
-			klog.V(4).Infof("ignoring orphaned object '%s' of foo '%s'", object.GetSelfLink(), ownerRef.Name)
+			klog.V(4).Infof("ignoring orphaned object '%s/%s' of foo '%s'", object.GetNamespace(), object.GetName(), ownerRef.Name)
 			return
 		}
 

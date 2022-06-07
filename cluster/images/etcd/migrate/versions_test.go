@@ -19,7 +19,7 @@ package main
 import (
 	"testing"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 )
 
 func TestSerializeEtcdVersionPair(t *testing.T) {

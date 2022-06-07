@@ -403,7 +403,7 @@ func TestBindToCommandArgRequirements(t *testing.T) {
 
 				// Ensure it is the expected function
 				if reflect.ValueOf(cCmd.Args).Pointer() != reflect.ValueOf(args.args).Pointer() {
-					t.Error("The function poiners where not equal.")
+					t.Error("The function pointers where not equal.")
 				}
 
 				// Test passing argument set

@@ -33,6 +33,7 @@ set -o pipefail
 KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE[0]}")/..}
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/logging.sh"
 
 # If KUBECTL_PATH isn't set, gather up the list of likely places and use ls
 # to find the latest one.

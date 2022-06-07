@@ -22,7 +22,7 @@ import (
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
-//go:embed flexvolume guestbook kubectl sample-device-plugin.yaml scheduling/nvidia-driver-installer.yaml statefulset storage-csi
+//go:embed cluster-dns flexvolume guestbook kubectl sample-device-plugin.yaml scheduling/nvidia-driver-installer.yaml statefulset storage-csi
 var e2eTestingManifestsFS embed.FS
 
 func GetE2ETestingManifestsFS() e2etestfiles.EmbeddedFileSource {

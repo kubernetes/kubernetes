@@ -187,6 +187,9 @@ rules:
       - k8s.io/kubernetes/pkg/scheduler/nodeinfo
       - k8s.io/kubernetes/pkg/scheduler/util
       - k8s.io/kubernetes/pkg/scheduler/volumebinder
+      - k8s.io/kubernetes/pkg/scheduler
+      - k8s.io/kubernetes/pkg/scheduler/profile
+      - k8s.io/kubernetes/pkg/scheduler/testing
       - k8s.io/kubernetes/pkg/security/apparmor
       - k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp
       - k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl
@@ -239,6 +242,7 @@ rules:
       - k8s.io/kubernetes/pkg/scheduler/internal/cache
   - selectorRegexp: k8s[.]io/kubernetes/test/
     allowedPrefixes:
+      - k8s.io/kubernetes/test/e2e/common
       - k8s.io/kubernetes/test/e2e/framework
       - k8s.io/kubernetes/test/e2e/framework/auth
       - k8s.io/kubernetes/test/e2e/framework/ginkgowrapper

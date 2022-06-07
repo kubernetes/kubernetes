@@ -2865,28 +2865,43 @@ func TestGetExec(t *testing.T) {
 	)
 	var (
 		podFullName = kubecontainer.GetPodFullName(podWithUIDNameNs(podUID, podName, podNamespace))
-		command     = []string{"ls"}
 	)
 
 	testcases := []struct {
 		description string
 		podFullName string
 		container   string
+		command     []string
 		expectError bool
 	}{{
 		description: "success case",
 		podFullName: podFullName,
 		container:   containerID,
+		command:     []string{"ls"},
+		expectError: false,
 	}, {
 		description: "no such pod",
 		podFullName: "bar" + podFullName,
 		container:   containerID,
+		command:     []string{"ls"},
 		expectError: true,
 	}, {
 		description: "no such container",
 		podFullName: podFullName,
 		container:   "containerBar",
+		command:     []string{"ls"},
 		expectError: true,
+	}, {
+		description: "null exec command",
+		podFullName: podFullName,
+		container:   containerID,
+		expectError: false,
+	}, {
+		description: "multi exec commands",
+		podFullName: podFullName,
+		container:   containerID,
+		command:     []string{"bash", "-c", "ls"},
+		expectError: false,
 	}}
 
 	for _, tc := range testcases {
@@ -2911,7 +2926,7 @@ func TestGetExec(t *testing.T) {
 		kubelet.containerRuntime = fakeRuntime
 		kubelet.streamingRuntime = fakeRuntime
 
-		redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, command, remotecommand.Options{})
+		redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, tc.command, remotecommand.Options{})
 		if tc.expectError {
 			assert.Error(t, err, description)
 		} else {
@@ -3284,6 +3299,7 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			criPodIPs: []string{"192.168.0.1"},
 			podIPs: []v1.PodIP{
 				{IP: "192.168.0.1"},
+				{IP: "fd01::1234"},
 			},
 		},
 		{
@@ -3343,6 +3359,119 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
 			}
 			if tc.criPodIPs == nil && status.HostIP != status.PodIPs[0].IP {
+				t.Fatalf("Expected HostIP %q to equal PodIPs[0].IP %q", status.HostIP, status.PodIPs[0].IP)
+			}
+		})
+	}
+}
+
+func TestNodeAddressUpdatesGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
+	testcases := []struct {
+		name           string
+		nodeIPs        []string
+		nodeAddresses  []v1.NodeAddress
+		expectedPodIPs []v1.PodIP
+	}{
+
+		{
+			name:    "Immutable after update node addresses single-stack",
+			nodeIPs: []string{"10.0.0.1"},
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "1.1.1.1"},
+			},
+			expectedPodIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+			},
+		},
+		{
+			name:    "Immutable after update node addresses dual-stack - primary address",
+			nodeIPs: []string{"10.0.0.1", "2001:db8::2"},
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "1.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "2001:db8::2"},
+			},
+			expectedPodIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+				{IP: "2001:db8::2"},
+			},
+		},
+		{
+			name:    "Immutable after update node addresses dual-stack - secondary address",
+			nodeIPs: []string{"10.0.0.1", "2001:db8::2"},
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "2001:db8:1:2:3::2"},
+			},
+			expectedPodIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+				{IP: "2001:db8::2"},
+			},
+		},
+		{
+			name:    "Immutable after update node addresses dual-stack - primary and secondary address",
+			nodeIPs: []string{"10.0.0.1", "2001:db8::2"},
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "1.1.1.1"},
+				{Type: v1.NodeInternalIP, Address: "2001:db8:1:2:3::2"},
+			},
+			expectedPodIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+				{IP: "2001:db8::2"},
+			},
+		},
+		{
+			name:    "Update secondary after new secondary address dual-stack",
+			nodeIPs: []string{"10.0.0.1"},
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: v1.NodeInternalIP, Address: "2001:db8::2"},
+			},
+			expectedPodIPs: []v1.PodIP{
+				{IP: "10.0.0.1"},
+				{IP: "2001:db8::2"},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			for _, ip := range tc.nodeIPs {
+				kl.nodeIPs = append(kl.nodeIPs, netutils.ParseIPSloppy(ip))
+			}
+			kl.nodeLister = testNodeLister{nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+					Status: v1.NodeStatus{
+						Addresses: tc.nodeAddresses,
+					},
+				},
+			}}
+
+			pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
+			pod.Spec.HostNetwork = true
+			for _, ip := range tc.nodeIPs {
+				pod.Status.PodIPs = append(pod.Status.PodIPs, v1.PodIP{IP: ip})
+			}
+			if len(pod.Status.PodIPs) > 0 {
+				pod.Status.PodIP = pod.Status.PodIPs[0].IP
+			}
+
+			// set old status
+			podStatus := &kubecontainer.PodStatus{
+				ID:        pod.UID,
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			}
+			podStatus.IPs = tc.nodeIPs
+
+			status := kl.generateAPIPodStatus(pod, podStatus)
+			if !reflect.DeepEqual(status.PodIPs, tc.expectedPodIPs) {
+				t.Fatalf("Expected PodIPs %#v, got %#v", tc.expectedPodIPs, status.PodIPs)
+			}
+			if kl.nodeIPs[0].String() != status.PodIPs[0].IP {
 				t.Fatalf("Expected HostIP %q to equal PodIPs[0].IP %q", status.HostIP, status.PodIPs[0].IP)
 			}
 		})

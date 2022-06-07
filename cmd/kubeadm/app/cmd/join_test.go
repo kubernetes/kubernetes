@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -47,7 +46,7 @@ nodeRegistration:
 
 func TestNewJoinData(t *testing.T) {
 	// create temp directory
-	tmpDir, err := ioutil.TempDir("", "kubeadm-join-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-join-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}

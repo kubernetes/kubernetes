@@ -21,6 +21,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	"k8s.io/kubernetes/test/e2e/network/scale"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -31,6 +32,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7 Scalability", func() {
 		ns string
 	)
 	f := framework.NewDefaultFramework("ingress-scale")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		ns = f.Namespace.Name

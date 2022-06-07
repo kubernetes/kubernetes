@@ -22,9 +22,12 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
+	"k8s.io/klog/v2"
 )
 
 func TestJSONFlag(t *testing.T) {
@@ -42,15 +45,27 @@ func TestJSONFlag(t *testing.T) {
 
 func TestJSONFormatRegister(t *testing.T) {
 	newOptions := logs.NewOptions()
+	klogr := klog.Background()
 	testcases := []struct {
-		name string
-		args []string
-		want *logs.Options
-		errs field.ErrorList
+		name              string
+		args              []string
+		contextualLogging bool
+		want              *logs.Options
+		errs              field.ErrorList
 	}{
 		{
 			name: "JSON log format",
 			args: []string{"--logging-format=json"},
+			want: func() *logs.Options {
+				c := newOptions.Config.DeepCopy()
+				c.Format = logs.JSONLogFormat
+				return &logs.Options{*c}
+			}(),
+		},
+		{
+			name:              "JSON direct",
+			args:              []string{"--logging-format=json"},
+			contextualLogging: true,
 			want: func() *logs.Options {
 				c := newOptions.Config.DeepCopy()
 				c.Format = logs.JSONLogFormat
@@ -83,10 +98,23 @@ func TestJSONFormatRegister(t *testing.T) {
 			if !assert.Equal(t, tc.want, o) {
 				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, o)
 			}
-			errs := o.ValidateAndApply()
+			featureGate := featuregate.NewFeatureGate()
+			logs.AddFeatureGates(featureGate)
+			err := featureGate.SetFromMap(map[string]bool{string(logs.ContextualLogging): tc.contextualLogging})
+			require.NoError(t, err)
+			errs := o.ValidateAndApply(featureGate)
+			defer klog.ClearLogger()
 			if !assert.ElementsMatch(t, tc.errs, errs) {
 				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, errs)
 
+			}
+			currentLogger := klog.Background()
+			isKlogr := currentLogger == klogr
+			if tc.contextualLogging && isKlogr {
+				t.Errorf("Expected to get zapr as logger, got: %T", currentLogger)
+			}
+			if !tc.contextualLogging && !isKlogr {
+				t.Errorf("Expected to get klogr as logger, got: %T", currentLogger)
 			}
 		})
 	}

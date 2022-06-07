@@ -29,24 +29,47 @@ import (
 )
 
 var (
-	// requestLatency is a Prometheus Summary metric type partitioned by
-	// "verb" and "url" labels. It is used for the rest client latency metrics.
+	// requestLatency is a Prometheus Histogram metric type partitioned by
+	// "verb", and "host" labels. It is used for the rest client latency metrics.
 	requestLatency = k8smetrics.NewHistogramVec(
 		&k8smetrics.HistogramOpts{
-			Name:    "rest_client_request_duration_seconds",
-			Help:    "Request latency in seconds. Broken down by verb and URL.",
-			Buckets: k8smetrics.ExponentialBuckets(0.001, 2, 10),
+			Name:           "rest_client_request_duration_seconds",
+			Help:           "Request latency in seconds. Broken down by verb, and host.",
+			StabilityLevel: k8smetrics.ALPHA,
+			Buckets:        []float64{0.005, 0.025, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0, 60.0},
 		},
-		[]string{"verb", "url"},
+		[]string{"verb", "host"},
+	)
+
+	requestSize = k8smetrics.NewHistogramVec(
+		&k8smetrics.HistogramOpts{
+			Name:           "rest_client_request_size_bytes",
+			Help:           "Request size in bytes. Broken down by verb and host.",
+			StabilityLevel: k8smetrics.ALPHA,
+			// 64 bytes to 16MB
+			Buckets: []float64{64, 256, 512, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216},
+		},
+		[]string{"verb", "host"},
+	)
+
+	responseSize = k8smetrics.NewHistogramVec(
+		&k8smetrics.HistogramOpts{
+			Name:           "rest_client_response_size_bytes",
+			Help:           "Response size in bytes. Broken down by verb and host.",
+			StabilityLevel: k8smetrics.ALPHA,
+			// 64 bytes to 16MB
+			Buckets: []float64{64, 256, 512, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 16777216},
+		},
+		[]string{"verb", "host"},
 	)
 
 	rateLimiterLatency = k8smetrics.NewHistogramVec(
 		&k8smetrics.HistogramOpts{
 			Name:    "rest_client_rate_limiter_duration_seconds",
-			Help:    "Client side rate limiter latency in seconds. Broken down by verb and URL.",
-			Buckets: k8smetrics.ExponentialBuckets(0.001, 2, 10),
+			Help:    "Client side rate limiter latency in seconds. Broken down by verb, and host.",
+			Buckets: []float64{0.005, 0.025, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 15.0, 30.0, 60.0},
 		},
-		[]string{"verb", "url"},
+		[]string{"verb", "host"},
 	)
 
 	requestResult = k8smetrics.NewCounterVec(
@@ -60,7 +83,7 @@ var (
 	execPluginCertTTLAdapter = &expiryToTTLAdapter{}
 
 	execPluginCertTTL = k8smetrics.NewGaugeFunc(
-		k8smetrics.GaugeOpts{
+		&k8smetrics.GaugeOpts{
 			Name: "rest_client_exec_plugin_ttl_seconds",
 			Help: "Gauge of the shortest TTL (time-to-live) of the client " +
 				"certificate(s) managed by the auth exec plugin. The value " +
@@ -121,6 +144,8 @@ var (
 func init() {
 
 	legacyregistry.MustRegister(requestLatency)
+	legacyregistry.MustRegister(requestSize)
+	legacyregistry.MustRegister(responseSize)
 	legacyregistry.MustRegister(rateLimiterLatency)
 	legacyregistry.MustRegister(requestResult)
 	legacyregistry.RawMustRegister(execPluginCertTTL)
@@ -129,6 +154,8 @@ func init() {
 		ClientCertExpiry:      execPluginCertTTLAdapter,
 		ClientCertRotationAge: &rotationAdapter{m: execPluginCertRotation},
 		RequestLatency:        &latencyAdapter{m: requestLatency},
+		RequestSize:           &sizeAdapter{m: requestSize},
+		ResponseSize:          &sizeAdapter{m: responseSize},
 		RateLimiterLatency:    &latencyAdapter{m: rateLimiterLatency},
 		RequestResult:         &resultAdapter{requestResult},
 		ExecPluginCalls:       &callsAdapter{m: execPluginCalls},
@@ -140,7 +167,15 @@ type latencyAdapter struct {
 }
 
 func (l *latencyAdapter) Observe(ctx context.Context, verb string, u url.URL, latency time.Duration) {
-	l.m.WithContext(ctx).WithLabelValues(verb, u.String()).Observe(latency.Seconds())
+	l.m.WithContext(ctx).WithLabelValues(verb, u.Host).Observe(latency.Seconds())
+}
+
+type sizeAdapter struct {
+	m *k8smetrics.HistogramVec
+}
+
+func (s *sizeAdapter) Observe(ctx context.Context, verb string, host string, size float64) {
+	s.m.WithContext(ctx).WithLabelValues(verb, host).Observe(size)
 }
 
 type resultAdapter struct {

@@ -95,6 +95,24 @@ type KubeProxyWinkernelConfiguration struct {
 	// enableDSR tells kube-proxy whether HNS policies should be created
 	// with DSR
 	EnableDSR bool `json:"enableDSR"`
+	// RootHnsEndpointName is the name of hnsendpoint that is attached to
+	// l2bridge for root network namespace
+	RootHnsEndpointName string `json:"rootHnsEndpointName"`
+	// ForwardHealthCheckVip forwards service VIP for health check port on
+	// Windows
+	ForwardHealthCheckVip bool `json:"forwardHealthCheckVip"`
+}
+
+// DetectLocalConfiguration contains optional settings related to DetectLocalMode option
+type DetectLocalConfiguration struct {
+	// BridgeInterface is a string argument which represents a single bridge interface name.
+	// Kube-proxy considers traffic as local if originating from this given bridge.
+	// This argument should be set if DetectLocalMode is set to LocalModeBridgeInterface.
+	BridgeInterface string `json:"bridgeInterface"`
+	// InterfaceNamePrefix is a string argument which represents a single interface prefix name.
+	// Kube-proxy considers traffic as local if originating from one or more interfaces which match
+	// the given prefix. This argument should be set if DetectLocalMode is set to LocalModeInterfaceNamePrefix.
+	InterfaceNamePrefix string `json:"interfaceNamePrefix"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -164,6 +182,8 @@ type KubeProxyConfiguration struct {
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
 	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
 	DetectLocalMode LocalMode `json:"detectLocalMode"`
+	// DetectLocal contains optional configuration settings related to DetectLocalMode.
+	DetectLocal DetectLocalConfiguration `json:"detectLocal"`
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server.

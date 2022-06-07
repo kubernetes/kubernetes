@@ -1,5 +1,3 @@
-// +build linux
-
 package libcontainer
 
 import (
@@ -117,7 +115,7 @@ func (r *runningState) transition(s containerState) error {
 	switch s.(type) {
 	case *stoppedState:
 		if r.c.runType() == Running {
-			return newGenericError(fmt.Errorf("container still running"), ContainerNotStopped)
+			return ErrRunning
 		}
 		r.c.state = s
 		return nil
@@ -132,7 +130,7 @@ func (r *runningState) transition(s containerState) error {
 
 func (r *runningState) destroy() error {
 	if r.c.runType() == Running {
-		return newGenericError(fmt.Errorf("container is not destroyed"), ContainerNotStopped)
+		return ErrRunning
 	}
 	return destroy(r.c)
 }
@@ -190,7 +188,7 @@ func (p *pausedState) destroy() error {
 		}
 		return destroy(p.c)
 	}
-	return newGenericError(fmt.Errorf("container is paused"), ContainerPaused)
+	return ErrPaused
 }
 
 // restoredState is the same as the running state but also has associated checkpoint

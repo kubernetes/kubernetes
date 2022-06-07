@@ -766,6 +766,13 @@ items:
     - get
     - list
   - apiGroups:
+    - external.metrics.k8s.io
+    resources:
+    - '*'
+    verbs:
+    - get
+    - list
+  - apiGroups:
     - ""
     - events.k8s.io
     resources:

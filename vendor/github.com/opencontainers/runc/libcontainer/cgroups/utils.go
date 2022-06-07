@@ -1,5 +1,3 @@
-// +build linux
-
 package cgroups
 
 import (
@@ -7,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -23,11 +20,14 @@ import (
 const (
 	CgroupProcesses   = "cgroup.procs"
 	unifiedMountpoint = "/sys/fs/cgroup"
+	hybridMountpoint  = "/sys/fs/cgroup/unified"
 )
 
 var (
 	isUnifiedOnce sync.Once
 	isUnified     bool
+	isHybridOnce  sync.Once
+	isHybrid      bool
 )
 
 // IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
@@ -47,6 +47,24 @@ func IsCgroup2UnifiedMode() bool {
 		isUnified = st.Type == unix.CGROUP2_SUPER_MAGIC
 	})
 	return isUnified
+}
+
+// IsCgroup2HybridMode returns whether we are running in cgroup v2 hybrid mode.
+func IsCgroup2HybridMode() bool {
+	isHybridOnce.Do(func() {
+		var st unix.Statfs_t
+		err := unix.Statfs(hybridMountpoint, &st)
+		if err != nil {
+			isHybrid = false
+			if !os.IsNotExist(err) {
+				// Report unexpected errors.
+				logrus.WithError(err).Debugf("statfs(%q) failed", hybridMountpoint)
+			}
+			return
+		}
+		isHybrid = st.Type == unix.CGROUP2_SUPER_MAGIC
+	})
+	return isHybrid
 }
 
 type Mount struct {
@@ -118,8 +136,8 @@ func GetAllSubsystems() ([]string, error) {
 	return subsystems, nil
 }
 
-func readProcsFile(file string) ([]int, error) {
-	f, err := os.Open(file)
+func readProcsFile(dir string) ([]int, error) {
+	f, err := OpenFile(dir, CgroupProcesses, os.O_RDONLY)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +228,7 @@ func EnterPid(cgroupPaths map[string]string, pid int) error {
 
 func rmdir(path string) error {
 	err := unix.Rmdir(path)
-	if err == nil || err == unix.ENOENT {
+	if err == nil || err == unix.ENOENT { //nolint:errorlint // unix errors are bare
 		return nil
 	}
 	return &os.PathError{Op: "rmdir", Path: path, Err: err}
@@ -224,7 +242,7 @@ func RemovePath(path string) error {
 		return nil
 	}
 
-	infos, err := ioutil.ReadDir(path)
+	infos, err := os.ReadDir(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			err = nil
@@ -284,40 +302,61 @@ func RemovePaths(paths map[string]string) (err error) {
 	return fmt.Errorf("Failed to remove paths: %v", paths)
 }
 
-func GetHugePageSize() ([]string, error) {
-	dir, err := os.OpenFile("/sys/kernel/mm/hugepages", unix.O_DIRECTORY|unix.O_RDONLY, 0)
-	if err != nil {
-		return nil, err
-	}
-	files, err := dir.Readdirnames(0)
-	dir.Close()
-	if err != nil {
-		return nil, err
-	}
+var (
+	hugePageSizes []string
+	initHPSOnce   sync.Once
+)
 
-	return getHugePageSizeFromFilenames(files)
+func HugePageSizes() []string {
+	initHPSOnce.Do(func() {
+		dir, err := os.OpenFile("/sys/kernel/mm/hugepages", unix.O_DIRECTORY|unix.O_RDONLY, 0)
+		if err != nil {
+			return
+		}
+		files, err := dir.Readdirnames(0)
+		dir.Close()
+		if err != nil {
+			return
+		}
+
+		hugePageSizes, err = getHugePageSizeFromFilenames(files)
+		if err != nil {
+			logrus.Warn("HugePageSizes: ", err)
+		}
+	})
+
+	return hugePageSizes
 }
 
 func getHugePageSizeFromFilenames(fileNames []string) ([]string, error) {
 	pageSizes := make([]string, 0, len(fileNames))
+	var warn error
 
 	for _, file := range fileNames {
 		// example: hugepages-1048576kB
 		val := strings.TrimPrefix(file, "hugepages-")
 		if len(val) == len(file) {
-			// unexpected file name: no prefix found
+			// Unexpected file name: no prefix found, ignore it.
 			continue
 		}
-		// The suffix is always "kB" (as of Linux 5.9)
+		// The suffix is always "kB" (as of Linux 5.13). If we find
+		// something else, produce an error but keep going.
 		eLen := len(val) - 2
 		val = strings.TrimSuffix(val, "kB")
 		if len(val) != eLen {
-			logrus.Warnf("GetHugePageSize: %s: invalid filename suffix (expected \"kB\")", file)
+			// Highly unlikely.
+			if warn == nil {
+				warn = errors.New(file + `: invalid suffix (expected "kB")`)
+			}
 			continue
 		}
 		size, err := strconv.Atoi(val)
 		if err != nil {
-			return nil, err
+			// Highly unlikely.
+			if warn == nil {
+				warn = fmt.Errorf("%s: %w", file, err)
+			}
+			continue
 		}
 		// Model after https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/mm/hugetlb_cgroup.c?id=eff48ddeab782e35e58ccc8853f7386bbae9dec4#n574
 		// but in our case the size is in KB already.
@@ -331,34 +370,12 @@ func getHugePageSizeFromFilenames(fileNames []string) ([]string, error) {
 		pageSizes = append(pageSizes, val)
 	}
 
-	return pageSizes, nil
+	return pageSizes, warn
 }
 
 // GetPids returns all pids, that were added to cgroup at path.
 func GetPids(dir string) ([]int, error) {
-	return readProcsFile(filepath.Join(dir, CgroupProcesses))
-}
-
-// GetAllPids returns all pids, that were added to cgroup at path and to all its
-// subcgroups.
-func GetAllPids(path string) ([]int, error) {
-	var pids []int
-	// collect pids from all sub-cgroups
-	err := filepath.Walk(path, func(p string, info os.FileInfo, iErr error) error {
-		if iErr != nil {
-			return iErr
-		}
-		if info.IsDir() || info.Name() != CgroupProcesses {
-			return nil
-		}
-		cPids, err := readProcsFile(p)
-		if err != nil {
-			return err
-		}
-		pids = append(pids, cPids...)
-		return nil
-	})
-	return pids, err
+	return readProcsFile(dir)
 }
 
 // WriteCgroupProc writes the specified pid into the cgroup's cgroup.procs file
@@ -376,7 +393,7 @@ func WriteCgroupProc(dir string, pid int) error {
 
 	file, err := OpenFile(dir, CgroupProcesses, os.O_WRONLY)
 	if err != nil {
-		return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
+		return fmt.Errorf("failed to write %v: %w", pid, err)
 	}
 	defer file.Close()
 
@@ -393,7 +410,7 @@ func WriteCgroupProc(dir string, pid int) error {
 			continue
 		}
 
-		return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
+		return fmt.Errorf("failed to write %v: %w", pid, err)
 	}
 	return err
 }
@@ -446,5 +463,5 @@ func ConvertBlkIOToIOWeightValue(blkIoWeight uint16) uint64 {
 	if blkIoWeight == 0 {
 		return 0
 	}
-	return uint64(1 + (uint64(blkIoWeight)-10)*9999/990)
+	return 1 + (uint64(blkIoWeight)-10)*9999/990
 }

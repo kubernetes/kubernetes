@@ -31,7 +31,7 @@ import (
 )
 
 // PodEtcHostsPathFunc is a function to fetch a etc hosts path by pod uid and whether etc host path is supported by the runtime
-type PodEtcHostsPathFunc func(podUID types.UID) (string, bool)
+type PodEtcHostsPathFunc func(podUID types.UID) string
 
 // metricsProviderByPath maps a path to its metrics provider
 type metricsProviderByPath map[string]volume.MetricsProvider
@@ -81,10 +81,7 @@ func (h hostStatsProvider) getPodContainerLogStats(podNamespace, podName string,
 // getPodEtcHostsStats gets status for pod etc hosts usage
 func (h hostStatsProvider) getPodEtcHostsStats(podUID types.UID, rootFsInfo *cadvisorapiv2.FsInfo) (*statsapi.FsStats, error) {
 	// Runtimes may not support etc hosts file (Windows with docker)
-	podEtcHostsPath, isEtcHostsSupported := h.podEtcHostsPathFunc(podUID)
-	if !isEtcHostsSupported {
-		return nil, nil
-	}
+	podEtcHostsPath := h.podEtcHostsPathFunc(podUID)
 	// Some pods have an explicit /etc/hosts mount and the Kubelet will not create an etc-hosts file for them
 	if _, err := os.Stat(podEtcHostsPath); os.IsNotExist(err) {
 		return nil, nil

@@ -30,8 +30,9 @@ DEFAULT_NPD_VERSION='v0.8.9'
 DEFAULT_NPD_HASH_AMD64='4919c47447c5f3871c1dc3171bbb817a38c8c8d07a6ce55a77d43cadc098e9ad608ceeab121eec00c13c0b6a2cc3488544d61ce84cdade1823f3fd5163a952de'
 # TODO (SergeyKanzhelev): fill up for npd 0.8.9+
 DEFAULT_NPD_HASH_ARM64='8ccb42a862efdfc1f25ca9a22f3fd36f9fdff1ac618dd7d39e3b5991505dd610d432364420896ad71f42197a116f28a85dde58b129baa075ebb7312caa57f852'
-DEFAULT_CRICTL_VERSION='v1.23.0'
-DEFAULT_CRICTL_SHA512='f8c40c66c8d9a85e857399506f4977564890815b02658eec591114e04bd8bc6b8ea08bcc159af0088b5eda7bf0dfd16096bf0c174819c204193fb7343ae7d9d5'
+DEFAULT_CRICTL_VERSION='v1.24.2'
+DEFAULT_CRICTL_AMD64_SHA512='961188117863ca9af5b084e84691e372efee93ad09daf6a0422e8d75a5803f394d8968064f7ca89f14e8973766201e731241f32538cf2c8d91f0233e786302df'
+DEFAULT_CRICTL_ARM64_SHA512='ebd055e9b2888624d006decd582db742131ed815d059d529ba21eaf864becca98a84b20a10eec91051b9d837c6855d28d5042bf5e9a454f4540aec6b82d37e96'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
 ###
 
@@ -262,24 +263,29 @@ function install-gci-mounter-tools {
 
 # Install node problem detector binary.
 function install-node-problem-detector {
-  if [[ "${HOST_ARCH}" == "amd64" ]]; then
-    DEFAULT_NPD_HASH=${DEFAULT_NPD_HASH_AMD64}
-  elif [[ "${HOST_ARCH}" == "arm64" ]]; then
-    DEFAULT_NPD_HASH=${DEFAULT_NPD_HASH_ARM64}
-  else
-    # no other architectures are supported currently.
-    # Assumption is that this script only runs on linux,
-    # see cluster/gce/windows/k8s-node-setup.psm1 for windows
-    # https://github.com/kubernetes/node-problem-detector/releases/
-    DEFAULT_NPD_HASH='N/A'
-  fi
-
   if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
       local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
       local -r npd_hash="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
   else
       local -r npd_version="${DEFAULT_NPD_VERSION}"
-      local -r npd_hash="${DEFAULT_NPD_HASH}"
+      case "${HOST_PLATFORM}/${HOST_ARCH}" in
+        linux/amd64)
+          local -r npd_hash="${DEFAULT_NPD_HASH_AMD64}"
+          ;;
+        linux/arm64)
+          local -r npd_hash="${DEFAULT_NPD_HASH_ARM64}"
+          ;;
+        # no other architectures are supported currently.
+        # Assumption is that this script only runs on linux,
+        # see cluster/gce/windows/k8s-node-setup.psm1 for windows
+        # https://github.com/kubernetes/node-problem-detector/releases/
+        *)
+          echo "Unrecognized version and platform/arch combination:"
+          echo "$DEFAULT_NPD_VERSION $HOST_PLATFORM/$HOST_ARCH"
+          echo "Set NODE_PROBLEM_DETECTOR_VERSION and NODE_PROBLEM_DETECTOR_TAR_HASH to overwrite"
+          exit 1
+          ;;
+      esac
   fi
   local -r npd_tar="node-problem-detector-${npd_version}-${HOST_PLATFORM}_${HOST_ARCH}.tar.gz"
 
@@ -334,7 +340,19 @@ function install-crictl {
     local -r crictl_hash="${CRICTL_TAR_HASH}"
   else
     local -r crictl_version="${DEFAULT_CRICTL_VERSION}"
-    local -r crictl_hash="${DEFAULT_CRICTL_SHA512}"
+    case "${HOST_PLATFORM}/${HOST_ARCH}" in
+      linux/amd64)
+        local -r crictl_hash="${DEFAULT_CRICTL_AMD64_SHA512}"
+        ;;
+      linux/arm64)
+        local -r crictl_hash="${DEFAULT_CRICTL_ARM64_SHA512}"
+        ;;
+      *)
+        echo "Unrecognized version and platform/arch combination:"
+        echo "$DEFAULT_CRICTL_VERSION $HOST_PLATFORM/$HOST_ARCH"
+        echo "Set CRICTL_VERSION and CRICTL_TAR_HASH to overwrite"
+        exit 1
+    esac
   fi
   local -r crictl="crictl-${crictl_version}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz"
 
@@ -354,32 +372,6 @@ EOF
   tar xf "${crictl}"
   mv crictl "${KUBE_BIN}/crictl"
   rm -f "${crictl}"
-}
-
-function install-exec-auth-plugin {
-  if [[ ! "${EXEC_AUTH_PLUGIN_URL:-}" ]]; then
-      return
-  fi
-  local -r plugin_url="${EXEC_AUTH_PLUGIN_URL}"
-  local -r plugin_hash="${EXEC_AUTH_PLUGIN_HASH}"
-
-  if is-preloaded "gke-exec-auth-plugin" "${plugin_hash}"; then
-    echo "gke-exec-auth-plugin is preloaded"
-    return
-  fi
-
-  echo "Downloading gke-exec-auth-plugin binary"
-  download-or-bust "${plugin_hash}" "${plugin_url}"
-  mv "${KUBE_HOME}/gke-exec-auth-plugin" "${KUBE_BIN}/gke-exec-auth-plugin"
-  chmod a+x "${KUBE_BIN}/gke-exec-auth-plugin"
-
-  if [[ ! "${EXEC_AUTH_PLUGIN_LICENSE_URL:-}" ]]; then
-      return
-  fi
-  local -r license_url="${EXEC_AUTH_PLUGIN_LICENSE_URL}"
-  echo "Downloading gke-exec-auth-plugin license"
-  download-or-bust "" "${license_url}"
-  mv "${KUBE_HOME}/LICENSES/LICENSE" "${KUBE_BIN}/gke-exec-auth-plugin-license"
 }
 
 function install-kube-manifests {
@@ -407,12 +399,12 @@ function install-kube-manifests {
   echo "Downloading k8s manifests tar"
   download-or-bust "${manifests_tar_hash}" "${manifests_tar_urls[@]}"
   tar xzf "${KUBE_HOME}/${manifests_tar}" -C "${dst_dir}" --overwrite
-  local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-k8s.gcr.io}"
-  if [[ "${kube_addon_registry}" != "k8s.gcr.io" ]]; then
-    find "${dst_dir}" \(-name '*.yaml' -or -name '*.yaml.in'\) -print0 | \
-      xargs -0 sed -ri "s@(image:\s.*)k8s.gcr.io@\1${kube_addon_registry}@"
-    find "${dst_dir}" \(-name '*.manifest' -or -name '*.json'\) -print0 | \
-      xargs -0 sed -ri "s@(image\":\s+\")k8s.gcr.io@\1${kube_addon_registry}@"
+  local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-registry.k8s.io}"
+  if [[ "${kube_addon_registry}" != "registry.k8s.io" ]]; then
+    find "${dst_dir}" \( -name '*.yaml' -or -name '*.yaml.in' \) -print0 | \
+      xargs -0 sed -ri "s@(image:\s.*)registry.k8s.io@\1${kube_addon_registry}@"
+    find "${dst_dir}" \( -name '*.manifest' -or -name '*.json' \) -print0 | \
+      xargs -0 sed -ri "s@(image\":\s+\")registry.k8s.io@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
   cp "${dst_dir}/kubernetes/gci-trusty/configure-kubeapiserver.sh" "${KUBE_BIN}/configure-kubeapiserver.sh"
@@ -439,8 +431,10 @@ function try-load-docker-image {
 
   if [[ "${CONTAINER_RUNTIME_NAME:-}" == "containerd" || "${CONTAINERD_TEST:-}"  == "containerd" ]]; then
     load_image_command=${LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
+    tag_image_command=${TAG_IMAGE_COMMAND:-ctr -n=k8s.io images tag}
   else
     load_image_command="${LOAD_IMAGE_COMMAND:-}"
+    tag_image_command="${TAG_IMAGE_COMMAND:-}"
   fi
 
   # Deliberately word split load_image_command
@@ -454,6 +448,15 @@ function try-load-docker-image {
       sleep 5
     fi
   done
+
+  if [[ -n "${KUBE_ADDON_REGISTRY:-}" ]]; then
+    # remove the prefix and suffix from the path to get the container name
+    container=${img##*/}
+    container=${container%.tar}
+    # find the right one for which we will need an additional tag
+    container=$(ctr -n k8s.io images ls | grep "registry.k8s.io/${container}" | awk '{print $1}' | cut -f 2 -d '/')
+    ${tag_image_command} "registry.k8s.io/${container}" "${KUBE_ADDON_REGISTRY}/${container}"
+  fi
   # Re-enable errexit.
   set -e
 }
@@ -470,44 +473,6 @@ function load-docker-images {
   else
     try-load-docker-image "${img_dir}/kube-proxy.tar"
   fi
-}
-
-# If we are on ubuntu we can try to install docker
-function install-docker {
-  # bailout if we are not on ubuntu
-  if ! command -v apt-get >/dev/null 2>&1; then
-    echo "Unable to automatically install docker. Bailing out..."
-    return
-  fi
-  # Install Docker deps, some of these are already installed in the image but
-  # that's fine since they won't re-install and we can reuse the code below
-  # for another image someday.
-  apt-get update
-  apt-get install -y --no-install-recommends \
-    apt-transport-https \
-    ca-certificates \
-    socat \
-    curl \
-    gnupg2 \
-    software-properties-common \
-    lsb-release
-
-  release=$(lsb_release -cs)
-
-  # Add the Docker apt-repository
-  # shellcheck disable=SC2086
-  curl ${CURL_FLAGS} \
-    --location \
-    "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
-  | apt-key add -
-  add-apt-repository \
-    "deb [arch=${HOST_ARCH}] https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID") \
-    $release stable"
-
-  # Install Docker
-  apt-get update && \
-    apt-get install -y --no-install-recommends "${GCI_DOCKER_VERSION:-"docker-ce=5:19.03.*"}"
-  rm -rf /var/lib/apt/lists/*
 }
 
 # If we are on ubuntu we can try to install containerd
@@ -586,19 +551,23 @@ function ensure-container-runtime {
   if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
     log-wrap "InstallContainerdUbuntu" install-containerd-ubuntu
   fi
+
+  # when custom containerd version is installed sourcing containerd_env.sh will add all tools like ctr to the PATH
+  if [[ -e "/etc/profile.d/containerd_env.sh" ]]; then
+   log-wrap 'SourceContainerdEnv' source "/etc/profile.d/containerd_env.sh"
+  fi
+
   # Verify presence and print versions of ctr, containerd, runc
   if ! command -v ctr >/dev/null 2>&1; then
     echo "ERROR ctr not found. Aborting."
     exit 2
   fi
   ctr --version
-
   if ! command -v containerd >/dev/null 2>&1; then
     echo "ERROR containerd not found. Aborting."
     exit 2
   fi
   containerd --version
-
   if ! command -v runc >/dev/null 2>&1; then
     echo "ERROR runc not found. Aborting."
     exit 2
@@ -677,9 +646,6 @@ function install-kube-binary-config {
 
   # Install crictl on each node.
   log-wrap "InstallCrictl" install-crictl
-
-  # TODO(awly): include the binary and license in the OS image.
-  log-wrap "InstallExecAuthPlugin" install-exec-auth-plugin
 
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"

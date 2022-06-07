@@ -124,15 +124,6 @@ func (b *ClusterRoleBindingApplyConfiguration) WithNamespace(value string) *Clus
 	return b
 }
 
-// WithSelfLink sets the SelfLink field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the SelfLink field is set to the value of the last call.
-func (b *ClusterRoleBindingApplyConfiguration) WithSelfLink(value string) *ClusterRoleBindingApplyConfiguration {
-	b.ensureObjectMetaApplyConfigurationExists()
-	b.SelfLink = &value
-	return b
-}
-
 // WithUID sets the UID field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the UID field is set to the value of the last call.
@@ -239,15 +230,6 @@ func (b *ClusterRoleBindingApplyConfiguration) WithFinalizers(values ...string) 
 	for i := range values {
 		b.Finalizers = append(b.Finalizers, values[i])
 	}
-	return b
-}
-
-// WithClusterName sets the ClusterName field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ClusterName field is set to the value of the last call.
-func (b *ClusterRoleBindingApplyConfiguration) WithClusterName(value string) *ClusterRoleBindingApplyConfiguration {
-	b.ensureObjectMetaApplyConfigurationExists()
-	b.ClusterName = &value
 	return b
 }
 

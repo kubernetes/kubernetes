@@ -19,7 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path"
 	"time"
 
@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -37,6 +38,7 @@ import (
 
 var _ = SIGDescribe("Container Runtime", func() {
 	f := framework.NewDefaultFramework("container-runtime")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.Describe("blackbox test", func() {
 		ginkgo.Context("when starting a container that exits", func() {
@@ -188,11 +190,8 @@ while true; do sleep 1; done
 				Release: v1.15
 				Testname: Container Runtime, TerminationMessagePath, non-root user and non-default path
 				Description: Create a pod with a container to run it as a non-root user with a custom TerminationMessagePath set. Pod redirects the output to the provided path successfully. When the container is terminated, the termination message MUST match the expected output logged in the provided custom path.
-				[LinuxOnly]: Tagged LinuxOnly due to use of 'uid' and unable to mount files in Windows Containers.
 			*/
-			framework.ConformanceIt("should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]", func() {
-				// TODO(claudiub): Remove [LinuxOnly] tag once Containerd becomes the default
-				// container runtime on Windows
+			framework.ConformanceIt("should report termination message if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance]", func() {
 				container := v1.Container{
 					Image:                  framework.BusyBoxImage,
 					Command:                []string{"/bin/sh", "-c"},
@@ -291,7 +290,7 @@ while true; do sleep 1; done
 }`
 					// we might be told to use a different docker config JSON.
 					if framework.TestContext.DockerConfigFile != "" {
-						contents, err := ioutil.ReadFile(framework.TestContext.DockerConfigFile)
+						contents, err := os.ReadFile(framework.TestContext.DockerConfigFile)
 						framework.ExpectNoError(err)
 						auth = string(contents)
 					}

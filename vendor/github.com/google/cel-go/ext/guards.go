@@ -17,6 +17,7 @@ package ext
 import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+	"github.com/google/cel-go/common/types/traits"
 	"github.com/google/cel-go/interpreter/functions"
 )
 
@@ -244,5 +245,59 @@ func callInStrStrStrIntOutStr(fn func(string, string, string, int64) (string, er
 			return types.NewErr(err.Error())
 		}
 		return types.String(out)
+	}
+}
+
+func callInListStrOutStr(fn func([]string) (string, error)) functions.UnaryOp {
+	return func(args1 ref.Val) ref.Val {
+		vVal, ok := args1.(traits.Lister)
+		if !ok {
+			return types.MaybeNoSuchOverloadErr(args1)
+		}
+		strings := make([]string, vVal.Size().Value().(int64))
+		i := 0
+		for it := vVal.Iterator(); it.HasNext() == types.True; {
+			next := it.Next()
+			v, ok := next.(types.String)
+			if !ok {
+				return types.MaybeNoSuchOverloadErr(next)
+			}
+			strings[i] = string(v)
+			i++
+		}
+		out, err := fn(strings)
+		if err != nil {
+			return types.NewErr(err.Error())
+		}
+		return types.DefaultTypeAdapter.NativeToValue(out)
+	}
+}
+
+func callInListStrStrOutStr(fn func([]string, string) (string, error)) functions.BinaryOp {
+	return func(args1, args2 ref.Val) ref.Val {
+		vVal, ok := args1.(traits.Lister)
+		if !ok {
+			return types.MaybeNoSuchOverloadErr(args1)
+		}
+		arg1Val, ok := args2.(types.String)
+		if !ok {
+			return types.MaybeNoSuchOverloadErr(args2)
+		}
+		strings := make([]string, vVal.Size().Value().(int64))
+		i := 0
+		for it := vVal.Iterator(); it.HasNext() == types.True; {
+			next := it.Next()
+			v, ok := next.(types.String)
+			if !ok {
+				return types.MaybeNoSuchOverloadErr(next)
+			}
+			strings[i] = string(v)
+			i++
+		}
+		out, err := fn(strings, string(arg1Val))
+		if err != nil {
+			return types.NewErr(err.Error())
+		}
+		return types.DefaultTypeAdapter.NativeToValue(out)
 	}
 }

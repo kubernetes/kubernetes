@@ -19,7 +19,6 @@ package testing
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path"
@@ -36,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storageversion"
 	"k8s.io/client-go/kubernetes"
@@ -46,6 +44,8 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	testutil "k8s.io/kubernetes/test/utils"
+
+	"k8s.io/klog/v2"
 )
 
 // This key is for testing purposes only and is not considered secure.
@@ -60,8 +60,6 @@ type TearDownFunc func()
 
 // TestServerInstanceOptions Instance options the TestServer
 type TestServerInstanceOptions struct {
-	// DisableStorageCleanup Disable the automatic storage cleanup
-	DisableStorageCleanup bool
 	// Enable cert-auth for the kube-apiserver
 	EnableCertAuth bool
 	// Wrap the storage version interface of the created server's generic server.
@@ -88,8 +86,7 @@ type Logger interface {
 // NewDefaultTestServerOptions Default options for TestServer instances
 func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 	return &TestServerInstanceOptions{
-		DisableStorageCleanup: false,
-		EnableCertAuth:        true,
+		EnableCertAuth: true,
 	}
 }
 
@@ -104,33 +101,33 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		instanceOptions = NewDefaultTestServerOptions()
 	}
 
-	// TODO : Remove TrackStorageCleanup below when PR
-	// https://github.com/kubernetes/kubernetes/pull/50690
-	// merges as that shuts down storage properly
-	if !instanceOptions.DisableStorageCleanup {
-		registry.TrackStorageCleanup()
+	result.TmpDir, err = os.MkdirTemp("", "kubernetes-kube-apiserver")
+	if err != nil {
+		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}
 
 	stopCh := make(chan struct{})
+	var errCh chan error
 	tearDown := func() {
-		if !instanceOptions.DisableStorageCleanup {
-			registry.CleanupStorage()
-		}
+		// Closing stopCh is stopping apiserver and cleaning up
+		// after itself, including shutting down its storage layer.
 		close(stopCh)
-		if len(result.TmpDir) != 0 {
-			os.RemoveAll(result.TmpDir)
+
+		// If the apiserver was started, let's wait for it to
+		// shutdown clearly.
+		if errCh != nil {
+			err, ok := <-errCh
+			if ok && err != nil {
+				klog.Errorf("Failed to shutdown test server clearly: %v", err)
+			}
 		}
+		os.RemoveAll(result.TmpDir)
 	}
 	defer func() {
 		if result.TearDownFn == nil {
 			tearDown()
 		}
 	}()
-
-	result.TmpDir, err = ioutil.TempDir("", "kubernetes-kube-apiserver")
-	if err != nil {
-		return result, fmt.Errorf("failed to create temp dir: %v", err)
-	}
 
 	fs := pflag.NewFlagSet("test", pflag.PanicOnError)
 
@@ -156,7 +153,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 			return result, err
 		}
 		proxyCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "proxy-ca.crt")
-		if err := ioutil.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
+		if err := os.WriteFile(proxyCACertFile, testutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
 			return result, err
 		}
 		s.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
@@ -169,7 +166,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 			return result, err
 		}
 		clientCACertFile := path.Join(s.SecureServing.ServerCert.CertDirectory, "client-ca.crt")
-		if err := ioutil.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
+		if err := os.WriteFile(clientCACertFile, testutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 			return result, err
 		}
 		s.Authentication.ClientCert.ClientCA = clientCACertFile
@@ -191,12 +188,12 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, err
 	}
 
-	saSigningKeyFile, err := ioutil.TempFile("/tmp", "insecure_test_key")
+	saSigningKeyFile, err := os.CreateTemp("/tmp", "insecure_test_key")
 	if err != nil {
 		t.Fatalf("create temp file failed: %v", err)
 	}
 	defer os.RemoveAll(saSigningKeyFile.Name())
-	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+	if err = os.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
 		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 	s.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
@@ -214,7 +211,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
-	server, err := app.CreateServerChain(completedOptions, stopCh)
+	server, err := app.CreateServerChain(completedOptions)
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
 	}
@@ -222,8 +219,9 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		server.GenericAPIServer.StorageVersionManager = instanceOptions.StorageVersionWrapFunc(server.GenericAPIServer.StorageVersionManager)
 	}
 
-	errCh := make(chan error)
+	errCh = make(chan error)
 	go func(stopCh <-chan struct{}) {
+		defer close(errCh)
 		prepared, err := server.PrepareRun()
 		if err != nil {
 			errCh <- err
@@ -315,7 +313,10 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	result.ClientConfig.QPS = 1000
 	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s
-	result.TearDownFn = tearDown
+	result.TearDownFn = func() {
+		tearDown()
+		etcdClient.Close()
+	}
 	result.EtcdClient = etcdClient
 	result.EtcdStoragePrefix = storageConfig.Prefix
 

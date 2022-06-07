@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	admissionapi "k8s.io/pod-security-admission/api"
 	"os"
 	"os/exec"
 	"regexp"
@@ -55,6 +55,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 		})
 		ginkgo.Context("when running with AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
+			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject an unloaded profile", func() {
 				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileNamePrefix+"non-existent-profile")
@@ -85,6 +86,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 	} else {
 		ginkgo.Context("when running without AppArmor", func() {
 			f := framework.NewDefaultFramework("apparmor-test")
+			f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 			ginkgo.It("should reject a pod with an AppArmor profile", func() {
 				status := runAppArmorTest(f, false, v1.AppArmorBetaProfileRuntimeDefault)
@@ -118,7 +120,7 @@ profile e2e-node-apparmor-test-audit-write flags=(attach_disconnected) {
 `
 
 func loadTestProfiles() error {
-	f, err := ioutil.TempFile("/tmp", "apparmor")
+	f, err := os.CreateTemp("/tmp", "apparmor")
 	if err != nil {
 		return fmt.Errorf("failed to open temp file: %v", err)
 	}

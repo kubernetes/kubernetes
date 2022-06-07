@@ -18,9 +18,11 @@ package kubeadm
 
 import (
 	"context"
+
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -39,6 +41,7 @@ var _ = Describe("nodes", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("nodes")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// Tests in this container are not expected to create new objects in the cluster
 	// so we are disabling the creation of a namespace in order to get a faster execution
@@ -49,9 +52,11 @@ var _ = Describe("nodes", func() {
 			List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err, "error reading nodes")
 
-		// checks that the nodes have the CRI annotation
+		// Checks that the nodes have the CRI socket annotation
+		// and that it is prefixed with a URL scheme
 		for _, node := range nodes.Items {
 			gomega.Expect(node.Annotations).To(gomega.HaveKey(nodesCRISocketAnnotation))
+			gomega.Expect(node.Annotations[nodesCRISocketAnnotation]).To(gomega.HavePrefix("unix://"))
 		}
 	})
 

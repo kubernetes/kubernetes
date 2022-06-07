@@ -21,7 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -126,7 +126,7 @@ func TestEmptyList(t *testing.T) {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
 	defer resp.Body.Close()
-	data, _ := ioutil.ReadAll(resp.Body)
+	data, _ := io.ReadAll(resp.Body)
 	decodedData := map[string]interface{}{}
 	if err := json.Unmarshal(data, &decodedData); err != nil {
 		t.Logf("body: %s", string(data))
@@ -202,44 +202,46 @@ func TestStatus(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, s, closeFn := framework.RunAnAPIServer(tc.controlPlaneConfig)
-		defer closeFn()
+		t.Run(tc.name, func(t *testing.T) {
+			_, s, closeFn := framework.RunAnAPIServer(tc.controlPlaneConfig)
+			defer closeFn()
 
-		u := s.URL + tc.reqPath
-		resp, err := http.Get(u)
-		if err != nil {
-			t.Fatalf("unexpected error getting %s: %v", u, err)
-		}
-		if resp.StatusCode != tc.statusCode {
-			t.Fatalf("got status %v instead of %s", resp.StatusCode, tc.name)
-		}
-		defer resp.Body.Close()
-		data, _ := ioutil.ReadAll(resp.Body)
-		decodedData := map[string]interface{}{}
-		if err := json.Unmarshal(data, &decodedData); err != nil {
+			u := s.URL + tc.reqPath
+			resp, err := http.Get(u)
+			if err != nil {
+				t.Fatalf("unexpected error getting %s: %v", u, err)
+			}
+			if resp.StatusCode != tc.statusCode {
+				t.Fatalf("got status %v instead of %s", resp.StatusCode, tc.name)
+			}
+			defer resp.Body.Close()
+			data, _ := io.ReadAll(resp.Body)
+			decodedData := map[string]interface{}{}
+			if err := json.Unmarshal(data, &decodedData); err != nil {
+				t.Logf("body: %s", string(data))
+				t.Fatalf("got error decoding data: %v", err)
+			}
 			t.Logf("body: %s", string(data))
-			t.Fatalf("got error decoding data: %v", err)
-		}
-		t.Logf("body: %s", string(data))
 
-		if got, expected := decodedData["apiVersion"], "v1"; got != expected {
-			t.Errorf("unexpected apiVersion %q, expected %q", got, expected)
-		}
-		if got, expected := decodedData["kind"], "Status"; got != expected {
-			t.Errorf("unexpected kind %q, expected %q", got, expected)
-		}
-		if got, expected := decodedData["status"], "Failure"; got != expected {
-			t.Errorf("unexpected status %q, expected %q", got, expected)
-		}
-		if got, expected := decodedData["code"], float64(tc.statusCode); got != expected {
-			t.Errorf("unexpected code %v, expected %v", got, expected)
-		}
-		if got, expected := decodedData["reason"], tc.reason; got != expected {
-			t.Errorf("unexpected reason %v, expected %v", got, expected)
-		}
-		if got, expected := decodedData["message"], tc.message; got != expected {
-			t.Errorf("unexpected message %v, expected %v", got, expected)
-		}
+			if got, expected := decodedData["apiVersion"], "v1"; got != expected {
+				t.Errorf("unexpected apiVersion %q, expected %q", got, expected)
+			}
+			if got, expected := decodedData["kind"], "Status"; got != expected {
+				t.Errorf("unexpected kind %q, expected %q", got, expected)
+			}
+			if got, expected := decodedData["status"], "Failure"; got != expected {
+				t.Errorf("unexpected status %q, expected %q", got, expected)
+			}
+			if got, expected := decodedData["code"], float64(tc.statusCode); got != expected {
+				t.Errorf("unexpected code %v, expected %v", got, expected)
+			}
+			if got, expected := decodedData["reason"], tc.reason; got != expected {
+				t.Errorf("unexpected reason %v, expected %v", got, expected)
+			}
+			if got, expected := decodedData["message"], tc.message; got != expected {
+				t.Errorf("unexpected message %v, expected %v", got, expected)
+			}
+		})
 	}
 }
 
@@ -418,7 +420,7 @@ var deploymentApps = `
       "spec": {
         "containers": [{
           "name": "nginx",
-          "image": "k8s.gcr.io/nginx:1.7.9"
+          "image": "registry.k8s.io/nginx:1.7.9"
         }]
       }
     }
@@ -470,7 +472,7 @@ func TestAutoscalingGroupBackwardCompatibility(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			body := string(b)
 			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -518,7 +520,7 @@ func TestAppsGroupBackwardCompatibility(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			body := string(b)
 			if _, ok := r.expectedStatusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
@@ -545,7 +547,7 @@ func TestAccept(t *testing.T) {
 		t.Fatalf("got status %v instead of 200 OK", resp.StatusCode)
 	}
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	if resp.Header.Get("Content-Type") != "application/json" {
 		t.Errorf("unexpected content: %s", body)
 	}
@@ -562,7 +564,7 @@ func TestAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, _ = ioutil.ReadAll(resp.Body)
+	body, _ = io.ReadAll(resp.Body)
 	if resp.Header.Get("Content-Type") != "application/yaml" {
 		t.Errorf("unexpected content: %s", body)
 	}
@@ -580,7 +582,7 @@ func TestAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, _ = ioutil.ReadAll(resp.Body)
+	body, _ = io.ReadAll(resp.Body)
 	if resp.Header.Get("Content-Type") != "application/json" {
 		t.Errorf("unexpected content: %s", body)
 	}

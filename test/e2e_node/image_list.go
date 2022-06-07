@@ -55,9 +55,9 @@ const (
 var NodePrePullImageList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
 	"gcr.io/cadvisor/cadvisor:v0.43.0",
-	"k8s.gcr.io/stress:v1",
+	"registry.k8s.io/stress:v1",
 	busyboxImage,
-	"k8s.gcr.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
+	"registry.k8s.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
 	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.Perl),
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
@@ -100,7 +100,7 @@ func updateImageAllowList() {
 }
 
 func getNodeProblemDetectorImage() string {
-	const defaultImage string = "k8s.gcr.io/node-problem-detector/node-problem-detector:v0.8.7"
+	const defaultImage string = "registry.k8s.io/node-problem-detector/node-problem-detector:v0.8.7"
 	image := os.Getenv("NODE_PROBLEM_DETECTOR_IMAGE")
 	if image == "" {
 		image = defaultImage
@@ -125,8 +125,8 @@ func (rp *remotePuller) Name() string {
 }
 
 func (rp *remotePuller) Pull(image string) ([]byte, error) {
-	imageStatus, err := rp.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image})
-	if err == nil && imageStatus != nil {
+	resp, err := rp.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image}, false)
+	if err == nil && resp.GetImage() != nil {
 		return nil, nil
 	}
 	_, err = rp.imageService.PullImage(&runtimeapi.ImageSpec{Image: image}, nil, nil)

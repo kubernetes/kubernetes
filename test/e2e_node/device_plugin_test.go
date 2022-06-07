@@ -19,15 +19,19 @@ package e2enode
 import (
 	"context"
 	"path/filepath"
+	"regexp"
 	"time"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-
-	"regexp"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,9 +41,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -61,7 +62,8 @@ var (
 // Serial because the test restarts Kubelet
 var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
-	testDevicePlugin(f, "/var/lib/kubelet/plugins_registry")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	testDevicePlugin(f, kubeletdevicepluginv1beta1.DevicePluginPath)
 })
 
 // numberOfSampleResources returns the number of resources advertised by a node.
@@ -73,26 +75,6 @@ func numberOfSampleResources(node *v1.Node) int64 {
 	}
 
 	return val.Value()
-}
-
-// getSampleDevicePluginPod returns the Device Plugin pod for sample resources in e2e tests.
-func getSampleDevicePluginPod() *v1.Pod {
-	data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
-	if err != nil {
-		framework.Fail(err.Error())
-	}
-
-	ds := readDaemonSetV1OrDie(data)
-	p := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      sampleDevicePluginName,
-			Namespace: metav1.NamespaceSystem,
-		},
-
-		Spec: ds.Spec.Template.Spec,
-	}
-
-	return p
 }
 
 // readDaemonSetV1OrDie reads daemonset object from bytes. Panics on error.
@@ -122,26 +104,39 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 			ginkgo.By("Scheduling a sample device plugin pod")
-			dp := getSampleDevicePluginPod()
-			dp.Namespace = ""
+			data, err := e2etestfiles.Read(SampleDevicePluginDSYAML)
+			if err != nil {
+				framework.Fail(err.Error())
+			}
+			ds := readDaemonSetV1OrDie(data)
+
+			dp := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: sampleDevicePluginName,
+				},
+				Spec: ds.Spec.Template.Spec,
+			}
+
 			for i := range dp.Spec.Containers[0].Env {
 				if dp.Spec.Containers[0].Env[i].Name == envVarNamePluginSockDir {
 					dp.Spec.Containers[0].Env[i].Value = pluginSockDir
 				}
 			}
-			dptemplate = dp
+			dptemplate = dp.DeepCopy()
 			devicePluginPod = f.PodClient().CreateSync(dp)
 
 			ginkgo.By("Waiting for devices to become available on the local node")
 			gomega.Eventually(func() bool {
-				return numberOfSampleResources(getLocalNode(f)) > 0
+				node, ready := getLocalTestNode(f)
+				return ready && numberOfSampleResources(node) > 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 			framework.Logf("Successfully created device plugin pod")
 
 			ginkgo.By("Waiting for the resource exported by the sample device plugin to become available on the local node")
 			gomega.Eventually(func() bool {
-				node := getLocalNode(f)
-				return numberOfDevicesCapacity(node, resourceName) == devsLen &&
+				node, ready := getLocalTestNode(f)
+				return ready &&
+					numberOfDevicesCapacity(node, resourceName) == devsLen &&
 					numberOfDevicesAllocatable(node, resourceName) == devsLen
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 		})
@@ -166,8 +161,11 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Waiting for devices to become unavailable on the local node")
 			gomega.Eventually(func() bool {
-				return numberOfSampleResources(getLocalNode(f)) <= 0
+				node, ready := getLocalTestNode(f)
+				return ready && numberOfSampleResources(node) <= 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+
+			ginkgo.By("devices now unavailable on the local node")
 		})
 
 		ginkgo.It("Can schedule a pod that requires a device", func() {
@@ -288,8 +286,9 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			ginkgo.By("Waiting for resource to become available on the local node after re-registration")
 			gomega.Eventually(func() bool {
-				node := getLocalNode(f)
-				return numberOfDevicesCapacity(node, resourceName) == devsLen &&
+				node, ready := getLocalTestNode(f)
+				return ready &&
+					numberOfDevicesCapacity(node, resourceName) == devsLen &&
 					numberOfDevicesAllocatable(node, resourceName) == devsLen
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrue())
 

@@ -30,10 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	/*
 		Release: v1.9
@@ -185,7 +187,9 @@ var _ = SIGDescribe("Secrets", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundCreatedSecret, true, "unable to find secret by its value")
+		if !foundCreatedSecret {
+			framework.Failf("unable to find secret %s/%s by name", f.Namespace.Name, secretTestName)
+		}
 
 		ginkgo.By("patching the secret")
 		// patch the secret in the test namespace
@@ -228,7 +232,9 @@ var _ = SIGDescribe("Secrets", func() {
 				break
 			}
 		}
-		framework.ExpectEqual(foundCreatedSecret, false, "secret was not deleted successfully")
+		if foundCreatedSecret {
+			framework.Failf("secret %s/%s was not deleted successfully", f.Namespace.Name, secretTestName)
+		}
 	})
 })
 

@@ -57,8 +57,8 @@ $GCE_METADATA_SERVER = "169.254.169.254"
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
-$CRICTL_VERSION = 'v1.23.0'
-$CRICTL_SHA256 = '9c5a270f1c23878f247fb9846b8046cb3fd3cd55066ea767d68dfc9c30a7871c'
+$CRICTL_VERSION = 'v1.24.2'
+$CRICTL_SHA256 = 'db202de544fb49ffc58d1aa4b574dfaed0aeb71c45a542715b42f7b739ff7394'
 
 Import-Module -Force C:\common.psm1
 
@@ -282,6 +282,7 @@ function Set-EnvironmentVars {
     "WINDOWS_CNI_VERSION" = ${kube_env}['WINDOWS_CNI_VERSION']
     "CSI_PROXY_STORAGE_PATH" = ${kube_env}['CSI_PROXY_STORAGE_PATH']
     "CSI_PROXY_VERSION" = ${kube_env}['CSI_PROXY_VERSION']
+    "CSI_PROXY_FLAGS" = ${kube_env}['CSI_PROXY_FLAGS']
     "ENABLE_CSI_PROXY" = ${kube_env}['ENABLE_CSI_PROXY']
     "PKI_DIR" = ${kube_env}['PKI_DIR']
     "CA_FILE_PATH" = ${kube_env}['CA_FILE_PATH']
@@ -357,39 +358,6 @@ function Download-HelperScripts {
   }
 }
 
-# Downloads the gke-exec-auth-plugin for TPM-based authentication to the
-# master, if auth plugin support has been requested for this node (see
-# Test-NodeUsesAuthPlugin).
-# https://github.com/kubernetes/cloud-provider-gcp/tree/master/cmd/gke-exec-auth-plugin
-#
-# Required ${kube_env} keys:
-#   EXEC_AUTH_PLUGIN_LICENSE_URL
-#   EXEC_AUTH_PLUGIN_HASH
-#   EXEC_AUTH_PLUGIN_URL
-function DownloadAndInstall-AuthPlugin {
-  if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
-    Log-Output 'Skipping download of auth plugin'
-    return
-  }
-  if (-not (ShouldWrite-File "${env:NODE_DIR}\gke-exec-auth-plugin.exe")) {
-    return
-  }
-
-  if (-not ($kube_env.ContainsKey('EXEC_AUTH_PLUGIN_LICENSE_URL') -and
-            $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_HASH') -and
-            $kube_env.ContainsKey('EXEC_AUTH_PLUGIN_URL'))) {
-    Log-Output -Fatal ("Missing one or more kube-env keys needed for " +
-                       "downloading auth plugin: $(Out-String $kube_env)")
-  }
-  MustDownload-File `
-      -URLs ${kube_env}['EXEC_AUTH_PLUGIN_URL'] `
-      -Hash ${kube_env}['EXEC_AUTH_PLUGIN_HASH'] `
-      -OutFile "${env:NODE_DIR}\gke-exec-auth-plugin.exe"
-  MustDownload-File `
-      -URLs ${kube_env}['EXEC_AUTH_PLUGIN_LICENSE_URL'] `
-      -OutFile "${env:LICENSE_DIR}\LICENSE_gke-exec-auth-plugin.txt"
-}
-
 # Downloads the Kubernetes binaries from kube-env's NODE_BINARY_TAR_URL and
 # puts them in a subdirectory of $env:K8S_DIR.
 #
@@ -446,7 +414,7 @@ function DownloadAndInstall-CSIProxyBinaries {
 function Start-CSIProxy {
   if ("${env:ENABLE_CSI_PROXY}" -eq "true") {
     Log-Output "Creating CSI Proxy Service"
-    $flags = "-windows-service -log_file=${env:LOGS_DIR}\csi-proxy.log -logtostderr=false"
+    $flags = "-windows-service -log_file=${env:LOGS_DIR}\csi-proxy.log -logtostderr=false ${env:CSI_PROXY_FLAGS}"
     & sc.exe create csiproxy binPath= "${env:NODE_DIR}\csi-proxy.exe $flags"
     & sc.exe failure csiproxy reset= 0 actions= restart/10000
     Log-Output "Starting CSI Proxy Service"
@@ -568,15 +536,6 @@ function Create-NodePki {
     Log-Output -Fatal 'CA_CERT not present in kube-env'
   }
 
-  # On nodes that use a plugin to support authentication, KUBELET_CERT and
-  # KUBELET_KEY will not be present - TPM_BOOTSTRAP_CERT and TPM_BOOTSTRAP_KEY
-  # should be set instead.
-  if (Test-NodeUsesAuthPlugin ${kube_env}) {
-    Log-Output ('Skipping KUBELET_CERT and KUBELET_KEY, plugin will be used ' +
-                'for authentication')
-    return
-  }
-
   if ($kube_env.ContainsKey('KUBELET_CERT')) {
     $KUBELET_CERT = ${kube_env}['KUBELET_CERT']
     Write_PkiData "${KUBELET_CERT}" ${env:KUBELET_CERT_PATH}
@@ -667,11 +626,7 @@ function Write_KubeconfigFromMetadata {
 # Required ${kube_env} keys:
 #   KUBERNETES_MASTER_NAME: the apiserver IP address.
 function Create-KubeletKubeconfig {
-  if (Test-NodeUsesAuthPlugin ${kube_env}) {
-    Write_KubeconfigFromMetadata
-  } else {
-    Write_BootstrapKubeconfig
-  }
+  Write_BootstrapKubeconfig
 }
 
 # Creates the kubeconfig user file for applications that communicate with Kubernetes.
@@ -891,8 +846,12 @@ function Configure-HostNetworkingService {
         -Verbose
     $created_hns_network = $true
   }
-
+  # This name of endpoint is referred in pkg/proxy/winkernel/proxier.go as part of
+  # kube-proxy as well. A health check port for every service that is specified as
+  # "externalTrafficPolicy: local" will be added on the endpoint.
+  # PLEASE KEEP THEM CONSISTENT!!!
   $endpoint_name = "cbr0"
+
   $vnic_name = "vEthernet (${endpoint_name})"
 
   $hns_endpoint = Get-HnsEndpoint | Where-Object Name -eq $endpoint_name
@@ -982,7 +941,7 @@ function Configure-GcePdTools {
   Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
 }
 
-# Setup cni network. This function supports both Docker and containerd.
+# Setup cni network for containerd.
 function Prepare-CniNetworking {
     Configure_Containerd_CniNetworking
 }
@@ -1053,11 +1012,9 @@ function Start-WorkerServices {
   )
 
   $kubelet_args = ${default_kubelet_args} + ${kubelet_args}
-  if (-not (Test-NodeUsesAuthPlugin ${kube_env})) {
-    Log-Output 'Using bootstrap kubeconfig for authentication'
-    $kubelet_args = (${kubelet_args} +
-                     "--bootstrap-kubeconfig=${env:BOOTSTRAP_KUBECONFIG}")
-  }
+  Log-Output 'Using bootstrap kubeconfig for authentication'
+  $kubelet_args = (${kubelet_args} +
+                   "--bootstrap-kubeconfig=${env:BOOTSTRAP_KUBECONFIG}")
   Log-Output "Final kubelet_args: ${kubelet_args}"
 
   # Compute kube-proxy args
@@ -1161,12 +1118,34 @@ function WaitFor_KubeletAndKubeProxyReady {
 }
 
 # Runs 'kubectl get nodes'.
-# TODO(pjh): run more verification commands.
+# Runs additional verification commands to ensure node successfully joined cluster
+# and that it connects to the API Server.
 function Verify-WorkerServices {
-  Log-Output ("kubectl get nodes:`n" +
-              $(& "${env:NODE_DIR}\kubectl.exe" get nodes | Out-String))
+  $timeout = 12
+  $retries = 0
+  $retryDelayInSeconds = 5
+  
+  Log-Output ("Testing node connection to API server...")
+  do {
+      $retries++
+      $nodes_list = & "${env:NODE_DIR}\kubectl.exe" get nodes -o=custom-columns=:.metadata.name -A | Out-String
+      $host_status = & "${env:NODE_DIR}\kubectl.exe" get nodes (hostname) -o=custom-columns=:.status.conditions[4].type | Out-String
+      Start-Sleep $retryDelayInSeconds
+  } while (((-Not $nodes_list) -or (-Not $nodes_list.contains((hostname))) -or (-Not $host_status.contains("Ready")))-and ($retries -le $timeout))
+  
+  If (-Not $nodes_list){
+      Throw ("Node: '$(hostname)' failed to connect to API server")
+  
+  }ElseIf (-Not $nodes_list.contains((hostname))) {
+      Throw ("Node: '$(hostname)' failed to join the cluster; NODES: '`n $($nodes_list)'")
+
+  }ELseIf (-Not $host_status.contains("Ready")) {
+      Throw ("Node: '$(hostname)' is not in Ready state")
+  }
+  
+  Log-Output ("Node: $(hostname) successfully joined cluster `n NODES: `n $($nodes_list)")
   Verify_GceMetadataServerRouteIsPresent
-  Log_Todo "run more verification commands."
+
 }
 
 # Downloads the Windows crictl package and installs its contents (e.g.
@@ -1213,8 +1192,7 @@ function Pull-InfraContainer {
   Log-Output "Infra/pause container:`n$inspect"
 }
 
-# Setup the container runtime on the node. It supports both
-# Docker and containerd.
+# Setup the containerd on the node.
 function Setup-ContainerRuntime {
   Install-Pigz
   Install_Containerd
@@ -1249,35 +1227,6 @@ function Enable-HyperVFeature {
   Log-Output "Enabling Windows 'HyperV' feature"
   Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All -NoRestart
   Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-Management-PowerShell -All -NoRestart
-}
-
-function Test-DockerIsInstalled {
-  return ((Get-Package `
-               -ProviderName DockerMsftProvider `
-               -ErrorAction SilentlyContinue |
-           Where-Object Name -eq 'docker') -ne $null)
-}
-
-function Test-DockerIsRunning {
-  return ((Get-Service docker).Status -eq 'Running')
-}
-
-# Installs Docker EE via the DockerMsftProvider. Ensure that the Windows
-# Containers feature is installed before calling this function; otherwise,
-# a restart may be needed after this function returns.
-function Install-Docker {
-  Log-Output 'Installing NuGet module'
-  Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
-
-  Log-Output 'Installing DockerMsftProvider module'
-  Install-Module -Name DockerMsftProvider -Repository PSGallery -Force
-
-  Log-Output "Installing latest Docker EE version"
-  Install-Package `
-      -Name docker `
-      -ProviderName DockerMsftProvider `
-      -Force `
-      -Verbose
 }
 
 # Configures the TCP/IP parameters to be in sync with the GCP recommendation.
@@ -1427,7 +1376,7 @@ function Install_Containerd {
   New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
 
   # TODO(ibrahimab) Change this to a gcs bucket with CI maintained and accessible by community.
-  $version = '1.5.4'
+  $version = '1.6.2'
   $tar_url = ("https://github.com/containerd/containerd/releases/download/v${version}/" +
               "cri-containerd-cni-${version}-windows-amd64.tar.gz")
   $sha_url = $tar_url + ".sha256sum"
@@ -1441,7 +1390,7 @@ function Install_Containerd {
       -Algorithm SHA256
 
   tar xzvf $tmp_dir\containerd.tar.gz -C $tmp_dir
-  Move-Item -Force $tmp_dir\cni\*.exe "${env:CNI_DIR}\"
+  Move-Item -Force $tmp_dir\cni\bin\*.exe "${env:CNI_DIR}\"
   Move-Item -Force $tmp_dir\*.exe "${env:NODE_DIR}\"
   Remove-Item -Force -Recurse $tmp_dir
 
@@ -1518,7 +1467,7 @@ function Install-Pigz {
       Expand-Archive -Path "$PIGZ_ROOT\pigz-$PIGZ_VERSION.zip" `
         -DestinationPath $PIGZ_ROOT
       Remove-Item -Path "$PIGZ_ROOT\pigz-$PIGZ_VERSION.zip"
-      # Docker and Containerd search for unpigz.exe on the first container image
+      # Containerd search for unpigz.exe on the first container image
       # pull request after the service is started. If unpigz.exe is in the
       # Windows path it'll use it instead of the default unzipper.
       # See: https://github.com/containerd/containerd/issues/1896

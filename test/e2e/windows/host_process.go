@@ -19,6 +19,7 @@ package windows
 import (
 	"context"
 	"fmt"
+	"github.com/onsi/gomega"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -64,7 +66,7 @@ const (
 		throw "Contents of /etc/secret/foo.txt are not as expected"
 	}
 	if ($env:NODE_NAME_TEST -ne $env:COMPUTERNAME) {
-		throw "NODE_NAME_TEST env var does not equal COMPUTERNAME"
+		throw "NODE_NAME_TEST env var ($env:NODE_NAME_TEST) does not equal COMPUTERNAME ($env:COMPUTERNAME)"
 	}
 	Write-Output "SUCCESS"`
 )
@@ -82,6 +84,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 	})
 
 	f := framework.NewDefaultFramework("host-process-test-windows")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should run as a process on the host/node", func() {
 
@@ -566,10 +569,10 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [MinimumKubeletVersi
 		// Note: This test performs relative comparisons to ensure metrics values were logged and does not validate specific values.
 		// This done so the test can be run in parallel with other tests which may start HostProcess containers on the same node.
 		ginkgo.By("Ensuring metrics were updated")
-		framework.ExpectEqual(beforeMetrics.StartedContainersCount < afterMetrics.StartedContainersCount, true, "Count of started HostProcess containers should increase")
-		framework.ExpectEqual(beforeMetrics.StartedContainersErrorCount < afterMetrics.StartedContainersErrorCount, true, "Count of started HostProcess errors containers should increase")
-		framework.ExpectEqual(beforeMetrics.StartedInitContainersCount < afterMetrics.StartedInitContainersCount, true, "Count of started HostProcess init containers should increase")
-		framework.ExpectEqual(beforeMetrics.StartedInitContainersErrorCount < afterMetrics.StartedInitContainersErrorCount, true, "Count of started HostProcess errors init containers should increase")
+		gomega.Expect(beforeMetrics.StartedContainersCount).To(gomega.BeNumerically("<", afterMetrics.StartedContainersCount), "Count of started HostProcess containers should increase")
+		gomega.Expect(beforeMetrics.StartedContainersErrorCount).To(gomega.BeNumerically("<", afterMetrics.StartedContainersErrorCount), "Count of started HostProcess errors containers should increase")
+		gomega.Expect(beforeMetrics.StartedInitContainersCount).To(gomega.BeNumerically("<", afterMetrics.StartedInitContainersCount), "Count of started HostProcess init containers should increase")
+		gomega.Expect(beforeMetrics.StartedInitContainersErrorCount).To(gomega.BeNumerically("<", afterMetrics.StartedInitContainersErrorCount), "Count of started HostProcess errors init containers should increase")
 	})
 
 })

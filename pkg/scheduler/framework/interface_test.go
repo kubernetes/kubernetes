@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var errorStatus = NewStatus(Error, "internal error")
@@ -33,6 +34,8 @@ func TestStatus(t *testing.T) {
 		expectedCode      Code
 		expectedMessage   string
 		expectedIsSuccess bool
+		expectedIsWait    bool
+		expectedIsSkip    bool
 		expectedAsError   error
 	}{
 		{
@@ -41,6 +44,18 @@ func TestStatus(t *testing.T) {
 			expectedCode:      Success,
 			expectedMessage:   "",
 			expectedIsSuccess: true,
+			expectedIsWait:    false,
+			expectedIsSkip:    false,
+			expectedAsError:   nil,
+		},
+		{
+			name:              "wait status",
+			status:            NewStatus(Wait, ""),
+			expectedCode:      Wait,
+			expectedMessage:   "",
+			expectedIsSuccess: false,
+			expectedIsWait:    true,
+			expectedIsSkip:    false,
 			expectedAsError:   nil,
 		},
 		{
@@ -49,7 +64,19 @@ func TestStatus(t *testing.T) {
 			expectedCode:      Error,
 			expectedMessage:   "unknown error",
 			expectedIsSuccess: false,
+			expectedIsWait:    false,
+			expectedIsSkip:    false,
 			expectedAsError:   errors.New("unknown error"),
+		},
+		{
+			name:              "skip status",
+			status:            NewStatus(Skip, ""),
+			expectedCode:      Skip,
+			expectedMessage:   "",
+			expectedIsSuccess: false,
+			expectedIsWait:    false,
+			expectedIsSkip:    true,
+			expectedAsError:   nil,
 		},
 		{
 			name:              "nil status",
@@ -57,6 +84,7 @@ func TestStatus(t *testing.T) {
 			expectedCode:      Success,
 			expectedMessage:   "",
 			expectedIsSuccess: true,
+			expectedIsSkip:    false,
 			expectedAsError:   nil,
 		},
 	}
@@ -73,6 +101,14 @@ func TestStatus(t *testing.T) {
 
 			if test.status.IsSuccess() != test.expectedIsSuccess {
 				t.Errorf("expect status.IsSuccess() returns %v, but %v", test.expectedIsSuccess, test.status.IsSuccess())
+			}
+
+			if test.status.IsWait() != test.expectedIsWait {
+				t.Errorf("status.IsWait() returns %v, but want %v", test.status.IsWait(), test.expectedIsWait)
+			}
+
+			if test.status.IsSkip() != test.expectedIsSkip {
+				t.Errorf("status.IsSkip() returns %v, but want %v", test.status.IsSkip(), test.expectedIsSkip)
 			}
 
 			if test.status.AsError() == test.expectedAsError {
@@ -134,6 +170,61 @@ func TestPluginToStatusMerge(t *testing.T) {
 			gotStatus := test.statusMap.Merge()
 			if test.wantCode != gotStatus.Code() {
 				t.Errorf("wantCode %v, gotCode %v", test.wantCode, gotStatus.Code())
+			}
+		})
+	}
+}
+
+func TestPreFilterResultMerge(t *testing.T) {
+	tests := map[string]struct {
+		receiver *PreFilterResult
+		in       *PreFilterResult
+		want     *PreFilterResult
+	}{
+		"all nil": {},
+		"nil receiver empty input": {
+			in:   &PreFilterResult{NodeNames: sets.NewString()},
+			want: &PreFilterResult{NodeNames: sets.NewString()},
+		},
+		"empty receiver nil input": {
+			receiver: &PreFilterResult{NodeNames: sets.NewString()},
+			want:     &PreFilterResult{NodeNames: sets.NewString()},
+		},
+		"empty receiver empty input": {
+			receiver: &PreFilterResult{NodeNames: sets.NewString()},
+			in:       &PreFilterResult{NodeNames: sets.NewString()},
+			want:     &PreFilterResult{NodeNames: sets.NewString()},
+		},
+		"nil receiver populated input": {
+			in:   &PreFilterResult{NodeNames: sets.NewString("node1")},
+			want: &PreFilterResult{NodeNames: sets.NewString("node1")},
+		},
+		"empty receiver populated input": {
+			receiver: &PreFilterResult{NodeNames: sets.NewString()},
+			in:       &PreFilterResult{NodeNames: sets.NewString("node1")},
+			want:     &PreFilterResult{NodeNames: sets.NewString()},
+		},
+
+		"populated receiver nil input": {
+			receiver: &PreFilterResult{NodeNames: sets.NewString("node1")},
+			want:     &PreFilterResult{NodeNames: sets.NewString("node1")},
+		},
+		"populated receiver empty input": {
+			receiver: &PreFilterResult{NodeNames: sets.NewString("node1")},
+			in:       &PreFilterResult{NodeNames: sets.NewString()},
+			want:     &PreFilterResult{NodeNames: sets.NewString()},
+		},
+		"populated receiver and input": {
+			receiver: &PreFilterResult{NodeNames: sets.NewString("node1", "node2")},
+			in:       &PreFilterResult{NodeNames: sets.NewString("node2", "node3")},
+			want:     &PreFilterResult{NodeNames: sets.NewString("node2")},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := test.receiver.Merge(test.in)
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("unexpected diff (-want, +got):\n%s", diff)
 			}
 		})
 	}

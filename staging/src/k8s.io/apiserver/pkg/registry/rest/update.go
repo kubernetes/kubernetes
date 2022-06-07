@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
@@ -110,12 +111,14 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	if kerr != nil {
 		return kerr
 	}
-	if strategy.NamespaceScoped() {
-		if !ValidNamespace(ctx, objectMeta) {
-			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
-		}
-	} else if len(objectMeta.GetNamespace()) > 0 {
-		objectMeta.SetNamespace(metav1.NamespaceNone)
+
+	// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
+	requestNamespace, ok := genericapirequest.NamespaceFrom(ctx)
+	if !ok {
+		return errors.NewInternalError(fmt.Errorf("no namespace information found in request context"))
+	}
+	if err := EnsureObjectNamespaceMatchesRequestNamespace(ExpectedNamespaceForScope(requestNamespace, strategy.NamespaceScoped()), objectMeta); err != nil {
+		return err
 	}
 
 	// Ensure requests cannot update generation
@@ -133,10 +136,6 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 
 	strategy.PrepareForUpdate(ctx, obj, old)
 
-	// ClusterName is ignored and should not be saved
-	if len(objectMeta.GetClusterName()) > 0 {
-		objectMeta.SetClusterName("")
-	}
 	// Use the existing UID if none is provided
 	if len(objectMeta.GetUID()) == 0 {
 		objectMeta.SetUID(oldMeta.GetUID())

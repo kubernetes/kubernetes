@@ -137,20 +137,21 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.DefaultWatchCacheSize, "default-watch-cache-size", s.DefaultWatchCacheSize,
 		"Default watch cache size. If zero, watch cache will be disabled for resources that do not have a default watch size set.")
 
+	fs.MarkDeprecated("default-watch-cache-size",
+		"watch caches are sized automatically and this flag will be removed in a future version")
+
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
 		"Watch cache size settings for some resources (pods, nodes, etc.), comma separated. "+
 		"The individual setting format: resource[.group]#size, where resource is lowercase plural (no version), "+
 		"group is omitted for resources of apiVersion v1 (the legacy core API) and included for others, "+
-		"and size is a number. It takes effect when watch-cache is enabled. "+
-		"Some resources (replicationcontrollers, endpoints, nodes, pods, services, apiservices.apiregistration.k8s.io) "+
-		"have system defaults set by heuristics, others default to default-watch-cache-size")
+		"and size is a number. This option is only meaningful for resources built into the apiserver, "+
+		"not ones defined by CRDs or aggregated from external servers, and is only consulted if the "+
+		"watch-cache is enabled. The only meaningful size setting to supply here is zero, which means to "+
+		"disable watch caching for the associated resource; all non-zero values are equivalent and mean "+
+		"to not disable watch caching for that resource")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default).")
-
-	dummyCacheSize := 0
-	fs.IntVar(&dummyCacheSize, "deserialization-cache-size", 0, "Number of deserialized json objects to cache in memory.")
-	fs.MarkDeprecated("deserialization-cache-size", "the deserialization cache was dropped in 1.13 with support for etcd2")
 
 	fs.StringSliceVar(&s.StorageConfig.Transport.ServerList, "etcd-servers", s.StorageConfig.Transport.ServerList,
 		"List of etcd servers to connect with (scheme://ip:port), comma separated.")
@@ -166,10 +167,6 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.StorageConfig.Transport.TrustedCAFile, "etcd-cafile", s.StorageConfig.Transport.TrustedCAFile,
 		"SSL Certificate Authority file used to secure etcd communication.")
-
-	fs.StringVar(&s.EncryptionProviderConfigFilepath, "experimental-encryption-provider-config", s.EncryptionProviderConfigFilepath,
-		"The file containing configuration for encryption providers to be used for storing secrets in etcd")
-	fs.MarkDeprecated("experimental-encryption-provider-config", "use --encryption-provider-config.")
 
 	fs.StringVar(&s.EncryptionProviderConfigFilepath, "encryption-provider-config", s.EncryptionProviderConfigFilepath,
 		"The file containing configuration for encryption providers to be used for storing secrets in etcd")
@@ -229,7 +226,7 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 }
 
 func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
-	healthCheck, err := storagefactory.CreateHealthCheck(s.StorageConfig)
+	healthCheck, err := storagefactory.CreateHealthCheck(s.StorageConfig, c.DrainedNotify())
 	if err != nil {
 		return err
 	}
@@ -278,8 +275,10 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 			klog.Warningf("Dropping watch-cache-size for %v - watchCache size is now dynamic", resource)
 		}
 		if ok && size <= 0 {
+			klog.V(3).InfoS("Not using watch cache", "resource", resource)
 			ret.Decorator = generic.UndecoratedStorage
 		} else {
+			klog.V(3).InfoS("Using watch cache", "resource", resource)
 			ret.Decorator = genericregistry.StorageWithCacher()
 		}
 	}

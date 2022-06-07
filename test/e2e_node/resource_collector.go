@@ -23,7 +23,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"sort"
@@ -486,7 +486,7 @@ func getPidFromPidFile(pidFile string) (int, error) {
 	}
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return 0, fmt.Errorf("error reading pid file %s: %v", pidFile, err)
 	}

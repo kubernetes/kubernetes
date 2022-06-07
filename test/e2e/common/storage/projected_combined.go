@@ -25,12 +25,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Projected combined", func() {
 	f := framework.NewDefaultFramework("projected")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	// Test multiple projections
 	/*

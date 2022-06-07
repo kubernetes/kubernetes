@@ -19,8 +19,6 @@ package v1
 import (
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -45,11 +43,11 @@ func SetDefaults_Job(obj *batchv1.Job) {
 	if labels != nil && len(obj.Labels) == 0 {
 		obj.Labels = labels
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && obj.Spec.CompletionMode == nil {
+	if obj.Spec.CompletionMode == nil {
 		mode := batchv1.NonIndexedCompletion
 		obj.Spec.CompletionMode = &mode
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) && obj.Spec.Suspend == nil {
+	if obj.Spec.Suspend == nil {
 		obj.Spec.Suspend = utilpointer.BoolPtr(false)
 	}
 }

@@ -197,7 +197,6 @@ func newResourceConsumer(name, nsName string, kind schema.GroupVersionKind, repl
 
 	go rc.makeConsumeCPURequests()
 	rc.ConsumeCPU(initCPUTotal)
-
 	go rc.makeConsumeMemRequests()
 	rc.ConsumeMem(initMemoryTotal)
 	go rc.makeConsumeCustomMetric()
@@ -227,16 +226,22 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 	defer ginkgo.GinkgoRecover()
 	rc.stopWaitGroup.Add(1)
 	defer rc.stopWaitGroup.Done()
-	sleepTime := time.Duration(0)
+	tick := time.After(time.Duration(0))
 	millicores := 0
 	for {
 		select {
 		case millicores = <-rc.cpu:
-			framework.Logf("RC %s: setting consumption to %v millicores in total", rc.name, millicores)
-		case <-time.After(sleepTime):
-			framework.Logf("RC %s: sending request to consume %d millicores", rc.name, millicores)
-			rc.sendConsumeCPURequest(millicores)
-			sleepTime = rc.sleepTime
+			if millicores != 0 {
+				framework.Logf("RC %s: setting consumption to %v millicores in total", rc.name, millicores)
+			} else {
+				framework.Logf("RC %s: disabling CPU consumption", rc.name)
+			}
+		case <-tick:
+			if millicores != 0 {
+				framework.Logf("RC %s: sending request to consume %d millicores", rc.name, millicores)
+				rc.sendConsumeCPURequest(millicores)
+			}
+			tick = time.After(rc.sleepTime)
 		case <-rc.stopCPU:
 			framework.Logf("RC %s: stopping CPU consumer", rc.name)
 			return
@@ -248,16 +253,22 @@ func (rc *ResourceConsumer) makeConsumeMemRequests() {
 	defer ginkgo.GinkgoRecover()
 	rc.stopWaitGroup.Add(1)
 	defer rc.stopWaitGroup.Done()
-	sleepTime := time.Duration(0)
+	tick := time.After(time.Duration(0))
 	megabytes := 0
 	for {
 		select {
 		case megabytes = <-rc.mem:
-			framework.Logf("RC %s: setting consumption to %v MB in total", rc.name, megabytes)
-		case <-time.After(sleepTime):
-			framework.Logf("RC %s: sending request to consume %d MB", rc.name, megabytes)
-			rc.sendConsumeMemRequest(megabytes)
-			sleepTime = rc.sleepTime
+			if megabytes != 0 {
+				framework.Logf("RC %s: setting consumption to %v MB in total", rc.name, megabytes)
+			} else {
+				framework.Logf("RC %s: disabling mem consumption", rc.name)
+			}
+		case <-tick:
+			if megabytes != 0 {
+				framework.Logf("RC %s: sending request to consume %d MB", rc.name, megabytes)
+				rc.sendConsumeMemRequest(megabytes)
+			}
+			tick = time.After(rc.sleepTime)
 		case <-rc.stopMem:
 			framework.Logf("RC %s: stopping mem consumer", rc.name)
 			return
@@ -269,16 +280,22 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 	defer ginkgo.GinkgoRecover()
 	rc.stopWaitGroup.Add(1)
 	defer rc.stopWaitGroup.Done()
-	sleepTime := time.Duration(0)
+	tick := time.After(time.Duration(0))
 	delta := 0
 	for {
 		select {
 		case delta = <-rc.customMetric:
-			framework.Logf("RC %s: setting bump of metric %s to %d in total", rc.name, customMetricName, delta)
-		case <-time.After(sleepTime):
-			framework.Logf("RC %s: sending request to consume %d of custom metric %s", rc.name, delta, customMetricName)
-			rc.sendConsumeCustomMetric(delta)
-			sleepTime = rc.sleepTime
+			if delta != 0 {
+				framework.Logf("RC %s: setting bump of metric %s to %d in total", rc.name, customMetricName, delta)
+			} else {
+				framework.Logf("RC %s: disabling consumption of custom metric %s", rc.name, customMetricName)
+			}
+		case <-tick:
+			if delta != 0 {
+				framework.Logf("RC %s: sending request to consume %d of custom metric %s", rc.name, delta, customMetricName)
+				rc.sendConsumeCustomMetric(delta)
+			}
+			tick = time.After(rc.sleepTime)
 		case <-rc.stopCustomMetric:
 			framework.Logf("RC %s: stopping metric consumer", rc.name)
 			return
@@ -664,6 +681,48 @@ func CreateContainerResourceCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu
 
 // DeleteContainerResourceHPA delete the horizontalPodAutoscaler for consuming resources.
 func DeleteContainerResourceHPA(rc *ResourceConsumer, autoscalerName string) {
+	rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
+}
+
+func CreateCPUHorizontalPodAutoscalerWithBehavior(rc *ResourceConsumer, cpu, minReplicas, maxRepl, downscaleStabilizationSeconds int32) *autoscalingv2.HorizontalPodAutoscaler {
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rc.name,
+			Namespace: rc.nsName,
+		},
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+				APIVersion: rc.kind.GroupVersion().String(),
+				Kind:       rc.kind.Kind,
+				Name:       rc.name,
+			},
+			MinReplicas: &minReplicas,
+			MaxReplicas: maxRepl,
+			Metrics: []autoscalingv2.MetricSpec{
+				{
+					Type: autoscalingv2.ResourceMetricSourceType,
+					Resource: &autoscalingv2.ResourceMetricSource{
+						Name: v1.ResourceCPU,
+						Target: autoscalingv2.MetricTarget{
+							Type:               autoscalingv2.UtilizationMetricType,
+							AverageUtilization: &cpu,
+						},
+					},
+				},
+			},
+			Behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscalingv2.HPAScalingRules{
+					StabilizationWindowSeconds: &downscaleStabilizationSeconds,
+				},
+			},
+		},
+	}
+	hpa, errHPA := rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
+	framework.ExpectNoError(errHPA)
+	return hpa
+}
+
+func DeleteHPAWithBehavior(rc *ResourceConsumer, autoscalerName string) {
 	rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
 }
 

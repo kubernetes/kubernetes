@@ -22,8 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,7 +40,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func TestGenericSchedulerWithExtenders(t *testing.T) {
+func TestSchedulerWithExtenders(t *testing.T) {
 	tests := []struct {
 		name            string
 		registerPlugins []st.RegisterPluginFunc
@@ -58,10 +57,12 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.TruePredicateExtender},
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 				},
 				{
-					Predicates: []st.FitPredicate{st.ErrorPredicateExtender},
+					ExtenderName: "FakeExtender2",
+					Predicates:   []st.FitPredicate{st.ErrorPredicateExtender},
 				},
 			},
 			nodes:      []string{"node1", "node2"},
@@ -76,10 +77,12 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.TruePredicateExtender},
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 				},
 				{
-					Predicates: []st.FitPredicate{st.FalsePredicateExtender},
+					ExtenderName: "FakeExtender2",
+					Predicates:   []st.FitPredicate{st.FalsePredicateExtender},
 				},
 			},
 			nodes:      []string{"node1", "node2"},
@@ -94,10 +97,12 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.TruePredicateExtender},
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 				},
 				{
-					Predicates: []st.FitPredicate{st.Node1PredicateExtender},
+					ExtenderName: "FakeExtender2",
+					Predicates:   []st.FitPredicate{st.Node1PredicateExtender},
 				},
 			},
 			nodes: []string{"node1", "node2"},
@@ -116,10 +121,12 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.Node2PredicateExtender},
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.Node2PredicateExtender},
 				},
 				{
-					Predicates: []st.FitPredicate{st.Node1PredicateExtender},
+					ExtenderName: "FakeExtender2",
+					Predicates:   []st.FitPredicate{st.Node1PredicateExtender},
 				},
 			},
 			nodes:      []string{"node1", "node2"},
@@ -134,6 +141,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 					Prioritizers: []st.PriorityConfig{{Function: st.ErrorPrioritizerExtender, Weight: 10}},
 					Weight:       1,
@@ -155,11 +163,13 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 					Prioritizers: []st.PriorityConfig{{Function: st.Node1PrioritizerExtender, Weight: 10}},
 					Weight:       1,
 				},
 				{
+					ExtenderName: "FakeExtender2",
 					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 					Prioritizers: []st.PriorityConfig{{Function: st.Node2PrioritizerExtender, Weight: 10}},
 					Weight:       5,
@@ -182,6 +192,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates:   []st.FitPredicate{st.TruePredicateExtender},
 					Prioritizers: []st.PriorityConfig{{Function: st.Node1PrioritizerExtender, Weight: 10}},
 					Weight:       1,
@@ -211,6 +222,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
+					ExtenderName: "FakeExtender1",
 					Predicates:   []st.FitPredicate{st.ErrorPredicateExtender},
 					Prioritizers: []st.PriorityConfig{{Function: st.ErrorPrioritizerExtender, Weight: 10}},
 					UnInterested: true,
@@ -238,11 +250,13 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			},
 			extenders: []st.FakeExtender{
 				{
-					Predicates: []st.FitPredicate{st.ErrorPredicateExtender},
-					Ignorable:  true,
+					ExtenderName: "FakeExtender1",
+					Predicates:   []st.FitPredicate{st.ErrorPredicateExtender},
+					Ignorable:    true,
 				},
 				{
-					Predicates: []st.FitPredicate{st.Node1PredicateExtender},
+					ExtenderName: "FakeExtender2",
+					Predicates:   []st.FitPredicate{st.Node1PredicateExtender},
 				},
 			},
 			nodes:      []string{"node1", "node2"},
@@ -279,12 +293,19 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			scheduler := NewGenericScheduler(
+			scheduler := newScheduler(
 				cache,
+				extenders,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
 				emptySnapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			podIgnored := &v1.Pod{}
-			result, err := scheduler.Schedule(context.Background(), extenders, fwk, framework.NewCycleState(), podIgnored)
+			result, err := scheduler.SchedulePod(context.Background(), fwk, framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)
@@ -330,56 +351,23 @@ func TestIsInterested(t *testing.T) {
 		{
 			label:    "Managed memory, empty resources",
 			extender: mem,
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name: "app",
-						},
-					},
-				},
-			},
-			want: false,
+			pod:      st.MakePod().Container("app").Obj(),
+			want:     false,
 		},
 		{
 			label:    "Managed memory, container memory",
 			extender: mem,
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name: "app",
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{"memory": resource.Quantity{}},
-								Limits:   v1.ResourceList{"memory": resource.Quantity{}},
-							},
-						},
-					},
-				},
-			},
+			pod: st.MakePod().Req(map[v1.ResourceName]string{
+				"memory": "0",
+			}).Obj(),
 			want: true,
 		},
 		{
 			label:    "Managed memory, init container memory",
 			extender: mem,
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name: "app",
-						},
-					},
-					InitContainers: []v1.Container{
-						{
-							Name: "init",
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{"memory": resource.Quantity{}},
-								Limits:   v1.ResourceList{"memory": resource.Quantity{}},
-							},
-						},
-					},
-				},
-			},
+			pod: st.MakePod().Container("app").InitReq(map[v1.ResourceName]string{
+				"memory": "0",
+			}).Obj(),
 			want: true,
 		},
 	} {
@@ -402,15 +390,15 @@ func TestConvertToMetaVictims(t *testing.T) {
 			nodeNameToVictims: map[string]*extenderv1.Victims{
 				"node1": {
 					Pods: []*v1.Pod{
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "uid1"}},
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: "uid3"}},
+						st.MakePod().Name("pod1").UID("uid1").Obj(),
+						st.MakePod().Name("pod3").UID("uid3").Obj(),
 					},
 					NumPDBViolations: 1,
 				},
 				"node2": {
 					Pods: []*v1.Pod{
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "uid2"}},
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod4", UID: "uid4"}},
+						st.MakePod().Name("pod2").UID("uid2").Obj(),
+						st.MakePod().Name("pod4").UID("uid4").Obj(),
 					},
 					NumPDBViolations: 2,
 				},
@@ -474,24 +462,24 @@ func TestConvertToVictims(t *testing.T) {
 			},
 			nodeNames: []string{"node1", "node2"},
 			podsInNodeList: []*v1.Pod{
-				{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "uid1"}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "uid2"}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: "uid3"}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "pod4", UID: "uid4"}},
+				st.MakePod().Name("pod1").UID("uid1").Obj(),
+				st.MakePod().Name("pod2").UID("uid2").Obj(),
+				st.MakePod().Name("pod3").UID("uid3").Obj(),
+				st.MakePod().Name("pod4").UID("uid4").Obj(),
 			},
 			nodeInfos: nil,
 			want: map[string]*extenderv1.Victims{
 				"node1": {
 					Pods: []*v1.Pod{
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "uid1"}},
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod3", UID: "uid3"}},
+						st.MakePod().Name("pod1").UID("uid1").Obj(),
+						st.MakePod().Name("pod3").UID("uid3").Obj(),
 					},
 					NumPDBViolations: 1,
 				},
 				"node2": {
 					Pods: []*v1.Pod{
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "uid2"}},
-						{ObjectMeta: metav1.ObjectMeta{Name: "pod4", UID: "uid4"}},
+						st.MakePod().Name("pod2").UID("uid2").Obj(),
+						st.MakePod().Name("pod4").UID("uid4").Obj(),
 					},
 					NumPDBViolations: 2,
 				},

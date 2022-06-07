@@ -130,7 +130,6 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1.PartialObjectMetadata {
 				Annotations:                m.GetAnnotations(),
 				OwnerReferences:            m.GetOwnerReferences(),
 				Finalizers:                 m.GetFinalizers(),
-				ClusterName:                m.GetClusterName(),
 				ManagedFields:              m.GetManagedFields(),
 			},
 		}

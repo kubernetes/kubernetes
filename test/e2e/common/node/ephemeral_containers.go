@@ -27,6 +27,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -34,6 +35,7 @@ import (
 
 var _ = SIGDescribe("Ephemeral Containers [NodeFeature:EphemeralContainers]", func() {
 	f := framework.NewDefaultFramework("ephemeral-containers-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()

@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -111,14 +110,14 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tmpDir, err := ioutil.TempDir("", "kubeadm-images-test")
+			tmpDir, err := os.MkdirTemp("", "kubeadm-images-test")
 			if err != nil {
 				t.Fatalf("Unable to create temporary directory: %v", err)
 			}
 			defer os.RemoveAll(tmpDir)
 
 			configFilePath := filepath.Join(tmpDir, "test-config-file")
-			if err := ioutil.WriteFile(configFilePath, tc.configContents, 0644); err != nil {
+			if err := os.WriteFile(configFilePath, tc.configContents, 0644); err != nil {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
@@ -236,13 +235,13 @@ func TestConfigImagesListOutput(t *testing.T) {
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "text",
-			expectedOutput: `k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
-k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}
-k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
-k8s.gcr.io/kube-proxy:{{.KubeVersion}}
-k8s.gcr.io/pause:{{.PauseVersion}}
-k8s.gcr.io/etcd:{{.EtcdVersion}}
-k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
+			expectedOutput: `registry.k8s.io/kube-apiserver:{{.KubeVersion}}
+registry.k8s.io/kube-controller-manager:{{.KubeVersion}}
+registry.k8s.io/kube-scheduler:{{.KubeVersion}}
+registry.k8s.io/kube-proxy:{{.KubeVersion}}
+registry.k8s.io/pause:{{.PauseVersion}}
+registry.k8s.io/etcd:{{.EtcdVersion}}
+registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 `,
 		},
 		{
@@ -255,13 +254,13 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
     "kind": "Images",
     "apiVersion": "output.kubeadm.k8s.io/v1alpha2",
     "images": [
-        "k8s.gcr.io/kube-apiserver:{{.KubeVersion}}",
-        "k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}",
-        "k8s.gcr.io/kube-scheduler:{{.KubeVersion}}",
-        "k8s.gcr.io/kube-proxy:{{.KubeVersion}}",
-        "k8s.gcr.io/pause:{{.PauseVersion}}",
-        "k8s.gcr.io/etcd:{{.EtcdVersion}}",
-        "k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}"
+        "registry.k8s.io/kube-apiserver:{{.KubeVersion}}",
+        "registry.k8s.io/kube-controller-manager:{{.KubeVersion}}",
+        "registry.k8s.io/kube-scheduler:{{.KubeVersion}}",
+        "registry.k8s.io/kube-proxy:{{.KubeVersion}}",
+        "registry.k8s.io/pause:{{.PauseVersion}}",
+        "registry.k8s.io/etcd:{{.EtcdVersion}}",
+        "registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}"
     ]
 }
 `,
@@ -274,13 +273,13 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 			outputFormat: "yaml",
 			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha2
 images:
-- k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
-- k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}
-- k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
-- k8s.gcr.io/kube-proxy:{{.KubeVersion}}
-- k8s.gcr.io/pause:{{.PauseVersion}}
-- k8s.gcr.io/etcd:{{.EtcdVersion}}
-- k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
+- registry.k8s.io/kube-apiserver:{{.KubeVersion}}
+- registry.k8s.io/kube-controller-manager:{{.KubeVersion}}
+- registry.k8s.io/kube-scheduler:{{.KubeVersion}}
+- registry.k8s.io/kube-proxy:{{.KubeVersion}}
+- registry.k8s.io/pause:{{.PauseVersion}}
+- registry.k8s.io/etcd:{{.EtcdVersion}}
+- registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 kind: Images
 `,
 		},
@@ -290,13 +289,13 @@ kind: Images
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: `go-template={{range .images}}{{.}}{{"\n"}}{{end}}`,
-			expectedOutput: `k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
-k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}
-k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
-k8s.gcr.io/kube-proxy:{{.KubeVersion}}
-k8s.gcr.io/pause:{{.PauseVersion}}
-k8s.gcr.io/etcd:{{.EtcdVersion}}
-k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
+			expectedOutput: `registry.k8s.io/kube-apiserver:{{.KubeVersion}}
+registry.k8s.io/kube-controller-manager:{{.KubeVersion}}
+registry.k8s.io/kube-scheduler:{{.KubeVersion}}
+registry.k8s.io/kube-proxy:{{.KubeVersion}}
+registry.k8s.io/pause:{{.PauseVersion}}
+registry.k8s.io/etcd:{{.EtcdVersion}}
+registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}}
 `,
 		},
 		{
@@ -305,8 +304,8 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: `jsonpath={range.images[*]}{@} {end}`,
-			expectedOutput: "k8s.gcr.io/kube-apiserver:{{.KubeVersion}} k8s.gcr.io/kube-controller-manager:{{.KubeVersion}} k8s.gcr.io/kube-scheduler:{{.KubeVersion}} " +
-				"k8s.gcr.io/kube-proxy:{{.KubeVersion}} k8s.gcr.io/pause:{{.PauseVersion}} k8s.gcr.io/etcd:{{.EtcdVersion}} k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}} ",
+			expectedOutput: "registry.k8s.io/kube-apiserver:{{.KubeVersion}} registry.k8s.io/kube-controller-manager:{{.KubeVersion}} registry.k8s.io/kube-scheduler:{{.KubeVersion}} " +
+				"registry.k8s.io/kube-proxy:{{.KubeVersion}} registry.k8s.io/pause:{{.PauseVersion}} registry.k8s.io/etcd:{{.EtcdVersion}} registry.k8s.io/coredns/coredns:{{.CoreDNSVersion}} ",
 		},
 	}
 
@@ -413,12 +412,12 @@ func TestMigrate(t *testing.T) {
 // Returns the name of the file created and a cleanup callback
 func tempConfig(t *testing.T, config []byte) (string, func()) {
 	t.Helper()
-	tmpDir, err := ioutil.TempDir("", "kubeadm-migration-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-migration-test")
 	if err != nil {
 		t.Fatalf("Unable to create temporary directory: %v", err)
 	}
 	configFilePath := filepath.Join(tmpDir, "test-config-file")
-	if err := ioutil.WriteFile(configFilePath, config, 0644); err != nil {
+	if err := os.WriteFile(configFilePath, config, 0644); err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("Failed writing a config file: %v", err)
 	}

@@ -15,7 +15,7 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-provisioner
-          image: k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v3.0.0
           args:
             - "--csi-address=$(ADDRESS)"
             # Topology support is needed for the pod rescheduling test
@@ -35,7 +35,7 @@ spec:
             - mountPath: /csi
               name: socket-dir
         - name: driver-registrar
-          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.3.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.3.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -53,7 +53,7 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: mock
-          image: k8s.gcr.io/sig-storage/hostpathplugin:v1.7.3
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.7.3
           args:
             - -v=5
             - -nodeid=$(KUBE_NODE_NAME)
@@ -77,7 +77,7 @@ spec:
         # test for directories or create them. It needs additional privileges
         # for that.
         - name: busybox
-          image: k8s.gcr.io/e2e-test-images/busybox:1.29-1
+          image: registry.k8s.io/e2e-test-images/busybox:1.29-2
           securityContext:
             privileged: true
           command:

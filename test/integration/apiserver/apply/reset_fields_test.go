@@ -29,17 +29,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	k8sfeatures "k8s.io/kubernetes/pkg/features"
+
+	//k8sfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/image"
-	"sigs.k8s.io/yaml"
 )
 
 // namespace used for all tests, do not change this
@@ -55,6 +56,8 @@ var resetFieldsStatusData = map[schema.GroupVersionResource]string{
 	gvr("extensions", "v1beta1", "ingresses"):                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                     `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.2"}]}}}`,
+	gvr("extensions", "v1beta1", "networkpolicies"):                 `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
+	gvr("networking.k8s.io", "v1", "networkpolicies"):               `{"status": {"conditions":[{"type":"Accepted","status":"True","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 	gvr("autoscaling", "v1", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 25}}`,
 	gvr("autoscaling", "v2", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 25}}`,
 	gvr("batch", "v1", "cronjobs"):                                  `{"status": {"lastScheduleTime":  "2020-01-01T00:00:00Z"}}`,
@@ -128,6 +131,8 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("extensions", "v1beta1", "ingresses"):                                      `{"spec": {"backend": {"serviceName": "service2"}}}`,
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                               `{"spec": {"backend": {"serviceName": "service2"}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                                    `{"spec": {"defaultBackend": {"service": {"name": "service2"}}}}`,
+	gvr("extensions", "v1beta1", "networkpolicies"):                                `{"spec":{"podSelector":{"matchLabels":{"app":"web"}},"ingress":[]}}`,
+	gvr("networking.k8s.io", "v1", "networkpolicies"):                              `{"spec":{"podSelector":{"matchLabels":{"app":"web"}},"ingress":[]}}`,
 	gvr("policy", "v1", "poddisruptionbudgets"):                                    `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("policy", "v1beta1", "poddisruptionbudgets"):                               `{"spec": {"selector": {"matchLabels": {"anokkey2": "anokvalue"}}}}`,
 	gvr("storage.k8s.io", "v1alpha1", "volumeattachments"):                         `{"metadata": {"name": "vaName2"}, "spec": {"nodeName": "localhost2"}}`,
@@ -148,6 +153,8 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 // We then attempt to apply obj2 to the spec endpoint which fails with an expected conflict.
 func TestApplyResetFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, k8sfeatures.NetworkPolicyStatus, true)()
+
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -219,16 +226,12 @@ func TestApplyResetFields(t *testing.T) {
 				obj1.SetAPIVersion(mapping.GroupVersionKind.GroupVersion().String())
 				obj1.SetKind(mapping.GroupVersionKind.Kind)
 				obj1.SetName(name)
-				obj1YAML, err := yaml.Marshal(obj1.Object)
-				if err != nil {
-					t.Fatal(err)
-				}
 
 				// apply the spec of the first object
 				_, err = dynamicClient.
 					Resource(mapping.Resource).
 					Namespace(namespace).
-					Patch(context.TODO(), name, types.ApplyPatchType, obj1YAML, metav1.PatchOptions{FieldManager: "fieldmanager1"}, "")
+					Apply(context.TODO(), name, &obj1, metav1.ApplyOptions{FieldManager: "fieldmanager1"})
 				if err != nil {
 					t.Fatalf("Failed to apply obj1: %v", err)
 				}
@@ -251,18 +254,13 @@ func TestApplyResetFields(t *testing.T) {
 					t.Fatalf("obj1 and obj2 should not be equal %v", obj2)
 				}
 
-				obj2YAML, err := yaml.Marshal(obj2.Object)
-				if err != nil {
-					t.Fatal(err)
-				}
-
 				// apply the status of the second object
 				// this won't conflict if resetfields are set correctly
 				// and will conflict if they are not
 				_, err = dynamicClient.
 					Resource(mapping.Resource).
 					Namespace(namespace).
-					Patch(context.TODO(), name, types.ApplyPatchType, obj2YAML, metav1.PatchOptions{FieldManager: "fieldmanager2"}, "status")
+					ApplyStatus(context.TODO(), name, obj2, metav1.ApplyOptions{FieldManager: "fieldmanager2"})
 				if err != nil {
 					t.Fatalf("Failed to apply obj2: %v", err)
 				}
@@ -275,7 +273,7 @@ func TestApplyResetFields(t *testing.T) {
 					_, err = dynamicClient.
 						Resource(mapping.Resource).
 						Namespace(namespace).
-						Patch(context.TODO(), name, types.ApplyPatchType, obj2YAML, metav1.PatchOptions{FieldManager: "fieldmanager2"}, "")
+						Apply(context.TODO(), name, obj2, metav1.ApplyOptions{FieldManager: "fieldmanager2"})
 					if err == nil || !strings.Contains(err.Error(), "conflict") {
 						t.Fatalf("expected conflict, got error %v", err)
 					}
@@ -285,7 +283,7 @@ func TestApplyResetFields(t *testing.T) {
 					_, err = dynamicClient.
 						Resource(mapping.Resource).
 						Namespace(namespace).
-						Patch(context.TODO(), name, types.ApplyPatchType, obj1YAML, metav1.PatchOptions{FieldManager: "fieldmanager1"}, "status")
+						ApplyStatus(context.TODO(), name, &obj1, metav1.ApplyOptions{FieldManager: "fieldmanager1"})
 					if err == nil || !strings.Contains(err.Error(), "conflict") {
 						t.Fatalf("expected conflict, got error %v", err)
 					}

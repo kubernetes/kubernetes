@@ -36,9 +36,8 @@ type PodDisruptionBudgetSpec struct {
 	// A null selector selects no pods.
 	// An empty selector ({}) also selects no pods, which differs from standard behavior of selecting all pods.
 	// In policy/v1, an empty selector will select all pods in the namespace.
-	// +patchStrategy=replace
 	// +optional
-	Selector *metav1.LabelSelector `json:"selector,omitempty" patchStrategy:"replace" protobuf:"bytes,2,opt,name=selector"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
 	// An eviction is allowed if at most "maxUnavailable" pods selected by
 	// "selector" are unavailable after the eviction, i.e. even in absence of

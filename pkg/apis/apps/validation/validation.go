@@ -115,10 +115,8 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 		}
 	case apps.RollingUpdateStatefulSetStrategyType:
 		if spec.UpdateStrategy.RollingUpdate != nil {
-			allErrs = append(allErrs,
-				apivalidation.ValidateNonnegativeField(
-					int64(spec.UpdateStrategy.RollingUpdate.Partition),
-					fldPath.Child("updateStrategy").Child("rollingUpdate").Child("partition"))...)
+			allErrs = append(allErrs, validateRollingUpdateStatefulSet(spec.UpdateStrategy.RollingUpdate, fldPath.Child("updateStrategy", "rollingUpdate"))...)
+
 		}
 	default:
 		allErrs = append(allErrs,
@@ -168,8 +166,11 @@ func ValidateStatefulSet(statefulSet *apps.StatefulSet, opts apivalidation.PodVa
 }
 
 // ValidateStatefulSetUpdate tests if required fields in the StatefulSet are set.
-func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))
+func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet, opts apivalidation.PodValidationOptions) field.ErrorList {
+	// first, validate that the new statefulset is valid
+	allErrs := ValidateStatefulSet(statefulSet, opts)
+
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&statefulSet.ObjectMeta, &oldStatefulSet.ObjectMeta, field.NewPath("metadata"))...)
 
 	// statefulset updates aren't super common and general updates are likely to be touching spec, so we'll do this
 	// deep copy right away.  This avoids mutating our inputs
@@ -189,11 +190,6 @@ func ValidateStatefulSetUpdate(statefulSet, oldStatefulSet *apps.StatefulSet) fi
 		}
 	}
 
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(statefulSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
-	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(statefulSet.Spec.MinReadySeconds), field.NewPath("spec", "minReadySeconds"))...)
-	}
-	allErrs = append(allErrs, ValidatePersistentVolumeClaimRetentionPolicy(statefulSet.Spec.PersistentVolumeClaimRetentionPolicy, field.NewPath("spec", "persistentVolumeClaimRetentionPolicy"))...)
 	return allErrs
 }
 
@@ -415,6 +411,26 @@ func ValidateRollingUpdateDaemonSet(rollingUpdate *apps.RollingUpdateDaemonSet, 
 		}
 		// Validate that MaxUnavailable is not more than 100%.
 		allErrs = append(allErrs, IsNotMoreThan100Percent(rollingUpdate.MaxUnavailable, fldPath.Child("maxUnavailable"))...)
+	}
+	return allErrs
+}
+
+// validateRollingUpdateStatefulSet validates a given RollingUpdateStatefulSet.
+func validateRollingUpdateStatefulSet(rollingUpdate *apps.RollingUpdateStatefulSetStrategy, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	fldPathMaxUn := fldPath.Child("maxUnavailable")
+	allErrs = append(allErrs,
+		apivalidation.ValidateNonnegativeField(
+			int64(rollingUpdate.Partition),
+			fldPath.Child("partition"))...)
+	if rollingUpdate.MaxUnavailable != nil {
+		allErrs = append(allErrs, ValidatePositiveIntOrPercent(*rollingUpdate.MaxUnavailable, fldPathMaxUn)...)
+		if getIntOrPercentValue(*rollingUpdate.MaxUnavailable) == 0 {
+			// MaxUnavailable cannot be 0.
+			allErrs = append(allErrs, field.Invalid(fldPathMaxUn, *rollingUpdate.MaxUnavailable, "cannot be 0"))
+		}
+		// Validate that MaxUnavailable is not more than 100%.
+		allErrs = append(allErrs, IsNotMoreThan100Percent(*rollingUpdate.MaxUnavailable, fldPathMaxUn)...)
 	}
 	return allErrs
 }

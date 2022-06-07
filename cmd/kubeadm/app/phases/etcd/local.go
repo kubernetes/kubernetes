@@ -179,6 +179,7 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 // GetEtcdPodSpec returns the etcd static Pod actualized to the context of the current configuration
 // NB. GetEtcdPodSpec methods holds the information about how kubeadm creates etcd static pod manifests.
 func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member) v1.Pod {
+	const etcdHealthEndpoint = "/health?serializable=true"
 	pathType := v1.HostPathDirectoryOrCreate
 	etcdMounts := map[string]v1.Volume{
 		etcdVolumeName:  staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.Local.DataDir, &pathType),
@@ -203,8 +204,8 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			},
-			LivenessProbe: staticpodutil.LivenessProbe(probeHostname, "/health", probePort, probeScheme),
-			StartupProbe:  staticpodutil.StartupProbe(probeHostname, "/health", probePort, probeScheme, cfg.APIServer.TimeoutForControlPlane),
+			LivenessProbe: staticpodutil.LivenessProbe(probeHostname, etcdHealthEndpoint, probePort, probeScheme),
+			StartupProbe:  staticpodutil.StartupProbe(probeHostname, etcdHealthEndpoint, probePort, probeScheme, cfg.APIServer.TimeoutForControlPlane),
 		},
 		etcdMounts,
 		// etcd will listen on the advertise address of the API server, in a different port (2379)
@@ -220,22 +221,25 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 		etcdLocalhostAddress = "::1"
 	}
 	defaultArguments := map[string]string{
-		"name":                        nodeName,
-		"listen-client-urls":          fmt.Sprintf("%s,%s", etcdutil.GetClientURLByIP(etcdLocalhostAddress), etcdutil.GetClientURL(endpoint)),
-		"advertise-client-urls":       etcdutil.GetClientURL(endpoint),
-		"listen-peer-urls":            etcdutil.GetPeerURL(endpoint),
-		"initial-advertise-peer-urls": etcdutil.GetPeerURL(endpoint),
-		"data-dir":                    cfg.Etcd.Local.DataDir,
-		"cert-file":                   filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName),
-		"key-file":                    filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName),
-		"trusted-ca-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
-		"client-cert-auth":            "true",
-		"peer-cert-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerCertName),
-		"peer-key-file":               filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
-		"peer-trusted-ca-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
-		"peer-client-cert-auth":       "true",
-		"snapshot-count":              "10000",
-		"listen-metrics-urls":         fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdMetricsPort))),
+		"name": nodeName,
+		// TODO: start using --initial-corrupt-check once the graduated flag is available:
+		// https://github.com/kubernetes/kubeadm/issues/2676
+		"experimental-initial-corrupt-check": "true",
+		"listen-client-urls":                 fmt.Sprintf("%s,%s", etcdutil.GetClientURLByIP(etcdLocalhostAddress), etcdutil.GetClientURL(endpoint)),
+		"advertise-client-urls":              etcdutil.GetClientURL(endpoint),
+		"listen-peer-urls":                   etcdutil.GetPeerURL(endpoint),
+		"initial-advertise-peer-urls":        etcdutil.GetPeerURL(endpoint),
+		"data-dir":                           cfg.Etcd.Local.DataDir,
+		"cert-file":                          filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName),
+		"key-file":                           filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName),
+		"trusted-ca-file":                    filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
+		"client-cert-auth":                   "true",
+		"peer-cert-file":                     filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerCertName),
+		"peer-key-file":                      filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
+		"peer-trusted-ca-file":               filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
+		"peer-client-cert-auth":              "true",
+		"snapshot-count":                     "10000",
+		"listen-metrics-urls":                fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdMetricsPort))),
 	}
 
 	if len(initialCluster) == 0 {

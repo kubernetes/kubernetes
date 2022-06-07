@@ -217,7 +217,7 @@ func TestApfRejectRequest(t *testing.T) {
 
 	checkForExpectedMetrics(t, []string{
 		"apiserver_request_terminations_total",
-		"apiserver_dropped_requests_total",
+		"apiserver_request_total",
 	})
 }
 
@@ -367,7 +367,7 @@ func TestApfCancelWaitRequest(t *testing.T) {
 	checkForExpectedMetrics(t, []string{
 		"apiserver_current_inflight_requests",
 		"apiserver_request_terminations_total",
-		"apiserver_dropped_requests_total",
+		"apiserver_request_total",
 	})
 }
 

@@ -222,7 +222,7 @@ func TestDeleteServiceAccountToken(t *testing.T) {
 			expLeftIndex: []int{1},
 		},
 		{
-			name:         "delete all with all suceess requests",
+			name:         "delete all with all success requests",
 			requestIndex: []int{0, 1, 2},
 			deletePodUID: []types.UID{"fake-uid-1", "fake-uid-2", "fake-uid-3"},
 		},

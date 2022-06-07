@@ -347,6 +347,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1().CSIDrivers().Informer()}, nil
 	case storagev1.SchemeGroupVersion.WithResource("csinodes"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1().CSINodes().Informer()}, nil
+	case storagev1.SchemeGroupVersion.WithResource("csistoragecapacities"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1().CSIStorageCapacities().Informer()}, nil
 	case storagev1.SchemeGroupVersion.WithResource("storageclasses"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1().StorageClasses().Informer()}, nil
 	case storagev1.SchemeGroupVersion.WithResource("volumeattachments"):

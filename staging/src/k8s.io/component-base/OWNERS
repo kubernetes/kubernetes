@@ -11,3 +11,5 @@ emeritus_approvers:
   - mtaufen
   - stealthybox
   - sttts
+labels:
+  - sig/architecture

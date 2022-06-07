@@ -19,7 +19,6 @@ package gcp
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
@@ -82,7 +81,7 @@ func checkIPTables() (err error) {
 // checkPublicGCR checks the access to the public Google Container Registry by
 // pulling the busybox image.
 func checkPublicGCR() error {
-	const image = "k8s.gcr.io/busybox"
+	const image = "registry.k8s.io/busybox"
 	output, err := runCommand("docker", "images", "-q", image)
 	if err != nil {
 		return err
@@ -137,7 +136,7 @@ var _ = SIGDescribe("GKE system requirements [NodeConformance][Feature:GKEEnv][N
 // getPPID returns the PPID for the pid.
 func getPPID(pid int) (int, error) {
 	statusFile := "/proc/" + strconv.Itoa(pid) + "/status"
-	content, err := ioutil.ReadFile(statusFile)
+	content, err := os.ReadFile(statusFile)
 	if err != nil {
 		return 0, err
 	}
@@ -183,7 +182,7 @@ func getCmdToProcessMap() (map[string][]process, error) {
 		if err != nil {
 			continue
 		}
-		content, err := ioutil.ReadFile("/proc/" + dir + "/cmdline")
+		content, err := os.ReadFile("/proc/" + dir + "/cmdline")
 		if err != nil || len(content) == 0 {
 			continue
 		}

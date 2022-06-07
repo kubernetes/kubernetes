@@ -321,7 +321,7 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 
 	beforeEtcdPodHash, err := waiter.WaitForStaticPodSingleHash(cfg.NodeRegistration.Name, constants.Etcd)
 	if err != nil {
-		return true, errors.Wrap(err, "failed to get etcd pod's hash")
+		return true, err
 	}
 
 	// Write the updated etcd static Pod manifest into the temporary directory, at this point no etcd change

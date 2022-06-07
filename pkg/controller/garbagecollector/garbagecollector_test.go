@@ -956,11 +956,6 @@ func (*fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) 
 	return nil, nil
 }
 
-// Deprecated: use ServerGroupsAndResources instead.
-func (*fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
 func (*fakeServerResources) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return nil, nil, nil
 }
@@ -2243,7 +2238,7 @@ func TestConflictingData(t *testing.T) {
 			eventRecorder := record.NewFakeRecorder(100)
 			eventRecorder.IncludeObject = true
 
-			metadataClient := fakemetadata.NewSimpleMetadataClient(legacyscheme.Scheme)
+			metadataClient := fakemetadata.NewSimpleMetadataClient(fakemetadata.NewTestScheme())
 
 			tweakableRM := meta.NewDefaultRESTMapper(nil)
 			tweakableRM.AddSpecific(

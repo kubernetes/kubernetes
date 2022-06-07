@@ -104,9 +104,9 @@ type Interface interface {
 	GetOffsetAndNumCandidates(nodes int32) (int32, int32)
 	// CandidatesToVictimsMap builds a map from the target node to a list of to-be-preempted Pods and the number of PDB violation.
 	CandidatesToVictimsMap(candidates []Candidate) map[string]*extenderv1.Victims
-	// PodEligibleToPreemptOthers determines whether this pod should be considered
-	// for preempting other pods or not.
-	PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) bool
+	// PodEligibleToPreemptOthers returns one bool and one string. The bool indicates whether this pod should be considered for
+	// preempting other pods or not. The string includes the reason if this pod isn't eligible.
+	PodEligibleToPreemptOthers(pod *v1.Pod, nominatedNodeStatus *framework.Status) (bool, string)
 	// SelectVictimsOnNode finds minimum set of pods on the given node that should be preempted in order to make enough room
 	// for "pod" to be scheduled.
 	// Note that both `state` and `nodeInfo` are deep copied.
@@ -148,9 +148,9 @@ func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeT
 	}
 
 	// 1) Ensure the preemptor is eligible to preempt other pods.
-	if !ev.PodEligibleToPreemptOthers(pod, m[pod.Status.NominatedNodeName]) {
-		klog.V(5).InfoS("Pod is not eligible for more preemption", "pod", klog.KObj(pod))
-		return nil, framework.NewStatus(framework.Unschedulable)
+	if ok, msg := ev.PodEligibleToPreemptOthers(pod, m[pod.Status.NominatedNodeName]); !ok {
+		klog.V(5).InfoS("Pod is not eligible for preemption", "pod", klog.KObj(pod), "reason", msg)
+		return nil, framework.NewStatus(framework.Unschedulable, msg)
 	}
 
 	// 2) Find all preemption candidates.
@@ -182,7 +182,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeT
 	// 4) Find the best candidate.
 	bestCandidate := ev.SelectCandidate(candidates)
 	if bestCandidate == nil || len(bestCandidate.Name()) == 0 {
-		return nil, framework.NewStatus(framework.Unschedulable)
+		return nil, framework.NewStatus(framework.Unschedulable, "no candidate node for preemption")
 	}
 
 	// 5) Perform preparation work before nominating the selected candidate.

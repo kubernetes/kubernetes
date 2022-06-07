@@ -35,6 +35,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo"
@@ -43,6 +44,7 @@ import (
 
 var _ = SIGDescribe("MirrorPod", func() {
 	f := framework.NewDefaultFramework("mirror-pod")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.Context("when create a mirror pod ", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
 		ginkgo.BeforeEach(func() {

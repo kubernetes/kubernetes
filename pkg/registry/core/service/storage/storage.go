@@ -157,6 +157,12 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
+// Destroy cleans up everything on shutdown.
+func (r *REST) Destroy() {
+	r.Store.Destroy()
+	r.alloc.Destroy()
+}
+
 // StatusREST implements the REST endpoint for changing the status of a service.
 type StatusREST struct {
 	store *genericregistry.Store
@@ -164,6 +170,12 @@ type StatusREST struct {
 
 func (r *StatusREST) New() runtime.Object {
 	return &api.Service{}
+}
+
+// Destroy cleans up resources on shutdown.
+func (r *StatusREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
@@ -176,6 +188,10 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
 // GetResetFields implements rest.ResetFieldsStrategy
@@ -366,6 +382,11 @@ func (r *REST) beginCreate(ctx context.Context, obj runtime.Object, options *met
 func (r *REST) beginUpdate(ctx context.Context, obj, oldObj runtime.Object, options *metav1.UpdateOptions) (genericregistry.FinishFunc, error) {
 	newSvc := obj.(*api.Service)
 	oldSvc := oldObj.(*api.Service)
+
+	// Make sure the existing object has all fields we expect to be defaulted.
+	// This might not be true if the saved object predates these fields (the
+	// Decorator hook is not called on 'old' in the update path.
+	r.defaultOnReadService(oldSvc)
 
 	// Fix up allocated values that the client may have not specified (for
 	// idempotence).

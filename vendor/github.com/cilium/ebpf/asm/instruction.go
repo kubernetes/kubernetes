@@ -181,6 +181,11 @@ func (ins *Instruction) IsFunctionCall() bool {
 	return ins.OpCode.JumpOp() == Call && ins.Src == PseudoCall
 }
 
+// IsBuiltinCall returns true if the instruction is a built-in call, i.e. BPF helper call.
+func (ins *Instruction) IsBuiltinCall() bool {
+	return ins.OpCode.JumpOp() == Call && ins.Src == R0 && ins.Dst == R0
+}
+
 // IsConstantLoad returns true if the instruction loads a constant of the
 // given size.
 func (ins *Instruction) IsConstantLoad(size Size) bool {

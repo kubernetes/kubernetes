@@ -546,7 +546,6 @@ function compute-kube-apiserver-params {
 	params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
 	params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
 	params+=" --secure-port=443"
-	params+=" --target-ram-mb=$((NUM_NODES * 60))"
 	params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 	params+=" --admission-control=${CUSTOM_ADMISSION_PLUGINS}"
 	params+=" --authorization-mode=Node,RBAC"
@@ -743,7 +742,7 @@ create-addonmanager-kubeconfig
 
 # Setup docker flags and load images of the master components.
 assemble-docker-flags
-DOCKER_REGISTRY="k8s.gcr.io"
+DOCKER_REGISTRY="registry.k8s.io"
 load-docker-images
 
 readonly audit_policy_file="/etc/audit_policy.config"

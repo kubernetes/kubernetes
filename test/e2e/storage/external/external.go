@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"time"
 
 	storagev1 "k8s.io/api/storage/v1"
@@ -182,7 +182,7 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	if filename == "" {
 		return nil, fmt.Errorf("missing file name")
 	}
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -203,11 +203,18 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 		return nil, fmt.Errorf("%s: %w", filename, err)
 	}
 
-	// to ensure backward compatibility if controller expansion is enabled then set online expansion to true
+	// To ensure backward compatibility: if controller expansion is enabled,
+	// then set both online and offline expansion to true
 	if _, ok := driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion]; !ok &&
 		driver.GetDriverInfo().Capabilities[storageframework.CapControllerExpansion] {
 		caps := driver.DriverInfo.Capabilities
 		caps[storageframework.CapOnlineExpansion] = true
+		driver.DriverInfo.Capabilities = caps
+	}
+	if _, ok := driver.GetDriverInfo().Capabilities[storageframework.CapOfflineExpansion]; !ok &&
+		driver.GetDriverInfo().Capabilities[storageframework.CapControllerExpansion] {
+		caps := driver.DriverInfo.Capabilities
+		caps[storageframework.CapOfflineExpansion] = true
 		driver.DriverInfo.Capabilities = caps
 	}
 	return driver, nil
@@ -339,7 +346,7 @@ func (d *driverDefinition) GetTimeouts() *framework.TimeoutContext {
 }
 
 func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

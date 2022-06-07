@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v2beta1";
+option go_package = "k8s.io/api/autoscaling/v2beta1";
 
 // ContainerResourceMetricSource indicates how to scale on a resource metric known to
 // Kubernetes, as specified in requests and limits, describing each pod in the

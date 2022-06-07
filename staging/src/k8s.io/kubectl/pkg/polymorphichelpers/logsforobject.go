@@ -34,10 +34,6 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 )
 
-// defaultLogsContainerAnnotationName is an annotation name that can be used to preselect the interesting container
-// from a pod when running kubectl logs. It is deprecated and will be remove in 1.25.
-const defaultLogsContainerAnnotationName = "kubectl.kubernetes.io/default-logs-container"
-
 func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
@@ -85,13 +81,6 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 				var defaultContainer string
 				if len(annotations[podcmd.DefaultContainerAnnotationName]) > 0 {
 					defaultContainer = annotations[podcmd.DefaultContainerAnnotationName]
-				} else if len(annotations[defaultLogsContainerAnnotationName]) > 0 {
-					// Only log deprecation if we have only the old annotation. This allows users to
-					// set both to support multiple versions of kubectl; if they are setting both
-					// they must already know it is deprecated, so we don't need to add noisy
-					// warnings.
-					defaultContainer = annotations[defaultLogsContainerAnnotationName]
-					fmt.Fprintf(os.Stderr, "Using deprecated annotation `kubectl.kubernetes.io/default-logs-container` in pod/%v. Please use `kubectl.kubernetes.io/default-container` instead\n", t.Name)
 				}
 				if len(defaultContainer) > 0 {
 					if exists, _ := podcmd.FindContainerByName(t, defaultContainer); exists == nil {

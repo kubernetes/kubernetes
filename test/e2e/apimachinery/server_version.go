@@ -21,12 +21,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("server version", func() {
 	f := framework.NewDefaultFramework("server-version")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
 	   Release: v1.19

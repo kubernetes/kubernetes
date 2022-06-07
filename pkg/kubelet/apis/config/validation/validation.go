@@ -133,7 +133,7 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 			allErrors = append(allErrors, fmt.Errorf("invalid taint: %v", nodeTaint))
 		}
 		if nodeTaint.TimeAdded != nil {
-			allErrors = append(allErrors, fmt.Errorf("taint TimeAdded is not nil"))
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: taint.TimeAdded is not nil"))
 		}
 	}
 

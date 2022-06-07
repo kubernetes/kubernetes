@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +31,7 @@ import (
 )
 
 func loadConfigFromFile(file string) (*config.KubeSchedulerConfiguration, error) {
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +93,7 @@ func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, c
 	}
 
 	if klogV.Enabled() {
-		klogV.Info("Using component config", "\n-------------------------Configuration File Contents Start Here---------------------- \n", buf.String(), "\n------------------------------------Configuration File Contents End Here---------------------------------\n")
+		klogV.InfoS("Using component config", "config", buf.String())
 	}
 
 	if len(fileName) > 0 {

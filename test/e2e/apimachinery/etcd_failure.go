@@ -31,6 +31,7 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -38,6 +39,7 @@ import (
 var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("etcd-failure")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// This test requires:

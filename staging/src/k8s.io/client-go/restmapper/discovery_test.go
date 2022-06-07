@@ -27,10 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	. "k8s.io/client-go/discovery"
+	"k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -401,10 +402,6 @@ func (d *fakeFailingDiscovery) ServerResourcesForGroupVersion(groupVersion strin
 	return nil, fmt.Errorf("not found")
 }
 
-func (d *fakeFailingDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
-	return ServerResources(d)
-}
-
 func (d *fakeFailingDiscovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	return ServerPreferredResources(d)
 }
@@ -418,6 +415,10 @@ func (*fakeFailingDiscovery) ServerVersion() (*version.Info, error) {
 }
 
 func (*fakeFailingDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
+	panic("implement me")
+}
+
+func (c *fakeFailingDiscovery) OpenAPIV3() openapi.Client {
 	panic("implement me")
 }
 
@@ -464,11 +465,6 @@ func (c *fakeCachedDiscoveryInterface) ServerResourcesForGroupVersion(groupVersi
 	return nil, errors.NewNotFound(schema.GroupResource{}, "")
 }
 
-// Deprecated: use ServerGroupsAndResources instead.
-func (c *fakeCachedDiscoveryInterface) ServerResources() ([]*metav1.APIResourceList, error) {
-	return ServerResources(c)
-}
-
 func (c *fakeCachedDiscoveryInterface) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	if c.enabledGroupA {
 		return []*metav1.APIResourceList{
@@ -497,6 +493,10 @@ func (c *fakeCachedDiscoveryInterface) ServerVersion() (*version.Info, error) {
 
 func (c *fakeCachedDiscoveryInterface) OpenAPISchema() (*openapi_v2.Document, error) {
 	return &openapi_v2.Document{}, nil
+}
+
+func (c *fakeCachedDiscoveryInterface) OpenAPIV3() openapi.Client {
+	panic("implement me")
 }
 
 var (

@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	storageetcd3 "k8s.io/apiserver/pkg/storage/etcd3"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -87,8 +87,8 @@ func isObjectOlder(newObject, oldObject runtime.Object) bool {
 	if newObject == nil || oldObject == nil {
 		return false
 	}
-	newVersion, _ := storageetcd3.Versioner.ObjectResourceVersion(newObject)
-	oldVersion, _ := storageetcd3.Versioner.ObjectResourceVersion(oldObject)
+	newVersion, _ := storage.APIObjectVersioner{}.ObjectResourceVersion(newObject)
+	oldVersion, _ := storage.APIObjectVersioner{}.ObjectResourceVersion(oldObject)
 	return newVersion < oldVersion
 }
 

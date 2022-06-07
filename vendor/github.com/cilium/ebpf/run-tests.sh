@@ -5,7 +5,7 @@
 #     Run all tests on a 5.4 kernel
 #     $ ./run-tests.sh 5.4
 #     Run a subset of tests:
-#     $ ./run-tests.sh 5.4 go test ./link
+#     $ ./run-tests.sh 5.4 ./link
 
 set -euo pipefail
 
@@ -48,15 +48,17 @@ if [[ "${1:-}" = "--exec-vm" ]]; then
     rm "${output}/fake-stdin"
   fi
 
-  $sudo virtme-run --kimg "${input}/bzImage" --memory 768M --pwd \
-  --rwdir="${testdir}=${testdir}" \
-  --rodir=/run/input="${input}" \
-  --rwdir=/run/output="${output}" \
-  --script-sh "PATH=\"$PATH\" \"$script\" --exec-test $cmd" \
-  --qemu-opts -smp 2 # need at least two CPUs for some tests
+  if ! $sudo virtme-run --kimg "${input}/bzImage" --memory 768M --pwd \
+    --rwdir="${testdir}=${testdir}" \
+    --rodir=/run/input="${input}" \
+    --rwdir=/run/output="${output}" \
+    --script-sh "PATH=\"$PATH\" \"$script\" --exec-test $cmd" \
+    --kopt possible_cpus=2; then # need at least two CPUs for some tests
+    exit 23
+  fi
 
   if [[ ! -e "${output}/success" ]]; then
-    exit 1
+    exit 42
   fi
 
   $sudo rm -r "$output"
@@ -74,7 +76,7 @@ elif [[ "${1:-}" = "--exec-test" ]]; then
   dmesg -C
   if ! "$@"; then
     dmesg
-    exit 1
+    exit 1 # this return code is "swallowed" by qemu
   fi
   touch "/run/output/success"
   exit 0
@@ -108,7 +110,7 @@ else
   echo "No selftests found, disabling"
 fi
 
-args=(-v -short -coverpkg=./... -coverprofile=coverage.out -count 1 ./...)
+args=(-short -coverpkg=./... -coverprofile=coverage.out -count 1 ./...)
 if (( $# > 0 )); then
   args=("$@")
 fi

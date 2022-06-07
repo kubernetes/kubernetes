@@ -263,7 +263,7 @@ profiles:
           - Score: 2
             Utilization: 1
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "scoringStrategy.requestedToCapacityRatio.shape[0].Score", unknown field "scoringStrategy.requestedToCapacityRatio.shape[0].Utilization"`,
+			wantErr: `strict decoding error: decoding .profiles[0].pluginConfig[0]: strict decoding error: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "scoringStrategy.requestedToCapacityRatio.shape[0].Score", unknown field "scoringStrategy.requestedToCapacityRatio.shape[0].Utilization"`,
 		},
 		{
 			name: "v1beta2 NodeResourcesFitArgs resources encoding is strict",
@@ -279,7 +279,7 @@ profiles:
         - Name: cpu
           Weight: 1
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "scoringStrategy.resources[0].Name", unknown field "scoringStrategy.resources[0].Weight"`,
+			wantErr: `strict decoding error: decoding .profiles[0].pluginConfig[0]: strict decoding error: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "scoringStrategy.resources[0].Name", unknown field "scoringStrategy.resources[0].Weight"`,
 		},
 		{
 			name: "out-of-tree plugin args",
@@ -604,7 +604,7 @@ profiles:
           - Score: 2
             Utilization: 1
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "scoringStrategy.requestedToCapacityRatio.shape[0].Score", unknown field "scoringStrategy.requestedToCapacityRatio.shape[0].Utilization"`,
+			wantErr: `strict decoding error: decoding .profiles[0].pluginConfig[0]: strict decoding error: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "scoringStrategy.requestedToCapacityRatio.shape[0].Score", unknown field "scoringStrategy.requestedToCapacityRatio.shape[0].Utilization"`,
 		},
 		{
 			name: "v1beta3 NodeResourcesFitArgs resources encoding is strict",
@@ -620,7 +620,7 @@ profiles:
         - Name: cpu
           Weight: 1
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "scoringStrategy.resources[0].Name", unknown field "scoringStrategy.resources[0].Weight"`,
+			wantErr: `strict decoding error: decoding .profiles[0].pluginConfig[0]: strict decoding error: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "scoringStrategy.resources[0].Name", unknown field "scoringStrategy.resources[0].Weight"`,
 		},
 		{
 			name: "out-of-tree plugin args",

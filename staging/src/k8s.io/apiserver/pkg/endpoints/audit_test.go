@@ -149,7 +149,6 @@ func TestAudit(t *testing.T) {
 	for _, test := range []struct {
 		desc   string
 		req    func(server string) (*http.Request, error)
-		linker runtime.SelfLinker
 		code   int
 		events int
 		checks []eventCheck
@@ -159,7 +158,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("GET", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple/c", bytes.NewBuffer(simpleFooJSON))
 			},
-			selfLinker,
 			200,
 			2,
 			[]eventCheck{
@@ -172,11 +170,6 @@ func TestAudit(t *testing.T) {
 			"list",
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("GET", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple?labelSelector=a%3Dfoobar", nil)
-			},
-			&setTestSelfLinker{
-				t:           t,
-				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple",
-				namespace:   "other",
 			},
 			200,
 			2,
@@ -191,7 +184,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("POST", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(simpleFooJSON))
 			},
-			selfLinker,
 			201,
 			2,
 			[]eventCheck{
@@ -205,7 +197,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("POST", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/named", bytes.NewBuffer(simpleFooJSON))
 			},
-			selfLinker,
 			405,
 			2,
 			[]eventCheck{
@@ -219,7 +210,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("DELETE", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/a", nil)
 			},
-			selfLinker,
 			200,
 			2,
 			[]eventCheck{
@@ -233,7 +223,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("DELETE", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/a", bytes.NewBuffer([]byte(`{"kind":"DeleteOptions"}`)))
 			},
-			selfLinker,
 			200,
 			2,
 			[]eventCheck{
@@ -247,7 +236,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("PUT", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple/c", bytes.NewBuffer(simpleCPrimeJSON))
 			},
-			selfLinker,
 			200,
 			2,
 			[]eventCheck{
@@ -261,7 +249,6 @@ func TestAudit(t *testing.T) {
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("PUT", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/c", bytes.NewBuffer(simpleCPrimeJSON))
 			},
-			selfLinker,
 			400,
 			2,
 			[]eventCheck{
@@ -277,12 +264,6 @@ func TestAudit(t *testing.T) {
 				req.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
 				return req, nil
 			},
-			&setTestSelfLinker{
-				t:           t,
-				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple/c",
-				name:        "c",
-				namespace:   "other",
-			},
 			200,
 			2,
 			[]eventCheck{
@@ -295,11 +276,6 @@ func TestAudit(t *testing.T) {
 			"watch",
 			func(server string) (*http.Request, error) {
 				return http.NewRequest("GET", server+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/simple?watch=true", nil)
-			},
-			&setTestSelfLinker{
-				t:           t,
-				expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/simple",
-				namespace:   "other",
 			},
 			200,
 			3,
@@ -328,7 +304,7 @@ func TestAudit(t *testing.T) {
 					Other:      "foo",
 				},
 			},
-		}, admissionControl, selfLinker, sink)
+		}, admissionControl, sink)
 
 		server := httptest.NewServer(handler)
 		defer server.Close()

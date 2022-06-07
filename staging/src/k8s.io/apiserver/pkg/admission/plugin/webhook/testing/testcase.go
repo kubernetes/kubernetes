@@ -691,6 +691,98 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 	}
 }
 
+// NewNonMutatingPanicTestCases returns test cases with a given base url.
+// All test cases in NewNonMutatingTestCases have no Patch set in
+// AdmissionResponse. The expected responses are set for panic handling.
+func NewNonMutatingPanicTestCases(url *url.URL) []ValidatingTest {
+	policyIgnore := registrationv1.Ignore
+	policyFail := registrationv1.Fail
+
+	return []ValidatingTest{
+		{
+			Name: "match & allow, but panic",
+			Webhooks: []registrationv1.ValidatingWebhook{{
+				Name:                    "allow.example.com",
+				ClientConfig:            ccfgSVC("allow"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectStatusCode:  http.StatusForbidden,
+			ErrorContains:     "ValidatingAdmissionWebhook/allow.example.com has panicked: Start panicking!",
+			ExpectAnnotations: map[string]string{},
+		},
+		{
+			Name: "match & fail (but allow because fail open)",
+			Webhooks: []registrationv1.ValidatingWebhook{{
+				Name:                    "internalErr A",
+				ClientConfig:            ccfgSVC("internalErr"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				FailurePolicy:           &policyIgnore,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}, {
+				Name:                    "internalErr B",
+				ClientConfig:            ccfgSVC("internalErr"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				FailurePolicy:           &policyIgnore,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}, {
+				Name:                    "internalErr C",
+				ClientConfig:            ccfgSVC("internalErr"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				FailurePolicy:           &policyIgnore,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+
+			SkipBenchmark: true,
+			ExpectAllow:   true,
+			ExpectAnnotations: map[string]string{
+				"failed-open.validating.webhook.admission.k8s.io/round_0_index_0": "internalErr A",
+				"failed-open.validating.webhook.admission.k8s.io/round_0_index_1": "internalErr B",
+				"failed-open.validating.webhook.admission.k8s.io/round_0_index_2": "internalErr C",
+			},
+		},
+		{
+			Name: "match & fail (but fail because fail closed)",
+			Webhooks: []registrationv1.ValidatingWebhook{{
+				Name:                    "internalErr A",
+				ClientConfig:            ccfgSVC("internalErr"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				FailurePolicy:           &policyFail,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}, {
+				Name:                    "internalErr B",
+				ClientConfig:            ccfgSVC("internalErr"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				FailurePolicy:           &policyFail,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}, {
+				Name:                    "internalErr C",
+				ClientConfig:            ccfgSVC("internalErr"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				FailurePolicy:           &policyFail,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectStatusCode: http.StatusInternalServerError,
+			ExpectAllow:      false,
+			ErrorContains:    " has panicked: Start panicking!",
+		},
+	}
+}
+
 func mutationAnnotationValue(configuration, webhook string, mutated bool) string {
 	return fmt.Sprintf(`{"configuration":"%s","webhook":"%s","mutated":%t}`, configuration, webhook, mutated)
 }

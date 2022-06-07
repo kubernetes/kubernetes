@@ -17,7 +17,6 @@ limitations under the License.
 package printers
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
@@ -58,11 +57,7 @@ func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj.Object.Object)).Type().PkgPath()) {
 			return fmt.Errorf(InternalObjectPrinterErr)
 		}
-		data, err := json.Marshal(obj)
-		if err != nil {
-			return err
-		}
-		data, err = yaml.JSONToYAML(data)
+		data, err := yaml.Marshal(obj)
 		if err != nil {
 			return err
 		}

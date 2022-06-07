@@ -51,8 +51,9 @@ func CheckSeccompProfileRestricted() Check {
 		Level: api.LevelRestricted,
 		Versions: []VersionedCheck{
 			{
-				MinimumVersion: api.MajorMinorVersion(1, 19),
-				CheckPod:       seccompProfileRestricted_1_19,
+				MinimumVersion:   api.MajorMinorVersion(1, 19),
+				CheckPod:         seccompProfileRestricted_1_19,
+				OverrideCheckIDs: []CheckID{checkSeccompBaselineID},
 			},
 		},
 	}

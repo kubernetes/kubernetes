@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/apply"
@@ -110,21 +109,13 @@ type DiffOptions struct {
 
 	Selector         string
 	OpenAPISchema    openapi.Resources
-	DiscoveryClient  discovery.DiscoveryInterface
 	DynamicClient    dynamic.Interface
-	DryRunVerifier   *resource.DryRunVerifier
+	DryRunVerifier   *resource.QueryParamVerifier
 	CmdNamespace     string
 	EnforceNamespace bool
 	Builder          *resource.Builder
 	Diff             *DiffProgram
 	pruner           *pruner
-}
-
-func validateArgs(cmd *cobra.Command, args []string) error {
-	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
-	}
-	return nil
 }
 
 func NewDiffOptions(ioStreams genericclioptions.IOStreams) *DiffOptions {
@@ -145,8 +136,8 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Long:                  diffLong,
 		Example:               diffExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckDiffErr(options.Complete(f, cmd))
-			cmdutil.CheckDiffErr(validateArgs(cmd, args))
+			cmdutil.CheckDiffErr(options.Complete(f, cmd, args))
+			cmdutil.CheckDiffErr(options.Validate())
 			// `kubectl diff` propagates the error code from
 			// diff or `KUBECTL_EXTERNAL_DIFF`. Also, we
 			// don't want to print an error if diff returns
@@ -607,7 +598,11 @@ func isConflict(err error) bool {
 	return err != nil && errors.IsConflict(err)
 }
 
-func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	if len(args) != 0 {
+		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
+	}
+
 	var err error
 
 	err = o.FilenameOptions.RequireFilenameOrKustomize()
@@ -629,17 +624,12 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		}
 	}
 
-	o.DiscoveryClient, err = f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-
 	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
 
-	o.DryRunVerifier = resource.NewDryRunVerifier(o.DynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(o.DynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	o.CmdNamespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -764,6 +754,11 @@ func (o *DiffOptions) Run() error {
 	}
 
 	return differ.Run(o.Diff)
+}
+
+// Validate makes sure provided values for DiffOptions are valid
+func (o *DiffOptions) Validate() error {
+	return nil
 }
 
 func getObjectName(obj runtime.Object) (string, error) {

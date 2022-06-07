@@ -22,9 +22,9 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
@@ -323,7 +323,7 @@ func prepareGceImages() (*internalImageConfig, error) {
 			configPath = filepath.Join(*imageConfigDir, *imageConfigFile)
 		}
 
-		imageConfigData, err := ioutil.ReadFile(configPath)
+		imageConfigData, err := os.ReadFile(configPath)
 		if err != nil {
 			return nil, fmt.Errorf("Could not read image config file provided: %v", err)
 		}
@@ -705,15 +705,14 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 
 		var output string
 		output, err = remote.SSH(name, "sh", "-c",
-			"'systemctl list-units  --type=service  --state=running | grep -e docker -e containerd -e crio'")
+			"'systemctl list-units  --type=service  --state=running | grep -e containerd -e crio'")
 		if err != nil {
-			err = fmt.Errorf("instance %s not running docker/containerd/crio daemon - Command failed: %s", name, output)
+			err = fmt.Errorf("instance %s not running containerd/crio daemon - Command failed: %s", name, output)
 			continue
 		}
-		if !strings.Contains(output, "docker.service") &&
-			!strings.Contains(output, "containerd.service") &&
+		if !strings.Contains(output, "containerd.service") &&
 			!strings.Contains(output, "crio.service") {
-			err = fmt.Errorf("instance %s not running docker/containerd/crio daemon: %s", name, output)
+			err = fmt.Errorf("instance %s not running containerd/crio daemon: %s", name, output)
 			continue
 		}
 		instanceRunning = true
@@ -895,17 +894,52 @@ func parseInstanceMetadata(str string) map[string]string {
 		if *imageConfigDir != "" {
 			metaPath = filepath.Join(*imageConfigDir, metaPath)
 		}
-		v, err := ioutil.ReadFile(metaPath)
+		v, err := os.ReadFile(metaPath)
 		if err != nil {
 			klog.Fatalf("Failed to read metadata file %q: %v", metaPath, err)
 			continue
 		}
-		metadata[kp[0]] = string(v)
+		metadata[kp[0]] = ignitionInjectGCEPublicKey(metaPath, string(v))
 	}
 	for k, v := range nodeEnvs {
 		metadata[k] = v
 	}
 	return metadata
+}
+
+// ignitionInjectGCEPublicKey tries to inject the GCE SSH public key into the
+// provided ignition file path.
+//
+// This will only being done if the job has the
+// IGNITION_INJECT_GCE_SSH_PUBLIC_KEY_FILE environment variable set, while it
+// tried to replace the GCE_SSH_PUBLIC_KEY_FILE_CONTENT placeholder.
+func ignitionInjectGCEPublicKey(path string, content string) string {
+	if os.Getenv("IGNITION_INJECT_GCE_SSH_PUBLIC_KEY_FILE") == "" {
+		return content
+	}
+
+	klog.Infof("Injecting SSH public key into ignition")
+
+	const publicKeyEnv = "GCE_SSH_PUBLIC_KEY_FILE"
+	sshPublicKeyFile := os.Getenv(publicKeyEnv)
+	if sshPublicKeyFile == "" {
+		klog.Errorf("Environment variable %s is not set", publicKeyEnv)
+		os.Exit(1)
+	}
+
+	sshPublicKey, err := os.ReadFile(sshPublicKeyFile)
+	if err != nil {
+		klog.ErrorS(err, "unable to read SSH public key file")
+		os.Exit(1)
+	}
+
+	const sshPublicKeyFileContentMarker = "GCE_SSH_PUBLIC_KEY_FILE_CONTENT"
+	return strings.Replace(
+		content,
+		sshPublicKeyFileContentMarker,
+		base64.StdEncoding.EncodeToString(sshPublicKey),
+		1,
+	)
 }
 
 func imageToInstanceName(imageConfig *internalGCEImage) string {

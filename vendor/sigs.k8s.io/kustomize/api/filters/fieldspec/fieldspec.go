@@ -51,9 +51,8 @@ func (fltr Filter) Filter(obj *yaml.RNode) (*yaml.RNode, error) {
 	}
 	fltr.path = utils.PathSplitter(fltr.FieldSpec.Path, "/")
 	if err := fltr.filter(obj); err != nil {
-		s, _ := obj.String()
 		return nil, errors.WrapPrefixf(err,
-			"considering field '%s' of object\n%v", fltr.FieldSpec.Path, s)
+			"considering field '%s' of object %s", fltr.FieldSpec.Path, resid.FromRNode(obj))
 	}
 	return obj, nil
 }
@@ -138,6 +137,8 @@ func (fltr Filter) handleMap(obj *yaml.RNode) error {
 // seq calls filter on all sequence elements
 func (fltr Filter) handleSequence(obj *yaml.RNode) error {
 	if err := obj.VisitElements(func(node *yaml.RNode) error {
+		// set an accurate FieldPath for nested elements
+		node.AppendToFieldPath(obj.FieldPath()...)
 		// recurse on each element -- re-allocating a Filter is
 		// not strictly required, but is more consistent with field
 		// and less likely to have side effects

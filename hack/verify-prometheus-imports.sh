@@ -38,6 +38,12 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 allowed_prometheus_importers=(
   ./cluster/images/etcd-version-monitor/etcd-version-monitor.go
   ./pkg/volume/util/operationexecutor/operation_generator_test.go
+  ./staging/src/k8s.io/component-base/metrics/prometheusextension/timing_histogram.go
+  ./staging/src/k8s.io/component-base/metrics/prometheusextension/timing_histogram_test.go
+  ./staging/src/k8s.io/component-base/metrics/prometheusextension/timing_histogram_vec.go
+  ./staging/src/k8s.io/component-base/metrics/prometheusextension/weighted_histogram.go
+  ./staging/src/k8s.io/component-base/metrics/prometheusextension/weighted_histogram_test.go
+  ./staging/src/k8s.io/component-base/metrics/prometheusextension/weighted_histogram_vec.go
   ./staging/src/k8s.io/component-base/metrics/collector.go
   ./staging/src/k8s.io/component-base/metrics/collector_test.go
   ./staging/src/k8s.io/component-base/metrics/counter.go
@@ -60,6 +66,7 @@ allowed_prometheus_importers=(
   ./staging/src/k8s.io/component-base/metrics/testutil/metrics_test.go
   ./staging/src/k8s.io/component-base/metrics/testutil/promlint.go
   ./staging/src/k8s.io/component-base/metrics/testutil/testutil.go
+  ./staging/src/k8s.io/component-base/metrics/timing_histogram_test.go
   ./staging/src/k8s.io/component-base/metrics/value.go
   ./staging/src/k8s.io/component-base/metrics/wrappers.go
   ./test/e2e/apimachinery/flowcontrol.go

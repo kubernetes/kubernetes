@@ -45,7 +45,6 @@ import (
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
 	"k8s.io/kubernetes/plugin/pkg/admission/runtimeclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecurity"
-	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
 	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/label"
@@ -75,8 +74,7 @@ var AllOrderedPlugins = []string{
 	nodetaint.PluginName,                    // TaintNodesByCondition
 	alwayspullimages.PluginName,             // AlwaysPullImages
 	imagepolicy.PluginName,                  // ImagePolicyWebhook
-	podsecurity.PluginName,                  // PodSecurity - before PodSecurityPolicy so audit/warn get exercised even if PodSecurityPolicy denies
-	podsecuritypolicy.PluginName,            // PodSecurityPolicy
+	podsecurity.PluginName,                  // PodSecurity
 	podnodeselector.PluginName,              // PodNodeSelector
 	podpriority.PluginName,                  // Priority
 	defaulttolerationseconds.PluginName,     // DefaultTolerationSeconds
@@ -129,7 +127,6 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	runtimeclass.Register(plugins)
 	resourcequota.Register(plugins)
 	podsecurity.Register(plugins)
-	podsecuritypolicy.Register(plugins)
 	podpriority.Register(plugins)
 	scdeny.Register(plugins)
 	serviceaccount.Register(plugins)
