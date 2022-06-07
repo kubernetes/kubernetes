@@ -17,17 +17,64 @@ limitations under the License.
 package filters
 
 import (
+	"context"
+	"fmt"
 	"net/http"
+	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
-// WithWebhookDuration adds WebhookDuration trackers to the
-// context associated with a request.
-func WithWebhookDuration(handler http.Handler) http.Handler {
+var (
+	watchVerbs = sets.NewString("watch")
+)
+
+// WithLatencyTrackers adds a LatencyTrackers instance to the
+// context associated with a request so that we can measure latency
+// incurred in various components within the apiserver.
+func WithLatencyTrackers(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		req = req.WithContext(request.WithWebhookDuration(ctx))
+		requestInfo, ok := request.RequestInfoFrom(ctx)
+		if !ok {
+			handleError(w, req, http.StatusInternalServerError, fmt.Errorf("no RequestInfo found in context, handler chain must be wrong"))
+			return
+		}
+
+		if watchVerbs.Has(requestInfo.Verb) {
+			handler.ServeHTTP(w, req)
+			return
+		}
+
+		req = req.WithContext(request.WithLatencyTrackers(ctx))
+		w = responsewriter.WrapForHTTP1Or2(&writeLatencyTracker{
+			ResponseWriter: w,
+			ctx:            req.Context(),
+		})
+
 		handler.ServeHTTP(w, req)
 	})
+}
+
+var _ http.ResponseWriter = &writeLatencyTracker{}
+var _ responsewriter.UserProvidedDecorator = &writeLatencyTracker{}
+
+type writeLatencyTracker struct {
+	http.ResponseWriter
+	ctx context.Context
+}
+
+func (wt *writeLatencyTracker) Unwrap() http.ResponseWriter {
+	return wt.ResponseWriter
+}
+
+func (wt *writeLatencyTracker) Write(bs []byte) (int, error) {
+	startedAt := time.Now()
+	defer func() {
+		request.TrackResponseWriteLatency(wt.ctx, time.Since(startedAt))
+	}()
+
+	return wt.ResponseWriter.Write(bs)
 }

@@ -47,11 +47,11 @@ func init() {
 type rrPickerBuilder struct{}
 
 func (*rrPickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
-	logger.Infof("roundrobinPicker: newPicker called with info: %v", info)
+	logger.Infof("roundrobinPicker: Build called with info: %v", info)
 	if len(info.ReadySCs) == 0 {
 		return base.NewErrPicker(balancer.ErrNoSubConnAvailable)
 	}
-	var scs []balancer.SubConn
+	scs := make([]balancer.SubConn, 0, len(info.ReadySCs))
 	for sc := range info.ReadySCs {
 		scs = append(scs, sc)
 	}

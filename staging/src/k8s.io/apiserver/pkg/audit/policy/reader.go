@@ -23,8 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/apis/audit/validation"
 	"k8s.io/apiserver/pkg/audit"
 
@@ -33,8 +31,6 @@ import (
 
 var (
 	apiGroupVersions = []schema.GroupVersion{
-		auditv1beta1.SchemeGroupVersion,
-		auditv1alpha1.SchemeGroupVersion,
 		auditv1.SchemeGroupVersion,
 	}
 	apiGroupVersionSet = map[schema.GroupVersion]bool{}
@@ -76,10 +72,6 @@ func LoadPolicyFromBytes(policyDef []byte) (*auditinternal.Policy, error) {
 	gv := schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}
 	if !apiGroupVersionSet[gv] {
 		return nil, fmt.Errorf("unknown group version field %v in policy", gvk)
-	}
-
-	if gv != auditv1.SchemeGroupVersion {
-		klog.Warningf("%q is deprecated and will be removed in a future release, use %q instead", gv, auditv1.SchemeGroupVersion)
 	}
 
 	if err := validation.ValidatePolicy(policy); err != nil {

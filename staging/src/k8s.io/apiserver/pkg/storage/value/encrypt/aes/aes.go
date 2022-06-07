@@ -19,6 +19,7 @@ package aes
 
 import (
 	"bytes"
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -52,7 +53,7 @@ func NewGCMTransformer(block cipher.Block) value.Transformer {
 	return &gcm{block: block}
 }
 
-func (t *gcm) TransformFromStorage(data []byte, context value.Context) ([]byte, bool, error) {
+func (t *gcm) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
 	aead, err := cipher.NewGCM(t.block)
 	if err != nil {
 		return nil, false, err
@@ -61,11 +62,11 @@ func (t *gcm) TransformFromStorage(data []byte, context value.Context) ([]byte, 
 	if len(data) < nonceSize {
 		return nil, false, fmt.Errorf("the stored data was shorter than the required size")
 	}
-	result, err := aead.Open(nil, data[:nonceSize], data[nonceSize:], context.AuthenticatedData())
+	result, err := aead.Open(nil, data[:nonceSize], data[nonceSize:], dataCtx.AuthenticatedData())
 	return result, false, err
 }
 
-func (t *gcm) TransformToStorage(data []byte, context value.Context) ([]byte, error) {
+func (t *gcm) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
 	aead, err := cipher.NewGCM(t.block)
 	if err != nil {
 		return nil, err
@@ -79,7 +80,7 @@ func (t *gcm) TransformToStorage(data []byte, context value.Context) ([]byte, er
 	if n != nonceSize {
 		return nil, fmt.Errorf("unable to read sufficient random bytes")
 	}
-	cipherText := aead.Seal(result[nonceSize:nonceSize], result[:nonceSize], data, context.AuthenticatedData())
+	cipherText := aead.Seal(result[nonceSize:nonceSize], result[:nonceSize], data, dataCtx.AuthenticatedData())
 	return result[:nonceSize+len(cipherText)], nil
 }
 
@@ -95,12 +96,12 @@ func NewCBCTransformer(block cipher.Block) value.Transformer {
 }
 
 var (
-	errInvalidBlockSize    = fmt.Errorf("the stored data is not a multiple of the block size")
+	ErrInvalidBlockSize    = fmt.Errorf("the stored data is not a multiple of the block size")
 	errInvalidPKCS7Data    = errors.New("invalid PKCS7 data (empty or not padded)")
 	errInvalidPKCS7Padding = errors.New("invalid padding on input")
 )
 
-func (t *cbc) TransformFromStorage(data []byte, context value.Context) ([]byte, bool, error) {
+func (t *cbc) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
 	blockSize := aes.BlockSize
 	if len(data) < blockSize {
 		return nil, false, fmt.Errorf("the stored data was shorter than the required size")
@@ -109,7 +110,7 @@ func (t *cbc) TransformFromStorage(data []byte, context value.Context) ([]byte, 
 	data = data[blockSize:]
 
 	if len(data)%blockSize != 0 {
-		return nil, false, errInvalidBlockSize
+		return nil, false, ErrInvalidBlockSize
 	}
 
 	result := make([]byte, len(data))
@@ -133,7 +134,7 @@ func (t *cbc) TransformFromStorage(data []byte, context value.Context) ([]byte, 
 	return result[:size], false, nil
 }
 
-func (t *cbc) TransformToStorage(data []byte, context value.Context) ([]byte, error) {
+func (t *cbc) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
 	blockSize := aes.BlockSize
 	paddingSize := blockSize - (len(data) % blockSize)
 	result := make([]byte, blockSize+len(data)+paddingSize)

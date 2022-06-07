@@ -42,7 +42,7 @@ type ContainerManager interface {
 	// ListContainers lists all containers by filters.
 	ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error)
 	// ContainerStatus returns the status of the container.
-	ContainerStatus(containerID string) (*runtimeapi.ContainerStatus, error)
+	ContainerStatus(containerID string, verbose bool) (*runtimeapi.ContainerStatusResponse, error)
 	// UpdateContainerResources updates the cgroup resources for the container.
 	UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error
 	// ExecSync executes a command in the container, and returns the stdout output.
@@ -71,7 +71,7 @@ type PodSandboxManager interface {
 	// sandbox, they should be forcibly removed.
 	RemovePodSandbox(podSandboxID string) error
 	// PodSandboxStatus returns the Status of the PodSandbox.
-	PodSandboxStatus(podSandboxID string) (*runtimeapi.PodSandboxStatus, error)
+	PodSandboxStatus(podSandboxID string, verbose bool) (*runtimeapi.PodSandboxStatusResponse, error)
 	// ListPodSandbox returns a list of Sandbox.
 	ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error)
 	// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
@@ -104,7 +104,7 @@ type RuntimeService interface {
 	// UpdateRuntimeConfig updates runtime configuration if specified
 	UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeConfig) error
 	// Status returns the status of the runtime.
-	Status() (*runtimeapi.RuntimeStatus, error)
+	Status(verbose bool) (*runtimeapi.StatusResponse, error)
 }
 
 // ImageManagerService interface should be implemented by a container image
@@ -114,7 +114,7 @@ type ImageManagerService interface {
 	// ListImages lists the existing images.
 	ListImages(filter *runtimeapi.ImageFilter) ([]*runtimeapi.Image, error)
 	// ImageStatus returns the status of the image.
-	ImageStatus(image *runtimeapi.ImageSpec) (*runtimeapi.Image, error)
+	ImageStatus(image *runtimeapi.ImageSpec, verbose bool) (*runtimeapi.ImageStatusResponse, error)
 	// PullImage pulls an image with the authentication config.
 	PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
 	// RemoveImage removes the image.

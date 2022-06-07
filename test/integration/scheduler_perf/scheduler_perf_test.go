@@ -20,8 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -60,6 +60,7 @@ const (
 	createPodSetsOpcode      = "createPodSets"
 	churnOpcode              = "churn"
 	barrierOpcode            = "barrier"
+	sleepOpcode              = "sleep"
 	extensionPointsLabelName = "extension_point"
 
 	// Two modes supported in "churn" operator.
@@ -77,8 +78,8 @@ var (
 				label:  extensionPointsLabelName,
 				values: []string{"Filter", "Score"},
 			},
-			"scheduler_e2e_scheduling_duration_seconds": nil,
-			"scheduler_pod_scheduling_duration_seconds": nil,
+			"scheduler_scheduling_attempt_duration_seconds": nil,
+			"scheduler_pod_scheduling_duration_seconds":     nil,
 		},
 	}
 )
@@ -208,7 +209,7 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		&createPodSetsOp{},
 		&churnOp{},
 		&barrierOp{},
-		// TODO(#93793): add a sleep timer op to simulate waiting?
+		&sleepOp{},
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
 	}
 	var firstError error
@@ -511,6 +512,44 @@ func (bo barrierOp) patchParams(w *workload) (realOp, error) {
 	return &bo, nil
 }
 
+// sleepOp defines an op that can be used to sleep for a specified amount of time.
+// This is useful in simulating workloads that require some sort of time-based synchronisation.
+type sleepOp struct {
+	// Must be "sleep".
+	Opcode string
+	// duration of sleep.
+	Duration time.Duration
+}
+
+func (so *sleepOp) UnmarshalJSON(data []byte) (err error) {
+	var tmp struct {
+		Opcode   string
+		Duration string
+	}
+	if err = json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+
+	so.Opcode = tmp.Opcode
+	so.Duration, err = time.ParseDuration(tmp.Duration)
+	return err
+}
+
+func (so *sleepOp) isValid(_ bool) error {
+	if so.Opcode != sleepOpcode {
+		return fmt.Errorf("invalid opcode %q; expected %q", so.Opcode, sleepOpcode)
+	}
+	return nil
+}
+
+func (so *sleepOp) collectsMetrics() bool {
+	return false
+}
+
+func (so sleepOp) patchParams(_ *workload) (realOp, error) {
+	return &so, nil
+}
+
 func BenchmarkPerfScheduling(b *testing.B) {
 	testCases, err := getTestCases(configFile)
 	if err != nil {
@@ -537,12 +576,12 @@ func BenchmarkPerfScheduling(b *testing.B) {
 		})
 	}
 	if err := dataItems2JSONFile(dataItems, b.Name()); err != nil {
-		klog.Fatalf("%v: unable to write measured data: %v", b.Name(), err)
+		klog.Fatalf("%v: unable to write measured data %+v: %v", b.Name(), dataItems, err)
 	}
 }
 
 func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error) {
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -600,8 +639,17 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 
 	var mu sync.Mutex
 	var dataItems []DataItem
-	numPodsScheduledPerNamespace := make(map[string]int)
 	nextNodeIndex := 0
+	// numPodsScheduledPerNamespace has all namespaces created in workload and the number of pods they (will) have.
+	// All namespaces listed in numPodsScheduledPerNamespace will be cleaned up.
+	numPodsScheduledPerNamespace := make(map[string]int)
+	b.Cleanup(func() {
+		for namespace := range numPodsScheduledPerNamespace {
+			if err := client.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{}); err != nil {
+				b.Errorf("Deleting Namespace in numPodsScheduledPerNamespace: %v", err)
+			}
+		}
+	})
 
 	for opIndex, op := range unrollWorkloadTemplate(b, tc.WorkloadTemplate, w) {
 		realOp, err := op.realOp.patchParams(w)
@@ -636,27 +684,29 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 				nsPreparer.cleanup()
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
-			b.Cleanup(func() {
-				nsPreparer.cleanup()
-			})
+			for _, n := range nsPreparer.namespaces() {
+				if _, ok := numPodsScheduledPerNamespace[n]; ok {
+					// this namespace has been already created.
+					continue
+				}
+				numPodsScheduledPerNamespace[n] = 0
+			}
 
 		case *createPodsOp:
 			var namespace string
+			// define Pod's namespace automatically, and create that namespace.
+			namespace = fmt.Sprintf("namespace-%d", opIndex)
 			if concreteOp.Namespace != nil {
 				namespace = *concreteOp.Namespace
-			} else {
-				// define Pod's namespace automatically, and create that namespace.
-				namespace = fmt.Sprintf("namespace-%d", opIndex)
+			}
+			if _, ok := numPodsScheduledPerNamespace[namespace]; !ok {
+				// The namespace has not created yet.
+				// So, creat that and register it to numPodsScheduledPerNamespace.
 				_, err := client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{})
-				if err != nil && !apierrors.IsAlreadyExists(err) {
+				if err != nil {
 					b.Fatalf("failed to create namespace for Pod: %v", namespace)
 				}
-				b.Cleanup(func() {
-					err := client.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
-					if err != nil {
-						b.Errorf("failed to delete namespace %v", namespace)
-					}
-				})
+				numPodsScheduledPerNamespace[namespace] = 0
 			}
 			var collectors []testDataCollector
 			var collectorCtx context.Context
@@ -820,6 +870,11 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 				}
 			}
 
+		case *sleepOp:
+			select {
+			case <-ctx.Done():
+			case <-time.After(concreteOp.Duration):
+			}
 		default:
 			b.Fatalf("op %d: invalid op %v", opIndex, concreteOp)
 		}
@@ -940,7 +995,7 @@ func waitUntilPodsScheduled(ctx context.Context, podInformer coreinformers.PodIn
 }
 
 func getSpecFromFile(path *string, spec interface{}) error {
-	bytes, err := ioutil.ReadFile(*path)
+	bytes, err := os.ReadFile(*path)
 	if err != nil {
 		return err
 	}
@@ -948,7 +1003,7 @@ func getSpecFromFile(path *string, spec interface{}) error {
 }
 
 func getUnstructuredFromFile(path string) (*unstructured.Unstructured, *schema.GroupVersionKind, error) {
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1104,6 +1159,15 @@ func newNamespacePreparer(cno *createNamespacesOp, clientset clientset.Interface
 	}, nil
 }
 
+// namespaces returns namespace names have been (or will be) created by this namespacePreparer
+func (p *namespacePreparer) namespaces() []string {
+	namespaces := make([]string, p.count)
+	for i := 0; i < p.count; i++ {
+		namespaces[i] = fmt.Sprintf("%s-%d", p.prefix, i)
+	}
+	return namespaces
+}
+
 // prepare creates the namespaces.
 func (p *namespacePreparer) prepare() error {
 	base := &v1.Namespace{}
@@ -1115,7 +1179,7 @@ func (p *namespacePreparer) prepare() error {
 		n := base.DeepCopy()
 		n.Name = fmt.Sprintf("%s-%d", p.prefix, i)
 		if err := testutils.RetryWithExponentialBackOff(func() (bool, error) {
-			_, err := p.client.CoreV1().Namespaces().Create(context.TODO(), n, metav1.CreateOptions{})
+			_, err := p.client.CoreV1().Namespaces().Create(context.Background(), n, metav1.CreateOptions{})
 			return err == nil || apierrors.IsAlreadyExists(err), nil
 		}); err != nil {
 			return err
@@ -1129,7 +1193,7 @@ func (p *namespacePreparer) cleanup() error {
 	var errRet error
 	for i := 0; i < p.count; i++ {
 		n := fmt.Sprintf("%s-%d", p.prefix, i)
-		if err := p.client.CoreV1().Namespaces().Delete(context.TODO(), n, metav1.DeleteOptions{}); err != nil {
+		if err := p.client.CoreV1().Namespaces().Delete(context.Background(), n, metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("Deleting Namespace: %v", err)
 			errRet = err
 		}

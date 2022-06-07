@@ -139,8 +139,8 @@ func (ft *fightTest) createController(invert bool, i int) {
 		FlowcontrolClient:      fcIfc,
 		ServerConcurrencyLimit: 200,             // server concurrency limit
 		RequestWaitLimit:       time.Minute / 4, // request wait limit
-		ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
+		ReqsGaugePairVec:       metrics.PriorityLevelConcurrencyPairVec,
+		ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 		QueueSetFactory:        fqtesting.NewNoRestraintFactory(),
 	})
 	ft.ctlrs[invert][i] = ctlr

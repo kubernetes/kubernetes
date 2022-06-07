@@ -24,17 +24,8 @@ import (
 )
 
 var (
-	once sync.Once
-)
-
-// ControllerMetrics includes all the metrics of the proxy server.
-type ControllerMetrics struct {
-	controllerInstanceCount *k8smetrics.GaugeVec
-}
-
-// NewControllerMetrics create a new ControllerMetrics, configured with default metric names.
-func NewControllerMetrics() *ControllerMetrics {
-	controllerInstanceCount := k8smetrics.NewGaugeVec(
+	once                    sync.Once
+	controllerInstanceCount = k8smetrics.NewGaugeVec(
 		&k8smetrics.GaugeOpts{
 			Name:           "running_managed_controllers",
 			Help:           "Indicates where instances of a controller are currently running",
@@ -42,27 +33,36 @@ func NewControllerMetrics() *ControllerMetrics {
 		},
 		[]string{"name", "manager"},
 	)
-	controllerMetrics := &ControllerMetrics{
-		controllerInstanceCount: controllerInstanceCount,
+)
+
+// ControllerManagerMetrics is a proxy to set controller manager specific metrics.
+type ControllerManagerMetrics struct {
+	manager string
+}
+
+// NewControllerManagerMetrics create a new ControllerManagerMetrics, with specific manager name.
+func NewControllerManagerMetrics(manager string) *ControllerManagerMetrics {
+	controllerMetrics := &ControllerManagerMetrics{
+		manager: manager,
 	}
-	once.Do(func() {
-		controllerMetrics.Register()
-	})
 	return controllerMetrics
 }
 
-func (a *ControllerMetrics) Register() {
-	legacyregistry.MustRegister(a.controllerInstanceCount)
+// Register controller manager metrics.
+func Register() {
+	once.Do(func() {
+		legacyregistry.MustRegister(controllerInstanceCount)
+	})
 }
 
 // ControllerStarted sets the controllerInstanceCount to 1.
 // These values use set instead of inc/dec to avoid accidentally double counting
 // a controller that starts but fails to properly signal when it crashes.
-func (a *ControllerMetrics) ControllerStarted(name string, manager string) {
-	a.controllerInstanceCount.With(k8smetrics.Labels{"name": name, "manager": manager}).Set(float64(1))
+func (a *ControllerManagerMetrics) ControllerStarted(name string) {
+	controllerInstanceCount.With(k8smetrics.Labels{"name": name, "manager": a.manager}).Set(float64(1))
 }
 
 // ControllerStopped sets the controllerInstanceCount to 0.
-func (a *ControllerMetrics) ControllerStopped(name string, manager string) {
-	a.controllerInstanceCount.With(k8smetrics.Labels{"name": name, "manager": manager}).Set(float64(0))
+func (a *ControllerManagerMetrics) ControllerStopped(name string) {
+	controllerInstanceCount.With(k8smetrics.Labels{"name": name, "manager": a.manager}).Set(float64(0))
 }

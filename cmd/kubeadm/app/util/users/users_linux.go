@@ -149,11 +149,11 @@ func addUsersAndGroupsImpl(pathLoginDef, pathUsers, pathGroups string) (*UsersAn
 	var loginDef string
 	f, close, err := openFileWithLock(pathLoginDef)
 	if err != nil {
-		klog.V(1).Info("Could not open %q, using default system limits: %v", pathLoginDef, err)
+		klog.V(1).Infof("Could not open %q, using default system limits: %v", pathLoginDef, err)
 	} else {
 		loginDef, err = readFile(f)
 		if err != nil {
-			klog.V(1).Info("Could not read %q, using default system limits: %v", pathLoginDef, err)
+			klog.V(1).Infof("Could not read %q, using default system limits: %v", pathLoginDef, err)
 		}
 		close()
 	}

@@ -67,15 +67,15 @@ KUBELET_HEALTHZ_PORT=${KUBELET_HEALTHZ_PORT:-10248}
 SECURE_CTLRMGR_PORT=${SECURE_CTLRMGR_PORT:-10257}
 PROXY_HOST=127.0.0.1 # kubectl only serves on localhost.
 
-IMAGE_NGINX="k8s.gcr.io/nginx:1.7.9"
-export IMAGE_DEPLOYMENT_R1="k8s.gcr.io/nginx:test-cmd"  # deployment-revision1.yaml
+IMAGE_NGINX="registry.k8s.io/nginx:1.7.9"
+export IMAGE_DEPLOYMENT_R1="registry.k8s.io/nginx:test-cmd"  # deployment-revision1.yaml
 export IMAGE_DEPLOYMENT_R2="$IMAGE_NGINX"  # deployment-revision2.yaml
-export IMAGE_PERL="k8s.gcr.io/perl"
-export IMAGE_PAUSE_V2="k8s.gcr.io/pause:2.0"
-export IMAGE_DAEMONSET_R2="k8s.gcr.io/pause:latest"
-export IMAGE_DAEMONSET_R2_2="k8s.gcr.io/nginx:test-cmd"  # rollingupdate-daemonset-rv2.yaml
-export IMAGE_STATEFULSET_R1="k8s.gcr.io/nginx-slim:0.7"
-export IMAGE_STATEFULSET_R2="k8s.gcr.io/nginx-slim:0.8"
+export IMAGE_PERL="registry.k8s.io/perl"
+export IMAGE_PAUSE_V2="registry.k8s.io/pause:2.0"
+export IMAGE_DAEMONSET_R2="registry.k8s.io/pause:latest"
+export IMAGE_DAEMONSET_R2_2="registry.k8s.io/nginx:test-cmd"  # rollingupdate-daemonset-rv2.yaml
+export IMAGE_STATEFULSET_R1="registry.k8s.io/nginx-slim:0.7"
+export IMAGE_STATEFULSET_R2="registry.k8s.io/nginx-slim:0.8"
 
 # Expose kubectl directly for readability
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
@@ -90,7 +90,6 @@ nodes="nodes"
 persistentvolumeclaims="persistentvolumeclaims"
 persistentvolumes="persistentvolumes"
 pods="pods"
-podsecuritypolicies="podsecuritypolicies"
 podtemplates="podtemplates"
 replicasets="replicasets"
 replicationcontrollers="replicationcontrollers"
@@ -106,6 +105,11 @@ daemonsets="daemonsets"
 controllerrevisions="controllerrevisions"
 job="jobs"
 
+# A junit-style XML test report will be generated in the directory specified by KUBE_JUNIT_REPORT_DIR, if set.
+# If KUBE_JUNIT_REPORT_DIR is unset, and ARTIFACTS is set, then use what is set in ARTIFACTS.
+if [[ -z "${KUBE_JUNIT_REPORT_DIR:-}" && -n "${ARTIFACTS:-}" ]]; then
+  export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS}"
+fi
 
 # include shell2junit library
 sh2ju="${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
@@ -169,7 +173,7 @@ fi
 function stop-proxy()
 {
   [[ -n "${PROXY_PORT-}" ]] && kube::log::status "Stopping proxy on port ${PROXY_PORT}"
-  [[ -n "${PROXY_PID-}" ]] && kill "${PROXY_PID}" 1>&2 2>/dev/null
+  [[ -n "${PROXY_PID-}" ]] && kill -9 "${PROXY_PID}" 1>&2 2>/dev/null
   [[ -n "${PROXY_PORT_FILE-}" ]] && rm -f "${PROXY_PORT_FILE}"
   PROXY_PID=
   PROXY_PORT=
@@ -218,10 +222,10 @@ function start-proxy()
 
 function cleanup()
 {
-  [[ -n "${APISERVER_PID-}" ]] && kill "${APISERVER_PID}" 1>&2 2>/dev/null
-  [[ -n "${CTLRMGR_PID-}" ]] && kill "${CTLRMGR_PID}" 1>&2 2>/dev/null
-  [[ -n "${KUBELET_PID-}" ]] && kill "${KUBELET_PID}" 1>&2 2>/dev/null
   stop-proxy
+  [[ -n "${CTLRMGR_PID-}" ]] && kill -9 "${CTLRMGR_PID}" 1>&2 2>/dev/null
+  [[ -n "${KUBELET_PID-}" ]] && kill -9 "${KUBELET_PID}" 1>&2 2>/dev/null
+  [[ -n "${APISERVER_PID-}" ]] && kill -9 "${APISERVER_PID}" 1>&2 2>/dev/null
 
   kube::etcd::cleanup
   rm -rf "${KUBE_TEMP}"
@@ -568,6 +572,7 @@ runTests() {
   fi
   if kube::test::if_supports_resource "${deployments}"; then
     record_command run_kubectl_create_kustomization_directory_tests
+    record_command run_kubectl_create_validate_tests
   fi
 
   ######################
@@ -606,7 +611,7 @@ runTests() {
   #####################################
 
   if kube::test::if_supports_resource "${pods}" ; then
-    run_recursive_resources_tests
+    record_command run_recursive_resources_tests
   fi
 
 
@@ -892,6 +897,13 @@ runTests() {
     record_command run_kubectl_explain_tests
   fi
 
+  ##############################
+  # CRD Deletion / Re-creation #
+  ##############################
+
+  if kube::test::if_supports_resource "${namespaces}" ; then
+      record_command run_crd_deletion_recreation_tests
+  fi
 
   ###########
   # Swagger #
@@ -921,8 +933,8 @@ runTests() {
   # Kubectl deprecated APIs  #
   ############################
 
-  if kube::test::if_supports_resource "${podsecuritypolicies}" ; then
-    run_deprecated_api_tests
+  if kube::test::if_supports_resource "${customresourcedefinitions}" ; then
+    record_command run_deprecated_api_tests
   fi
 
 

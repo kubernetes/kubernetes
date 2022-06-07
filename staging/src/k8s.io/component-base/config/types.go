@@ -93,8 +93,9 @@ type LoggingConfiguration struct {
 	// Format Flag specifies the structure of log messages.
 	// default value of format is `text`
 	Format string
-	// Maximum number of seconds between log flushes. Ignored if the
-	// selected logging backend writes log messages without buffering.
+	// Maximum number of nanoseconds (i.e. 1s = 1000000000) between log
+	// flushes.  Ignored if the selected logging backend writes log
+	// messages without buffering.
 	FlushFrequency time.Duration
 	// Verbosity is the threshold that determines which log messages are
 	// logged. Default is zero which logs only the most important

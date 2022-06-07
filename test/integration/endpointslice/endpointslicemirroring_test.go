@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/endpointslice"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring"
@@ -40,12 +40,11 @@ import (
 )
 
 func TestEndpointSliceMirroring(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	client, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -174,8 +173,8 @@ func TestEndpointSliceMirroring(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			ns := framework.CreateTestingNamespace(fmt.Sprintf("test-endpointslice-mirroring-%d", i), server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
+			ns := framework.CreateNamespaceOrDie(client, fmt.Sprintf("test-endpointslice-mirroring-%d", i), t)
+			defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 			resourceName := ""
 			if tc.service != nil {
@@ -234,12 +233,11 @@ func TestEndpointSliceMirroring(t *testing.T) {
 }
 
 func TestEndpointSliceMirroringUpdates(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	client, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -294,8 +292,8 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			ns := framework.CreateTestingNamespace(fmt.Sprintf("test-endpointslice-mirroring-%d", i), server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
+			ns := framework.CreateNamespaceOrDie(client, fmt.Sprintf("test-endpointslice-mirroring-%d", i), t)
+			defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 			service := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -410,12 +408,11 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 }
 
 func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	config := restclient.Config{Host: server.URL}
-	client, err := clientset.NewForConfig(&config)
+	client, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
 	}
@@ -476,8 +473,8 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 
 	for i, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
-			ns := framework.CreateTestingNamespace(fmt.Sprintf("test-endpointslice-mirroring-%d", i), server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
+			ns := framework.CreateNamespaceOrDie(client, fmt.Sprintf("test-endpointslice-mirroring-%d", i), t)
+			defer framework.DeleteNamespaceOrDie(client, ns, t)
 			meta := metav1.ObjectMeta{Name: "test-123", Namespace: ns.Name}
 
 			service := &corev1.Service{

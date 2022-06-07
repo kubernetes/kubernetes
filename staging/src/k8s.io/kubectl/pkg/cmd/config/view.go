@@ -123,7 +123,7 @@ func (o *ViewOptions) Complete(cmd *cobra.Command, args []string) error {
 // Validate makes sure that provided values for command-line options are valid
 func (o ViewOptions) Validate() error {
 	if !o.Merge.Value() && !o.ConfigAccess.IsExplicitFile() {
-		return errors.New("if merge==false a precise file must to specified")
+		return errors.New("if merge==false a precise file must be specified")
 	}
 
 	return nil

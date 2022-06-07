@@ -29,49 +29,49 @@ const (
 	labelNameMark       = "mark"
 	labelValueLo        = "low"
 	labelValueHi        = "high"
-	labelNamePhase      = "phase"
-	labelValueWaiting   = "waiting"
-	labelValueExecuting = "executing"
+	LabelNamePhase      = "phase"
+	LabelValueWaiting   = "waiting"
+	LabelValueExecuting = "executing"
 )
 
-// SampleAndWaterMarkPairGenerator makes pairs of RatioedChangeObservers that
+// SampleAndWaterMarkPairVec makes pairs of RatioedGauges that
 // track samples and watermarks.
-type SampleAndWaterMarkPairGenerator struct {
-	urGenerator SampleAndWaterMarkObserverGenerator
+type SampleAndWaterMarkPairVec struct {
+	urVec SampleAndWaterMarkObserverVec
 }
 
-var _ RatioedChangeObserverPairGenerator = SampleAndWaterMarkPairGenerator{}
+var _ RatioedGaugePairVec = SampleAndWaterMarkPairVec{}
 
-// NewSampleAndWaterMarkHistogramsPairGenerator makes a new pair generator
-func NewSampleAndWaterMarkHistogramsPairGenerator(clock clock.PassiveClock, samplePeriod time.Duration, sampleOpts, waterMarkOpts *compbasemetrics.HistogramOpts, labelNames []string) SampleAndWaterMarkPairGenerator {
-	return SampleAndWaterMarkPairGenerator{
-		urGenerator: NewSampleAndWaterMarkHistogramsGenerator(clock, samplePeriod, sampleOpts, waterMarkOpts, append([]string{labelNamePhase}, labelNames...)),
+// NewSampleAndWaterMarkHistogramsPairVec makes a new pair generator
+func NewSampleAndWaterMarkHistogramsPairVec(clock clock.PassiveClock, samplePeriod time.Duration, sampleOpts, waterMarkOpts *compbasemetrics.HistogramOpts, labelNames []string) SampleAndWaterMarkPairVec {
+	return SampleAndWaterMarkPairVec{
+		urVec: NewSampleAndWaterMarkHistogramsVec(clock, samplePeriod, sampleOpts, waterMarkOpts, append([]string{LabelNamePhase}, labelNames...)),
 	}
 }
 
-// Generate makes a new pair
-func (spg SampleAndWaterMarkPairGenerator) Generate(initialWaitingDenominator, initialExecutingDenominator float64, labelValues []string) RatioedChangeObserverPair {
-	return RatioedChangeObserverPair{
-		RequestsWaiting:   spg.urGenerator.Generate(0, initialWaitingDenominator, append([]string{labelValueWaiting}, labelValues...)),
-		RequestsExecuting: spg.urGenerator.Generate(0, initialExecutingDenominator, append([]string{labelValueExecuting}, labelValues...)),
+// NewForLabelValuesSafe makes a new pair
+func (spg SampleAndWaterMarkPairVec) NewForLabelValuesSafe(initialWaitingDenominator, initialExecutingDenominator float64, labelValues []string) RatioedGaugePair {
+	return RatioedGaugePair{
+		RequestsWaiting:   spg.urVec.NewForLabelValuesSafe(0, initialWaitingDenominator, append([]string{LabelValueWaiting}, labelValues...)),
+		RequestsExecuting: spg.urVec.NewForLabelValuesSafe(0, initialExecutingDenominator, append([]string{LabelValueExecuting}, labelValues...)),
 	}
 }
 
-func (spg SampleAndWaterMarkPairGenerator) metrics() Registerables {
-	return spg.urGenerator.metrics()
+func (spg SampleAndWaterMarkPairVec) metrics() Registerables {
+	return spg.urVec.metrics()
 }
 
-// SampleAndWaterMarkObserverGenerator creates RatioedChangeObservers that
+// SampleAndWaterMarkObserverVec creates RatioedGauges that
 // populate histograms of samples and low- and high-water-marks.  The
 // generator has a samplePeriod, and the histograms get an observation
 // every samplePeriod.  The sampling windows are quantized based on
 // the monotonic rather than wall-clock times.  The `t0` field is
 // there so to provide a baseline for monotonic clock differences.
-type SampleAndWaterMarkObserverGenerator struct {
-	*sampleAndWaterMarkObserverGenerator
+type SampleAndWaterMarkObserverVec struct {
+	*sampleAndWaterMarkObserverVec
 }
 
-type sampleAndWaterMarkObserverGenerator struct {
+type sampleAndWaterMarkObserverVec struct {
 	clock        clock.PassiveClock
 	t0           time.Time
 	samplePeriod time.Duration
@@ -79,12 +79,12 @@ type sampleAndWaterMarkObserverGenerator struct {
 	waterMarks   *compbasemetrics.HistogramVec
 }
 
-var _ RatioedChangeObserverGenerator = SampleAndWaterMarkObserverGenerator{}
+var _ RatioedGaugeVec = SampleAndWaterMarkObserverVec{}
 
-// NewSampleAndWaterMarkHistogramsGenerator makes a new one
-func NewSampleAndWaterMarkHistogramsGenerator(clock clock.PassiveClock, samplePeriod time.Duration, sampleOpts, waterMarkOpts *compbasemetrics.HistogramOpts, labelNames []string) SampleAndWaterMarkObserverGenerator {
-	return SampleAndWaterMarkObserverGenerator{
-		&sampleAndWaterMarkObserverGenerator{
+// NewSampleAndWaterMarkHistogramsVec makes a new one
+func NewSampleAndWaterMarkHistogramsVec(clock clock.PassiveClock, samplePeriod time.Duration, sampleOpts, waterMarkOpts *compbasemetrics.HistogramOpts, labelNames []string) SampleAndWaterMarkObserverVec {
+	return SampleAndWaterMarkObserverVec{
+		&sampleAndWaterMarkObserverVec{
 			clock:        clock,
 			t0:           clock.Now(),
 			samplePeriod: samplePeriod,
@@ -93,20 +93,20 @@ func NewSampleAndWaterMarkHistogramsGenerator(clock clock.PassiveClock, samplePe
 		}}
 }
 
-func (swg *sampleAndWaterMarkObserverGenerator) quantize(when time.Time) int64 {
+func (swg *sampleAndWaterMarkObserverVec) quantize(when time.Time) int64 {
 	return int64(when.Sub(swg.t0) / swg.samplePeriod)
 }
 
-// Generate makes a new RatioedChangeObserver
-func (swg *sampleAndWaterMarkObserverGenerator) Generate(initialNumerator, initialDenominator float64, labelValues []string) RatioedChangeObserver {
+// NewForLabelValuesSafe makes a new RatioedGauge
+func (swg *sampleAndWaterMarkObserverVec) NewForLabelValuesSafe(initialNumerator, initialDenominator float64, labelValues []string) RatioedGauge {
 	ratio := initialNumerator / initialDenominator
 	when := swg.clock.Now()
 	return &sampleAndWaterMarkHistograms{
-		sampleAndWaterMarkObserverGenerator: swg,
-		labelValues:                         labelValues,
-		loLabelValues:                       append([]string{labelValueLo}, labelValues...),
-		hiLabelValues:                       append([]string{labelValueHi}, labelValues...),
-		denominator:                         initialDenominator,
+		sampleAndWaterMarkObserverVec: swg,
+		labelValues:                   labelValues,
+		loLabelValues:                 append([]string{labelValueLo}, labelValues...),
+		hiLabelValues:                 append([]string{labelValueHi}, labelValues...),
+		denominator:                   initialDenominator,
 		sampleAndWaterMarkAccumulator: sampleAndWaterMarkAccumulator{
 			lastSet:    when,
 			lastSetInt: swg.quantize(when),
@@ -117,12 +117,12 @@ func (swg *sampleAndWaterMarkObserverGenerator) Generate(initialNumerator, initi
 		}}
 }
 
-func (swg *sampleAndWaterMarkObserverGenerator) metrics() Registerables {
+func (swg *sampleAndWaterMarkObserverVec) metrics() Registerables {
 	return Registerables{swg.samples, swg.waterMarks}
 }
 
 type sampleAndWaterMarkHistograms struct {
-	*sampleAndWaterMarkObserverGenerator
+	*sampleAndWaterMarkObserverVec
 	labelValues                  []string
 	loLabelValues, hiLabelValues []string
 
@@ -139,17 +139,39 @@ type sampleAndWaterMarkAccumulator struct {
 	loRatio, hiRatio float64
 }
 
-var _ RatioedChangeObserver = (*sampleAndWaterMarkHistograms)(nil)
+var _ RatioedGauge = (*sampleAndWaterMarkHistograms)(nil)
+
+func (saw *sampleAndWaterMarkHistograms) Set(numerator float64) {
+	saw.innerSet(func() {
+		saw.numerator = numerator
+	})
+}
 
 func (saw *sampleAndWaterMarkHistograms) Add(deltaNumerator float64) {
 	saw.innerSet(func() {
 		saw.numerator += deltaNumerator
 	})
 }
-
-func (saw *sampleAndWaterMarkHistograms) Observe(numerator float64) {
+func (saw *sampleAndWaterMarkHistograms) Sub(deltaNumerator float64) {
 	saw.innerSet(func() {
-		saw.numerator = numerator
+		saw.numerator -= deltaNumerator
+	})
+}
+
+func (saw *sampleAndWaterMarkHistograms) Inc() {
+	saw.innerSet(func() {
+		saw.numerator += 1
+	})
+}
+func (saw *sampleAndWaterMarkHistograms) Dec() {
+	saw.innerSet(func() {
+		saw.numerator -= 1
+	})
+}
+
+func (saw *sampleAndWaterMarkHistograms) SetToCurrentTime() {
+	saw.innerSet(func() {
+		saw.numerator = float64(saw.clock.Now().Sub(time.Unix(0, 0)))
 	})
 }
 

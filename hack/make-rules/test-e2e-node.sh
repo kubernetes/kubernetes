@@ -39,7 +39,7 @@ parallelism=${PARALLELISM:-8}
 artifacts="${ARTIFACTS:-"/tmp/_artifacts/$(date +%y%m%dT%H%M%S)"}"
 remote=${REMOTE:-"false"}
 remote_mode=${REMOTE_MODE:-"gce"}
-container_runtime_endpoint=${CONTAINER_RUNTIME_ENDPOINT:-""}
+container_runtime_endpoint=${CONTAINER_RUNTIME_ENDPOINT:-"unix:///run/containerd/containerd.sock"}
 image_service_endpoint=${IMAGE_SERVICE_ENDPOINT:-""}
 run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
 test_args=${TEST_ARGS:-""}
@@ -89,19 +89,13 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   # The following options are only valid in remote GCE run.
   images=${IMAGES:-""}
   hosts=${HOSTS:-""}
-  image_project=${IMAGE_PROJECT:-"kubernetes-node-e2e-images"}
+  image_project=${IMAGE_PROJECT:-"cos-cloud"}
   metadata=${INSTANCE_METADATA:-""}
-  list_images=${LIST_IMAGES:-false}
-  if  [[ ${list_images} == "true" ]]; then
-    gcloud compute images list --project="${image_project}" | grep "e2e-node"
-    exit 0
-  fi
   gubernator=${GUBERNATOR:-"false"}
   image_config_file=${IMAGE_CONFIG_FILE:-""}
   image_config_dir=${IMAGE_CONFIG_DIR:-""}
   runtime_config=${RUNTIME_CONFIG:-""}
   if [[ ${hosts} == "" && ${images} == "" && ${image_config_file} == "" ]]; then
-    image_project="${IMAGE_PROJECT:-"cos-cloud"}"
     gci_image=$(gcloud compute images list --project "${image_project}" \
     --no-standard-images --filter="name ~ 'cos-beta.*'" --format="table[no-heading](name)")
     images=${gci_image}

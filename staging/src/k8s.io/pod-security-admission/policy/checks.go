@@ -26,7 +26,7 @@ import (
 
 type Check struct {
 	// ID is the unique ID of the check.
-	ID string
+	ID CheckID
 	// Level is the policy level this check belongs to.
 	// Must be Baseline or Restricted.
 	// Baseline checks are evaluated for baseline and restricted namespaces.
@@ -45,9 +45,14 @@ type VersionedCheck struct {
 	MinimumVersion api.Version
 	// CheckPod determines if the pod is allowed.
 	CheckPod CheckPodFn
+	// OverrideCheckIDs is an optional list of checks that should be skipped when this check is run.
+	// Overrides may only be set on restricted checks, and may only override baseline checks.
+	OverrideCheckIDs []CheckID
 }
 
 type CheckPodFn func(*metav1.ObjectMeta, *corev1.PodSpec) CheckResult
+
+type CheckID string
 
 // CheckResult contains the result of checking a pod and indicates whether the pod is allowed,
 // and if not, why it was forbidden.

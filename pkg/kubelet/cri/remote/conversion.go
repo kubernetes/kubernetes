@@ -27,8 +27,8 @@ func fromV1alpha2VersionResponse(from *v1alpha2.VersionResponse) *runtimeapi.Ver
 	return (*runtimeapi.VersionResponse)(unsafe.Pointer(from))
 }
 
-func fromV1alpha2PodSandboxStatus(from *v1alpha2.PodSandboxStatus) *runtimeapi.PodSandboxStatus {
-	return (*runtimeapi.PodSandboxStatus)(unsafe.Pointer(from))
+func fromV1alpha2PodSandboxStatusResponse(from *v1alpha2.PodSandboxStatusResponse) *runtimeapi.PodSandboxStatusResponse {
+	return (*runtimeapi.PodSandboxStatusResponse)(unsafe.Pointer(from))
 }
 
 func fromV1alpha2ListPodSandboxResponse(from *v1alpha2.ListPodSandboxResponse) *runtimeapi.ListPodSandboxResponse {
@@ -39,8 +39,8 @@ func fromV1alpha2ListContainersResponse(from *v1alpha2.ListContainersResponse) *
 	return (*runtimeapi.ListContainersResponse)(unsafe.Pointer(from))
 }
 
-func fromV1alpha2ContainerStatus(from *v1alpha2.ContainerStatus) *runtimeapi.ContainerStatus {
-	return (*runtimeapi.ContainerStatus)(unsafe.Pointer(from))
+func fromV1alpha2ContainerStatusResponse(from *v1alpha2.ContainerStatusResponse) *runtimeapi.ContainerStatusResponse {
+	return (*runtimeapi.ContainerStatusResponse)(unsafe.Pointer(from))
 }
 
 func fromV1alpha2ExecResponse(from *v1alpha2.ExecResponse) *runtimeapi.ExecResponse {
@@ -61,8 +61,8 @@ func fromV1alpha2PortForwardResponse(from *v1alpha2.PortForwardResponse) *runtim
 	return (*runtimeapi.PortForwardResponse)(unsafe.Pointer(from))
 }
 
-func fromV1alpha2RuntimeStatus(from *v1alpha2.RuntimeStatus) *runtimeapi.RuntimeStatus {
-	return (*runtimeapi.RuntimeStatus)(unsafe.Pointer(from))
+func fromV1alpha2StatusResponse(from *v1alpha2.StatusResponse) *runtimeapi.StatusResponse {
+	return (*runtimeapi.StatusResponse)(unsafe.Pointer(from))
 }
 
 func fromV1alpha2ContainerStats(from *v1alpha2.ContainerStats) *runtimeapi.ContainerStats {
@@ -85,8 +85,8 @@ func fromV1alpha2ListPodSandboxStatsResponse(from *v1alpha2.ListPodSandboxStatsR
 	return (*runtimeapi.ListPodSandboxStatsResponse)(unsafe.Pointer(from))
 }
 
-func fromV1alpha2Image(from *v1alpha2.Image) *runtimeapi.Image {
-	return (*runtimeapi.Image)(unsafe.Pointer(from))
+func fromV1alpha2ImageStatusResponse(from *v1alpha2.ImageStatusResponse) *runtimeapi.ImageStatusResponse {
+	return (*runtimeapi.ImageStatusResponse)(unsafe.Pointer(from))
 }
 
 func fromV1alpha2ListImagesResponse(from *v1alpha2.ListImagesResponse) *runtimeapi.ListImagesResponse {

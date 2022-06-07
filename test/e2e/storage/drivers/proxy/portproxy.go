@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"sync"
@@ -220,7 +219,7 @@ func dial(ctx context.Context, prefix string, dialer httpstream.Dialer, port int
 	}
 	errorStream.Close()
 	go func() {
-		message, err := ioutil.ReadAll(errorStream)
+		message, err := io.ReadAll(errorStream)
 		switch {
 		case err != nil:
 			klog.Errorf("%s: error reading from error stream: %v", prefix, err)

@@ -30,7 +30,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/describe"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -107,9 +107,10 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 		Short:                 i18n.T("Show details of a specific resource or group of resources"),
 		Long:                  describeLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               describeExample,
-		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
+		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -148,7 +149,7 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	return nil
 }
 
-func (o *DescribeOptions) Validate(args []string) error {
+func (o *DescribeOptions) Validate() error {
 	return nil
 }
 

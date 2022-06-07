@@ -18,7 +18,6 @@ package controlplane
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -507,7 +506,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		},
 	}
 
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}

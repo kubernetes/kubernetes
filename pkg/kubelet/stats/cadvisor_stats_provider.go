@@ -125,7 +125,17 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			// the user and has network stats.
 			podStats.Network = cadvisorInfoToNetworkStats(&cinfo)
 		} else {
-			podStats.Containers = append(podStats.Containers, *cadvisorInfoToContainerStats(containerName, &cinfo, &rootFsInfo, &imageFsInfo))
+			containerStat := cadvisorInfoToContainerStats(containerName, &cinfo, &rootFsInfo, &imageFsInfo)
+			// NOTE: This doesn't support the old pod log path, `/var/log/pods/UID`. For containers
+			// using old log path, they will be populated by cadvisorInfoToContainerStats.
+			podUID := types.UID(podStats.PodRef.UID)
+			logs, err := p.hostStatsProvider.getPodContainerLogStats(podStats.PodRef.Namespace, podStats.PodRef.Name, podUID, containerName, &rootFsInfo)
+			if err != nil {
+				klog.ErrorS(err, "Unable to fetch container log stats", "containerName", containerName)
+			} else {
+				containerStat.Logs = logs
+			}
+			podStats.Containers = append(podStats.Containers, *containerStat)
 		}
 	}
 
@@ -341,7 +351,11 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 	result := make(map[string]cadvisorapiv2.ContainerInfo)
 	for _, refs := range cinfoMap {
 		if len(refs) == 1 {
-			result[refs[0].cgroup] = refs[0].cinfo
+			// ContainerInfo with no CPU/memory usage for uncleaned cgroups of
+			// already terminated containers, which should not be shown in the results.
+			if !isContainerTerminated(&refs[0].cinfo) {
+				result[refs[0].cgroup] = refs[0].cinfo
+			}
 			continue
 		}
 		sort.Sort(ByCreationTime(refs))
@@ -399,6 +413,23 @@ func hasMemoryAndCPUInstUsage(info *cadvisorapiv2.ContainerInfo) bool {
 		return false
 	}
 	return cstat.CpuInst.Usage.Total != 0 && cstat.Memory.RSS != 0
+}
+
+// isContainerTerminated returns true if the specified container info has
+// both zero CPU instantaneous usage and zero memory RSS usage, and
+// false otherwise.
+func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
+	if !info.Spec.HasCpu && !info.Spec.HasMemory {
+		return true
+	}
+	cstat, found := latestContainerStats(info)
+	if !found {
+		return true
+	}
+	if cstat.CpuInst == nil || cstat.Memory == nil {
+		return true
+	}
+	return cstat.CpuInst.Usage.Total == 0 && cstat.Memory.RSS == 0
 }
 
 func getCadvisorContainerInfo(ca cadvisor.Interface) (map[string]cadvisorapiv2.ContainerInfo, error) {

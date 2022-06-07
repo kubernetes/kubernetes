@@ -742,3 +742,192 @@ func TestValidateTaint(t *testing.T) {
 		}
 	}
 }
+
+func TestTaintSetDiff(t *testing.T) {
+	cases := []struct {
+		name                   string
+		t1                     []v1.Taint
+		t2                     []v1.Taint
+		expectedTaintsToAdd    []*v1.Taint
+		expectedTaintsToRemove []*v1.Taint
+	}{
+		{
+			name:                   "two_taints_are_nil",
+			expectedTaintsToAdd:    nil,
+			expectedTaintsToRemove: nil,
+		},
+		{
+			name: "one_taint_is_nil_and_the_other_is_not_nil",
+			t1: []v1.Taint{
+				{
+					Key:    "foo_1",
+					Value:  "bar_1",
+					Effect: v1.TaintEffectNoExecute,
+				},
+				{
+					Key:    "foo_2",
+					Value:  "bar_2",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			expectedTaintsToAdd: []*v1.Taint{
+				{
+					Key:    "foo_1",
+					Value:  "bar_1",
+					Effect: v1.TaintEffectNoExecute,
+				},
+				{
+					Key:    "foo_2",
+					Value:  "bar_2",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			expectedTaintsToRemove: nil,
+		},
+		{
+			name: "shared_taints_with_the_same_key_value_effect",
+			t1: []v1.Taint{
+				{
+					Key:    "foo_1",
+					Value:  "bar_1",
+					Effect: v1.TaintEffectNoExecute,
+				},
+				{
+					Key:    "foo_2",
+					Value:  "bar_2",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			t2: []v1.Taint{
+				{
+					Key:    "foo_3",
+					Value:  "bar_3",
+					Effect: v1.TaintEffectNoExecute,
+				},
+				{
+					Key:    "foo_2",
+					Value:  "bar_2",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			expectedTaintsToAdd: []*v1.Taint{
+				{
+					Key:    "foo_1",
+					Value:  "bar_1",
+					Effect: v1.TaintEffectNoExecute,
+				},
+			},
+			expectedTaintsToRemove: []*v1.Taint{
+				{
+					Key:    "foo_3",
+					Value:  "bar_3",
+					Effect: v1.TaintEffectNoExecute,
+				},
+			},
+		},
+		{
+			name: "shared_taints_with_the_same_key_effect_different_value",
+			t1: []v1.Taint{
+				{
+					Key:    "foo_1",
+					Value:  "bar_1",
+					Effect: v1.TaintEffectNoExecute,
+				},
+				{
+					Key:    "foo_2",
+					Value:  "different-value",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			t2: []v1.Taint{
+				{
+					Key:    "foo_3",
+					Value:  "bar_3",
+					Effect: v1.TaintEffectNoExecute,
+				},
+				{
+					Key:    "foo_2",
+					Value:  "bar_2",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			expectedTaintsToAdd: []*v1.Taint{
+				{
+					Key:    "foo_1",
+					Value:  "bar_1",
+					Effect: v1.TaintEffectNoExecute,
+				},
+			},
+			expectedTaintsToRemove: []*v1.Taint{
+				{
+					Key:    "foo_3",
+					Value:  "bar_3",
+					Effect: v1.TaintEffectNoExecute,
+				},
+			},
+		},
+		{
+			name: "shared_taints_with_the_same_key_different_value_effect",
+			t1: []v1.Taint{
+				{
+					Key:    "foo_1",
+					Value:  "bar_1",
+					Effect: v1.TaintEffectNoExecute,
+				},
+				{
+					Key:    "foo_2",
+					Value:  "different-value",
+					Effect: v1.TaintEffectNoExecute,
+				},
+			},
+			t2: []v1.Taint{
+				{
+					Key:    "foo_3",
+					Value:  "bar_3",
+					Effect: v1.TaintEffectNoExecute,
+				},
+				{
+					Key:    "foo_2",
+					Value:  "bar_2",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			expectedTaintsToAdd: []*v1.Taint{
+				{
+					Key:    "foo_1",
+					Value:  "bar_1",
+					Effect: v1.TaintEffectNoExecute,
+				},
+				{
+					Key:    "foo_2",
+					Value:  "different-value",
+					Effect: v1.TaintEffectNoExecute,
+				},
+			},
+			expectedTaintsToRemove: []*v1.Taint{
+				{
+					Key:    "foo_3",
+					Value:  "bar_3",
+					Effect: v1.TaintEffectNoExecute,
+				},
+				{
+					Key:    "foo_2",
+					Value:  "bar_2",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			add, remove := TaintSetDiff(tt.t1, tt.t2)
+			if !reflect.DeepEqual(add, tt.expectedTaintsToAdd) {
+				t.Errorf("taintsToAdd: %v should equal %v, but get unexpected results", add, tt.expectedTaintsToAdd)
+			}
+			if !reflect.DeepEqual(remove, tt.expectedTaintsToRemove) {
+				t.Errorf("taintsToRemove: %v should equal %v, but get unexpected results", remove, tt.expectedTaintsToRemove)
+			}
+		})
+	}
+}

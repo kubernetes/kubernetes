@@ -25,7 +25,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/apimachinery/pkg/apis/meta/v1";
 
 // APIGroup contains the name, the supported versions, and the preferred version
 // of a group.
@@ -457,13 +457,7 @@ message List {
 // ListMeta describes metadata that synthetic resources must have, including lists and
 // various status objects. A resource may have only one of {ObjectMeta, ListMeta}.
 message ListMeta {
-  // selfLink is a URL representing this object.
-  // Populated by the system.
-  // Read-only.
-  //
-  // DEPRECATED
-  // Kubernetes will stop propagating this field in 1.20 release and the field is planned
-  // to be removed in 1.21 release.
+  // Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.
   // +optional
   optional string selfLink = 1;
 
@@ -598,7 +592,11 @@ message ManagedFieldsEntry {
   // set because it cannot be automatically converted.
   optional string apiVersion = 3;
 
-  // Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'
+  // Time is the timestamp of when the ManagedFields entry was added. The
+  // timestamp will also be updated if a field is added, the manager
+  // changes any of the owned fields value or removes a field. The
+  // timestamp does not update when a field is removed from the entry
+  // because another manager took it over.
   // +optional
   optional Time time = 4;
 
@@ -658,10 +656,7 @@ message ObjectMeta {
   // and may be truncated by the length of the suffix required to make the value
   // unique on the server.
   //
-  // If this field is specified and the generated name exists, the server will
-  // NOT return a 409 - instead, it will either return 201 Created or 500 with Reason
-  // ServerTimeout indicating a unique name could not be found in the time allotted, and the client
-  // should retry (optionally after the time indicated in the Retry-After header).
+  // If this field is specified and the generated name exists, the server will return a 409.
   //
   // Applied only if Name is not specified.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#idempotency
@@ -679,13 +674,7 @@ message ObjectMeta {
   // +optional
   optional string namespace = 3;
 
-  // SelfLink is a URL representing this object.
-  // Populated by the system.
-  // Read-only.
-  //
-  // DEPRECATED
-  // Kubernetes will stop propagating this field in 1.20 release and the field is planned
-  // to be removed in 1.21 release.
+  // Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.
   // +optional
   optional string selfLink = 4;
 
@@ -795,12 +784,6 @@ message ObjectMeta {
   // +optional
   // +patchStrategy=merge
   repeated string finalizers = 14;
-
-  // The name of the cluster which the object belongs to.
-  // This is used to distinguish resources with same name and namespace in different clusters.
-  // This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
-  // +optional
-  optional string clusterName = 15;
 
   // ManagedFields maps workflow-id and version to the set of fields
   // that are managed by that workflow. This is mostly for internal

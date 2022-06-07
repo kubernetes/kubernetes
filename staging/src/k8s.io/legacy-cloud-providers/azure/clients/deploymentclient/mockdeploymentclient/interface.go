@@ -25,66 +25,65 @@ package mockdeploymentclient
 
 import (
 	context "context"
+	reflect "reflect"
+
 	resources "github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2017-05-10/resources"
 	gomock "github.com/golang/mock/gomock"
 	retry "k8s.io/legacy-cloud-providers/azure/retry"
-	reflect "reflect"
 )
 
-// MockInterface is a mock of Interface interface
+// MockInterface is a mock of Interface interface.
 type MockInterface struct {
 	ctrl     *gomock.Controller
 	recorder *MockInterfaceMockRecorder
 }
 
-// MockInterfaceMockRecorder is the mock recorder for MockInterface
+// MockInterfaceMockRecorder is the mock recorder for MockInterface.
 type MockInterfaceMockRecorder struct {
 	mock *MockInterface
 }
 
-// NewMockInterface creates a new mock instance
+// NewMockInterface creates a new mock instance.
 func NewMockInterface(ctrl *gomock.Controller) *MockInterface {
 	mock := &MockInterface{ctrl: ctrl}
 	mock.recorder = &MockInterfaceMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockInterface) EXPECT() *MockInterfaceMockRecorder {
 	return m.recorder
 }
 
-// Get mocks base method
-func (m *MockInterface) Get(ctx context.Context, resourceGroupName, deploymentName string) (resources.DeploymentExtended, *retry.Error) {
+// CreateOrUpdate mocks base method.
+func (m *MockInterface) CreateOrUpdate(ctx context.Context, resourceGroupName, managedClusterName string, parameters resources.Deployment, etag string) *retry.Error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", ctx, resourceGroupName, deploymentName)
-	ret0, _ := ret[0].(resources.DeploymentExtended)
-	ret1, _ := ret[1].(*retry.Error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "CreateOrUpdate", ctx, resourceGroupName, managedClusterName, parameters, etag)
+	ret0, _ := ret[0].(*retry.Error)
+	return ret0
 }
 
-// Get indicates an expected call of Get
-func (mr *MockInterfaceMockRecorder) Get(ctx, resourceGroupName, deploymentName interface{}) *gomock.Call {
+// CreateOrUpdate indicates an expected call of CreateOrUpdate.
+func (mr *MockInterfaceMockRecorder) CreateOrUpdate(ctx, resourceGroupName, managedClusterName, parameters, etag interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockInterface)(nil).Get), ctx, resourceGroupName, deploymentName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrUpdate", reflect.TypeOf((*MockInterface)(nil).CreateOrUpdate), ctx, resourceGroupName, managedClusterName, parameters, etag)
 }
 
-// List mocks base method
-func (m *MockInterface) List(ctx context.Context, resourceGroupName string) ([]resources.DeploymentExtended, *retry.Error) {
+// Delete mocks base method.
+func (m *MockInterface) Delete(ctx context.Context, resourceGroupName, deploymentName string) *retry.Error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "List", ctx, resourceGroupName)
-	ret0, _ := ret[0].([]resources.DeploymentExtended)
-	ret1, _ := ret[1].(*retry.Error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "Delete", ctx, resourceGroupName, deploymentName)
+	ret0, _ := ret[0].(*retry.Error)
+	return ret0
 }
 
-// List indicates an expected call of List
-func (mr *MockInterfaceMockRecorder) List(ctx, resourceGroupName interface{}) *gomock.Call {
+// Delete indicates an expected call of Delete.
+func (mr *MockInterfaceMockRecorder) Delete(ctx, resourceGroupName, deploymentName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockInterface)(nil).List), ctx, resourceGroupName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockInterface)(nil).Delete), ctx, resourceGroupName, deploymentName)
 }
 
-// ExportTemplate mocks base method
+// ExportTemplate mocks base method.
 func (m *MockInterface) ExportTemplate(ctx context.Context, resourceGroupName, deploymentName string) (resources.DeploymentExportResult, *retry.Error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExportTemplate", ctx, resourceGroupName, deploymentName)
@@ -93,36 +92,38 @@ func (m *MockInterface) ExportTemplate(ctx context.Context, resourceGroupName, d
 	return ret0, ret1
 }
 
-// ExportTemplate indicates an expected call of ExportTemplate
+// ExportTemplate indicates an expected call of ExportTemplate.
 func (mr *MockInterfaceMockRecorder) ExportTemplate(ctx, resourceGroupName, deploymentName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExportTemplate", reflect.TypeOf((*MockInterface)(nil).ExportTemplate), ctx, resourceGroupName, deploymentName)
 }
 
-// CreateOrUpdate mocks base method
-func (m *MockInterface) CreateOrUpdate(ctx context.Context, resourceGroupName, managedClusterName string, parameters resources.Deployment, etag string) *retry.Error {
+// Get mocks base method.
+func (m *MockInterface) Get(ctx context.Context, resourceGroupName, deploymentName string) (resources.DeploymentExtended, *retry.Error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateOrUpdate", ctx, resourceGroupName, managedClusterName, parameters, etag)
-	ret0, _ := ret[0].(*retry.Error)
-	return ret0
+	ret := m.ctrl.Call(m, "Get", ctx, resourceGroupName, deploymentName)
+	ret0, _ := ret[0].(resources.DeploymentExtended)
+	ret1, _ := ret[1].(*retry.Error)
+	return ret0, ret1
 }
 
-// CreateOrUpdate indicates an expected call of CreateOrUpdate
-func (mr *MockInterfaceMockRecorder) CreateOrUpdate(ctx, resourceGroupName, managedClusterName, parameters, etag interface{}) *gomock.Call {
+// Get indicates an expected call of Get.
+func (mr *MockInterfaceMockRecorder) Get(ctx, resourceGroupName, deploymentName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrUpdate", reflect.TypeOf((*MockInterface)(nil).CreateOrUpdate), ctx, resourceGroupName, managedClusterName, parameters, etag)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockInterface)(nil).Get), ctx, resourceGroupName, deploymentName)
 }
 
-// Delete mocks base method
-func (m *MockInterface) Delete(ctx context.Context, resourceGroupName, deploymentName string) *retry.Error {
+// List mocks base method.
+func (m *MockInterface) List(ctx context.Context, resourceGroupName string) ([]resources.DeploymentExtended, *retry.Error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", ctx, resourceGroupName, deploymentName)
-	ret0, _ := ret[0].(*retry.Error)
-	return ret0
+	ret := m.ctrl.Call(m, "List", ctx, resourceGroupName)
+	ret0, _ := ret[0].([]resources.DeploymentExtended)
+	ret1, _ := ret[1].(*retry.Error)
+	return ret0, ret1
 }
 
-// Delete indicates an expected call of Delete
-func (mr *MockInterfaceMockRecorder) Delete(ctx, resourceGroupName, deploymentName interface{}) *gomock.Call {
+// List indicates an expected call of List.
+func (mr *MockInterfaceMockRecorder) List(ctx, resourceGroupName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockInterface)(nil).Delete), ctx, resourceGroupName, deploymentName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockInterface)(nil).List), ctx, resourceGroupName)
 }

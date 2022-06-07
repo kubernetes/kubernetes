@@ -1,23 +1,25 @@
-// +build linux,cgo,seccomp
+//go:build cgo && seccomp
+// +build cgo,seccomp
 
 package patchbpf
 
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"runtime"
 	"unsafe"
 
-	"github.com/opencontainers/runc/libcontainer/configs"
-	"github.com/opencontainers/runc/libcontainer/utils"
-
-	"github.com/pkg/errors"
 	libseccomp "github.com/seccomp/libseccomp-golang"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/bpf"
 	"golang.org/x/sys/unix"
+
+	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/utils"
 )
 
 // #cgo pkg-config: libseccomp
@@ -40,6 +42,11 @@ const uintptr_t C_SET_MODE_FILTER = SECCOMP_SET_MODE_FILTER;
 #	define SECCOMP_FILTER_FLAG_LOG (1UL << 1)
 #endif
 const uintptr_t C_FILTER_FLAG_LOG = SECCOMP_FILTER_FLAG_LOG;
+
+#ifndef SECCOMP_FILTER_FLAG_NEW_LISTENER
+#	define SECCOMP_FILTER_FLAG_NEW_LISTENER (1UL << 3)
+#endif
+const uintptr_t C_FILTER_FLAG_NEW_LISTENER = SECCOMP_FILTER_FLAG_NEW_LISTENER;
 
 // We use the AUDIT_ARCH_* values because those are the ones used by the kernel
 // and SCMP_ARCH_* sometimes has fake values (such as SCMP_ARCH_X32). But we
@@ -85,17 +92,16 @@ loop:
 		// seccomp_export_bpf outputs the program in *host* endian-ness.
 		var insn unix.SockFilter
 		if err := binary.Read(rdr, utils.NativeEndian, &insn); err != nil {
-			switch err {
-			case io.EOF:
+			if errors.Is(err, io.EOF) {
 				// Parsing complete.
 				break loop
-			case io.ErrUnexpectedEOF:
-				// Parsing stopped mid-instruction.
-				return nil, errors.Wrap(err, "program parsing halted mid-instruction")
-			default:
-				// All other errors.
-				return nil, errors.Wrap(err, "parsing instructions")
 			}
+			if errors.Is(err, io.ErrUnexpectedEOF) {
+				// Parsing stopped mid-instruction.
+				return nil, fmt.Errorf("program parsing halted mid-instruction: %w", err)
+			}
+			// All other errors.
+			return nil, fmt.Errorf("error parsing instructions: %w", err)
 		}
 		program = append(program, bpf.RawInstruction{
 			Op: insn.Code,
@@ -110,7 +116,7 @@ loop:
 func disassembleFilter(filter *libseccomp.ScmpFilter) ([]bpf.Instruction, error) {
 	rdr, wtr, err := os.Pipe()
 	if err != nil {
-		return nil, errors.Wrap(err, "creating scratch pipe")
+		return nil, fmt.Errorf("error creating scratch pipe: %w", err)
 	}
 	defer wtr.Close()
 	defer rdr.Close()
@@ -124,23 +130,23 @@ func disassembleFilter(filter *libseccomp.ScmpFilter) ([]bpf.Instruction, error)
 	}()
 
 	if err := filter.ExportBPF(wtr); err != nil {
-		return nil, errors.Wrap(err, "exporting BPF")
+		return nil, fmt.Errorf("error exporting BPF: %w", err)
 	}
 	// Close so that the reader actually gets EOF.
 	_ = wtr.Close()
 
 	if copyErr := <-errChan; copyErr != nil {
-		return nil, errors.Wrap(copyErr, "reading from ExportBPF pipe")
+		return nil, fmt.Errorf("error reading from ExportBPF pipe: %w", copyErr)
 	}
 
 	// Parse the instructions.
 	rawProgram, err := parseProgram(readerBuffer)
 	if err != nil {
-		return nil, errors.Wrap(err, "parsing generated BPF filter")
+		return nil, fmt.Errorf("parsing generated BPF filter: %w", err)
 	}
 	program, ok := bpf.Disassemble(rawProgram)
 	if !ok {
-		return nil, errors.Errorf("could not disassemble entire BPF filter")
+		return nil, errors.New("could not disassemble entire BPF filter")
 	}
 	return program, nil
 }
@@ -155,7 +161,7 @@ func archToNative(arch libseccomp.ScmpArch) (nativeArch, error) {
 		// Convert to actual native architecture.
 		arch, err := libseccomp.GetNativeArch()
 		if err != nil {
-			return invalidArch, errors.Wrap(err, "get native arch")
+			return invalidArch, fmt.Errorf("unable to get native arch: %w", err)
 		}
 		return archToNative(arch)
 	case libseccomp.ArchX86:
@@ -192,7 +198,7 @@ func archToNative(arch libseccomp.ScmpArch) (nativeArch, error) {
 	case libseccomp.ArchS390X:
 		return nativeArch(C.C_AUDIT_ARCH_S390X), nil
 	default:
-		return invalidArch, errors.Errorf("unknown architecture: %v", arch)
+		return invalidArch, fmt.Errorf("unknown architecture: %v", arch)
 	}
 }
 
@@ -209,7 +215,7 @@ func findLastSyscalls(config *configs.Seccomp) (lastSyscallMap, error) {
 	for _, ociArch := range config.Architectures {
 		arch, err := libseccomp.GetArchFromString(ociArch)
 		if err != nil {
-			return nil, errors.Wrap(err, "validating seccomp architecture")
+			return nil, fmt.Errorf("unable to validate seccomp architecture: %w", err)
 		}
 
 		// Map native architecture to a real architecture value to avoid
@@ -217,7 +223,7 @@ func findLastSyscalls(config *configs.Seccomp) (lastSyscallMap, error) {
 		if arch == libseccomp.ArchNative {
 			nativeArch, err := libseccomp.GetNativeArch()
 			if err != nil {
-				return nil, errors.Wrap(err, "get native arch")
+				return nil, fmt.Errorf("unable to get native architecture: %w", err)
 			}
 			arch = nativeArch
 		}
@@ -225,7 +231,7 @@ func findLastSyscalls(config *configs.Seccomp) (lastSyscallMap, error) {
 		// Figure out native architecture representation of the architecture.
 		nativeArch, err := archToNative(arch)
 		if err != nil {
-			return nil, errors.Wrapf(err, "cannot map architecture %v to AUDIT_ARCH_ constant", arch)
+			return nil, fmt.Errorf("cannot map architecture %v to AUDIT_ARCH_ constant: %w", arch, err)
 		}
 
 		if _, ok := lastSyscalls[nativeArch]; !ok {
@@ -370,7 +376,7 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 						},
 					}, sectionTail...)
 				default:
-					return nil, errors.Errorf("unknown amd64 native architecture %#x", scmpArch)
+					return nil, fmt.Errorf("unknown amd64 native architecture %#x", scmpArch)
 				}
 			}
 
@@ -378,16 +384,16 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 		case 2:
 			// x32 and x86_64 are a unique case, we can't handle any others.
 			if uint32(nativeArch) != uint32(C.C_AUDIT_ARCH_X86_64) {
-				return nil, errors.Errorf("unknown architecture overlap on native arch %#x", nativeArch)
+				return nil, fmt.Errorf("unknown architecture overlap on native arch %#x", nativeArch)
 			}
 
 			x32sysno, ok := maxSyscalls[libseccomp.ArchX32]
 			if !ok {
-				return nil, errors.Errorf("missing %v in overlapping x86_64 arch: %v", libseccomp.ArchX32, maxSyscalls)
+				return nil, fmt.Errorf("missing %v in overlapping x86_64 arch: %v", libseccomp.ArchX32, maxSyscalls)
 			}
 			x86sysno, ok := maxSyscalls[libseccomp.ArchAMD64]
 			if !ok {
-				return nil, errors.Errorf("missing %v in overlapping x86_64 arch: %v", libseccomp.ArchAMD64, maxSyscalls)
+				return nil, fmt.Errorf("missing %v in overlapping x86_64 arch: %v", libseccomp.ArchAMD64, maxSyscalls)
 			}
 
 			// The x32 ABI indicates that a syscall is being made by an x32
@@ -448,7 +454,7 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 				}...)
 			}
 		default:
-			return nil, errors.Errorf("invalid number of architecture overlaps: %v", len(maxSyscalls))
+			return nil, fmt.Errorf("invalid number of architecture overlaps: %v", len(maxSyscalls))
 		}
 
 		// Prepend this section to the tail.
@@ -517,7 +523,7 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 func assemble(program []bpf.Instruction) ([]unix.SockFilter, error) {
 	rawProgram, err := bpf.Assemble(program)
 	if err != nil {
-		return nil, errors.Wrap(err, "assembling program")
+		return nil, fmt.Errorf("error assembling program: %w", err)
 	}
 
 	// Convert to []unix.SockFilter for unix.SockFilter.
@@ -547,11 +553,11 @@ func generatePatch(config *configs.Seccomp) ([]bpf.Instruction, error) {
 
 	lastSyscalls, err := findLastSyscalls(config)
 	if err != nil {
-		return nil, errors.Wrap(err, "finding last syscalls for -ENOSYS stub")
+		return nil, fmt.Errorf("error finding last syscalls for -ENOSYS stub: %w", err)
 	}
 	stubProgram, err := generateEnosysStub(lastSyscalls)
 	if err != nil {
-		return nil, errors.Wrap(err, "generating -ENOSYS stub")
+		return nil, fmt.Errorf("error generating -ENOSYS stub: %w", err)
 	}
 	return stubProgram, nil
 }
@@ -559,12 +565,12 @@ func generatePatch(config *configs.Seccomp) ([]bpf.Instruction, error) {
 func enosysPatchFilter(config *configs.Seccomp, filter *libseccomp.ScmpFilter) ([]unix.SockFilter, error) {
 	program, err := disassembleFilter(filter)
 	if err != nil {
-		return nil, errors.Wrap(err, "disassembling original filter")
+		return nil, fmt.Errorf("error disassembling original filter: %w", err)
 	}
 
 	patch, err := generatePatch(config)
 	if err != nil {
-		return nil, errors.Wrap(err, "generating patch for filter")
+		return nil, fmt.Errorf("error generating patch for filter: %w", err)
 	}
 	fullProgram := append(patch, program...)
 
@@ -576,48 +582,60 @@ func enosysPatchFilter(config *configs.Seccomp, filter *libseccomp.ScmpFilter) (
 
 	fprog, err := assemble(fullProgram)
 	if err != nil {
-		return nil, errors.Wrap(err, "assembling modified filter")
+		return nil, fmt.Errorf("error assembling modified filter: %w", err)
 	}
 	return fprog, nil
 }
 
-func filterFlags(filter *libseccomp.ScmpFilter) (flags uint, noNewPrivs bool, err error) {
+func filterFlags(config *configs.Seccomp, filter *libseccomp.ScmpFilter) (flags uint, noNewPrivs bool, err error) {
 	// Ignore the error since pre-2.4 libseccomp is treated as API level 0.
-	apiLevel, _ := libseccomp.GetApi()
+	apiLevel, _ := libseccomp.GetAPI()
 
 	noNewPrivs, err = filter.GetNoNewPrivsBit()
 	if err != nil {
-		return 0, false, errors.Wrap(err, "fetch no_new_privs filter bit")
+		return 0, false, fmt.Errorf("unable to fetch no_new_privs filter bit: %w", err)
 	}
 
 	if apiLevel >= 3 {
 		if logBit, err := filter.GetLogBit(); err != nil {
-			return 0, false, errors.Wrap(err, "fetch SECCOMP_FILTER_FLAG_LOG bit")
+			return 0, false, fmt.Errorf("unable to fetch SECCOMP_FILTER_FLAG_LOG bit: %w", err)
 		} else if logBit {
 			flags |= uint(C.C_FILTER_FLAG_LOG)
 		}
 	}
 
 	// TODO: Support seccomp flags not yet added to libseccomp-golang...
+
+	for _, call := range config.Syscalls {
+		if call.Action == configs.Notify {
+			flags |= uint(C.C_FILTER_FLAG_NEW_LISTENER)
+			break
+		}
+	}
+
 	return
 }
 
-func sysSeccompSetFilter(flags uint, filter []unix.SockFilter) (err error) {
+func sysSeccompSetFilter(flags uint, filter []unix.SockFilter) (fd int, err error) {
 	fprog := unix.SockFprog{
 		Len:    uint16(len(filter)),
 		Filter: &filter[0],
 	}
+	fd = -1 // only return a valid fd when C_FILTER_FLAG_NEW_LISTENER is set
 	// If no seccomp flags were requested we can use the old-school prctl(2).
 	if flags == 0 {
 		err = unix.Prctl(unix.PR_SET_SECCOMP,
 			unix.SECCOMP_MODE_FILTER,
 			uintptr(unsafe.Pointer(&fprog)), 0, 0)
 	} else {
-		_, _, errno := unix.RawSyscall(unix.SYS_SECCOMP,
+		fdptr, _, errno := unix.RawSyscall(unix.SYS_SECCOMP,
 			uintptr(C.C_SET_MODE_FILTER),
 			uintptr(flags), uintptr(unsafe.Pointer(&fprog)))
 		if errno != 0 {
 			err = errno
+		}
+		if flags&uint(C.C_FILTER_FLAG_NEW_LISTENER) != 0 {
+			fd = int(fdptr)
 		}
 	}
 	runtime.KeepAlive(filter)
@@ -630,17 +648,17 @@ func sysSeccompSetFilter(flags uint, filter []unix.SockFilter) (err error) {
 // patches said filter to handle -ENOSYS in a much nicer manner than the
 // default libseccomp default action behaviour, and loads the patched filter
 // into the kernel for the current process.
-func PatchAndLoad(config *configs.Seccomp, filter *libseccomp.ScmpFilter) error {
+func PatchAndLoad(config *configs.Seccomp, filter *libseccomp.ScmpFilter) (int, error) {
 	// Generate a patched filter.
 	fprog, err := enosysPatchFilter(config, filter)
 	if err != nil {
-		return errors.Wrap(err, "patching filter")
+		return -1, fmt.Errorf("error patching filter: %w", err)
 	}
 
 	// Get the set of libseccomp flags set.
-	seccompFlags, noNewPrivs, err := filterFlags(filter)
+	seccompFlags, noNewPrivs, err := filterFlags(config, filter)
 	if err != nil {
-		return errors.Wrap(err, "fetch seccomp filter flags")
+		return -1, fmt.Errorf("unable to fetch seccomp filter flags: %w", err)
 	}
 
 	// Set no_new_privs if it was requested, though in runc we handle
@@ -648,13 +666,15 @@ func PatchAndLoad(config *configs.Seccomp, filter *libseccomp.ScmpFilter) error 
 	if noNewPrivs {
 		logrus.Warnf("potentially misconfigured filter -- setting no_new_privs in seccomp path")
 		if err := unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
-			return errors.Wrap(err, "enable no_new_privs bit")
+			return -1, fmt.Errorf("error enabling no_new_privs bit: %w", err)
 		}
 	}
 
 	// Finally, load the filter.
-	if err := sysSeccompSetFilter(seccompFlags, fprog); err != nil {
-		return errors.Wrap(err, "loading seccomp filter")
+	fd, err := sysSeccompSetFilter(seccompFlags, fprog)
+	if err != nil {
+		return -1, fmt.Errorf("error loading seccomp filter: %w", err)
 	}
-	return nil
+
+	return fd, nil
 }

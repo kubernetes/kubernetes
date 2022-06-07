@@ -1,3 +1,4 @@
+//go:build linux && (386 || arm)
 // +build linux
 // +build 386 arm
 

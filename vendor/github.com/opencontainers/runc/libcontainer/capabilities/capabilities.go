@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package capabilities
@@ -32,6 +33,17 @@ func init() {
 		}
 		capabilityMap["CAP_"+strings.ToUpper(c.String())] = c
 	}
+}
+
+// KnownCapabilities returns the list of the known capabilities.
+// Used by `runc features`.
+func KnownCapabilities() []string {
+	list := capability.List()
+	res := make([]string, len(list))
+	for i, c := range list {
+		res[i] = "CAP_" + strings.ToUpper(c.String())
+	}
+	return res
 }
 
 // New creates a new Caps from the given Capabilities config. Unknown Capabilities

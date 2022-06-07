@@ -124,6 +124,11 @@ type DesiredStateOfWorld interface {
 
 	// MarkVolumeAttachability updates the volume's attachability for a given volume
 	MarkVolumeAttachability(volumeName v1.UniqueVolumeName, attachable bool)
+
+	// UpdatePersistentVolumeSize updates persistentVolumeSize in desired state of the world
+	// so as it can be compared against actual size and volume expansion performed
+	// if necessary
+	UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size *resource.Quantity)
 }
 
 // VolumeToMount represents a volume that is attached to this node and needs to
@@ -186,6 +191,10 @@ type volumeToMount struct {
 	// desiredSizeLimit indicates the desired upper bound on the size of the volume
 	// (if so implemented)
 	desiredSizeLimit *resource.Quantity
+
+	// persistentVolumeSize records desired size of a persistent volume.
+	// Usually this value reflects size recorded in pv.Spec.Capacity
+	persistentVolumeSize *resource.Quantity
 }
 
 // The pod object represents a pod that references the underlying volume and
@@ -274,7 +283,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				}
 			}
 		}
-		dsw.volumesToMount[volumeName] = volumeToMount{
+		vmt := volumeToMount{
 			volumeName:              volumeName,
 			podsToMount:             make(map[types.UniquePodName]podToMount),
 			pluginIsAttachable:      attachable,
@@ -283,6 +292,16 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			reportedInUse:           false,
 			desiredSizeLimit:        sizeLimit,
 		}
+		// record desired size of the volume
+		if volumeSpec.PersistentVolume != nil {
+			pvCap := volumeSpec.PersistentVolume.Spec.Capacity.Storage()
+			if pvCap != nil {
+				pvCapCopy := pvCap.DeepCopy()
+				vmt.persistentVolumeSize = &pvCapCopy
+			}
+		}
+
+		dsw.volumesToMount[volumeName] = vmt
 	}
 	oldPodMount, ok := dsw.volumesToMount[volumeName].podsToMount[podName]
 	mountRequestTime := time.Now()
@@ -347,6 +366,19 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 	}
 }
 
+// UpdatePersistentVolumeSize updates last known PV size. This is used for volume expansion and
+// should be only used for persistent volumes.
+func (dsw *desiredStateOfWorld) UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size *resource.Quantity) {
+	dsw.Lock()
+	defer dsw.Unlock()
+
+	vol, volExists := dsw.volumesToMount[volumeName]
+	if volExists {
+		vol.persistentVolumeSize = size
+		dsw.volumesToMount[volumeName] = vol
+	}
+}
+
 func (dsw *desiredStateOfWorld) VolumeExists(
 	volumeName v1.UniqueVolumeName) bool {
 	dsw.RLock()
@@ -403,21 +435,25 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 	volumesToMount := make([]VolumeToMount, 0 /* len */, len(dsw.volumesToMount) /* cap */)
 	for volumeName, volumeObj := range dsw.volumesToMount {
 		for podName, podObj := range volumeObj.podsToMount {
-			volumesToMount = append(
-				volumesToMount,
-				VolumeToMount{
-					VolumeToMount: operationexecutor.VolumeToMount{
-						VolumeName:              volumeName,
-						PodName:                 podName,
-						Pod:                     podObj.pod,
-						VolumeSpec:              podObj.volumeSpec,
-						PluginIsAttachable:      volumeObj.pluginIsAttachable,
-						PluginIsDeviceMountable: volumeObj.pluginIsDeviceMountable,
-						OuterVolumeSpecName:     podObj.outerVolumeSpecName,
-						VolumeGidValue:          volumeObj.volumeGidValue,
-						ReportedInUse:           volumeObj.reportedInUse,
-						MountRequestTime:        podObj.mountRequestTime,
-						DesiredSizeLimit:        volumeObj.desiredSizeLimit}})
+			vmt := VolumeToMount{
+				VolumeToMount: operationexecutor.VolumeToMount{
+					VolumeName:              volumeName,
+					PodName:                 podName,
+					Pod:                     podObj.pod,
+					VolumeSpec:              podObj.volumeSpec,
+					PluginIsAttachable:      volumeObj.pluginIsAttachable,
+					PluginIsDeviceMountable: volumeObj.pluginIsDeviceMountable,
+					OuterVolumeSpecName:     podObj.outerVolumeSpecName,
+					VolumeGidValue:          volumeObj.volumeGidValue,
+					ReportedInUse:           volumeObj.reportedInUse,
+					MountRequestTime:        podObj.mountRequestTime,
+					DesiredSizeLimit:        volumeObj.desiredSizeLimit,
+				},
+			}
+			if volumeObj.persistentVolumeSize != nil {
+				vmt.PersistentVolumeSize = volumeObj.persistentVolumeSize.DeepCopy()
+			}
+			volumesToMount = append(volumesToMount, vmt)
 		}
 	}
 	return volumesToMount

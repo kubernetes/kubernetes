@@ -19,7 +19,6 @@ package preflight
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -335,7 +334,7 @@ func TestFileContentCheck(t *testing.T) {
 }
 
 func TestDirAvailableCheck(t *testing.T) {
-	fileDir, err := ioutil.TempDir("", "dir-avail-check")
+	fileDir, err := os.MkdirTemp("", "dir-avail-check")
 	if err != nil {
 		t.Fatalf("failed creating directory: %v", err)
 	}
@@ -455,12 +454,12 @@ func TestRunChecks(t *testing.T) {
 	}
 }
 func TestConfigRootCAs(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-cafile")
+	f, err := os.CreateTemp(os.TempDir(), "kubeadm-external-etcd-test-cafile")
 	if err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed creating temp CA file\n\tactual:%v", err)
 	}
 	defer os.Remove(f.Name())
-	if err := ioutil.WriteFile(f.Name(), []byte(externalEtcdRootCAFileContent), 0644); err != nil {
+	if err := os.WriteFile(f.Name(), []byte(externalEtcdRootCAFileContent), 0644); err != nil {
 		t.Errorf("failed configRootCAs:\n\texpected: succeed writing contents to temp CA file %s\n\tactual:%v", f.Name(), err)
 	}
 
@@ -481,7 +480,7 @@ func TestConfigRootCAs(t *testing.T) {
 	}
 }
 func TestConfigCertAndKey(t *testing.T) {
-	certFile, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-certfile")
+	certFile, err := os.CreateTemp(os.TempDir(), "kubeadm-external-etcd-test-certfile")
 	if err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed creating temp CertFile file\n\tactual:%v",
@@ -489,7 +488,7 @@ func TestConfigCertAndKey(t *testing.T) {
 		)
 	}
 	defer os.Remove(certFile.Name())
-	if err := ioutil.WriteFile(certFile.Name(), []byte(externalEtcdCertFileContent), 0644); err != nil {
+	if err := os.WriteFile(certFile.Name(), []byte(externalEtcdCertFileContent), 0644); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp CertFile file %s\n\tactual:%v",
 			certFile.Name(),
@@ -497,7 +496,7 @@ func TestConfigCertAndKey(t *testing.T) {
 		)
 	}
 
-	keyFile, err := ioutil.TempFile(os.TempDir(), "kubeadm-external-etcd-test-keyfile")
+	keyFile, err := os.CreateTemp(os.TempDir(), "kubeadm-external-etcd-test-keyfile")
 	if err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed creating temp KeyFile file\n\tactual:%v",
@@ -505,7 +504,7 @@ func TestConfigCertAndKey(t *testing.T) {
 		)
 	}
 	defer os.Remove(keyFile.Name())
-	if err := ioutil.WriteFile(keyFile.Name(), []byte(externalEtcdKeyFileContent), 0644); err != nil {
+	if err := os.WriteFile(keyFile.Name(), []byte(externalEtcdKeyFileContent), 0644); err != nil {
 		t.Errorf(
 			"failed configCertAndKey:\n\texpected: succeed writing contents to temp KeyFile file %s\n\tactual:%v",
 			keyFile.Name(),

@@ -96,10 +96,6 @@ func runCleanupNode(c workflow.RunData) error {
 		fmt.Println("[reset] Would remove Kubernetes-managed containers")
 	}
 
-	// TODO: remove the dockershim directory cleanup in 1.25
-	// https://github.com/kubernetes/kubeadm/issues/2626
-	r.AddDirsToClean("/var/lib/dockershim", "/var/run/kubernetes", "/var/lib/cni")
-
 	// Remove contents from the config and pki directories
 	if certsDir != kubeadmapiv1.DefaultCertificatesDir {
 		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)

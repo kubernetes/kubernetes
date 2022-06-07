@@ -71,7 +71,7 @@ func PodRequestsAndLimitsReuse(pod *v1.Pod, reuseReqs, reuseLimits v1.ResourceLi
 
 	// if PodOverhead feature is supported, add overhead for running a pod
 	// to the sum of requests and to non-zero limits:
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if pod.Spec.Overhead != nil {
 		addResourceList(reqs, pod.Spec.Overhead)
 
 		for name, quantity := range pod.Spec.Overhead {
@@ -152,7 +152,7 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 
 	// if PodOverhead feature is supported, add overhead for running a pod
 	// to the total requests if the resource total is non-zero
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if pod.Spec.Overhead != nil {
 		if podOverhead, ok := pod.Spec.Overhead[resourceName]; ok && !requestQuantity.IsZero() {
 			requestQuantity.Add(podOverhead)
 		}

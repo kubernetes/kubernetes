@@ -37,6 +37,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -61,6 +62,7 @@ type scaleUpTestConfig struct {
 
 var _ = SIGDescribe("Cluster size autoscaler scalability [Slow]", func() {
 	f := framework.NewDefaultFramework("autoscaling")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var nodeCount int
 	var coresPerNode int

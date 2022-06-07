@@ -30,6 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -107,7 +108,7 @@ const (
 )
 
 // PodsToActivateKey is a reserved state key for stashing pods.
-// If the stashed pods are present in unschedulableQ or backoffQ，they will be
+// If the stashed pods are present in unschedulablePods or backoffQ，they will be
 // activated (i.e., moved to activeQ) in two phases:
 // - end of a scheduling cycle if it succeeds (will be cleared from `PodsToActivate` if activated)
 // - end of a binding cycle if it succeeds
@@ -192,16 +193,26 @@ func (s *Status) IsSuccess() bool {
 	return s.Code() == Success
 }
 
+// IsWait returns true if and only if "Status" is non-nil and its Code is "Wait".
+func (s *Status) IsWait() bool {
+	return s.Code() == Wait
+}
+
+// IsSkip returns true if and only if "Status" is non-nil and its Code is "Skip".
+func (s *Status) IsSkip() bool {
+	return s.Code() == Skip
+}
+
 // IsUnschedulable returns true if "Status" is Unschedulable (Unschedulable or UnschedulableAndUnresolvable).
 func (s *Status) IsUnschedulable() bool {
 	code := s.Code()
 	return code == Unschedulable || code == UnschedulableAndUnresolvable
 }
 
-// AsError returns nil if the status is a success; otherwise returns an "error" object
+// AsError returns nil if the status is a success or a wait; otherwise returns an "error" object
 // with a concatenated message on reasons of the Status.
 func (s *Status) AsError() error {
-	if s.IsSuccess() {
+	if s.IsSuccess() || s.IsWait() || s.IsSkip() {
 		return nil
 	}
 	if s.err != nil {
@@ -337,8 +348,10 @@ type PreFilterExtensions interface {
 type PreFilterPlugin interface {
 	Plugin
 	// PreFilter is called at the beginning of the scheduling cycle. All PreFilter
-	// plugins must return success or the pod will be rejected.
-	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) *Status
+	// plugins must return success or the pod will be rejected. PreFilter could optionally
+	// return a PreFilterResult to influence which nodes to evaluate downstream. This is useful
+	// for cases where it is possible to determine the subset of nodes to process in O(1) time.
+	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) (*PreFilterResult, *Status)
 	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
 	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally
 	// modify its pre-processed info. The framework guarantees that the extensions
@@ -498,7 +511,9 @@ type Framework interface {
 	// *Status and its code is set to non-success if any of the plugins returns
 	// anything but Success. If a non-success status is returned, then the scheduling
 	// cycle is aborted.
-	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) *Status
+	// It also returns a PreFilterResult, which may influence what or how many nodes to
+	// evaluate downstream.
+	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) (*PreFilterResult, *Status)
 
 	// RunPostFilterPlugins runs the set of configured PostFilter plugins.
 	// PostFilter plugins can either be informational, in which case should be configured
@@ -606,6 +621,36 @@ type Handle interface {
 
 	// Parallelizer returns a parallelizer holding parallelism for scheduler.
 	Parallelizer() parallelize.Parallelizer
+}
+
+// PreFilterResult wraps needed info for scheduler framework to act upon PreFilter phase.
+type PreFilterResult struct {
+	// The set of nodes that should be considered downstream; if nil then
+	// all nodes are eligible.
+	NodeNames sets.String
+}
+
+func (p *PreFilterResult) AllNodes() bool {
+	return p == nil || p.NodeNames == nil
+}
+
+func (p *PreFilterResult) Merge(in *PreFilterResult) *PreFilterResult {
+	if p.AllNodes() && in.AllNodes() {
+		return nil
+	}
+
+	r := PreFilterResult{}
+	if p.AllNodes() {
+		r.NodeNames = sets.NewString(in.NodeNames.UnsortedList()...)
+		return &r
+	}
+	if in.AllNodes() {
+		r.NodeNames = sets.NewString(p.NodeNames.UnsortedList()...)
+		return &r
+	}
+
+	r.NodeNames = p.NodeNames.Intersection(in.NodeNames)
+	return &r
 }
 
 type NominatingMode int

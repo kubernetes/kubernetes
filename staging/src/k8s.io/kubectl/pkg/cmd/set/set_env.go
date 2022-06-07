@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/util/term"
 )
 
 var (
@@ -122,7 +123,7 @@ type EnvOptions struct {
 	resources              []string
 	output                 string
 	dryRunStrategy         cmdutil.DryRunStrategy
-	dryRunVerifier         *resource.DryRunVerifier
+	dryRunVerifier         *resource.QueryParamVerifier
 	builder                func() *resource.Builder
 	updatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	namespace              string
@@ -130,6 +131,7 @@ type EnvOptions struct {
 	clientset              *kubernetes.Clientset
 
 	genericclioptions.IOStreams
+	warningPrinter *printers.WarningPrinter
 }
 
 // NewEnvOptions returns an EnvOptions indicating all containers in the selected
@@ -140,14 +142,14 @@ func NewEnvOptions(streams genericclioptions.IOStreams) *EnvOptions {
 
 		ContainerSelector: "*",
 		Overwrite:         true,
-
-		IOStreams: streams,
+		IOStreams:         streams,
 	}
 }
 
 // NewCmdEnv implements the OpenShift cli env command
 func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewEnvOptions(streams)
+
 	cmd := &cobra.Command{
 		Use:                   "env RESOURCE/NAME KEY_1=VAL_1 ... KEY_N=VAL_N",
 		DisableFlagsInUseLine: true,
@@ -190,10 +192,6 @@ func validateNoOverwrites(existing []v1.EnvVar, env []v1.EnvVar) error {
 	return nil
 }
 
-func keyToEnvName(key string) string {
-	return strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
-}
-
 func contains(key string, keyList []string) bool {
 	if len(keyList) == 0 {
 		return true
@@ -205,6 +203,14 @@ func contains(key string, keyList []string) bool {
 		}
 	}
 	return false
+}
+
+func (o *EnvOptions) keyToEnvName(key string) string {
+	envName := strings.ToUpper(validEnvNameRegexp.ReplaceAllString(key, "_"))
+	if envName != key {
+		o.warningPrinter.Print(fmt.Sprintf("key %s transferred to %s", key, envName))
+	}
+	return envName
 }
 
 // Complete completes all required options
@@ -229,7 +235,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
@@ -247,6 +253,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		return err
 	}
 	o.builder = f.NewBuilder
+	o.warningPrinter = printers.NewWarningPrinter(o.ErrOut, printers.WarningPrinterOptions{Color: term.AllowsColorOutput(o.ErrOut)})
 
 	return nil
 }
@@ -264,6 +271,9 @@ func (o *EnvOptions) Validate() error {
 	}
 	if len(o.Keys) > 0 && len(o.From) == 0 {
 		return fmt.Errorf("when specifying --keys, a configmap or secret must be provided with --from")
+	}
+	if o.warningPrinter == nil {
+		return fmt.Errorf("warningPrinter can not be used without initialization")
 	}
 	return nil
 }
@@ -306,7 +316,7 @@ func (o *EnvOptions) RunEnv() error {
 				for key := range from.Data {
 					if contains(key, o.Keys) {
 						envVar := v1.EnvVar{
-							Name: keyToEnvName(key),
+							Name: o.keyToEnvName(key),
 							ValueFrom: &v1.EnvVarSource{
 								SecretKeyRef: &v1.SecretKeySelector{
 									LocalObjectReference: v1.LocalObjectReference{
@@ -323,7 +333,7 @@ func (o *EnvOptions) RunEnv() error {
 				for key := range from.Data {
 					if contains(key, o.Keys) {
 						envVar := v1.EnvVar{
-							Name: keyToEnvName(key),
+							Name: o.keyToEnvName(key),
 							ValueFrom: &v1.EnvVarSource{
 								ConfigMapKeyRef: &v1.ConfigMapKeySelector{
 									LocalObjectReference: v1.LocalObjectReference{
@@ -417,7 +427,7 @@ func (o *EnvOptions) RunEnv() error {
 						}
 					}
 
-					fmt.Fprintf(o.ErrOut, "warning: %s/%s does not have any containers matching %q\n", objKind, objName, o.ContainerSelector)
+					o.warningPrinter.Print(fmt.Sprintf("%s/%s does not have any containers matching %q", objKind, objName, o.ContainerSelector))
 				}
 				return nil
 			}

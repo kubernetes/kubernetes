@@ -587,16 +587,6 @@ func TestPluginArgsDefaults(t *testing.T) {
 			},
 		},
 		{
-			name: "PodTopologySpreadArgs empty, DefaultPodTopologySpread feature disabled",
-			features: map[featuregate.Feature]bool{
-				features.DefaultPodTopologySpread: false,
-			},
-			in: &v1beta2.PodTopologySpreadArgs{},
-			want: &v1beta2.PodTopologySpreadArgs{
-				DefaultingType: v1beta2.ListDefaulting,
-			},
-		},
-		{
 			name: "NodeResourcesFitArgs not set",
 			in:   &v1beta2.NodeResourcesFitArgs{},
 			want: &v1beta2.NodeResourcesFitArgs{

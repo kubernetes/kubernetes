@@ -124,7 +124,16 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 	}
 
 	o.validator = func() (validation.Schema, error) {
-		return f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
+		directive, err := cmdutil.GetValidationDirective(cmd)
+		if err != nil {
+			return nil, err
+		}
+		dynamicClient, err := f.DynamicClient()
+		if err != nil {
+			return nil, err
+		}
+		verifier := resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
+		return f.Validator(directive, verifier)
 	}
 
 	// build the printer

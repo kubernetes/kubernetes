@@ -77,7 +77,7 @@ func newUncheckedPlanner(disp Dispatcher,
 	}
 }
 
-// planner is an implementatio of the interpretablePlanner interface.
+// planner is an implementation of the interpretablePlanner interface.
 type planner struct {
 	disp        Dispatcher
 	provider    ref.TypeProvider
@@ -617,6 +617,7 @@ func (p *planner) planComprehension(expr *exprpb.Expr) (Interpretable, error) {
 		cond:      cond,
 		step:      step,
 		result:    result,
+		adapter:   p.adapter,
 	}, nil
 }
 

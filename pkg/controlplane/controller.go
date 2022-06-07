@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +34,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	eventsv1client "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -55,7 +57,7 @@ const (
 type Controller struct {
 	ServiceClient   corev1client.ServicesGetter
 	NamespaceClient corev1client.NamespacesGetter
-	EventClient     corev1client.EventsGetter
+	EventClient     eventsv1client.EventsV1Interface
 	readyzClient    rest.Interface
 
 	ServiceClusterIPRegistry          rangeallocation.RangeRegistry
@@ -80,8 +82,6 @@ type Controller struct {
 	// ServiceIP indicates where the kubernetes service will live.  It may not be nil.
 	ServiceIP                 net.IP
 	ServicePort               int
-	ExtraServicePorts         []corev1.ServicePort
-	ExtraEndpointPorts        []corev1.EndpointPort
 	PublicServicePort         int
 	KubernetesServiceNodePort int
 
@@ -89,7 +89,7 @@ type Controller struct {
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
-func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, nsClient corev1client.NamespacesGetter, eventClient corev1client.EventsGetter, readyzClient rest.Interface) (*Controller, error) {
+func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, nsClient corev1client.NamespacesGetter, eventClient eventsv1client.EventsV1Interface, readyzClient rest.Interface) (*Controller, error) {
 	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
@@ -135,8 +135,6 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 
 		ServiceIP:                 c.ExtraConfig.APIServerServiceIP,
 		ServicePort:               c.ExtraConfig.APIServerServicePort,
-		ExtraServicePorts:         c.ExtraConfig.ExtraServicePorts,
-		ExtraEndpointPorts:        c.ExtraConfig.ExtraEndpointPorts,
 		PublicServicePort:         publicServicePort,
 		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
 	}, nil
@@ -162,7 +160,7 @@ func (c *Controller) Start() {
 	}
 
 	// Reconcile during first run removing itself until server is ready.
-	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
 	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err == nil {
 		klog.Error("Found stale data, removed previous endpoints on kubernetes service, apiserver didn't exit successfully previously")
 	} else if !storage.IsNotFound(err) {
@@ -172,18 +170,41 @@ func (c *Controller) Start() {
 	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceClient, c.EventClient, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry, &c.SecondaryServiceClusterIPRange, c.SecondaryServiceClusterIPRegistry)
 	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceClient, c.EventClient, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
 
-	// run all of the controllers once prior to returning from Start.
-	if err := repairClusterIPs.RunOnce(); err != nil {
-		// If we fail to repair cluster IPs apiserver is useless. We should restart and retry.
-		klog.Fatalf("Unable to perform initial IP allocation check: %v", err)
+	// We start both repairClusterIPs and repairNodePorts to ensure repair
+	// loops of ClusterIPs and NodePorts.
+	// We run both repair loops using RunUntil public interface.
+	// However, we want to fail liveness/readiness until the first
+	// successful repair loop, so we basically pass appropriate
+	// callbacks to RunUtil methods.
+	// Additionally, we ensure that we don't wait for it for longer
+	// than 1 minute for backward compatibility of failing the whole
+	// apiserver if we can't repair them.
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	runRepairClusterIPs := func(stopCh chan struct{}) {
+		repairClusterIPs.RunUntil(wg.Done, stopCh)
 	}
-	if err := repairNodePorts.RunOnce(); err != nil {
-		// If we fail to repair node ports apiserver is useless. We should restart and retry.
-		klog.Fatalf("Unable to perform initial service nodePort check: %v", err)
+	runRepairNodePorts := func(stopCh chan struct{}) {
+		repairNodePorts.RunUntil(wg.Done, stopCh)
 	}
 
-	c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
+	c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, runRepairClusterIPs, runRepairNodePorts)
 	c.runner.Start()
+
+	// For backward compatibility, we ensure that if we never are able
+	// to repair clusterIPs and/or nodeports, we not only fail the liveness
+	// and/or readiness, but also explicitly fail.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		wg.Wait()
+	}()
+	select {
+	case <-done:
+	case <-time.After(time.Minute):
+		klog.Fatalf("Unable to perform initial IP and Port allocation check")
+	}
 }
 
 // Stop cleans up this API Servers endpoint reconciliation leases so another master can take over more quickly.
@@ -191,7 +212,7 @@ func (c *Controller) Stop() {
 	if c.runner != nil {
 		c.runner.Stop()
 	}
-	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
 	finishedReconciling := make(chan struct{})
 	go func() {
 		defer close(finishedReconciling)
@@ -200,6 +221,7 @@ func (c *Controller) Stop() {
 		if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
 			klog.Errorf("Unable to remove endpoints from kubernetes service: %v", err)
 		}
+		c.EndpointReconciler.Destroy()
 	}()
 
 	select {
@@ -252,11 +274,11 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 
-	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
+	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, "https")
 	if err := c.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
 		return err
 	}
-	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https")
 	if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile); err != nil {
 		return err
 	}
@@ -265,34 +287,30 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 
 // createPortAndServiceSpec creates an array of service ports.
 // If the NodePort value is 0, just the servicePort is used, otherwise, a node port is exposed.
-func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort int, servicePortName string, extraServicePorts []corev1.ServicePort) ([]corev1.ServicePort, corev1.ServiceType) {
-	//Use the Cluster IP type for the service port if NodePort isn't provided.
-	//Otherwise, we will be binding the master service to a NodePort.
-	servicePorts := []corev1.ServicePort{{Protocol: corev1.ProtocolTCP,
+func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort int, servicePortName string) ([]corev1.ServicePort, corev1.ServiceType) {
+	// Use the Cluster IP type for the service port if NodePort isn't provided.
+	// Otherwise, we will be binding the master service to a NodePort.
+	servicePorts := []corev1.ServicePort{{
+		Protocol:   corev1.ProtocolTCP,
 		Port:       int32(servicePort),
 		Name:       servicePortName,
-		TargetPort: intstr.FromInt(targetServicePort)}}
+		TargetPort: intstr.FromInt(targetServicePort),
+	}}
 	serviceType := corev1.ServiceTypeClusterIP
 	if nodePort > 0 {
 		servicePorts[0].NodePort = int32(nodePort)
 		serviceType = corev1.ServiceTypeNodePort
 	}
-	if extraServicePorts != nil {
-		servicePorts = append(servicePorts, extraServicePorts...)
-	}
 	return servicePorts, serviceType
 }
 
-// createEndpointPortSpec creates an array of endpoint ports
-func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndpointPorts []corev1.EndpointPort) []corev1.EndpointPort {
-	endpointPorts := []corev1.EndpointPort{{Protocol: corev1.ProtocolTCP,
-		Port: int32(endpointPort),
-		Name: endpointPortName,
+// createEndpointPortSpec creates the endpoint ports
+func createEndpointPortSpec(endpointPort int, endpointPortName string) []corev1.EndpointPort {
+	return []corev1.EndpointPort{{
+		Protocol: corev1.ProtocolTCP,
+		Port:     int32(endpointPort),
+		Name:     endpointPortName,
 	}}
-	if extraEndpointPorts != nil {
-		endpointPorts = append(endpointPorts, extraEndpointPorts...)
-	}
-	return endpointPorts
 }
 
 // CreateOrUpdateMasterServiceIfNeeded will create the specified service if it
@@ -301,7 +319,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 	if s, err := c.ServiceClient.Services(metav1.NamespaceDefault).Get(context.TODO(), serviceName, metav1.GetOptions{}); err == nil {
 		// The service already exists.
 		if reconcile {
-			if svc, updated := reconcilers.GetMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
+			if svc, updated := getMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
 				klog.Warningf("Resetting master service %q to %#v", serviceName, svc)
 				_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Update(context.TODO(), svc, metav1.UpdateOptions{})
 				return err
@@ -332,4 +350,35 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		return c.CreateOrUpdateMasterServiceIfNeeded(serviceName, serviceIP, servicePorts, serviceType, reconcile)
 	}
 	return err
+}
+
+// getMasterServiceUpdateIfNeeded sets service attributes for the given apiserver service.
+func getMasterServiceUpdateIfNeeded(svc *corev1.Service, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType) (s *corev1.Service, updated bool) {
+	// Determine if the service is in the format we expect
+	// (servicePorts are present and service type matches)
+	formatCorrect := checkServiceFormat(svc, servicePorts, serviceType)
+	if formatCorrect {
+		return svc, false
+	}
+	svc.Spec.Ports = servicePorts
+	svc.Spec.Type = serviceType
+	return svc, true
+}
+
+// Determine if the service is in the correct format
+// getMasterServiceUpdateIfNeeded expects (servicePorts are correct
+// and service type matches).
+func checkServiceFormat(s *corev1.Service, ports []corev1.ServicePort, serviceType corev1.ServiceType) (formatCorrect bool) {
+	if s.Spec.Type != serviceType {
+		return false
+	}
+	if len(ports) != len(s.Spec.Ports) {
+		return false
+	}
+	for i, port := range ports {
+		if port != s.Spec.Ports[i] {
+			return false
+		}
+	}
+	return true
 }

@@ -46,7 +46,7 @@ run_persistent_volumes_tests() {
   kubectl create -f test/fixtures/doc-yaml/user-guide/persistent-volumes/volumes/local-01.yaml "${kube_flags[@]}"
   kube::test::get_object_assert pv "{{range.items}}{{$id_field}}:{{end}}" 'pv0001:'
   output_message=$(kubectl delete pv -n test --all 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'warning: deleting cluster-scoped resources'
+  kube::test::if_has_string "${output_message}" 'Warning: deleting cluster-scoped resources'
   kube::test::if_has_string "${output_message}" 'persistentvolume "pv0001" deleted'
   kube::test::get_object_assert pv "{{range.items}}{{$id_field}}:{{end}}" ''
 

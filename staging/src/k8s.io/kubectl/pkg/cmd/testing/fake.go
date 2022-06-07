@@ -51,7 +51,7 @@ import (
 	openapitesting "k8s.io/kubectl/pkg/util/openapi/testing"
 	"k8s.io/kubectl/pkg/validation"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 )
 
 // InternalType is the schema for internal type
@@ -364,24 +364,45 @@ func AddToScheme(scheme *runtime.Scheme) (meta.RESTMapper, runtime.Codec) {
 	return mapper, codec
 }
 
-type fakeCachedDiscoveryClient struct {
+type FakeCachedDiscoveryClient struct {
 	discovery.DiscoveryInterface
+	Groups             []*metav1.APIGroup
+	Resources          []*metav1.APIResourceList
+	PreferredResources []*metav1.APIResourceList
+	Invalidations      int
 }
 
-func (d *fakeCachedDiscoveryClient) Fresh() bool {
+func NewFakeCachedDiscoveryClient() *FakeCachedDiscoveryClient {
+	return &FakeCachedDiscoveryClient{
+		Groups:             []*metav1.APIGroup{},
+		Resources:          []*metav1.APIResourceList{},
+		PreferredResources: []*metav1.APIResourceList{},
+		Invalidations:      0,
+	}
+}
+
+func (d *FakeCachedDiscoveryClient) Fresh() bool {
 	return true
 }
 
-func (d *fakeCachedDiscoveryClient) Invalidate() {
+func (d *FakeCachedDiscoveryClient) Invalidate() {
+	d.Invalidations++
 }
 
-// Deprecated: use ServerGroupsAndResources instead.
-func (d *fakeCachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
-	return []*metav1.APIResourceList{}, nil
+func (d *FakeCachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	return d.Groups, d.Resources, nil
 }
 
-func (d *fakeCachedDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-	return []*metav1.APIGroup{}, []*metav1.APIResourceList{}, nil
+func (d *FakeCachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
+	groupList := &metav1.APIGroupList{Groups: []metav1.APIGroup{}}
+	for _, g := range d.Groups {
+		groupList.Groups = append(groupList.Groups, *g)
+	}
+	return groupList, nil
+}
+
+func (d *FakeCachedDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	return d.PreferredResources, nil
 }
 
 // TestFactory extends cmdutil.Factory
@@ -446,6 +467,17 @@ func (f *TestFactory) WithNamespace(ns string) *TestFactory {
 	return f
 }
 
+// WithClientConfig sets the client config to use
+func (f *TestFactory) WithClientConfig(clientConfig clientcmd.ClientConfig) *TestFactory {
+	f.kubeConfigFlags.WithClientConfig(clientConfig)
+	return f
+}
+
+func (f *TestFactory) WithDiscoveryClient(discoveryClient discovery.CachedDiscoveryInterface) *TestFactory {
+	f.kubeConfigFlags.WithDiscoveryClient(discoveryClient)
+	return f
+}
+
 // Cleanup cleans up TestFactory temp config file
 func (f *TestFactory) Cleanup() {
 	if f.tempConfigFile == nil {
@@ -493,7 +525,7 @@ func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (r
 }
 
 // Validator returns a validation schema
-func (f *TestFactory) Validator(validate bool) (validation.Schema, error) {
+func (f *TestFactory) Validator(validateDirective string, verifier *resource.QueryParamVerifier) (validation.Schema, error) {
 	return validation.NullSchema{}, nil
 }
 
@@ -617,7 +649,7 @@ func testRESTMapper() meta.RESTMapper {
 		},
 	}
 
-	fakeDs := &fakeCachedDiscoveryClient{}
+	fakeDs := NewFakeCachedDiscoveryClient()
 	expander := restmapper.NewShortcutExpander(mapper, fakeDs)
 	return expander
 }

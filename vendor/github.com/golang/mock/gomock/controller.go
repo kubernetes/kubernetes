@@ -123,7 +123,7 @@ type Controller struct {
 // Controller.
 //
 // New in go1.14+, if you are passing a *testing.T into this function you no
-// longer need to call ctrl.Finish() in your test methods
+// longer need to call ctrl.Finish() in your test methods.
 func NewController(t TestReporter) *Controller {
 	h, ok := t.(TestHelper)
 	if !ok {
@@ -259,6 +259,9 @@ func (ctrl *Controller) Call(receiver interface{}, method string, args ...interf
 // Finish checks to see if all the methods that were expected to be called
 // were called. It should be invoked for each Controller. It is not idempotent
 // and therefore can only be invoked once.
+//
+// New in go1.14+, if you are passing a *testing.T into NewController function you no
+// longer need to call ctrl.Finish() in your test methods.
 func (ctrl *Controller) Finish() {
 	// If we're currently panicking, probably because this is a deferred call.
 	// This must be recovered in the deferred function.

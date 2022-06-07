@@ -45,5 +45,6 @@ export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 make update
 
 if [[ -d "${ARTIFACTS:-}" ]]; then
-  git archive -o "${ARTIFACTS}/updated-files.zip" HEAD
+  # ignore the .git, _output directories and zip up everything else
+  zip -y -r "${ARTIFACTS}/updated-files.zip" . -x '*.git*' -x '*_output*'
 fi

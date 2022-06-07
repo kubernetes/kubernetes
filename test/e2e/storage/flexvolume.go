@@ -35,6 +35,7 @@ import (
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -157,6 +158,7 @@ func getHostFromHostPort(hostPort string) string {
 
 var _ = utils.SIGDescribe("Flexvolumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	// note that namespace deletion is handled by delete-namespace flag
 

@@ -105,7 +105,7 @@ func (apat *AttributePattern) QualifierPatterns() []*AttributeQualifierPattern {
 	return apat.qualifierPatterns
 }
 
-// AttributeQualifierPattern holds a wilcard or valued qualifier pattern.
+// AttributeQualifierPattern holds a wildcard or valued qualifier pattern.
 type AttributeQualifierPattern struct {
 	wildcard bool
 	value    interface{}
@@ -125,7 +125,7 @@ func (qpat *AttributeQualifierPattern) Matches(q Qualifier) bool {
 // type, is equal to the value held in the Qualifier. This interface is used by the
 // AttributeQualifierPattern to determine pattern matches for non-wildcard qualifier patterns.
 //
-// Note: Attribute values are also Qualifier values; however, Attriutes are resolved before
+// Note: Attribute values are also Qualifier values; however, Attributes are resolved before
 // qualification happens. This is an implementation detail, but one relevant to why the Attribute
 // types do not surface in the list of implementations.
 //
@@ -157,14 +157,23 @@ func (q *stringQualifier) QualifierValueEquals(value interface{}) bool {
 
 // QualifierValueEquals implementation for int qualifiers.
 func (q *intQualifier) QualifierValueEquals(value interface{}) bool {
-	ival, ok := value.(int64)
-	return ok && q.value == ival
+	return numericValueEquals(value, q.celValue)
 }
 
 // QualifierValueEquals implementation for uint qualifiers.
 func (q *uintQualifier) QualifierValueEquals(value interface{}) bool {
-	uval, ok := value.(uint64)
-	return ok && q.value == uval
+	return numericValueEquals(value, q.celValue)
+}
+
+// QualifierValueEquals implementation for double qualifiers.
+func (q *doubleQualifier) QualifierValueEquals(value interface{}) bool {
+	return numericValueEquals(value, q.celValue)
+}
+
+// numericValueEquals uses CEL equality to determine whether two number values are
+func numericValueEquals(value interface{}, celValue ref.Val) bool {
+	val := types.DefaultTypeAdapter.NativeToValue(value)
+	return celValue.Equal(val) == types.True
 }
 
 // NewPartialAttributeFactory returns an AttributeFactory implementation capable of performing
@@ -197,7 +206,7 @@ func (fac *partialAttributeFactory) AbsoluteAttribute(id int64, names ...string)
 }
 
 // MaybeAttribute implementation of the AttributeFactory interface which ensure that the set of
-// 'maybe' NamespacedAttribute values are produced using the PartialAttributeFactory rather than
+// 'maybe' NamespacedAttribute values are produced using the partialAttributeFactory rather than
 // the base AttributeFactory implementation.
 func (fac *partialAttributeFactory) MaybeAttribute(id int64, name string) Attribute {
 	return &maybeAttribute{
@@ -348,7 +357,8 @@ func (m *attributeMatcher) Resolve(vars Activation) (interface{}, error) {
 // the standard Resolve logic applies.
 func (m *attributeMatcher) TryResolve(vars Activation) (interface{}, bool, error) {
 	id := m.NamespacedAttribute.ID()
-	partial, isPartial := vars.(PartialActivation)
+	// Bug in how partial activation is resolved, should search parents as well.
+	partial, isPartial := toPartialActivation(vars)
 	if isPartial {
 		unk, err := m.fac.matchesUnknownPatterns(
 			partial,
@@ -380,4 +390,15 @@ func (m *attributeMatcher) Qualify(vars Activation, obj interface{}) (interface{
 		return nil, err
 	}
 	return qual.Qualify(vars, obj)
+}
+
+func toPartialActivation(vars Activation) (PartialActivation, bool) {
+	pv, ok := vars.(PartialActivation)
+	if ok {
+		return pv, true
+	}
+	if vars.Parent() != nil {
+		return toPartialActivation(vars.Parent())
+	}
+	return nil, false
 }

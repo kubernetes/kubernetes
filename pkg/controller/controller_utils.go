@@ -504,10 +504,10 @@ func validateControllerRef(controllerRef *metav1.OwnerReference) error {
 	if len(controllerRef.Kind) == 0 {
 		return fmt.Errorf("controllerRef has empty Kind")
 	}
-	if controllerRef.Controller == nil || *controllerRef.Controller != true {
+	if controllerRef.Controller == nil || !*controllerRef.Controller {
 		return fmt.Errorf("controllerRef.Controller is not set to true")
 	}
-	if controllerRef.BlockOwnerDeletion == nil || *controllerRef.BlockOwnerDeletion != true {
+	if controllerRef.BlockOwnerDeletion == nil || !*controllerRef.BlockOwnerDeletion {
 		return fmt.Errorf("controllerRef.BlockOwnerDeletion is not set")
 	}
 	return nil

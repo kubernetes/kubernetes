@@ -251,8 +251,8 @@
     works for CRD preserving unknown fields at the schema root [Conformance]'
   description: Register a custom resource definition with x-preserve-unknown-fields
     in the schema root. Attempt to create and apply a change a custom resource, via
-    kubectl; client-side validation MUST accept unknown properties. Attempt kubectl
-    explain; the output MUST show the custom resource KIND.
+    kubectl; kubectl validation MUST accept unknown properties. Attempt kubectl explain;
+    the output MUST show the custom resource KIND.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in embedded
@@ -261,7 +261,7 @@
     works for CRD preserving unknown fields in an embedded object [Conformance]'
   description: Register a custom resource definition with x-preserve-unknown-fields
     in an embedded object. Attempt to create and apply a change a custom resource,
-    via kubectl; client-side validation MUST accept unknown properties. Attempt kubectl
+    via kubectl; kubectl validation MUST accept unknown properties. Attempt kubectl
     explain; the output MUST show that x-preserve-unknown-properties is used on the
     nested field.
   release: v1.16
@@ -271,12 +271,12 @@
     works for CRD with validation schema [Conformance]'
   description: Register a custom resource definition with a validating schema consisting
     of objects, arrays and primitives. Attempt to create and apply a change a custom
-    resource using valid properties, via kubectl; client-side validation MUST pass.
-    Attempt both operations with unknown properties and without required properties;
-    client-side validation MUST reject the operations. Attempt kubectl explain; the
-    output MUST explain the custom resource properties. Attempt kubectl explain on
-    custom resource properties; the output MUST explain the nested custom resource
-    properties.
+    resource using valid properties, via kubectl; kubectl validation MUST pass. Attempt
+    both operations with unknown properties and without required properties; kubectl
+    validation MUST reject the operations. Attempt kubectl explain; the output MUST
+    explain the custom resource properties. Attempt kubectl explain on custom resource
+    properties; the output MUST explain the nested custom resource properties. All
+    validation should be the same.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
 - testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in object
@@ -284,7 +284,7 @@
     works for CRD without validation schema [Conformance]'
   description: Register a custom resource definition with x-preserve-unknown-fields
     in the top level object. Attempt to create and apply a change a custom resource,
-    via kubectl; client-side validation MUST accept unknown properties. Attempt kubectl
+    via kubectl; kubectl validation MUST accept unknown properties. Attempt kubectl
     explain; the output MUST contain a valid DESCRIPTION stanza.
   release: v1.16
   file: test/e2e/apimachinery/crd_publish_openapi.go
@@ -359,7 +359,7 @@
     between 10 and 100 replicas. Create second replication controller RC2 and set
     RC2 as owner for half of those replicas. Once RC1 is created and the all Pods
     are created, delete RC1 with deleteOptions.PropagationPolicy set to Foreground.
-    Half of the Pods that has RC2 as owner MUST not be deleted but have a deletion
+    Half of the Pods that has RC2 as owner MUST not be deleted or have a deletion
     timestamp. Deleting the Replication Controller MUST not delete Pods that are owned
     by multiple replication controllers.
   release: v1.9
@@ -763,11 +763,37 @@
     pod. Modify the labels of one of the Job's Pods. The Job MUST release the Pod.
   release: v1.16
   file: test/e2e/apps/job.go
+- testname: Jobs, apply changes to status
+  codename: '[sig-apps] Job should apply changes to a job status [Conformance]'
+  description: Attempt to create a running Job which MUST succeed. Attempt to patch
+    the Job status to include a new start time which MUST succeed. An annotation for
+    the job that was patched MUST be found. Attempt to replace the job status with
+    a new start time which MUST succeed. Attempt to read its status sub-resource which
+    MUST succeed
+  release: v1.24
+  file: test/e2e/apps/job.go
+- testname: Ensure Pods of an Indexed Job get a unique index.
+  codename: '[sig-apps] Job should create pods for an Indexed job with completion
+    indexes and specified hostname [Conformance]'
+  description: Create an Indexed job. Job MUST complete successfully. Ensure that
+    created pods have completion index annotation and environment variable.
+  release: v1.24
+  file: test/e2e/apps/job.go
 - testname: Jobs, active pods, graceful termination
   codename: '[sig-apps] Job should delete a job [Conformance]'
   description: Create a job. Ensure the active pods reflect paralellism in the namespace
     and delete the job. Job MUST be deleted successfully.
   release: v1.15
+  file: test/e2e/apps/job.go
+- testname: Jobs, manage lifecycle
+  codename: '[sig-apps] Job should manage the lifecycle of a job [Conformance]'
+  description: Attempt to create a suspended Job which MUST succeed. Attempt to patch
+    the Job to include a new label which MUST succeed. The label MUST be found. Attempt
+    to replace the Job to include a new annotation which MUST succeed. The annotation
+    MUST be found. Attempt to list all namespaces with a label selector which MUST
+    succeed. One list MUST be found. It MUST succeed at deleting a collection of jobs
+    via a label selector.
+  release: v1.25
   file: test/e2e/apps/job.go
 - testname: Jobs, completion after task failure
   codename: '[sig-apps] Job should run a job to completion when tasks sometimes fail
@@ -1191,8 +1217,7 @@
   release: v1.20
   file: test/e2e/instrumentation/core_events.go
 - testname: DNS, cluster
-  codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [LinuxOnly]
-    [Conformance]'
+  codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [Conformance]'
   description: When a Pod is created, the pod MUST be able to resolve cluster dns
     entries such as kubernetes.default via /etc/hosts.
   release: v1.14
@@ -1206,8 +1231,7 @@
   release: v1.15
   file: test/e2e/network/dns.go
 - testname: DNS, resolve the hostname
-  codename: '[sig-network] DNS should provide DNS for pods for Hostname [LinuxOnly]
-    [Conformance]'
+  codename: '[sig-network] DNS should provide DNS for pods for Hostname [Conformance]'
   description: Create a headless service with label. Create a Pod with label to match
     service's label, with hostname and a subdomain same as service name. Pod MUST
     be able to resolve its fully qualified domain name as well as hostname by serving
@@ -1366,8 +1390,8 @@
     the each of service proxy endpoints in the cluster using a http post(protocol=tcp)  and
     the request MUST be successful. Container will execute curl command to reach the
     service port within specified max retry limit and MUST result in reporting unique
-    hostnames. This test is marked LinuxOnly since HostNetwork is not supported on
-    other platforms like Windows.
+    hostnames. This test is marked LinuxOnly it breaks when using Overlay networking
+    with Windows.
   release: v1.9
   file: test/e2e/common/network/networking.go
 - testname: Networking, intra pod http, from node
@@ -1380,8 +1404,8 @@
     the each of service proxy endpoints in the cluster using a http post(protocol=udp)  and
     the request MUST be successful. Container will execute curl command to reach the
     service port within specified max retry limit and MUST result in reporting unique
-    hostnames. This test is marked LinuxOnly since HostNetwork is not supported on
-    other platforms like Windows.
+    hostnames. This test is marked LinuxOnly it breaks when using Overlay networking
+    with Windows.
   release: v1.9
   file: test/e2e/common/network/networking.go
 - testname: Proxy, validate Proxy responses
@@ -1690,18 +1714,6 @@
     server pod to validate that the pre-stop is executed.
   release: v1.9
   file: test/e2e/common/node/lifecycle_hook.go
-- testname: Container Runtime, TerminationMessagePath, non-root user and non-default
-    path
-  codename: '[sig-node] Container Runtime blackbox test on terminated container should
-    report termination message [LinuxOnly] if TerminationMessagePath is set as non-root
-    user and at a non-default path [NodeConformance] [Conformance]'
-  description: 'Create a pod with a container to run it as a non-root user with a
-    custom TerminationMessagePath set. Pod redirects the output to the provided path
-    successfully. When the container is terminated, the termination message MUST match
-    the expected output logged in the provided custom path. [LinuxOnly]: Tagged LinuxOnly
-    due to use of ''uid'' and unable to mount files in Windows Containers.'
-  release: v1.15
-  file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, TerminationMessage, from log output of succeeding container
   codename: '[sig-node] Container Runtime blackbox test on terminated container should
     report termination message as empty when pod succeeds and TerminationMessagePolicy
@@ -1728,6 +1740,17 @@
   description: Create a pod with an container. Container's output is recorded in log
     and container exits with an error. When container is terminated, termination message
     MUST match the expected output recorded from container's log.
+  release: v1.15
+  file: test/e2e/common/node/runtime.go
+- testname: Container Runtime, TerminationMessagePath, non-root user and non-default
+    path
+  codename: '[sig-node] Container Runtime blackbox test on terminated container should
+    report termination message if TerminationMessagePath is set as non-root user and
+    at a non-default path [NodeConformance] [Conformance]'
+  description: Create a pod with a container to run it as a non-root user with a custom
+    TerminationMessagePath set. Pod redirects the output to the provided path successfully.
+    When the container is terminated, the termination message MUST match the expected
+    output logged in the provided custom path.
   release: v1.15
   file: test/e2e/common/node/runtime.go
 - testname: Container Runtime, Restart Policy, Pod Phases
@@ -1927,6 +1950,13 @@
     when listed by its label selector.
   release: v1.19
   file: test/e2e/common/node/podtemplates.go
+- testname: PodTemplate, replace
+  codename: '[sig-node] PodTemplates should replace a pod template [Conformance]'
+  description: Attempt to create a PodTemplate which MUST succeed. Attempt to replace
+    the PodTemplate to include a new annotation which MUST succeed. The annotation
+    MUST be found in the new PodTemplate.
+  release: v1.24
+  file: test/e2e/common/node/podtemplates.go
 - testname: PodTemplate lifecycle
   codename: '[sig-node] PodTemplates should run the lifecycle of PodTemplates [Conformance]'
   description: Attempt to create a PodTemplate. Patch the created PodTemplate. Fetching
@@ -2103,6 +2133,36 @@
     document. The runtimeclasses resource MUST exist in the /apis/node.k8s.io/v1 discovery
     document. The runtimeclasses resource must support create, get, list, watch, update,
     patch, delete, and deletecollection.'
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
+- testname: Pod with the deleted RuntimeClass is rejected.
+  codename: '[sig-node] RuntimeClass should reject a Pod requesting a deleted RuntimeClass
+    [NodeConformance] [Conformance]'
+  description: Pod requesting the deleted RuntimeClass must be rejected.
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
+- testname: Pod with the non-existing RuntimeClass is rejected.
+  codename: '[sig-node] RuntimeClass should reject a Pod requesting a non-existent
+    RuntimeClass [NodeConformance] [Conformance]'
+  description: The Pod requesting the non-existing RuntimeClass must be rejected.
+  release: v1.20
+  file: test/e2e/common/node/runtimeclass.go
+- testname: RuntimeClass Overhead field must be respected.
+  codename: '[sig-node] RuntimeClass should schedule a Pod requesting a RuntimeClass
+    and initialize its Overhead [NodeConformance] [Conformance]'
+  description: The Pod requesting the existing RuntimeClass must be scheduled. This
+    test doesn't validate that the Pod will actually start because this functionality
+    depends on container runtime and preconfigured handler. Runtime-specific functionality
+    is not being tested here.
+  release: v1.24
+  file: test/e2e/common/node/runtimeclass.go
+- testname: Can schedule a pod requesting existing RuntimeClass.
+  codename: '[sig-node] RuntimeClass should schedule a Pod requesting a RuntimeClass
+    without PodOverhead [NodeConformance] [Conformance]'
+  description: The Pod requesting the existing RuntimeClass must be scheduled. This
+    test doesn't validate that the Pod will actually start because this functionality
+    depends on container runtime and preconfigured handler. Runtime-specific functionality
+    is not being tested here.
   release: v1.20
   file: test/e2e/common/node/runtimeclass.go
 - testname: Secrets, pod environment field
@@ -2339,6 +2399,16 @@
     pod.
   release: v1.19
   file: test/e2e/scheduling/preemption.go
+- testname: CSIStorageCapacity API
+  codename: '[sig-storage] CSIStorageCapacity  should support CSIStorageCapacities
+    API operations [Conformance]'
+  description: ' The storage.k8s.io API group MUST exist in the /apis discovery document.
+    The storage.k8s.io/v1 API group/version MUST exist in the /apis/mode.k8s.io discovery
+    document. The csistoragecapacities resource MUST exist in the /apis/storage.k8s.io/v1
+    discovery document. The csistoragecapacities resource must support create, get,
+    list, watch, update, patch, delete, and deletecollection.'
+  release: v1.24
+  file: test/e2e/storage/csistoragecapacity.go
 - testname: ConfigMap Volume, text data, binary data
   codename: '[sig-storage] ConfigMap binary data should be reflected in volume [NodeConformance]
     [Conformance]'

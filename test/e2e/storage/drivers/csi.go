@@ -40,7 +40,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -147,6 +146,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapBlock:               true,
 		storageframework.CapPVCDataSource:       true,
 		storageframework.CapControllerExpansion: true,
+		storageframework.CapOfflineExpansion:    true,
 		storageframework.CapOnlineExpansion:     true,
 		storageframework.CapSingleNodeVolume:    true,
 
@@ -243,14 +243,6 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 		ProvisionerContainerName: "csi-provisioner",
 		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 node.Name,
-	}
-
-	// Disable volume lifecycle checks due to issue #103651 for the one
-	// test that it breaks.
-	// TODO: enable this check once issue is resolved for csi-host-path driver
-	// (https://github.com/kubernetes/kubernetes/pull/104858).
-	if regexp.MustCompile("should unmount if pod is.*deleted while kubelet is down").MatchString(ginkgo.CurrentGinkgoTestDescription().FullTestText) {
-		o.DriverContainerArguments = append(o.DriverContainerArguments, "--check-volume-lifecycle=false")
 	}
 
 	cleanup, err := utils.CreateFromManifests(config.Framework, driverNamespace, func(item interface{}) error {
@@ -810,6 +802,7 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapVolumeLimits:        false,
 				storageframework.CapTopology:            true,
 				storageframework.CapControllerExpansion: true,
+				storageframework.CapOfflineExpansion:    true,
 				storageframework.CapOnlineExpansion:     true,
 				storageframework.CapNodeExpansion:       true,
 				storageframework.CapSnapshotDataSource:  true,

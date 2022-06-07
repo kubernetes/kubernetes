@@ -463,6 +463,68 @@ func TestZonesNoConfig(t *testing.T) {
 	}
 }
 
+func TestZonesWithCredsInSecret(t *testing.T) {
+	noSecretCfg, err := readConfig(strings.NewReader(`
+[Global]
+user = "vsphere-creds"
+password = "kube-system"
+insecure-flag = "1"
+[Workspace]
+server = "vcenter.example.com"
+datacenter = "LAB"
+default-datastore = "datastore"
+folder = "/LAB/vm/lab-gxjfk"
+[VirtualCenter "vcenter.example.com"]
+datacenters = "LAB"
+[Labels]
+region = "kube-region"
+zone = "kube-zone"
+`))
+	if err != nil {
+		t.Fatalf("Should succeed when a valid config is provided: %s", err)
+	}
+	vsphere, err := buildVSphereFromConfig(noSecretCfg)
+	if err != nil {
+		t.Fatalf("Should succeed when a valid config is provided: %s", err)
+	}
+	_, ok := vsphere.Zones()
+	if !ok {
+		t.Fatalf("Zones should return true with plain text credentials")
+	}
+
+	// Return false in case if secret provided but no informers (no NodeManager.credentialManager basically) set up.
+	// Such situation happens during kubelet startup process, when InitialNode creates.
+	// See https://github.com/kubernetes/kubernetes/issues/75175
+	// and https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kubelet_node_status.go#L418
+	withSecretCfg, err := readConfig(strings.NewReader(`
+[Global]
+secret-name = "vsphere-creds"
+secret-namespace = "kube-system"
+insecure-flag = "1"
+[Workspace]
+server = "vcenter.example.com"
+datacenter = "LAB"
+default-datastore = "datastore_big"
+folder = "/LAB/vm/lab-gxjfk"
+[VirtualCenter "vcenter.example.com"]
+datacenters = "LAB"
+[Labels]
+region = "kube-region"
+zone = "kube-zone"
+`))
+	if err != nil {
+		t.Fatalf("Should succeed when a valid config is provided: %s", err)
+	}
+	vsphere, err = buildVSphereFromConfig(withSecretCfg)
+	if err != nil {
+		t.Fatalf("Should succeed when a valid config is provided: %s", err)
+	}
+	_, ok = vsphere.Zones()
+	if ok {
+		t.Fatalf("Zones should return false with plain credentials in secret")
+	}
+}
+
 func TestZones(t *testing.T) {
 	// Any context will do
 	ctx := context.Background()

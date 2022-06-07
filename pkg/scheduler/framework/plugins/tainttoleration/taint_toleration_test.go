@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -230,7 +231,7 @@ func TestTaintTolerationScore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
 			snapshot := cache.NewSnapshot(nil, test.nodes)
-			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			fh, _ := runtime.NewFramework(nil, nil, wait.NeverStop, runtime.WithSnapshotSharedLister(snapshot))
 
 			p, _ := New(nil, fh)
 			status := p.(framework.PreScorePlugin).PreScore(context.Background(), state, test.pod, test.nodes)
@@ -271,7 +272,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 			pod:  podWithTolerations("pod1", []v1.Toleration{}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
-				"node(s) had taint {dedicated: user1}, that the pod didn't tolerate"),
+				"node(s) had untolerated taint {dedicated: user1}"),
 		},
 		{
 			name: "A pod which can be scheduled on a dedicated node assigned to user1 with effect NoSchedule",
@@ -283,7 +284,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
-				"node(s) had taint {dedicated: user1}, that the pod didn't tolerate"),
+				"node(s) had untolerated taint {dedicated: user1}"),
 		},
 		{
 			name: "A pod can be scheduled onto the node, with a toleration uses operator Exists that tolerates the taints on the node",
@@ -307,7 +308,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 			pod:  podWithTolerations("pod1", []v1.Toleration{{Key: "foo", Operator: "Equal", Value: "bar", Effect: "PreferNoSchedule"}}),
 			node: nodeWithTaints("nodeA", []v1.Taint{{Key: "foo", Value: "bar", Effect: "NoSchedule"}}),
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
-				"node(s) had taint {foo: bar}, that the pod didn't tolerate"),
+				"node(s) had untolerated taint {foo: bar}"),
 		},
 		{
 			name: "The pod has a toleration that keys and values match the taint on the node, the effect of toleration is empty, " +

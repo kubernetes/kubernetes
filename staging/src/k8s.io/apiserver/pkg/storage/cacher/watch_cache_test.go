@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/client-go/tools/cache"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -72,9 +71,31 @@ type testWatchCache struct {
 }
 
 func (w *testWatchCache) getAllEventsSince(resourceVersion uint64) ([]*watchCacheEvent, error) {
-	w.watchCache.RLock()
-	defer w.watchCache.RUnlock()
-	return w.watchCache.GetAllEventsSinceThreadUnsafe(resourceVersion)
+	cacheInterval, err := w.getCacheIntervalForEvents(resourceVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	result := []*watchCacheEvent{}
+	for {
+		event, err := cacheInterval.Next()
+		if err != nil {
+			return nil, err
+		}
+		if event == nil {
+			break
+		}
+		result = append(result, event)
+	}
+
+	return result, nil
+}
+
+func (w *testWatchCache) getCacheIntervalForEvents(resourceVersion uint64) (*watchCacheInterval, error) {
+	w.RLock()
+	defer w.RUnlock()
+
+	return w.getAllEventsSinceLocked(resourceVersion)
 }
 
 // newTestWatchCache just adds a fake clock.
@@ -89,7 +110,7 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 		}
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
-	versioner := etcd3.APIObjectVersioner{}
+	versioner := storage.APIObjectVersioner{}
 	mockHandler := func(*watchCacheEvent) {}
 	wc := newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), reflect.TypeOf(&example.Pod{}))
 	// To preserve behavior of tests that assume a given capacity,

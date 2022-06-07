@@ -261,9 +261,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 		}
 	}
 
-	// TODO: in order for exec probes to correctly handle downward API env, we must be able to reconstruct
-	// the full container environment here, OR we must make a call to the CRI in order to get those environment
-	// values from the running container.
+	// Note, exec probe does NOT have access to pod environment variables or downward API
 	result, err := w.probeManager.prober.probe(w.probeType, w.pod, status, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.

@@ -29,6 +29,7 @@ type pluginInitializer struct {
 	externalInformers informers.SharedInformerFactory
 	authorizer        authorizer.Authorizer
 	featureGates      featuregate.FeatureGate
+	stopCh            <-chan struct{}
 }
 
 // New creates an instance of admission plugins initializer.
@@ -39,19 +40,26 @@ func New(
 	extInformers informers.SharedInformerFactory,
 	authz authorizer.Authorizer,
 	featureGates featuregate.FeatureGate,
+	stopCh <-chan struct{},
 ) pluginInitializer {
 	return pluginInitializer{
 		externalClient:    extClientset,
 		externalInformers: extInformers,
 		authorizer:        authz,
 		featureGates:      featureGates,
+		stopCh:            stopCh,
 	}
 }
 
 // Initialize checks the initialization interfaces implemented by a plugin
 // and provide the appropriate initialization data
 func (i pluginInitializer) Initialize(plugin admission.Interface) {
-	// First tell the plugin about enabled features, so it can decide whether to start informers or not
+	// First tell the plugin about drained notification, so it can pass it to further initializations.
+	if wants, ok := plugin.(WantsDrainedNotification); ok {
+		wants.SetDrainedNotification(i.stopCh)
+	}
+
+	// Second tell the plugin about enabled features, so it can decide whether to start informers or not
 	if wants, ok := plugin.(WantsFeatures); ok {
 		wants.InspectFeatureGates(i.featureGates)
 	}

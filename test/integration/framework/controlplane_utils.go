@@ -65,6 +65,13 @@ const (
 	UnprivilegedUserToken = "unprivileged-user"
 )
 
+// MinVerbosity determines the minimum klog verbosity when running tests that
+// involve the apiserver.  This overrides the -v value from the command line,
+// i.e. -v=0 has no effect when MinVerbosity is 4 (the default).  Tests can opt
+// out of this by setting MinVerbosity to zero before starting the control
+// plane or choose some different minimum verbosity.
+var MinVerbosity = 4
+
 // Config is a struct of configuration directives for NewControlPlaneComponents.
 type Config struct {
 	// If nil, a default is used, partially filled configs will not get populated.
@@ -134,16 +141,35 @@ func DefaultOpenAPIConfig() *openapicommon.Config {
 	return openAPIConfig
 }
 
+// DefaultOpenAPIV3Config returns an openapicommon.Config initialized to default values.
+func DefaultOpenAPIV3Config() *openapicommon.Config {
+	openAPIConfig := genericapiserver.DefaultOpenAPIV3Config(openapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme))
+	openAPIConfig.Info = &spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:   "Kubernetes",
+			Version: "unversioned",
+		},
+	}
+	openAPIConfig.DefaultResponse = &spec.Response{
+		ResponseProps: spec.ResponseProps{
+			Description: "Default Response.",
+		},
+	}
+	openAPIConfig.GetDefinitions = utilopenapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(openapi.GetOpenAPIDefinitions)
+
+	return openAPIConfig
+}
+
 // startAPIServerOrDie starts a kubernetes API server and an httpserver to handle api requests
 func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer *httptest.Server, apiServerReceiver APIServerReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	var m *controlplane.Instance
 	var s *httptest.Server
 
-	// Ensure we log at least level 4
+	// Ensure we log at least at the desired level
 	v := flag.Lookup("v").Value
 	level, _ := strconv.Atoi(v.String())
-	if level < 4 {
-		v.Set("4")
+	if level < MinVerbosity {
+		v.Set(strconv.Itoa(MinVerbosity))
 	}
 
 	if incomingServer != nil {
@@ -155,11 +181,25 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	}
 
 	stopCh := make(chan struct{})
+
+	// the APIServer implements logic to handle the shutdown process, taking care of draining
+	// the connections, closing the listener socket, running the preShutdown hooks, stopping the postStartHooks, ...
+	// In the integration framework we don't have that logic so we try to emulate a similar shutdown process.
+	// Ref: staging/src/k8s.io/apiserver/pkg/server/genericapiserver.go
 	closeFn := func() {
 		if m != nil {
 			m.GenericAPIServer.RunPreShutdownHooks()
 		}
+		// Signal RunPostStartHooks to finish
 		close(stopCh)
+		// Clean up APIServer resources
+		m.GenericAPIServer.Destroy()
+		// At this point the APIserver was already "destroyed", new requests will not be processed,
+		// however, the httptest.Server.Close() method will block if there are active connections.
+		// To avoid that any spurious connection keeps the test hanging, we forcefully close the
+		// connections before shuting down the server. There is a small window where new connections
+		// can be initiated but is unlikely those move to active, hanging the server shutdown.
+		s.CloseClientConnections()
 		s.Close()
 	}
 
@@ -206,6 +246,7 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 
 	clientset, err := clientset.NewForConfig(controlPlaneConfig.GenericConfig.LoopbackClientConfig)
 	if err != nil {
+		closeFn()
 		klog.Fatal(err)
 	}
 
@@ -361,6 +402,9 @@ func NewControlPlaneConfigWithOptions(opts *ControlPlaneConfigOptions) *controlp
 // CloseFunc can be called to cleanup the API server
 type CloseFunc func()
 
+// DEPRECATED: Use StartTestServer or directly StartTestServer directly
+// from cmd/kube-apiserver/app/testing.
+//
 // RunAnAPIServer starts a API server with the provided config.
 func RunAnAPIServer(controlPlaneConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	if controlPlaneConfig == nil {

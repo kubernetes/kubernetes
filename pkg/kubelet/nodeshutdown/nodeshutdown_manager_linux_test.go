@@ -22,6 +22,7 @@ package nodeshutdown
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -251,6 +252,7 @@ func TestManager(t *testing.T) {
 				ShutdownGracePeriodRequested:    tc.shutdownGracePeriodRequested,
 				ShutdownGracePeriodCriticalPods: tc.shutdownGracePeriodCriticalPods,
 				Clock:                           testingclock.NewFakeClock(time.Now()),
+				StateDirectory:                  os.TempDir(),
 			})
 
 			err := manager.Start()
@@ -345,8 +347,8 @@ func TestFeatureEnabled(t *testing.T) {
 				SyncNodeStatusFunc:              func() {},
 				ShutdownGracePeriodRequested:    tc.shutdownGracePeriodRequested,
 				ShutdownGracePeriodCriticalPods: 0,
+				StateDirectory:                  os.TempDir(),
 			})
-
 			assert.Equal(t, tc.expectEnabled, manager != managerStub{})
 		})
 	}
@@ -399,6 +401,7 @@ func TestRestart(t *testing.T) {
 		SyncNodeStatusFunc:              syncNodeStatus,
 		ShutdownGracePeriodRequested:    shutdownGracePeriodRequested,
 		ShutdownGracePeriodCriticalPods: shutdownGracePeriodCriticalPods,
+		StateDirectory:                  os.TempDir(),
 	})
 
 	err := manager.Start()
@@ -614,6 +617,23 @@ func Test_groupByPriority(t *testing.T) {
 	}
 }
 
+type buffer struct {
+	b  bytes.Buffer
+	rw sync.RWMutex
+}
+
+func (b *buffer) String() string {
+	b.rw.RLock()
+	defer b.rw.RUnlock()
+	return b.b.String()
+}
+
+func (b *buffer) Write(p []byte) (n int, err error) {
+	b.rw.Lock()
+	defer b.rw.Unlock()
+	return b.b.Write(p)
+}
+
 func Test_managerImpl_processShutdownEvent(t *testing.T) {
 	var (
 		probeManager   = probetest.FakeManager{}
@@ -677,14 +697,14 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-
-		l := klog.Level(1)
-		l.Set("1")
-		tmpWriteBuffer := bytes.NewBuffer(nil)
-		klog.SetOutput(tmpWriteBuffer)
-		klog.LogToStderr(false)
-
 		t.Run(tt.name, func(t *testing.T) {
+			l := klog.Level(1)
+			l.Set("1")
+			// hijack the klog output
+			tmpWriteBuffer := new(buffer)
+			klog.SetOutput(tmpWriteBuffer)
+			klog.LogToStderr(false)
+
 			m := &managerImpl{
 				recorder:                         tt.fields.recorder,
 				nodeRef:                          tt.fields.nodeRef,

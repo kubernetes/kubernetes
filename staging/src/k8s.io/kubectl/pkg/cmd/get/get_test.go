@@ -168,7 +168,7 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	defer tf.Cleanup()
 	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 
-	// overide the openAPISchema function to return custom output
+	// override the openAPISchema function to return custom output
 	// for Pod type.
 	tf.OpenAPISchemaFunc = testOpenAPISchemaData
 	tf.UnstructuredClient = &fake.RESTClient{
@@ -237,6 +237,60 @@ func TestGetObjects(t *testing.T) {
 	expected := `NAME   AGE
 foo    <unknown>
 `
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetObjectSubresourceStatus(t *testing.T) {
+	_, _, replicationcontrollers := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &replicationcontrollers.Items[0])},
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("subresource", "status")
+	cmd.Run(cmd, []string{"replicationcontrollers", "rc1"})
+
+	expected := `NAME   AGE
+rc1    <unknown>
+`
+
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestGetObjectSubresourceScale(t *testing.T) {
+	_, _, replicationcontrollers := cmdtesting.TestData()
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: replicationControllersScaleSubresourceTableObjBody(codec, replicationcontrollers.Items[0])},
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("subresource", "scale")
+	cmd.Run(cmd, []string{"replicationcontrollers", "rc1"})
+
+	expected := `NAME   DESIRED   AVAILABLE
+rc1    1         0
+`
+
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
@@ -676,7 +730,6 @@ func TestGetEmptyTable(t *testing.T) {
 "kind":"Table",
 "apiVersion":"meta.k8s.io/v1beta1",
 "metadata":{
-	"selfLink":"/api/v1/namespaces/default/pods",
 	"resourceVersion":"346"
 },
 "columnDefinitions":[
@@ -1297,8 +1350,7 @@ func TestGetMixedGenericObjects(t *testing.T) {
     ],
     "kind": "List",
     "metadata": {
-        "resourceVersion": "",
-        "selfLink": ""
+        "resourceVersion": ""
     }
 }
 `
@@ -1476,8 +1528,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
     ],
     "kind": "List",
     "metadata": {
-        "resourceVersion": "",
-        "selfLink": ""
+        "resourceVersion": ""
     }
 }
 `
@@ -2902,6 +2953,26 @@ func componentStatusTableObjBody(codec runtime.Codec, componentStatuses ...corev
 func emptyTableObjBody(codec runtime.Codec) io.ReadCloser {
 	table := &metav1.Table{
 		ColumnDefinitions: podColumns,
+	}
+	return cmdtesting.ObjBody(codec, table)
+}
+
+func replicationControllersScaleSubresourceTableObjBody(codec runtime.Codec, replicationControllers ...corev1.ReplicationController) io.ReadCloser {
+	table := &metav1.Table{
+		ColumnDefinitions: []metav1.TableColumnDefinition{
+			{Name: "Name", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+			{Name: "Desired", Type: "integer", Description: autoscalingv1.ScaleSpec{}.SwaggerDoc()["replicas"]},
+			{Name: "Available", Type: "integer", Description: autoscalingv1.ScaleStatus{}.SwaggerDoc()["replicas"]},
+		},
+	}
+
+	for i := range replicationControllers {
+		b := bytes.NewBuffer(nil)
+		codec.Encode(&replicationControllers[i], b)
+		table.Rows = append(table.Rows, metav1.TableRow{
+			Object: runtime.RawExtension{Raw: b.Bytes()},
+			Cells:  []interface{}{replicationControllers[i].Name, replicationControllers[i].Spec.Replicas, replicationControllers[i].Status.Replicas},
+		})
 	}
 	return cmdtesting.ObjBody(codec, table)
 }

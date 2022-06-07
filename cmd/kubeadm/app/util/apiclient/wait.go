@@ -185,18 +185,19 @@ func (w *KubeWaiter) SetTimeout(timeout time.Duration) {
 func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error) {
 
 	componentHash := ""
-	var err error
+	var err, lastErr error
 	mirrorPodHashes := map[string]string{}
 	for _, component := range kubeadmconstants.ControlPlaneComponents {
 		err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 			componentHash, err = getStaticPodSingleHash(w.client, nodeName, component)
 			if err != nil {
+				lastErr = err
 				return false, nil
 			}
 			return true, nil
 		})
 		if err != nil {
-			return nil, err
+			return nil, lastErr
 		}
 		mirrorPodHashes[component] = componentHash
 	}
@@ -208,27 +209,34 @@ func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[st
 func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component string) (string, error) {
 
 	componentPodHash := ""
-	var err error
+	var err, lastErr error
 	err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		componentPodHash, err = getStaticPodSingleHash(w.client, nodeName, component)
 		if err != nil {
+			lastErr = err
 			return false, nil
 		}
 		return true, nil
 	})
 
+	if err != nil {
+		err = lastErr
+	}
 	return componentPodHash, err
 }
 
 // WaitForStaticPodHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
 // This implicitly means this function blocks until the kubelet has restarted the Static Pod in question
 func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHash string) error {
-	return wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
-
+	var err, lastErr error
+	err = wait.PollImmediate(kubeadmconstants.APICallRetryInterval, w.timeout, func() (bool, error) {
 		hash, err := getStaticPodSingleHash(w.client, nodeName, component)
 		if err != nil {
+			lastErr = err
 			return false, nil
 		}
+		// Set lastErr to nil to be able to later distinguish between getStaticPodSingleHash() and timeout errors
+		lastErr = nil
 		// We should continue polling until the UID changes
 		if hash == previousHash {
 			return false, nil
@@ -236,6 +244,15 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 
 		return true, nil
 	})
+
+	// If lastError is not nil, this must be a getStaticPodSingleHash() error, else if err is not nil there was a poll timeout
+	if lastErr != nil {
+		return lastErr
+	}
+	if err != nil {
+		return errors.Wrapf(err, "static Pod hash for component %s on Node %s did not change after %v", component, nodeName, w.timeout)
+	}
+	return nil
 }
 
 // getStaticPodSingleHash computes hashes for a single Static Pod resource
@@ -244,11 +261,10 @@ func getStaticPodSingleHash(client clientset.Interface, nodeName string, compone
 	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
 	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), staticPodName, metav1.GetOptions{})
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "failed to obtain static Pod hash for component %s on Node %s", component, nodeName)
 	}
 
 	staticPodHash := staticPod.Annotations["kubernetes.io/config.hash"]
-	fmt.Printf("Static pod: %s hash: %s\n", staticPodName, staticPodHash)
 	return staticPodHash, nil
 }
 

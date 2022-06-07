@@ -554,10 +554,6 @@ func (f *stubVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{}
 }
 
-func (f *stubVolume) CanMount() error {
-	return nil
-}
-
 func (f *stubVolume) SetUp(mounterArgs volume.MounterArgs) error {
 	return nil
 }

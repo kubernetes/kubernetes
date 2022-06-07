@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: etcd
-        image: quay.io/coreos/etcd:v3.0.15
+        image: gcr.io/etcd-development/etcd:v3.0.15
         command:
         - "etcd"
         - "--listen-client-urls=https://0.0.0.0:4001"

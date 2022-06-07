@@ -36,6 +36,7 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -115,6 +116,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewFrameworkWithCustomTimeouts("volume-expand", storageframework.GetDriverTimeouts(driver))
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	init := func() {
 		l = local{}
@@ -174,6 +176,10 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 		ginkgo.It("Verify if offline PVC expansion works", func() {
 			init()
 			defer cleanup()
+
+			if !driver.GetDriverInfo().Capabilities[storageframework.CapOfflineExpansion] {
+				e2eskipper.Skipf("Driver %q does not support offline volume expansion - skipping", driver.GetDriverInfo().Name)
+			}
 
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")

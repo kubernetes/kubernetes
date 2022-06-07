@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/pod-security-admission/api"
@@ -71,7 +70,7 @@ func procMount_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) Chec
 			return
 		}
 		// check if the value of the proc mount type is valid.
-		if *container.SecurityContext.ProcMount != v1.DefaultProcMount {
+		if *container.SecurityContext.ProcMount != corev1.DefaultProcMount {
 			badContainers = append(badContainers, container.Name)
 			forbiddenProcMountTypes.Insert(string(*container.SecurityContext.ProcMount))
 		}

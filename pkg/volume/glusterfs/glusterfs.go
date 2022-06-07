@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	dstrings "strings"
 	"sync"
@@ -73,14 +72,13 @@ var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
 var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
 const (
-	glusterfsPluginName            = "kubernetes.io/glusterfs"
-	volPrefix                      = "vol_"
-	dynamicEpSvcPrefix             = "glusterfs-dynamic"
-	replicaCount                   = 3
-	secretKeyName                  = "key" // key name used in secret
-	gciLinuxGlusterMountBinaryPath = "/sbin/mount.glusterfs"
-	defaultGidMin                  = 2000
-	defaultGidMax                  = math.MaxInt32
+	glusterfsPluginName = "kubernetes.io/glusterfs"
+	volPrefix           = "vol_"
+	dynamicEpSvcPrefix  = "glusterfs-dynamic"
+	replicaCount        = 3
+	secretKeyName       = "key" // key name used in secret
+	defaultGidMin       = 2000
+	defaultGidMax       = math.MaxInt32
 
 	// maxCustomEpNamePrefix is the maximum number of chars.
 	// which can be used as ep/svc name prefix. This number is carved
@@ -251,24 +249,10 @@ var _ volume.Mounter = &glusterfsMounter{}
 
 func (b *glusterfsMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         false,
-		SupportsSELinux: false,
+		ReadOnly:       b.readOnly,
+		Managed:        false,
+		SELinuxRelabel: false,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *glusterfsMounter) CanMount() error {
-	exe := b.plugin.host.GetExec(b.plugin.GetPluginName())
-	switch runtime.GOOS {
-	case "linux":
-		if _, err := exe.Command("test", "-x", gciLinuxGlusterMountBinaryPath).CombinedOutput(); err != nil {
-			return fmt.Errorf("required binary %s is missing", gciLinuxGlusterMountBinaryPath)
-		}
-	}
-	return nil
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.

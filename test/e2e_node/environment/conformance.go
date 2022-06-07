@@ -21,7 +21,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os/exec"
 	"regexp"
@@ -31,7 +30,7 @@ import (
 	"os"
 )
 
-const success = "\033[0;32mSUCESS\033[0m"
+const success = "\033[0;32mSUCCESS\033[0m"
 const failed = "\033[0;31mFAILED\033[0m"
 const notConfigured = "\033[0;34mNOT CONFIGURED\033[0m"
 const skipped = "\033[0;34mSKIPPED\033[0m"
@@ -146,7 +145,7 @@ const cmdlineCGroupMemory = `cgroup_enable=memory`
 
 // kernel checks that the kernel has been configured correctly to support the required cgroup features
 func kernel() error {
-	cmdline, err := ioutil.ReadFile("/proc/cmdline")
+	cmdline, err := os.ReadFile("/proc/cmdline")
 	if err != nil {
 		return printError("Kernel Command Line Check %s: Could not check /proc/cmdline", failed)
 	}

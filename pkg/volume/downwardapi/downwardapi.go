@@ -153,17 +153,10 @@ var _ volume.Mounter = &downwardAPIVolumeMounter{}
 // downward API volumes are always ReadOnlyManaged
 func (d *downwardAPIVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        true,
-		Managed:         true,
-		SupportsSELinux: true,
+		ReadOnly:       true,
+		Managed:        true,
+		SELinuxRelabel: true,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *downwardAPIVolumeMounter) CanMount() error {
-	return nil
 }
 
 // SetUp puts in place the volume plugin.

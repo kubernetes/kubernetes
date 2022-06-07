@@ -127,6 +127,12 @@ items:
   - apiGroups:
     - ""
     resources:
+    - pods/eviction
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    resources:
     - configmaps
     - events
     - persistentvolumeclaims
@@ -142,6 +148,12 @@ items:
     - deletecollection
     - patch
     - update
+  - apiGroups:
+    - ""
+    resources:
+    - serviceaccounts/token
+    verbs:
+    - create
   - apiGroups:
     - apps
     resources:

@@ -56,6 +56,11 @@ type Storage interface {
 	// New returns an empty object that can be used with Create and Update after request data has been put into it.
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	New() runtime.Object
+
+	// Destroy cleans up its resources on shutdown.
+	// Destroy has to be implemented in thread-safe way and be prepared
+	// for being called more than once.
+	Destroy()
 }
 
 // Scoper indicates what scope the resource is at. It must be specified.
@@ -278,6 +283,11 @@ type StandardStorage interface {
 	GracefulDeleter
 	CollectionDeleter
 	Watcher
+
+	// Destroy cleans up its resources on shutdown.
+	// Destroy has to be implemented in thread-safe way and be prepared
+	// for being called more than once.
+	Destroy()
 }
 
 // Redirector know how to return a remote resource's location.

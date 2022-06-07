@@ -17,9 +17,15 @@ limitations under the License.
 package rest
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,7 +36,7 @@ var alwaysRetryError = IsRetryableErrorFunc(func(_ *http.Request, _ error) bool 
 	return true
 })
 
-func TestNextRetry(t *testing.T) {
+func TestIsNextRetry(t *testing.T) {
 	fakeError := errors.New("fake error")
 	tests := []struct {
 		name               string
@@ -205,14 +211,20 @@ func TestNextRetry(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			restReq := &Request{
+				body: bytes.NewReader([]byte{}),
+				c: &RESTClient{
+					base: &url.URL{},
+				},
+			}
 			r := &withRetry{maxRetries: test.maxRetries}
 
 			retryGot := make([]bool, 0)
 			retryAfterGot := make([]*RetryAfter, 0)
 			for i := 0; i < test.attempts; i++ {
-				retryAfter, retry := r.NextRetry(test.request, test.response, test.err, test.retryableErrFunc)
+				retry := r.IsNextRetry(context.TODO(), restReq, test.request, test.response, test.err, test.retryableErrFunc)
 				retryGot = append(retryGot, retry)
-				retryAfterGot = append(retryAfterGot, retryAfter)
+				retryAfterGot = append(retryAfterGot, r.retryAfter)
 			}
 
 			if !reflect.DeepEqual(test.retryExpected, retryGot) {
@@ -223,4 +235,167 @@ func TestNextRetry(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWrapPreviousError(t *testing.T) {
+	const (
+		attempt                = 2
+		previousAttempt        = 1
+		containsFormatExpected = "- error from a previous attempt: %s"
+	)
+	var (
+		wrappedCtxDeadlineExceededErr = &url.Error{
+			Op:  "GET",
+			URL: "http://foo.bar",
+			Err: context.DeadlineExceeded,
+		}
+		wrappedCtxCanceledErr = &url.Error{
+			Op:  "GET",
+			URL: "http://foo.bar",
+			Err: context.Canceled,
+		}
+		urlEOFErr = &url.Error{
+			Op:  "GET",
+			URL: "http://foo.bar",
+			Err: io.EOF,
+		}
+	)
+
+	tests := []struct {
+		name        string
+		previousErr error
+		currentErr  error
+		expectedErr error
+		wrapped     bool
+		contains    string
+	}{
+		{
+			name: "current error is nil, previous error is nil",
+		},
+		{
+			name:        "current error is nil",
+			previousErr: errors.New("error from a previous attempt"),
+		},
+		{
+			name:        "previous error is nil",
+			currentErr:  urlEOFErr,
+			expectedErr: urlEOFErr,
+			wrapped:     false,
+		},
+		{
+			name:        "both current and previous errors represent the same error",
+			currentErr:  urlEOFErr,
+			previousErr: &url.Error{Op: "GET", URL: "http://foo.bar", Err: io.EOF},
+			expectedErr: urlEOFErr,
+		},
+		{
+			name:        "current and previous errors are not same",
+			currentErr:  urlEOFErr,
+			previousErr: errors.New("unknown error"),
+			expectedErr: urlEOFErr,
+			wrapped:     true,
+			contains:    fmt.Sprintf(containsFormatExpected, "unknown error"),
+		},
+		{
+			name:        "current error is context.Canceled",
+			currentErr:  context.Canceled,
+			previousErr: io.EOF,
+			expectedErr: context.Canceled,
+			wrapped:     true,
+			contains:    fmt.Sprintf(containsFormatExpected, io.EOF.Error()),
+		},
+		{
+			name:        "current error is context.DeadlineExceeded",
+			currentErr:  context.DeadlineExceeded,
+			previousErr: io.EOF,
+			expectedErr: context.DeadlineExceeded,
+			wrapped:     true,
+			contains:    fmt.Sprintf(containsFormatExpected, io.EOF.Error()),
+		},
+		{
+			name:        "current error is a wrapped context.DeadlineExceeded",
+			currentErr:  wrappedCtxDeadlineExceededErr,
+			previousErr: io.EOF,
+			expectedErr: wrappedCtxDeadlineExceededErr,
+			wrapped:     true,
+			contains:    fmt.Sprintf(containsFormatExpected, io.EOF.Error()),
+		},
+		{
+			name:        "current error is a wrapped context.Canceled",
+			currentErr:  wrappedCtxCanceledErr,
+			previousErr: io.EOF,
+			expectedErr: wrappedCtxCanceledErr,
+			wrapped:     true,
+			contains:    fmt.Sprintf(containsFormatExpected, io.EOF.Error()),
+		},
+		{
+			name:        "previous error should be unwrapped if it is url.Error",
+			currentErr:  urlEOFErr,
+			previousErr: &url.Error{Err: io.ErrUnexpectedEOF},
+			expectedErr: urlEOFErr,
+			wrapped:     true,
+			contains:    fmt.Sprintf(containsFormatExpected, io.ErrUnexpectedEOF.Error()),
+		},
+		{
+			name:        "previous error should not be unwrapped if it is not url.Error",
+			currentErr:  urlEOFErr,
+			previousErr: fmt.Errorf("should be included in error message - %w", io.EOF),
+			expectedErr: urlEOFErr,
+			wrapped:     true,
+			contains:    fmt.Sprintf(containsFormatExpected, "should be included in error message - EOF"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			retry := &withRetry{
+				previousErr: test.previousErr,
+			}
+
+			err := retry.WrapPreviousError(test.currentErr)
+			switch {
+			case test.expectedErr == nil:
+				if err != nil {
+					t.Errorf("Expected a nil error, but got: %v", err)
+					return
+				}
+			case test.expectedErr != nil:
+				// make sure the message from the returned error contains
+				// message from the "previous" error from retries.
+				if !strings.Contains(err.Error(), test.contains) {
+					t.Errorf("Expected error message to contain %q, but got: %v", test.contains, err)
+				}
+
+				currentErrGot := err
+				if test.wrapped {
+					currentErrGot = errors.Unwrap(err)
+				}
+				if test.expectedErr != currentErrGot {
+					t.Errorf("Expected current error %v, but got: %v", test.expectedErr, currentErrGot)
+				}
+			}
+		})
+	}
+
+	t.Run("Before should track previous error", func(t *testing.T) {
+		retry := &withRetry{
+			currentErr: io.EOF,
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		// we pass zero Request object since we expect 'Before'
+		// to check the context for error at the very beginning.
+		err := retry.Before(ctx, &Request{})
+		if err != context.Canceled {
+			t.Errorf("Expected error: %v, but got: %v", context.Canceled, err)
+		}
+		if retry.currentErr != context.Canceled {
+			t.Errorf("Expected current error: %v, but got: %v", context.Canceled, retry.currentErr)
+		}
+		if retry.previousErr != io.EOF {
+			t.Errorf("Expected previous error: %v, but got: %v", io.EOF, retry.previousErr)
+		}
+	})
 }

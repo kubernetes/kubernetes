@@ -51,7 +51,7 @@ type scaleTest struct {
 func TestScaleAllResources(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	tests := []scaleTest{
@@ -241,7 +241,7 @@ func TestScaleAllResources(t *testing.T) {
 func TestScaleUpdateOnlyStatus(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	resource := "deployments"
@@ -398,7 +398,7 @@ func assertReplicasValue(t *testing.T, obj *unstructured.Unstructured, value int
 	actualValue, found, err := unstructured.NestedInt64(obj.Object, "spec", "replicas")
 
 	if err != nil {
-		t.Fatalf("Error when retriving replicas field: %v", err)
+		t.Fatalf("Error when retrieving replicas field: %v", err)
 	}
 	if !found {
 		t.Fatalf("Replicas field not found")

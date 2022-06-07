@@ -505,6 +505,20 @@ function ensure-local-ssds-ephemeral-storage() {
   safe-bind-mount "${ephemeral_mountpoint}/log_pods" "/var/log/pods"
 }
 
+# set journald configuration
+function setup-journald() {
+  if [[ "${SET_JOURNALD_CONFIGURATION:-true}" = "true" ]]; then
+  cat <<EOF > /etc/systemd/journald.conf
+[Journal]
+Storage=persistent
+SystemMaxUse=1G
+SystemMaxFileSize=100M
+RuntimeMaxUse=100M
+EOF
+    systemctl restart systemd-journald.service
+  fi
+}
+
 # Installs logrotate configuration files
 function setup-logrotate() {
   mkdir -p /etc/logrotate.d/
@@ -1015,36 +1029,6 @@ EOF
     fi
   fi
 
-  if [[ -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
-    if [[ -z "${EXEC_AUTH_PLUGIN_URL:-}" ]]; then
-      1>&2 echo "You requested GKE exec auth support for webhooks, but EXEC_AUTH_PLUGIN_URL was not specified.  This configuration depends on gke-exec-auth-plugin for authenticating to the webhook endpoint."
-      exit 1
-    fi
-
-    if [[ -z "${TOKEN_URL:-}" || -z "${TOKEN_BODY:-}" || -z "${TOKEN_BODY_UNQUOTED:-}" ]]; then
-      1>&2 echo "You requested GKE exec auth support for webhooks, but TOKEN_URL, TOKEN_BODY, and TOKEN_BODY_UNQUOTED were not provided.  gke-exec-auth-plugin requires these values for its configuration."
-      exit 1
-    fi
-
-    # kubeconfig to be used by webhooks with GKE exec auth support.  Note that
-    # the path to gke-exec-auth-plugin is the path when mounted inside the
-    # kube-apiserver pod.
-    cat <<EOF >/etc/srv/kubernetes/webhook.kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: '*.googleapis.com'
-  user:
-    exec:
-      apiVersion: "client.authentication.k8s.io/v1alpha1"
-      command: /usr/bin/gke-exec-auth-plugin
-      args:
-      - --mode=alt-token
-      - --alt-token-url=${TOKEN_URL}
-      - --alt-token-body=${TOKEN_BODY_UNQUOTED}
-EOF
-  fi
-
   if [[ -n "${ADMISSION_CONTROL:-}" ]]; then
     # Emit a basic admission control configuration file, with no plugins specified.
     cat <<EOF >/etc/srv/kubernetes/admission_controller_config.yaml
@@ -1075,8 +1059,7 @@ EOF
 
       1>&2 echo "ImagePolicyWebhook admission control plugin requested.  Configuring it to point at ${GCP_IMAGE_VERIFICATION_URL}"
 
-      # ImagePolicyWebhook does not use gke-exec-auth-plugin for authenticating
-      # to the webhook endpoint.  Emit its special kubeconfig.
+      # ImagePolicyWebhook needs special kubeconfig for authenticating to the webhook endpoint.
       cat <<EOF >/etc/srv/kubernetes/gcp_image_review.kubeconfig
 clusters:
   - name: gcp-image-review-server
@@ -1106,23 +1089,6 @@ EOF
       denyTTL: 30
       retryBackoff: 500
       defaultAllow: true
-EOF
-    fi
-
-    # If GKE exec auth for webhooks has been requested, then
-    # ValidatingAdmissionWebhook should use it.  Otherwise, run with the default
-    # config.
-    if [[ -n "${WEBHOOK_GKE_EXEC_AUTH:-}" ]]; then
-      1>&2 echo "ValidatingAdmissionWebhook requested, and WEBHOOK_GKE_EXEC_AUTH specified.  Configuring ValidatingAdmissionWebhook to use gke-exec-auth-plugin."
-
-      # Append config for ValidatingAdmissionWebhook to the shared admission
-      # controller configuration file.
-      cat <<EOF >>/etc/srv/kubernetes/admission_controller_config.yaml
-- name: ValidatingAdmissionWebhook
-  configuration:
-    apiVersion: apiserver.config.k8s.io/v1alpha1
-    kind: WebhookAdmission
-    kubeConfigFile: /etc/srv/kubernetes/webhook.kubeconfig
 EOF
     fi
   fi
@@ -1754,7 +1720,7 @@ function prepare-kube-proxy-manifest-variables {
   local -r src_file=$1;
 
   local -r kubeconfig="--kubeconfig=/var/lib/kube-proxy/kubeconfig"
-  local kube_docker_registry="k8s.gcr.io"
+  local kube_docker_registry="registry.k8s.io"
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     kube_docker_registry=${KUBE_DOCKER_REGISTRY}
   fi
@@ -2091,7 +2057,7 @@ function compute-master-manifest-variables {
     CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\", \"type\": \"FileOrCreate\"}},"
     CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
   fi
-  DOCKER_REGISTRY="k8s.gcr.io"
+  DOCKER_REGISTRY="registry.k8s.io"
   if [[ -n "${KUBE_DOCKER_REGISTRY:-}" ]]; then
     DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY}"
   fi
@@ -2179,7 +2145,7 @@ function start-kube-controller-manager {
   local params=("${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"}" "${CONTROLLER_MANAGER_TEST_ARGS:-}" "${CLOUD_CONFIG_OPT}")
   local config_path='/etc/srv/kubernetes/kube-controller-manager/kubeconfig'
   params+=("--use-service-account-credentials")
-  params+=("--cloud-provider=gce")
+  params+=("--cloud-provider=${CLOUD_PROVIDER_FLAG:-gce}")
   params+=("--kubeconfig=${config_path}" "--authentication-kubeconfig=${config_path}" "--authorization-kubeconfig=${config_path}")
   params+=("--root-ca-file=${CA_CERT_BUNDLE_PATH}")
   params+=("--service-account-private-key-file=${SERVICEACCOUNT_KEY_PATH}")
@@ -2371,15 +2337,6 @@ function setup-addon-manifests {
   local -r dst_dir="/etc/kubernetes/$1/$2"
 
   copy-manifests "${src_dir}/$2" "${dst_dir}"
-
-  # If the PodSecurityPolicy admission controller is enabled,
-  # set up the corresponding addon policies.
-  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
-    local -r psp_dir="${src_dir}/${3:-$2}/podsecuritypolicies"
-    if [[ -d "${psp_dir}" ]]; then
-      copy-manifests "${psp_dir}" "${dst_dir}"
-    fi
-  fi
 }
 
 # A function that downloads extra addons from a URL and puts them in the GCI
@@ -2596,12 +2553,6 @@ function update-event-exporter {
     sed -i -e "s@{{ exporter_sd_endpoint }}@${STACKDRIVER_ENDPOINT:-}@g" "$1"
 }
 
-function update-dashboard-deployment {
-  if [ -n "${CUSTOM_KUBE_DASHBOARD_BANNER:-}" ]; then
-    sed -i -e "s@\( \+\)# PLATFORM-SPECIFIC ARGS HERE@\1- --system-banner=${CUSTOM_KUBE_DASHBOARD_BANNER}\n\1- --system-banner-severity=WARNING@" "$1"
-  fi
-}
-
 # Sets up the manifests of coreDNS for k8s addons.
 function setup-coredns-manifest {
   setup-addon-manifests "addons" "0-dns/coredns"
@@ -2735,10 +2686,6 @@ function start-kube-addons {
     setup-addon-manifests "addons" "rbac/legacy-kubelet-user-disable"
   fi
 
-  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "podsecuritypolicies"
-  fi
-
   # Set up manifests of other addons.
   if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]] && [[ "${KUBE_PROXY_DISABLE:-}" != "true" ]]; then
     if [ -n "${CUSTOM_KUBE_PROXY_YAML:-}" ]; then
@@ -2827,11 +2774,6 @@ EOF
     local -r event_exporter_yaml="${dst_dir}/fluentd-gcp/event-exporter.yaml"
     update-event-exporter ${event_exporter_yaml}
     update-prometheus-to-sd-parameters ${event_exporter_yaml}
-  fi
-  if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "dashboard"
-    local -r dashboard_deployment_yaml="${dst_dir}/dashboard/dashboard-deployment.yaml"
-    update-dashboard-deployment ${dashboard_deployment_yaml}
   fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
     setup-addon-manifests "addons" "node-problem-detector"
@@ -3047,7 +2989,7 @@ spec:
   - name: vol
   containers:
   - name: pv-recycler
-    image: k8s.gcr.io/busybox:1.27
+    image: registry.k8s.io/debian-base:v2.0.0
     command:
     - /bin/sh
     args:
@@ -3057,6 +2999,11 @@ spec:
     - name: vol
       mountPath: /scrub
 EOF
+
+# fixup the alternate registry if specified
+if [[ -n "${KUBE_ADDON_REGISTRY:-}" ]]; then
+  sed -i -e "s@registry.k8s.io@${KUBE_ADDON_REGISTRY}@g" "${PV_RECYCLER_OVERRIDE_TEMPLATE}"
+fi
 }
 
 function wait-till-apiserver-ready() {
@@ -3127,6 +3074,7 @@ oom_score = -999
 [plugins."io.containerd.grpc.v1.cri"]
   stream_server_address = "127.0.0.1"
   max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
+  sandbox_image = "${CONTAINERD_INFRA_CONTAINER:-"registry.k8s.io/pause:3.7"}"
 [plugins."io.containerd.grpc.v1.cri".cni]
   bin_dir = "${KUBE_HOME}/bin"
   conf_dir = "/etc/cni/net.d"
@@ -3137,6 +3085,10 @@ oom_score = -999
   runtime_type = "io.containerd.runc.v2"
 [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+# Enable registry.k8s.io as the primary mirror for k8s.gcr.io
+# See: https://github.com/kubernetes/k8s.io/issues/3411
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."k8s.gcr.io"]
+  endpoint = ["https://registry.k8s.io", "https://k8s.gcr.io",]
 EOF
 
   if [[ "${CONTAINER_RUNTIME_TEST_HANDLER:-}" == "true" ]]; then
@@ -3415,6 +3367,7 @@ function main() {
   log-wrap 'CreateDirs' create-dirs
   log-wrap 'EnsureLocalSSDs' ensure-local-ssds
   log-wrap 'SetupKubeletDir' setup-kubelet-dir
+  log-wrap 'SetupJournald' setup-journald
   log-wrap 'SetupLogrotate' setup-logrotate
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     log-wrap 'MountMasterPD' mount-master-pd
@@ -3453,7 +3406,12 @@ function main() {
     # stop docker if it is present as we want to use just containerd
     log-wrap 'StopDocker' systemctl stop docker || echo "unable to stop docker"
   fi
-  log-wrap 'SetupContainerd' setup-containerd
+
+  if [[ ! -e "/etc/profile.d/containerd_env.sh" ]]; then
+    log-wrap 'SetupContainerd' setup-containerd
+  else
+    echo "Skipping SetupContainerd step because containerd has already been setup by containerd's configure.sh script"
+  fi
 
   log-start 'SetupKubePodLogReadersGroupDir'
   if [[ -n "${KUBE_POD_LOG_READERS_GROUP:-}" ]]; then
