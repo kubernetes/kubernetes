@@ -18,11 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Stop the bleeding, turn off the WARNING until we FIX token Gen.
+# Stop the bleeding, turn off the warning until we fix token gen.
 # echo "-=-=-=-=-=-=-=-=-=-="
 # echo "NOTE:"
 # echo "kubectl.sh is deprecated and will be removed soon."
-# echo "Please replace all usage with calls to the kubectl"
+# echo "please replace all usage with calls to the kubectl"   
 # echo "binary and ensure that it is in your PATH."
 # echo ""
 # echo "Please see 'kubectl help config' for more details"
@@ -43,9 +43,9 @@ if [[ -z "${KUBECTL_PATH:-}" ]]; then
     {
       echo "It looks as if you don't have a compiled kubectl binary"
       echo
-      echo "If you are running from a clone of the git repo, please run"
+      echo "If you are running from a clone of the git repo, please run this command"
       echo "'./build/run.sh make cross'. Note that this requires having"
-      echo "Docker installed."
+      echo "Docker installed in your device."
       echo
       echo "If you are running from a binary release tarball, something is wrong. "
       echo "Look at http://kubernetes.io/ for information on how to contact the "
