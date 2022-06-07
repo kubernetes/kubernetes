@@ -60,7 +60,7 @@ func NewCmdUpgrade(out io.Writer) *cobra.Command {
 	cmd.AddCommand(newCmdApply(flags))
 	cmd.AddCommand(newCmdPlan(flags))
 	cmd.AddCommand(newCmdDiff(out))
-	cmd.AddCommand(newCmdNode())
+	cmd.AddCommand(newCmdNode(out))
 	return cmd
 }
 

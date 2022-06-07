@@ -22,7 +22,7 @@ package reconciler
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -454,14 +454,6 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	if err != nil {
 		return nil, err
 	}
-	attachablePlugin, err := rc.volumePluginMgr.FindAttachablePluginByName(volume.pluginName)
-	if err != nil {
-		return nil, err
-	}
-	deviceMountablePlugin, err := rc.volumePluginMgr.FindDeviceMountablePluginByName(volume.pluginName)
-	if err != nil {
-		return nil, err
-	}
 
 	// Create pod object
 	pod := &v1.Pod{
@@ -486,6 +478,20 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		volume.volumeSpecName,
 		volume.volumePath,
 		volume.pluginName)
+	if err != nil {
+		return nil, err
+	}
+
+	// We have to find the plugins by volume spec (NOT by plugin name) here
+	// in order to correctly reconstruct ephemeral volume types.
+	// Searching by spec checks whether the volume is actually attachable
+	// (i.e. has a PV) whereas searching by plugin name can only tell whether
+	// the plugin supports attachable volumes.
+	attachablePlugin, err := rc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+	if err != nil {
+		return nil, err
+	}
+	deviceMountablePlugin, err := rc.volumePluginMgr.FindDeviceMountablePluginBySpec(volumeSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -669,7 +675,7 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 // It returns a list of pod volume information including pod's uid, volume's plugin name, mount path,
 // and volume spec name.
 func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
-	podsDirInfo, err := ioutil.ReadDir(podDir)
+	podsDirInfo, err := os.ReadDir(podDir)
 	if err != nil {
 		return nil, err
 	}
@@ -691,8 +697,8 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 		volumesDirs[v1.PersistentVolumeBlock] = path.Join(podDir, config.DefaultKubeletVolumeDevicesDirName)
 
 		for volumeMode, volumesDir := range volumesDirs {
-			var volumesDirInfo []os.FileInfo
-			if volumesDirInfo, err = ioutil.ReadDir(volumesDir); err != nil {
+			var volumesDirInfo []fs.DirEntry
+			if volumesDirInfo, err = os.ReadDir(volumesDir); err != nil {
 				// Just skip the loop because given volumesDir doesn't exist depending on volumeMode
 				continue
 			}

@@ -330,7 +330,19 @@ func readConfig(config io.Reader) (Config, error) {
 
 	err := gcfg.ReadInto(&cfg, config)
 	if err != nil {
-		return cfg, err
+		// Warn instead of failing on non-fatal config parsing errors.
+		// This is important during the transition to external CCM we
+		// may be sharing user-managed configuration KCM, using legacy
+		// cloud provider, and CCM using external cloud provider.
+		// We do not want to prevent KCM from starting if the user adds
+		// new configuration which is only present in OpenStack CCM.
+		if gcfg.FatalOnly(err) == nil {
+			klog.Warningf("Non-fatal error parsing OpenStack cloud config. "+
+				"This may happen when passing config directives exclusive to OpenStack CCM to the legacy cloud provider. "+
+				"Legacy cloud provider has correctly parsed all directives it knows about: %s", err)
+		} else {
+			return cfg, err
+		}
 	}
 
 	if cfg.Global.SecretName != "" && cfg.Global.SecretNamespace != "" {
