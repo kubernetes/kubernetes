@@ -85,6 +85,8 @@ var args = []string{
 	"--cluster-signing-legacy-unknown-key-file=/cluster-signing-legacy-unknown/key-file",
 	"--concurrent-deployment-syncs=10",
 	"--concurrent-horizontal-pod-autoscaler-syncs=10",
+	"--concurrent-job-syncs=10",
+	"--concurrent-cronjob-syncs=10",
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
 	"--concurrent-ephemeralvolume-syncs=10",
@@ -317,12 +319,12 @@ func TestAddFlags(t *testing.T) {
 		},
 		JobController: &JobControllerOptions{
 			&jobconfig.JobControllerConfiguration{
-				ConcurrentJobSyncs: 5,
+				ConcurrentJobSyncs: 10,
 			},
 		},
 		CronJobController: &CronJobControllerOptions{
 			&cronjobconfig.CronJobControllerConfiguration{
-				ConcurrentCronJobSyncs: 5,
+				ConcurrentCronJobSyncs: 10,
 			},
 		},
 		NamespaceController: &NamespaceControllerOptions{
@@ -570,10 +572,10 @@ func TestApplyTo(t *testing.T) {
 				HorizontalPodAutoscalerTolerance:                    0.1,
 			},
 			JobController: jobconfig.JobControllerConfiguration{
-				ConcurrentJobSyncs: 5,
+				ConcurrentJobSyncs: 10,
 			},
 			CronJobController: cronjobconfig.CronJobControllerConfiguration{
-				ConcurrentCronJobSyncs: 5,
+				ConcurrentCronJobSyncs: 10,
 			},
 			NamespaceController: namespaceconfig.NamespaceControllerConfiguration{
 				NamespaceSyncPeriod:      metav1.Duration{Duration: 10 * time.Minute},

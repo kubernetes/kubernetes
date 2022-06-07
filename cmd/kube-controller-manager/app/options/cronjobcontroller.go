@@ -32,6 +32,8 @@ func (o *CronJobControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
+
+	fs.Int32Var(&o.ConcurrentCronJobSyncs, "concurrent-cronjob-syncs", o.ConcurrentCronJobSyncs, "The number of cronjob objects that are allowed to sync concurrently. Larger number = more responsive cronjobs, but more CPU (and network) load")
 }
 
 // ApplyTo fills up JobController config with options.
