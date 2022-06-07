@@ -14,6 +14,7 @@ import (
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/image"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/kubecontrollermanager"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/network"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/node"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/oauth"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/project"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/rolebindingrestriction"
@@ -38,6 +39,7 @@ var AllCustomResourceValidators = []string{
 	rolebindingrestriction.PluginName,
 	network.PluginName,
 	apirequestcount.PluginName,
+	node.PluginName,
 
 	// the kubecontrollermanager operator resource has to exist in order to run deployments to deploy admission webhooks.
 	kubecontrollermanager.PluginName,
@@ -70,6 +72,9 @@ func RegisterCustomResourceValidation(plugins *admission.Plugins) {
 	network.Register(plugins)
 	// This plugin validates the apiserver.openshift.io/v1 APIRequestCount resources.
 	apirequestcount.Register(plugins)
+	// This plugin validates config.openshift.io/v1/node objects
+	node.Register(plugins)
+
 	// this one is special because we don't work without it.
 	securitycontextconstraints.RegisterDefaulting(plugins)
 }
