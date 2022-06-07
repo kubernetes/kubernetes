@@ -472,13 +472,6 @@ func takeByTopologyNUMAPacked(topo *topology.CPUTopology, availableCPUs cpuset.C
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
-	// WAS
-	// if acc.isUncoreCacheAlignEnabled() {
-	//     acc.takeFullUncoreCaches()
-	//	   if acc.isSatisfied() {
-	//		   return acc.result, nil
-	//	   }
-	// }
 
 	// 2. Acquire whole cores, if available and the container requires at least
 	//    a core's-worth of CPUs.

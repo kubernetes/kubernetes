@@ -21,6 +21,8 @@ func (a *cpuAccumulator) tryTakeAlignedUncoreCacheCPUs(numCpus int) {
 		return // TODO remove this when feature gate is default true... or not
 	}
 	ua := newUncoreAccumulator(a)
+	fmt.Println("")                                   // FIXME
+	fmt.Println("numCpus: ", numCpus)                 // FIXME
 	fmt.Println("availcpus:", ua.AvailableCpuIdArray) // FIXME
 	fmt.Println("ucc2count:", ua.Ucc2Count)           // FIXME
 	if ua.numberAvailableCaches() <= 1 {
