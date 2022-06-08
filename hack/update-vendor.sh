@@ -39,6 +39,7 @@ if [[ "${GOPROXY:-}" == "off" ]]; then
   exit 1
 fi
 
+kube::golang::setup_env
 kube::golang::verify_go_version
 kube::util::require-jq
 
@@ -403,15 +404,12 @@ hack/update-internal-modules.sh
 
 
 # Phase 8: rebuild vendor directory
-kube::log::status "vendor: running 'go mod vendor'" >&11
-go mod vendor
-
-# create a symlink in vendor directory pointing to the staging components.
-# This lets other packages and tools use the local staging components as if they were vendored.
-for repo in $(kube::util::list_staging_repos); do
-  rm -fr "${KUBE_ROOT}/vendor/k8s.io/${repo}"
-  ln -s "../../staging/src/k8s.io/${repo}" "${KUBE_ROOT}/vendor/k8s.io/${repo}"
-done
+(
+  kube::log::status "vendor: running 'go work vendor'" >&11
+  unset GOWORK
+  unset GOFLAGS
+  go work vendor
+)
 
 kube::log::status "vendor: updating vendor/LICENSES" >&11
 hack/update-vendor-licenses.sh
