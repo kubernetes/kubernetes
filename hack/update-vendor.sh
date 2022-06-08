@@ -24,6 +24,10 @@ cd "$(pwd -P)"
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+# Get all the default Go environment.
+kube::golang::setup_env
+kube::golang::verify_go_version
+
 # Turn off workspaces until we are ready for them later
 export GOWORK=off
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
@@ -39,7 +43,6 @@ if [[ "${GOPROXY:-}" == "off" ]]; then
   exit 1
 fi
 
-kube::golang::verify_go_version
 kube::util::require-jq
 
 TMP_DIR="${TMP_DIR:-$(mktemp -d /tmp/update-vendor.XXXX)}"
@@ -403,15 +406,12 @@ hack/update-internal-modules.sh
 
 
 # Phase 8: rebuild vendor directory
-kube::log::status "vendor: running 'go mod vendor'" >&11
-go mod vendor
-
-# create a symlink in vendor directory pointing to the staging components.
-# This lets other packages and tools use the local staging components as if they were vendored.
-for repo in $(kube::util::list_staging_repos); do
-  rm -fr "${KUBE_ROOT}/vendor/k8s.io/${repo}"
-  ln -s "../../staging/src/k8s.io/${repo}" "${KUBE_ROOT}/vendor/k8s.io/${repo}"
-done
+(
+  kube::log::status "vendor: running 'go work vendor'" >&11
+  unset GOWORK
+  unset GOFLAGS
+  go work vendor
+)
 
 kube::log::status "vendor: updating vendor/LICENSES" >&11
 hack/update-vendor-licenses.sh
