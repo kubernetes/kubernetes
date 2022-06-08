@@ -1,6 +1,6 @@
 module k8s.io/kms/plugins/mock
 
-go 1.21
+go 1.22.0
 
 require (
 	github.com/ThalesIgnite/crypto11 v1.2.5
