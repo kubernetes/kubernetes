@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -333,7 +334,11 @@ func readAndAnnotateUnstructured(t *testing.T, filename string) (string, []byte)
 	return annotateRuntimeObject(t, obj1, obj2, "Widget")
 }
 
-func validatePatchApplication(t *testing.T, req *http.Request) {
+func validatePatchApplication(t *testing.T, req *http.Request, patchType types.PatchType) {
+	if got, wanted := req.Header.Get("Content-Type"), string(patchType); got != wanted {
+		t.Fatalf("unexpected content-type expected: %s but actual %s\n", wanted, got)
+	}
+
 	patch, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		t.Fatal(err)
@@ -624,7 +629,7 @@ func TestApplyObject(t *testing.T) {
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					case p == pathRC && m == "PATCH":
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.StrategicMergePatchType)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					default:
@@ -673,7 +678,7 @@ func TestApplyPruneObjects(t *testing.T) {
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					case p == pathRC && m == "PATCH":
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.StrategicMergePatchType)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					default:
@@ -739,7 +744,7 @@ func TestApplyObjectOutput(t *testing.T) {
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					case p == pathRC && m == "PATCH":
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.StrategicMergePatchType)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(postPatchData))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					default:
@@ -801,7 +806,7 @@ func TestApplyRetry(t *testing.T) {
 							return &http.Response{StatusCode: http.StatusConflict, Header: cmdtesting.DefaultHeader(), Body: bodyErr}, nil
 						}
 						retry = true
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.StrategicMergePatchType)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					default:
@@ -970,14 +975,14 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					case p == pathRC && m == "PATCH":
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.StrategicMergePatchType)
 						bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 					case p == pathSVC && m == "GET":
 						bodySVC := ioutil.NopCloser(bytes.NewReader(currentSVC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodySVC}, nil
 					case p == pathSVC && m == "PATCH":
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.StrategicMergePatchType)
 						bodySVC := ioutil.NopCloser(bytes.NewReader(currentSVC))
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: bodySVC}, nil
 					default:
@@ -1131,11 +1136,7 @@ func TestUnstructuredApply(t *testing.T) {
 							Header:     cmdtesting.DefaultHeader(),
 							Body:       body}, nil
 					case p == path && m == "PATCH":
-						contentType := req.Header.Get("Content-Type")
-						if contentType != "application/merge-patch+json" {
-							t.Fatalf("Unexpected Content-Type: %s", contentType)
-						}
-						validatePatchApplication(t, req)
+						validatePatchApplication(t, req, types.MergePatchType)
 						verifiedPatch = true
 
 						body := ioutil.NopCloser(bytes.NewReader(curr))
@@ -1202,7 +1203,6 @@ func TestUnstructuredIdempotentApply(t *testing.T) {
 					case p == path && m == "PATCH":
 						// In idempotent updates, kubectl will resolve to an empty patch and not send anything to the server
 						// Thus, if we reach this branch, kubectl is unnecessarily sending a patch.
-
 						patch, err := ioutil.ReadAll(req.Body)
 						if err != nil {
 							t.Fatal(err)
