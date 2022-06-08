@@ -165,7 +165,7 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 	// very infrequently. DO NOT MODIFY this to perform frequent operations.
 	go wait.Until(func() {
 		if err := cnc.UpdateNodeStatus(context.TODO()); err != nil {
-			klog.Errorf("failed to update node status")
+			klog.Errorf("failed to update node status: %v", err)
 		}
 	}, cnc.nodeStatusUpdateFrequency, stopCh)
 
