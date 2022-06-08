@@ -1425,7 +1425,8 @@ func mergeSliceHandler(original, patch interface{}, schema LookupPatchMeta,
 		return nil, err
 	}
 
-	if fieldPatchStrategy == mergeDirective {
+	// Delete lists are handled the same way regardless of what the field's patch strategy is
+	if fieldPatchStrategy == mergeDirective || isDeleteList {
 		return mergeSlice(typedOriginal, typedPatch, schema, fieldPatchMergeKey, mergeOptions, isDeleteList)
 	} else {
 		return typedPatch, nil
