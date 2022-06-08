@@ -37,6 +37,7 @@ import (
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -49,10 +50,7 @@ const (
 // TestVolumeTemplateNoopUpdate ensures embedded StatefulSet objects with embedded PersistentVolumes can be updated
 func TestVolumeTemplateNoopUpdate(t *testing.T) {
 	// Start the server with default storage setup
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
-	if err != nil {
-		t.Fatal(err)
-	}
+	server := apiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	c, err := dynamic.NewForConfig(server.ClientConfig)
@@ -76,7 +74,7 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 			  "terminationGracePeriodSeconds": 10,
 			  "containers": [{
 				  "name": "nginx",
-				  "image": "k8s.gcr.io/nginx-slim:0.8",
+				  "image": "registry.k8s.io/nginx-slim:0.8",
 				  "ports": [{"containerPort": 80,"name": "web"}],
 				  "volumeMounts": [{"name": "www","mountPath": "/usr/share/nginx/html"}]
 			  }]
@@ -125,8 +123,8 @@ func TestVolumeTemplateNoopUpdate(t *testing.T) {
 func TestSpecReplicasChange(t *testing.T) {
 	closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-spec-replicas-change", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-spec-replicas-change", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(rm, informers)
 	defer cancel()
 
@@ -168,8 +166,8 @@ func TestSpecReplicasChange(t *testing.T) {
 func TestDeletingAndFailedPods(t *testing.T) {
 	closeFn, rm, informers, c := scSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-deleting-and-failed-pods", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-deleting-and-failed-pods", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 	cancel := runControllerAndInformers(rm, informers)
 	defer cancel()
 
@@ -269,8 +267,8 @@ func TestStatefulSetAvailable(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, test.enabled)()
 			closeFn, rm, informers, c := scSetup(t)
 			defer closeFn()
-			ns := framework.CreateTestingNamespace("test-available-pods", t)
-			defer framework.DeleteTestingNamespace(ns, t)
+			ns := framework.CreateNamespaceOrDie(c, "test-available-pods", t)
+			defer framework.DeleteNamespaceOrDie(c, ns, t)
 			cancel := runControllerAndInformers(rm, informers)
 			defer cancel()
 
@@ -358,31 +356,28 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 // add for issue: https://github.com/kubernetes/kubernetes/issues/108837
 func TestStatefulSetStatusWithPodFail(t *testing.T) {
 	limitedPodNumber := 2
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.AdmissionControl = &fakePodFailAdmission{
-		limitedPodNumber: limitedPodNumber,
-	}
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	c, config, closeFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.AdmissionControl = &fakePodFailAdmission{
+				limitedPodNumber: limitedPodNumber,
+			}
+		},
+	})
 	defer closeFn()
 
-	config := restclient.Config{Host: s.URL}
-	c, err := clientset.NewForConfig(&config)
-	if err != nil {
-		t.Fatalf("Could not create clientset: %v", err)
-	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "statefulset-informers")), resyncPeriod)
+	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-informers")), resyncPeriod)
 
 	ssc := statefulset.NewStatefulSetController(
 		informers.Core().V1().Pods(),
 		informers.Apps().V1().StatefulSets(),
 		informers.Core().V1().PersistentVolumeClaims(),
 		informers.Apps().V1().ControllerRevisions(),
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "statefulset-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-controller")),
 	)
 
-	ns := framework.CreateTestingNamespace("test-pod-fail", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-pod-fail", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -390,7 +385,7 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 	go ssc.Run(ctx, 5)
 
 	sts := newSTS("sts", ns.Name, 4)
-	_, err = c.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
+	_, err := c.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Could not create statefuleSet %s: %v", sts.Name, err)
 	}

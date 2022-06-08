@@ -30,9 +30,9 @@ DEFAULT_NPD_VERSION='v0.8.9'
 DEFAULT_NPD_HASH_AMD64='4919c47447c5f3871c1dc3171bbb817a38c8c8d07a6ce55a77d43cadc098e9ad608ceeab121eec00c13c0b6a2cc3488544d61ce84cdade1823f3fd5163a952de'
 # TODO (SergeyKanzhelev): fill up for npd 0.8.9+
 DEFAULT_NPD_HASH_ARM64='8ccb42a862efdfc1f25ca9a22f3fd36f9fdff1ac618dd7d39e3b5991505dd610d432364420896ad71f42197a116f28a85dde58b129baa075ebb7312caa57f852'
-DEFAULT_CRICTL_VERSION='v1.23.0'
-DEFAULT_CRICTL_AMD64_SHA512='f8c40c66c8d9a85e857399506f4977564890815b02658eec591114e04bd8bc6b8ea08bcc159af0088b5eda7bf0dfd16096bf0c174819c204193fb7343ae7d9d5'
-DEFAULT_CRICTL_ARM64_SHA512='261ac360b0ac3fc88c81f1cc348f84b0df0b07ca4db61b0e647c142882d129ba11d21d0de373a27ecfd984436a08a11b19cde2ad5e3412e5d03203caedd62d92'
+DEFAULT_CRICTL_VERSION='v1.24.2'
+DEFAULT_CRICTL_AMD64_SHA512='961188117863ca9af5b084e84691e372efee93ad09daf6a0422e8d75a5803f394d8968064f7ca89f14e8973766201e731241f32538cf2c8d91f0233e786302df'
+DEFAULT_CRICTL_ARM64_SHA512='ebd055e9b2888624d006decd582db742131ed815d059d529ba21eaf864becca98a84b20a10eec91051b9d837c6855d28d5042bf5e9a454f4540aec6b82d37e96'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
 ###
 
@@ -399,12 +399,12 @@ function install-kube-manifests {
   echo "Downloading k8s manifests tar"
   download-or-bust "${manifests_tar_hash}" "${manifests_tar_urls[@]}"
   tar xzf "${KUBE_HOME}/${manifests_tar}" -C "${dst_dir}" --overwrite
-  local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-k8s.gcr.io}"
-  if [[ "${kube_addon_registry}" != "k8s.gcr.io" ]]; then
+  local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-registry.k8s.io}"
+  if [[ "${kube_addon_registry}" != "registry.k8s.io" ]]; then
     find "${dst_dir}" \( -name '*.yaml' -or -name '*.yaml.in' \) -print0 | \
-      xargs -0 sed -ri "s@(image:\s.*)k8s.gcr.io@\1${kube_addon_registry}@"
+      xargs -0 sed -ri "s@(image:\s.*)registry.k8s.io@\1${kube_addon_registry}@"
     find "${dst_dir}" \( -name '*.manifest' -or -name '*.json' \) -print0 | \
-      xargs -0 sed -ri "s@(image\":\s+\")k8s.gcr.io@\1${kube_addon_registry}@"
+      xargs -0 sed -ri "s@(image\":\s+\")registry.k8s.io@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
   cp "${dst_dir}/kubernetes/gci-trusty/configure-kubeapiserver.sh" "${KUBE_BIN}/configure-kubeapiserver.sh"
@@ -454,8 +454,8 @@ function try-load-docker-image {
     container=${img##*/}
     container=${container%.tar}
     # find the right one for which we will need an additional tag
-    container=$(ctr -n k8s.io images ls | grep "k8s.gcr.io/${container}" | awk '{print $1}' | cut -f 2 -d '/')
-    ${tag_image_command} "k8s.gcr.io/${container}" "${KUBE_ADDON_REGISTRY}/${container}"
+    container=$(ctr -n k8s.io images ls | grep "registry.k8s.io/${container}" | awk '{print $1}' | cut -f 2 -d '/')
+    ${tag_image_command} "registry.k8s.io/${container}" "${KUBE_ADDON_REGISTRY}/${container}"
   fi
   # Re-enable errexit.
   set -e

@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"io"
 	"os"
 
 	"github.com/pkg/errors"
@@ -32,6 +33,7 @@ import (
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/upgrade/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
@@ -62,10 +64,11 @@ type nodeData struct {
 	patchesDir            string
 	ignorePreflightErrors sets.String
 	kubeConfigPath        string
+	outputWriter          io.Writer
 }
 
 // newCmdNode returns the cobra command for `kubeadm upgrade node`
-func newCmdNode() *cobra.Command {
+func newCmdNode(out io.Writer) *cobra.Command {
 	nodeOptions := newNodeOptions()
 	nodeRunner := workflow.NewRunner()
 
@@ -91,7 +94,7 @@ func newCmdNode() *cobra.Command {
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	nodeRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		return newNodeData(cmd, args, nodeOptions)
+		return newNodeData(cmd, args, nodeOptions, out)
 	})
 
 	// binds the Runner to kubeadm upgrade node command by altering
@@ -122,7 +125,7 @@ func addUpgradeNodeFlags(flagSet *flag.FlagSet, nodeOptions *nodeOptions) {
 // newNodeData returns a new nodeData struct to be used for the execution of the kubeadm upgrade node workflow.
 // This func takes care of validating nodeOptions passed to the command, and then it converts
 // options into the internal InitConfiguration type that is used as input all the phases in the kubeadm upgrade node workflow
-func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*nodeData, error) {
+func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions, out io.Writer) (*nodeData, error) {
 	client, err := getClient(options.kubeConfigPath, options.dryRun)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", options.kubeConfigPath)
@@ -143,6 +146,12 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
+	// In case we fetch a configuration from the cluster, mutate the ImageRepository field
+	// to be 'registry.k8s.io', if it was 'k8s.gcr.io'. Don't mutate the in-cluster value by passing
+	// nil as the client field; this is done only on "apply".
+	// TODO: Remove this in 1.26
+	// https://github.com/kubernetes/kubeadm/issues/2671
+	_ = uploadconfig.MutateImageRepository(cfg, nil)
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
 	if err != nil {
@@ -161,6 +170,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 		patchesDir:            options.patchesDir,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		kubeConfigPath:        options.kubeConfigPath,
+		outputWriter:          out,
 	}, nil
 }
 
@@ -207,4 +217,8 @@ func (d *nodeData) IgnorePreflightErrors() sets.String {
 // KubeconfigPath returns the path to the user kubeconfig file.
 func (d *nodeData) KubeConfigPath() string {
 	return d.kubeConfigPath
+}
+
+func (d *nodeData) OutputWriter() io.Writer {
+	return d.outputWriter
 }

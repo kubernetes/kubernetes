@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -101,23 +102,23 @@ func newDeployment(name, ns string, replicas int32) *apps.Deployment {
 }
 
 // dcSetup sets up necessities for Deployment integration test, including control plane, apiserver, informers, and clientset
-func dcSetup(t *testing.T) (framework.CloseFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+func dcSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
-	config := restclient.Config{Host: s.URL}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("error in create clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "deployment-informers")), resyncPeriod)
+	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "deployment-informers")), resyncPeriod)
 
 	dc, err := deployment.NewDeploymentController(
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "deployment-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "deployment-controller")),
 	)
 	if err != nil {
 		t.Fatalf("error creating Deployment controller: %v", err)
@@ -125,24 +126,24 @@ func dcSetup(t *testing.T) (framework.CloseFunc, *replicaset.ReplicaSetControlle
 	rm := replicaset.NewReplicaSetController(
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),
 		replicaset.BurstReplicas,
 	)
-	return closeFn, rm, dc, informers, clientSet
+	return server.TearDownFn, rm, dc, informers, clientSet
 }
 
 // dcSimpleSetup sets up necessities for Deployment integration test, including control plane, apiserver,
 // and clientset, but not controllers and informers
-func dcSimpleSetup(t *testing.T) (framework.CloseFunc, clientset.Interface) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+func dcSimpleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, clientset.Interface) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
-	config := restclient.Config{Host: s.URL}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("error in create clientset: %v", err)
 	}
-	return closeFn, clientSet
+	return server.TearDownFn, clientSet
 }
 
 // runControllersAndInformers runs RS and deployment controllers and informers

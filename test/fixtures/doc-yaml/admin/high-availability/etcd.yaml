@@ -5,7 +5,7 @@ metadata:
 spec:
   hostNetwork: true
   containers:
-  - image: k8s.gcr.io/etcd:2.0.9
+  - image: registry.k8s.io/etcd:2.0.9
     name: etcd-container
     command:
     - /usr/local/bin/etcd

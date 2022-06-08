@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega/format"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -67,16 +66,18 @@ const (
 type podCondition func(pod *v1.Pod) (bool, error)
 
 type timeoutError struct {
-	msg string
+	msg             string
+	observedObjects []interface{}
 }
 
 func (e *timeoutError) Error() string {
 	return e.msg
 }
 
-func TimeoutError(format string, args ...interface{}) *timeoutError {
+func TimeoutError(msg string, observedObjects ...interface{}) *timeoutError {
 	return &timeoutError{
-		msg: fmt.Sprintf(format, args...),
+		msg:             msg,
+		observedObjects: observedObjects,
 	}
 }
 
@@ -85,7 +86,7 @@ func TimeoutError(format string, args ...interface{}) *timeoutError {
 // e.g. "waiting for pod to be running".
 func maybeTimeoutError(err error, taskFormat string, taskArgs ...interface{}) error {
 	if IsTimeout(err) {
-		return TimeoutError("timed out while "+taskFormat, taskArgs...)
+		return TimeoutError(fmt.Sprintf("timed out while "+taskFormat, taskArgs...))
 	} else if err != nil {
 		return fmt.Errorf("error while %s: %w", fmt.Sprintf(taskFormat, taskArgs...), err)
 	} else {
@@ -275,9 +276,10 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, conditionDesc strin
 	if err == nil {
 		return nil
 	}
-	if IsTimeout(err) {
-		e2elog.Logf("Timed out while waiting for pod %s to be %s. Last observed as: %s",
-			podIdentifier(ns, podName), conditionDesc, format.Object(lastPod, 1))
+	if IsTimeout(err) && lastPod != nil {
+		return TimeoutError(fmt.Sprintf("timed out while waiting for pod %s to be %s", podIdentifier(ns, podName), conditionDesc),
+			lastPod,
+		)
 	}
 	if lastPodError != nil {
 		// If the last API call was an error.
@@ -494,9 +496,10 @@ func WaitForPodNotFoundInNamespace(c clientset.Interface, podName, ns string, ti
 	if err == nil {
 		return nil
 	}
-	if IsTimeout(err) {
-		e2elog.Logf("Timed out while waiting for pod %s to be Not Found. Last observed as: %s",
-			podIdentifier(ns, podName), format.Object(lastPod, 1))
+	if IsTimeout(err) && lastPod != nil {
+		return TimeoutError(fmt.Sprintf("timed out while waiting for pod %s to be Not Found", podIdentifier(ns, podName)),
+			lastPod,
+		)
 	}
 	return maybeTimeoutError(err, "waiting for pod %s not found", podIdentifier(ns, podName))
 }
@@ -530,8 +533,9 @@ func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labe
 		return nil
 	}
 	if IsTimeout(err) {
-		e2elog.Logf("Timed out while waiting for pod %s to disappear. Last observed as: %s",
-			podIdentifier(ns, podName), format.Object(lastPod, 1))
+		return TimeoutError(fmt.Sprintf("timed out while waiting for pod %s to disappear", podIdentifier(ns, podName)),
+			lastPod,
+		)
 	}
 	return maybeTimeoutError(err, "waiting for pod %s to disappear", podIdentifier(ns, podName))
 }

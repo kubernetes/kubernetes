@@ -44,6 +44,7 @@ var BannedOwners = map[schema.GroupVersionKind]struct{}{
 func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for k := range annotations {
+		// The rule is QualifiedName except that case doesn't matter, so convert to lowercase before checking.
 		for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
 			allErrs = append(allErrs, field.Invalid(fldPath, k, msg))
 		}

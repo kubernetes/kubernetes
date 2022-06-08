@@ -19,7 +19,7 @@ We have the following variables in the yaml:
 
 Note: The local listen IP address for NodeLocal DNSCache can be any address that can be guaranteed to not collide with any existing IP in your cluster. It's recommended to use an address with a local scope, per example, from the link-local range 169.254.0.0/16 for IPv4 or from the Unique Local Address range in IPv6 fd00::/8.
 
-The following variables will be set by the node-cache images - k8s.gcr.io/k8s-dns-node-cache:1.15.6 or later.
+The following variables will be set by the node-cache images - registry.k8s.io/k8s-dns-node-cache:1.15.6 or later.
 The values will be determined by reading the kube-dns configMap for custom
 Upstream server configuration.
 `__PILLAR__CLUSTER__DNS__` - Upstream server for in-cluster queries.

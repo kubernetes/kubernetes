@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-REGISTRY ?= k8s.gcr.io/e2e-test-images
+REGISTRY ?= registry.k8s.io/e2e-test-images
 GOARM ?= 7
 DOCKER_CERT_BASE_PATH ?=
 QEMUVERSION=v5.1.0-2
-GOLANG_VERSION=1.18.2
+GOLANG_VERSION=1.18.3
 export
 
 ifndef WHAT

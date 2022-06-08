@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -172,6 +171,7 @@ func TestPreemption(t *testing.T) {
 
 	testCtx := testutils.InitTestSchedulerWithOptions(t,
 		testutils.InitTestAPIServer(t, "preemption", nil),
+		0,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	testutils.SyncInformerFactory(testCtx)
@@ -621,10 +621,9 @@ func TestPodPriorityResolution(t *testing.T) {
 	cs := testCtx.ClientSet
 
 	// Build clientset and informers for controllers.
-	externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
-		QPS:           -1,
-		Host:          testCtx.HTTPServer.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
+	externalClientConfig.QPS = -1
+	externalClientset := kubernetes.NewForConfigOrDie(externalClientConfig)
 	externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
@@ -1438,7 +1437,7 @@ func TestPDBInPreemption(t *testing.T) {
 }
 
 func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutils.TestContext {
-	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestAPIServer(t, nsPrefix, nil), opts...)
+	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestAPIServer(t, nsPrefix, nil), 0, opts...)
 	testutils.SyncInformerFactory(testCtx)
 	// wraps the NextPod() method to make it appear the preemption has been done already and the nominated node has been set.
 	f := testCtx.Scheduler.NextPod

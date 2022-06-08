@@ -123,16 +123,16 @@ func readFromURL(url string, writer io.Writer) error {
 var (
 	initRegistry = RegistryList{
 		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
-		PromoterE2eRegistry:      "k8s.gcr.io/e2e-test-images",
-		BuildImageRegistry:       "k8s.gcr.io/build-image",
+		PromoterE2eRegistry:      "registry.k8s.io/e2e-test-images",
+		BuildImageRegistry:       "registry.k8s.io/build-image",
 		InvalidRegistry:          "invalid.registry.k8s.io/invalid",
-		GcEtcdRegistry:           "k8s.gcr.io",
-		GcRegistry:               "k8s.gcr.io",
-		SigStorageRegistry:       "k8s.gcr.io/sig-storage",
+		GcEtcdRegistry:           "registry.k8s.io",
+		GcRegistry:               "registry.k8s.io",
+		SigStorageRegistry:       "registry.k8s.io/sig-storage",
 		PrivateRegistry:          "gcr.io/k8s-authenticated-test",
 		MicrosoftRegistry:        "mcr.microsoft.com",
 		DockerLibraryRegistry:    "docker.io/library",
-		CloudProviderGcpRegistry: "k8s.gcr.io/cloud-provider-gcp",
+		CloudProviderGcpRegistry: "registry.k8s.io/cloud-provider-gcp",
 	}
 
 	registry = initReg()
@@ -244,7 +244,7 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
 	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "bullseye-v1.3.0"}
 	configs[EchoServer] = Config{list.PromoterE2eRegistry, "echoserver", "2.4"}
-	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.3-0"}
+	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.4-0"}
 	configs[GlusterDynamicProvisioner] = Config{list.PromoterE2eRegistry, "glusterdynamic-provisioner", "v1.3"}
 	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-2"}
 	configs[HttpdNew] = Config{list.PromoterE2eRegistry, "httpd", "2.4.39-2"}

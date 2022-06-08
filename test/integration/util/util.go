@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -28,7 +27,6 @@ import (
 	policy "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
@@ -47,8 +45,10 @@ import (
 	pvutil "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-scheduler/config/v1beta3"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -162,8 +162,7 @@ func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {
 
 // TestContext store necessary context info
 type TestContext struct {
-	CloseFn            framework.CloseFunc
-	HTTPServer         *httptest.Server
+	CloseFn            framework.TearDownFunc
 	NS                 *v1.Namespace
 	ClientSet          clientset.Interface
 	KubeConfig         *restclient.Config
@@ -341,32 +340,23 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 		CancelFn: cancelFunc,
 	}
 
-	// 1. Create API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-
-	if admission != nil {
-		controlPlaneConfig.GenericConfig.AdmissionControl = admission
-	}
-
-	_, testCtx.HTTPServer, testCtx.CloseFn = framework.RunAnAPIServer(controlPlaneConfig)
+	testCtx.ClientSet, testCtx.KubeConfig, testCtx.CloseFn = framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(options *options.ServerRunOptions) {
+			options.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "TaintNodesByCondition", "Priority", "StorageObjectInUseProtection"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			if admission != nil {
+				config.GenericConfig.AdmissionControl = admission
+			}
+		},
+	})
 
 	if nsPrefix != "default" {
-		testCtx.NS = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), t)
+		testCtx.NS = framework.CreateNamespaceOrDie(testCtx.ClientSet, nsPrefix+string(uuid.NewUUID()), t)
 	} else {
-		testCtx.NS = framework.CreateTestingNamespace("default", t)
+		testCtx.NS = framework.CreateNamespaceOrDie(testCtx.ClientSet, "default", t)
 	}
 
-	// 2. Create kubeclient
-	kubeConfig := &restclient.Config{
-		QPS:   100,
-		Burst: 100,
-		Host:  testCtx.HTTPServer.URL,
-		ContentConfig: restclient.ContentConfig{
-			GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"},
-		},
-	}
-	testCtx.KubeConfig = kubeConfig
-	testCtx.ClientSet = clientset.NewForConfigOrDie(kubeConfig)
 	return &testCtx
 }
 
@@ -390,7 +380,7 @@ func InitTestScheduler(
 	testCtx *TestContext,
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration.
-	return InitTestSchedulerWithOptions(t, testCtx)
+	return InitTestSchedulerWithOptions(t, testCtx, 0)
 }
 
 // InitTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -398,10 +388,11 @@ func InitTestScheduler(
 func InitTestSchedulerWithOptions(
 	t *testing.T,
 	testCtx *TestContext,
+	resyncPeriod time.Duration,
 	opts ...scheduler.Option,
 ) *TestContext {
 	// 1. Create scheduler
-	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, 0)
+	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, resyncPeriod)
 	if testCtx.KubeConfig != nil {
 		dynClient := dynamic.NewForConfigOrDie(testCtx.KubeConfig)
 		testCtx.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, v1.NamespaceAll, nil)
@@ -428,6 +419,11 @@ func InitTestSchedulerWithOptions(
 
 	eventBroadcaster.StartRecordingToSink(testCtx.Ctx.Done())
 
+	oldCloseFn := testCtx.CloseFn
+	testCtx.CloseFn = func() {
+		oldCloseFn()
+		eventBroadcaster.Shutdown()
+	}
 	return testCtx
 }
 
@@ -466,9 +462,9 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 	discoveryClient := cacheddiscovery.NewMemCacheClient(testCtx.ClientSet.Discovery())
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 
-	config := restclient.Config{Host: testCtx.HTTPServer.URL}
+	config := restclient.CopyConfig(testCtx.KubeConfig)
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(testCtx.ClientSet.Discovery())
-	scaleClient, err := scale.NewForConfig(&config, mapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	scaleClient, err := scale.NewForConfig(config, mapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
 		t.Fatalf("Error in create scaleClient: %v", err)
 	}
@@ -494,7 +490,7 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 // InitTestSchedulerWithNS initializes a test environment and creates API server and scheduler with default
 // configuration.
 func InitTestSchedulerWithNS(t *testing.T, nsPrefix string, opts ...scheduler.Option) *TestContext {
-	testCtx := InitTestSchedulerWithOptions(t, InitTestAPIServer(t, nsPrefix, nil), opts...)
+	testCtx := InitTestSchedulerWithOptions(t, InitTestAPIServer(t, nsPrefix, nil), 0, opts...)
 	SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	return testCtx
@@ -517,6 +513,7 @@ func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	})
 	testCtx := InitTestSchedulerWithOptions(
 		t, InitTestAPIServer(t, nsPrefix, nil),
+		0,
 		scheduler.WithProfiles(cfg.Profiles...))
 	SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)

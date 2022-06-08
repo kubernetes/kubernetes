@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.3] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[BUNDLED_ETCD_VERSIONS=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.4] [REGISTRY=registry.k8s.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 #
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any versions from here.
@@ -26,17 +26,17 @@
 # Except from etcd-$(version) and etcdctl-$(version) binaries, we also
 # need etcd and etcdctl binaries for backward compatibility reasons.
 # That binary will be set to the last version from $(BUNDLED_ETCD_VERSIONS).
-BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.3
+BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.20 3.2.32 3.3.17 3.4.18 3.5.4
 
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
-LATEST_ETCD_VERSION?=3.5.3
+LATEST_ETCD_VERSION?=3.5.4
 
 # REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
 REVISION?=0
 
-# IMAGE_TAG Uniquely identifies k8s.gcr.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
+# IMAGE_TAG Uniquely identifies registry.k8s.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
 
 ARCH?=amd64
@@ -62,9 +62,9 @@ IMAGE_SUFFIX.linux = $(OS)-$(ARCH)
 IMAGE_SUFFIX.windows = $(OS)-$(ARCH)-$(OSVERSION)
 IMAGE_SUFFIX := ${IMAGE_SUFFIX.${OS}}
 
-# Image should be pulled from k8s.gcr.io, which will auto-detect
+# Image should be pulled from registry.k8s.io, which will auto-detect
 # region (us, eu, asia, ...) and pull from the closest.
-REGISTRY?=k8s.gcr.io
+REGISTRY?=registry.k8s.io
 # Images should be pushed to staging-k8s.gcr.io.
 PUSH_REGISTRY?=staging-k8s.gcr.io
 
@@ -92,19 +92,19 @@ DOCKERFILE.windows = Dockerfile.windows
 DOCKERFILE := ${DOCKERFILE.${OS}}
 
 ifeq ($(ARCH),amd64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:bullseye-v1.2.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base:bullseye-v1.2.0
 endif
 ifeq ($(ARCH),arm)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:bullseye-v1.2.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm:bullseye-v1.2.0
 endif
 ifeq ($(ARCH),arm64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:bullseye-v1.2.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-arm64:bullseye-v1.2.0
 endif
 ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:bullseye-v1.2.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-ppc64le:bullseye-v1.2.0
 endif
 ifeq ($(ARCH),s390x)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:bullseye-v1.2.0
+    BASEIMAGE?=registry.k8s.io/build-image/debian-base-s390x:bullseye-v1.2.0
 endif
 
 BASE.windows = mcr.microsoft.com/windows/nanoserver
@@ -240,8 +240,8 @@ unit-test:
 	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
 		/bin/bash -c "CGO_ENABLED=0 go test -v k8s.io/kubernetes/cluster/images/etcd/migrate"
 
-# Integration tests require both a golang build environment and all the etcd binaries from a `k8s.gcr.io/etcd` image (`/usr/local/bin/etcd-<version>`, ...).
-# Since the `k8s.gcr.io/etcd` image is for runtime only and does not have a build golang environment, we create a new docker image to run integration tests
+# Integration tests require both a golang build environment and all the etcd binaries from a `registry.k8s.io/etcd` image (`/usr/local/bin/etcd-<version>`, ...).
+# Since the `registry.k8s.io/etcd` image is for runtime only and does not have a build golang environment, we create a new docker image to run integration tests
 # with.
 build-integration-test-image: build
 	cp -r $(TEMP_DIR) $(TEMP_DIR)_integration_test

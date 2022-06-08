@@ -353,7 +353,7 @@ func TestSchedulerExtender(t *testing.T) {
 		},
 	}
 
-	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, scheduler.WithExtenders(extenders...))
+	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, 0, scheduler.WithExtenders(extenders...))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 	defer testutils.CleanupTest(t, testCtx)

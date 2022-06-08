@@ -52,11 +52,13 @@ var ProberResults = metrics.NewCounterVec(
 // probe (AddPod). The worker periodically probes its assigned container and caches the results. The
 // manager use the cached probe results to set the appropriate Ready state in the PodStatus when
 // requested (UpdatePodStatus). Updating probe parameters is not currently supported.
-// TODO: Move liveness probing out of the runtime, to here.
 type Manager interface {
 	// AddPod creates new probe workers for every container probe. This should be called for every
 	// pod created.
 	AddPod(pod *v1.Pod)
+
+	// StopLivenessAndStartup handles stopping liveness and startup probes during termination.
+	StopLivenessAndStartup(pod *v1.Pod)
 
 	// RemovePod handles cleaning up the removed pod state, including terminating probe workers and
 	// deleting cached results.
@@ -161,7 +163,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.StartupProbe != nil {
 			key.probeType = startup
 			if _, ok := m.workers[key]; ok {
-				klog.ErrorS(nil, "Startup probe already exists for container",
+				klog.V(8).ErrorS(nil, "Startup probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
@@ -173,7 +175,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.ReadinessProbe != nil {
 			key.probeType = readiness
 			if _, ok := m.workers[key]; ok {
-				klog.ErrorS(nil, "Readiness probe already exists for container",
+				klog.V(8).ErrorS(nil, "Readiness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
@@ -185,13 +187,29 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.LivenessProbe != nil {
 			key.probeType = liveness
 			if _, ok := m.workers[key]; ok {
-				klog.ErrorS(nil, "Liveness probe already exists for container",
+				klog.V(8).ErrorS(nil, "Liveness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
 			w := newWorker(m, liveness, pod, c)
 			m.workers[key] = w
 			go w.run()
+		}
+	}
+}
+
+func (m *manager) StopLivenessAndStartup(pod *v1.Pod) {
+	m.workerLock.RLock()
+	defer m.workerLock.RUnlock()
+
+	key := probeKey{podUID: pod.UID}
+	for _, c := range pod.Spec.Containers {
+		key.containerName = c.Name
+		for _, probeType := range [...]probeType{liveness, startup} {
+			key.probeType = probeType
+			if worker, ok := m.workers[key]; ok {
+				worker.stop()
+			}
 		}
 	}
 }

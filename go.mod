@@ -23,7 +23,7 @@ require (
 	github.com/aws/aws-sdk-go v1.38.49
 	github.com/blang/semver/v4 v4.0.0
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
-	github.com/container-storage-interface/spec v1.5.0
+	github.com/container-storage-interface/spec v1.6.0
 	github.com/coredns/corefile-migration v1.0.14
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.3.2
@@ -78,7 +78,7 @@ require (
 	go.opentelemetry.io/otel/trace v0.20.0
 	go.opentelemetry.io/proto/otlp v0.7.0
 	go.uber.org/zap v1.19.0
-	golang.org/x/crypto v0.0.0-20220214200702-86341886e292
+	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
@@ -317,7 +317,7 @@ replace (
 	github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20200714090401-bf6692d28da5
 	github.com/cockroachdb/errors => github.com/cockroachdb/errors v1.2.4
 	github.com/cockroachdb/logtags => github.com/cockroachdb/logtags v0.0.0-20190617123548-eb05cc24525f
-	github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.5.0
+	github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.6.0
 	github.com/containerd/cgroups => github.com/containerd/cgroups v1.0.1
 	github.com/containerd/console => github.com/containerd/console v1.0.3
 	github.com/containerd/containerd => github.com/containerd/containerd v1.4.12
@@ -526,7 +526,7 @@ replace (
 	go.uber.org/goleak => go.uber.org/goleak v1.1.10
 	go.uber.org/multierr => go.uber.org/multierr v1.6.0
 	go.uber.org/zap => go.uber.org/zap v1.19.0
-	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220214200702-86341886e292
+	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
 	golang.org/x/exp => golang.org/x/exp v0.0.0-20210220032938-85be41e4509f
 	golang.org/x/image => golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20210508222113-6edffad5e616

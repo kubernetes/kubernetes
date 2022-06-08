@@ -213,8 +213,8 @@ kube::golang::setup_platforms() {
 
   elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
     host_arch=$(kube::util::host_arch)
-    if [[ "${host_arch}" != "amd64" && "${host_arch}" != "arm64" && "${host_arch}" != "ppc64le" ]]; then
-      # on any platform other than amd64, arm64 and ppc64le, we just default to amd64
+    if [[ "${host_arch}" != "amd64" && "${host_arch}" != "arm64" && "${host_arch}" != "ppc64le" && "${host_arch}" != "s390x" ]]; then
+      # on any platform other than amd64, arm64, ppc64le and s390x, we just default to amd64
       host_arch="amd64"
     fi
     KUBE_SERVER_PLATFORMS=("linux/${host_arch}")

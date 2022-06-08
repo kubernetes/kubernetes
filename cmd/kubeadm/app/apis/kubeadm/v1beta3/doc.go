@@ -195,7 +195,7 @@ limitations under the License.
 // 	etcd:
 // 	  # one of local or external
 // 	  local:
-// 	    imageRepository: "k8s.gcr.io"
+// 	    imageRepository: "registry.k8s.io"
 // 	    imageTag: "3.2.24"
 // 	    dataDir: "/var/lib/etcd"
 // 	    extraArgs:
@@ -249,7 +249,7 @@ limitations under the License.
 // 	    readOnly: false
 // 	    pathType: File
 // 	certificatesDir: "/etc/kubernetes/pki"
-// 	imageRepository: "k8s.gcr.io"
+// 	imageRepository: "registry.k8s.io"
 // 	clusterName: "example-cluster"
 // 	---
 // 	apiVersion: kubelet.config.k8s.io/v1beta1

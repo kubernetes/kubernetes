@@ -254,6 +254,19 @@ func getLocalNode(f *framework.Framework) *v1.Node {
 	return &nodeList.Items[0]
 }
 
+// getLocalTestNode fetches the node object describing the local worker node set up by the e2e_node infra, alongside with its ready state.
+// getLocalTestNode is a variant of `getLocalNode` which reports but does not set any requirement about the node readiness state, letting
+// the caller decide. The check is intentionally done like `getLocalNode` does.
+// Note `getLocalNode` aborts (as in ginkgo.Expect) the test implicitly if the worker node is not ready.
+func getLocalTestNode(f *framework.Framework) (*v1.Node, bool) {
+	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	ready := e2enode.IsNodeReady(node)
+	schedulable := e2enode.IsNodeSchedulable(node)
+	framework.Logf("node %q ready=%v schedulable=%v", node.Name, ready, schedulable)
+	return node, ready && schedulable
+}
+
 // logKubeletLatencyMetrics logs KubeletLatencyMetrics computed from the Prometheus
 // metrics exposed on the current node and identified by the metricNames.
 // The Kubelet subsystem prefix is automatically prepended to these metric names.

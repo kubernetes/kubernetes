@@ -267,7 +267,7 @@ func TestMultipleSchedulers(t *testing.T) {
 			}},
 		},
 	})
-	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, scheduler.WithProfiles(cfg.Profiles...))
+	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, 0, scheduler.WithProfiles(cfg.Profiles...))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 

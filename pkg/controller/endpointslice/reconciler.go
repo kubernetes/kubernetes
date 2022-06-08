@@ -150,11 +150,10 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	// Build data structures for desired state.
 	desiredMetaByPortMap := map[endpointutil.PortMapKey]*endpointMeta{}
 	desiredEndpointsByPortMap := map[endpointutil.PortMapKey]endpointsliceutil.EndpointSet{}
-	numDesiredEndpoints := 0
 
 	for _, pod := range pods {
 		includeTerminating := service.Spec.PublishNotReadyAddresses || utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceTerminatingCondition)
-		if !endpointutil.ShouldPodBeInEndpointSlice(pod, includeTerminating) {
+		if !endpointutil.ShouldPodBeInEndpoints(pod, includeTerminating) {
 			continue
 		}
 
@@ -178,7 +177,6 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 		endpoint := podToEndpoint(pod, node, service, addressType)
 		if len(endpoint.Addresses) > 0 {
 			desiredEndpointsByPortMap[epHash].Insert(&endpoint)
-			numDesiredEndpoints++
 		}
 	}
 

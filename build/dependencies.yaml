@@ -32,11 +32,11 @@ dependencies:
     version: 1.8.6
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
-      match: k8s.gcr.io/coredns
+      match: registry.k8s.io/coredns
     - path: cluster/addons/dns/coredns/coredns.yaml.in
-      match: k8s.gcr.io/coredns
+      match: registry.k8s.io/coredns
     - path: cluster/addons/dns/coredns/coredns.yaml.sed
-      match: k8s.gcr.io/coredns
+      match: registry.k8s.io/coredns
 
   - name: "coredns-kubeadm"
     version: 1.8.6
@@ -46,7 +46,7 @@ dependencies:
 
   # CRI Tools
   - name: "crictl"
-    version: 1.23.0
+    version: 1.24.2
     refPaths:
     - path: cluster/gce/windows/k8s-node-setup.psm1
       match: CRICTL_VERSION =
@@ -55,7 +55,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.5.3
+    version: 3.5.4
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -73,7 +73,7 @@ dependencies:
       match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
 
   - name: "etcd-image"
-    version: 3.5.3
+    version: 3.5.4
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
@@ -81,14 +81,14 @@ dependencies:
 
   # From https://github.com/etcd-io/etcd/blob/main/Makefile
   - name: "golang: etcd release version"
-    version: 1.16.15 # for etcd v3.5.3: https://github.com/etcd-io/etcd/blob/0452feec719fa8ad88ae343e66e9bb222965d75d/Makefile#L58
+    version: 1.16.15 # for etcd v3.5.4: https://github.com/etcd-io/etcd/blob/08407ff7600eb16c4445d5f21c4fafaf19412e24/Makefile#L58
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: 'GOLANG_VERSION\?=\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.18.2
+    version: 1.18.3
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: staging/publishing/rules.yaml
@@ -109,29 +109,29 @@ dependencies:
     #- path: hack/lib/golang.sh
     #  match: minimum_go_version=go([0-9]+\.[0-9]+)
 
-  - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.25.0-go1.18.2-bullseye.0
+  - name: "registry.k8s.io/kube-cross: dependents"
+    version: v1.25.0-go1.18.3-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
   # Base images
-  - name: "k8s.gcr.io/debian-base: dependents"
+  - name: "registry.k8s.io/debian-base: dependents"
     version: bullseye-v1.2.0
     refPaths:
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base-arm:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-arm64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base-arm64:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-ppc64le:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base-ppc64le:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
-      match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+      match: BASEIMAGE\?\=registry\.k8s\.io\/build-image\/debian-base-s390x:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: test/conformance/image/Makefile
       match: BASE_IMAGE_VERSION\?=
 
-  - name: "k8s.gcr.io/debian-iptables: dependents"
+  - name: "registry.k8s.io/debian-iptables: dependents"
     version: bullseye-v1.3.0
     refPaths:
     - path: build/common.sh
@@ -139,27 +139,27 @@ dependencies:
     - path: test/utils/image/manifest.go
       match: configs\[DebianIptables\] = Config{list\.BuildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
-  - name: "k8s.gcr.io/go-runner: dependents"
-    version: v2.3.1-go1.18.2-bullseye.0
+  - name: "registry.k8s.io/go-runner: dependents"
+    version: v2.3.1-go1.18.3-bullseye.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
 
-  - name: "k8s.gcr.io/pause"
+  - name: "registry.k8s.io/pause"
     version: 3.7
     refPaths:
     - path: build/pause/Makefile
       match: TAG\s*\?=
 
-  - name: "k8s.gcr.io/pause: dependents"
+  - name: "registry.k8s.io/pause: dependents"
     version: 3.7
     refPaths:
     - path: cluster/gce/config-common.sh
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: cluster/gce/gci/configure-helper.sh
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: cluster/gce/windows/smoke-test.sh
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: cmd/kubeadm/app/constants/constants.go
       match: PauseVersion\s+=
     - path: cmd/kubeadm/app/util/template_test.go
@@ -171,43 +171,43 @@ dependencies:
     - path: cmd/kubelet/app/options/container_runtime.go
       match: defaultPodSandboxImageVersion\s+=
     - path: hack/testdata/pod-with-precision.json
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: staging/src/k8s.io/kubectl/testdata/set/multi-resource-yaml.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: staging/src/k8s.io/kubectl/testdata/set/namespaced-resource.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/cmd/core.sh
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/fixtures/pkg/kubectl/cmd/set/namespaced-resource.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/benchmark-controller.json
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/scheduler_perf/config/pod-default.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/scheduler_perf/config/pod-with-node-affinity.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/scheduler_perf/config/pod-with-pod-affinity.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/scheduler_perf/config/pod-with-pod-anti-affinity.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/scheduler_perf/config/pod-with-preferred-pod-affinity.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/scheduler_perf/config/pod-with-preferred-pod-anti-affinity.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/scheduler_perf/config/pod-with-preferred-topology-spreading.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/scheduler_perf/config/pod-with-secret-volume.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/integration/scheduler_perf/config/pod-with-topology-spreading.yaml
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/utils/runners.go
-      match: k8s.gcr.io\/pause:\d+\.\d+
+      match: registry.k8s.io\/pause:\d+\.\d+
     - path: test/utils/image/manifest.go
       match: configs\[Pause\] = Config{list\.GcRegistry, "pause", "\d+\.\d+(.\d+)?"}
 
-  - name: "k8s.gcr.io/setcap: dependents"
+  - name: "registry.k8s.io/setcap: dependents"
     version: bullseye-v1.2.0
     refPaths:
     - path: build/common.sh
