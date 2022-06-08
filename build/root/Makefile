@@ -70,6 +70,8 @@ define ALL_HELP_INFO
 #   WHAT: Directory names to build.  If any of these directories has a 'main'
 #     package, the build will produce executable files under $(OUT_DIR)/bin.
 #     If not specified, "everything" will be built.
+#     "vendor/<module>/<path>" is accepted as alias for "<module>/<path>".
+#     "ginkgo" is an alias for the ginkgo CLI.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags passed to 'go' when building.
 #   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
