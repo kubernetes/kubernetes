@@ -305,9 +305,6 @@ func (m *managerImpl) processShutdownEvent() error {
 
 				gracePeriodOverride := group.ShutdownGracePeriodSeconds
 
-				// Stop probes for the pod
-				m.probeManager.RemovePod(pod)
-
 				// If the pod's spec specifies a termination gracePeriod which is less than the gracePeriodOverride calculated, use the pod spec termination gracePeriod.
 				if pod.Spec.TerminationGracePeriodSeconds != nil && *pod.Spec.TerminationGracePeriodSeconds <= gracePeriodOverride {
 					gracePeriodOverride = *pod.Spec.TerminationGracePeriodSeconds
