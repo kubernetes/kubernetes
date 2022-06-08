@@ -196,14 +196,17 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 			"properties": {
 				"spec": {
 					"type": "object",
-					"x-kubernetes-validations": [{
-						"rule": "self.x.all(s, s == \"string constant\")"
-					}],
 					"properties": {
 						"x": {
 							"type": "array",
 							"items": {
-								"type": "string"
+								"type": "array",
+								"items": {
+									"type": "string"
+								},
+								"x-kubernetes-validations": [{
+									"rule": "self.all(s, s == \"string constant\")"
+								}]
 							}
 						}
 					}
