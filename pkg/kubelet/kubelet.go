@@ -1714,6 +1714,9 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Fetch the pull secrets for the pod
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
+	// Ensure the pod is being probed
+	kl.probeManager.AddPod(pod)
+
 	// Call the container runtime's SyncPod callback
 	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
@@ -1771,6 +1774,9 @@ func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	} else {
 		klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", nil)
 	}
+
+	kl.probeManager.StopLivenessAndStartup(pod)
+
 	p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 	if err := kl.killPod(pod, p, gracePeriod); err != nil {
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
@@ -1778,6 +1784,12 @@ func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 		utilruntime.HandleError(err)
 		return err
 	}
+
+	// Once the containers are stopped, we can stop probing for liveness and readiness.
+	// TODO: once a pod is terminal, certain probes (liveness exec) could be stopped immediately after
+	//   the detection of a container shutdown or (for readiness) after the first failure. Tracked as
+	//   https://github.com/kubernetes/kubernetes/issues/107894 although may not be worth optimizing.
+	kl.probeManager.RemovePod(pod)
 
 	// Guard against consistency issues in KillPod implementations by checking that there are no
 	// running containers. This method is invoked infrequently so this is effectively free and can
@@ -2234,9 +2246,6 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
-		// TODO: move inside syncPod and make reentrant
-		// https://github.com/kubernetes/kubernetes/issues/105014
-		kl.probeManager.AddPod(pod)
 	}
 }
 
@@ -2270,10 +2279,6 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 		if err := kl.deletePod(pod); err != nil {
 			klog.V(2).InfoS("Failed to delete pod", "pod", klog.KObj(pod), "err", err)
 		}
-		// TODO: move inside syncTerminatingPod|syncTerminatedPod (we should stop probing
-		// once the pod kill is acknowledged and during eviction)
-		// https://github.com/kubernetes/kubernetes/issues/105014
-		kl.probeManager.RemovePod(pod)
 	}
 }
 
