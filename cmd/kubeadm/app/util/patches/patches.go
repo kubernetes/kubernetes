@@ -97,6 +97,8 @@ var (
 func GetPatchManagerForPath(path string, knownTargets []string, output io.Writer) (*PatchManager, error) {
 	pathLock.RLock()
 	if pm, known := pathCache[path]; known {
+		// in case known targets are changed
+		pm.knownTargets = knownTargets
 		pathLock.RUnlock()
 		return pm, nil
 	}
