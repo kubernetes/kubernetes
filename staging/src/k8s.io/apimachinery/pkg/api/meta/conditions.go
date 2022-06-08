@@ -81,16 +81,6 @@ func FindStatusCondition(conditions []metav1.Condition, conditionType string) *m
 	return nil
 }
 
-// IsStatusConditionTrue returns true when the conditionType is present and set to `metav1.ConditionTrue`
-func IsStatusConditionTrue(conditions []metav1.Condition, conditionType string) bool {
-	return IsStatusConditionPresentAndEqual(conditions, conditionType, metav1.ConditionTrue)
-}
-
-// IsStatusConditionFalse returns true when the conditionType is present and set to `metav1.ConditionFalse`
-func IsStatusConditionFalse(conditions []metav1.Condition, conditionType string) bool {
-	return IsStatusConditionPresentAndEqual(conditions, conditionType, metav1.ConditionFalse)
-}
-
 // IsStatusConditionPresentAndEqual returns true when conditionType is present and equal to status.
 func IsStatusConditionPresentAndEqual(conditions []metav1.Condition, conditionType string, status metav1.ConditionStatus) bool {
 	for _, condition := range conditions {
