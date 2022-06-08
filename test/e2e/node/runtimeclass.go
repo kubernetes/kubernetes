@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+
 	"k8s.io/pod-security-admission/api"
 
 	v1 "k8s.io/api/core/v1"
@@ -66,6 +67,10 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	})
 
 	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func() {
+		// Requires special setup of test-handler which is only done in GCE kube-up environment
+		// see https://github.com/kubernetes/kubernetes/blob/eb729620c522753bc7ae61fc2c7b7ea19d4aad2f/cluster/gce/gci/configure-helper.sh#L3069-L3076
+		e2eskipper.SkipUnlessProviderIs("gce")
+
 		labelFooName := "foo-" + string(uuid.NewUUID())
 		labelFizzName := "fizz-" + string(uuid.NewUUID())
 
@@ -87,14 +92,14 @@ var _ = SIGDescribe("RuntimeClass", func() {
 			Tolerations:  tolerations,
 		}
 
-		ginkgo.By("Trying to apply a label on the found node.")
+		ginkgo.By(fmt.Sprintf("Trying to apply a label on the found node %q.", nodeName))
 		for key, value := range nodeSelector {
 			framework.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
 			framework.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
 			defer framework.RemoveLabelOffNode(f.ClientSet, nodeName, key)
 		}
 
-		ginkgo.By("Trying to apply taint on the found node.")
+		ginkgo.By(fmt.Sprintf("Trying to apply taint on the found node %q.", nodeName))
 		taint := v1.Taint{
 			Key:    labelFooName,
 			Value:  "bar",
