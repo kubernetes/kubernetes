@@ -269,7 +269,7 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 				defer wg.Done()
 				klog.Infof("node %v has no routes assigned to it. NodeNetworkUnavailable will be set to true", n.Name)
 				if err := rc.updateNetworkingCondition(n, false); err != nil {
-					klog.Errorf("failed to update networking condition when no nodeRoutes")
+					klog.Errorf("failed to update networking condition when no nodeRoutes: %v", err)
 				}
 			}(node)
 			continue
@@ -285,7 +285,7 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 		go func(n *v1.Node) {
 			defer wg.Done()
 			if err := rc.updateNetworkingCondition(n, allRoutesCreated); err != nil {
-				klog.Errorf("failed to update networking condition")
+				klog.Errorf("failed to update networking condition: %v", err)
 			}
 		}(node)
 	}
