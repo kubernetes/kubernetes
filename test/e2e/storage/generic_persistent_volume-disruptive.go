@@ -62,6 +62,7 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 			runTest:    utils.TestVolumeUnmountsFromForceDeletedPod,
 		},
 	}
+
 	ginkgo.Context("When kubelet restarts", func() {
 		// Test table housing the ginkgo.It() title string and test spec.  runTest is type testBody, defined at
 		// the start of this file.  To add tests, define a function mirroring the testBody signature and assign
@@ -79,6 +80,7 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 		for _, test := range disruptiveTestTable {
 			func(t disruptiveTest) {
 				ginkgo.It(t.testItStmt, func(ctx context.Context) {
+					e2eskipper.SkipUnlessSSHKeyPresent()
 					ginkgo.By("Executing Spec")
 					t.runTest(c, f, clientPod, e2epod.VolumeMountPath1)
 				})

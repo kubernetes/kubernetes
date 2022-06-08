@@ -339,6 +339,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 	})
 
 	ginkgo.It("should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]", func(ctx context.Context) {
+		e2eskipper.SkipUnlessSSHKeyPresent()
 		init()
 		defer cleanup()
 
@@ -351,6 +352,7 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 	})
 
 	ginkgo.It("should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]", func(ctx context.Context) {
+		e2eskipper.SkipUnlessSSHKeyPresent()
 		init()
 		defer cleanup()
 

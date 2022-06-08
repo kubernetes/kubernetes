@@ -271,6 +271,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		for _, test := range disruptiveTestTable {
 			func(t disruptiveTest) {
 				ginkgo.It(t.testItStmt, func(ctx context.Context) {
+					e2eskipper.SkipUnlessSSHKeyPresent()
 					ginkgo.By("Executing Spec")
 					t.runTest(c, f, clientPod, e2epod.VolumeMountPath1)
 				})

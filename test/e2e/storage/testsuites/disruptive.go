@@ -71,6 +71,7 @@ func (s *disruptiveTestSuite) SkipUnsupportedTests(driver storageframework.TestD
 	if pattern.VolMode == v1.PersistentVolumeBlock && !driver.GetDriverInfo().Capabilities[storageframework.CapBlock] {
 		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", driver.GetDriverInfo().Name, pattern.VolMode)
 	}
+	e2eskipper.SkipUnlessSSHKeyPresent()
 }
 
 func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
