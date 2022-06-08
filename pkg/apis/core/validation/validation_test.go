@@ -19893,6 +19893,7 @@ func TestValidateNonSpecialIP(t *testing.T) {
 		ip   string
 	}{
 		{"ipv4", "10.1.2.3"},
+		{"ipv4 class E", "244.1.2.3"},
 		{"ipv6", "2000::1"},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
