@@ -19,6 +19,7 @@ package pvcprotection
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -53,7 +54,22 @@ type Controller struct {
 	podIndexer      cache.Indexer
 
 	queue workqueue.RateLimitingInterface
+
+	// pvcUsedCheckRetryingCache is a cache to record the check result
+	// of terminating PVCs been used by any Pods from Informer.
+	pvcUsedCheckRetryingCache sync.Map
 }
+
+const (
+	// maxUsedCheckRetries is the number of times that a terminating PVC will be retried
+	// to check if it is used by any Pods from Informer.
+	// So with the defaultUsedCheckBackOff, it costs 500ms * 3 for a terminating PVC
+	// to remove the finalizer on it.
+	maxUsedCheckRetries = 3
+
+	// defaultUsedCheckBackOff is the default backoff period for PVC used check from Informer.
+	defaultUsedCheckBackOff = 500 * time.Millisecond
+)
 
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
 func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) (*Controller, error) {
@@ -133,7 +149,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	err = c.processPVC(ctx, pvcNamespace, pvcName)
+	err = c.processPVC(ctx, pvcKey, pvcNamespace, pvcName)
 	if err == nil {
 		c.queue.Forget(pvcKey)
 		return true
@@ -145,7 +161,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
-func (c *Controller) processPVC(ctx context.Context, pvcNamespace, pvcName string) error {
+func (c *Controller) processPVC(ctx context.Context, pvcKey interface{}, pvcNamespace, pvcName string) error {
 	klog.V(4).InfoS("Processing PVC", "PVC", klog.KRef(pvcNamespace, pvcName))
 	startTime := time.Now()
 	defer func() {
@@ -162,15 +178,41 @@ func (c *Controller) processPVC(ctx context.Context, pvcNamespace, pvcName strin
 	}
 
 	if protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
-		// PVC should be deleted. Check if it's used and remove finalizer if
-		// it's not.
-		isUsed, err := c.isBeingUsed(ctx, pvc)
+		// PVC should be deleted. Check if it's used and remove finalizer if it's not.
+		isUsed, err := c.isBeingUsed(pvc)
 		if err != nil {
 			return err
 		}
 		if !isUsed {
-			return c.removeFinalizer(ctx, pvc)
+			// PVC is not used by any Pods from Informer. Considering the objects in Informer
+			// might not be consistent with APIServer yet, we introduce retries with backoff
+			// to check the usage multiple times.
+			var retryCount int
+			if val, ok := c.pvcUsedCheckRetryingCache.Load(pvcKey); ok {
+				retryCount = val.(int)
+			}
+			klog.V(4).InfoS("Check terminating PVC not being used from Informer",
+				"retries", fmt.Sprintf("%d/%d", retryCount, maxUsedCheckRetries),
+				"PVC", klog.KRef(pvcNamespace, pvcName))
+
+			// If it has not reached the maxUsedCheckRetries, put the PVC into delaying queue with backoff.
+			if retryCount < maxUsedCheckRetries {
+				c.pvcUsedCheckRetryingCache.Store(pvcKey, retryCount+1)
+				c.queue.AddAfter(pvcKey, defaultUsedCheckBackOff)
+				return nil
+			}
+
+			if err = c.removeFinalizer(ctx, pvc); err == nil {
+				// The PVC in cache should only be deleted when removeFinalizer succeeds,
+				// otherwise it will lead to duplicate retries when removeFinalizer fails.
+				c.pvcUsedCheckRetryingCache.Delete(pvcKey)
+			}
+			return err
 		}
+
+		// The PVC in cache should only be deleted when it is being used,
+		// so that it should be checked multiple times after the using Pod has been deleted.
+		c.pvcUsedCheckRetryingCache.Delete(pvcKey)
 		klog.V(2).InfoS("Keeping PVC because it is being used", "PVC", klog.KObj(pvc))
 	}
 
@@ -208,25 +250,10 @@ func (c *Controller) removeFinalizer(ctx context.Context, pvc *v1.PersistentVolu
 	return nil
 }
 
-func (c *Controller) isBeingUsed(ctx context.Context, pvc *v1.PersistentVolumeClaim) (bool, error) {
-	// Look for a Pod using pvc in the Informer's cache. If one is found the
-	// correct decision to keep pvc is taken without doing an expensive live
-	// list.
-	if inUse, err := c.askInformer(pvc); err != nil {
-		// No need to return because a live list will follow.
-		klog.Error(err)
-	} else if inUse {
-		return true, nil
-	}
-
-	// Even if no Pod using pvc was found in the Informer's cache it doesn't
-	// mean such a Pod doesn't exist: it might just not be in the cache yet. To
-	// be 100% confident that it is safe to delete pvc make sure no Pod is using
-	// it among those returned by a live list.
-	return c.askAPIServer(ctx, pvc)
-}
-
-func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
+// Look for a Pod using pvc in the Informer's cache.
+// Note that we should not do an expensive live list directly to APIServer,
+// which will take slow/inefficient performance in large-scale clusters.
+func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
 	klog.V(4).InfoS("Looking for Pods using PVC in the Informer's cache", "PVC", klog.KObj(pvc))
 
 	// The indexer is used to find pods which might use the PVC.
@@ -249,24 +276,6 @@ func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 	}
 
 	klog.V(4).InfoS("No Pod using PVC was found in the Informer's cache", "PVC", klog.KObj(pvc))
-	return false, nil
-}
-
-func (c *Controller) askAPIServer(ctx context.Context, pvc *v1.PersistentVolumeClaim) (bool, error) {
-	klog.V(4).InfoS("Looking for Pods using PVC with a live list", "PVC", klog.KObj(pvc))
-
-	podsList, err := c.client.CoreV1().Pods(pvc.Namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return false, fmt.Errorf("live list of pods failed: %s", err.Error())
-	}
-
-	for _, pod := range podsList.Items {
-		if c.podUsesPVC(&pod, pvc) {
-			return true, nil
-		}
-	}
-
-	klog.V(2).InfoS("PVC is unused", "PVC", klog.KObj(pvc))
 	return false, nil
 }
 

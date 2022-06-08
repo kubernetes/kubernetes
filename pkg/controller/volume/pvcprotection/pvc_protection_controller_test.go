@@ -147,21 +147,20 @@ func generateUpdateErrorFunc(t *testing.T, failures int) clienttesting.ReactionF
 	}
 }
 
+func isProcessUncompleted(ctrl *Controller) bool {
+	var cacheSize int
+	ctrl.pvcUsedCheckRetryingCache.Range(func(key, value interface{}) bool {
+		cacheSize++
+		return true
+	})
+	return ctrl.queue.Len() > 0 || cacheSize > 0
+}
+
 func TestPVCProtectionController(t *testing.T) {
 	pvcGVR := schema.GroupVersionResource{
 		Group:    v1.GroupName,
 		Version:  "v1",
 		Resource: "persistentvolumeclaims",
-	}
-	podGVR := schema.GroupVersionResource{
-		Group:    v1.GroupName,
-		Version:  "v1",
-		Resource: "pods",
-	}
-	podGVK := schema.GroupVersionKind{
-		Group:   v1.GroupName,
-		Version: "v1",
-		Kind:    "Pod",
 	}
 
 	tests := []struct {
@@ -225,7 +224,6 @@ func TestPVCProtectionController(t *testing.T) {
 			name:       "deleted PVC with finalizer -> finalizer is removed",
 			updatedPVC: deleted(withProtectionFinalizer(pvc())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
 		},
@@ -240,13 +238,10 @@ func TestPVCProtectionController(t *testing.T) {
 				},
 			},
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				// Fails
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
-				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				// Fails too
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
-				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				// Succeeds
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
@@ -266,7 +261,6 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 			updatedPVC: deleted(withProtectionFinalizer(pvc())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
 		},
@@ -279,15 +273,13 @@ func TestPVCProtectionController(t *testing.T) {
 			expectedActions: []clienttesting.Action{},
 		},
 		{
-			name: "deleted PVC with finalizer + pod with the PVC exists but is not in the Informer's cache yet -> finalizer is not removed",
+			name: "deleted PVC with finalizer + pod with the PVC exists but is lately sync to Informer's cache -> finalizer is not removed for the cache synced after multiple retries",
 			initialObjects: []runtime.Object{
 				withPVC(defaultPVCName, pod()),
 			},
 			informersAreLate: true,
 			updatedPVC:       deleted(withProtectionFinalizer(pvc())),
-			expectedActions: []clienttesting.Action{
-				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
-			},
+			expectedActions:  []clienttesting.Action{},
 		},
 		//
 		// Pod events
@@ -315,7 +307,6 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 			updatedPod: unscheduled(withPVC(defaultPVCName, pod())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
 		},
@@ -326,7 +317,6 @@ func TestPVCProtectionController(t *testing.T) {
 			},
 			deletedPod: withStatus(v1.PodRunning, withPVC(defaultPVCName, pod())),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
 		},
@@ -338,7 +328,6 @@ func TestPVCProtectionController(t *testing.T) {
 			deletedPod: withPVC(defaultPVCName, pod()),
 			updatedPod: withUID("uid2", pod()),
 			expectedActions: []clienttesting.Action{
-				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
 				clienttesting.NewUpdateAction(pvcGVR, defaultNS, deleted(pvc())),
 			},
 		},
@@ -438,16 +427,32 @@ func TestPVCProtectionController(t *testing.T) {
 		// Process the controller queue until we get expected results
 		timeout := time.Now().Add(10 * time.Second)
 		lastReportedActionCount := 0
+		var processCount int
 		for {
+			// When informersAreLate is true, we put the objects into Informer after multiple retries,
+			// which is similar to the late sync from APIServer to cache.
+			if test.informersAreLate && processCount == maxUsedCheckRetries {
+				for _, obj := range test.initialObjects {
+					switch obj.(type) {
+					case *v1.PersistentVolumeClaim:
+						pvcInformer.Informer().GetStore().Add(obj)
+					case *v1.Pod:
+						podInformer.Informer().GetStore().Add(obj)
+					default:
+						t.Fatalf("Unknown initalObject type: %+v", obj)
+					}
+				}
+			}
 			if time.Now().After(timeout) {
 				t.Errorf("Test %q: timed out", test.name)
 				break
 			}
-			if ctrl.queue.Len() > 0 {
+			if isProcessUncompleted(ctrl) {
 				klog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
 				ctrl.processNextWorkItem(context.TODO())
+				processCount++
 			}
-			if ctrl.queue.Len() > 0 {
+			if isProcessUncompleted(ctrl) {
 				// There is still some work in the queue, process it now
 				continue
 			}
