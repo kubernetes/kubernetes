@@ -182,6 +182,53 @@ func TestMatchPod(t *testing.T) {
 			fieldSelector: fields.ParseSelectorOrDie("status.podIP=2001:db7::"),
 			expectMatch:   false,
 		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						HostNetwork: true,
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=true"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						HostNetwork: true,
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=false"),
+			expectMatch:   false,
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{
+					SecurityContext: &api.PodSecurityContext{
+						HostNetwork: false,
+					},
+				},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=false"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=false"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Pod{
+				Spec: api.PodSpec{},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.hostNetwork=true"),
+			expectMatch:   false,
+		},
 	}
 	for _, testCase := range testCases {
 		m := MatchPod(labels.Everything(), testCase.fieldSelector)

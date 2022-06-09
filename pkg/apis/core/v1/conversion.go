@@ -41,6 +41,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"spec.restartPolicy",
 				"spec.schedulerName",
 				"spec.serviceAccountName",
+				"spec.hostNetwork",
 				"status.phase",
 				"status.podIP",
 				"status.podIPs",
