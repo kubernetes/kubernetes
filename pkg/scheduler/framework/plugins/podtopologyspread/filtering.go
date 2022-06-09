@@ -344,13 +344,6 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeLabelNotMatch)
 		}
 
-		selfMatchNum := 0
-		if c.Selector.Matches(podLabelSet) {
-			selfMatchNum = 1
-		}
-
-		pair := topologyPair{key: tpKey, value: tpVal}
-
 		// judging criteria:
 		// 'existing matching num' + 'if self-match (1 or 0)' - 'global minimum' <= 'maxSkew'
 		minMatchNum, err := s.minMatchNum(tpKey, c.MinDomains, pl.enableMinDomainsInPodTopologySpread)
@@ -359,6 +352,12 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 			continue
 		}
 
+		selfMatchNum := 0
+		if c.Selector.Matches(podLabelSet) {
+			selfMatchNum = 1
+		}
+
+		pair := topologyPair{key: tpKey, value: tpVal}
 		matchNum := 0
 		if tpCount, ok := s.TpPairToMatchNum[pair]; ok {
 			matchNum = tpCount
