@@ -303,6 +303,76 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 				},
 			},
 		},
+		"3 endpoints with deprecated topology hostname": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			hostname:       "host1",
+			endpointSlices: []*discovery.EndpointSlice{
+				generateEndpointSliceWithDeprecatedTopologyHostname("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80)}),
+			},
+			expectedMap: spToEndpointMap{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					"10.0.1.1:80": &BaseEndpointInfo{
+						Endpoint:    "10.0.1.1:80",
+						IsLocal:     false,
+						NodeName:    "host2",
+						Ready:       true,
+						Serving:     true,
+						Terminating: false,
+					},
+					"10.0.1.2:80": &BaseEndpointInfo{
+						Endpoint:    "10.0.1.2:80",
+						IsLocal:     true,
+						NodeName:    "host1",
+						Ready:       true,
+						Serving:     true,
+						Terminating: false,
+					},
+					"10.0.1.3:80": &BaseEndpointInfo{
+						Endpoint:    "10.0.1.3:80",
+						IsLocal:     false,
+						NodeName:    "host2",
+						Ready:       true,
+						Serving:     true,
+						Terminating: false,
+					},
+				},
+			},
+		},
+		"3 endpoints that each with different nodeName and deprecated topology hostName": {
+			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			hostname:       "host1",
+			endpointSlices: []*discovery.EndpointSlice{
+				generateEndpointSliceWithNodeNameAndWrongDeprecatedTopologyHostname("svc1", "ns1", 1, 3, 999, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80)}, "host3"),
+			},
+			expectedMap: spToEndpointMap{
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
+					"10.0.1.1:80": &BaseEndpointInfo{
+						Endpoint:    "10.0.1.1:80",
+						IsLocal:     false,
+						NodeName:    "host2",
+						Ready:       true,
+						Serving:     true,
+						Terminating: false,
+					},
+					"10.0.1.2:80": &BaseEndpointInfo{
+						Endpoint:    "10.0.1.2:80",
+						IsLocal:     true,
+						NodeName:    "host1",
+						Ready:       true,
+						Serving:     true,
+						Terminating: false,
+					},
+					"10.0.1.3:80": &BaseEndpointInfo{
+						Endpoint:    "10.0.1.3:80",
+						IsLocal:     false,
+						NodeName:    "host2",
+						Ready:       true,
+						Serving:     true,
+						Terminating: false,
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -512,6 +582,34 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 
 func generateEndpointSlice(serviceName, namespace string, sliceNum, numEndpoints, unreadyMod int, terminatingMod int, hosts []string, portNums []*int32) *discovery.EndpointSlice {
 	return generateEndpointSliceWithOffset(serviceName, namespace, sliceNum, sliceNum, numEndpoints, unreadyMod, terminatingMod, hosts, portNums)
+}
+
+// generateEndpointSliceWithDeprecatedTopologyHostname mocks the situation where a v1beta1 endpointSlice object without NodeName field being received by kube-proxy
+// refer to https://github.com/kubernetes/kubernetes/issues/110208
+func generateEndpointSliceWithDeprecatedTopologyHostname(serviceName, namespace string, sliceNum, numEndpoints, unreadyMod int, terminatingMod int, hosts []string, portNums []*int32) *discovery.EndpointSlice {
+	eps := generateEndpointSliceWithOffset(serviceName, namespace, sliceNum, sliceNum, numEndpoints, unreadyMod, terminatingMod, hosts, portNums)
+	newEps := make([]discovery.Endpoint, 0)
+	for _, ep := range eps.Endpoints {
+		ep.DeprecatedTopology = make(map[string]string)
+		ep.DeprecatedTopology[v1.LabelHostname] = *ep.NodeName
+		ep.NodeName = nil
+		newEps = append(newEps, ep)
+	}
+	eps.Endpoints = newEps
+	return eps
+}
+
+// generateEndpointSliceWithNodeNameAndWrongDeprecatedTopologyHostname helps to test nodeName's precedence over Hostname in DeprecatedTopology
+func generateEndpointSliceWithNodeNameAndWrongDeprecatedTopologyHostname(serviceName, namespace string, sliceNum, numEndpoints, unreadyMod int, terminatingMod int, hosts []string, portNums []*int32, topologyHostName string) *discovery.EndpointSlice {
+	eps := generateEndpointSliceWithOffset(serviceName, namespace, sliceNum, sliceNum, numEndpoints, unreadyMod, terminatingMod, hosts, portNums)
+	newEps := make([]discovery.Endpoint, 0)
+	for _, ep := range eps.Endpoints {
+		ep.DeprecatedTopology = make(map[string]string)
+		ep.DeprecatedTopology[v1.LabelHostname] = topologyHostName
+		newEps = append(newEps, ep)
+	}
+	eps.Endpoints = newEps
+	return eps
 }
 
 // cacheMutationCheck helps ensure that cached objects have not been changed
