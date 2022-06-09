@@ -81,6 +81,9 @@ type GetOptions struct {
 
 	NoHeaders      bool
 	Sort           bool
+	sortBy         string
+	args           []string
+	f              cmdutil.Factory
 	IgnoreNotFound bool
 
 	genericclioptions.IOStreams
@@ -170,7 +173,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run(f, cmd, args))
+			cmdutil.CheckErr(o.Run())
 		},
 		SuggestFor: []string{"list", "ps"},
 	}
@@ -216,7 +219,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		return err
 	}
 	o.Sort = len(sortBy) > 0
-
+	o.sortBy = sortBy
 	o.NoHeaders = cmdutil.GetFlagBool(cmd, "no-headers")
 
 	// TODO (soltysh): currently we don't support custom columns
@@ -298,7 +301,8 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	if o.PrintWithOpenAPICols && o.ServerPrint {
 		fmt.Fprintf(o.IOStreams.ErrOut, "warning: --%s requested, --%s will be ignored\n", useOpenAPIPrintColumnFlagLabel, useServerPrintColumns)
 	}
-
+	o.args = args
+	o.f = f
 	return nil
 }
 
@@ -454,17 +458,16 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 }
 
 // Run performs the get operation.
-// TODO: remove the need to pass these arguments, like other commands.
-func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *GetOptions) Run() error {
 	if len(o.Raw) > 0 {
-		restClient, err := f.RESTClient()
+		restClient, err := o.f.RESTClient()
 		if err != nil {
 			return err
 		}
 		return rawhttp.RawGet(restClient, o.IOStreams, o.Raw)
 	}
 	if o.Watch || o.WatchOnly {
-		return o.watch(f, cmd, args)
+		return o.watch()
 	}
 
 	chunkSize := o.ChunkSize
@@ -474,7 +477,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		chunkSize = 0
 	}
 
-	r := f.NewBuilder().
+	r := o.f.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
@@ -482,7 +485,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		FieldSelectorParam(o.FieldSelector).
 		Subresource(o.Subresource).
 		RequestChunksOf(chunkSize).
-		ResourceTypeOrNameArgs(true, args...).
+		ResourceTypeOrNameArgs(true, o.args...).
 		ContinueOnError().
 		Latest().
 		Flatten().
@@ -513,14 +516,9 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		objs[ix] = infos[ix].Object
 	}
 
-	sorting, err := cmd.Flags().GetString("sort-by")
-	if err != nil {
-		return err
-	}
-
 	var positioner OriginalPositioner
 	if o.Sort {
-		sorter := NewRuntimeSorter(objs, sorting)
+		sorter := NewRuntimeSorter(objs, o.sortBy)
 		if err := sorter.Sort(); err != nil {
 			return err
 		}
@@ -631,16 +629,15 @@ func (s *separatorWriterWrapper) SetReady(state bool) {
 }
 
 // watch starts a client-side watch of one or more resources.
-// TODO: remove the need for arguments here.
-func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	r := f.NewBuilder().
+func (o *GetOptions) watch() error {
+	r := o.f.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
 		LabelSelectorParam(o.LabelSelector).
 		FieldSelectorParam(o.FieldSelector).
 		RequestChunksOf(o.ChunkSize).
-		ResourceTypeOrNameArgs(true, args...).
+		ResourceTypeOrNameArgs(true, o.args...).
 		SingleResourceType().
 		Latest().
 		TransformRequests(o.transformRequests).
