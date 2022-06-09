@@ -382,6 +382,10 @@ func NewControlPlaneConfigWithOptions(opts *ControlPlaneConfigOptions) *controlp
 	genericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
 	// if using endpoint reconciler the service subnet IP family must match the Public address
 	genericConfig.PublicAddress = netutils.ParseIPSloppy("10.1.1.1")
+
+	// Populate OpenAPI
+	genericConfig.OpenAPIConfig = DefaultOpenAPIConfig()
+
 	err = etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
 	if err != nil {
 		panic(err)
