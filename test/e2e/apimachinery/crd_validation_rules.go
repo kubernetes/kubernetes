@@ -170,14 +170,14 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 	ginkgo.It("MUST fail create of a custom resource definition that contains an x-kubernetes-validations rule that contains a syntax error", func() {
 		ginkgo.By("Defining a custom resource definition that contains a validation rule with a syntax error")
 		var schemaWithSyntaxErrorRule = unmarshallSchema([]byte(`{
-			"type":"object",
-			"properties":{
-			   "spec":{
-				  "type":"object",
-				  "x-kubernetes-validations":[
-					{ "rule":"self = 42" }
-				  ]
-			   }
+		   "type":"object",
+		   "properties":{
+		      "spec":{
+			    "type":"object",
+				"x-kubernetes-validations":[
+				  { "rule":"self = 42" }
+				]
+			  }
 			}
 		}`))
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithSyntaxErrorRule, false)
@@ -192,26 +192,26 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 	ginkgo.It("MUST fail create of a custom resource definition that contains an x-kubernetes-validations rule that exceeds the estimated cost limit", func() {
 		ginkgo.By("Defining a custom resource definition that contains a validation rule that exceeds the cost limit")
 		var schemaWithExpensiveRule = unmarshallSchema([]byte(`{
-			"type": "object",
-			"properties": {
-				"spec": {
-					"type": "object",
-					"properties": {
-						"x": {
-							"type": "array",
-							"items": {
-								"type": "array",
-								"items": {
-									"type": "string"
-								},
-								"x-kubernetes-validations": [{
-									"rule": "self.all(s, s == \"string constant\")"
-								}]
-							}
-						}
-					}
-				}
-			}
+		   "type":"object",
+		   "properties":{
+			  "spec":{
+			    "type":"object",
+			    "properties":{
+				  "x":{
+				    "type":"array",
+				    "items":{
+				      "type":"array",
+					  "items":{
+					    "type":"string"
+					  },
+					  "x-kubernetes-validations":[
+					    { "rule":"self.all(s, s == \"string constant\")" }
+					  ]
+				    }
+				  }
+			    }
+			  }
+		    }
 		}`))
 		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithExpensiveRule, false)
 		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
