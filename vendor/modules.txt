@@ -2382,6 +2382,7 @@ k8s.io/pod-security-admission/admission
 k8s.io/pod-security-admission/admission/api
 k8s.io/pod-security-admission/admission/api/load
 k8s.io/pod-security-admission/admission/api/scheme
+k8s.io/pod-security-admission/admission/api/v1
 k8s.io/pod-security-admission/admission/api/v1alpha1
 k8s.io/pod-security-admission/admission/api/v1beta1
 k8s.io/pod-security-admission/admission/api/validation
