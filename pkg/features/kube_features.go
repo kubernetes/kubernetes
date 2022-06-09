@@ -611,6 +611,7 @@ const (
 	// owner: @liggitt, @tallclair, sig-auth
 	// alpha: v1.22
 	// beta: v1.23
+	// ga: v1.25
 	//
 	// Enables the PodSecurity admission plugin
 	PodSecurity featuregate.Feature = "PodSecurity"
@@ -962,7 +963,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PodOverhead: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
-	PodSecurity: {Default: true, PreRelease: featuregate.Beta},
+	PodSecurity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	PreferNominatedNode: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
