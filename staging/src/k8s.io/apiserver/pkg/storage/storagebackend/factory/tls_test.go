@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"go.etcd.io/etcd/client/pkg/v3/transport"
-
+	"go.etcd.io/etcd/server/v3/embed"
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,7 +55,7 @@ func TestTLSConnection(t *testing.T) {
 	defer os.RemoveAll(filepath.Dir(certFile))
 
 	// override server config to be TLS-enabled
-	etcdConfig := testserver.NewTestConfig(t)
+	etcdConfig := embed.NewConfig()
 	etcdConfig.ClientTLSInfo = transport.TLSInfo{
 		CertFile:      certFile,
 		KeyFile:       keyFile,

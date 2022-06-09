@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,19 +79,41 @@ func NewTestConfig(t *testing.T) *embed.Config {
 	return cfg
 }
 
+func startEtcd(t *testing.T, cfg *embed.Config) (e *embed.Etcd, cfgR *embed.Config, err error) {
+	cfgR = NewTestConfig(t)
+	if cfg != nil {
+		cfgR.ExperimentalWatchProgressNotifyInterval = cfg.ExperimentalWatchProgressNotifyInterval
+		cfgR.ClientTLSInfo = cfg.ClientTLSInfo
+		if len(cfg.ClientTLSInfo.CertFile) > 0 && len(cfg.ClientTLSInfo.KeyFile) > 0 {
+			for i := range cfgR.LCUrls {
+				cfgR.LCUrls[i].Scheme = "https"
+			}
+			for i := range cfgR.ACUrls {
+				cfgR.ACUrls[i].Scheme = "https"
+			}
+		}
+	}
+
+	e, err = embed.StartEtcd(cfgR)
+	return e, cfgR, err
+}
+
 // RunEtcd starts an embedded etcd server with the provided config
 // (or NewTestConfig(t) if nil), and returns a client connected to the server.
 // The server is terminated when the test ends.
 func RunEtcd(t *testing.T, cfg *embed.Config) *clientv3.Client {
 	t.Helper()
-
-	if cfg == nil {
-		cfg = NewTestConfig(t)
-	}
-
-	e, err := embed.StartEtcd(cfg)
-	if err != nil {
-		t.Fatal(err)
+	var e *embed.Etcd
+	var err error
+	for {
+		e, cfg, err = startEtcd(t, cfg)
+		if err != nil {
+			if strings.Contains(err.Error(), "bind: address already in use") {
+				continue
+			}
+			t.Fatal(err)
+		}
+		break
 	}
 	t.Cleanup(e.Close)
 

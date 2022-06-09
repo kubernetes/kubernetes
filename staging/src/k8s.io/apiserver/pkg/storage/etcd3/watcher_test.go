@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	clientv3 "go.etcd.io/etcd/client/v3"
-
+	"go.etcd.io/etcd/server/v3/embed"
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -332,7 +332,7 @@ func TestWatchInitializationSignal(t *testing.T) {
 
 func TestProgressNotify(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	clusterConfig := testserver.NewTestConfig(t)
+	clusterConfig := embed.NewConfig()
 	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
 	client := testserver.RunEtcd(t, clusterConfig)
 	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, NewDefaultLeaseManagerConfig())
