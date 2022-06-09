@@ -226,10 +226,8 @@ type FitError struct {
 	Diagnosis   Diagnosis
 }
 
-const (
-	// NoNodeAvailableMsg is used to format message when no nodes available.
-	NoNodeAvailableMsg = "0/%v nodes are available"
-)
+// NoNodeAvailableMsg is used to format message when no nodes available.
+const NoNodeAvailableMsg = "0/%v nodes are available"
 
 // Error returns detailed information of why the pod failed to fit on each node
 func (f *FitError) Error() string {
