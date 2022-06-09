@@ -72,10 +72,8 @@ var _ framework.PreScorePlugin = &PodTopologySpread{}
 var _ framework.ScorePlugin = &PodTopologySpread{}
 var _ framework.EnqueueExtensions = &PodTopologySpread{}
 
-const (
-	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = names.PodTopologySpread
-)
+// Name is the name of the plugin used in the plugin registry and configurations.
+const Name = names.PodTopologySpread
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *PodTopologySpread) Name() string {
