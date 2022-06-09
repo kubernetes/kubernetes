@@ -61,6 +61,8 @@ func DefaultWatchCacheSizes() map[schema.GroupResource]int {
 func NewStorageFactoryConfig() *StorageFactoryConfig {
 
 	resources := []schema.GroupVersionResource{
+		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in
+		// 1.25.
 		apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
 	}
 

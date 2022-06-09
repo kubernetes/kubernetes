@@ -57,6 +57,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	clientset "k8s.io/client-go/kubernetes"
@@ -109,7 +110,13 @@ func getTestWebhookTokenAuth(serverURL string, customDial utilnet.DialFunc) (aut
 		Jitter:   0.2,
 		Steps:    5,
 	}
-	webhookTokenAuth, err := webhook.New(kubecfgFile.Name(), "v1beta1", nil, retryBackoff, customDial)
+
+	clientConfig, err := webhookutil.LoadKubeconfig(kubecfgFile.Name(), customDial)
+	if err != nil {
+		return nil, err
+	}
+
+	webhookTokenAuth, err := webhook.New(clientConfig, "v1beta1", nil, retryBackoff)
 	if err != nil {
 		return nil, err
 	}
@@ -459,8 +466,8 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("auth-always-allow", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("auth-always-allow", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	transport := http.DefaultTransport
 	previousResourceVersion := make(map[string]float64)
@@ -556,8 +563,8 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("auth-always-deny", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("auth-always-deny", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 	transport := resttransport.NewBearerAuthRoundTripper(framework.UnprivilegedUserToken, http.DefaultTransport)
 
 	for _, r := range getTestRequests(ns.Name) {
@@ -605,8 +612,8 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("auth-alice-not-forbidden", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("auth-alice-not-forbidden", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
@@ -674,8 +681,8 @@ func TestBobIsForbidden(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("auth-bob-forbidden", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("auth-bob-forbidden", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	transport := http.DefaultTransport
 
@@ -718,8 +725,8 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("auth-unknown-unauthorized", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("auth-unknown-unauthorized", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	transport := http.DefaultTransport
 
@@ -780,8 +787,8 @@ func TestImpersonateIsForbidden(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("auth-impersonate-forbidden", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("auth-impersonate-forbidden", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	transport := http.DefaultTransport
 
@@ -1085,8 +1092,8 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("auth-attribute-determination", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("auth-attribute-determination", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	transport := http.DefaultTransport
 
@@ -1151,8 +1158,8 @@ func TestNamespaceAuthorization(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("auth-namespace", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("auth-namespace", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
@@ -1249,8 +1256,8 @@ func TestKindAuthorization(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("auth-kind", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("auth-kind", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
@@ -1333,8 +1340,8 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("auth-read-only", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("auth-read-only", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	transport := http.DefaultTransport
 
@@ -1410,8 +1417,8 @@ func testWebhookTokenAuthenticator(customDialer bool, t *testing.T) {
 	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 	defer closeFn()
 
-	ns := framework.CreateTestingNamespace("auth-webhook-token", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateTestingNamespace("auth-webhook-token", t)
+	defer framework.DeleteTestingNamespace(ns, t)
 
 	transport := http.DefaultTransport
 

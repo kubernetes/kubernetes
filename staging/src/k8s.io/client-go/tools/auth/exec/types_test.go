@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientauthenticationv1 "k8s.io/client-go/pkg/apis/clientauthentication/v1"
-	clientauthenticationv1alpha1 "k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"
 	clientauthenticationv1beta1 "k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
 	clientcmdv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 )
@@ -139,15 +138,13 @@ func testClientAuthenticationClusterTypesAreSynced(t *testing.T, cluster interfa
 }
 
 // TestAllClusterTypesAreSynced is a TODO so that we remember to write a test similar to
-// TestV1beta1ClusterTypesAreSynced for any future ExecCredential version. It should start failing
+// TestClientAuthenticationClusterTypesAreSynced for any future ExecCredential version. It should start failing
 // when someone adds support for any other ExecCredential type to this package.
 func TestAllClusterTypesAreSynced(t *testing.T) {
 	versionsThatDontNeedTests := sets.NewString(
 		// The internal Cluster type should only be used...internally...and therefore doesn't
 		// necessarily need to be synced with clientcmdv1.
 		runtime.APIVersionInternal,
-		// V1alpha1 does not contain a Cluster type.
-		clientauthenticationv1alpha1.SchemeGroupVersion.Version,
 		// We have a test for v1beta1 above.
 		clientauthenticationv1beta1.SchemeGroupVersion.Version,
 		// We have a test for v1 above.

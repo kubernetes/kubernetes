@@ -101,8 +101,6 @@ func EvalStateObserver(state EvalState) EvalObserver {
 	}
 }
 
-// TODO: Replace all usages of ExhaustiveEval with ExhaustiveEvalWrapper
-
 // ExhaustiveEval replaces operations that short-circuit with versions that evaluate
 // expressions and couples this behavior with the TrackState() decorator to provide
 // insight into the evaluation state of the entire expression. EvalState must be
@@ -115,6 +113,11 @@ func ExhaustiveEval() InterpretableDecorator {
 	}
 }
 
+// InterruptableEval annotates comprehension loops with information that indicates they
+// should check the `#interrupted` state within a custom Activation.
+//
+// The custom activation is currently managed higher up in the stack within the 'cel' package
+// and should not require any custom support on behalf of callers.
 func InterruptableEval() InterpretableDecorator {
 	return decInterruptFolds()
 }
@@ -159,7 +162,7 @@ type exprInterpreter struct {
 }
 
 // NewInterpreter builds an Interpreter from a Dispatcher and TypeProvider which will be used
-// throughout the Eval of all Interpretable instances gerenated from it.
+// throughout the Eval of all Interpretable instances generated from it.
 func NewInterpreter(dispatcher Dispatcher,
 	container *containers.Container,
 	provider ref.TypeProvider,

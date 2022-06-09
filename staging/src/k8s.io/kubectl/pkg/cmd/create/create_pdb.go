@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
 	resourcecli "k8s.io/cli-runtime/pkg/resource"
 	policyv1client "k8s.io/client-go/kubernetes/typed/policy/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -69,9 +70,10 @@ type PodDisruptionBudgetOpts struct {
 	Namespace        string
 	EnforceNamespace bool
 
-	Client         *policyv1client.PolicyV1Client
-	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resourcecli.DryRunVerifier
+	Client              *policyv1client.PolicyV1Client
+	DryRunStrategy      cmdutil.DryRunStrategy
+	DryRunVerifier      *resourcecli.QueryParamVerifier
+	ValidationDirective string
 
 	genericclioptions.IOStreams
 }
@@ -146,7 +148,7 @@ func (o *PodDisruptionBudgetOpts) Complete(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resourcecli.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, discoveryClient, resource.QueryParamDryRun)
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -162,6 +164,11 @@ func (o *PodDisruptionBudgetOpts) Complete(f cmdutil.Factory, cmd *cobra.Command
 
 	o.PrintObj = func(obj runtime.Object) error {
 		return printer.PrintObj(obj, o.Out)
+	}
+
+	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -216,6 +223,7 @@ func (o *PodDisruptionBudgetOpts) Run() error {
 		if o.FieldManager != "" {
 			createOptions.FieldManager = o.FieldManager
 		}
+		createOptions.FieldValidation = o.ValidationDirective
 		if o.DryRunStrategy == cmdutil.DryRunServer {
 			if err := o.DryRunVerifier.HasSupport(podDisruptionBudget.GroupVersionKind()); err != nil {
 				return err

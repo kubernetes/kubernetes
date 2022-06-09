@@ -26,7 +26,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
-	"strings"
+	"regexp"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -56,7 +56,7 @@ func TestDialURL(t *testing.T) {
 		},
 		"secure, no roots": {
 			TLSConfig:   &tls.Config{InsecureSkipVerify: false},
-			ExpectError: "unknown authority",
+			ExpectError: "unknown authority|not trusted",
 		},
 		"secure with roots": {
 			TLSConfig: &tls.Config{InsecureSkipVerify: false, RootCAs: roots},
@@ -76,7 +76,7 @@ func TestDialURL(t *testing.T) {
 		"secure, no roots, custom dial": {
 			TLSConfig:   &tls.Config{InsecureSkipVerify: false},
 			Dial:        d.DialContext,
-			ExpectError: "unknown authority",
+			ExpectError: "unknown authority|not trusted",
 		},
 		"secure with roots, custom dial": {
 			TLSConfig: &tls.Config{InsecureSkipVerify: false, RootCAs: roots},
@@ -154,7 +154,7 @@ func TestDialURL(t *testing.T) {
 				if tc.ExpectError == "" {
 					t.Errorf("%s: expected no error, got %q", k, err.Error())
 				}
-				if !strings.Contains(err.Error(), tc.ExpectError) {
+				if tc.ExpectError != "" && !regexp.MustCompile(tc.ExpectError).MatchString(err.Error()) {
 					t.Errorf("%s: expected error containing %q, got %q", k, tc.ExpectError, err.Error())
 				}
 				return

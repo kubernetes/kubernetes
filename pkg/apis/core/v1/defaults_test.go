@@ -43,6 +43,16 @@ import (
 // TestWorkloadDefaults detects changes to defaults within PodTemplateSpec.
 // Defaulting changes within this type can cause spurious rollouts of workloads on API server update.
 func TestWorkloadDefaults(t *testing.T) {
+	t.Run("enabled_features", func(t *testing.T) { testWorkloadDefaults(t, true) })
+	t.Run("disabled_features", func(t *testing.T) { testWorkloadDefaults(t, false) })
+}
+func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
+	features := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+	for feature, featureSpec := range features {
+		if !featureSpec.LockToDefault {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)()
+		}
+	}
 	rc := &v1.ReplicationController{Spec: v1.ReplicationControllerSpec{Template: &v1.PodTemplateSpec{}}}
 	template := rc.Spec.Template
 	// New defaults under PodTemplateSpec are only acceptable if they would not be applied when reading data from a previous release.
@@ -177,6 +187,16 @@ func TestWorkloadDefaults(t *testing.T) {
 // TestPodDefaults detects changes to defaults within PodSpec.
 // Defaulting changes within this type (*especially* within containers) can cause kubelets to restart containers on API server update.
 func TestPodDefaults(t *testing.T) {
+	t.Run("enabled_features", func(t *testing.T) { testPodDefaults(t, true) })
+	t.Run("disabled_features", func(t *testing.T) { testPodDefaults(t, false) })
+}
+func testPodDefaults(t *testing.T, featuresEnabled bool) {
+	features := utilfeature.DefaultFeatureGate.DeepCopy().GetAll()
+	for feature, featureSpec := range features {
+		if !featureSpec.LockToDefault {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, featuresEnabled)()
+		}
+	}
 	pod := &v1.Pod{}
 	// New defaults under PodSpec are only acceptable if they would not be applied when reading data from a previous release.
 	// Forbidden: adding a new field `MyField *bool` and defaulting it to a non-nil value

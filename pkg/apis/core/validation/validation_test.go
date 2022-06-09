@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -1355,14 +1356,6 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				return claim
 			}(),
 		},
-		"with-cluster-name": {
-			isExpectedFailure: ephemeral,
-			claim: func() *core.PersistentVolumeClaim {
-				claim := testVolumeClaim(goodName, goodNS, goodClaimSpec)
-				claim.ClusterName = "foo"
-				return claim
-			}(),
-		},
 		"with-managed-fields": {
 			isExpectedFailure: ephemeral,
 			claim: func() *core.PersistentVolumeClaim {
@@ -2107,215 +2100,173 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		isExpectedFailure          bool
 		oldClaim                   *core.PersistentVolumeClaim
 		newClaim                   *core.PersistentVolumeClaim
-		enableResize               bool
 		enableRecoverFromExpansion bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validUpdateClaim,
-			enableResize:      false,
 		},
 		"valid-no-op-update": {
 			isExpectedFailure: false,
 			oldClaim:          validUpdateClaim,
 			newClaim:          validUpdateClaim,
-			enableResize:      false,
 		},
 		"invalid-update-change-resources-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimResources,
-			enableResize:      false,
 		},
 		"invalid-update-change-access-modes-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimAccessModes,
-			enableResize:      false,
 		},
 		"valid-update-volume-mode-block-to-block": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          validClaimVolumeModeBlock,
-			enableResize:      false,
 		},
 		"valid-update-volume-mode-file-to-file": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimVolumeModeFile,
 			newClaim:          validClaimVolumeModeFile,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-to-block": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeFile,
 			newClaim:          validClaimVolumeModeBlock,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-to-file": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          validClaimVolumeModeFile,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-nil-to-file": {
 			isExpectedFailure: true,
 			oldClaim:          invalidClaimVolumeModeNil,
 			newClaim:          validClaimVolumeModeFile,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-nil-to-block": {
 			isExpectedFailure: true,
 			oldClaim:          invalidClaimVolumeModeNil,
 			newClaim:          validClaimVolumeModeBlock,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-block-to-nil": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          invalidClaimVolumeModeNil,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-file-to-nil": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeFile,
 			newClaim:          invalidClaimVolumeModeNil,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-empty-to-mode": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          validClaimVolumeModeBlock,
-			enableResize:      false,
 		},
 		"invalid-update-volume-mode-mode-to-empty": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimVolumeModeBlock,
 			newClaim:          validClaim,
-			enableResize:      false,
 		},
 		"invalid-update-change-storage-class-annotation-after-creation": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidUpdateClaimStorageClass,
-			enableResize:      false,
 		},
 		"valid-update-mutable-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimAnnotation,
 			newClaim:          validUpdateClaimMutableAnnotation,
-			enableResize:      false,
 		},
 		"valid-update-add-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validAddClaimAnnotation,
-			enableResize:      false,
 		},
 		"valid-size-update-resize-disabled": {
-			isExpectedFailure: true,
-			oldClaim:          validClaim,
-			newClaim:          validSizeUpdate,
-			enableResize:      false,
+			oldClaim: validClaim,
+			newClaim: validSizeUpdate,
 		},
 		"valid-size-update-resize-enabled": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validSizeUpdate,
-			enableResize:      true,
 		},
 		"invalid-size-update-resize-enabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          invalidSizeUpdate,
-			enableResize:      true,
 		},
 		"unbound-size-update-resize-enabled": {
 			isExpectedFailure: true,
 			oldClaim:          validClaim,
 			newClaim:          unboundSizeUpdate,
-			enableResize:      true,
 		},
 		"valid-upgrade-storage-class-annotation-to-spec": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          validClaimStorageClassInSpec,
-			enableResize:      false,
 		},
 		"invalid-upgrade-storage-class-annotation-to-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidClaimStorageClassInSpec,
-			enableResize:      false,
 		},
 		"valid-upgrade-storage-class-annotation-to-annotation-and-spec": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          validClaimStorageClassInAnnotationAndSpec,
-			enableResize:      false,
 		},
 		"invalid-upgrade-storage-class-annotation-to-annotation-and-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidClaimStorageClassInAnnotationAndSpec,
-			enableResize:      false,
 		},
 		"invalid-upgrade-storage-class-in-spec": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClassInSpec,
 			newClaim:          invalidClaimStorageClassInSpec,
-			enableResize:      false,
 		},
 		"invalid-downgrade-storage-class-spec-to-annotation": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClassInSpec,
 			newClaim:          validClaimStorageClass,
-			enableResize:      false,
 		},
 		"valid-update-rwop-used-and-rwop-feature-disabled": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimRWOPAccessMode,
 			newClaim:          validClaimRWOPAccessModeAddAnnotation,
-			enableResize:      false,
 		},
 		"valid-expand-shrink-resize-enabled": {
 			oldClaim:                   validClaimShrinkInitial,
 			newClaim:                   validClaimShrink,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 		},
 		"invalid-expand-shrink-resize-enabled": {
 			oldClaim:                   validClaimShrinkInitial,
 			newClaim:                   invalidClaimShrink,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 			isExpectedFailure:          true,
 		},
 		"invalid-expand-shrink-to-status-resize-enabled": {
 			oldClaim:                   validClaimShrinkInitial,
 			newClaim:                   invalidShrinkToStatus,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 			isExpectedFailure:          true,
 		},
 		"invalid-expand-shrink-recover-disabled": {
 			oldClaim:                   validClaimShrinkInitial,
 			newClaim:                   validClaimShrink,
-			enableResize:               true,
 			enableRecoverFromExpansion: false,
-			isExpectedFailure:          true,
-		},
-		"invalid-expand-shrink-resize-disabled": {
-			oldClaim:                   validClaimShrinkInitial,
-			newClaim:                   validClaimShrink,
-			enableResize:               false,
-			enableRecoverFromExpansion: true,
 			isExpectedFailure:          true,
 		},
 		"unbound-size-shrink-resize-enabled": {
 			oldClaim:                   validClaimShrinkInitial,
 			newClaim:                   unboundShrink,
-			enableResize:               true,
 			enableRecoverFromExpansion: true,
 			isExpectedFailure:          true,
 		},
@@ -2323,7 +2274,6 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
@@ -2350,7 +2300,6 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             true,
-				EnableExpansion:                   true,
 				EnableRecoverFromExpansionFailure: false,
 			},
 		},
@@ -2359,7 +2308,6 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             true,
-				EnableExpansion:                   true,
 				EnableRecoverFromExpansionFailure: false,
 			},
 		},
@@ -2368,7 +2316,6 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             false,
-				EnableExpansion:                   true,
 				EnableRecoverFromExpansionFailure: false,
 			},
 		},
@@ -2377,7 +2324,6 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			enableReadWriteOncePod: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             true,
-				EnableExpansion:                   true,
 				EnableRecoverFromExpansionFailure: false,
 			},
 		},
@@ -2386,7 +2332,6 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			enableReadWriteOncePod: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
 				AllowReadWriteOncePod:             true,
-				EnableExpansion:                   true,
 				EnableRecoverFromExpansionFailure: false,
 			},
 		},
@@ -2944,6 +2889,22 @@ func TestValidateCSIPersistentVolumeSource(t *testing.T) {
 			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodePublishSecretRef: &core.SecretReference{Name: "foobar"}},
 			errtype:  field.ErrorTypeRequired,
 			errfield: "nodePublishSecretRef.namespace",
+		},
+		{
+			name:     "nodeExpandSecretRef: invalid name missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodeExpandSecretRef: &core.SecretReference{Namespace: "default"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "nodeExpandSecretRef.name",
+		},
+		{
+			name:     "nodeExpandSecretRef: invalid namespace missing",
+			csi:      &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodeExpandSecretRef: &core.SecretReference{Name: "foobar"}},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "nodeExpandSecretRef.namespace",
+		},
+		{
+			name: "valid nodeExpandSecretRef",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodeExpandSecretRef: &core.SecretReference{Name: "foobar", Namespace: "default"}},
 		},
 	}
 
@@ -18958,57 +18919,121 @@ func TestAnyDataSource(t *testing.T) {
 }
 
 func TestValidateTopologySpreadConstraints(t *testing.T) {
+	fieldPath := field.NewPath("field")
+	subFldPath0 := fieldPath.Index(0)
+	fieldPathMinDomains := subFldPath0.Child("minDomains")
+	fieldPathMaxSkew := subFldPath0.Child("maxSkew")
+	fieldPathTopologyKey := subFldPath0.Child("topologyKey")
+	fieldPathWhenUnsatisfiable := subFldPath0.Child("whenUnsatisfiable")
+	fieldPathTopologyKeyAndWhenUnsatisfiable := subFldPath0.Child("{topologyKey, whenUnsatisfiable}")
+	nodeAffinityField := subFldPath0.Child("nodeAffinityPolicy")
+	nodeTaintsField := subFldPath0.Child("nodeTaintsPolicy")
+	unknown := core.NodeInclusionPolicy("Unknown")
+	ignore := core.NodeInclusionPolicyIgnore
+	honor := core.NodeInclusionPolicyHonor
+
 	testCases := []struct {
-		name        string
-		constraints []core.TopologySpreadConstraint
-		errtype     field.ErrorType
-		errfield    string
+		name            string
+		constraints     []core.TopologySpreadConstraint
+		wantFieldErrors field.ErrorList
 	}{
 		{
 			name: "all required fields ok",
 			constraints: []core.TopologySpreadConstraint{
-				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					MinDomains:        pointer.Int32(3),
+				},
 			},
+			wantFieldErrors: field.ErrorList{},
 		},
 		{
 			name: "missing MaxSkew",
 			constraints: []core.TopologySpreadConstraint{
 				{TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "maxSkew",
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMaxSkew, int32(0), isNotPositiveErrorMsg)},
 		},
 		{
-			name: "invalid MaxSkew",
+			name: "negative MaxSkew",
 			constraints: []core.TopologySpreadConstraint{
-				{MaxSkew: 0, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
+				{MaxSkew: -1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeInvalid,
-			errfield: "maxSkew",
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMaxSkew, int32(-1), isNotPositiveErrorMsg)},
+		},
+		{
+			name: "can use MinDomains with ScheduleAnyway, when MinDomains = nil",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.ScheduleAnyway,
+					MinDomains:        nil,
+				},
+			},
+			wantFieldErrors: field.ErrorList{},
+		},
+		{
+			name: "negative minDomains is invalid",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					MinDomains:        pointer.Int32(-1),
+				},
+			},
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, pointer.Int32(-1), isNotPositiveErrorMsg)},
+		},
+		{
+			name: "cannot use non-nil MinDomains with ScheduleAnyway",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.ScheduleAnyway,
+					MinDomains:        pointer.Int32(10),
+				},
+			},
+			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMinDomains, pointer.Int32(10), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway)))},
+		},
+		{
+			name: "use negative MinDomains with ScheduleAnyway(invalid)",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.ScheduleAnyway,
+					MinDomains:        pointer.Int32(-1),
+				},
+			},
+			wantFieldErrors: []*field.Error{
+				field.Invalid(fieldPathMinDomains, pointer.Int32(-1), isNotPositiveErrorMsg),
+				field.Invalid(fieldPathMinDomains, pointer.Int32(-1), fmt.Sprintf("can only use minDomains if whenUnsatisfiable=%s, not %s", string(core.DoNotSchedule), string(core.ScheduleAnyway))),
+			},
 		},
 		{
 			name: "missing TopologyKey",
 			constraints: []core.TopologySpreadConstraint{
 				{MaxSkew: 1, WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "topologyKey",
+			wantFieldErrors: []*field.Error{field.Required(fieldPathTopologyKey, "can not be empty")},
 		},
 		{
 			name: "missing scheduling mode",
 			constraints: []core.TopologySpreadConstraint{
 				{MaxSkew: 1, TopologyKey: "k8s.io/zone"},
 			},
-			errtype:  field.ErrorTypeNotSupported,
-			errfield: "whenUnsatisfiable",
+			wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction(""), supportedScheduleActions.List())},
 		},
 		{
 			name: "unsupported scheduling mode",
 			constraints: []core.TopologySpreadConstraint{
 				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.UnsatisfiableConstraintAction("N/A")},
 			},
-			errtype:  field.ErrorTypeNotSupported,
-			errfield: "whenUnsatisfiable",
+			wantFieldErrors: []*field.Error{field.NotSupported(fieldPathWhenUnsatisfiable, core.UnsatisfiableConstraintAction("N/A"), supportedScheduleActions.List())},
 		},
 		{
 			name: "multiple constraints ok with all required fields",
@@ -19016,15 +19041,15 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 				{MaxSkew: 2, TopologyKey: "k8s.io/node", WhenUnsatisfiable: core.ScheduleAnyway},
 			},
+			wantFieldErrors: field.ErrorList{},
 		},
 		{
 			name: "multiple constraints missing TopologyKey on partial ones",
 			constraints: []core.TopologySpreadConstraint{
-				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
-				{MaxSkew: 2, WhenUnsatisfiable: core.ScheduleAnyway},
+				{MaxSkew: 1, WhenUnsatisfiable: core.ScheduleAnyway},
+				{MaxSkew: 2, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "topologyKey",
+			wantFieldErrors: []*field.Error{field.Required(fieldPathTopologyKey, "can not be empty")},
 		},
 		{
 			name: "duplicate constraints",
@@ -19032,25 +19057,62 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 				{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 				{MaxSkew: 2, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			},
-			errtype:  field.ErrorTypeDuplicate,
-			errfield: "{topologyKey, whenUnsatisfiable}",
+			wantFieldErrors: []*field.Error{
+				field.Duplicate(fieldPathTopologyKeyAndWhenUnsatisfiable, fmt.Sprintf("{%v, %v}", "k8s.io/zone", core.DoNotSchedule)),
+			},
+		},
+		{
+			name: "supported policy name set on NodeAffinityPolicy and NodeTaintsPolicy",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:            1,
+					TopologyKey:        "k8s.io/zone",
+					WhenUnsatisfiable:  core.DoNotSchedule,
+					NodeAffinityPolicy: &honor,
+					NodeTaintsPolicy:   &ignore,
+				},
+			},
+			wantFieldErrors: []*field.Error{},
+		},
+		{
+			name: "unsupported policy name set on NodeAffinityPolicy",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:            1,
+					TopologyKey:        "k8s.io/zone",
+					WhenUnsatisfiable:  core.DoNotSchedule,
+					NodeAffinityPolicy: &unknown,
+					NodeTaintsPolicy:   &ignore,
+				},
+			},
+			wantFieldErrors: []*field.Error{
+				field.NotSupported(nodeAffinityField, &unknown, supportedPodTopologySpreadNodePolicies.List()),
+			},
+		},
+		{
+			name: "unsupported policy name set on NodeTaintsPolicy",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:            1,
+					TopologyKey:        "k8s.io/zone",
+					WhenUnsatisfiable:  core.DoNotSchedule,
+					NodeAffinityPolicy: &honor,
+					NodeTaintsPolicy:   &unknown,
+				},
+			},
+			wantFieldErrors: []*field.Error{
+				field.NotSupported(nodeTaintsField, &unknown, supportedPodTopologySpreadNodePolicies.List()),
+			},
 		},
 	}
 
-	for i, tc := range testCases {
-		errs := validateTopologySpreadConstraints(tc.constraints, field.NewPath("field"))
-
-		if len(errs) > 0 && tc.errtype == "" {
-			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
-		} else if len(errs) == 0 && tc.errtype != "" {
-			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
-		} else if len(errs) >= 1 {
-			if errs[0].Type != tc.errtype {
-				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
-			} else if !strings.HasSuffix(errs[0].Field, "."+tc.errfield) {
-				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateTopologySpreadConstraints(tc.constraints, fieldPath)
+			if diff := cmp.Diff(tc.wantFieldErrors, errs); diff != "" {
+				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
-		}
+		})
 	}
 }
 
@@ -19831,6 +19893,7 @@ func TestValidateNonSpecialIP(t *testing.T) {
 		ip   string
 	}{
 		{"ipv4", "10.1.2.3"},
+		{"ipv4 class E", "244.1.2.3"},
 		{"ipv6", "2000::1"},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -20448,5 +20511,67 @@ func TestValidateAppArmorProfileFormat(t *testing.T) {
 		} else {
 			assert.Error(t, err, fmt.Sprintf("Profile %s should not be valid", test.profile))
 		}
+	}
+}
+
+func TestValidatePVSecretReference(t *testing.T) {
+	rootFld := field.NewPath("name")
+	type args struct {
+		secretRef *core.SecretReference
+		fldPath   *field.Path
+	}
+	tests := []struct {
+		name          string
+		args          args
+		expectError   bool
+		expectedError string
+	}{
+		{
+			name:          "invalid secret ref name",
+			args:          args{&core.SecretReference{Name: "$%^&*#", Namespace: "default"}, rootFld},
+			expectError:   true,
+			expectedError: "name.name: Invalid value: \"$%^&*#\": " + dnsLabelErrMsg,
+		},
+		{
+			name:          "invalid secret ref namespace",
+			args:          args{&core.SecretReference{Name: "valid", Namespace: "$%^&*#"}, rootFld},
+			expectError:   true,
+			expectedError: "name.namespace: Invalid value: \"$%^&*#\": " + dnsLabelErrMsg,
+		},
+		{
+			name:          "invalid secret: missing namespace",
+			args:          args{&core.SecretReference{Name: "valid"}, rootFld},
+			expectError:   true,
+			expectedError: "name.namespace: Required value",
+		},
+		{
+			name:          "invalid secret : missing name",
+			args:          args{&core.SecretReference{Namespace: "default"}, rootFld},
+			expectError:   true,
+			expectedError: "name.name: Required value",
+		},
+		{
+			name:          "valid secret",
+			args:          args{&core.SecretReference{Name: "valid", Namespace: "default"}, rootFld},
+			expectError:   false,
+			expectedError: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := validatePVSecretReference(tt.args.secretRef, tt.args.fldPath)
+			if tt.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if tt.expectError && len(errs) != 0 {
+				str := errs[0].Error()
+				if str != "" && !strings.Contains(str, tt.expectedError) {
+					t.Errorf("%s: expected error detail either empty or %q, got %q", tt.name, tt.expectedError, str)
+				}
+			}
+			if !tt.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
 	}
 }

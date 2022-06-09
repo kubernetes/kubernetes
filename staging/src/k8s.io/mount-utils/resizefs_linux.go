@@ -129,6 +129,9 @@ func (resizefs *ResizeFs) NeedResize(devicePath string, deviceMountPath string) 
 	case "xfs":
 		blockSize, fsSize, err = resizefs.getXFSSize(deviceMountPath)
 		klog.V(5).Infof("Xfs size: filesystem size=%d, block size=%d, err=%v", fsSize, blockSize, err)
+	case "btrfs":
+		blockSize, fsSize, err = resizefs.getBtrfsSize(devicePath)
+		klog.V(5).Infof("Btrfs size: filesystem size=%d, block size=%d, err=%v", fsSize, blockSize, err)
 	default:
 		klog.Errorf("Not able to parse given filesystem info. fsType: %s, will not resize", format)
 		return false, fmt.Errorf("Could not parse fs info on given filesystem format: %s. Supported fs types are: xfs, ext3, ext4", format)
@@ -188,6 +191,51 @@ func (resizefs *ResizeFs) getXFSSize(devicePath string) (uint64, uint64, error) 
 		return 0, 0, fmt.Errorf("could not find block count of device %s", devicePath)
 	}
 	return blockSize, blockSize * blockCount, nil
+}
+
+func (resizefs *ResizeFs) getBtrfsSize(devicePath string) (uint64, uint64, error) {
+	output, err := resizefs.exec.Command("btrfs", "inspect-internal", "dump-super", "-f", devicePath).CombinedOutput()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to read size of filesystem on %s: %s: %s", devicePath, err, string(output))
+	}
+
+	blockSize, totalBytes, _ := resizefs.parseBtrfsInfoOutput(string(output), "sectorsize", "total_bytes")
+
+	if blockSize == 0 {
+		return 0, 0, fmt.Errorf("could not find block size of device %s", devicePath)
+	}
+	if totalBytes == 0 {
+		return 0, 0, fmt.Errorf("could not find total size of device %s", devicePath)
+	}
+	return blockSize, totalBytes, nil
+}
+
+func (resizefs *ResizeFs) parseBtrfsInfoOutput(cmdOutput string, blockSizeKey string, totalBytesKey string) (uint64, uint64, error) {
+	lines := strings.Split(cmdOutput, "\n")
+	var blockSize, blockCount uint64
+	var err error
+
+	for _, line := range lines {
+		tokens := strings.Fields(line)
+		if len(tokens) != 2 {
+			continue
+		}
+		key, value := strings.ToLower(strings.TrimSpace(tokens[0])), strings.ToLower(strings.TrimSpace(tokens[1]))
+
+		if key == blockSizeKey {
+			blockSize, err = strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return 0, 0, fmt.Errorf("failed to parse block size %s: %s", value, err)
+			}
+		}
+		if key == totalBytesKey {
+			blockCount, err = strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return 0, 0, fmt.Errorf("failed to parse total size %s: %s", value, err)
+			}
+		}
+	}
+	return blockSize, blockCount, err
 }
 
 func (resizefs *ResizeFs) parseFsInfoOutput(cmdOutput string, spliter string, blockSizeKey string, blockCountKey string) (uint64, uint64, error) {

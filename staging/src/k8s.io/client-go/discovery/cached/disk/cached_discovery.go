@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/openapi"
+	cachedopenapi "k8s.io/client-go/openapi/cached"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -56,6 +58,9 @@ type CachedDiscoveryClient struct {
 	invalidated bool
 	// fresh is true if all used cache files were ours
 	fresh bool
+
+	// caching openapi v3 client which wraps the delegate's client
+	openapiClient openapi.Client
 }
 
 var _ discovery.CachedDiscoveryInterface = &CachedDiscoveryClient{}
@@ -88,13 +93,6 @@ func (d *CachedDiscoveryClient) ServerResourcesForGroupVersion(groupVersion stri
 	}
 
 	return liveResources, nil
-}
-
-// ServerResources returns the supported resources for all groups and versions.
-// Deprecated: use ServerGroupsAndResources instead.
-func (d *CachedDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
-	_, rs, err := discovery.ServerGroupsAndResources(d)
-	return rs, err
 }
 
 // ServerGroupsAndResources returns the supported groups and resources for all groups and versions.
@@ -240,6 +238,21 @@ func (d *CachedDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
 	return d.delegate.OpenAPISchema()
 }
 
+// OpenAPIV3 retrieves and parses the OpenAPIV3 specs exposed by the server
+func (d *CachedDiscoveryClient) OpenAPIV3() openapi.Client {
+	// Must take lock since Invalidate call may modify openapiClient
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	if d.openapiClient == nil {
+		// Delegate is discovery client created with special HTTP client which
+		// respects E-Tag cache responses to serve cache from disk.
+		d.openapiClient = cachedopenapi.NewClient(d.delegate.OpenAPIV3())
+	}
+
+	return d.openapiClient
+}
+
 // Fresh is supposed to tell the caller whether or not to retry if the cache
 // fails to find something (false = retry, true = no need to retry).
 func (d *CachedDiscoveryClient) Fresh() bool {
@@ -257,6 +270,7 @@ func (d *CachedDiscoveryClient) Invalidate() {
 	d.ourFiles = map[string]struct{}{}
 	d.fresh = true
 	d.invalidated = true
+	d.openapiClient = nil
 }
 
 // NewCachedDiscoveryClientForConfig creates a new DiscoveryClient for the given config, and wraps

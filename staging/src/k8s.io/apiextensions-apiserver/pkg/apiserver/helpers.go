@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"fmt"
+
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -33,6 +34,42 @@ func getColumnsForVersion(crd *apiextensionsv1.CustomResourceDefinition, version
 		if version == v.Name {
 			return serveDefaultColumnsIfEmpty(v.AdditionalPrinterColumns), nil
 		}
+	}
+	return nil, fmt.Errorf("version %s not found in apiextensionsv1.CustomResourceDefinition: %v", version, crd.Name)
+}
+
+// getScaleColumnsForVersion returns 2 columns for the desired and actual number of replicas.
+func getScaleColumnsForVersion(crd *apiextensionsv1.CustomResourceDefinition, version string) ([]apiextensionsv1.CustomResourceColumnDefinition, error) {
+	for _, v := range crd.Spec.Versions {
+		if version != v.Name {
+			continue
+		}
+		var cols []apiextensionsv1.CustomResourceColumnDefinition
+		if v.Subresources != nil && v.Subresources.Scale != nil {
+			if v.Subresources.Scale.SpecReplicasPath != "" {
+				cols = append(cols, apiextensionsv1.CustomResourceColumnDefinition{
+					Name:        "Desired",
+					Type:        "integer",
+					Description: "Number of desired replicas",
+					JSONPath:    ".spec.replicas",
+				})
+			}
+			if v.Subresources.Scale.StatusReplicasPath != "" {
+				cols = append(cols, apiextensionsv1.CustomResourceColumnDefinition{
+					Name:        "Available",
+					Type:        "integer",
+					Description: "Number of actual replicas",
+					JSONPath:    ".status.replicas",
+				})
+			}
+		}
+		cols = append(cols, apiextensionsv1.CustomResourceColumnDefinition{
+			Name:        "Age",
+			Type:        "date",
+			Description: swaggerMetadataDescriptions["creationTimestamp"],
+			JSONPath:    ".metadata.creationTimestamp",
+		})
+		return cols, nil
 	}
 	return nil, fmt.Errorf("version %s not found in apiextensionsv1.CustomResourceDefinition: %v", version, crd.Name)
 }

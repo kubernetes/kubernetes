@@ -94,6 +94,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		}
 
 		body, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
+		trace.Step("limitedReadBody done", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -157,8 +158,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		}
 		ctx = request.WithNamespace(ctx, namespace)
 
-		ae := audit.AuditEventFrom(ctx)
-		admit = admission.WithAudit(admit, ae)
+		admit = admission.WithAudit(admit)
 		audit.LogRequestObject(req.Context(), obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 
 		userInfo, _ := request.UserFrom(ctx)
@@ -212,11 +212,11 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			}
 			return result, err
 		})
+		trace.Step("Write to database call finished", utiltrace.Field{"len", len(body)}, utiltrace.Field{"err", err})
 		if err != nil {
 			scope.err(err, w, req)
 			return
 		}
-		trace.Step("Object stored in database")
 
 		code := http.StatusCreated
 		status, ok := result.(*metav1.Status)

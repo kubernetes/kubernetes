@@ -125,10 +125,7 @@ type ObjectMeta struct {
 	// and may be truncated by the length of the suffix required to make the value
 	// unique on the server.
 	//
-	// If this field is specified and the generated name exists, the server will
-	// NOT return a 409 - instead, it will either return 201 Created or 500 with Reason
-	// ServerTimeout indicating a unique name could not be found in the time allotted, and the client
-	// should retry (optionally after the time indicated in the Retry-After header).
+	// If this field is specified and the generated name exists, the server will return a 409.
 	//
 	// Applied only if Name is not specified.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#idempotency
@@ -257,11 +254,9 @@ type ObjectMeta struct {
 	// +patchStrategy=merge
 	Finalizers []string `json:"finalizers,omitempty" patchStrategy:"merge" protobuf:"bytes,14,rep,name=finalizers"`
 
-	// The name of the cluster which the object belongs to.
-	// This is used to distinguish resources with same name and namespace in different clusters.
-	// This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
-	// +optional
-	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
+	// Tombstone: ClusterName was a legacy field that was always cleared by
+	// the system and never used.
+	// ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
 
 	// ManagedFields maps workflow-id and version to the set of fields
 	// that are managed by that workflow. This is mostly for internal

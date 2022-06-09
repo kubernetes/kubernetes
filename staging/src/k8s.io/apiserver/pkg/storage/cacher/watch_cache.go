@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -220,7 +221,7 @@ func newWatchCache(
 		objectType:          objectType,
 	}
 	objType := objectType.String()
-	watchCacheCapacity.WithLabelValues(objType).Set(float64(wc.capacity))
+	metrics.WatchCacheCapacity.WithLabelValues(objType).Set(float64(wc.capacity))
 	wc.cond = sync.NewCond(wc.RLocker())
 	wc.indexValidator = wc.isIndexValidLocked
 
@@ -385,7 +386,7 @@ func (w *watchCache) doCacheResizeLocked(capacity int) {
 		newCache[i%capacity] = w.cache[i%w.capacity]
 	}
 	w.cache = newCache
-	recordsWatchCacheCapacityChange(w.objectType.String(), w.capacity, capacity)
+	metrics.RecordsWatchCacheCapacityChange(w.objectType.String(), w.capacity, capacity)
 	w.capacity = capacity
 }
 

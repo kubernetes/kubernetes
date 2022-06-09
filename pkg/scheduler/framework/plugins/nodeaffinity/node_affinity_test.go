@@ -18,28 +18,32 @@ package nodeaffinity
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 // TODO: Add test case for RequiredDuringSchedulingRequiredDuringExecution after it's implemented.
 func TestNodeAffinity(t *testing.T) {
 	tests := []struct {
-		name             string
-		pod              *v1.Pod
-		labels           map[string]string
-		nodeName         string
-		wantStatus       *framework.Status
-		args             config.NodeAffinityArgs
-		disablePreFilter bool
+		name                string
+		pod                 *v1.Pod
+		labels              map[string]string
+		nodeName            string
+		wantStatus          *framework.Status
+		wantPreFilterStatus *framework.Status
+		wantPreFilterResult *framework.PreFilterResult
+		args                config.NodeAffinityArgs
+		disablePreFilter    bool
 	}{
 		{
 			name: "no selector",
@@ -47,37 +51,25 @@ func TestNodeAffinity(t *testing.T) {
 		},
 		{
 			name: "missing labels",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-				},
-			},
+			pod: st.MakePod().NodeSelector(map[string]string{
+				"foo": "bar",
+			}).Obj(),
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			name: "same labels",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-				},
-			},
+			pod: st.MakePod().NodeSelector(map[string]string{
+				"foo": "bar",
+			}).Obj(),
 			labels: map[string]string{
 				"foo": "bar",
 			},
 		},
 		{
 			name: "node labels are superset",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-				},
-			},
+			pod: st.MakePod().NodeSelector(map[string]string{
+				"foo": "bar",
+			}).Obj(),
 			labels: map[string]string{
 				"foo": "bar",
 				"baz": "blah",
@@ -85,14 +77,10 @@ func TestNodeAffinity(t *testing.T) {
 		},
 		{
 			name: "node labels are subset",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-						"baz": "blah",
-					},
-				},
-			},
+			pod: st.MakePod().NodeSelector(map[string]string{
+				"foo": "bar",
+				"baz": "blah",
+			}).Obj(),
 			labels: map[string]string{
 				"foo": "bar",
 			},
@@ -513,7 +501,7 @@ func TestNodeAffinity(t *testing.T) {
 											{
 												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"node_1"},
+												Values:   []string{"node1"},
 											},
 										},
 									},
@@ -523,7 +511,8 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName: "node_1",
+			nodeName:            "node1",
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
 		},
 		{
 			name: "Pod with matchFields using In operator that does not match the existing node",
@@ -538,7 +527,7 @@ func TestNodeAffinity(t *testing.T) {
 											{
 												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"node_1"},
+												Values:   []string{"node1"},
 											},
 										},
 									},
@@ -548,8 +537,9 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName:   "node_2",
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			nodeName:            "node2",
+			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
 		},
 		{
 			name: "Pod with two terms: matchFields does not match, but matchExpressions matches",
@@ -564,7 +554,7 @@ func TestNodeAffinity(t *testing.T) {
 											{
 												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"node_1"},
+												Values:   []string{"node1"},
 											},
 										},
 									},
@@ -583,7 +573,7 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName: "node_2",
+			nodeName: "node2",
 			labels:   map[string]string{"foo": "bar"},
 		},
 		{
@@ -599,7 +589,7 @@ func TestNodeAffinity(t *testing.T) {
 											{
 												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"node_1"},
+												Values:   []string{"node1"},
 											},
 										},
 										MatchExpressions: []v1.NodeSelectorRequirement{
@@ -616,9 +606,10 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName:   "node_2",
-			labels:     map[string]string{"foo": "bar"},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			nodeName:            "node2",
+			labels:              map[string]string{"foo": "bar"},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
+			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			name: "Pod with one term: both matchFields and matchExpressions match",
@@ -633,7 +624,7 @@ func TestNodeAffinity(t *testing.T) {
 											{
 												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"node_1"},
+												Values:   []string{"node1"},
 											},
 										},
 										MatchExpressions: []v1.NodeSelectorRequirement{
@@ -650,8 +641,9 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName: "node_1",
-			labels:   map[string]string{"foo": "bar"},
+			nodeName:            "node1",
+			labels:              map[string]string{"foo": "bar"},
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1")},
 		},
 		{
 			name: "Pod with two terms: both matchFields and matchExpressions do not match",
@@ -666,7 +658,7 @@ func TestNodeAffinity(t *testing.T) {
 											{
 												Key:      metav1.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
-												Values:   []string{"node_1"},
+												Values:   []string{"node1"},
 											},
 										},
 									},
@@ -685,9 +677,77 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName:   "node_2",
+			nodeName:   "node2",
 			labels:     map[string]string{"foo": "bar"},
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+		},
+		{
+			name: "Pod with two terms of node.Name affinity",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node1"},
+											},
+										},
+									},
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node2"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName:            "node2",
+			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.NewString("node1", "node2")},
+		},
+		{
+			name: "Pod with two conflicting mach field requirements",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node1"},
+											},
+											{
+												Key:      metav1.ObjectNameField,
+												Operator: v1.NodeSelectorOpIn,
+												Values:   []string{"node2"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			nodeName:            "node2",
+			labels:              map[string]string{"foo": "bar"},
+			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonConflict),
+			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
 		},
 		{
 			name: "Matches added affinity and Pod's node affinity",
@@ -712,7 +772,7 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName: "node_2",
+			nodeName: "node2",
 			labels:   map[string]string{"zone": "foo"},
 			args: config.NodeAffinityArgs{
 				AddedAffinity: &v1.NodeAffinity{
@@ -721,7 +781,7 @@ func TestNodeAffinity(t *testing.T) {
 							MatchFields: []v1.NodeSelectorRequirement{{
 								Key:      metav1.ObjectNameField,
 								Operator: v1.NodeSelectorOpIn,
-								Values:   []string{"node_2"},
+								Values:   []string{"node2"},
 							}},
 						}},
 					},
@@ -751,7 +811,7 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			nodeName: "node_2",
+			nodeName: "node2",
 			labels:   map[string]string{"zone": "foo"},
 			args: config.NodeAffinityArgs{
 				AddedAffinity: &v1.NodeAffinity{
@@ -760,7 +820,7 @@ func TestNodeAffinity(t *testing.T) {
 							MatchFields: []v1.NodeSelectorRequirement{{
 								Key:      metav1.ObjectNameField,
 								Operator: v1.NodeSelectorOpIn,
-								Values:   []string{"node_2"},
+								Values:   []string{"node2"},
 							}},
 						}},
 					},
@@ -771,7 +831,7 @@ func TestNodeAffinity(t *testing.T) {
 		{
 			name:     "Doesn't match added affinity",
 			pod:      &v1.Pod{},
-			nodeName: "node_2",
+			nodeName: "node2",
 			labels:   map[string]string{"zone": "foo"},
 			args: config.NodeAffinityArgs{
 				AddedAffinity: &v1.NodeAffinity{
@@ -855,14 +915,17 @@ func TestNodeAffinity(t *testing.T) {
 			state := framework.NewCycleState()
 			var gotStatus *framework.Status
 			if !test.disablePreFilter {
-				gotStatus = p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.pod)
-				if !gotStatus.IsSuccess() {
-					t.Errorf("unexpected error: %v", gotStatus)
+				gotPreFilterResult, gotStatus := p.(framework.PreFilterPlugin).PreFilter(context.Background(), state, test.pod)
+				if diff := cmp.Diff(test.wantPreFilterStatus, gotStatus); diff != "" {
+					t.Errorf("unexpected PreFilter Status (-want,+got):\n%s", diff)
+				}
+				if diff := cmp.Diff(test.wantPreFilterResult, gotPreFilterResult); diff != "" {
+					t.Errorf("unexpected PreFilterResult (-want,+got):\n%s", diff)
 				}
 			}
 			gotStatus = p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, nodeInfo)
-			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
-				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			if diff := cmp.Diff(test.wantStatus, gotStatus); diff != "" {
+				t.Errorf("unexpected Filter Status (-want,+got):\n%s", diff)
 			}
 		})
 	}
@@ -952,69 +1015,69 @@ func TestNodeAffinityPriority(t *testing.T) {
 		disablePreScore bool
 	}{
 		{
-			name: "all machines are same priority as NodeAffinity is nil",
+			name: "all nodes are same priority as NodeAffinity is nil",
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{},
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
 		},
 		{
-			name: "no machine matches preferred scheduling requirements in NodeAffinity of pod so all machines' priority is zero",
+			name: "no node matches preferred scheduling requirements in NodeAffinity of pod so all nodes' priority is zero",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Affinity: affinity1,
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label4}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label4}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
 		},
 		{
-			name: "only machine1 matches the preferred scheduling requirements of pod",
+			name: "only node1 matches the preferred scheduling requirements of pod",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Affinity: affinity1,
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: 0}, {Name: "node3", Score: 0}},
 		},
 		{
-			name: "all machines matches the preferred scheduling requirements of pod but with different priorities ",
+			name: "all nodes matches the preferred scheduling requirements of pod but with different priorities ",
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
 					Affinity: affinity2,
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: label5}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node5", Labels: label5}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 18}, {Name: "machine5", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 36}},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 18}, {Name: "node5", Score: framework.MaxNodeScore}, {Name: "node2", Score: 36}},
 		},
 		{
 			name: "added affinity",
 			pod:  &v1.Pod{},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: 0}},
 			args: config.NodeAffinityArgs{
 				AddedAffinity: affinity1.NodeAffinity,
 			},
@@ -1027,11 +1090,11 @@ func TestNodeAffinityPriority(t *testing.T) {
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label5}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: label5}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 40}, {Name: "machine2", Score: 60}, {Name: "machine3", Score: framework.MaxNodeScore}},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: 40}, {Name: "node2", Score: 60}, {Name: "node3", Score: framework.MaxNodeScore}},
 			args: config.NodeAffinityArgs{
 				AddedAffinity: &v1.NodeAffinity{
 					PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{
@@ -1059,11 +1122,11 @@ func TestNodeAffinityPriority(t *testing.T) {
 				},
 			},
 			nodes: []*v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: label1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: label5}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node5", Labels: label5}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 			},
-			expectedList:    []framework.NodeScore{{Name: "machine1", Score: 18}, {Name: "machine5", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 36}},
+			expectedList:    []framework.NodeScore{{Name: "node1", Score: 18}, {Name: "node5", Score: framework.MaxNodeScore}, {Name: "node2", Score: 36}},
 			disablePreScore: true,
 		},
 	}
@@ -1071,7 +1134,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, test.nodes)))
+			fh, _ := runtime.NewFramework(nil, nil, wait.NeverStop, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, test.nodes)))
 			p, err := New(&test.args, fh)
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)

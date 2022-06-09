@@ -199,8 +199,9 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 
-	serviceClusterIPAllocator, err := ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
-		mem := allocator.NewAllocationMap(max, rangeSpec)
+	serviceClusterIPAllocator, err := ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+		var mem allocator.Snapshottable
+		mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
 		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
 		if err != nil {
@@ -212,14 +213,16 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster IP allocator: %v", err)
 	}
+	serviceClusterIPAllocator.EnableMetrics()
 	restStorage.ServiceClusterIPAllocator = serviceClusterIPRegistry
 
 	// allocator for secondary service ip range
 	var secondaryServiceClusterIPAllocator ipallocator.Interface
 	if c.SecondaryServiceIPRange.IP != nil {
 		var secondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
-		secondaryServiceClusterIPAllocator, err = ipallocator.New(&c.SecondaryServiceIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
-			mem := allocator.NewAllocationMap(max, rangeSpec)
+		secondaryServiceClusterIPAllocator, err = ipallocator.New(&c.SecondaryServiceIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+			var mem allocator.Snapshottable
+			mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
 			// TODO etcdallocator package to return a storage interface via the storageFactory
 			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
 			if err != nil {
@@ -231,6 +234,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 		if err != nil {
 			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
 		}
+		secondaryServiceClusterIPAllocator.EnableMetrics()
 		restStorage.SecondaryServiceClusterIPAllocator = secondaryServiceClusterIPRegistry
 	}
 

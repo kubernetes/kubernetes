@@ -358,7 +358,18 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 
 func (dc *DisruptionController) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
+
+	// Start events processing pipeline.
+	if dc.kubeClient != nil {
+		klog.Infof("Sending events to api server.")
+		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dc.kubeClient.CoreV1().Events("")})
+	} else {
+		klog.Infof("No api server defined - no events will be sent to API server.")
+	}
+	defer dc.broadcaster.Shutdown()
+
 	defer dc.queue.ShutDown()
+	defer dc.recheckQueue.ShutDown()
 
 	klog.Infof("Starting disruption controller")
 	defer klog.Infof("Shutting down disruption controller")
@@ -367,12 +378,6 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 		return
 	}
 
-	if dc.kubeClient != nil {
-		klog.Infof("Sending events to api server.")
-		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dc.kubeClient.CoreV1().Events("")})
-	} else {
-		klog.Infof("No api server defined - no events will be sent to API server.")
-	}
 	go wait.UntilWithContext(ctx, dc.worker, time.Second)
 	go wait.Until(dc.recheckWorker, time.Second, ctx.Done())
 

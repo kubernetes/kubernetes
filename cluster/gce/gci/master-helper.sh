@@ -86,8 +86,6 @@ function replicate-master-instance() {
   echo "${master_certs}" > "${KUBE_TEMP}/kube-master-certs.yaml"
   get-metadata "${existing_master_zone}" "${existing_master_name}" cluster-name > "${KUBE_TEMP}/cluster-name.txt"
   get-metadata "${existing_master_zone}" "${existing_master_name}" gci-update-strategy > "${KUBE_TEMP}/gci-update.txt"
-  get-metadata "${existing_master_zone}" "${existing_master_name}" gci-ensure-gke-docker > "${KUBE_TEMP}/gci-ensure-gke-docker.txt"
-  get-metadata "${existing_master_zone}" "${existing_master_name}" gci-docker-version > "${KUBE_TEMP}/gci-docker-version.txt"
   get-metadata "${existing_master_zone}" "${existing_master_name}" cluster-location > "${KUBE_TEMP}/cluster-location.txt"
 
   create-master-instance-internal "${REPLICA_NAME}"
@@ -158,8 +156,6 @@ function create-master-instance-internal() {
   metadata="${metadata},cluster-location=${KUBE_TEMP}/cluster-location.txt"
   metadata="${metadata},cluster-name=${KUBE_TEMP}/cluster-name.txt"
   metadata="${metadata},gci-update-strategy=${KUBE_TEMP}/gci-update.txt"
-  metadata="${metadata},gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt"
-  metadata="${metadata},gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt"
   metadata="${metadata},kube-master-certs=${KUBE_TEMP}/kube-master-certs.yaml"
   metadata="${metadata},cluster-location=${KUBE_TEMP}/cluster-location.txt"
   metadata="${metadata},kube-master-internal-route=${KUBE_ROOT}/cluster/gce/gci/kube-master-internal-route.sh"

@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 func recordEvents(events []watch.Event, f func(watch.Event) (bool, error)) func(watch.Event) (bool, error) {
@@ -158,6 +159,7 @@ func initContainersInvariants(pod *v1.Pod) error {
 
 var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("init-container")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
@@ -233,7 +235,9 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 
 		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			framework.ExpectEqual(status.Ready, true)
+			if !status.Ready {
+				framework.Failf("init container %s should be in Ready status", status.Name)
+			}
 			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
 			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
 		}
@@ -310,7 +314,9 @@ var _ = SIGDescribe("InitContainer [NodeConformance]", func() {
 
 		framework.ExpectEqual(len(endPod.Status.InitContainerStatuses), 2)
 		for _, status := range endPod.Status.InitContainerStatuses {
-			framework.ExpectEqual(status.Ready, true)
+			if !status.Ready {
+				framework.Failf("init container %s should be in Ready status", status.Name)
+			}
 			gomega.Expect(status.State.Terminated).NotTo(gomega.BeNil())
 			gomega.Expect(status.State.Terminated.ExitCode).To(gomega.BeZero())
 		}

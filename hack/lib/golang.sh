@@ -111,7 +111,7 @@ readonly KUBE_SERVER_IMAGE_BINARIES=("${KUBE_SERVER_IMAGE_TARGETS[@]##*/}")
 kube::golang::conformance_image_targets() {
   # NOTE: this contains cmd targets for kube::release::build_conformance_image
   local targets=(
-    vendor/github.com/onsi/ginkgo/ginkgo
+    github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
     test/conformance/image/go-runner
     cmd/kubectl
@@ -213,8 +213,8 @@ kube::golang::setup_platforms() {
 
   elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
     host_arch=$(kube::util::host_arch)
-    if [[ "${host_arch}" != "amd64" && "${host_arch}" != "arm64" && "${host_arch}" != "ppc64le" ]]; then
-      # on any platform other than amd64, arm64 and ppc64le, we just default to amd64
+    if [[ "${host_arch}" != "amd64" && "${host_arch}" != "arm64" && "${host_arch}" != "ppc64le" && "${host_arch}" != "s390x" ]]; then
+      # on any platform other than amd64, arm64, ppc64le and s390x, we just default to amd64
       host_arch="amd64"
     fi
     KUBE_SERVER_PLATFORMS=("linux/${host_arch}")
@@ -274,7 +274,7 @@ kube::golang::test_targets() {
     cmd/genyaml
     cmd/genswaggertypedocs
     cmd/linkcheck
-    vendor/github.com/onsi/ginkgo/ginkgo
+    github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
     test/conformance/image/go-runner
   )
@@ -301,7 +301,7 @@ readonly KUBE_TEST_PORTABLE=(
 kube::golang::server_test_targets() {
   local targets=(
     cmd/kubemark
-    vendor/github.com/onsi/ginkgo/ginkgo
+    github.com/onsi/ginkgo/ginkgo
   )
 
   if [[ "${OSTYPE:-}" == "linux"* ]]; then
@@ -382,11 +382,14 @@ kube::golang::is_statically_linked_library() {
 kube::golang::binaries_from_targets() {
   local target
   for target; do
-    # If the target starts with what looks like a domain name, assume it has a
-    # fully-qualified package name rather than one that needs the Kubernetes
-    # package prepended.
     if [[ "${target}" =~ ^([[:alnum:]]+".")+[[:alnum:]]+"/" ]]; then
+      # If the target starts with what looks like a domain name, assume it has a
+      # fully-qualified package name rather than one that needs the Kubernetes
+      # package prepended.
       echo "${target}"
+    elif [[ "${target}" =~ ^vendor/ ]]; then
+      # Strip vendor/ prefix, since we're building in gomodule mode.
+      echo "${target#"vendor/"}"
     else
       echo "${KUBE_GO_PACKAGE}/${target}"
     fi
@@ -480,7 +483,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.17.0
+  minimum_go_version=go1.18.1
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -495,9 +498,6 @@ EOF
 # ${PATH}. It will also check that the Go version is good enough for the
 # Kubernetes build.
 #
-# Inputs:
-#   KUBE_EXTRA_GOPATH - If set, this is included in created GOPATH
-#
 # Outputs:
 #   env-var GOPATH points to our local output dir
 #   env-var GOBIN is unset (we want binaries in a predictable place)
@@ -510,11 +510,6 @@ kube::golang::setup_env() {
 
   export GOPATH="${KUBE_GOPATH}"
   export GOCACHE="${KUBE_GOPATH}/cache"
-
-  # Append KUBE_EXTRA_GOPATH to the GOPATH if it is defined.
-  if [[ -n ${KUBE_EXTRA_GOPATH:-} ]]; then
-    GOPATH="${GOPATH}:${KUBE_EXTRA_GOPATH}"
-  fi
 
   # Make sure our own Go binaries are in PATH.
   export PATH="${KUBE_GOPATH}/bin:${PATH}"
@@ -676,13 +671,13 @@ kube::golang::build_some_binaries() {
     done
     if [[ "${#uncovered[@]}" != 0 ]]; then
       V=2 kube::log::info "Building ${uncovered[*]} without coverage..."
-      go install "${build_args[@]}" "${uncovered[@]}"
+      GO111MODULE=on GOPROXY=off go install "${build_args[@]}" "${uncovered[@]}"
     else
       V=2 kube::log::info "Nothing to build without coverage."
      fi
    else
     V=2 kube::log::info "Coverage is disabled."
-    go install "${build_args[@]}" "$@"
+    GO111MODULE=on GOPROXY=off go install "${build_args[@]}" "$@"
    fi
 }
 

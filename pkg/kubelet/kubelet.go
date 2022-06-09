@@ -108,7 +108,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/security/apparmor"
-	sysctlallowlist "k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
@@ -776,7 +775,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	// Safe, allowed sysctls can always be used as unsafe sysctls in the spec.
 	// Hence, we concatenate those two lists.
-	safeAndUnsafeSysctls := append(sysctlallowlist.SafeSysctlAllowlist(), allowedUnsafeSysctls...)
+	safeAndUnsafeSysctls := append(sysctl.SafeSysctlAllowlist(), allowedUnsafeSysctls...)
 	sysctlsAllowlist, err := sysctl.NewAllowlist(safeAndUnsafeSysctls)
 	if err != nil {
 		return nil, err
@@ -829,6 +828,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		ShutdownGracePeriodRequested:     kubeCfg.ShutdownGracePeriod.Duration,
 		ShutdownGracePeriodCriticalPods:  kubeCfg.ShutdownGracePeriodCriticalPods.Duration,
 		ShutdownGracePeriodByPodPriority: kubeCfg.ShutdownGracePeriodByPodPriority,
+		StateDirectory:                   rootDirectory,
 	})
 	klet.shutdownManager = shutdownManager
 	klet.admitHandlers.AddPodAdmitHandler(shutdownAdmitHandler)
@@ -1452,24 +1452,36 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 }
 
 // syncPod is the transaction script for the sync of a single pod (setting up)
-// a pod. The reverse (teardown) is handled in syncTerminatingPod and
-// syncTerminatedPod. If syncPod exits without error, then the pod runtime
-// state is in sync with the desired configuration state (pod is running).
-// If syncPod exits with a transient error, the next invocation of syncPod
-// is expected to make progress towards reaching the runtime state.
+// a pod. This method is reentrant and expected to converge a pod towards the
+// desired state of the spec. The reverse (teardown) is handled in
+// syncTerminatingPod and syncTerminatedPod. If syncPod exits without error,
+// then the pod runtime state is in sync with the desired configuration state
+// (pod is running). If syncPod exits with a transient error, the next
+// invocation of syncPod is expected to make progress towards reaching the
+// runtime state. syncPod exits with isTerminal when the pod was detected to
+// have reached a terminal lifecycle phase due to container exits (for
+// RestartNever or RestartOnFailure) and the next method invoked will by
+// syncTerminatingPod.
 //
 // Arguments:
 //
-// o - the SyncPodOptions for this invocation
+// updateType - whether this is a create (first time) or an update, should
+//   only be used for metrics since this method must be reentrant
+// pod - the pod that is being set up
+// mirrorPod - the mirror pod known to the kubelet for this pod, if any
+// podStatus - the most recent pod status observed for this pod which can
+//   be used to determine the set of actions that should be taken during
+//   this loop of syncPod
 //
 // The workflow is:
-// * Kill the pod immediately if update type is SyncPodKill
 // * If the pod is being created, record pod worker start latency
 // * Call generateAPIPodStatus to prepare an v1.PodStatus for the pod
 // * If the pod is being seen as running for the first time, record pod
 //   start latency
 // * Update the status of the pod in the status manager
-// * Kill the pod if it should not be running due to soft admission
+// * Stop the pod's containers if it should not be running due to soft
+//   admission
+// * Ensure any background tracking for a runnable pod is started
 // * Create a mirror pod if the pod is a static pod, and does not
 //   already have a mirror pod
 // * Create the data directories for the pod if they do not exist
@@ -1483,10 +1495,12 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 //
 // This operation writes all events that are dispatched in order to provide
 // the most accurate information possible about an error situation to aid debugging.
-// Callers should not throw an event if this operation returns an error.
-func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+// Callers should not write an event if this operation returns an error.
+func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (isTerminal bool, err error) {
 	klog.V(4).InfoS("syncPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
-	defer klog.V(4).InfoS("syncPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
+	defer func() {
+		klog.V(4).InfoS("syncPod exit", "pod", klog.KObj(pod), "podUID", pod.UID, "isTerminal", isTerminal)
+	}()
 
 	// Latency measurements for the main workflow are relative to the
 	// first time the pod was seen by kubelet.
@@ -1518,9 +1532,15 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	for _, ipInfo := range apiPodStatus.PodIPs {
 		podStatus.IPs = append(podStatus.IPs, ipInfo.IP)
 	}
-
 	if len(podStatus.IPs) == 0 && len(apiPodStatus.PodIP) > 0 {
 		podStatus.IPs = []string{apiPodStatus.PodIP}
+	}
+
+	// If the pod is terminal, we don't need to continue to setup the pod
+	if apiPodStatus.Phase == v1.PodSucceeded || apiPodStatus.Phase == v1.PodFailed {
+		kl.statusManager.SetPodStatus(pod, apiPodStatus)
+		isTerminal = true
+		return isTerminal, nil
 	}
 
 	// If the pod should not be running, we request the pod's containers be stopped. This is not the same
@@ -1572,13 +1592,13 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			// Return an error to signal that the sync loop should back off.
 			syncErr = fmt.Errorf("pod cannot be run: %s", runnable.Message)
 		}
-		return syncErr
+		return false, syncErr
 	}
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
 	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "%s: %v", NetworkNotReadyErrorMsg, err)
-		return fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, err)
+		return false, fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, err)
 	}
 
 	// ensure the kubelet knows about referenced secrets or configmaps used by the pod
@@ -1635,7 +1655,7 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 				}
 				if err := pcm.EnsureExists(pod); err != nil {
 					kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
-					return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+					return false, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
 				}
 			}
 		}
@@ -1676,7 +1696,7 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	if err := kl.makePodDataDirs(pod); err != nil {
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToMakePodDataDirectories, "error making pod data directories: %v", err)
 		klog.ErrorS(err, "Unable to make pod data directories for pod", "pod", klog.KObj(pod))
-		return err
+		return false, err
 	}
 
 	// Volume manager will not mount volumes for terminating pods
@@ -1686,12 +1706,15 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
 			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to attach or mount volumes: %v", err)
 			klog.ErrorS(err, "Unable to attach or mount volumes for pod; skipping pod", "pod", klog.KObj(pod))
-			return err
+			return false, err
 		}
 	}
 
 	// Fetch the pull secrets for the pod
 	pullSecrets := kl.getPullSecretsForPod(pod)
+
+	// Ensure the pod is being probed
+	kl.probeManager.AddPod(pod)
 
 	// Call the container runtime's SyncPod callback
 	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
@@ -1702,14 +1725,14 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			if r.Error != kubecontainer.ErrCrashLoopBackOff && r.Error != images.ErrImagePullBackOff {
 				// Do not record an event here, as we keep all event logging for sync pod failures
 				// local to container runtime, so we get better errors.
-				return err
+				return false, err
 			}
 		}
 
-		return nil
+		return false, nil
 	}
 
-	return nil
+	return false, nil
 }
 
 // syncTerminatingPod is expected to terminate all running containers in a pod. Once this method
@@ -1750,6 +1773,9 @@ func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 	} else {
 		klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", nil)
 	}
+
+	kl.probeManager.StopLivenessAndStartup(pod)
+
 	p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 	if err := kl.killPod(pod, p, gracePeriod); err != nil {
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
@@ -1757,6 +1783,12 @@ func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 		utilruntime.HandleError(err)
 		return err
 	}
+
+	// Once the containers are stopped, we can stop probing for liveness and readiness.
+	// TODO: once a pod is terminal, certain probes (liveness exec) could be stopped immediately after
+	//   the detection of a container shutdown or (for readiness) after the first failure. Tracked as
+	//   https://github.com/kubernetes/kubernetes/issues/107894 although may not be worth optimizing.
+	kl.probeManager.RemovePod(pod)
 
 	// Guard against consistency issues in KillPod implementations by checking that there are no
 	// running containers. This method is invoked infrequently so this is effectively free and can
@@ -2213,9 +2245,6 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
-		// TODO: move inside syncPod and make reentrant
-		// https://github.com/kubernetes/kubernetes/issues/105014
-		kl.probeManager.AddPod(pod)
 	}
 }
 
@@ -2249,10 +2278,6 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 		if err := kl.deletePod(pod); err != nil {
 			klog.V(2).InfoS("Failed to delete pod", "pod", klog.KObj(pod), "err", err)
 		}
-		// TODO: move inside syncTerminatingPod|syncTerminatedPod (we should stop probing
-		// once the pod kill is acknowledged and during eviction)
-		// https://github.com/kubernetes/kubernetes/issues/105014
-		kl.probeManager.RemovePod(pod)
 	}
 }
 

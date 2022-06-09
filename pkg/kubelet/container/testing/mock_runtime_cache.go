@@ -21,36 +21,51 @@ limitations under the License.
 package testing
 
 import (
-	gomock "github.com/golang/mock/gomock"
-	container "k8s.io/kubernetes/pkg/kubelet/container"
 	reflect "reflect"
 	time "time"
+
+	gomock "github.com/golang/mock/gomock"
+	container "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
-// MockRuntimeCache is a mock of RuntimeCache interface
+// MockRuntimeCache is a mock of RuntimeCache interface.
 type MockRuntimeCache struct {
 	ctrl     *gomock.Controller
 	recorder *MockRuntimeCacheMockRecorder
 }
 
-// MockRuntimeCacheMockRecorder is the mock recorder for MockRuntimeCache
+// MockRuntimeCacheMockRecorder is the mock recorder for MockRuntimeCache.
 type MockRuntimeCacheMockRecorder struct {
 	mock *MockRuntimeCache
 }
 
-// NewMockRuntimeCache creates a new mock instance
+// NewMockRuntimeCache creates a new mock instance.
 func NewMockRuntimeCache(ctrl *gomock.Controller) *MockRuntimeCache {
 	mock := &MockRuntimeCache{ctrl: ctrl}
 	mock.recorder = &MockRuntimeCacheMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockRuntimeCache) EXPECT() *MockRuntimeCacheMockRecorder {
 	return m.recorder
 }
 
-// GetPods mocks base method
+// ForceUpdateIfOlder mocks base method.
+func (m *MockRuntimeCache) ForceUpdateIfOlder(arg0 time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ForceUpdateIfOlder", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ForceUpdateIfOlder indicates an expected call of ForceUpdateIfOlder.
+func (mr *MockRuntimeCacheMockRecorder) ForceUpdateIfOlder(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForceUpdateIfOlder", reflect.TypeOf((*MockRuntimeCache)(nil).ForceUpdateIfOlder), arg0)
+}
+
+// GetPods mocks base method.
 func (m *MockRuntimeCache) GetPods() ([]*container.Pod, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPods")
@@ -59,50 +74,36 @@ func (m *MockRuntimeCache) GetPods() ([]*container.Pod, error) {
 	return ret0, ret1
 }
 
-// GetPods indicates an expected call of GetPods
+// GetPods indicates an expected call of GetPods.
 func (mr *MockRuntimeCacheMockRecorder) GetPods() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockRuntimeCache)(nil).GetPods))
 }
 
-// ForceUpdateIfOlder mocks base method
-func (m *MockRuntimeCache) ForceUpdateIfOlder(arg0 time.Time) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ForceUpdateIfOlder", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ForceUpdateIfOlder indicates an expected call of ForceUpdateIfOlder
-func (mr *MockRuntimeCacheMockRecorder) ForceUpdateIfOlder(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForceUpdateIfOlder", reflect.TypeOf((*MockRuntimeCache)(nil).ForceUpdateIfOlder), arg0)
-}
-
-// MockpodsGetter is a mock of podsGetter interface
+// MockpodsGetter is a mock of podsGetter interface.
 type MockpodsGetter struct {
 	ctrl     *gomock.Controller
 	recorder *MockpodsGetterMockRecorder
 }
 
-// MockpodsGetterMockRecorder is the mock recorder for MockpodsGetter
+// MockpodsGetterMockRecorder is the mock recorder for MockpodsGetter.
 type MockpodsGetterMockRecorder struct {
 	mock *MockpodsGetter
 }
 
-// NewMockpodsGetter creates a new mock instance
+// NewMockpodsGetter creates a new mock instance.
 func NewMockpodsGetter(ctrl *gomock.Controller) *MockpodsGetter {
 	mock := &MockpodsGetter{ctrl: ctrl}
 	mock.recorder = &MockpodsGetterMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockpodsGetter) EXPECT() *MockpodsGetterMockRecorder {
 	return m.recorder
 }
 
-// GetPods mocks base method
+// GetPods mocks base method.
 func (m *MockpodsGetter) GetPods(arg0 bool) ([]*container.Pod, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPods", arg0)
@@ -111,7 +112,7 @@ func (m *MockpodsGetter) GetPods(arg0 bool) ([]*container.Pod, error) {
 	return ret0, ret1
 }
 
-// GetPods indicates an expected call of GetPods
+// GetPods indicates an expected call of GetPods.
 func (mr *MockpodsGetterMockRecorder) GetPods(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPods", reflect.TypeOf((*MockpodsGetter)(nil).GetPods), arg0)

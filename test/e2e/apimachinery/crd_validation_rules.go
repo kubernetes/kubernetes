@@ -32,10 +32,12 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alpha][Feature:CustomResourceValidationExpressions]", func() {
 	f := framework.NewDefaultFramework("crd-validation-expressions")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var apiExtensionClient *clientset.Clientset
 	ginkgo.BeforeEach(func() {

@@ -404,19 +404,27 @@ func (c *csiMountMgr) supportsFSGroup(fsType string, fsGroup *int64, driverPolic
 		return false
 	}
 
-	if c.spec.PersistentVolume == nil {
-		klog.V(4).Info(log("mounter.SetupAt Warning: skipping fsGroup permission change, no access mode available. The volume may only be accessible to root users."))
-		return false
+	if c.spec.PersistentVolume != nil {
+		if c.spec.PersistentVolume.Spec.AccessModes == nil {
+			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
+			return false
+		}
+		if !hasReadWriteOnce(c.spec.PersistentVolume.Spec.AccessModes) {
+			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
+			return false
+		}
+		return true
+	} else if c.spec.Volume != nil && c.spec.Volume.CSI != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, CSIInlineVolume feature required"))
+			return false
+		}
+		// Inline CSI volumes are always mounted with RWO AccessMode by SetUpAt
+		return true
 	}
-	if c.spec.PersistentVolume.Spec.AccessModes == nil {
-		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, access modes not provided"))
-		return false
-	}
-	if !hasReadWriteOnce(c.spec.PersistentVolume.Spec.AccessModes) {
-		klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, only support ReadWriteOnce access mode"))
-		return false
-	}
-	return true
+
+	klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, unsupported volume type"))
+	return false
 }
 
 // isDirMounted returns the !notMounted result from IsLikelyNotMountPoint check

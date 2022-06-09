@@ -31,7 +31,6 @@
     "finalizers": [
       "finalizersValue"
     ],
-    "clusterName": "clusterNameValue",
     "managedFields": [
       {
         "manager": "managerValue",
@@ -46,6 +45,7 @@
   },
   "spec": {
     "schedule": "scheduleValue",
+    "timeZone": "timeZoneValue",
     "startingDeadlineSeconds": 2,
     "concurrencyPolicy": "concurrencyPolicyValue",
     "suspend": true,
@@ -80,7 +80,6 @@
         "finalizers": [
           "finalizersValue"
         ],
-        "clusterName": "clusterNameValue",
         "managedFields": [
           {
             "manager": "managerValue",
@@ -144,7 +143,6 @@
             "finalizers": [
               "finalizersValue"
             ],
-            "clusterName": "clusterNameValue",
             "managedFields": [
               {
                 "manager": "managerValue",
@@ -472,7 +470,6 @@
                       "finalizers": [
                         "finalizersValue"
                       ],
-                      "clusterName": "clusterNameValue",
                       "managedFields": [
                         {
                           "manager": "managerValue",
@@ -1670,7 +1667,10 @@
                       ]
                     }
                   ]
-                }
+                },
+                "minDomains": 5,
+                "nodeAffinityPolicy": "nodeAffinityPolicyValue",
+                "nodeTaintsPolicy": "nodeTaintsPolicyValue"
               }
             ],
             "setHostnameAsFQDN": true,

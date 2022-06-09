@@ -261,8 +261,12 @@ func NewImagePolicyWebhook(configFile io.Reader) (*Plugin, error) {
 		return nil, err
 	}
 
+	clientConfig, err := webhook.LoadKubeconfig(whConfig.KubeConfigFile, nil)
+	if err != nil {
+		return nil, err
+	}
 	retryBackoff := webhook.DefaultRetryBackoffWithInitialDelay(whConfig.RetryBackoff)
-	gw, err := webhook.NewGenericWebhook(legacyscheme.Scheme, legacyscheme.Codecs, whConfig.KubeConfigFile, groupVersions, retryBackoff, nil)
+	gw, err := webhook.NewGenericWebhook(legacyscheme.Scheme, legacyscheme.Codecs, clientConfig, groupVersions, retryBackoff)
 	if err != nil {
 		return nil, err
 	}

@@ -69,6 +69,10 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 func NewForConfig(c *rest.Config) (*Clientset, error) {
 	configShallowCopy := *c
 
+	if configShallowCopy.UserAgent == "" {
+		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+
 	// share the transport between all clients
 	httpClient, err := rest.HTTPClientFor(&configShallowCopy)
 	if err != nil {

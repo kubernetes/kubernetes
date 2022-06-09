@@ -41,6 +41,18 @@ type schemaPropsValidator struct {
 
 func (s *schemaPropsValidator) SetPath(path string) {
 	s.Path = path
+	for _, v := range s.anyOfValidators {
+		v.SetPath(path)
+	}
+	for _, v := range s.allOfValidators {
+		v.SetPath(path)
+	}
+	for _, v := range s.oneOfValidators {
+		v.SetPath(path)
+	}
+	if s.notValidator != nil {
+		s.notValidator.SetPath(path)
+	}
 }
 
 func newSchemaPropsValidator(path string, in string, allOf, oneOf, anyOf []spec.Schema, not *spec.Schema, deps spec.Dependencies, root interface{}, formats strfmt.Registry, options ...Option) *schemaPropsValidator {

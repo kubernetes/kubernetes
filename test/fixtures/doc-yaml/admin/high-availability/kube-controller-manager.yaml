@@ -10,7 +10,7 @@ spec:
     - /usr/local/bin/kube-controller-manager --master=127.0.0.1:8080 --cluster-name=e2e-test-bburns
       --cluster-cidr=10.245.0.0/16 --allocate-node-cidrs=true --cloud-provider=gce  --service-account-private-key-file=/srv/kubernetes/server.key
       --v=2 1>>/var/log/kube-controller-manager.log --leader-elect 2>&1
-    image: k8s.gcr.io/kube-controller-manager:fda24638d51a48baa13c35337fcd4793
+    image: registry.k8s.io/kube-controller-manager:fda24638d51a48baa13c35337fcd4793
     livenessProbe:
       httpGet:
         path: /healthz

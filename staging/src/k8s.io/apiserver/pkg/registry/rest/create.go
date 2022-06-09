@@ -123,11 +123,6 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		objectMeta.SetManagedFields(nil)
 	}
 
-	// ClusterName is ignored and should not be saved
-	if len(objectMeta.GetClusterName()) > 0 {
-		objectMeta.SetClusterName("")
-	}
-
 	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
 	}

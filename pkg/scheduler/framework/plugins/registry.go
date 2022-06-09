@@ -45,11 +45,10 @@ import (
 // through the WithFrameworkOutOfTreeRegistry option.
 func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.Features{
-		EnablePodDisruptionBudget:    feature.DefaultFeatureGate.Enabled(features.PodDisruptionBudget),
-		EnablePodOverhead:            feature.DefaultFeatureGate.Enabled(features.PodOverhead),
-		EnableReadWriteOncePod:       feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
-		EnableVolumeCapacityPriority: feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
-		EnableCSIStorageCapacity:     feature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity),
+		EnableReadWriteOncePod:                       feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+		EnableVolumeCapacityPriority:                 feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
+		EnableMinDomainsInPodTopologySpread:          feature.DefaultFeatureGate.Enabled(features.MinDomainsInPodTopologySpread),
+		EnableNodeInclusionPolicyInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
 	}
 
 	return runtime.Registry{
@@ -59,7 +58,7 @@ func NewInTreeRegistry() runtime.Registry {
 		nodename.Name:                        nodename.New,
 		nodeports.Name:                       nodeports.New,
 		nodeaffinity.Name:                    nodeaffinity.New,
-		podtopologyspread.Name:               podtopologyspread.New,
+		podtopologyspread.Name:               runtime.FactoryAdapter(fts, podtopologyspread.New),
 		nodeunschedulable.Name:               nodeunschedulable.New,
 		noderesources.Name:                   runtime.FactoryAdapter(fts, noderesources.NewFit),
 		noderesources.BalancedAllocationName: runtime.FactoryAdapter(fts, noderesources.NewBalancedAllocation),

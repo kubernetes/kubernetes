@@ -275,6 +275,16 @@ func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 	return false
 }
 
+// TaintKeyExists checks if the given taint key exists in list of taints. Returns true if exists false otherwise.
+func TaintKeyExists(taints []v1.Taint, taintKeyToMatch string) bool {
+	for _, taint := range taints {
+		if taint.Key == taintKeyToMatch {
+			return true
+		}
+	}
+	return false
+}
+
 func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []*v1.Taint) {
 	for _, taint := range t1 {
 		if !TaintExists(t2, &taint) {

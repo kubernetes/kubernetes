@@ -35,7 +35,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	outputapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
+	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -218,7 +218,7 @@ var (
 			etcd:
 			  local:
 			    dataDir: /var/lib/etcd
-			imageRepository: k8s.gcr.io
+			imageRepository: registry.k8s.io
 			kind: ClusterConfiguration
 			kubernetesVersion: 1.2.3
 			networking:
@@ -234,7 +234,7 @@ var (
 			ClusterName:       "LeCluster",
 			KubernetesVersion: "1.2.3",
 			CertificatesDir:   "/etc/kubernetes/pki",
-			ImageRepository:   "k8s.gcr.io",
+			ImageRepository:   "registry.k8s.io",
 			Networking: kubeadmapiv1.Networking{
 				DNSDomain:     "cluster.local",
 				ServiceSubnet: "10.96.0.0/12",
@@ -361,8 +361,7 @@ func TestGeneratedConfigFromCluster(t *testing.T) {
 				}
 
 				client := clientsetfake.NewSimpleClientset(configMap)
-				legacyKubeletConfigMap := true
-				cfg, err := clusterConfigHandler.FromCluster(client, testClusterCfg(legacyKubeletConfigMap))
+				cfg, err := clusterConfigHandler.FromCluster(client, testClusterCfg())
 				if err != nil {
 					t.Fatalf("unexpected failure of FromCluster: %v", err)
 				}
@@ -487,8 +486,7 @@ func TestLoadingFromCluster(t *testing.T) {
 			testClusterConfigMap(in, false),
 		)
 
-		legacyKubeletConfigMap := true
-		return clusterConfigHandler.FromCluster(client, testClusterCfg(legacyKubeletConfigMap))
+		return clusterConfigHandler.FromCluster(client, testClusterCfg())
 	})
 }
 
@@ -581,8 +579,7 @@ func TestFetchFromClusterWithLocalOverwrites(t *testing.T) {
 					t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 				}
 
-				legacyKubeletConfigMap := true
-				clusterCfg := testClusterCfg(legacyKubeletConfigMap)
+				clusterCfg := testClusterCfg()
 
 				err = FetchFromClusterWithLocalOverwrites(clusterCfg, client, docmap)
 				if err != nil {
@@ -615,12 +612,12 @@ func TestFetchFromClusterWithLocalOverwrites(t *testing.T) {
 
 func TestGetVersionStates(t *testing.T) {
 	fakeKnownContext(func() {
-		versionStateCurrent := outputapi.ComponentConfigVersionState{
+		versionStateCurrent := outputapiv1alpha2.ComponentConfigVersionState{
 			Group:            kubeadmapiv1.GroupName,
 			CurrentVersion:   currentClusterConfigVersion,
 			PreferredVersion: currentClusterConfigVersion,
 		}
-		versionStateOld := outputapi.ComponentConfigVersionState{
+		versionStateOld := outputapiv1alpha2.ComponentConfigVersionState{
 			Group:                 kubeadmapiv1.GroupName,
 			CurrentVersion:        oldClusterConfigVersion,
 			PreferredVersion:      currentClusterConfigVersion,
@@ -631,7 +628,7 @@ func TestGetVersionStates(t *testing.T) {
 			desc     string
 			obj      runtime.Object
 			config   string
-			expected outputapi.ComponentConfigVersionState
+			expected outputapiv1alpha2.ComponentConfigVersionState
 		}{
 			{
 				desc:     "appropriate cluster object without overwrite",
@@ -687,7 +684,7 @@ func TestGetVersionStates(t *testing.T) {
 			{
 				desc: "old signed config without an overwrite",
 				obj:  testClusterConfigMap(oldFooClusterConfig, true),
-				expected: outputapi.ComponentConfigVersionState{
+				expected: outputapiv1alpha2.ComponentConfigVersionState{
 					Group:            kubeadmapiv1.GroupName,
 					CurrentVersion:   "", // The config is treated as if it's missing
 					PreferredVersion: currentClusterConfigVersion,
@@ -716,8 +713,7 @@ func TestGetVersionStates(t *testing.T) {
 					t.Fatalf("unexpected failure of SplitYAMLDocuments: %v", err)
 				}
 
-				legacyKubeletConfigMap := true
-				clusterCfg := testClusterCfg(legacyKubeletConfigMap)
+				clusterCfg := testClusterCfg()
 
 				got, err := GetVersionStates(clusterCfg, client, docmap)
 				if err != nil {

@@ -30,9 +30,8 @@ import (
 
 // Tests that the apiserver limits the resource size in write operations.
 func TestMaxResourceSize(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	clientSet, _ := framework.StartTestServer(t, stopCh, framework.TestServerSetup{})
+	clientSet, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{})
+	defer tearDownFn()
 
 	hugeData := []byte(strings.Repeat("x", 3*1024*1024+1))
 

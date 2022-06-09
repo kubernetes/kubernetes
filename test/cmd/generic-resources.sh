@@ -383,6 +383,17 @@ run_recursive_resources_tests() {
   # Post-condition: nginx0 & nginx1 should both have paused set to nothing, and since nginx2 is malformed, it should error
   kube::test::get_object_assert deployment "{{range.items}}{{.spec.paused}}:{{end}}" "<no value>:<no value>:"
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  ## Fetch rollout status for multiple resources
+  output_message=$(! kubectl rollout status -f hack/testdata/recursive/deployment/deployment --timeout=1s 2>&1 "${kube_flags[@]:?}")
+  # Post-condition: nginx1 should both exist and nginx2 should error
+  kube::test::if_has_string "${output_message}" "Waiting for deployment \"nginx1-deployment\" rollout to finish"
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
+  ## Fetch rollout status for deployments recursively
+  output_message=$(! kubectl rollout status -f hack/testdata/recursive/deployment -R --timeout=1s 2>&1 "${kube_flags[@]:?}")
+  # Post-condition: nginx0 & nginx1 should both exist, nginx2 should error
+  kube::test::if_has_string "${output_message}" "Waiting for deployment \"nginx0-deployment\" rollout to finish"
+  kube::test::if_has_string "${output_message}" "Waiting for deployment \"nginx1-deployment\" rollout to finish"
+  kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   ## Retrieve the rollout history of the deployments recursively
   output_message=$(! kubectl rollout history -f hack/testdata/recursive/deployment --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: nginx0 & nginx1 should both have a history, and since nginx2 is malformed, it should error

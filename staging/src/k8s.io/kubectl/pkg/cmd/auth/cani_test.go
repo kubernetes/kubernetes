@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -281,7 +282,7 @@ func TestRunResourceFor(t *testing.T) {
 			expectGVR: schema.GroupVersionResource{
 				Resource: "invalid",
 			},
-			expectedErrOut: "Warning: the server doesn't have a resource type 'invalid'\n",
+			expectedErrOut: "Warning: the server doesn't have a resource type 'invalid'\n\n",
 		},
 	}
 
@@ -292,6 +293,7 @@ func TestRunResourceFor(t *testing.T) {
 
 			ioStreams, _, _, buf := genericclioptions.NewTestIOStreams()
 			test.o.IOStreams = ioStreams
+			test.o.warningPrinter = printers.NewWarningPrinter(test.o.IOStreams.ErrOut, printers.WarningPrinterOptions{Color: false})
 
 			restMapper, err := tf.ToRESTMapper()
 			if err != nil {

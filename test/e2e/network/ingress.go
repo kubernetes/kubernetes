@@ -42,6 +42,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -58,6 +59,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		conformanceTests []e2eingress.ConformanceTests
 	)
 	f := framework.NewDefaultFramework("ingress")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		jig = e2eingress.NewIngressTestJig(f.ClientSet)
@@ -535,6 +537,7 @@ func detectNegAnnotation(f *framework.Framework, jig *e2eingress.TestJig, gceCon
 
 var _ = common.SIGDescribe("Ingress API", func() {
 	f := framework.NewDefaultFramework("ingress")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	/*
 		Release: v1.19
 		Testname: Ingress API

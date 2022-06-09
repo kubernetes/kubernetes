@@ -17,10 +17,12 @@ limitations under the License.
 package cel
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
@@ -30,11 +32,15 @@ import (
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
 func TestValidationExpressions(t *testing.T) {
 	tests := []struct {
-		name   string
-		schema *schema.Structural
-		obj    map[string]interface{}
-		valid  []string
-		errors map[string]string // rule -> string that error message must contain
+		name          string
+		schema        *schema.Structural
+		obj           interface{}
+		oldObj        interface{}
+		valid         []string
+		errors        map[string]string // rule -> string that error message must contain
+		costBudget    int64
+		isRoot        bool
+		expectSkipped bool
 	}{
 		// tests where val1 and val2 are equal but val3 is different
 		// equality, comparisons and type specific functions
@@ -192,6 +198,10 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1.substring(4, 10).trim() == 'takes'",
 				"self.val1.upperAscii() == 'ROOK TAKES 👑'",
 				"self.val1.lowerAscii() == 'rook takes 👑'",
+			},
+			errors: map[string]string{
+				// Invalid regex with a string constant regex pattern is compile time error
+				"self.val1.matches(')')": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
 			},
 		},
 		{name: "escaped strings",
@@ -619,6 +629,7 @@ func TestValidationExpressions(t *testing.T) {
 			},
 		},
 		{name: "typemeta and objectmeta access not specified",
+			isRoot: true,
 			obj: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
@@ -1437,11 +1448,11 @@ func TestValidationExpressions(t *testing.T) {
 			}),
 			errors: map[string]string{
 				// data is validated before CEL evaluation, so these errors should not be surfaced to end users
-				"has(self.o)":             "invalid data, expected map[string]interface{} to match the provided schema with type=object",
-				"has(self.m)":             "invalid data, expected map[string]interface{} to match the provided schema with type=object",
-				"has(self.l)":             "invalid data, expected []interface{} to match the provided schema with type=array",
-				"has(self.s)":             "invalid data, expected []interface{} to match the provided schema with type=array",
-				"has(self.lm)":            "invalid data, expected []interface{} to match the provided schema with type=array",
+				"has(self.o)":             "invalid data, expected a map for the provided schema with type=object",
+				"has(self.m)":             "invalid data, expected a map for the provided schema with type=object",
+				"has(self.l)":             "invalid data, expected an array for the provided schema with type=array",
+				"has(self.s)":             "invalid data, expected an array for the provided schema with type=array",
+				"has(self.lm)":            "invalid data, expected an array for the provided schema with type=array",
 				"has(self.intorstring)":   "invalid data, expected XIntOrString value to be either a string or integer",
 				"self.nullable[0] == 'x'": "invalid data, got null for schema with nullable=false",
 				// TODO: also find a way to test the errors returned for: array with no items, object with no properties or additionalProperties, invalid listType and invalid type.
@@ -1634,6 +1645,12 @@ func TestValidationExpressions(t *testing.T) {
 				"self.str.findAll('xyz') == []",
 				"self.str.findAll('xyz', 1) == []",
 			},
+			errors: map[string]string{
+				// Invalid regex with a string constant regex pattern is compile time error
+				"self.str.find(')') == ''":       "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				"self.str.findAll(')') == []":    "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				"self.str.findAll(')', 1) == []": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+			},
 		},
 		{name: "URL parsing",
 			obj: map[string]interface{}{
@@ -1679,31 +1696,106 @@ func TestValidationExpressions(t *testing.T) {
 				"isURL('../relative-path') == false",
 			},
 		},
+		{name: "transition rules",
+			obj: map[string]interface{}{
+				"v": "new",
+			},
+			oldObj: map[string]interface{}{
+				"v": "old",
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"v": stringType,
+			}),
+			valid: []string{
+				"oldSelf.v != self.v",
+				"oldSelf.v == 'old' && self.v == 'new'",
+			},
+		},
+		{name: "skipped transition rule for nil old primitive",
+			expectSkipped: true,
+			obj:           "exists",
+			oldObj:        nil,
+			schema:        &stringType,
+			valid: []string{
+				"oldSelf == self",
+			},
+		},
+		{name: "skipped transition rule for nil old array",
+			expectSkipped: true,
+			obj:           []interface{}{},
+			oldObj:        nil,
+			schema:        listTypePtr(&stringType),
+			valid: []string{
+				"oldSelf == self",
+			},
+		},
+		{name: "skipped transition rule for nil old object",
+			expectSkipped: true,
+			obj:           map[string]interface{}{"f": "exists"},
+			oldObj:        nil,
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": stringType,
+			}),
+			valid: []string{
+				"oldSelf.f == self.f",
+			},
+		},
+		{name: "skipped transition rule for old with non-nil interface but nil value",
+			expectSkipped: true,
+			obj:           []interface{}{},
+			oldObj:        nilInterfaceOfStringSlice(),
+			schema:        listTypePtr(&stringType),
+			valid: []string{
+				"oldSelf == self",
+			},
+		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			for _, validRule := range tt.valid {
-				t.Run(validRule, func(t *testing.T) {
+	for i := range tests {
+		i := i
+		t.Run(tests[i].name, func(t *testing.T) {
+			t.Parallel()
+			tt := tests[i]
+			tt.costBudget = RuntimeCELCostBudget
+			ctx := context.TODO()
+			for j := range tt.valid {
+				validRule := tt.valid[j]
+				testName := validRule
+				if len(testName) > 127 {
+					testName = testName[:127]
+				}
+				t.Run(testName, func(t *testing.T) {
+					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := NewValidator(&s)
+					celValidator := validator(&s, tt.isRoot, PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs := celValidator.Validate(field.NewPath("root"), &s, tt.obj)
+					errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
+					}
+					if tt.expectSkipped {
+						// Skipped validations should have no cost. The only possible false positive here would be the CEL expression 'true'.
+						if remainingBudget != tt.costBudget {
+							t.Errorf("expected no cost expended for skipped validation, but got %d remaining from %d budget", remainingBudget, tt.costBudget)
+						}
+						return
 					}
 				})
 			}
 			for rule, expectErrToContain := range tt.errors {
-				t.Run(rule, func(t *testing.T) {
+				testName := rule
+				if len(testName) > 127 {
+					testName = testName[:127]
+				}
+				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s)
+					celValidator := NewValidator(&s, PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs := celValidator.Validate(field.NewPath("root"), &s, tt.obj)
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
 					if len(errs) == 0 {
 						t.Error("expected validation errors but got none")
 					}
@@ -1714,7 +1806,213 @@ func TestValidationExpressions(t *testing.T) {
 					}
 				})
 			}
+		})
+	}
+}
 
+func TestCELValidationLimit(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    interface{}
+		valid  []string
+	}{
+		{
+			name:   "test limit",
+			obj:    objs(math.MaxInt64),
+			schema: schemas(integerType),
+			valid: []string{
+				"self.val1 > 0",
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			for j := range tt.valid {
+				validRule := tt.valid[j]
+				t.Run(validRule, func(t *testing.T) {
+					t.Parallel()
+					s := withRule(*tt.schema, validRule)
+					celValidator := validator(&s, false, PerCallLimit)
+
+					// test with cost budget exceeded
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, 0)
+					var found bool
+					for _, err := range errs {
+						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
+							found = true
+						} else {
+							t.Errorf("unexpected err: %v", err)
+						}
+					}
+					if !found {
+						t.Errorf("expect cost limit exceed err but did not find")
+					}
+					if len(errs) > 1 {
+						t.Errorf("expect to only return cost budget exceed err once but got: %v", len(errs))
+					}
+
+					// test with PerCallLimit exceeded
+					found = false
+					celValidator = NewValidator(&s, 0)
+					if celValidator == nil {
+						t.Fatal("expected non nil validator")
+					}
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+					for _, err := range errs {
+						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "no further validation rules will be run due to call cost exceeds limit for rule") {
+							found = true
+							break
+						}
+					}
+					if !found {
+						t.Errorf("expect PerCostLimit exceed err but did not find")
+					}
+				})
+			}
+		})
+	}
+
+}
+
+func TestCELValidationContextCancellation(t *testing.T) {
+	items := make([]interface{}, 1000)
+	for i := int64(0); i < 1000; i++ {
+		items[i] = i
+	}
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    map[string]interface{}
+		rule   string
+	}{
+		{name: "test cel validation with context cancellation",
+			obj: map[string]interface{}{
+				"array": items,
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"array": listType(&integerType),
+			}),
+			rule: "self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			s := withRule(*tt.schema, tt.rule)
+			celValidator := NewValidator(&s, PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+			for _, err := range errs {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			// test context cancellation
+			found := false
+			evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
+			cancel()
+			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+			for _, err := range errs {
+				if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expect operation interrupted err but did not find")
+			}
+		})
+	}
+}
+
+func BenchmarkCELValidationWithContext(b *testing.B) {
+	items := make([]interface{}, 1000)
+	for i := int64(0); i < 1000; i++ {
+		items[i] = i
+	}
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    map[string]interface{}
+		rule   string
+	}{
+		{name: "benchmark for cel validation with context",
+			obj: map[string]interface{}{
+				"array": items,
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"array": listType(&integerType),
+			}),
+			rule: "self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)",
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			ctx := context.TODO()
+			s := withRule(*tt.schema, tt.rule)
+			celValidator := NewValidator(&s, PerCallLimit)
+			if celValidator == nil {
+				b.Fatal("expected non nil validator")
+			}
+			for i := 0; i < b.N; i++ {
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+				for _, err := range errs {
+					b.Fatalf("validation failed: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
+	items := make([]interface{}, 1000)
+	for i := int64(0); i < 1000; i++ {
+		items[i] = i
+	}
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    map[string]interface{}
+		rule   string
+	}{
+		{name: "benchmark for cel validation with context",
+			obj: map[string]interface{}{
+				"array": items,
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"array": listType(&integerType),
+			}),
+			rule: "self.array.map(e, e * 20).filter(e, e > 50).exists(e, e == 60)",
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			ctx := context.TODO()
+			s := withRule(*tt.schema, tt.rule)
+			celValidator := NewValidator(&s, PerCallLimit)
+			if celValidator == nil {
+				b.Fatal("expected non nil validator")
+			}
+			for i := 0; i < b.N; i++ {
+				evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
+				cancel()
+				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
+				//found := false
+				//for _, err := range errs {
+				//	if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
+				//		found = true
+				//		break
+				//	}
+				//}
+				if len(errs) == 0 {
+					b.Errorf("expect operation interrupted err but did not find")
+				}
+			}
 		})
 	}
 }
@@ -1853,6 +2151,22 @@ func withRule(s schema.Structural, rule string) schema.Structural {
 	return s
 }
 
+func withMaxLength(s schema.Structural, maxLength *int64) schema.Structural {
+	if s.ValueValidation == nil {
+		s.ValueValidation = &schema.ValueValidation{}
+	}
+	s.ValueValidation.MaxLength = maxLength
+	return s
+}
+
+func withMaxItems(s schema.Structural, maxItems *int64) schema.Structural {
+	if s.ValueValidation == nil {
+		s.ValueValidation = &schema.ValueValidation{}
+	}
+	s.ValueValidation.MaxItems = maxItems
+	return s
+}
+
 func withDefault(dflt interface{}, s schema.Structural) schema.Structural {
 	s.Generic.Default = schema.JSON{Object: dflt}
 	return s
@@ -1866,4 +2180,9 @@ func withNullable(nullable bool, s schema.Structural) schema.Structural {
 func withNullablePtr(nullable bool, s schema.Structural) *schema.Structural {
 	s.Generic.Nullable = nullable
 	return &s
+}
+
+func nilInterfaceOfStringSlice() []interface{} {
+	var slice []interface{} = nil
+	return slice
 }

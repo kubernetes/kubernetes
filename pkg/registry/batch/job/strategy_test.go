@@ -42,20 +42,15 @@ var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Deta
 
 func TestJobStrategy(t *testing.T) {
 	cases := map[string]struct {
-		indexedJobEnabled             bool
 		trackingWithFinalizersEnabled bool
 	}{
 		"features disabled": {},
-		"indexed job enabled": {
-			indexedJobEnabled: true,
-		},
 		"new job tracking enabled": {
 			trackingWithFinalizersEnabled: true,
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IndexedJob, tc.indexedJobEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizersEnabled)()
 			testJobStrategy(t)
 		})
@@ -63,7 +58,6 @@ func TestJobStrategy(t *testing.T) {
 }
 
 func testJobStrategy(t *testing.T) {
-	indexedJobEnabled := utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob)
 	trackingWithFinalizersEnabled := utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers)
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
@@ -121,8 +115,8 @@ func testJobStrategy(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
-	if indexedJobEnabled != (job.Spec.CompletionMode != nil) {
-		t.Errorf("Job should allow setting .spec.completionMode only when %v feature is enabled", features.IndexedJob)
+	if job.Spec.CompletionMode == nil {
+		t.Errorf("Job should allow setting .spec.completionMode")
 	}
 	wantAnnotations := map[string]string{"foo": "bar"}
 	if trackingWithFinalizersEnabled {

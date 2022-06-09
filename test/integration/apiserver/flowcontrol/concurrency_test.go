@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -104,22 +105,28 @@ func TestPriorityLevelIsolation(t *testing.T) {
 	}
 
 	stopCh := make(chan struct{})
-	defer close(stopCh)
+	wg := sync.WaitGroup{}
+	defer func() {
+		close(stopCh)
+		wg.Wait()
+	}()
 
 	// "elephant"
+	wg.Add(concurrencyShares + queueLength)
 	streamRequests(concurrencyShares+queueLength, func() {
 		_, err := noxu1Client.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			t.Error(err)
 		}
-	}, stopCh)
+	}, &wg, stopCh)
 	// "mouse"
+	wg.Add(3)
 	streamRequests(3, func() {
 		_, err := noxu2Client.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			t.Error(err)
 		}
-	}, stopCh)
+	}, &wg, stopCh)
 
 	time.Sleep(time.Second * 10) // running in background for a while
 
@@ -312,9 +319,10 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 	})
 }
 
-func streamRequests(parallel int, request func(), stopCh <-chan struct{}) {
+func streamRequests(parallel int, request func(), wg *sync.WaitGroup, stopCh <-chan struct{}) {
 	for i := 0; i < parallel; i++ {
 		go func() {
+			defer wg.Done()
 			for {
 				select {
 				case <-stopCh:

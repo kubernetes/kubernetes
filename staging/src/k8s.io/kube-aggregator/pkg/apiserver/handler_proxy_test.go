@@ -847,7 +847,8 @@ func TestProxyCertReload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to create dynamic certificates: %v", err)
 	}
-	err = certProvider.RunOnce()
+	ctx := context.TODO()
+	err = certProvider.RunOnce(ctx)
 	if err != nil {
 		t.Fatalf("Unable to load dynamic certificates: %v", err)
 	}
@@ -886,7 +887,7 @@ func TestProxyCertReload(t *testing.T) {
 	// STEP 3: swap the certificate used by the aggregator to auth against the backend server and verify the request passes
 	//         note that this step uses the certificate that can be validated by the backend server with clientCaCrt()
 	writeCerts(certFile, keyFile, clientCert(), clientKey(), t)
-	err = certProvider.RunOnce()
+	err = certProvider.RunOnce(ctx)
 	if err != nil {
 		t.Fatalf("Expected no error when refreshing dynamic certs, got %v", err)
 	}

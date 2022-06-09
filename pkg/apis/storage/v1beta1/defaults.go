@@ -49,11 +49,11 @@ func SetDefaults_CSIDriver(obj *storagev1beta1.CSIDriver) {
 		obj.Spec.PodInfoOnMount = new(bool)
 		*(obj.Spec.PodInfoOnMount) = false
 	}
-	if obj.Spec.StorageCapacity == nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	if obj.Spec.StorageCapacity == nil {
 		obj.Spec.StorageCapacity = new(bool)
 		*(obj.Spec.StorageCapacity) = false
 	}
-	if obj.Spec.FSGroupPolicy == nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
+	if obj.Spec.FSGroupPolicy == nil {
 		obj.Spec.FSGroupPolicy = new(storagev1beta1.FSGroupPolicy)
 		*obj.Spec.FSGroupPolicy = storagev1beta1.ReadWriteOnceWithFSTypeFSGroupPolicy
 	}

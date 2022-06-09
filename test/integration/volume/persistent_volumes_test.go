@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"net/http/httptest"
 	"os"
 	"strconv"
 	"testing"
@@ -36,13 +35,13 @@ import (
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
 	fakecloud "k8s.io/cloud-provider/fake"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
 )
 
@@ -105,15 +104,16 @@ func testSleep() {
 
 func TestPersistentVolumeRecycler(t *testing.T) {
 	klog.V(2).Infof("TestPersistentVolumeRecycler started")
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
+	defer s.TearDownFn()
+	namespaceName := "pv-recycler"
 
-	ns := framework.CreateTestingNamespace("pv-recycler", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	testClient, ctrl, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, ctrl, informers, watchPV, watchPVC := createClients(namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
@@ -160,15 +160,16 @@ func TestPersistentVolumeRecycler(t *testing.T) {
 
 func TestPersistentVolumeDeleter(t *testing.T) {
 	klog.V(2).Infof("TestPersistentVolumeDeleter started")
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
+	defer s.TearDownFn()
+	namespaceName := "pv-deleter"
 
-	ns := framework.CreateTestingNamespace("pv-deleter", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	testClient, ctrl, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, ctrl, informers, watchPV, watchPVC := createClients(namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
@@ -220,15 +221,16 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	// Test a race binding many claims to a PV that is pre-bound to a specific
 	// PVC. Only this specific PVC should get bound.
 	klog.V(2).Infof("TestPersistentVolumeBindRace started")
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
+	defer s.TearDownFn()
+	namespaceName := "pv-bind-race"
 
-	ns := framework.CreateTestingNamespace("pv-bind-race", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	testClient, ctrl, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, ctrl, informers, watchPV, watchPVC := createClients(namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
@@ -290,15 +292,16 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 
 // TestPersistentVolumeClaimLabelSelector test binding using label selectors
 func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
+	defer s.TearDownFn()
+	namespaceName := "pvc-label-selector"
 
-	ns := framework.CreateTestingNamespace("pvc-label-selector", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	testClient, controller, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, controller, informers, watchPV, watchPVC := createClients(namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
@@ -371,15 +374,16 @@ func TestPersistentVolumeClaimLabelSelector(t *testing.T) {
 // TestPersistentVolumeClaimLabelSelectorMatchExpressions test binding using
 // MatchExpressions label selectors
 func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
+	defer s.TearDownFn()
+	namespaceName := "pvc-match-expressions"
 
-	ns := framework.CreateTestingNamespace("pvc-match-expressions", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	testClient, controller, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, controller, informers, watchPV, watchPVC := createClients(namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
@@ -471,15 +475,16 @@ func TestPersistentVolumeClaimLabelSelectorMatchExpressions(t *testing.T) {
 // TestPersistentVolumeMultiPVs tests binding of one PVC to 100 PVs with
 // different size.
 func TestPersistentVolumeMultiPVs(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
+	defer s.TearDownFn()
+	namespaceName := "multi-pvs"
 
-	ns := framework.CreateTestingNamespace("multi-pvs", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	testClient, controller, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, controller, informers, watchPV, watchPVC := createClients(namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
@@ -561,15 +566,16 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 // TestPersistentVolumeMultiPVsPVCs tests binding of 100 PVC to 100 PVs.
 // This test is configurable by KUBE_INTEGRATION_PV_* variables.
 func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
+	defer s.TearDownFn()
+	namespaceName := "multi-pvs-pvcs"
 
-	ns := framework.CreateTestingNamespace("multi-pvs-pvcs", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	testClient, binder, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, binder, informers, watchPV, watchPVC := createClients(namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
@@ -721,20 +727,21 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 // TestPersistentVolumeControllerStartup tests startup of the controller.
 // The controller should not unbind any volumes when it starts.
 func TestPersistentVolumeControllerStartup(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
-
-	ns := framework.CreateTestingNamespace("controller-startup", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
+	defer s.TearDownFn()
+	namespaceName := "controller-startup"
 
 	objCount := getObjectCount()
 
 	const shortSyncPeriod = 2 * time.Second
 	syncPeriod := getSyncPeriod(shortSyncPeriod)
 
-	testClient, binder, informers, watchPV, watchPVC := createClients(ns, t, s, shortSyncPeriod)
+	testClient, binder, informers, watchPV, watchPVC := createClients(namespaceName, t, s, shortSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	// Create *bound* volumes and PVCs
 	pvs := make([]*v1.PersistentVolume, objCount)
@@ -850,15 +857,16 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 // TestPersistentVolumeProvisionMultiPVCs tests provisioning of many PVCs.
 // This test is configurable by KUBE_INTEGRATION_PV_* variables.
 func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
+	defer s.TearDownFn()
+	namespaceName := "provision-multi-pvs"
 
-	ns := framework.CreateTestingNamespace("provision-multi-pvs", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	testClient, binder, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, binder, informers, watchPV, watchPVC := createClients(namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes and StorageClasses).
@@ -945,15 +953,16 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 // TestPersistentVolumeMultiPVsDiffAccessModes tests binding of one PVC to two
 // PVs with different access modes.
 func TestPersistentVolumeMultiPVsDiffAccessModes(t *testing.T) {
-	_, s, closeFn := framework.RunAnAPIServer(nil)
-	defer closeFn()
+	s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
+	defer s.TearDownFn()
+	namespaceName := "multi-pvs-diff-access"
 
-	ns := framework.CreateTestingNamespace("multi-pvs-diff-access", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	testClient, controller, informers, watchPV, watchPVC := createClients(ns, t, s, defaultSyncPeriod)
+	testClient, controller, informers, watchPV, watchPVC := createClients(namespaceName, t, s, defaultSyncPeriod)
 	defer watchPV.Stop()
 	defer watchPVC.Stop()
+
+	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
+	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes).
@@ -1093,21 +1102,17 @@ func waitForAnyPersistentVolumeClaimPhase(w watch.Interface, phase v1.Persistent
 	}
 }
 
-func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPeriod time.Duration) (*clientset.Clientset, *persistentvolumecontroller.PersistentVolumeController, informers.SharedInformerFactory, watch.Interface, watch.Interface) {
+func createClients(namespaceName string, t *testing.T, s *kubeapiservertesting.TestServer, syncPeriod time.Duration) (*clientset.Clientset, *persistentvolumecontroller.PersistentVolumeController, informers.SharedInformerFactory, watch.Interface, watch.Interface) {
 	// Use higher QPS and Burst, there is a test for race conditions which
 	// creates many objects and default values were too low.
-	binderClient := clientset.NewForConfigOrDie(&restclient.Config{
-		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
-		QPS:           1000000,
-		Burst:         1000000,
-	})
-	testClient := clientset.NewForConfigOrDie(&restclient.Config{
-		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
-		QPS:           1000000,
-		Burst:         1000000,
-	})
+	binderConfig := restclient.CopyConfig(s.ClientConfig)
+	binderConfig.QPS = 1000000
+	binderConfig.Burst = 1000000
+	binderClient := clientset.NewForConfigOrDie(binderConfig)
+	testConfig := restclient.CopyConfig(s.ClientConfig)
+	testConfig.QPS = 1000000
+	testConfig.Burst = 1000000
+	testClient := clientset.NewForConfigOrDie(testConfig)
 
 	host := volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil)
 	plugin := &volumetest.FakeVolumePlugin{
@@ -1146,7 +1151,7 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 	if err != nil {
 		t.Fatalf("Failed to watch PersistentVolumes: %v", err)
 	}
-	watchPVC, err := testClient.CoreV1().PersistentVolumeClaims(ns.Name).Watch(context.TODO(), metav1.ListOptions{})
+	watchPVC, err := testClient.CoreV1().PersistentVolumeClaims(namespaceName).Watch(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to watch PersistentVolumeClaims: %v", err)
 	}

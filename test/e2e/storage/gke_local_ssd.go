@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -33,6 +34,7 @@ import (
 var _ = utils.SIGDescribe("GKE local SSD [Feature:GKELocalSSD]", func() {
 
 	f := framework.NewDefaultFramework("localssd")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gke")

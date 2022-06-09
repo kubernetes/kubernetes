@@ -84,7 +84,7 @@ That said, if you have questions, reach out to us
 [interactive tutorial]: https://kubernetes.io/docs/tutorials/kubernetes-basics
 [kubernetes.io]: https://kubernetes.io
 [Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615
-[troubleshooting guide]: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/
+[troubleshooting guide]: https://kubernetes.io/docs/tasks/debug/
 
 ## Community Meetings 
 

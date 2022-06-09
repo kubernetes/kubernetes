@@ -72,43 +72,23 @@ func DefaultShouldRetry(err error) bool {
 	return false
 }
 
-// NewGenericWebhook creates a new GenericWebhook from the provided kubeconfig file.
-func NewGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (*GenericWebhook, error) {
-	return newGenericWebhook(scheme, codecFactory, kubeConfigFile, groupVersions, retryBackoff, defaultRequestTimeout, customDial)
-}
-
-func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, retryBackoff wait.Backoff, requestTimeout time.Duration, customDial utilnet.DialFunc) (*GenericWebhook, error) {
+// NewGenericWebhook creates a new GenericWebhook from the provided rest.Config.
+func NewGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, config *rest.Config, groupVersions []schema.GroupVersion, retryBackoff wait.Backoff) (*GenericWebhook, error) {
 	for _, groupVersion := range groupVersions {
 		if !scheme.IsVersionRegistered(groupVersion) {
 			return nil, fmt.Errorf("webhook plugin requires enabling extension resource: %s", groupVersion)
 		}
 	}
 
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	loadingRules.ExplicitPath = kubeConfigFile
-	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
-
-	clientConfig, err := loader.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	// Kubeconfigs can't set a timeout, this can only be set through a command line flag.
-	//
-	// https://github.com/kubernetes/client-go/blob/master/tools/clientcmd/overrides.go
-	//
-	// Set this to something reasonable so request to webhooks don't hang forever.
-	clientConfig.Timeout = requestTimeout
-
-	// Avoid client-side rate limiting talking to the webhook backend.
-	// Rate limiting should happen when deciding how many requests to serve.
-	clientConfig.QPS = -1
+	clientConfig := rest.CopyConfig(config)
 
 	codec := codecFactory.LegacyCodec(groupVersions...)
 	clientConfig.ContentConfig.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
-	clientConfig.Dial = customDial
-	clientConfig.Wrap(x509metrics.NewMissingSANRoundTripperWrapperConstructor(x509MissingSANCounter))
+	clientConfig.Wrap(x509metrics.NewDeprecatedCertificateRoundTripperWrapperConstructor(
+		x509MissingSANCounter,
+		x509InsecureSHA1Counter,
+	))
 
 	restClient, err := rest.UnversionedRESTClientFor(clientConfig)
 	if err != nil {
@@ -161,4 +141,30 @@ func WithExponentialBackoff(ctx context.Context, retryBackoff wait.Backoff, webh
 	default:
 		return nil
 	}
+}
+
+func LoadKubeconfig(kubeConfigFile string, customDial utilnet.DialFunc) (*rest.Config, error) {
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	loadingRules.ExplicitPath = kubeConfigFile
+	loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+
+	clientConfig, err := loader.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	clientConfig.Dial = customDial
+
+	// Kubeconfigs can't set a timeout, this can only be set through a command line flag.
+	//
+	// https://github.com/kubernetes/client-go/blob/master/tools/clientcmd/overrides.go
+	//
+	// Set this to something reasonable so request to webhooks don't hang forever.
+	clientConfig.Timeout = defaultRequestTimeout
+
+	// Avoid client-side rate limiting talking to the webhook backend.
+	// Rate limiting should happen when deciding how many requests to serve.
+	clientConfig.QPS = -1
+
+	return clientConfig, nil
 }

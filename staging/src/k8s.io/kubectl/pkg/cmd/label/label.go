@@ -39,7 +39,7 @@ import (
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
-	"k8s.io/kubectl/pkg/util"
+	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -83,7 +83,7 @@ type LabelOptions struct {
 	enforceNamespace             bool
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
-	dryRunVerifier               *resource.DryRunVerifier
+	dryRunVerifier               *resource.QueryParamVerifier
 
 	// Common shared fields
 	genericclioptions.IOStreams
@@ -139,7 +139,7 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 		Short:                 i18n.T("Update the labels on a resource"),
 		Long:                  fmt.Sprintf(labelLong, validation.LabelValueMaxLength),
 		Example:               labelExample,
-		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
+		ValidArgsFunction:     completion.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
@@ -185,7 +185,7 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
@@ -408,9 +408,9 @@ func updateDataChangeMsg(oldObj []byte, newObj []byte, overwrite bool) string {
 
 func validateNoOverwrites(accessor metav1.Object, labels map[string]string) error {
 	allErrs := []error{}
-	for key := range labels {
-		if value, found := accessor.GetLabels()[key]; found {
-			allErrs = append(allErrs, fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", key, value))
+	for key, value := range labels {
+		if currValue, found := accessor.GetLabels()[key]; found && currValue != value {
+			allErrs = append(allErrs, fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", key, currValue))
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)

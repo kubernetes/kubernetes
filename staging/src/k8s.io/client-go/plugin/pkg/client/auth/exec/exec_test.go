@@ -115,7 +115,7 @@ func TestCacheKey(t *testing.T) {
 			{Name: "5", Value: "6"},
 			{Name: "7", Value: "8"},
 		},
-		APIVersion:         "client.authentication.k8s.io/v1alpha1",
+		APIVersion:         "client.authentication.k8s.io/v1beta1",
 		ProvideClusterInfo: true,
 	}
 	c1c := &clientauthentication.Cluster{
@@ -141,7 +141,7 @@ func TestCacheKey(t *testing.T) {
 			{Name: "5", Value: "6"},
 			{Name: "7", Value: "8"},
 		},
-		APIVersion:         "client.authentication.k8s.io/v1alpha1",
+		APIVersion:         "client.authentication.k8s.io/v1beta1",
 		ProvideClusterInfo: true,
 	}
 	c2c := &clientauthentication.Cluster{
@@ -166,7 +166,7 @@ func TestCacheKey(t *testing.T) {
 			{Name: "3", Value: "4"},
 			{Name: "5", Value: "6"},
 		},
-		APIVersion: "client.authentication.k8s.io/v1alpha1",
+		APIVersion: "client.authentication.k8s.io/v1beta1",
 	}
 	c3c := &clientauthentication.Cluster{
 		Server:                   "foo",
@@ -190,7 +190,7 @@ func TestCacheKey(t *testing.T) {
 			{Name: "3", Value: "4"},
 			{Name: "5", Value: "6"},
 		},
-		APIVersion: "client.authentication.k8s.io/v1alpha1",
+		APIVersion: "client.authentication.k8s.io/v1beta1",
 	}
 	c4c := &clientauthentication.Cluster{
 		Server:                   "foo",
@@ -215,7 +215,7 @@ func TestCacheKey(t *testing.T) {
 			{Name: "3", Value: "4"},
 			{Name: "5", Value: "6"},
 		},
-		APIVersion:         "client.authentication.k8s.io/v1alpha1",
+		APIVersion:         "client.authentication.k8s.io/v1beta1",
 		ProvideClusterInfo: true,
 	}
 	c5c := &clientauthentication.Cluster{
@@ -241,7 +241,7 @@ func TestCacheKey(t *testing.T) {
 			{Name: "3", Value: "4"},
 			{Name: "5", Value: "6"},
 		},
-		APIVersion: "client.authentication.k8s.io/v1alpha1",
+		APIVersion: "client.authentication.k8s.io/v1betaa1",
 	}
 
 	// c7 should be the same as c6, except c7 has stdin marked as unavailable
@@ -252,7 +252,7 @@ func TestCacheKey(t *testing.T) {
 			{Name: "3", Value: "4"},
 			{Name: "5", Value: "6"},
 		},
-		APIVersion:       "client.authentication.k8s.io/v1alpha1",
+		APIVersion:       "client.authentication.k8s.io/v1beta1",
 		StdinUnavailable: true,
 	}
 
@@ -313,7 +313,6 @@ func TestRefreshCreds(t *testing.T) {
 		cluster          *clientauthentication.Cluster
 		output           string
 		isTerminal       bool
-		response         *clientauthentication.Response
 		wantInput        string
 		wantCreds        credentials
 		wantExpiry       time.Time
@@ -321,173 +320,21 @@ func TestRefreshCreds(t *testing.T) {
 		wantErrSubstr    string
 	}{
 		{
-			name: "basic-request",
+			name: "beta-with-TLS-credentials",
 			config: api.ExecConfig{
-				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
 				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			wantInput: `{
 				"kind":"ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1",
-				"spec": {}
-			}`,
-			output: `{
-				"kind": "ExecCredential",
-				"apiVersion": "client.authentication.k8s.io/v1alpha1",
-				"status": {
-					"token": "foo-bar"
-				}
-			}`,
-			wantCreds: credentials{token: "foo-bar"},
-		},
-		{
-			name: "interactive",
-			config: api.ExecConfig{
-				APIVersion:      "client.authentication.k8s.io/v1alpha1",
-				InteractiveMode: api.IfAvailableExecInteractiveMode,
-			},
-			isTerminal: true,
-			wantInput: `{
-				"kind":"ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1",
+				"apiVersion":"client.authentication.k8s.io/v1beta1",
 				"spec": {
-					"interactive": true
+					"interactive": false
 				}
-			}`,
-			output: `{
-				"kind": "ExecCredential",
-				"apiVersion": "client.authentication.k8s.io/v1alpha1",
-				"status": {
-					"token": "foo-bar"
-				}
-			}`,
-			wantCreds: credentials{token: "foo-bar"},
-		},
-		{
-			name: "response",
-			config: api.ExecConfig{
-				APIVersion:      "client.authentication.k8s.io/v1alpha1",
-				InteractiveMode: api.IfAvailableExecInteractiveMode,
-			},
-			response: &clientauthentication.Response{
-				Header: map[string][]string{
-					"WWW-Authenticate": {`Basic realm="Access to the staging site", charset="UTF-8"`},
-				},
-				Code: 401,
-			},
-			wantInput: `{
-				"kind":"ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1",
-				"spec": {
-					"response": {
-						"header": {
-							"WWW-Authenticate": [
-								"Basic realm=\"Access to the staging site\", charset=\"UTF-8\""
-							]
-						},
-						"code": 401
-					}
-				}
-			}`,
-			output: `{
-				"kind": "ExecCredential",
-				"apiVersion": "client.authentication.k8s.io/v1alpha1",
-				"status": {
-					"token": "foo-bar"
-				}
-			}`,
-			wantCreds: credentials{token: "foo-bar"},
-		},
-		{
-			name: "expiry",
-			config: api.ExecConfig{
-				APIVersion:      "client.authentication.k8s.io/v1alpha1",
-				InteractiveMode: api.IfAvailableExecInteractiveMode,
-			},
-			wantInput: `{
-				"kind":"ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1",
-				"spec": {}
-			}`,
-			output: `{
-				"kind": "ExecCredential",
-				"apiVersion": "client.authentication.k8s.io/v1alpha1",
-				"status": {
-					"token": "foo-bar",
-					"expirationTimestamp": "2006-01-02T15:04:05Z"
-				}
-			}`,
-			wantExpiry: time.Date(2006, 01, 02, 15, 04, 05, 0, time.UTC),
-			wantCreds:  credentials{token: "foo-bar"},
-		},
-		{
-			name: "no-group-version",
-			config: api.ExecConfig{
-				APIVersion:      "client.authentication.k8s.io/v1alpha1",
-				InteractiveMode: api.IfAvailableExecInteractiveMode,
-			},
-			wantInput: `{
-				"kind":"ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1",
-				"spec": {}
-			}`,
-			output: `{
-				"kind": "ExecCredential",
-				"status": {
-					"token": "foo-bar"
-				}
-			}`,
-			wantErr: true,
-		},
-		{
-			name: "no-status",
-			config: api.ExecConfig{
-				APIVersion:      "client.authentication.k8s.io/v1alpha1",
-				InteractiveMode: api.IfAvailableExecInteractiveMode,
-			},
-			wantInput: `{
-				"kind":"ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1",
-				"spec": {}
-			}`,
-			output: `{
-				"kind": "ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1"
-			}`,
-			wantErr: true,
-		},
-		{
-			name: "no-creds",
-			config: api.ExecConfig{
-				APIVersion:      "client.authentication.k8s.io/v1alpha1",
-				InteractiveMode: api.IfAvailableExecInteractiveMode,
-			},
-			wantInput: `{
-				"kind":"ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1",
-				"spec": {}
-			}`,
-			output: `{
-				"kind": "ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1",
-				"status": {}
-			}`,
-			wantErr: true,
-		},
-		{
-			name: "TLS credentials",
-			config: api.ExecConfig{
-				APIVersion:      "client.authentication.k8s.io/v1alpha1",
-				InteractiveMode: api.IfAvailableExecInteractiveMode,
-			},
-			wantInput: `{
-				"kind":"ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1",
-				"spec": {}
 			}`,
 			output: fmt.Sprintf(`{
 				"kind": "ExecCredential",
-				"apiVersion": "client.authentication.k8s.io/v1alpha1",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
 				"status": {
 					"clientKeyData": %q,
 					"clientCertificateData": %q
@@ -496,19 +343,14 @@ func TestRefreshCreds(t *testing.T) {
 			wantCreds: credentials{cert: validCert},
 		},
 		{
-			name: "bad TLS credentials",
+			name: "beta-with-bad-TLS-credentials",
 			config: api.ExecConfig{
-				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
 				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
-			wantInput: `{
-				"kind":"ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1",
-				"spec": {}
-			}`,
 			output: `{
 				"kind": "ExecCredential",
-				"apiVersion": "client.authentication.k8s.io/v1alpha1",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
 				"status": {
 					"clientKeyData": "foo",
 					"clientCertificateData": "bar"
@@ -517,19 +359,14 @@ func TestRefreshCreds(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "cert but no key",
+			name: "beta-cert-but-no-key",
 			config: api.ExecConfig{
-				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
 				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
-			wantInput: `{
-				"kind":"ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1",
-				"spec": {}
-			}`,
 			output: fmt.Sprintf(`{
 				"kind": "ExecCredential",
-				"apiVersion": "client.authentication.k8s.io/v1alpha1",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
 				"status": {
 					"clientCertificateData": %q
 				}
@@ -835,55 +672,6 @@ func TestRefreshCreds(t *testing.T) {
 			wantErrSubstr: "73",
 		},
 		{
-			name: "alpha-with-cluster-is-ignored",
-			config: api.ExecConfig{
-				APIVersion:      "client.authentication.k8s.io/v1alpha1",
-				InteractiveMode: api.IfAvailableExecInteractiveMode,
-			},
-			cluster: &clientauthentication.Cluster{
-				Server:                   "foo",
-				TLSServerName:            "bar",
-				CertificateAuthorityData: []byte("baz"),
-				Config: &runtime.Unknown{
-					TypeMeta: runtime.TypeMeta{
-						APIVersion: "",
-						Kind:       "",
-					},
-					Raw:             []byte(`{"apiVersion":"group/v1","kind":"PluginConfig","spec":{"audience":"panda"}}`),
-					ContentEncoding: "",
-					ContentType:     "application/json",
-				},
-			},
-			response: &clientauthentication.Response{
-				Header: map[string][]string{
-					"WWW-Authenticate": {`Basic realm="Access to the staging site", charset="UTF-8"`},
-				},
-				Code: 401,
-			},
-			wantInput: `{
-				"kind":"ExecCredential",
-				"apiVersion":"client.authentication.k8s.io/v1alpha1",
-				"spec": {
-					"response": {
-						"header": {
-							"WWW-Authenticate": [
-								"Basic realm=\"Access to the staging site\", charset=\"UTF-8\""
-							]
-						},
-						"code": 401
-					}
-				}
-			}`,
-			output: `{
-				"kind": "ExecCredential",
-				"apiVersion": "client.authentication.k8s.io/v1alpha1",
-				"status": {
-					"token": "foo-bar"
-				}
-			}`,
-			wantCreds: credentials{token: "foo-bar"},
-		},
-		{
 			name: "beta-with-cluster-and-provide-cluster-info-is-serialized",
 			config: api.ExecConfig{
 				APIVersion:         "client.authentication.k8s.io/v1beta1",
@@ -903,12 +691,6 @@ func TestRefreshCreds(t *testing.T) {
 					ContentEncoding: "",
 					ContentType:     "application/json",
 				},
-			},
-			response: &clientauthentication.Response{
-				Header: map[string][]string{
-					"WWW-Authenticate": {`Basic realm="Access to the staging site", charset="UTF-8"`},
-				},
-				Code: 401,
 			},
 			wantInput: `{
 				"kind":"ExecCredential",
@@ -957,12 +739,6 @@ func TestRefreshCreds(t *testing.T) {
 					ContentEncoding: "",
 					ContentType:     "application/json",
 				},
-			},
-			response: &clientauthentication.Response{
-				Header: map[string][]string{
-					"WWW-Authenticate": {`Basic realm="Access to the staging site", charset="UTF-8"`},
-				},
-				Code: 401,
 			},
 			wantInput: `{
 				"kind":"ExecCredential",
@@ -1037,7 +813,7 @@ func TestRefreshCreds(t *testing.T) {
 			a.stderr = stderr
 			a.environ = func() []string { return nil }
 
-			if err := a.refreshCredsLocked(test.response); err != nil {
+			if err := a.refreshCredsLocked(); err != nil {
 				if !test.wantErr {
 					t.Errorf("get token %v", err)
 				} else if !strings.Contains(err.Error(), test.wantErrSubstr) {
@@ -1103,7 +879,7 @@ func TestRoundTripper(t *testing.T) {
 
 	c := api.ExecConfig{
 		Command:         "./testdata/test-plugin.sh",
-		APIVersion:      "client.authentication.k8s.io/v1alpha1",
+		APIVersion:      "client.authentication.k8s.io/v1beta1",
 		InteractiveMode: api.IfAvailableExecInteractiveMode,
 	}
 	a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
@@ -1136,7 +912,7 @@ func TestRoundTripper(t *testing.T) {
 
 	setOutput(`{
 		"kind": "ExecCredential",
-		"apiVersion": "client.authentication.k8s.io/v1alpha1",
+		"apiVersion": "client.authentication.k8s.io/v1beta1",
 		"status": {
 			"token": "token1"
 		}
@@ -1146,7 +922,7 @@ func TestRoundTripper(t *testing.T) {
 
 	setOutput(`{
 		"kind": "ExecCredential",
-		"apiVersion": "client.authentication.k8s.io/v1alpha1",
+		"apiVersion": "client.authentication.k8s.io/v1beta1",
 		"status": {
 			"token": "token2"
 		}
@@ -1162,7 +938,7 @@ func TestRoundTripper(t *testing.T) {
 
 	setOutput(`{
 		"kind": "ExecCredential",
-		"apiVersion": "client.authentication.k8s.io/v1alpha1",
+		"apiVersion": "client.authentication.k8s.io/v1beta1",
 		"status": {
 			"token": "token3",
 			"expirationTimestamp": "` + now().Add(time.Hour).Format(time.RFC3339Nano) + `"
@@ -1177,7 +953,7 @@ func TestRoundTripper(t *testing.T) {
 	n = n.Add(time.Hour * 2)
 	setOutput(`{
 		"kind": "ExecCredential",
-		"apiVersion": "client.authentication.k8s.io/v1alpha1",
+		"apiVersion": "client.authentication.k8s.io/v1beta1",
 		"status": {
 			"token": "token4",
 			"expirationTimestamp": "` + now().Add(time.Hour).Format(time.RFC3339Nano) + `"
@@ -1218,7 +994,7 @@ func TestAuthorizationHeaderPresentCancelsExecAction(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &api.ExecConfig{
 				Command:    "./testdata/test-plugin.sh",
-				APIVersion: "client.authentication.k8s.io/v1alpha1",
+				APIVersion: "client.authentication.k8s.io/v1beta1",
 			}, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -1260,7 +1036,7 @@ func TestTLSCredentials(t *testing.T) {
 
 	a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &api.ExecConfig{
 		Command:         "./testdata/test-plugin.sh",
-		APIVersion:      "client.authentication.k8s.io/v1alpha1",
+		APIVersion:      "client.authentication.k8s.io/v1beta1",
 		InteractiveMode: api.IfAvailableExecInteractiveMode,
 	}, nil)
 	if err != nil {
@@ -1350,7 +1126,7 @@ func TestConcurrentUpdateTransportConfig(t *testing.T) {
 
 	c := api.ExecConfig{
 		Command:    "./testdata/test-plugin.sh",
-		APIVersion: "client.authentication.k8s.io/v1alpha1",
+		APIVersion: "client.authentication.k8s.io/v1beta1",
 	}
 	a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
 	if err != nil {
@@ -1416,7 +1192,7 @@ func TestInstallHintRateLimit(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			c := api.ExecConfig{
 				Command:         "does not exist",
-				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
 				InstallHint:     "some install hint",
 				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			}
@@ -1433,7 +1209,7 @@ func TestInstallHintRateLimit(t *testing.T) {
 
 			count := 0
 			for i := 0; i < test.calls; i++ {
-				err := a.refreshCredsLocked(&clientauthentication.Response{})
+				err := a.refreshCredsLocked()
 				if strings.Contains(err.Error(), c.InstallHint) {
 					count++
 				}

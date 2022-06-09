@@ -95,6 +95,8 @@ function set-windows-node-image() {
     WINDOWS_NODE_IMAGE="windows-server-2004-dc-core-v20210914"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION,,}" == "win20h2" ]]; then
     WINDOWS_NODE_IMAGE="windows-server-20h2-dc-core-v20210914"
+  elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION,,}" == "win2022" ]]; then
+    WINDOWS_NODE_IMAGE="windows-server-2022-dc-core-v20220513"
   else
     echo "Unknown WINDOWS_NODE_OS_DISTRIBUTION ${WINDOWS_NODE_OS_DISTRIBUTION}" >&2
     exit 1
@@ -1124,7 +1126,6 @@ KUBE_PROXY_MODE: $(yaml-quote "${KUBE_PROXY_MODE:-iptables}")
 DETECT_LOCAL_MODE: $(yaml-quote "${DETECT_LOCAL_MODE:-}")
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TOKEN:-}")
 ADMISSION_CONTROL: $(yaml-quote "${ADMISSION_CONTROL:-}")
-ENABLE_POD_SECURITY_POLICY: $(yaml-quote "${ENABLE_POD_SECURITY_POLICY:-}")
 MASTER_IP_RANGE: $(yaml-quote "${MASTER_IP_RANGE}")
 RUNTIME_CONFIG: $(yaml-quote "${RUNTIME_CONFIG}")
 CA_CERT: $(yaml-quote "${CA_CERT_BASE64:-}")

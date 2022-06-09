@@ -74,13 +74,12 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 	}
 
 	// Start the API Server with our tracing configuration
-	stopCh := make(chan struct{})
-	defer close(stopCh)
 	testServer := kubeapiservertesting.StartTestServerOrDie(t,
 		kubeapiservertesting.NewDefaultTestServerOptions(),
 		[]string{"--tracing-config-file=" + tracingConfigFile.Name()},
 		framework.SharedEtcd(),
 	)
+	defer testServer.TearDownFn()
 	clientConfig := testServer.ClientConfig
 
 	// Create a client that creates sampled traces.

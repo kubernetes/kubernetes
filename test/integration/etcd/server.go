@@ -27,7 +27,6 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.etcd.io/etcd/client/v3/concurrency"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -118,25 +117,12 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 		t.Fatal(err)
 	}
 
-	// get a leased session
-	session, err := concurrency.NewSession(rawClient)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// then build and use an etcd lock
-	// this prevents more than one of these api servers from running at the same time
-	lock := concurrency.NewLocker(session, "kube_integration_etcd_raw")
-	lock.Lock()
-
 	// make sure we start with a clean slate
 	if _, err := kvClient.Delete(context.Background(), "/registry/", clientv3.WithPrefix()); err != nil {
 		t.Fatal(err)
 	}
 
-	stopCh := make(chan struct{})
-
-	kubeAPIServer, err := app.CreateServerChain(completedOptions, stopCh)
+	kubeAPIServer, err := app.CreateServerChain(completedOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,6 +138,8 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 
 	kubeClient := clientset.NewForConfigOrDie(kubeClientConfig)
 
+	stopCh := make(chan struct{})
+	errCh := make(chan error)
 	go func() {
 		// Catch panics that occur in this go routine so we get a comprehensible failure
 		defer func() {
@@ -159,19 +147,29 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 				t.Errorf("Unexpected panic trying to start API server: %#v", err)
 			}
 		}()
+		defer close(errCh)
 
 		prepared, err := kubeAPIServer.PrepareRun()
 		if err != nil {
-			t.Error(err)
+			errCh <- err
+			return
 		}
 		if err := prepared.Run(stopCh); err != nil {
+			errCh <- err
 			t.Error(err)
+			return
 		}
 	}()
 
 	lastHealth := ""
 	attempt := 0
 	if err := wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
+		select {
+		case err := <-errCh:
+			return false, err
+		default:
+		}
+
 		// wait for the server to be healthy
 		result := kubeClient.RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
 		content, _ := result.Raw()
@@ -207,12 +205,18 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 	}
 
 	cleanup := func() {
-		if err := os.RemoveAll(certDir); err != nil {
-			t.Log(err)
-		}
+		// Closing stopCh is stopping apiserver and cleaning up
+		// after itself, including shutting down its storage layer.
 		close(stopCh)
-		lock.Unlock()
-		if err := session.Close(); err != nil {
+
+		// If the apiserver was started, let's wait for it to
+		// shutdown clearly.
+		err, ok := <-errCh
+		if ok && err != nil {
+			t.Error(err)
+		}
+		rawClient.Close()
+		if err := os.RemoveAll(certDir); err != nil {
 			t.Log(err)
 		}
 	}

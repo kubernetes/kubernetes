@@ -76,7 +76,7 @@ func New(dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 		fh:        fh,
 		args:      *args,
 		podLister: fh.SharedInformerFactory().Core().V1().Pods().Lister(),
-		pdbLister: getPDBLister(fh.SharedInformerFactory(), fts.EnablePodDisruptionBudget),
+		pdbLister: getPDBLister(fh.SharedInformerFactory()),
 	}
 	return &pl, nil
 }
@@ -175,7 +175,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 
 	// No potential victims are found, and so we don't need to evaluate the node again since its state didn't change.
 	if len(potentialVictims) == 0 {
-		message := fmt.Sprintf("No victims found on node %v for preemptor pod %v", nodeInfo.Node().Name, pod.Name)
+		message := fmt.Sprintf("No preemption victims found for incoming pod")
 		return nil, 0, framework.NewStatus(framework.UnschedulableAndUnresolvable, message)
 	}
 
@@ -314,9 +314,6 @@ func filterPodsWithPDBViolation(podInfos []*framework.PodInfo, pdbs []*policy.Po
 	return violatingPodInfos, nonViolatingPodInfos
 }
 
-func getPDBLister(informerFactory informers.SharedInformerFactory, enablePodDisruptionBudget bool) policylisters.PodDisruptionBudgetLister {
-	if enablePodDisruptionBudget {
-		return informerFactory.Policy().V1().PodDisruptionBudgets().Lister()
-	}
-	return nil
+func getPDBLister(informerFactory informers.SharedInformerFactory) policylisters.PodDisruptionBudgetLister {
+	return informerFactory.Policy().V1().PodDisruptionBudgets().Lister()
 }

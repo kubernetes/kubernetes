@@ -899,6 +899,13 @@ func (al *Allocators) releaseClusterIPs(service *api.Service) (released map[api.
 	return al.releaseIPs(toRelease)
 }
 
+func (al *Allocators) Destroy() {
+	al.serviceNodePorts.Destroy()
+	for _, a := range al.serviceIPAllocatorsByFamily {
+		a.Destroy()
+	}
+}
+
 // This is O(N), but we expect haystack to be small;
 // so small that we expect a linear search to be faster
 func containsNumber(haystack []int, needle int) bool {

@@ -6,7 +6,7 @@ spec:
   hostNetwork: true
   containers:
   - name: kube-apiserver
-    image: k8s.gcr.io/kube-apiserver:9680e782e08a1a1c94c656190011bd02
+    image: registry.k8s.io/kube-apiserver:9680e782e08a1a1c94c656190011bd02
     command:
     - /bin/sh
     - -c

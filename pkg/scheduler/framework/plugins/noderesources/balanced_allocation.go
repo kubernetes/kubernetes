@@ -91,7 +91,6 @@ func NewBalancedAllocation(baArgs runtime.Object, h framework.Handle, fts featur
 			scorer:              balancedResourceScorer,
 			useRequested:        true,
 			resourceToWeightMap: resToWeightMap,
-			enablePodOverhead:   fts.EnablePodOverhead,
 		},
 	}, nil
 }

@@ -19,17 +19,17 @@ package builder3
 import (
 	"sort"
 
-	"github.com/emicklei/go-restful"
+	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/spec3"
 )
 
-func mapKeyFromParam(param *restful.Parameter) interface{} {
+func mapKeyFromParam(param common.Parameter) interface{} {
 	return struct {
 		Name string
-		Kind int
+		Kind common.ParameterKind
 	}{
-		Name: param.Data().Name,
-		Kind: param.Data().Kind,
+		Name: param.Name(),
+		Kind: param.Kind(),
 	}
 }
 

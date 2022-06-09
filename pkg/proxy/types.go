@@ -83,14 +83,23 @@ type ServicePort interface {
 	HealthCheckNodePort() int
 	// GetNodePort returns a service Node port if present. If return 0, it means not present.
 	NodePort() int
-	// NodeLocalExternal returns if a service has only node local endpoints for external traffic.
-	NodeLocalExternal() bool
-	// NodeLocalInternal returns if a service has only node local endpoints for internal traffic.
-	NodeLocalInternal() bool
+	// ExternalPolicyLocal returns if a service has only node local endpoints for external traffic.
+	ExternalPolicyLocal() bool
+	// InternalPolicyLocal returns if a service has only node local endpoints for internal traffic.
+	InternalPolicyLocal() bool
 	// InternalTrafficPolicy returns service InternalTrafficPolicy
 	InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicyType
 	// HintsAnnotation returns the value of the v1.AnnotationTopologyAwareHints annotation.
 	HintsAnnotation() string
+	// ExternallyAccessible returns true if the service port is reachable via something
+	// other than ClusterIP (NodePort/ExternalIP/LoadBalancer)
+	ExternallyAccessible() bool
+	// UsesClusterEndpoints returns true if the service port ever sends traffic to
+	// endpoints based on "Cluster" traffic policy
+	UsesClusterEndpoints() bool
+	// UsesLocalEndpoints returns true if the service port ever sends traffic to
+	// endpoints based on "Local" traffic policy
+	UsesLocalEndpoints() bool
 }
 
 // Endpoint in an interface which abstracts information about an endpoint.
