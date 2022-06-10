@@ -25,7 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	restclient "k8s.io/client-go/rest"
+	clientset "k8s.io/client-go/kubernetes"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -37,19 +38,22 @@ func gvr(g, v, r string) schema.GroupVersionResource {
 // Is it possible that exist more fields that can contain IPs, the test consider the most significative.
 // xref: https://issues.k8s.io/100895
 func TestCanaryCVE_2021_29923(t *testing.T) {
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	config := restclient.Config{Host: server.URL}
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
 
-	dynamicClient, err := dynamic.NewForConfig(&config)
+	ns := framework.CreateNamespaceOrDie(client, "test-cve-2021-29923", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	dynamicClient, err := dynamic.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("unexpected error creating dynamic client: %v", err)
 	}
-
-	ns := framework.CreateTestingNamespace("test-cve-2021-29923", t)
-	defer framework.DeleteTestingNamespace(ns, t)
 
 	objects := map[schema.GroupVersionResource]string{
 		// k8s.io/kubernetes/pkg/api/v1
