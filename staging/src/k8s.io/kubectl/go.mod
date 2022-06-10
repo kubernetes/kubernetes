@@ -5,7 +5,7 @@ module k8s.io/kubectl
 go 1.18
 
 require (
-	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
+	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/davecgh/go-spew v1.1.1
 	github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
