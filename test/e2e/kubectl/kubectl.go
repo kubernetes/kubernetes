@@ -1150,13 +1150,13 @@ metadata:
       "metadata": {
         %s
         "name": "subobject",
-        "namespace": "my-ns"
+        "namespace": "%s"
       }
     }
   }
 }`
 			meta := unknownFieldMetadataJSON(gvk, "test-cr")
-			unknownRootMetaCR := fmt.Sprintf(embeddedCRPattern, meta, "")
+			unknownRootMetaCR := fmt.Sprintf(embeddedCRPattern, meta, "", ns)
 			_, err = framework.RunKubectlInput(ns, unknownRootMetaCR, "create", "--validate=true", "-f", "-")
 			if err == nil {
 				framework.Failf("unexpected nil error when creating CR with unknown root metadata field")
@@ -1170,7 +1170,7 @@ metadata:
 
 			ginkgo.By("attempting to create a CR with unknown metadata fields in the embedded object")
 			metaEmbedded := fmt.Sprintf(metaPattern, testCRD.Crd.Spec.Names.Kind, testCRD.Crd.Spec.Group, testCRD.Crd.Spec.Versions[0].Name, "test-cr-embedded")
-			unknownEmbeddedMetaCR := fmt.Sprintf(embeddedCRPattern, metaEmbedded, `"unknownMetaEmbedded": "bar",`)
+			unknownEmbeddedMetaCR := fmt.Sprintf(embeddedCRPattern, metaEmbedded, `"unknownMetaEmbedded": "bar",`, ns)
 			_, err = framework.RunKubectlInput(ns, unknownEmbeddedMetaCR, "create", "--validate=true", "-f", "-")
 			if err == nil {
 				framework.Failf("unexpected nil error when creating CR with unknown embedded metadata field")
