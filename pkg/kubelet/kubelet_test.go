@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog/v2/ktesting"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -149,6 +150,8 @@ func newTestKubeletWithImageList(
 	imageList []kubecontainer.Image,
 	controllerAttachDetachEnabled bool,
 	initFakeVolumePlugin bool) *TestKubelet {
+	logger, _ := ktesting.NewTestContext(t)
+
 	fakeRuntime := &containertest.FakeRuntime{
 		ImageList: imageList,
 		// Set ready conditions by default.
@@ -321,6 +324,7 @@ func newTestKubeletWithImageList(
 
 	// setup shutdown manager
 	shutdownManager, shutdownAdmitHandler := nodeshutdown.NewManager(&nodeshutdown.Config{
+		Logger:                          logger,
 		ProbeManager:                    kubelet.probeManager,
 		Recorder:                        fakeRecorder,
 		NodeRef:                         nodeRef,

@@ -36,6 +36,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/ktesting"
+	_ "k8s.io/klog/v2/ktesting/init" // activate ktesting command line flags
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -211,6 +213,8 @@ func TestManager(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
+
 			activePodsFunc := func() []*v1.Pod {
 				return tc.activePods
 			}
@@ -243,6 +247,7 @@ func TestManager(t *testing.T) {
 			fakeRecorder := &record.FakeRecorder{}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 			manager, _ := NewManager(&Config{
+				Logger:                          logger,
 				ProbeManager:                    proberManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
@@ -326,6 +331,7 @@ func TestFeatureEnabled(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
+			logger, _ := ktesting.NewTestContext(t)
 			activePodsFunc := func() []*v1.Pod {
 				return nil
 			}
@@ -339,6 +345,7 @@ func TestFeatureEnabled(t *testing.T) {
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			manager, _ := NewManager(&Config{
+				Logger:                          logger,
 				ProbeManager:                    proberManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
@@ -355,6 +362,7 @@ func TestFeatureEnabled(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	systemDbusTmp := systemDbus
 	defer func() {
 		systemDbus = systemDbusTmp
@@ -393,6 +401,7 @@ func TestRestart(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	manager, _ := NewManager(&Config{
+		Logger:                          logger,
 		ProbeManager:                    proberManager,
 		Recorder:                        fakeRecorder,
 		NodeRef:                         nodeRef,
@@ -706,6 +715,7 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 			klog.LogToStderr(false)
 
 			m := &managerImpl{
+				logger:                           klog.TODO(), // This test will be updated in a separate commit.
 				recorder:                         tt.fields.recorder,
 				nodeRef:                          tt.fields.nodeRef,
 				probeManager:                     tt.fields.probeManager,
