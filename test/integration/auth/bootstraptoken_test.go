@@ -29,7 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	"k8s.io/client-go/rest"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -117,17 +120,23 @@ func TestBootstrapTokenAuth(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(bootstrap.NewTokenAuthenticator(bootstrapSecrets{test.secret})))
-			// Set up an API server
-			controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-			controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
-			_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-			defer closeFn()
 
-			ns := framework.CreateTestingNamespace("auth-bootstrap-token", t)
-			defer framework.DeleteTestingNamespace(ns, t)
+			kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+				ModifyServerConfig: func(config *controlplane.Config) {
+					config.GenericConfig.Authentication.Authenticator = authenticator
+					config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+				},
+			})
+			defer tearDownFn()
+
+			ns := framework.CreateNamespaceOrDie(kubeClient, "auth-bootstrap-token", t)
+			defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
 			previousResourceVersion := make(map[string]float64)
-			transport := http.DefaultTransport
+			transport, err := rest.TransportFor(kubeConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			token := validTokenID + "." + validSecret
 			var bodyStr string
@@ -144,7 +153,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 			}
 			test.request.body = bodyStr
 			bodyBytes := bytes.NewReader([]byte(bodyStr))
-			req, err := http.NewRequest(test.request.verb, s.URL+test.request.URL, bodyBytes)
+			req, err := http.NewRequest(test.request.verb, kubeConfig.Host+test.request.URL, bodyBytes)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
