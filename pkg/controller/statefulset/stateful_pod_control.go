@@ -47,7 +47,7 @@ type StatefulPodControlObjectManager interface {
 	CreateClaim(claim *v1.PersistentVolumeClaim) error
 	GetClaim(namespace, claimName string) (*v1.PersistentVolumeClaim, error)
 	UpdateClaim(claim *v1.PersistentVolumeClaim) error
-	PatchClaim(namespace, claimName string, patchType types.PatchType, data []byte, opts metav1.PatchOptions) error
+	PatchClaim(namespace, claimName string, data []byte) error
 }
 
 // StatefulPodControl defines the interface that StatefulSetController uses to create, update, and delete Pods,
@@ -114,8 +114,8 @@ func (om *realStatefulPodControlObjectManager) UpdateClaim(claim *v1.PersistentV
 	return err
 }
 
-func (om *realStatefulPodControlObjectManager) PatchClaim(namespace, claimName string, patchType types.PatchType, data []byte, opts metav1.PatchOptions) error {
-	_, err := om.client.CoreV1().PersistentVolumeClaims(namespace).Patch(context.TODO(), claimName, patchType, data, opts)
+func (om *realStatefulPodControlObjectManager) PatchClaim(namespace, claimName string, data []byte) error {
+	_, err := om.client.CoreV1().PersistentVolumeClaims(namespace).Patch(context.TODO(), claimName, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 	return err
 }
 

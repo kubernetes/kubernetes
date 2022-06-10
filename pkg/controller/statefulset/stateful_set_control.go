@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -617,8 +616,12 @@ func (ssc *defaultStatefulSetControl) resizePVCs(set *apps.StatefulSet, pods []*
 				continue
 			}
 
+			if pvcActual.Spec.Resources.Requests.Storage().Equal(*pvc.Spec.Resources.Requests.Storage()) {
+				continue
+			}
+
 			patch := fmt.Sprintf(`{"spec": {"resources": {"requests": {"storage": "%s"}}}}`, pvc.Spec.Resources.Requests.Storage().String())
-			err = ssc.podControl.objectMgr.PatchClaim(set.Namespace, claimName, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
+			err = ssc.podControl.objectMgr.PatchClaim(set.Namespace, claimName, []byte(patch))
 			if err != nil {
 				err = fmt.Errorf("failed to resize PVC %s: %s", claimName, err)
 				errs = append(errs, err)

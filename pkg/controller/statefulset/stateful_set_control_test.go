@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -32,11 +33,13 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -1220,6 +1223,107 @@ func TestStatefulSetControlRollingUpdate(t *testing.T) {
 	}
 }
 
+func TestStatefulSetControlPVCResize(t *testing.T) {
+	type testcase struct {
+		name       string
+		invariants func(set *apps.StatefulSet, om *fakeObjectManager) error
+		initial    func() *apps.StatefulSet
+		update     func(set *apps.StatefulSet) *apps.StatefulSet
+		validate   func(set *apps.StatefulSet, pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) error
+	}
+
+	getPVCsForSet := func(om *fakeObjectManager, set *apps.StatefulSet, pods []*v1.Pod) ([]*v1.PersistentVolumeClaim, error) {
+		var pvcs []*v1.PersistentVolumeClaim
+		for _, pvcTpl := range set.Spec.VolumeClaimTemplates {
+			for _, pod := range pods {
+				ordinal := getOrdinal(pod)
+				pvcName := getPersistentVolumeClaimName(set, &pvcTpl, ordinal)
+				pvc, err := om.claimsLister.PersistentVolumeClaims(set.Namespace).Get(pvcName)
+
+				if err != nil {
+					return nil, fmt.Errorf("failed to get PVC in namespace %s for claim name %s", set.Namespace, pvcTpl.Name)
+				}
+				pvcs = append(pvcs, pvc)
+			}
+		}
+		return pvcs, nil
+	}
+
+	testFn := func(test *testcase, t *testing.T) {
+		set := test.initial()
+		client := fake.NewSimpleClientset(set)
+		om, _, ssc := setupController(client)
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		set = test.update(set)
+		if err := updateStatefulSetControl(set, ssc, om, assertUpdateInvariants); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		pvcs, err := getPVCsForSet(om, set, pods)
+		if err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		if err := test.validate(set, pods, pvcs); err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+	}
+
+	tests := []testcase{
+		{
+			name:       "pod pvc scale up",
+			invariants: assertMonotonicInvariants,
+			initial: func() *apps.StatefulSet {
+				return newStatefulSet(3)
+			},
+			update: func(set *apps.StatefulSet) *apps.StatefulSet {
+				set.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[v1.ResourceStorage] = *resource.NewQuantity(2, resource.BinarySI)
+				return set
+			},
+			validate: func(set *apps.StatefulSet, pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim) error {
+				count := 0
+				for _, pvc := range pvcs {
+					if !strings.Contains(pvc.Name, set.Spec.VolumeClaimTemplates[0].Name) {
+						continue
+					}
+
+					count += 1
+
+					wantSize := *resource.NewQuantity(2, resource.BinarySI)
+					foundSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+					if foundSize.String() != wantSize.String() {
+						return fmt.Errorf("want pvc size to be %s found %s", wantSize.String(), foundSize.String())
+					}
+				}
+				if count != int(*set.Spec.Replicas) {
+					return fmt.Errorf("want count to be %d found %d", *set.Spec.Replicas, count)
+				}
+
+				return nil
+			},
+		},
+	}
+	for i := range tests {
+		testFn(&tests[i], t)
+	}
+}
+
 func TestStatefulSetControlOnDeleteUpdate(t *testing.T) {
 	type testcase struct {
 		name            string
@@ -2217,6 +2321,33 @@ func (om *fakeObjectManager) UpdateClaim(claim *v1.PersistentVolumeClaim) error 
 	}
 	om.claimsIndexer.Update(claim)
 	return nil
+}
+
+func (om *fakeObjectManager) PatchClaim(namespace, claimName string, data []byte) error {
+	claim, err := om.claimsLister.PersistentVolumeClaims(namespace).Get(claimName)
+	if err != nil {
+		return fmt.Errorf("failed to find claim %s in namespace %s: %w", claimName, namespace, err)
+	}
+
+	claimBytes, err := json.Marshal(claim)
+	if err != nil {
+		return err
+	}
+
+	modified, err := strategicpatch.StrategicMergePatch(claimBytes, data, claim)
+	if err != nil {
+		return fmt.Errorf("failed to strategic merge patch claim %s in namespace %s: %w", claimName, namespace, err)
+	}
+
+	var modifiedClaim v1.PersistentVolumeClaim
+	err = json.Unmarshal(modified, &modifiedClaim)
+	if err != nil {
+		return err
+	}
+
+	claim.Spec = modifiedClaim.Spec
+
+	return om.claimsIndexer.Update(claim)
 }
 
 func (om *fakeObjectManager) SetCreateStatefulPodError(err error, after int) {
