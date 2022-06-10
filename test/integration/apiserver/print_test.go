@@ -120,7 +120,7 @@ var missingHanlders = sets.NewString(
 )
 
 func TestServerSidePrint(t *testing.T) {
-	s, _, closeFn := setupWithResources(t,
+	clientSet, kubeConfig, tearDownFn := setupWithResources(t,
 		// additional groupversions needed for the test to run
 		[]schema.GroupVersion{
 			{Group: "discovery.k8s.io", Version: "v1"},
@@ -140,16 +140,16 @@ func TestServerSidePrint(t *testing.T) {
 		},
 		[]schema.GroupVersionResource{},
 	)
-	defer closeFn()
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("server-print", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(clientSet, "server-print", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 	tableParam := fmt.Sprintf("application/json;as=Table;g=%s;v=%s, application/json", metav1beta1.GroupName, metav1beta1.SchemeGroupVersion.Version)
 	printer := newFakePrinter(printersinternal.AddHandlers)
 
 	configFlags := genericclioptions.NewTestConfigFlags().
-		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfig(s.URL), &clientcmd.ConfigOverrides{}))
+		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfig(kubeConfig.Host), &clientcmd.ConfigOverrides{}))
 
 	restConfig, err := configFlags.ToRESTConfig()
 	if err != nil {
