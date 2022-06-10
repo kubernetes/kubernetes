@@ -1,5 +1,7 @@
 package restful
 
+import "sort"
+
 // Copyright 2013 Ernest Micklei. All rights reserved.
 // Use of this source code is governed by a license
 // that can be found in the LICENSE file.
@@ -52,13 +54,25 @@ type Parameter struct {
 // ParameterData represents the state of a Parameter.
 // It is made public to make it accessible to e.g. the Swagger package.
 type ParameterData struct {
+	ExtensionProperties
 	Name, Description, DataType, DataFormat string
 	Kind                                    int
 	Required                                bool
-	AllowableValues                         map[string]string
-	AllowMultiple                           bool
-	DefaultValue                            string
-	CollectionFormat                        string
+	// AllowableValues is deprecated. Use PossibleValues instead
+	AllowableValues  map[string]string
+	PossibleValues   []string
+	AllowMultiple    bool
+	AllowEmptyValue  bool
+	DefaultValue     string
+	CollectionFormat string
+	Pattern          string
+	Minimum          *float64
+	Maximum          *float64
+	MinLength        *int64
+	MaxLength        *int64
+	MinItems         *int64
+	MaxItems         *int64
+	UniqueItems      bool
 }
 
 // Data returns the state of the Parameter
@@ -106,9 +120,38 @@ func (p *Parameter) AllowMultiple(multiple bool) *Parameter {
 	return p
 }
 
-// AllowableValues sets the allowableValues field and returns the receiver
+// AddExtension adds or updates a key=value pair to the extension map
+func (p *Parameter) AddExtension(key string, value interface{}) *Parameter {
+	p.data.AddExtension(key, value)
+	return p
+}
+
+// AllowEmptyValue sets the AllowEmptyValue field and returns the receiver
+func (p *Parameter) AllowEmptyValue(multiple bool) *Parameter {
+	p.data.AllowEmptyValue = multiple
+	return p
+}
+
+// AllowableValues is deprecated. Use PossibleValues instead. Both will be set.
 func (p *Parameter) AllowableValues(values map[string]string) *Parameter {
 	p.data.AllowableValues = values
+
+	allowableSortedKeys := make([]string, 0, len(values))
+	for k := range values {
+		allowableSortedKeys = append(allowableSortedKeys, k)
+	}
+	sort.Strings(allowableSortedKeys)
+
+	p.data.PossibleValues = make([]string, 0, len(values))
+	for _, k := range allowableSortedKeys {
+		p.data.PossibleValues = append(p.data.PossibleValues, values[k])
+	}
+	return p
+}
+
+// PossibleValues sets the possible values field and returns the receiver
+func (p *Parameter) PossibleValues(values []string) *Parameter {
+	p.data.PossibleValues = values
 	return p
 }
 
@@ -139,5 +182,53 @@ func (p *Parameter) Description(doc string) *Parameter {
 // CollectionFormat sets the collection format for an array type
 func (p *Parameter) CollectionFormat(format CollectionFormat) *Parameter {
 	p.data.CollectionFormat = format.String()
+	return p
+}
+
+// Pattern sets the pattern field and returns the receiver
+func (p *Parameter) Pattern(pattern string) *Parameter {
+	p.data.Pattern = pattern
+	return p
+}
+
+// Minimum sets the minimum field and returns the receiver
+func (p *Parameter) Minimum(minimum float64) *Parameter {
+	p.data.Minimum = &minimum
+	return p
+}
+
+// Maximum sets the maximum field and returns the receiver
+func (p *Parameter) Maximum(maximum float64) *Parameter {
+	p.data.Maximum = &maximum
+	return p
+}
+
+// MinLength sets the minLength field and returns the receiver
+func (p *Parameter) MinLength(minLength int64) *Parameter {
+	p.data.MinLength = &minLength
+	return p
+}
+
+// MaxLength sets the maxLength field and returns the receiver
+func (p *Parameter) MaxLength(maxLength int64) *Parameter {
+	p.data.MaxLength = &maxLength
+	return p
+}
+
+// MinItems sets the minItems field and returns the receiver
+func (p *Parameter) MinItems(minItems int64) *Parameter {
+	p.data.MinItems = &minItems
+	return p
+}
+
+// MaxItems sets the maxItems field and returns the receiver
+func (p *Parameter) MaxItems(maxItems int64) *Parameter {
+	p.data.MaxItems = &maxItems
+	return p
+}
+
+// UniqueItems sets the uniqueItems field and returns the receiver
+func (p *Parameter) UniqueItems(uniqueItems bool) *Parameter {
+	p.data.UniqueItems = uniqueItems
 	return p
 }

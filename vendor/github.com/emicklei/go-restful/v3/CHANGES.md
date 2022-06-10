@@ -1,7 +1,96 @@
-## Change history of go-restful
+# Change history of go-restful
 
+## [v3.7.2] - 2021-11-24
+
+- restored FilterChain (#482 by SVilgelm)
+
+
+## [v3.7.1] - 2021-10-04
+
+- fix problem with contentEncodingEnabled setting (#479)
+
+## [v3.7.0] - 2021-09-24
+
+- feat(parameter): adds additional openapi mappings (#478)
+
+## [v3.6.0] - 2021-09-18
+
+- add support for vendor extensions (#477 thx erraggy)
+
+## [v3.5.2] - 2021-07-14
+
+- fix removing absent route from webservice (#472)
+
+## [v3.5.1] - 2021-04-12
+
+- fix handling no match access selected path
+- remove obsolete field
+
+## [v3.5.0] - 2021-04-10
+
+- add check for wildcard (#463) in CORS
+- add access to Route from Request, issue #459 (#462)
+
+## [v3.4.0] - 2020-11-10
+
+- Added OPTIONS to WebService
+
+## [v3.3.2] - 2020-01-23
+
+- Fixed duplicate compression in dispatch. #449
+
+
+## [v3.3.1] - 2020-08-31
+
+- Added check on writer to prevent compression of response twice. #447
+
+## [v3.3.0] - 2020-08-19
+
+- Enable content encoding on Handle and ServeHTTP (#446)
+- List available representations in 406 body (#437)
+- Convert to string using rune() (#443)
+
+## [v3.2.0] - 2020-06-21
+
+- 405 Method Not Allowed must have Allow header (#436) (thx Bracken <abdawson@gmail.com>)
+- add field allowedMethodsWithoutContentType (#424)
+
+## [v3.1.0]
+
+- support describing response headers (#426)
+- fix openapi examples (#425)
+
+v3.0.0
+
+- fix: use request/response resulting from filter chain
+- add Go module
+  Module consumer should use github.com/emicklei/go-restful/v3 as import path
+
+v2.10.0
+
+- support for Custom Verbs (thanks Vinci Xu <277040271@qq.com>)
+- fixed static example (thanks Arthur <yang_yapo@126.com>)
+- simplify code (thanks Christian Muehlhaeuser <muesli@gmail.com>)
+- added JWT HMAC with SHA-512 authentication code example (thanks Amim Knabben <amim.knabben@gmail.com>)
+
+v2.9.6
+
+- small optimization in filter code
+
+v2.11.1
+
+- fix WriteError return value (#415)
+
+v2.11.0 
+
+- allow prefix and suffix in path variable expression (#414)
+
+v2.9.6
+
+- support google custome verb (#413)
 
 v2.9.5
+
 - fix panic in Response.WriteError if err == nil
 
 v2.9.4

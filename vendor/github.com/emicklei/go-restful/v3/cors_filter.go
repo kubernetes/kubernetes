@@ -184,6 +184,9 @@ func (c CrossOriginResourceSharing) isValidAccessControlRequestHeader(header str
 		if strings.ToLower(each) == strings.ToLower(header) {
 			return true
 		}
+		if each == "*" {
+			return true
+		}
 	}
 	return false
 }

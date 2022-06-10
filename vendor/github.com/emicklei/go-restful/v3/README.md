@@ -4,9 +4,10 @@ package for building REST-style Web Services using Google Go
 
 [![Build Status](https://travis-ci.org/emicklei/go-restful.png)](https://travis-ci.org/emicklei/go-restful)
 [![Go Report Card](https://goreportcard.com/badge/github.com/emicklei/go-restful)](https://goreportcard.com/report/github.com/emicklei/go-restful)
-[![GoDoc](https://godoc.org/github.com/emicklei/go-restful?status.svg)](https://godoc.org/github.com/emicklei/go-restful)
+[![GoDoc](https://godoc.org/github.com/emicklei/go-restful?status.svg)](https://pkg.go.dev/github.com/emicklei/go-restful)
+[![codecov](https://codecov.io/gh/emicklei/go-restful/branch/master/graph/badge.svg)](https://codecov.io/gh/emicklei/go-restful)
 
-- [Code examples](https://github.com/emicklei/go-restful/tree/master/examples)
+- [Code examples use v3](https://github.com/emicklei/go-restful/tree/v3/examples)
 
 REST asks developers to use HTTP methods explicitly and in a way that's consistent with the protocol definition. This basic REST design principle establishes a one-to-one mapping between create, read, update, and delete (CRUD) operations and HTTP methods. According to this mapping:
 
@@ -18,6 +19,28 @@ REST asks developers to use HTTP methods explicitly and in a way that's consiste
 - PATCH = Update partial content of a resource
 - OPTIONS = Get information about the communication options for the request URI
     
+### Usage
+
+#### Without Go Modules
+
+All versions up to `v2.*.*` (on the master) are not supporting Go modules.
+
+```
+import (
+	restful "github.com/emicklei/go-restful"
+)
+```
+
+#### Using Go Modules
+
+As of version `v3.0.0` (on the v3 branch), this package supports Go modules.
+
+```
+import (
+	restful "github.com/emicklei/go-restful/v3"
+)
+```
+
 ### Example
 
 ```Go
@@ -39,15 +62,15 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 }
 ```
 	
-[Full API of a UserResource](https://github.com/emicklei/go-restful/tree/master/examples/restful-user-resource.go) 
+[Full API of a UserResource](https://github.com/emicklei/go-restful/blob/v3/examples/user-resource/restful-user-resource.go) 
 		
 ### Features
 
-- Routes for request &#8594; function mapping with path parameter (e.g. {id}) support
+- Routes for request &#8594; function mapping with path parameter (e.g. {id} but also prefix_{var} and {var}_suffix) support
 - Configurable router:
-	- (default) Fast routing algorithm that allows static elements, regular expressions and dynamic parameters in the URL path (e.g. /meetings/{id} or /static/{subpath:*}
+	- (default) Fast routing algorithm that allows static elements, [google custom method](https://cloud.google.com/apis/design/custom_methods), regular expressions and dynamic parameters in the URL path (e.g. /resource/name:customVerb, /meetings/{id} or /static/{subpath:*})
 	- Routing algorithm after [JSR311](http://jsr311.java.net/nonav/releases/1.1/spec/spec.html) that is implemented using (but does **not** accept) regular expressions
-- Request API for reading structs from JSON/XML and accesing parameters (path,query,header)
+- Request API for reading structs from JSON/XML and accessing parameters (path,query,header)
 - Response API for writing structs to JSON/XML and setting headers
 - Customizable encoding using EntityReaderWriter registration
 - Filters for intercepting the request &#8594; response flow on Service or Route level
@@ -85,4 +108,4 @@ TODO: write examples of these.
 
 Type ```git shortlog -s``` for a full list of contributors.
 
-© 2012 - 2018, http://ernestmicklei.com. MIT License. Contributions are welcome.
+© 2012 - 2021, http://ernestmicklei.com. MIT License. Contributions are welcome.
