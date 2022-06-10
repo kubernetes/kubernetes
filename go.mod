@@ -9,7 +9,7 @@ module k8s.io/kubernetes
 go 1.18
 
 require (
-	bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
+	bitbucket.org/bertimus9/systemstat v0.5.0
 	github.com/Azure/azure-sdk-for-go v55.0.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.27
 	github.com/Azure/go-autorest/autorest/adal v0.9.20
@@ -264,7 +264,7 @@ require (
 
 replace (
 	bazil.org/fuse => bazil.org/fuse v0.0.0-20160811212531-371fbbdaa898
-	bitbucket.org/bertimus9/systemstat => bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
+	bitbucket.org/bertimus9/systemstat => bitbucket.org/bertimus9/systemstat v0.5.0
 	cloud.google.com/go => cloud.google.com/go v0.81.0
 	cloud.google.com/go/bigquery => cloud.google.com/go/bigquery v1.8.0
 	cloud.google.com/go/storage => cloud.google.com/go/storage v1.10.0

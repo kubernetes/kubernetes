@@ -1,5 +1,5 @@
-# bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690 => bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
-## explicit
+# bitbucket.org/bertimus9/systemstat v0.5.0 => bitbucket.org/bertimus9/systemstat v0.5.0
+## explicit; go 1.17
 bitbucket.org/bertimus9/systemstat
 # cloud.google.com/go v0.81.0 => cloud.google.com/go v0.81.0
 ## explicit; go 1.11
@@ -2549,7 +2549,7 @@ sigs.k8s.io/structured-merge-diff/v4/value
 ## explicit; go 1.12
 sigs.k8s.io/yaml
 # bazil.org/fuse => bazil.org/fuse v0.0.0-20160811212531-371fbbdaa898
-# bitbucket.org/bertimus9/systemstat => bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
+# bitbucket.org/bertimus9/systemstat => bitbucket.org/bertimus9/systemstat v0.5.0
 # cloud.google.com/go => cloud.google.com/go v0.81.0
 # cloud.google.com/go/bigquery => cloud.google.com/go/bigquery v1.8.0
 # cloud.google.com/go/storage => cloud.google.com/go/storage v1.10.0
