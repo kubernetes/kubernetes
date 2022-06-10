@@ -713,8 +713,8 @@ github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0 => github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
-# github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
-## explicit
+# github.com/pquerna/cachecontrol v0.1.0 => github.com/pquerna/cachecontrol v0.1.0
+## explicit; go 1.16
 github.com/pquerna/cachecontrol
 github.com/pquerna/cachecontrol/cacheobject
 # github.com/prometheus/client_golang v1.12.1 => github.com/prometheus/client_golang v1.12.1
@@ -2747,7 +2747,7 @@ sigs.k8s.io/yaml
 # github.com/pkg/errors => github.com/pkg/errors v0.9.1
 # github.com/pkg/sftp => github.com/pkg/sftp v1.10.1
 # github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
-# github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
+# github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.1.0
 # github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.12.1
 # github.com/prometheus/client_model => github.com/prometheus/client_model v0.2.0
 # github.com/prometheus/common => github.com/prometheus/common v0.32.1
