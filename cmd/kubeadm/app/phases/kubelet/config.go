@@ -56,14 +56,13 @@ func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patches
 
 	// Apply patches to the KubeletConfiguration
 	if len(patchesDir) != 0 {
-		target := "kubeletconfiguration"
-		knownTargets := []string{target}
-		patchManager, err := patches.GetPatchManagerForPath(patchesDir, knownTargets, output)
+		patchManager, err := patches.GetPatchManagerForPath(patchesDir, patches.KnownTargets(), output)
 		if err != nil {
 			return err
 		}
+
 		patchTarget := &patches.PatchTarget{
-			Name:                      target,
+			Name:                      patches.KubeletConfiguration,
 			StrategicMergePatchObject: kubeletconfig.KubeletConfiguration{},
 			Data:                      kubeletBytes,
 		}

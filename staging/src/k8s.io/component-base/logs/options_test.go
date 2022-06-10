@@ -128,7 +128,9 @@ func testContextualLogging(t *testing.T, enabled bool) {
 	defer klog.EnableContextualLogging(true)
 
 	ctx := context.Background()
+	// nolint:logcheck // This intentionally adds a name independently of the feature gate.
 	logger := klog.NewKlogr().WithName("contextual")
+	// nolint:logcheck // This intentionally creates a new context independently of the feature gate.
 	ctx = logr.NewContext(ctx, logger)
 	if enabled {
 		assert.Equal(t, logger, klog.FromContext(ctx), "FromContext")

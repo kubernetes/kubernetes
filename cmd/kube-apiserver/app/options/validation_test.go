@@ -95,6 +95,11 @@ func TestClusterServiceIPRange(t *testing.T) {
 			options:      makeOptionsWithCIDRs("10.0.0.0/16", ""),
 		},
 		{
+			name:         "valid primary, class E range",
+			expectErrors: false,
+			options:      makeOptionsWithCIDRs("244.0.0.0/16", ""),
+		},
+		{
 			name:         "valid v4-v6 dual stack",
 			expectErrors: false,
 			options:      makeOptionsWithCIDRs("10.0.0.0/16", "3000::/108"),

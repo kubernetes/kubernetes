@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"sigs.k8s.io/yaml"
 )
 
@@ -74,6 +75,8 @@ func (ps *patchSet) String() string {
 	)
 }
 
+const KubeletConfiguration = "kubeletconfiguration"
+
 var (
 	pathLock  = &sync.RWMutex{}
 	pathCache = map[string]*PatchManager{}
@@ -89,7 +92,19 @@ var (
 	knownExtensions  = []string{"json", "yaml"}
 
 	regExtension = regexp.MustCompile(`.+\.(` + strings.Join(knownExtensions, "|") + `)$`)
+
+	knownTargets = []string{
+		kubeadmconstants.Etcd,
+		kubeadmconstants.KubeAPIServer,
+		kubeadmconstants.KubeControllerManager,
+		kubeadmconstants.KubeScheduler,
+		KubeletConfiguration,
+	}
 )
+
+func KnownTargets() []string {
+	return knownTargets
+}
 
 // GetPatchManagerForPath creates a patch manager that can be used to apply patches to "knownTargets".
 // "path" should contain patches that can be used to patch the "knownTargets".
