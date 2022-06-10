@@ -7,11 +7,11 @@ Package po provides support for reading and writing GNU PO file.
 
 Examples:
 	import (
-		"github.com/chai2010/gettext-go/gettext/po"
+		"github.com/chai2010/gettext-go/po"
 	)
 
 	func main() {
-		poFile, err := po.Load("test.po")
+		poFile, err := po.LoadFile("test.po")
 		if err != nil {
 			log.Fatal(err)
 		}
