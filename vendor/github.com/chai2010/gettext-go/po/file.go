@@ -20,17 +20,21 @@ type File struct {
 	Messages   []Message
 }
 
-// Load loads a named po file.
-func Load(name string) (*File, error) {
-	data, err := ioutil.ReadFile(name)
+// Load loads po file format data.
+func Load(data []byte) (*File, error) {
+	return loadData(data)
+}
+
+// LoadFile loads a named po file.
+func LoadFile(path string) (*File, error) {
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return LoadData(data)
+	return loadData(data)
 }
 
-// LoadData loads po file format data.
-func LoadData(data []byte) (*File, error) {
+func loadData(data []byte) (*File, error) {
 	r := newLineReader(string(data))
 	var file File
 	for {
@@ -59,7 +63,9 @@ func (f *File) Data() []byte {
 	// sort the massge as ReferenceFile/ReferenceLine field
 	var messages []Message
 	messages = append(messages, f.Messages...)
-	sort.Sort(byMessages(messages))
+	sort.Slice(messages, func(i, j int) bool {
+		return messages[i].less(&messages[j])
+	})
 
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%s\n", f.MimeHeader.String())

@@ -5,9 +5,11 @@
 package gettext
 
 import (
-	"github.com/chai2010/gettext-go/gettext/mo"
-	"github.com/chai2010/gettext-go/gettext/plural"
-	"github.com/chai2010/gettext-go/gettext/po"
+	"encoding/json"
+
+	"github.com/chai2010/gettext-go/mo"
+	"github.com/chai2010/gettext-go/plural"
+	"github.com/chai2010/gettext-go/po"
 )
 
 var nilTranslator = &translator{
@@ -26,9 +28,9 @@ func newMoTranslator(name string, data []byte) (*translator, error) {
 		err error
 	)
 	if len(data) != 0 {
-		f, err = mo.LoadData(data)
+		f, err = mo.Load(data)
 	} else {
-		f, err = mo.Load(name)
+		f, err = mo.LoadFile(name)
 	}
 	if err != nil {
 		return nil, err
@@ -53,9 +55,9 @@ func newPoTranslator(name string, data []byte) (*translator, error) {
 		err error
 	)
 	if len(data) != 0 {
-		f, err = po.LoadData(data)
+		f, err = po.Load(data)
 	} else {
-		f, err = po.Load(name)
+		f, err = po.LoadFile(name)
 	}
 	if err != nil {
 		return nil, err
@@ -80,8 +82,43 @@ func newPoTranslator(name string, data []byte) (*translator, error) {
 	return tr, nil
 }
 
+func newJsonTranslator(lang, name string, jsonData []byte) (*translator, error) {
+	var msgList []struct {
+		MsgContext  string   `json:"msgctxt"`      // msgctxt context
+		MsgId       string   `json:"msgid"`        // msgid untranslated-string
+		MsgIdPlural string   `json:"msgid_plural"` // msgid_plural untranslated-string-plural
+		MsgStr      []string `json:"msgstr"`       // msgstr translated-string
+	}
+	if err := json.Unmarshal(jsonData, &msgList); err != nil {
+		return nil, err
+	}
+
+	var tr = &translator{
+		MessageMap:    make(map[string]mo.Message),
+		PluralFormula: plural.Formula(lang),
+	}
+
+	for _, v := range msgList {
+		var v_MsgStr string
+		var v_MsgStrPlural = v.MsgStr
+
+		if len(v.MsgStr) != 0 {
+			v_MsgStr = v.MsgStr[0]
+		}
+
+		tr.MessageMap[tr.makeMapKey(v.MsgContext, v.MsgId)] = mo.Message{
+			MsgContext:   v.MsgContext,
+			MsgId:        v.MsgId,
+			MsgIdPlural:  v.MsgIdPlural,
+			MsgStr:       v_MsgStr,
+			MsgStrPlural: v_MsgStrPlural,
+		}
+	}
+	return tr, nil
+}
+
 func (p *translator) PGettext(msgctxt, msgid string) string {
-	return p.PNGettext(msgctxt, msgid, "", 0)
+	return p.findMsgStr(msgctxt, msgid)
 }
 
 func (p *translator) PNGettext(msgctxt, msgid, msgidPlural string, n int) string {
@@ -96,6 +133,16 @@ func (p *translator) PNGettext(msgctxt, msgid, msgidPlural string, n int) string
 	}
 	if msgidPlural != "" && n > 0 {
 		return msgidPlural
+	}
+	return msgid
+}
+
+func (p *translator) findMsgStr(msgctxt, msgid string) string {
+	key := p.makeMapKey(msgctxt, msgid)
+	if v, ok := p.MessageMap[key]; ok {
+		if v.MsgStr != "" {
+			return v.MsgStr
+		}
 	}
 	return msgid
 }

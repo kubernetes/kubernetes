@@ -25,7 +25,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/chai2010/gettext-go/gettext"
+	gettext "github.com/chai2010/gettext-go"
 	"k8s.io/klog/v2"
 )
 

@@ -6,7 +6,7 @@ go 1.18
 
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
-	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
+	github.com/chai2010/gettext-go v1.0.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/daviddengcn/go-colortext v1.0.0
 	github.com/docker/distribution v2.8.1+incompatible

@@ -26,28 +26,20 @@ type Message struct {
 	MsgStrPlural []string // msgstr[0] translated-string-case-0
 }
 
-type byMessages []Message
-
-func (d byMessages) Len() int {
-	return len(d)
-}
-func (d byMessages) Less(i, j int) bool {
-	if d[i].Comment.less(&d[j].Comment) {
+func (p *Message) less(q *Message) bool {
+	if p.Comment.less(&q.Comment) {
 		return true
 	}
-	if a, b := d[i].MsgContext, d[j].MsgContext; a != b {
+	if a, b := p.MsgContext, q.MsgContext; a != b {
 		return a < b
 	}
-	if a, b := d[i].MsgId, d[j].MsgId; a != b {
+	if a, b := p.MsgId, q.MsgId; a != b {
 		return a < b
 	}
-	if a, b := d[i].MsgIdPlural, d[j].MsgIdPlural; a != b {
+	if a, b := p.MsgIdPlural, q.MsgIdPlural; a != b {
 		return a < b
 	}
 	return false
-}
-func (d byMessages) Swap(i, j int) {
-	d[i], d[j] = d[j], d[i]
 }
 
 func (p *Message) readPoEntry(r *lineReader) (err error) {
@@ -175,15 +167,27 @@ func (p *Message) readString(r *lineReader) (msg string, err error) {
 func (p Message) String() string {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%s", p.Comment.String())
+	if p.MsgContext != "" {
+		fmt.Fprintf(&buf, "msgctxt %s", encodePoString(p.MsgContext))
+	}
 	fmt.Fprintf(&buf, "msgid %s", encodePoString(p.MsgId))
 	if p.MsgIdPlural != "" {
 		fmt.Fprintf(&buf, "msgid_plural %s", encodePoString(p.MsgIdPlural))
 	}
-	if p.MsgStr != "" {
-		fmt.Fprintf(&buf, "msgstr %s", encodePoString(p.MsgStr))
-	}
-	for i := 0; i < len(p.MsgStrPlural); i++ {
-		fmt.Fprintf(&buf, "msgstr[%d] %s", i, encodePoString(p.MsgStrPlural[i]))
+	if len(p.MsgStrPlural) == 0 {
+		if p.MsgStr != "" {
+			fmt.Fprintf(&buf, "msgstr %s", encodePoString(p.MsgStr))
+		} else {
+			fmt.Fprintf(&buf, "msgstr %s", `""`+"\n")
+		}
+	} else {
+		for i := 0; i < len(p.MsgStrPlural); i++ {
+			if p.MsgStrPlural[i] != "" {
+				fmt.Fprintf(&buf, "msgstr[%d] %s", i, encodePoString(p.MsgStrPlural[i]))
+			} else {
+				fmt.Fprintf(&buf, "msgstr[%d] %s", i, `""`+"\n")
+			}
+		}
 	}
 	return buf.String()
 }
