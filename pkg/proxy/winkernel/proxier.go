@@ -124,7 +124,7 @@ type serviceInfo struct {
 	nodePorthnsID          string
 	policyApplied          bool
 	remoteEndpoint         *endpointsInfo
-	hns                    HostNetworkService
+	hns                    HCNUtils
 	preserveDIP            bool
 	localTrafficDSR        bool
 }
@@ -145,11 +145,11 @@ type remoteSubnetInfo struct {
 
 const NETWORK_TYPE_OVERLAY = "overlay"
 
-func newHostNetworkService() (HostNetworkService, hcn.SupportedFeatures) {
-	var h HostNetworkService
+func newHostNetworkService() (HCNUtils, hcn.SupportedFeatures) {
+	var h HCNUtils
 	supportedFeatures := hcn.GetSupportedFeatures()
 	if supportedFeatures.Api.V2 {
-		h = hns{}
+		h = hcnutils{&ihcn{}}
 	} else {
 		panic("Windows HNS Api V2 required. This version of windows does not support API V2")
 	}
@@ -168,7 +168,7 @@ func getNetworkName(hnsNetworkName string) (string, error) {
 	return hnsNetworkName, nil
 }
 
-func getNetworkInfo(hns HostNetworkService, hnsNetworkName string) (*hnsNetworkInfo, error) {
+func getNetworkInfo(hns HCNUtils, hnsNetworkName string) (*hnsNetworkInfo, error) {
 	hnsNetworkInfo, err := hns.getNetworkByName(hnsNetworkName)
 	for err != nil {
 		klog.ErrorS(err, "Unable to find HNS Network specified, please check network name and CNI deployment", "hnsNetworkName", hnsNetworkName)
@@ -234,7 +234,7 @@ type endpointsInfo struct {
 	hnsID           string
 	refCount        *uint16
 	providerAddress string
-	hns             HostNetworkService
+	hns             HCNUtils
 	name            string
 
 	// conditions
@@ -413,7 +413,7 @@ func (proxier *Proxier) newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, _ *pro
 	return info
 }
 
-func newSourceVIP(hns HostNetworkService, network string, ip string, mac string, providerAddress string) (*endpointsInfo, error) {
+func newSourceVIP(hns HCNUtils, network string, ip string, mac string, providerAddress string) (*endpointsInfo, error) {
 	hnsEndpoint := &endpointsInfo{
 		ip:              ip,
 		isLocal:         true,
@@ -553,7 +553,7 @@ type Proxier struct {
 	// precomputing some number of those and cache for future reuse.
 	precomputedProbabilities []string
 
-	hns               HostNetworkService
+	hns               HCNUtils
 	network           hnsNetworkInfo
 	sourceVip         string
 	hostMac           string
@@ -821,35 +821,6 @@ func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
 			lbIngressIP.healthCheckHnsID = ""
 		}
 	}
-}
-
-func deleteAllHnsLoadBalancerPolicy() {
-	plists, err := hcsshim.HNSListPolicyListRequest()
-	if err != nil {
-		return
-	}
-	for _, plist := range plists {
-		klog.V(3).InfoS("Remove policy", "policies", plist)
-		_, err = plist.Delete()
-		if err != nil {
-			klog.ErrorS(err, "Failed to delete policy list")
-		}
-	}
-
-}
-
-func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
-	hnsnetwork, err := hcsshim.GetHNSNetworkByName(hnsNetworkName)
-	if err != nil {
-		klog.ErrorS(err, "Failed to get HNS Network by name")
-		return nil, err
-	}
-
-	return &hnsNetworkInfo{
-		id:          hnsnetwork.Id,
-		name:        hnsnetwork.Name,
-		networkType: hnsnetwork.Type,
-	}, nil
 }
 
 // Sync is called to synchronize the proxier state to hns as soon as possible.

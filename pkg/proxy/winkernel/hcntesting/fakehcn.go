@@ -11,6 +11,7 @@ const (
 	guid = "123ABC"
 )
 
+//the fakeHCN saves the created endpoints and loadbalancers in slices to be able to work with them easier
 type FakeHCN struct {
 	Endpoints     []*hcn.HostComputeEndpoint
 	Loadbalancers []*hcn.HostComputeLoadBalancer
