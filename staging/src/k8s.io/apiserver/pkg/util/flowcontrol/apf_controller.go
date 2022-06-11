@@ -102,7 +102,7 @@ type configController struct {
 	name              string // varies in tests of fighting controllers
 	clock             clock.PassiveClock
 	queueSetFactory   fq.QueueSetFactory
-	reqsGaugePairVec  metrics.RatioedGaugePairVec
+	reqsGaugeVec      metrics.RatioedGaugeVec
 	execSeatsGaugeVec metrics.RatioedGaugeVec
 
 	// How this controller appears in an ObjectMeta ManagedFieldsEntry.Manager
@@ -205,7 +205,7 @@ func newTestableController(config TestableConfig) *configController {
 		name:                   config.Name,
 		clock:                  config.Clock,
 		queueSetFactory:        config.QueueSetFactory,
-		reqsGaugePairVec:       config.ReqsGaugePairVec,
+		reqsGaugeVec:           config.ReqsGaugeVec,
 		execSeatsGaugeVec:      config.ExecSeatsGaugeVec,
 		asFieldManager:         config.AsFieldManager,
 		foundToDangling:        config.FoundToDangling,
@@ -539,7 +539,7 @@ func (meal *cfgMeal) digestNewPLsLocked(newPLs []*flowcontrol.PriorityLevelConfi
 		state := meal.cfgCtlr.priorityLevelStates[pl.Name]
 		if state == nil {
 			labelValues := []string{pl.Name}
-			state = &priorityLevelState{reqsGaugePair: meal.cfgCtlr.reqsGaugePairVec.NewForLabelValuesSafe(1, 1, labelValues), execSeatsObs: meal.cfgCtlr.execSeatsGaugeVec.NewForLabelValuesSafe(0, 1, labelValues)}
+			state = &priorityLevelState{reqsGaugePair: metrics.RatioedGaugeVecPhasedElementPair(meal.cfgCtlr.reqsGaugeVec, 1, 1, labelValues), execSeatsObs: meal.cfgCtlr.execSeatsGaugeVec.NewForLabelValuesSafe(0, 1, labelValues)}
 		}
 		qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, state.queues, pl, meal.cfgCtlr.requestWaitLimit, state.reqsGaugePair, state.execSeatsObs)
 		if err != nil {
@@ -769,7 +769,7 @@ func (meal *cfgMeal) presyncFlowSchemaStatus(fs *flowcontrol.FlowSchema, isDangl
 func (meal *cfgMeal) imaginePL(proto *flowcontrol.PriorityLevelConfiguration, requestWaitLimit time.Duration) {
 	klog.V(3).Infof("No %s PriorityLevelConfiguration found, imagining one", proto.Name)
 	labelValues := []string{proto.Name}
-	reqsGaugePair := meal.cfgCtlr.reqsGaugePairVec.NewForLabelValuesSafe(1, 1, labelValues)
+	reqsGaugePair := metrics.RatioedGaugeVecPhasedElementPair(meal.cfgCtlr.reqsGaugeVec, 1, 1, labelValues)
 	execSeatsObs := meal.cfgCtlr.execSeatsGaugeVec.NewForLabelValuesSafe(0, 1, labelValues)
 	qsCompleter, err := queueSetCompleterForPL(meal.cfgCtlr.queueSetFactory, nil, proto, requestWaitLimit, reqsGaugePair, execSeatsObs)
 	if err != nil {

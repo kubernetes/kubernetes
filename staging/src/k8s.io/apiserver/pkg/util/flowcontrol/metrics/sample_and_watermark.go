@@ -34,33 +34,6 @@ const (
 	LabelValueExecuting = "executing"
 )
 
-// SampleAndWaterMarkPairVec makes pairs of RatioedGauges that
-// track samples and watermarks.
-type SampleAndWaterMarkPairVec struct {
-	urVec SampleAndWaterMarkObserverVec
-}
-
-var _ RatioedGaugePairVec = SampleAndWaterMarkPairVec{}
-
-// NewSampleAndWaterMarkHistogramsPairVec makes a new pair generator
-func NewSampleAndWaterMarkHistogramsPairVec(clock clock.PassiveClock, samplePeriod time.Duration, sampleOpts, waterMarkOpts *compbasemetrics.HistogramOpts, labelNames []string) SampleAndWaterMarkPairVec {
-	return SampleAndWaterMarkPairVec{
-		urVec: NewSampleAndWaterMarkHistogramsVec(clock, samplePeriod, sampleOpts, waterMarkOpts, append([]string{LabelNamePhase}, labelNames...)),
-	}
-}
-
-// NewForLabelValuesSafe makes a new pair
-func (spg SampleAndWaterMarkPairVec) NewForLabelValuesSafe(initialWaitingDenominator, initialExecutingDenominator float64, labelValues []string) RatioedGaugePair {
-	return RatioedGaugePair{
-		RequestsWaiting:   spg.urVec.NewForLabelValuesSafe(0, initialWaitingDenominator, append([]string{LabelValueWaiting}, labelValues...)),
-		RequestsExecuting: spg.urVec.NewForLabelValuesSafe(0, initialExecutingDenominator, append([]string{LabelValueExecuting}, labelValues...)),
-	}
-}
-
-func (spg SampleAndWaterMarkPairVec) metrics() Registerables {
-	return spg.urVec.metrics()
-}
-
 // SampleAndWaterMarkObserverVec creates RatioedGauges that
 // populate histograms of samples and low- and high-water-marks.  The
 // generator has a samplePeriod, and the histograms get an observation
