@@ -5,7 +5,7 @@ module k8s.io/apiextensions-apiserver
 go 1.18
 
 require (
-	github.com/emicklei/go-restful/v3 v3.7.5-0.20220308211933-7c971ca4d0fd
+	github.com/emicklei/go-restful/v3 v3.8.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/cel-go v0.11.2
 	github.com/google/gnostic v0.5.7-v3refs

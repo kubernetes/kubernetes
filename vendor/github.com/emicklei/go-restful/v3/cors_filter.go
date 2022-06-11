@@ -18,9 +18,22 @@ import (
 // http://enable-cors.org/server.html
 // http://www.html5rocks.com/en/tutorials/cors/#toc-handling-a-not-so-simple-request
 type CrossOriginResourceSharing struct {
-	ExposeHeaders  []string // list of Header names
-	AllowedHeaders []string // list of Header names
-	AllowedDomains []string // list of allowed values for Http Origin. An allowed value can be a regular expression to support subdomain matching. If empty all are allowed.
+	ExposeHeaders []string // list of Header names
+
+	// AllowedHeaders is alist of Header names. Checking is case-insensitive.
+	// The list may contain the special wildcard string ".*" ; all is allowed
+	AllowedHeaders []string
+
+	// AllowedDomains is a list of allowed values for Http Origin.
+	// The list may contain the special wildcard string ".*" ; all is allowed
+	// If empty all are allowed.
+	AllowedDomains []string
+
+	// AllowedDomainFunc is optional and is a function that will do the check
+	// when the origin is not part of the AllowedDomains and it does not contain the wildcard ".*".
+	AllowedDomainFunc func(origin string) bool
+
+	// AllowedMethods is either empty or has a list of http methods names. Checking is case-insensitive.
 	AllowedMethods []string
 	MaxAge         int // number of seconds before requiring new Options request
 	CookiesAllowed bool
@@ -119,36 +132,24 @@ func (c CrossOriginResourceSharing) isOriginAllowed(origin string) bool {
 	if len(origin) == 0 {
 		return false
 	}
+	lowerOrigin := strings.ToLower(origin)
 	if len(c.AllowedDomains) == 0 {
+		if c.AllowedDomainFunc != nil {
+			return c.AllowedDomainFunc(lowerOrigin)
+		}
 		return true
 	}
 
-	allowed := false
+	// exact match on each allowed domain
 	for _, domain := range c.AllowedDomains {
-		if domain == origin {
-			allowed = true
-			break
+		if domain == ".*" || strings.ToLower(domain) == lowerOrigin {
+			return true
 		}
 	}
-
-	if !allowed {
-		if len(c.allowedOriginPatterns) == 0 {
-			// compile allowed domains to allowed origin patterns
-			allowedOriginRegexps, err := compileRegexps(c.AllowedDomains)
-			if err != nil {
-				return false
-			}
-			c.allowedOriginPatterns = allowedOriginRegexps
-		}
-
-		for _, pattern := range c.allowedOriginPatterns {
-			if allowed = pattern.MatchString(origin); allowed {
-				break
-			}
-		}
+	if c.AllowedDomainFunc != nil {
+		return c.AllowedDomainFunc(origin)
 	}
-
-	return allowed
+	return false
 }
 
 func (c CrossOriginResourceSharing) setAllowOriginHeader(req *Request, resp *Response) {
@@ -189,17 +190,4 @@ func (c CrossOriginResourceSharing) isValidAccessControlRequestHeader(header str
 		}
 	}
 	return false
-}
-
-// Take a list of strings and compile them into a list of regular expressions.
-func compileRegexps(regexpStrings []string) ([]*regexp.Regexp, error) {
-	regexps := []*regexp.Regexp{}
-	for _, regexpStr := range regexpStrings {
-		r, err := regexp.Compile(regexpStr)
-		if err != nil {
-			return regexps, err
-		}
-		regexps = append(regexps, r)
-	}
-	return regexps, nil
 }

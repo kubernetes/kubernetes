@@ -94,12 +94,11 @@ There are several hooks to customize the behavior of the go-restful package.
 - Trace logging
 - Compression
 - Encoders for other serializers
-- Use [jsoniter](https://github.com/json-iterator/go) by build this package using a tag, e.g. `go build -tags=jsoniter .`
-
-TODO: write examples of these.
+- Use [jsoniter](https://github.com/json-iterator/go) by build this package using a tag, e.g. `go build -tags=jsoniter .` 
 
 ## Resources
 
+- [Example programs](./examples)
 - [Example posted on blog](http://ernestmicklei.com/2012/11/go-restful-first-working-example/)
 - [Design explained on blog](http://ernestmicklei.com/2012/11/go-restful-api-design/)
 - [sourcegraph](https://sourcegraph.com/github.com/emicklei/go-restful)
@@ -108,4 +107,4 @@ TODO: write examples of these.
 
 Type ```git shortlog -s``` for a full list of contributors.
 
-© 2012 - 2021, http://ernestmicklei.com. MIT License. Contributions are welcome.
+© 2012 - 2022, http://ernestmicklei.com. MIT License. Contributions are welcome.
