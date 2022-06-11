@@ -29,9 +29,11 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	apifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 )
 
 func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *bool, disableCallsWgMutex *sync.Mutex, nonMutating, mutating int) *httptest.Server {
+	fcmetrics.Register()
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
