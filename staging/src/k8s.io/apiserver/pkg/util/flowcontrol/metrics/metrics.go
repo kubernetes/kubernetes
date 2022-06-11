@@ -127,8 +127,8 @@ var (
 		},
 		[]string{priorityLevel},
 	)
-	// PriorityLevelConcurrencyPairVec creates pairs that observe concurrency for priority levels
-	PriorityLevelConcurrencyPairVec = NewSampleAndWaterMarkHistogramsPairVec(clock.RealClock{}, time.Millisecond,
+	// PriorityLevelConcurrencyGaugeVec creates gauges of concurrency broken down by phase, priority level
+	PriorityLevelConcurrencyGaugeVec = NewSampleAndWaterMarkHistogramsVec(clock.RealClock{}, time.Millisecond,
 		&compbasemetrics.HistogramOpts{
 			Namespace:      namespace,
 			Subsystem:      subsystem,
@@ -145,7 +145,7 @@ var (
 			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{priorityLevel},
+		[]string{LabelNamePhase, priorityLevel},
 	)
 	// ReadWriteConcurrencyGaugeVec creates gauges of number of requests broken down by phase and mutating vs readonly
 	ReadWriteConcurrencyGaugeVec = NewSampleAndWaterMarkHistogramsVec(clock.RealClock{}, time.Millisecond,
@@ -356,7 +356,7 @@ var (
 		apiserverDispatchWithNoAccommodation,
 	}.
 		Append(PriorityLevelExecutionSeatsGaugeVec.metrics()...).
-		Append(PriorityLevelConcurrencyPairVec.metrics()...).
+		Append(PriorityLevelConcurrencyGaugeVec.metrics()...).
 		Append(ReadWriteConcurrencyGaugeVec.metrics()...)
 )
 

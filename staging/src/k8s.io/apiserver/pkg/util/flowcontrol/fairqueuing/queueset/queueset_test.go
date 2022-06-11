@@ -1462,7 +1462,7 @@ func newFIFO(requests ...*request) fifo {
 }
 
 func newGaugePair(clk clock.PassiveClock) metrics.RatioedGaugePair {
-	return metrics.PriorityLevelConcurrencyPairVec.NewForLabelValuesSafe(1, 1, []string{"test"})
+	return metrics.RatioedGaugeVecPhasedElementPair(metrics.PriorityLevelConcurrencyGaugeVec, 1, 1, []string{"test"})
 }
 
 func newExecSeatsGauge(clk clock.PassiveClock) metrics.RatioedGauge {
