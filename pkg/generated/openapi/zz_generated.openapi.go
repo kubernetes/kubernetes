@@ -54369,6 +54369,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"externalCloudProvider": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ExternalCloudProvider replaces --cloud-provider=external.  When set to true, an external cloud provider is expected to be used, and nodes are tainted with `node.cloudprovider.kubernetes.io/uninitialized` so that the external cloud provider can initialize them.  When set to false, nodes are not tainted.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"systemReserved": {
 						SchemaProps: spec.SchemaProps{
 							Description: "systemReserved is a set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs that describe resources reserved for non-kubernetes components. Currently only cpu and memory are supported. See http://kubernetes.io/docs/user-guide/compute-resources for more detail. Default: nil",

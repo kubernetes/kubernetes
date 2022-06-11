@@ -201,6 +201,7 @@ var (
 		"EvictionPressureTransitionPeriod.Duration",
 		"EvictionSoft[*]",
 		"EvictionSoftGracePeriod[*]",
+		"ExternalCloudProvider",
 		"FailSwapOn",
 		"FeatureGates[*]",
 		"FileCheckFrequency.Duration",

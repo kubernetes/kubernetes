@@ -35,6 +35,7 @@ import (
 
 	"github.com/opencontainers/selinux/go-selinux"
 	"k8s.io/client-go/informers"
+	cloudproviderapi "k8s.io/cloud-provider/api"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
@@ -498,7 +499,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		recorder:                                kubeDeps.Recorder,
 		cadvisor:                                kubeDeps.CAdvisorInterface,
 		cloud:                                   kubeDeps.Cloud,
-		externalCloudProvider:                   cloudprovider.IsExternal(cloudProvider),
+		externalCloudProvider:                   isExternalCloudProvider(cloudProvider, kubeCfg),
 		providerID:                              providerID,
 		nodeRef:                                 nodeRef,
 		nodeLabels:                              nodeLabels,
@@ -2491,4 +2492,18 @@ func (kl *Kubelet) CheckpointContainer(
 func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 	// ContainerRemoved doesn't affect pod state
 	return event.Type != pleg.ContainerRemoved
+}
+
+// isExternalCloudProvider determines if either the cloud provider flag is set
+// (i.e. `--cloud-provider=external`) or the KubeletConfiguration
+// `ExternalCloudProvider` option is set to true.  If either is set, we apply
+// the taints for external cloud provider
+func isExternalCloudProvider(cloudProvider string, kubeletCfg *kubeletconfiginternal.KubeletConfiguration) bool {
+	external := cloudprovider.IsExternal(cloudProvider) || kubeletCfg.ExternalCloudProvider
+	klog.V(2).InfoS(
+		fmt.Sprintf("External cloud provider check.  If active, nodes will be tainted with %s", cloudproviderapi.TaintExternalCloudProvider),
+		"active", external,
+		"--cloud-provider", cloudprovider.IsExternal(cloudProvider),
+		"KubeletConfiguration.ExternalCloudProvider", kubeletCfg.ExternalCloudProvider)
+	return external
 }

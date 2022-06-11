@@ -370,6 +370,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.ExternalCloudProvider != nil {
+		in, out := &in.ExternalCloudProvider, &out.ExternalCloudProvider
+		*out = new(bool)
+		**out = **in
+	}
 	if in.SystemReserved != nil {
 		in, out := &in.SystemReserved, &out.SystemReserved
 		*out = make(map[string]string, len(*in))

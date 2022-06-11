@@ -589,6 +589,13 @@ type KubeletConfiguration struct {
 	// Default: "Watch"
 	// +optional
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy `json:"configMapAndSecretChangeDetectionStrategy,omitempty"`
+	// ExternalCloudProvider replaces --cloud-provider=external.  When set to
+	// true, an external cloud provider is expected to be used, and nodes are
+	// tainted with `node.cloudprovider.kubernetes.io/uninitialized` so that
+	// the external cloud provider can initialize them.  When set to false,
+	// nodes are not tainted.
+	// +optional
+	ExternalCloudProvider *bool `json:"externalCloudProvider,omitempty"`
 
 	/* the following fields are meant for Node Allocatable */
 

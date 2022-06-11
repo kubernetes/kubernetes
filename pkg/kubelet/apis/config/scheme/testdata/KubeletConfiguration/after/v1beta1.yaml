@@ -38,6 +38,7 @@ evictionHard:
   nodefs.available: 10%
   nodefs.inodesFree: 5%
 evictionPressureTransitionPeriod: 5m0s
+externalCloudProvider: false
 failSwapOn: true
 fileCheckFrequency: 20s
 hairpinMode: promiscuous-bridge

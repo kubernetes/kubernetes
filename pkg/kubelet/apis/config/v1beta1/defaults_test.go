@@ -121,6 +121,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.BoolPtr(false),
 				MemoryThrottlingFactor:  utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
 				RegisterNode:            utilpointer.BoolPtr(true),
+				ExternalCloudProvider:   utilpointer.BoolPtr(false),
 			},
 		},
 		{
@@ -245,6 +246,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:                  utilpointer.Bool(false),
 				MemoryThrottlingFactor:          utilpointer.Float64(0),
 				RegisterNode:                    utilpointer.BoolPtr(false),
+				ExternalCloudProvider:           utilpointer.BoolPtr(false),
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.BoolPtr(false),
@@ -340,6 +342,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.Bool(false),
 				MemoryThrottlingFactor:  utilpointer.Float64(0),
 				RegisterNode:            utilpointer.BoolPtr(false),
+				ExternalCloudProvider:   utilpointer.BoolPtr(false),
 			},
 		},
 		{
@@ -486,6 +489,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.Bool(true),
 				MemoryThrottlingFactor:  utilpointer.Float64(1),
 				RegisterNode:            utilpointer.BoolPtr(true),
+				ExternalCloudProvider:   utilpointer.BoolPtr(true),
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.BoolPtr(true),
@@ -629,6 +633,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.Bool(true),
 				MemoryThrottlingFactor:  utilpointer.Float64(1),
 				RegisterNode:            utilpointer.BoolPtr(true),
+				ExternalCloudProvider:   utilpointer.BoolPtr(true),
 			},
 		},
 		{
@@ -715,6 +720,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				SeccompDefault:          utilpointer.BoolPtr(false),
 				MemoryThrottlingFactor:  utilpointer.Float64Ptr(DefaultMemoryThrottlingFactor),
 				RegisterNode:            utilpointer.BoolPtr(true),
+				ExternalCloudProvider:   utilpointer.BoolPtr(false),
 			},
 		},
 	}

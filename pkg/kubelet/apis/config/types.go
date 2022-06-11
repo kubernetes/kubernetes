@@ -349,6 +349,12 @@ type KubeletConfiguration struct {
 	// kernelMemcgNotification if enabled, the kubelet will integrate with the kernel memcg
 	// notification to determine if memory eviction thresholds are crossed rather than polling.
 	KernelMemcgNotification bool
+	// ExternalCloudProvider replaces --cloud-provider=external.  When set to
+	// true, an external cloud provider is expected to be used, and nodes are
+	// tainted with `node.cloudprovider.kubernetes.io/uninitialized` so that
+	// the external cloud provider can initialize them.  When set to false,
+	// nodes are not tainted.
+	ExternalCloudProvider bool
 
 	/* the following fields are meant for Node Allocatable */
 
