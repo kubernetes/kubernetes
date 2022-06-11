@@ -177,23 +177,24 @@ var ipsetInfo = []struct {
 // Note: kubeNodePortLocalSetTCP must be prior to kubeNodePortSetTCP, the same for UDP.
 var ipsetWithIptablesChain = []struct {
 	name          string
+	table         utiliptables.Table
 	from          string
 	to            string
 	matchType     string
 	protocolMatch string
 }{
-	{kubeLoopBackIPSet, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
-	{kubeLoadBalancerSet, string(kubeServicesChain), string(kubeLoadBalancerChain), "dst,dst", ""},
-	{kubeLoadBalancerFWSet, string(kubeLoadBalancerChain), string(kubeFirewallChain), "dst,dst", ""},
-	{kubeLoadBalancerSourceCIDRSet, string(kubeFirewallChain), "RETURN", "dst,dst,src", ""},
-	{kubeLoadBalancerSourceIPSet, string(kubeFirewallChain), "RETURN", "dst,dst,src", ""},
-	{kubeLoadBalancerLocalSet, string(kubeLoadBalancerChain), "RETURN", "dst,dst", ""},
-	{kubeNodePortLocalSetTCP, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolTCP},
-	{kubeNodePortSetTCP, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolTCP},
-	{kubeNodePortLocalSetUDP, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolUDP},
-	{kubeNodePortSetUDP, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolUDP},
-	{kubeNodePortLocalSetSCTP, string(kubeNodePortChain), "RETURN", "dst,dst", utilipset.ProtocolSCTP},
-	{kubeNodePortSetSCTP, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst,dst", utilipset.ProtocolSCTP},
+	{kubeLoopBackIPSet, utiliptables.TableNAT, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
+	{kubeLoadBalancerSet, utiliptables.TableNAT, string(kubeServicesChain), string(kubeLoadBalancerChain), "dst,dst", ""},
+	{kubeLoadBalancerFWSet, utiliptables.TableNAT, string(kubeLoadBalancerChain), string(kubeFirewallChain), "dst,dst", ""},
+	{kubeLoadBalancerSourceCIDRSet, utiliptables.TableNAT, string(kubeFirewallChain), "RETURN", "dst,dst,src", ""},
+	{kubeLoadBalancerSourceIPSet, utiliptables.TableNAT, string(kubeFirewallChain), "RETURN", "dst,dst,src", ""},
+	{kubeLoadBalancerLocalSet, utiliptables.TableNAT, string(kubeLoadBalancerChain), "RETURN", "dst,dst", ""},
+	{kubeNodePortLocalSetTCP, utiliptables.TableNAT, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolTCP},
+	{kubeNodePortSetTCP, utiliptables.TableNAT, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolTCP},
+	{kubeNodePortLocalSetUDP, utiliptables.TableNAT, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolUDP},
+	{kubeNodePortSetUDP, utiliptables.TableNAT, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolUDP},
+	{kubeNodePortLocalSetSCTP, utiliptables.TableNAT, string(kubeNodePortChain), "RETURN", "dst,dst", utilipset.ProtocolSCTP},
+	{kubeNodePortSetSCTP, utiliptables.TableNAT, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst,dst", utilipset.ProtocolSCTP},
 }
 
 // In IPVS proxy mode, the following flags need to be set
@@ -1648,7 +1649,11 @@ func (proxier *Proxier) writeIptablesRules() {
 				"-m", "set", "--match-set", proxier.ipsetList[set.name].Name,
 				set.matchType,
 			)
-			proxier.natRules.Write(args, "-j", set.to)
+			if set.table == utiliptables.TableFilter {
+				proxier.filterRules.Write(args, "-j", set.to)
+			} else {
+				proxier.natRules.Write(args, "-j", set.to)
+			}
 		}
 	}
 
