@@ -7,11 +7,11 @@ Package mo provides support for reading and writing GNU MO file.
 
 Examples:
 	import (
-		"github.com/chai2010/gettext-go/gettext/mo"
+		"github.com/chai2010/gettext-go/mo"
 	)
 
 	func main() {
-		moFile, err := mo.Load("test.mo")
+		moFile, err := mo.LoadFile("test.mo")
 		if err != nil {
 			log.Fatal(err)
 		}
