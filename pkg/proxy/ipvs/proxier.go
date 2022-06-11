@@ -63,7 +63,7 @@ const (
 	// kubeServicesChain is the services portal chain
 	kubeServicesChain utiliptables.Chain = "KUBE-SERVICES"
 
-	// KubeFireWallChain is the kubernetes firewall chain.
+	// kubeFirewallChain is the kubernetes firewall chain.
 	kubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 
 	// kubePostroutingChain is the kubernetes postrouting chain
@@ -1731,13 +1731,13 @@ func (proxier *Proxier) writeIptablesRules() {
 	)
 	proxier.natRules.Write(args, "-j", string(kubeNodePortChain))
 
-	// mark drop for KUBE-LOAD-BALANCER
+	// mark for masquerading for KUBE-LOAD-BALANCER
 	proxier.natRules.Write(
 		"-A", string(kubeLoadBalancerChain),
 		"-j", string(kubeMarkMasqChain),
 	)
 
-	// mark drop for KUBE-FIRE-WALL
+	// mark drop for KUBE-FIREWALL
 	proxier.natRules.Write(
 		"-A", string(kubeFirewallChain),
 		"-j", string(kubeMarkDropChain),
