@@ -110,7 +110,7 @@ func (sctx *serveCtx) serve(
 	}()
 
 	if sctx.insecure {
-		gs = v3rpc.Server(s, nil, gopts...)
+		gs = v3rpc.Server(s, nil, nil, gopts...)
 		v3electionpb.RegisterElectionServer(gs, servElection)
 		v3lockpb.RegisterLockServer(gs, servLock)
 		if sctx.serviceRegister != nil {
@@ -148,7 +148,7 @@ func (sctx *serveCtx) serve(
 		if tlsErr != nil {
 			return tlsErr
 		}
-		gs = v3rpc.Server(s, tlscfg, gopts...)
+		gs = v3rpc.Server(s, tlscfg, nil, gopts...)
 		v3electionpb.RegisterElectionServer(gs, servElection)
 		v3lockpb.RegisterLockServer(gs, servLock)
 		if sctx.serviceRegister != nil {
