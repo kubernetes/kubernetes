@@ -543,6 +543,8 @@ func (o *DebugOptions) generateDebugContainer(pod *corev1.Pod) (*corev1.Pod, *co
 		return nil, nil, err
 	}
 
+	ec = &copied.Spec.EphemeralContainers[len(copied.Spec.EphemeralContainers)-1]
+
 	return copied, ec, nil
 }
 
