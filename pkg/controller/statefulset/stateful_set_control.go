@@ -330,7 +330,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// If the ordinal could not be parsed (ord < 0), ignore the Pod.
 	}
 
-	err = ssc.resizePVCs(set, replicas)
+	err = ssc.resizePVCs(set, updateRevision, replicas)
 	if err != nil {
 		return nil, err
 	}
@@ -598,7 +598,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	return &status, nil
 }
 
-func (ssc *defaultStatefulSetControl) resizePVCs(set *apps.StatefulSet, pods []*v1.Pod) error {
+func (ssc *defaultStatefulSetControl) resizePVCs(set *apps.StatefulSet, updateRevision *apps.ControllerRevision, pods []*v1.Pod) error {
 	var errs []error
 	for _, pvc := range set.Spec.VolumeClaimTemplates {
 		for _, pod := range pods {
@@ -609,15 +609,20 @@ func (ssc *defaultStatefulSetControl) resizePVCs(set *apps.StatefulSet, pods []*
 			ordinal := getOrdinal(pod)
 			claimName := getPersistentVolumeClaimName(set, &pvc, ordinal)
 			pvcActual, err := ssc.podControl.objectMgr.GetClaim(set.Namespace, claimName)
-			if err != nil {
+			if err != nil && errors.IsNotFound(err) {
+				continue
+			} else if err != nil {
 				err = fmt.Errorf("failed to retrieve PVC %s: %s", claimName, err)
 				errs = append(errs, err)
 				ssc.podControl.recordUnavailableClaimEvent("resize", set, pod, claimName, err)
 				continue
 			}
 
+			resizing := false
 			if pvcActual.Spec.Resources.Requests.Storage().Equal(*pvc.Spec.Resources.Requests.Storage()) {
 				continue
+			} else {
+				resizing = true
 			}
 
 			patch := fmt.Sprintf(`{"spec": {"resources": {"requests": {"storage": "%s"}}}}`, pvc.Spec.Resources.Requests.Storage().String())
@@ -629,7 +634,7 @@ func (ssc *defaultStatefulSetControl) resizePVCs(set *apps.StatefulSet, pods []*
 				continue
 			}
 
-			if !pvcActual.Spec.Resources.Requests.Storage().Equal(*pvc.Spec.Resources.Requests.Storage()) {
+			if resizing {
 				ssc.podControl.recordClaimEvent("resize", set, pod, pvcActual, nil)
 			}
 		}

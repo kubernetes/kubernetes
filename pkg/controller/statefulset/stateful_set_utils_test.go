@@ -783,7 +783,7 @@ func newPVC(name string) v1.PersistentVolumeClaim {
 		Spec: v1.PersistentVolumeClaimSpec{
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceStorage: *resource.NewQuantity(1, resource.BinarySI),
+					v1.ResourceStorage: *resource.NewQuantity(2, resource.BinarySI),
 				},
 			},
 		},
