@@ -89,7 +89,7 @@ func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResourc
 	return generic.RESTOptions{StorageConfig: storageConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource.Resource}, nil
 }
 
-func newRBACAuthorizer(t *testing.T, config *controlplane.Config) authorizer.Authorizer {
+func newRBACAuthorizer(t *testing.T, config *controlplane.Config) (authorizer.Authorizer, func()) {
 	optsGetter := &testRESTOptionsGetter{config}
 	roleRest, err := rolestore.NewREST(optsGetter)
 	if err != nil {
@@ -111,7 +111,14 @@ func newRBACAuthorizer(t *testing.T, config *controlplane.Config) authorizer.Aut
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 	clusterRoleBindingRegistry := clusterrolebinding.AuthorizerAdapter{Registry: clusterrolebinding.NewRegistry(clusterrolebindingRest)}
-	return rbac.New(roleRegistry, roleBindingRegistry, clusterRoleRegistry, clusterRoleBindingRegistry)
+
+	tearDownFn := func() {
+		roleRest.Destroy()
+		rolebindingRest.Destroy()
+		clusterroleRest.Destroy()
+		clusterrolebindingRest.Destroy()
+	}
+	return rbac.New(roleRegistry, roleBindingRegistry, clusterRoleRegistry, clusterRoleBindingRegistry), tearDownFn
 }
 
 // bootstrapRoles are a set of RBAC roles which will be populated before the test.
@@ -533,6 +540,12 @@ func TestRBAC(t *testing.T) {
 				"user-with-no-permissions":         {Name: "user-with-no-permissions"},
 			})))
 
+			var tearDownAuthorizerFn func()
+			defer func() {
+				if tearDownAuthorizerFn != nil {
+					tearDownAuthorizerFn()
+				}
+			}()
 			_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 					// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
@@ -542,7 +555,7 @@ func TestRBAC(t *testing.T) {
 				},
 				ModifyServerConfig: func(config *controlplane.Config) {
 					config.GenericConfig.Authentication.Authenticator = authenticator
-					config.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, config)
+					config.GenericConfig.Authorization.Authorizer, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
 				},
 			})
 			defer tearDownFn()
@@ -655,12 +668,18 @@ func TestRBAC(t *testing.T) {
 func TestBootstrapping(t *testing.T) {
 	superUser := "admin/system:masters"
 
+	var tearDownAuthorizerFn func()
+	defer func() {
+		if tearDownAuthorizerFn != nil {
+			tearDownAuthorizerFn()
+		}
+	}()
 	clientset, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerConfig: func(config *controlplane.Config) {
 			config.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 				superUser: {Name: "admin", Groups: []string{"system:masters"}},
 			}))
-			config.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, config)
+			config.GenericConfig.Authorization.Authorizer, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
 		},
 	})
 	defer tearDownFn()
@@ -713,10 +732,17 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 			tearDownFn()
 		}
 	}()
+	var tearDownAuthorizerFn func()
+	defer func() {
+		if tearDownAuthorizerFn != nil {
+			tearDownAuthorizerFn()
+		}
+	}()
 
 	superUser := "admin/system:masters"
 
 	etcdConfig := framework.SharedEtcd()
+
 	client, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure we're using the same etcd across apiserver restarts.
@@ -726,7 +752,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 			config.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 				superUser: {Name: "admin", Groups: []string{"system:masters"}},
 			}))
-			config.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, config)
+			config.GenericConfig.Authorization.Authorizer, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
 		},
 	})
 
@@ -767,6 +793,8 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	// Stop the first API server.
 	tearDownFn()
 	tearDownFn = nil
+	tearDownAuthorizerFn()
+	tearDownAuthorizerFn = nil
 
 	// Check that upgraded API servers inherit `system:public-info-viewer` settings from
 	// `system:discovery`, and respect auto-reconciliation annotations.
@@ -779,7 +807,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 			config.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 				superUser: {Name: "admin", Groups: []string{"system:masters"}},
 			}))
-			config.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, config)
+			config.GenericConfig.Authorization.Authorizer, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
 		},
 	})
 
