@@ -31,9 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -66,19 +66,16 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	// Has to be longer than 5 seconds
 	timeout := 30 * time.Second
 
-	// Set up an API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	// Timeout is set random between MinRequestTimeout and 2x
-	controlPlaneConfig.GenericConfig.MinRequestTimeout = int(timeout.Seconds()) / 4
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--min-request-timeout=7"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	config := &restclient.Config{
-		Host: s.URL,
+	clientset, err := kubernetes.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	namespaceObject := framework.CreateTestingNamespace("retry-watch", t)
-	defer framework.DeleteTestingNamespace(namespaceObject, t)
+	namespaceObject := framework.CreateNamespaceOrDie(clientset, "retry-watch", t)
+	defer framework.DeleteNamespaceOrDie(clientset, namespaceObject, t)
 
 	getListFunc := func(c *kubernetes.Clientset, secret *corev1.Secret) func(options metav1.ListOptions) *corev1.SecretList {
 		return func(options metav1.ListOptions) *corev1.SecretList {
@@ -215,7 +212,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 			tc := tmptc // we need to copy it for parallel runs
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-				c, err := kubernetes.NewForConfig(config)
+				c, err := kubernetes.NewForConfig(server.ClientConfig)
 				if err != nil {
 					t.Fatalf("Failed to create clientset: %v", err)
 				}
