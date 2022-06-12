@@ -705,6 +705,7 @@ kube::golang::build_binaries_for_platform() {
   done
 
   V=2 kube::log::info "Env for ${platform}: GOOS=${GOOS-} GOARCH=${GOARCH-} GOROOT=${GOROOT-} CGO_ENABLED=${CGO_ENABLED-} CC=${CC-}"
+  V=3 kube::log::info "Building binaries with GCFLAGS=${gogcflags} ASMFLAGS=${goasmflags} LDFLAGS=${goldflags}"
 
   local -a build_args
   if [[ "${#statics[@]}" != 0 ]]; then
@@ -807,8 +808,9 @@ kube::golang::build_binaries() {
 
     gogcflags="all=-trimpath=${trimroot} ${GOGCFLAGS:-}"
     if [[ "${DBG:-}" == 1 ]]; then
-        # Debugging - disable optimizations and inlining.
-        gogcflags="${gogcflags} -N -l"
+        # Debugging - disable optimizations and inlining and trimPath
+        gogcflags="${GOGCFLAGS:-} -N -l"
+        goasmflags=""
     fi
 
     goldflags="all=$(kube::version::ldflags) ${GOLDFLAGS:-}"
