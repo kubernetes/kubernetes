@@ -94,7 +94,7 @@ require (
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.0.0
 	k8s.io/apiextensions-apiserver v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -563,7 +563,7 @@ replace (
 	gopkg.in/tomb.v1 => gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 	gopkg.in/warnings.v0 => gopkg.in/warnings.v0 v0.1.1
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 => gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 => gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 => gotest.tools/v3 v3.0.3
 	honnef.co/go/tools => honnef.co/go/tools v0.0.1-2020.1.4
 	k8s.io/api => ./staging/src/k8s.io/api
