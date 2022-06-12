@@ -322,6 +322,52 @@ func TestSyncEndpointsExistingEmptySubsets(t *testing.T) {
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
+func TestSyncEndpointsWithPodResourceVersionUpdateOnly(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	testServer, endpointsHandler := makeTestServer(t, ns)
+	defer testServer.Close()
+	pod0 := testPod(ns, 0, 1, true, ipv4only)
+	pod1 := testPod(ns, 1, 1, false, ipv4only)
+	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints.endpointsStore.Add(&v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{
+				{
+					IP:        pod0.Status.PodIPs[0].IP,
+					NodeName:  &emptyNodeName,
+					TargetRef: &v1.ObjectReference{Kind: "Pod", Name: pod0.Name, Namespace: ns, ResourceVersion: "1"},
+				},
+			},
+			NotReadyAddresses: []v1.EndpointAddress{
+				{
+					IP:        pod1.Status.PodIPs[0].IP,
+					NodeName:  &emptyNodeName,
+					TargetRef: &v1.ObjectReference{Kind: "Pod", Name: pod1.Name, Namespace: ns, ResourceVersion: "2"},
+				},
+			},
+			Ports: []v1.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+	})
+	endpoints.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{"foo": "bar"},
+			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
+		},
+	})
+	pod0.ResourceVersion = "3"
+	pod1.ResourceVersion = "4"
+	endpoints.podStore.Add(pod0)
+	endpoints.podStore.Add(pod1)
+	endpoints.syncService(ns + "/foo")
+	endpointsHandler.ValidateRequestCount(t, 0)
+}
+
 func TestSyncEndpointsNewNoSubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
