@@ -64,11 +64,13 @@ import (
 	"k8s.io/client-go/rest"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	resttransport "k8s.io/client-go/transport"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -336,18 +338,15 @@ func addTimeoutFlag(URLString string) string {
 	return u.String()
 }
 
-func getTestRequests(namespace string) []struct {
+type testRequest struct {
 	verb        string
 	URL         string
 	body        string
 	statusCodes map[int]bool // allowed status codes.
-} {
-	requests := []struct {
-		verb        string
-		URL         string
-		body        string
-		statusCodes map[int]bool // Set of expected resp.StatusCode if all goes well.
-	}{
+}
+
+func getTestRequests(namespace string) []testRequest {
+	requests := []testRequest{
 		// Normal methods on pods
 		{"GET", path("pods", "", ""), "", integration.Code200},
 		{"GET", path("pods", namespace, ""), "", integration.Code200},
@@ -461,15 +460,24 @@ func getTestRequests(namespace string) []struct {
 //
 // TODO(etune): write a fuzz test of the REST API.
 func TestAuthModeAlwaysAllow(t *testing.T) {
-	// Set up an API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+		},
+	})
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("auth-always-allow", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(kubeClient, "auth-always-allow", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
-	transport := http.DefaultTransport
+	transport, err := rest.TransportFor(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 	previousResourceVersion := make(map[string]float64)
 
 	for _, r := range getTestRequests(ns.Name) {
@@ -487,7 +495,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		}
 		r.body = bodyStr
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
@@ -558,18 +566,30 @@ func getPreviousResourceVersionKey(url, id string) string {
 }
 
 func TestAuthModeAlwaysDeny(t *testing.T) {
-	// Set up an API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
-	ns := framework.CreateTestingNamespace("auth-always-deny", t)
-	defer framework.DeleteTestingNamespace(ns, t)
-	transport := resttransport.NewBearerAuthRoundTripper(framework.UnprivilegedUserToken, http.DefaultTransport)
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+			config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
+		},
+	})
+	defer tearDownFn()
+
+	ns := framework.CreateNamespaceOrDie(kubeClient, "auth-always-deny", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
+
+	transport, err := rest.TransportFor(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transport = resttransport.NewBearerAuthRoundTripper(AliceToken, transport)
 
 	for _, r := range getTestRequests(ns.Name) {
 		bodyBytes := bytes.NewReader([]byte(r.body))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
@@ -603,20 +623,26 @@ func (allowAliceAuthorizer) Authorize(ctx context.Context, a authorizer.Attribut
 // TestAliceNotForbiddenOrUnauthorized tests a user who is known to
 // the authentication system and authorized to do any actions.
 func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
-	// This file has alice and bob in it.
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+			config.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
-	// Set up an API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
-
-	ns := framework.CreateTestingNamespace("auth-alice-not-forbidden", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(kubeClient, "auth-alice-not-forbidden", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
 	previousResourceVersion := make(map[string]float64)
-	transport := http.DefaultTransport
+	transport, err := rest.TransportFor(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, r := range getTestRequests(ns.Name) {
 		token := AliceToken
@@ -634,7 +660,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		}
 		r.body = bodyStr
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -674,22 +700,30 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 // the authentication system but not authorized to do any actions
 // should receive "Forbidden".
 func TestBobIsForbidden(t *testing.T) {
-	// This file has alice and bob in it.
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+			config.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("auth-bob-forbidden", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(kubeClient, "auth-bob-forbidden", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
-	transport := http.DefaultTransport
+	transport, err := rest.TransportFor(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, r := range getTestRequests(ns.Name) {
 		token := BobToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -716,24 +750,30 @@ func TestBobIsForbidden(t *testing.T) {
 // An authorization module is installed in this scenario for integration
 // test purposes, but requests aren't expected to reach it.
 func TestUnknownUserIsUnauthorized(t *testing.T) {
-	// This file has alice and bob in it.
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+			config.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
-	// Set up an API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	ns := framework.CreateNamespaceOrDie(kubeClient, "auth-unknown-unauthorized", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
-	ns := framework.CreateTestingNamespace("auth-unknown-unauthorized", t)
-	defer framework.DeleteTestingNamespace(ns, t)
-
-	transport := http.DefaultTransport
+	transport, err := rest.TransportFor(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, r := range getTestRequests(ns.Name) {
 		token := UnknownToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -780,23 +820,31 @@ func (impersonateAuthorizer) Authorize(ctx context.Context, a authorizer.Attribu
 }
 
 func TestImpersonateIsForbidden(t *testing.T) {
-	// Set up an API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = impersonateAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+			config.GenericConfig.Authorization.Authorizer = impersonateAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("auth-impersonate-forbidden", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(kubeClient, "auth-impersonate-forbidden", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
-	transport := http.DefaultTransport
+	transport, err := rest.TransportFor(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// bob can't perform actions himself
 	for _, r := range getTestRequests(ns.Name) {
 		token := BobToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -821,7 +869,7 @@ func TestImpersonateIsForbidden(t *testing.T) {
 	for _, r := range getTestRequests(ns.Name) {
 		token := BobToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -846,7 +894,7 @@ func TestImpersonateIsForbidden(t *testing.T) {
 	for _, r := range getTestRequests(ns.Name) {
 		token := AliceToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -868,11 +916,11 @@ func TestImpersonateIsForbidden(t *testing.T) {
 		}()
 	}
 
-	// alice can impersonate a service account
+	// bob can impersonate a service account
 	for _, r := range getTestRequests(ns.Name) {
 		token := BobToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1085,17 +1133,25 @@ func (a *trackingAuthorizer) Authorize(ctx context.Context, attributes authorize
 func TestAuthorizationAttributeDetermination(t *testing.T) {
 	trackingAuthorizer := &trackingAuthorizer{}
 
-	// Set up an API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = trackingAuthorizer
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+			config.GenericConfig.Authorization.Authorizer = trackingAuthorizer
+		},
+	})
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("auth-attribute-determination", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(kubeClient, "auth-attribute-determination", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
-	transport := http.DefaultTransport
+	transport, err := rest.TransportFor(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	requests := map[string]struct {
 		verb               string
@@ -1111,7 +1167,7 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 
 	for testName, r := range requests {
 		token := BobToken
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, nil)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, nil)
 		if err != nil {
 			t.Logf("case %v", testName)
 			t.Fatalf("unexpected error: %v", err)
@@ -1151,18 +1207,26 @@ func TestNamespaceAuthorization(t *testing.T) {
 	a := newAuthorizerWithContents(t, `{"namespace": "auth-namespace"}
 `)
 
-	// Set up an API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = a
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+			config.GenericConfig.Authorization.Authorizer = a
+		},
+	})
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("auth-namespace", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(kubeClient, "auth-namespace", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
 	previousResourceVersion := make(map[string]float64)
-	transport := http.DefaultTransport
+	transport, err := rest.TransportFor(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	requests := []struct {
 		verb        string
@@ -1209,7 +1273,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 		}
 		r.body = bodyStr
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
@@ -1249,25 +1313,28 @@ func TestKindAuthorization(t *testing.T) {
 	a := newAuthorizerWithContents(t, `{"resource": "services"}
 `)
 
-	// Set up an API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = a
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+			config.GenericConfig.Authorization.Authorizer = a
+		},
+	})
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("auth-kind", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(kubeClient, "auth-kind", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
 	previousResourceVersion := make(map[string]float64)
-	transport := http.DefaultTransport
+	transport, err := rest.TransportFor(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	requests := []struct {
-		verb        string
-		URL         string
-		body        string
-		statusCodes map[int]bool // allowed status codes.
-	}{
+	requests := []testRequest{
 		{"POST", timeoutPath("services", ns.Name, ""), aService, integration.Code201},
 		{"GET", path("services", ns.Name, ""), "", integration.Code200},
 		{"GET", path("services", ns.Name, "a"), "", integration.Code200},
@@ -1294,13 +1361,13 @@ func TestKindAuthorization(t *testing.T) {
 		}
 		r.body = bodyStr
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-		{
+		func() {
 			resp, err := transport.RoundTrip(req)
 			if err != nil {
 				t.Logf("case %v", r)
@@ -1323,7 +1390,7 @@ func TestKindAuthorization(t *testing.T) {
 				}
 			}
 
-		}
+		}()
 	}
 }
 
@@ -1333,24 +1400,27 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	// This file has alice and bob in it.
 	a := newAuthorizerWithContents(t, `{"readonly": true}`)
 
-	// Set up an API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = a
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = getTestTokenAuth()
+			config.GenericConfig.Authorization.Authorizer = a
+		},
+	})
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("auth-read-only", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(kubeClient, "auth-read-only", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
-	transport := http.DefaultTransport
+	transport, err := rest.TransportFor(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	requests := []struct {
-		verb        string
-		URL         string
-		body        string
-		statusCodes map[int]bool // allowed status codes.
-	}{
+	requests := []testRequest{
 		{"POST", path("pods", ns.Name, ""), aPod, integration.Code403},
 		{"GET", path("pods", ns.Name, ""), "", integration.Code200},
 		{"GET", path("pods", metav1.NamespaceDefault, "a"), "", integration.Code404},
@@ -1359,7 +1429,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	for _, r := range requests {
 		token := BobToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1410,23 +1480,33 @@ func testWebhookTokenAuthenticator(customDialer bool, t *testing.T) {
 		t.Fatalf("error starting webhook token authenticator server: %v", err)
 	}
 
-	// Set up an API server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = group.NewAuthenticatedGroupAdder(authenticator)
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = group.NewAuthenticatedGroupAdder(authenticator)
+			// Disable checking API audiences that is set by testserver by default.
+			config.GenericConfig.Authentication.APIAudiences = nil
+			config.GenericConfig.Authorization.Authorizer = allowAliceAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("auth-webhook-token", t)
-	defer framework.DeleteTestingNamespace(ns, t)
+	ns := framework.CreateNamespaceOrDie(kubeClient, "auth-webhook-token", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
-	transport := http.DefaultTransport
+	transport, err := rest.TransportFor(kubeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, r := range getTestRequests(ns.Name) {
 		// Expect Bob's requests to all fail.
 		token := BobToken
 		bodyBytes := bytes.NewReader([]byte(r.body))
-		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err := http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1448,7 +1528,7 @@ func testWebhookTokenAuthenticator(customDialer bool, t *testing.T) {
 		// Expect Alice's requests to succeed.
 		token = AliceToken
 		bodyBytes = bytes.NewReader([]byte(r.body))
-		req, err = http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
+		req, err = http.NewRequest(r.verb, kubeConfig.Host+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
