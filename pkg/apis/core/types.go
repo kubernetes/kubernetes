@@ -3151,7 +3151,36 @@ type PodSecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SeccompProfile *SeccompProfile
+	// The apparmor options to use by the containers in this pod.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +optional
+	AppArmorProfile *AppArmorProfile
 }
+
+// AppArmorProfile defines a pod/container's apparmor profile settings.
+// Only one profile source may be set.
+// +union
+type AppArmorProfile struct {
+	// +unionDiscriminator
+	Type AppArmorProfileType
+	// Load a profile defined in static file on the node.
+	// The profile must be preconfigured on the node to work.
+	// LocalhostProfile cannot be an absolute nor a descending path.
+	// +optional
+	LocalhostProfile *string
+}
+
+// AppArmorProfileType defines the supported apparmor profile types.
+type AppArmorProfileType string
+
+const (
+	// AppArmorProfileTypeUnconfined is when no apparmor profile is applied (A.K.A. unconfined).
+	AppArmorProfileTypeUnconfined AppArmorProfileType = "Unconfined"
+	// AppArmorProfileTypeRuntimeDefault represents the default container runtime apparmor profile.
+	AppArmorProfileTypeRuntimeDefault AppArmorProfileType = "RuntimeDefault"
+	// AppArmorProfileTypeLocalhost represents custom made profiles stored on the node's disk.
+	AppArmorProfileTypeLocalhost AppArmorProfileType = "Localhost"
+)
 
 // SeccompProfile defines a pod/container's seccomp profile settings.
 // Only one profile source may be set.
@@ -5506,6 +5535,12 @@ type SecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SeccompProfile *SeccompProfile
+	// The apparmor options to use by this container. If apparmor options are
+	// provided at both the pod & container level, the container options
+	// override the pod options.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +optional
+	AppArmorProfile *AppArmorProfile
 }
 
 // ProcMountType defines the type of proc mount
