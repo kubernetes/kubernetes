@@ -20,7 +20,6 @@ package azure
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
@@ -30,14 +29,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
-
-type fakeClient struct {
-	results []containerregistry.Registry
-}
-
-func (f *fakeClient) List(ctx context.Context) ([]containerregistry.Registry, error) {
-	return f.results, nil
-}
 
 func Test(t *testing.T) {
 	configStr := `
@@ -71,13 +62,9 @@ func Test(t *testing.T) {
 			},
 		},
 	}
-	fakeClient := &fakeClient{
-		results: result,
-	}
 
 	provider := &acrProvider{
-		registryClient: fakeClient,
-		cache:          cache.NewExpirationStore(stringKeyFunc, &acrExpirationPolicy{}),
+		cache: cache.NewExpirationStore(stringKeyFunc, &acrExpirationPolicy{}),
 	}
 	provider.loadConfig(bytes.NewBufferString(configStr))
 
@@ -132,8 +119,7 @@ func TestProvide(t *testing.T) {
 
 	for i, test := range testCases {
 		provider := &acrProvider{
-			registryClient: &fakeClient{},
-			cache:          cache.NewExpirationStore(stringKeyFunc, &acrExpirationPolicy{}),
+			cache: cache.NewExpirationStore(stringKeyFunc, &acrExpirationPolicy{}),
 		}
 		provider.loadConfig(bytes.NewBufferString(test.configStr))
 
@@ -148,21 +134,8 @@ func TestParseACRLoginServerFromImage(t *testing.T) {
         "aadClientId": "foo",
         "aadClientSecret": "bar"
     }`
-	result := []containerregistry.Registry{
-		{
-			Name: to.StringPtr("foo"),
-			RegistryProperties: &containerregistry.RegistryProperties{
-				LoginServer: to.StringPtr("*.azurecr.io"),
-			},
-		},
-	}
-	fakeClient := &fakeClient{
-		results: result,
-	}
 
-	provider := &acrProvider{
-		registryClient: fakeClient,
-	}
+	provider := &acrProvider{}
 	provider.loadConfig(bytes.NewBufferString(configStr))
 	provider.environment = &azure.Environment{
 		ContainerRegistryDNSSuffix: ".azurecr.my.cloud",
