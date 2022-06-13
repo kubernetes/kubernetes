@@ -65,14 +65,3 @@ type RatioedGaugePair struct {
 	// RequestsExecuting is given observations of the number of requests currently executing
 	RequestsExecuting RatioedGauge
 }
-
-// RatioedGaugePairVec generates pairs
-type RatioedGaugePairVec interface {
-	// NewForLabelValuesSafe makes a new vector member for the given tuple of label values,
-	// initialized with the given denominators and zeros for numerators.
-	// Unlike the usual Vec WithLabelValues method, this is intended to be called only
-	// once per vector member (at the start of its lifecycle).
-	// The "Safe" part is saying that the returned object will function properly after metric registration
-	// even if this method is called before registration.
-	NewForLabelValuesSafe(initialWaitingDenominator, initialExecutingDenominator float64, labelValues []string) RatioedGaugePair
-}
