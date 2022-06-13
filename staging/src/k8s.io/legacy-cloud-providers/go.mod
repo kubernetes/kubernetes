@@ -49,7 +49,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dnaeon/go-vcr v1.0.1 // indirect
-	github.com/emicklei/go-restful/v3 v3.7.5-0.20220308211933-7c971ca4d0fd // indirect
+	github.com/emicklei/go-restful/v3 v3.8.0 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
