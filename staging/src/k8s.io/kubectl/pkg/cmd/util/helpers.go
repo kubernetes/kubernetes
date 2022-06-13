@@ -586,10 +586,6 @@ func GetValidationDirective(cmd *cobra.Command) (string, error) {
 	b, err := strconv.ParseBool(validateFlag)
 	if err != nil {
 		switch validateFlag {
-		case "":
-			return metav1.FieldValidationStrict, nil
-		case cmd.Flag("validate").NoOptDefVal:
-			return metav1.FieldValidationStrict, nil
 		case "strict":
 			return metav1.FieldValidationStrict, nil
 		case "warn":

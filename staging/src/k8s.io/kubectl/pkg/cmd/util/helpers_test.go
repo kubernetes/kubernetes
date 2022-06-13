@@ -517,7 +517,9 @@ func TestGetValidationDirective(t *testing.T) {
 	for _, tc := range tests {
 		cmd := &cobra.Command{}
 		AddValidateFlags(cmd)
-		cmd.Flags().Set("validate", tc.validateFlag)
+		if tc.validateFlag != "" {
+			cmd.Flags().Set("validate", tc.validateFlag)
+		}
 		directive, err := GetValidationDirective(cmd)
 		if directive != tc.expectedDirective {
 			t.Errorf("validation directive, expected: %v, but got: %v", tc.expectedDirective, directive)
