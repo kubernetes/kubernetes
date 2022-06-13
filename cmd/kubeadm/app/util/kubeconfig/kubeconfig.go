@@ -139,6 +139,11 @@ func HasAuthenticationCredentials(config *clientcmdapi.Config) bool {
 		return true
 	}
 
+	// exec authentication
+	if authInfo.Exec != nil && len(authInfo.Exec.Command) != 0 {
+		return true
+	}
+
 	return false
 }
 

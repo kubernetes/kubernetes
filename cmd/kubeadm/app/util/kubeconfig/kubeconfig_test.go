@@ -313,6 +313,15 @@ func TestHasCredentials(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "exec authentication credentials",
+			config: &clientcmdapi.Config{
+				CurrentContext: "kubernetes",
+				Contexts:       map[string]*clientcmdapi.Context{"kubernetes": {AuthInfo: "kubernetes"}},
+				AuthInfos:      map[string]*clientcmdapi.AuthInfo{"kubernetes": {Exec: &clientcmdapi.ExecConfig{Command: "command"}}},
+			},
+			expected: true,
+		},
 	}
 	for _, rt := range testCases {
 		t.Run(rt.name, func(t *testing.T) {
