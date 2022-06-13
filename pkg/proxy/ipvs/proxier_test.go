@@ -2151,7 +2151,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 	checkIptables(t, ipt, epIpt)
 }
 
-func TestLoadBalanceSourceRanges(t *testing.T) {
+func TestLoadBalancerSourceRanges(t *testing.T) {
 	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
@@ -2214,7 +2214,7 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 			Protocol: strings.ToLower(string(v1.ProtocolTCP)),
 			SetType:  utilipset.HashIPPort,
 		}},
-		kubeLoadbalancerFWSet: {{
+		kubeLoadBalancerFWSet: {{
 			IP:       svcLBIP,
 			Port:     svcPort,
 			Protocol: strings.ToLower(string(v1.ProtocolTCP)),
@@ -2244,7 +2244,7 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 			JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet,
 		}},
 		string(kubeLoadBalancerChain): {{
-			JumpChain: string(kubeFirewallChain), MatchSet: kubeLoadbalancerFWSet,
+			JumpChain: string(kubeFirewallChain), MatchSet: kubeLoadBalancerFWSet,
 		}, {
 			JumpChain: string(kubeMarkMasqChain), MatchSet: "",
 		}},
