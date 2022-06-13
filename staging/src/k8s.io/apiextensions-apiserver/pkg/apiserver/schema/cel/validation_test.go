@@ -27,6 +27,7 @@ import (
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
@@ -2011,6 +2012,57 @@ func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
 				//}
 				if len(errs) == 0 {
 					b.Errorf("expect operation interrupted err but did not find")
+				}
+			}
+		})
+	}
+}
+
+// BenchmarkCELValidationWithAndWithoutOldSelfReference measures the additional cost of evaluating
+// validation rules that reference "oldSelf".
+func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
+	for _, rule := range []string{
+		"self.getMonth() >= 0",
+		"oldSelf.getMonth() >= 0",
+	} {
+		b.Run(rule, func(b *testing.B) {
+			obj := map[string]interface{}{
+				"datetime": time.Time{}.Format(strfmt.ISO8601LocalTime),
+			}
+			s := &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"datetime": {
+						Generic: schema.Generic{
+							Type: "string",
+						},
+						ValueValidation: &schema.ValueValidation{
+							Format: "date-time",
+						},
+						Extensions: schema.Extensions{
+							XValidations: []apiextensions.ValidationRule{
+								{Rule: rule},
+							},
+						},
+					},
+				},
+			}
+			validator := NewValidator(s, PerCallLimit)
+			if validator == nil {
+				b.Fatal("expected non nil validator")
+			}
+
+			ctx := context.TODO()
+			root := field.NewPath("root")
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				errs, _ := validator.Validate(ctx, root, s, obj, obj, RuntimeCELCostBudget)
+				for _, err := range errs {
+					b.Errorf("unexpected error: %v", err)
 				}
 			}
 		})
