@@ -134,12 +134,7 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 	o.BuilderArgs = args
 	o.StatusViewerFn = polymorphichelpers.StatusViewerFn
 
-	clientConfig, err := f.ToRESTConfig()
-	if err != nil {
-		return err
-	}
-
-	o.DynamicClient, err = dynamic.NewForConfig(clientConfig)
+	o.DynamicClient, err = f.DynamicClient()
 	if err != nil {
 		return err
 	}
