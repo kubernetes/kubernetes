@@ -333,8 +333,8 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}}, &v1.NodeList{Items: tt.nodes})
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
@@ -343,14 +343,14 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(30*time.Second, stopCh)
+			schedulerCache := internalcache.New(30*time.Second, ctx.Done())
 
 			for i := range tt.nodes {
 				node := tt.nodes[i]
 				// Add node to schedulerCache no matter it's deleted in API server or not.
 				schedulerCache.AddNode(&node)
 				if node.Name == tt.nodeNameToDelete {
-					client.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{})
+					client.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{})
 				}
 			}
 
