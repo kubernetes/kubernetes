@@ -49,8 +49,8 @@ const (
 	kubeLoadBalancerLocalSetComment = "Kubernetes service load balancer ip + port with externalTrafficPolicy=local"
 	kubeLoadBalancerLocalSet        = "KUBE-LOAD-BALANCER-LOCAL"
 
-	kubeLoadbalancerFWSetComment = "Kubernetes service load balancer ip + port for load balancer with sourceRange"
-	kubeLoadbalancerFWSet        = "KUBE-LOAD-BALANCER-FW"
+	kubeLoadBalancerFWSetComment = "Kubernetes service load balancer ip + port for load balancer with sourceRange"
+	kubeLoadBalancerFWSet        = "KUBE-LOAD-BALANCER-FW"
 
 	kubeLoadBalancerSourceIPSetComment = "Kubernetes service load balancer ip + port + source IP for packet filter purpose"
 	kubeLoadBalancerSourceIPSet        = "KUBE-LOAD-BALANCER-SOURCE-IP"

@@ -157,7 +157,7 @@ var ipsetInfo = []struct {
 	{kubeExternalIPSet, utilipset.HashIPPort, kubeExternalIPSetComment},
 	{kubeExternalIPLocalSet, utilipset.HashIPPort, kubeExternalIPLocalSetComment},
 	{kubeLoadBalancerSet, utilipset.HashIPPort, kubeLoadBalancerSetComment},
-	{kubeLoadbalancerFWSet, utilipset.HashIPPort, kubeLoadbalancerFWSetComment},
+	{kubeLoadBalancerFWSet, utilipset.HashIPPort, kubeLoadBalancerFWSetComment},
 	{kubeLoadBalancerLocalSet, utilipset.HashIPPort, kubeLoadBalancerLocalSetComment},
 	{kubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, kubeLoadBalancerSourceIPSetComment},
 	{kubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, kubeLoadBalancerSourceCIDRSetComment},
@@ -184,7 +184,7 @@ var ipsetWithIptablesChain = []struct {
 }{
 	{kubeLoopBackIPSet, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
 	{kubeLoadBalancerSet, string(kubeServicesChain), string(kubeLoadBalancerChain), "dst,dst", ""},
-	{kubeLoadbalancerFWSet, string(kubeLoadBalancerChain), string(kubeFirewallChain), "dst,dst", ""},
+	{kubeLoadBalancerFWSet, string(kubeLoadBalancerChain), string(kubeFirewallChain), "dst,dst", ""},
 	{kubeLoadBalancerSourceCIDRSet, string(kubeFirewallChain), "RETURN", "dst,dst,src", ""},
 	{kubeLoadBalancerSourceIPSet, string(kubeFirewallChain), "RETURN", "dst,dst,src", ""},
 	{kubeLoadBalancerLocalSet, string(kubeLoadBalancerChain), "RETURN", "dst,dst", ""},
@@ -1307,11 +1307,11 @@ func (proxier *Proxier) syncProxyRules() {
 				// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
 				// This currently works for loadbalancers that preserves source ips.
 				// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
-				if valid := proxier.ipsetList[kubeLoadbalancerFWSet].validateEntry(entry); !valid {
-					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadbalancerFWSet].Name)
+				if valid := proxier.ipsetList[kubeLoadBalancerFWSet].validateEntry(entry); !valid {
+					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerFWSet].Name)
 					continue
 				}
-				proxier.ipsetList[kubeLoadbalancerFWSet].activeEntries.Insert(entry.String())
+				proxier.ipsetList[kubeLoadBalancerFWSet].activeEntries.Insert(entry.String())
 				allowFromNode := false
 				for _, src := range svcInfo.LoadBalancerSourceRanges() {
 					// ipset call
