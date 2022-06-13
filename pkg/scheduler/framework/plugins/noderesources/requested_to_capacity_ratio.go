@@ -24,9 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
-const (
-	maxUtilization = 100
-)
+const maxUtilization = 100
 
 // buildRequestedToCapacityRatioScorerFunction allows users to apply bin packing
 // on core resources like CPU, Memory as well as extended resources like accelerators.
