@@ -287,7 +287,7 @@ func TestFieldProfile(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		seccompProfile := fieldProfile(test.scmpProfile, test.rootPath, false)
+		seccompProfile := fieldSeccompProfilePath(test.scmpProfile, test.rootPath, false)
 		assert.Equal(t, test.expectedProfile, seccompProfile, "TestCase[%d]: %s", i, test.description)
 	}
 }
@@ -343,7 +343,7 @@ func TestFieldProfileDefaultSeccomp(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		seccompProfile := fieldProfile(test.scmpProfile, test.rootPath, true)
+		seccompProfile := fieldSeccompProfilePath(test.scmpProfile, test.rootPath, true)
 		assert.Equal(t, test.expectedProfile, seccompProfile, "TestCase[%d]: %s", i, test.description)
 	}
 }

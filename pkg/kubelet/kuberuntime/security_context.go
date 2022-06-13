@@ -19,7 +19,6 @@ package kuberuntime
 import (
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -40,8 +39,11 @@ func (m *kubeGenericRuntimeManager) determineEffectiveSecurityContext(pod *v1.Po
 
 	synthesized.Seccomp = m.getSeccompProfile(pod.Annotations, container.Name, pod.Spec.SecurityContext, container.SecurityContext, m.seccompDefault)
 
+	// TODO: Deprecated, remove after annotation use is removed
 	// set ApparmorProfile.
-	synthesized.ApparmorProfile = apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)
+	synthesized.ApparmorProfile = m.getAppArmorProfilePath(pod.Annotations, container.Name, pod.Spec.SecurityContext, container.SecurityContext, m.apparmorDefault)
+
+	synthesized.Apparmor = m.getAppArmorProfile(pod.Annotations, container.Name, pod.Spec.SecurityContext, container.SecurityContext, m.apparmorDefault)
 
 	// set RunAsUser.
 	if synthesized.RunAsUser == nil {

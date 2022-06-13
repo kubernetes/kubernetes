@@ -3604,6 +3604,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		if securityContext.SeccompProfile != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("seccompProfile"), "cannot be set for a windows pod"))
 		}
+		if securityContext.AppArmorProfile != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("apparmorProfile"), "cannot be set for a windows pod"))
+		}
 		if securityContext.FSGroup != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("fsGroup"), "cannot be set for a windows pod"))
 		}
@@ -3640,6 +3643,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 			}
 			if sc.SeccompProfile != nil {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("seccompProfile"), "cannot be set for a windows pod"))
+			}
+			if sc.AppArmorProfile != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("appArmorProfile"), "cannot be set for a windows pod"))
 			}
 			if sc.Capabilities != nil {
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("capabilities"), "cannot be set for a windows pod"))
@@ -4013,6 +4019,43 @@ func validateSeccompProfileType(fldPath *field.Path, seccompProfileType core.Sec
 	}
 }
 
+// ValidateAppArmorProfileType tests that the argument is a valid AppArmorProfileType.
+func validateAppArmorProfileType(fldPath *field.Path, appArmorProfileType core.AppArmorProfileType) *field.Error {
+	switch appArmorProfileType {
+	case core.AppArmorProfileTypeLocalhost, core.AppArmorProfileTypeRuntimeDefault, core.AppArmorProfileTypeUnconfined:
+		return nil
+	case "":
+		return field.Required(fldPath, "type is required when AppArmorProfile is set")
+	default:
+		return field.NotSupported(fldPath, appArmorProfileType, []string{string(core.AppArmorProfileTypeLocalhost), string(core.AppArmorProfileTypeRuntimeDefault), string(core.AppArmorProfileTypeUnconfined)})
+	}
+}
+
+func validateAppArmorProfileField(ap *core.AppArmorProfile, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if ap == nil {
+		return allErrs
+	}
+
+	if err := validateAppArmorProfileType(fldPath.Child("type"), ap.Type); err != nil {
+		allErrs = append(allErrs, err)
+	}
+
+	if ap.Type == core.AppArmorProfileTypeLocalhost {
+		if ap.LocalhostProfile == nil {
+			allErrs = append(allErrs, field.Required(fldPath.Child("localhostProfile"), "must be set when apparmor type is Localhost"))
+		} else {
+			allErrs = append(allErrs, validateLocalDescendingPath(*ap.LocalhostProfile, fldPath.Child("localhostProfile"))...)
+		}
+	} else {
+		if ap.LocalhostProfile != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("localhostProfile"), ap, "can only be set when apparmor type is Localhost"))
+		}
+	}
+
+	return allErrs
+}
+
 func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for k, p := range annotations {
@@ -4149,6 +4192,7 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 			allErrs = append(allErrs, validateFSGroupChangePolicy(securityContext.FSGroupChangePolicy, fldPath.Child("fsGroupChangePolicy"))...)
 		}
 
+		allErrs = append(allErrs, validateAppArmorProfileField(securityContext.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
 		allErrs = append(allErrs, validateSeccompProfileField(securityContext.SeccompProfile, fldPath.Child("seccompProfile"))...)
 		allErrs = append(allErrs, validateWindowsSecurityContextOptions(securityContext.WindowsOptions, fldPath.Child("windowsOptions"))...)
 	}
@@ -4251,6 +4295,72 @@ func validateSeccompAnnotationsAndFieldsMatch(annotationValue string, seccompFie
 			return field.Forbidden(fldPath.Child("type"), "seccomp type in annotation and field must match")
 		} else if seccompField.LocalhostProfile == nil || strings.TrimPrefix(annotationValue, v1.SeccompLocalhostProfileNamePrefix) != *seccompField.LocalhostProfile {
 			return field.Forbidden(fldPath.Child("localhostProfile"), "seccomp profile in annotation and field must match")
+		}
+	}
+
+	return nil
+}
+
+// ValidateAppArmorAnnotationsAndFields iterates through all containers and ensure that when both appArmorProfile and apparmor annotations exist they match.
+func validateAppArmorAnnotationsAndFields(objectMeta metav1.ObjectMeta, podSpec *core.PodSpec, specPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if podSpec.SecurityContext != nil && podSpec.SecurityContext.AppArmorProfile != nil {
+		// If both apparmor annotations and fields are specified, the values must match.
+		if annotation, found := objectMeta.Annotations[v1.AppArmorBetaAllowedProfilesAnnotationKey]; found {
+			apparmorPath := specPath.Child("securityContext").Child("appArmorProfile")
+			err := validateAppArmorAnnotationsAndFieldsMatch(annotation, podSpec.SecurityContext.AppArmorProfile, apparmorPath)
+			if err != nil {
+				allErrs = append(allErrs, err)
+			}
+		}
+	}
+
+	podshelper.VisitContainersWithPath(podSpec, specPath, func(c *core.Container, cFldPath *field.Path) bool {
+		var field *core.AppArmorProfile
+		if c.SecurityContext != nil {
+			field = c.SecurityContext.AppArmorProfile
+		}
+
+		if field == nil {
+			return true
+		}
+
+		key := v1.AppArmorBetaContainerAnnotationKeyPrefix + c.Name
+		if annotation, found := objectMeta.Annotations[key]; found {
+			appArmorPath := cFldPath.Child("securityContext").Child("appArmorProfile")
+			err := validateAppArmorAnnotationsAndFieldsMatch(annotation, field, appArmorPath)
+			if err != nil {
+				allErrs = append(allErrs, err)
+			}
+		}
+		return true
+	})
+
+	return allErrs
+}
+
+func validateAppArmorAnnotationsAndFieldsMatch(annotationValue string, appArmorField *core.AppArmorProfile, fldPath *field.Path) *field.Error {
+	if appArmorField == nil {
+		return nil
+	}
+
+	switch appArmorField.Type {
+	case core.AppArmorProfileTypeUnconfined:
+		if annotationValue != v1.AppArmorBetaProfileNameUnconfined {
+			return field.Forbidden(fldPath.Child("type"), "appArmor type in annotation and field must match")
+		}
+
+	case core.AppArmorProfileTypeRuntimeDefault:
+		if annotationValue != v1.AppArmorBetaProfileRuntimeDefault {
+			return field.Forbidden(fldPath.Child("type"), "appArmor type in annotation and field must match")
+		}
+
+	case core.AppArmorProfileTypeLocalhost:
+		if !strings.HasPrefix(annotationValue, v1.AppArmorBetaProfileNamePrefix) {
+			return field.Forbidden(fldPath.Child("type"), "appArmor type in annotation and field must match")
+		} else if appArmorField.LocalhostProfile == nil || strings.TrimPrefix(annotationValue, v1.AppArmorBetaProfileNamePrefix) != *appArmorField.LocalhostProfile {
+			return field.Forbidden(fldPath.Child("localhostProfile"), "appArmor profile in annotation and field must match")
 		}
 	}
 

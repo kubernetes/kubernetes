@@ -174,6 +174,10 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 			Seccomp: &runtimeapi.SecurityProfile{
 				ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
 			},
+
+			Apparmor: &runtimeapi.SecurityProfile{
+				ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+			},
 		},
 	}
 

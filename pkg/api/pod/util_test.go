@@ -841,10 +841,24 @@ func TestDropEmptyDirSizeLimit(t *testing.T) {
 }
 
 func TestDropAppArmor(t *testing.T) {
-	podWithAppArmor := func() *api.Pod {
+	podWithAppArmorAnnotation := func() *api.Pod {
 		return &api.Pod{
 			ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"a": "1", v1.AppArmorBetaContainerAnnotationKeyPrefix + "foo": "default"}},
 			Spec:       api.PodSpec{},
+		}
+	}
+	podWithAppArmorContainerContext := func() *api.Pod {
+		return &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{},
+			Spec: api.PodSpec{Containers: []api.Container{{
+				SecurityContext: &api.SecurityContext{AppArmorProfile: &api.AppArmorProfile{Type: "RuntimeDefault"}}}},
+			},
+		}
+	}
+	podWithAppArmorPodContext := func() *api.Pod {
+		return &api.Pod{
+			ObjectMeta: metav1.ObjectMeta{},
+			Spec:       api.PodSpec{SecurityContext: &api.PodSecurityContext{AppArmorProfile: &api.AppArmorProfile{Type: "RuntimeDefault"}}},
 		}
 	}
 	podWithoutAppArmor := func() *api.Pod {
@@ -860,9 +874,19 @@ func TestDropAppArmor(t *testing.T) {
 		pod         func() *api.Pod
 	}{
 		{
-			description: "has AppArmor",
+			description: "has AppArmor using annotation",
 			hasAppArmor: true,
-			pod:         podWithAppArmor,
+			pod:         podWithAppArmorAnnotation,
+		},
+		{
+			description: "has AppArmor using pod securityContext",
+			hasAppArmor: true,
+			pod:         podWithAppArmorPodContext,
+		},
+		{
+			description: "has AppArmor using container securityContext",
+			hasAppArmor: true,
+			pod:         podWithAppArmorContainerContext,
 		},
 		{
 			description: "does not have AppArmor",

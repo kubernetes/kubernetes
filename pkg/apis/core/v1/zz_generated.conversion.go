@@ -1357,11 +1357,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*core.PodSecurityContext)(nil), (*v1.PodSecurityContext)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_PodSecurityContext_To_v1_PodSecurityContext(a.(*core.PodSecurityContext), b.(*v1.PodSecurityContext), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.PodSignature)(nil), (*core.PodSignature)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_PodSignature_To_core_PodSignature(a.(*v1.PodSignature), b.(*core.PodSignature), scope)
 	}); err != nil {
@@ -1752,11 +1747,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*core.SecurityContext)(nil), (*v1.SecurityContext)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_SecurityContext_To_v1_SecurityContext(a.(*core.SecurityContext), b.(*v1.SecurityContext), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.SerializedReference)(nil), (*core.SerializedReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_SerializedReference_To_core_SerializedReference(a.(*v1.SerializedReference), b.(*core.SerializedReference), scope)
 	}); err != nil {
@@ -2112,6 +2102,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*core.PodSecurityContext)(nil), (*v1.PodSecurityContext)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_PodSecurityContext_To_v1_PodSecurityContext(a.(*core.PodSecurityContext), b.(*v1.PodSecurityContext), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*core.PodSpec)(nil), (*v1.PodSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_PodSpec_To_v1_PodSpec(a.(*core.PodSpec), b.(*v1.PodSpec), scope)
 	}); err != nil {
@@ -2134,6 +2129,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*core.ReplicationControllerSpec)(nil), (*v1.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(a.(*core.ReplicationControllerSpec), b.(*v1.ReplicationControllerSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*core.SecurityContext)(nil), (*v1.SecurityContext)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_SecurityContext_To_v1_SecurityContext(a.(*core.SecurityContext), b.(*v1.SecurityContext), scope)
 	}); err != nil {
 		return err
 	}

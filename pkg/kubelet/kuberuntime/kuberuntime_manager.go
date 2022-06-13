@@ -130,6 +130,9 @@ type kubeGenericRuntimeManager struct {
 	// The directory path for seccomp profiles.
 	seccompProfileRoot string
 
+	// The directory path for apparmor profiles.
+	apparmorProfileRoot string
+
 	// Internal lifecycle event handlers for container resource management.
 	internalLifecycle cm.InternalContainerLifecycle
 
@@ -144,6 +147,9 @@ type kubeGenericRuntimeManager struct {
 
 	// PodState provider instance
 	podStateProvider podStateProvider
+
+	// Use RuntimeDefault as the default seccomp profile for all workloads.
+	apparmorDefault bool
 
 	// Use RuntimeDefault as the default seccomp profile for all workloads.
 	seccompDefault bool

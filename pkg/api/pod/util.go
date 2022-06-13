@@ -780,6 +780,61 @@ func csiInUse(podSpec *api.PodSpec) bool {
 	return false
 }
 
+// AppArmorAnnotationForField takes a pod seccomp profile field and returns the
+// converted annotation value
+func AppArmorAnnotationForField(field *api.AppArmorProfile) string {
+	// If only seccomp fields are specified, add the corresponding annotations.
+	// This ensures that the fields are enforced even if the node version
+	// trails the API version
+	switch field.Type {
+	case api.AppArmorProfileTypeUnconfined:
+		return v1.AppArmorBetaProfileNameUnconfined
+
+	case api.AppArmorProfileTypeRuntimeDefault:
+		return v1.AppArmorBetaProfileRuntimeDefault
+
+	case api.AppArmorProfileTypeLocalhost:
+		if field.LocalhostProfile != nil {
+			return v1.AppArmorBetaProfileNamePrefix + *field.LocalhostProfile
+		}
+	}
+
+	// we can only reach this code path if the LocalhostProfile is nil but the
+	// provided field type is AppArmorProfileTypeLocalhost or if an unrecognized
+	// type is specified
+	return ""
+}
+
+// AppArmorFieldForAnnotation takes a pod annotation and returns the converted
+// seccomp profile field.
+func AppArmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
+	// If only seccomp annotations are specified, copy the values into the
+	// corresponding fields. This ensures that existing applications continue
+	// to enforce seccomp, and prevents the kubelet from needing to resolve
+	// annotations & fields.
+	if annotation == v1.AppArmorBetaProfileNameUnconfined {
+		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined}
+	}
+
+	if annotation == api.AppArmorBetaProfileRuntimeDefault {
+		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeRuntimeDefault}
+	}
+
+	if strings.HasPrefix(annotation, v1.AppArmorBetaProfileNamePrefix) {
+		localhostProfile := strings.TrimPrefix(annotation, v1.AppArmorBetaProfileNamePrefix)
+		if localhostProfile != "" {
+			return &api.AppArmorProfile{
+				Type:             api.AppArmorProfileTypeLocalhost,
+				LocalhostProfile: &localhostProfile,
+			}
+		}
+	}
+
+	// we can only reach this code path if the localhostProfile name has a zero
+	// length or if the annotation has an unrecognized value
+	return nil
+}
+
 // SeccompAnnotationForField takes a pod seccomp profile field and returns the
 // converted annotation value
 func SeccompAnnotationForField(field *api.SeccompProfile) string {

@@ -34,6 +34,24 @@ const (
 	// in the Annotations of a Node.
 	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
 
+	// AppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
+	AppArmorBetaContainerAnnotationKeyPrefix string = "container.apparmor.security.beta.kubernetes.io/"
+
+	// AppArmorBetaDefaultProfileAnnotationKey is the annotation key specifying the default AppArmor profile.
+	AppArmorBetaDefaultProfileAnnotationKey string = "apparmor.security.beta.kubernetes.io/defaultProfileName"
+
+	// AppArmorBetaAllowedProfilesAnnotationKey is the annotation key specifying the allowed AppArmor profiles.
+	AppArmorBetaAllowedProfilesAnnotationKey string = "apparmor.security.beta.kubernetes.io/allowedProfileNames"
+
+	// AppArmorBetaProfileRuntimeDefault is the profile specifying the runtime default.
+	AppArmorBetaProfileRuntimeDefault string = "runtime/default"
+
+	// AppArmorBetaProfileNamePrefix is the prefix for specifying profiles loaded on the node.
+	AppArmorBetaProfileNamePrefix string = "localhost/"
+
+	// AppArmorBetaProfileNameUnconfined is the Unconfined AppArmor profile
+	AppArmorBetaProfileNameUnconfined string = "unconfined"
+
 	// SeccompPodAnnotationKey represents the key of a seccomp profile applied
 	// to all containers of a pod.
 	// Deprecated: set a pod security context `seccompProfile` field.
