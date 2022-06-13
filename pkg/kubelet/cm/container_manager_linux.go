@@ -660,6 +660,10 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 	return opts, nil
 }
 
+func (cm *containerManagerImpl) ReallocatePluginResources(pod *v1.Pod, container *v1.Container) error {
+	return cm.deviceManager.ReallocateDevices(pod, container)
+}
+
 func (cm *containerManagerImpl) UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	return cm.deviceManager.UpdatePluginResources(node, attrs)
 }

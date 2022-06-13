@@ -79,6 +79,10 @@ type Manager interface {
 
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()
+
+	// ReallocateDevices reallocates Devices to containers on reboot if existing allocations to
+	// containers are found to be invalid
+	ReallocateDevices(pod *v1.Pod, container *v1.Container) error
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

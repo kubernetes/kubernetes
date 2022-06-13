@@ -115,6 +115,9 @@ type ContainerManager interface {
 	// GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
 	GetNodeAllocatableAbsolute() v1.ResourceList
 
+	// ReallocatePluginResources reallocates devices on reboot if existing allocations are found to be invalid
+	ReallocatePluginResources(pod *v1.Pod, container *v1.Container) error
+
 	// Implements the podresources Provider API for CPUs, Memory and Devices
 	podresources.CPUsProvider
 	podresources.DevicesProvider

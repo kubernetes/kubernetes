@@ -517,6 +517,10 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	return opts, cleanupAction, nil
 }
 
+func (kl *Kubelet) ReallocateDevices(pod *v1.Pod, container *v1.Container) error {
+	return kl.containerManager.ReallocatePluginResources(pod, container)
+}
+
 var masterServices = sets.NewString("kubernetes")
 
 // getServiceEnvVarMap makes a map[string]string of env vars for services a

@@ -97,3 +97,7 @@ func (h *ManagerStub) ShouldResetExtendedResourceCapacity() bool {
 func (h *ManagerStub) UpdateAllocatedDevices() {
 	return
 }
+
+func (h *ManagerStub) ReallocateDevices(pod *v1.Pod, container *v1.Container) error {
+	return nil
+}

@@ -884,6 +884,37 @@ func (m *ManagerImpl) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Co
 	return m.podDevices.deviceRunContainerOptions(string(pod.UID), container.Name), nil
 }
 
+func (m *ManagerImpl) ReallocateDevices(pod *v1.Pod, container *v1.Container) error {
+	podUID := string(pod.UID)
+	contName := container.Name
+	needsReAllocate := false
+
+	for k, v := range container.Resources.Limits {
+		resource := string(k)
+		if !m.isDevicePluginResource(resource) || v.Value() == 0 {
+			continue
+		}
+		allocatedDevices := m.podDevices.containerDevices(podUID, contName, resource)
+		if allocatedDevices == nil {
+			needsReAllocate = true
+		} else if !m.isValidDeviceAllocation(podUID, contName, resource, allocatedDevices) {
+			// clean up podDevices entry for this pod and resources
+			m.podDevices.deleteContainerResources(podUID, contName, resource)
+			needsReAllocate = true
+		}
+	}
+	if needsReAllocate {
+		klog.V(2).InfoS("Needs to re-allocate device plugin resources for pod", "pod", klog.KObj(pod),
+			"containerName", container.Name)
+		if err := m.Allocate(pod, container); err != nil {
+			klog.V(2).ErrorS(err, "failed to reallocate device for pod", "pod", klog.KObj(pod),
+				"container", container.Name)
+			return err
+		}
+	}
+	return nil
+}
+
 // callPreStartContainerIfNeeded issues PreStartContainer grpc call for device plugin resource
 // with PreStartRequired option set.
 func (m *ManagerImpl) callPreStartContainerIfNeeded(podUID, contName, resource string) error {
@@ -985,6 +1016,19 @@ func (m *ManagerImpl) isDevicePluginResource(resource string) bool {
 		return true
 	}
 	return false
+}
+
+// validate the allocation of devices to pod containers during reboot
+func (m *ManagerImpl) isValidDeviceAllocation(podUID, contName, resource string, allocatedDevices sets.String) bool {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	healthyDevices := m.healthyDevices[resource]
+	if !healthyDevices.HasAll(allocatedDevices.List()...) {
+		klog.V(2).InfoS("Found invalid device allocations for pod", "pod", podUID,
+			"container", contName, "resource", resource, "allocated devices", allocatedDevices)
+		return false
+	}
+	return true
 }
 
 // GetAllocatableDevices returns information about all the healthy devices known to the manager

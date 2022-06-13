@@ -233,3 +233,7 @@ func (cm *FakeContainerManager) GetNodeAllocatableAbsolute() v1.ResourceList {
 	defer cm.Unlock()
 	return nil
 }
+
+func (cm *FakeContainerManager) ReallocatePluginResources(pod *v1.Pod, container *v1.Container) error {
+	return nil
+}

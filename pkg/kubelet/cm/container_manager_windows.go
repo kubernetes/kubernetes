@@ -236,6 +236,10 @@ func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 	return
 }
 
+func (cm *containerManagerImpl) ReallocatePluginResources(pod *v1.Pod, container *v1.Container) error {
+	return nil
+}
+
 func (cm *containerManagerImpl) GetCPUs(_, _ string) []int64 {
 	return nil
 }

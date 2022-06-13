@@ -109,6 +109,14 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		podSandboxConfig.Hostname = podHostname
 	}
 
+	// check if device allocations are valid, if invalid trigger new allocation
+	for _, c := range pod.Spec.Containers {
+		err := m.runtimeHelper.ReallocateDevices(pod, &c)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	logDir := BuildPodLogsDirectory(pod.Namespace, pod.Name, pod.UID)
 	podSandboxConfig.LogDirectory = logDir
 
