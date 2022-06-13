@@ -809,7 +809,7 @@ kube::golang::build_binaries() {
     gogcflags="all=-trimpath=${trimroot} ${GOGCFLAGS:-}"
     if [[ "${DBG:-}" == 1 ]]; then
         # Debugging - disable optimizations and inlining and trimPath
-        gogcflags="${GOGCFLAGS:-} -N -l"
+        gogcflags="${GOGCFLAGS:-} all=-N -l"
         goasmflags=""
     fi
 
