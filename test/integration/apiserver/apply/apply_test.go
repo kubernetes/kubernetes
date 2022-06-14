@@ -113,35 +113,37 @@ func TestApplyAlsoCreates(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
-			Namespace("default").
-			Resource(tc.resource).
-			Name(tc.name).
-			Param("fieldManager", "apply_test").
-			Body([]byte(tc.body)).
-			Do(context.TODO()).
-			Get()
-		if err != nil {
-			t.Fatalf("Failed to create object using Apply patch: %v", err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+				Namespace("default").
+				Resource(tc.resource).
+				Name(tc.name).
+				Param("fieldManager", "apply_test").
+				Body([]byte(tc.body)).
+				Do(context.TODO()).
+				Get()
+			if err != nil {
+				t.Fatalf("Failed to create object using Apply patch: %v", err)
+			}
 
-		_, err = client.CoreV1().RESTClient().Get().Namespace("default").Resource(tc.resource).Name(tc.name).Do(context.TODO()).Get()
-		if err != nil {
-			t.Fatalf("Failed to retrieve object: %v", err)
-		}
+			_, err = client.CoreV1().RESTClient().Get().Namespace("default").Resource(tc.resource).Name(tc.name).Do(context.TODO()).Get()
+			if err != nil {
+				t.Fatalf("Failed to retrieve object: %v", err)
+			}
 
-		// Test that we can re apply with a different field manager and don't get conflicts
-		_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
-			Namespace("default").
-			Resource(tc.resource).
-			Name(tc.name).
-			Param("fieldManager", "apply_test_2").
-			Body([]byte(tc.body)).
-			Do(context.TODO()).
-			Get()
-		if err != nil {
-			t.Fatalf("Failed to re-apply object using Apply patch: %v", err)
-		}
+			// Test that we can re apply with a different field manager and don't get conflicts
+			_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+				Namespace("default").
+				Resource(tc.resource).
+				Name(tc.name).
+				Param("fieldManager", "apply_test_2").
+				Body([]byte(tc.body)).
+				Do(context.TODO()).
+				Get()
+			if err != nil {
+				t.Fatalf("Failed to re-apply object using Apply patch: %v", err)
+			}
+		})
 	}
 }
 
