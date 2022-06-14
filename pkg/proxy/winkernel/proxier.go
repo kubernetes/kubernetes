@@ -144,6 +144,7 @@ type remoteSubnetInfo struct {
 }
 
 const NETWORK_TYPE_OVERLAY = "overlay"
+const NETWORK_TYPE_L2BRIDGE = "L2Bridge"
 
 func newHostNetworkService() (HCNUtils, hcn.SupportedFeatures) {
 	var h HCNUtils

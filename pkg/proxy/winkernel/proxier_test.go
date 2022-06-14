@@ -21,11 +21,10 @@ package winkernel
 
 import (
 	"fmt"
-	"net"
 	"strings"
 	"testing"
-	"time"
 
+	"github.com/Microsoft/hcsshim/hcn"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/winkernel/hcntesting"
 	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -46,91 +46,16 @@ const (
 	guid              = "123ABC"
 )
 
-type fakeHNS struct{}
+//Conventions for tests using NewFakeProxier:
+//
+//syncPeriod 	  30 * time.Second
+//minSyncPeriod   30 * time.Second
+//clusterCIDR     "192.168.1.0/24"
+//hostname		  "testhost"
+//nodeIP		  "10.0.0.1"
+//networkType     "overlay" or "l2bridge"
 
-func newFakeHNS() *fakeHNS {
-	return &fakeHNS{}
-}
-
-func (hns fakeHNS) getNetworkByName(name string) (*hnsNetworkInfo, error) {
-	var remoteSubnets []*remoteSubnetInfo
-	rs := &remoteSubnetInfo{
-		destinationPrefix: destinationPrefix,
-		isolationID:       4096,
-		providerAddress:   providerAddress,
-		drMacAddress:      macAddress,
-	}
-	remoteSubnets = append(remoteSubnets, rs)
-	return &hnsNetworkInfo{
-		id:            strings.ToUpper(guid),
-		name:          name,
-		networkType:   NETWORK_TYPE_OVERLAY,
-		remoteSubnets: remoteSubnets,
-	}, nil
-}
-
-func (hns fakeHNS) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointsInfo), error) {
-	return nil, nil
-}
-
-func (hns fakeHNS) getEndpointByID(id string) (*endpointsInfo, error) {
-	return nil, nil
-}
-
-func (hns fakeHNS) getEndpointByName(name string) (*endpointsInfo, error) {
-	return &endpointsInfo{
-		isLocal:    true,
-		macAddress: macAddress,
-		hnsID:      guid,
-		hns:        hns,
-	}, nil
-}
-
-func (hns fakeHNS) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
-	return nil, nil
-}
-
-func (hns fakeHNS) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
-	_, ipNet, _ := netutils.ParseCIDRSloppy(destinationPrefix)
-
-	if ipNet.Contains(netutils.ParseIPSloppy(ip)) {
-		return &endpointsInfo{
-			ip:         ip,
-			isLocal:    false,
-			macAddress: macAddress,
-			hnsID:      guid,
-			hns:        hns,
-		}, nil
-	}
-	return nil, nil
-
-}
-
-func (hns fakeHNS) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
-	return &endpointsInfo{
-		ip:         ep.ip,
-		isLocal:    ep.isLocal,
-		macAddress: ep.macAddress,
-		hnsID:      guid,
-		hns:        hns,
-	}, nil
-}
-
-func (hns fakeHNS) deleteEndpoint(hnsID string) error {
-	return nil
-}
-
-func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
-	return &loadBalancerInfo{
-		hnsID: guid,
-	}, nil
-}
-
-func (hns fakeHNS) deleteLoadBalancer(hnsID string) error {
-	return nil
-}
-
-func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clusterCIDR string, hostname string, nodeIP net.IP, networkType string) *Proxier {
+func NewFakeProxier(hcnutilsfake *hcnutils, networkType string) *Proxier {
 	sourceVip := "192.168.1.2"
 	hnsNetworkInfo := &hnsNetworkInfo{
 		id:          strings.ToUpper(guid),
@@ -142,27 +67,26 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clust
 		endpointsMap:        make(proxy.EndpointsMap),
 		clusterCIDR:         clusterCIDR,
 		hostname:            testHostName,
-		nodeIP:              nodeIP,
+		nodeIP:              netutils.ParseIPSloppy("10.0.0.1"),
 		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
 		network:             *hnsNetworkInfo,
 		sourceVip:           sourceVip,
 		hostMac:             macAddress,
 		isDSR:               false,
-		hns:                 newFakeHNS(),
+		hns:                 hcnutilsfake,
 		endPointsRefCount:   make(endPointsReferenceCountMap),
 	}
 
 	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, v1.IPv4Protocol, nil, proxier.serviceMapChange)
-	endpointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, v1.IPv4Protocol, nil, proxier.endpointsMapChange)
+	endpointChangeTracker := proxy.NewEndpointChangeTracker("testhost", proxier.newEndpointInfo, v1.IPv4Protocol, nil, proxier.endpointsMapChange)
 	proxier.endpointsChanges = endpointChangeTracker
 	proxier.serviceChanges = serviceChanges
 
 	return proxier
 }
-
 func TestCreateServiceVip(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	testHNS := NewHCNUtils(&hcntesting.FakeHCN{})
+	proxier := NewFakeProxier(testHNS, NETWORK_TYPE_OVERLAY)
 	if proxier == nil {
 		t.Error()
 	}
@@ -216,8 +140,8 @@ func TestCreateServiceVip(t *testing.T) {
 }
 
 func TestCreateRemoteEndpointOverlay(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	testHNS := NewHCNUtils(&hcntesting.FakeHCN{})
+	proxier := NewFakeProxier(testHNS, NETWORK_TYPE_OVERLAY)
 	if proxier == nil {
 		t.Error()
 	}
@@ -278,11 +202,33 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 	if *proxier.endPointsRefCount[guid] != *epInfo.refCount {
 		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
 	}
+
+	expectedEndpoint := &hcn.HostComputeEndpoint{
+		Id:                 guid,
+		HostComputeNetwork: guid,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		IpConfigurations: []hcn.IpConfig{{IpAddress: epIpAddressRemote, PrefixLength: 24}},
+		Flags:            hcn.EndpointFlagsRemoteEndpoint,
+	}
+
+	Endpoint, err := testHNS.hcninstance.GetEndpointByID(guid)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	diff := assertHCNDiff(*expectedEndpoint, *Endpoint)
+	if diff != "" {
+		t.Errorf("GetEndpointById(%s) returned a different Endpoint. Diff: %s ", expectedEndpoint.Id, diff)
+	}
 }
 
 func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge")
+	testHNS := NewHCNUtils(&hcntesting.FakeHCN{})
+	proxier := NewFakeProxier(testHNS, NETWORK_TYPE_L2BRIDGE)
 	if proxier == nil {
 		t.Error()
 	}
@@ -342,11 +288,34 @@ func TestCreateRemoteEndpointL2Bridge(t *testing.T) {
 	if *proxier.endPointsRefCount[guid] != *epInfo.refCount {
 		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
 	}
+
+	expectedEndpoint := &hcn.HostComputeEndpoint{
+		Id:                 guid,
+		HostComputeNetwork: guid,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		IpConfigurations: []hcn.IpConfig{{IpAddress: epIpAddressRemote, PrefixLength: 24}},
+		Flags:            hcn.EndpointFlagsRemoteEndpoint,
+	}
+
+	Endpoint, err := testHNS.hcninstance.GetEndpointByID(guid)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	diff := assertHCNDiff(*expectedEndpoint, *Endpoint)
+	if diff != "" {
+		t.Errorf("GetEndpointById(%s) returned a different Endpoint. Diff: %s ", expectedEndpoint.Id, diff)
+	}
 }
+
 func TestSharedRemoteEndpointDelete(t *testing.T) {
-	syncPeriod := 30 * time.Second
 	tcpProtocol := v1.ProtocolTCP
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge")
+	testHNS := NewHCNUtils(&hcntesting.FakeHCN{})
+	proxier := NewFakeProxier(testHNS, NETWORK_TYPE_L2BRIDGE)
 	if proxier == nil {
 		t.Error()
 	}
@@ -487,8 +456,8 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 	}
 }
 func TestSharedRemoteEndpointUpdate(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), "L2Bridge")
+	testHNS := NewHCNUtils(&hcntesting.FakeHCN{})
+	proxier := NewFakeProxier(testHNS, NETWORK_TYPE_L2BRIDGE)
 	if proxier == nil {
 		t.Error()
 	}
@@ -580,6 +549,28 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
 	}
 
+	expectedEndpoint := &hcn.HostComputeEndpoint{
+		Id:                 guid,
+		HostComputeNetwork: guid,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		IpConfigurations: []hcn.IpConfig{{IpAddress: epIpAddressRemote, PrefixLength: 24}},
+		Flags:            hcn.EndpointFlagsRemoteEndpoint,
+	}
+
+	Endpoint, err := testHNS.hcninstance.GetEndpointByID(guid)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	diff := assertHCNDiff(*expectedEndpoint, *Endpoint)
+	if diff != "" {
+		t.Errorf("GetEndpointById(%s) returned a different Endpoint. Diff: %s ", expectedEndpoint.Id, diff)
+	}
+
 	proxier.setInitialized(false)
 
 	proxier.OnServiceUpdate(
@@ -659,11 +650,34 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 	if *proxier.endPointsRefCount[guid] != *epInfo.refCount {
 		t.Errorf("Global refCount: %v does not match endpoint refCount: %v", *proxier.endPointsRefCount[guid], *epInfo.refCount)
 	}
+
+	expectedEndpoint = &hcn.HostComputeEndpoint{
+		Id:                 guid,
+		HostComputeNetwork: guid,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		IpConfigurations: []hcn.IpConfig{{IpAddress: epIpAddressRemote, PrefixLength: 24}},
+		Flags:            hcn.EndpointFlagsRemoteEndpoint,
+	}
+
+	Endpoint, err = testHNS.hcninstance.GetEndpointByID(guid)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	diff = assertHCNDiff(*expectedEndpoint, *Endpoint)
+	if diff != "" {
+		t.Errorf("GetEndpointById(%s) returned a different Endpoint. Diff: %s ", expectedEndpoint.Id, diff)
+	}
+
 }
 func TestCreateLoadBalancer(t *testing.T) {
-	syncPeriod := 30 * time.Second
 	tcpProtocol := v1.ProtocolTCP
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	testHNS := NewHCNUtils(&hcntesting.FakeHCN{})
+	proxier := NewFakeProxier(testHNS, NETWORK_TYPE_L2BRIDGE)
 	if proxier == nil {
 		t.Error()
 	}
@@ -716,11 +730,30 @@ func TestCreateLoadBalancer(t *testing.T) {
 			t.Errorf("%v does not match %v", svcInfo.hnsID, guid)
 		}
 	}
-}
 
+	expectedLoadBalancer := &hcn.HostComputeLoadBalancer{
+		Id:                   guid,
+		HostComputeEndpoints: []string{guid},
+		SourceVIP:            sourceVip,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+
+	LoadBalancer, err := testHNS.hcninstance.GetLoadBalancerByID(guid)
+	if err != nil {
+		t.Error(err)
+	}
+
+	diff := assertHCNDiff(*LoadBalancer, *expectedLoadBalancer)
+	if diff != "" {
+		t.Errorf("GetLoadBalancerByID(%s) returned a different LoadBalancer. Diff: %s ", expectedLoadBalancer.Id, diff)
+	}
+}
 func TestCreateDsrLoadBalancer(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	testHNS := NewHCNUtils(&hcntesting.FakeHCN{})
+	proxier := NewFakeProxier(testHNS, NETWORK_TYPE_OVERLAY)
 	if proxier == nil {
 		t.Error()
 	}
@@ -785,11 +818,32 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 			t.Errorf("svcInfo does not have any loadBalancerIngressIPs, %+v", svcInfo)
 		}
 	}
+
+	expectedLoadBalancer := &hcn.HostComputeLoadBalancer{
+		Id:                   guid,
+		HostComputeEndpoints: []string{guid},
+		SourceVIP:            sourceVip,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		FrontendVIPs: []string{lbIP},
+	}
+
+	LoadBalancer, err := testHNS.hcninstance.GetLoadBalancerByID(guid)
+	if err != nil {
+		t.Error(err)
+	}
+
+	diff := assertHCNDiff(*LoadBalancer, *expectedLoadBalancer)
+	if diff != "" {
+		t.Errorf("GetLoadBalancerByID(%s) returned a different LoadBalancer. Diff: %s ", expectedLoadBalancer.Id, diff)
+	}
 }
 
 func TestEndpointSlice(t *testing.T) {
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	testHNS := NewHCNUtils(&hcntesting.FakeHCN{})
+	proxier := NewFakeProxier(testHNS, NETWORK_TYPE_OVERLAY)
 	if proxier == nil {
 		t.Error()
 	}
@@ -858,6 +912,27 @@ func TestEndpointSlice(t *testing.T) {
 			t.Errorf("Hns EndpointId %v does not match %v. ServicePortName %q", epInfo.hnsID, guid, svcPortName.String())
 		}
 	}
+
+	expectedEndpoint := &hcn.HostComputeEndpoint{
+		Id:                 guid,
+		HostComputeNetwork: guid,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		IpConfigurations: []hcn.IpConfig{{IpAddress: epIpAddressRemote, PrefixLength: 24}},
+		Flags:            hcn.EndpointFlagsRemoteEndpoint,
+	}
+
+	endpoint, err := testHNS.hcninstance.GetEndpointByID(guid)
+	if err != nil {
+		t.Error(err)
+	}
+
+	diff := assertHCNDiff(*expectedEndpoint, *endpoint)
+	if diff != "" {
+		t.Errorf("GetEndpointById(%s) returned a different LoadBalancer. Diff: %s ", endpoint.Id, diff)
+	}
 }
 
 func TestNoopEndpointSlice(t *testing.T) {
@@ -869,7 +944,7 @@ func TestNoopEndpointSlice(t *testing.T) {
 }
 
 func TestFindRemoteSubnetProviderAddress(t *testing.T) {
-	networkInfo, _ := newFakeHNS().getNetworkByName("TestNetwork")
+	networkInfo, _ := NewHCNUtils(&hcntesting.FakeHCN{}).getNetworkByName("TestNetwork")
 	pa := networkInfo.findRemoteSubnetProviderAddress(providerAddress)
 
 	if pa != providerAddress {
