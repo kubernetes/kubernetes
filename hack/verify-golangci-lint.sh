@@ -39,7 +39,7 @@ export GO111MODULE=on
 echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
 pushd "${KUBE_ROOT}/hack/tools" >/dev/null
   go install github.com/golangci/golangci-lint/cmd/golangci-lint
-  go build -o "${GOBIN}/logcheck.so" -buildmode=plugin k8s.io/klog/hack/tools/logcheck/plugin
+  go build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
 popd >/dev/null
 
 cd "${KUBE_ROOT}"
