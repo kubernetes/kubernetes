@@ -746,17 +746,11 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 	if feature.DefaultFeatureGate.Enabled(features.JobReadyPods) {
 		ready = pointer.Int32(countReadyPods(activePods))
 	}
-	// Job first start. Set StartTime and start the ActiveDeadlineSeconds timer
-	// only if the job is not in the suspended state.
+
+	// Job first start. Set StartTime only if the job is not in the suspended state.
 	if job.Status.StartTime == nil && !jobSuspended(&job) {
 		now := metav1.Now()
 		job.Status.StartTime = &now
-		// enqueue a sync to check if job past ActiveDeadlineSeconds
-		if job.Spec.ActiveDeadlineSeconds != nil {
-			klog.V(4).Infof("Job %s has ActiveDeadlineSeconds will sync after %d seconds",
-				key, *job.Spec.ActiveDeadlineSeconds)
-			jm.queue.AddAfter(key, time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second)
-		}
 	}
 
 	var manageJobErr error
@@ -775,6 +769,10 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, "BackoffLimitExceeded", "Job has reached the specified backoff limit")
 	} else if pastActiveDeadline(&job) {
 		finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, "DeadlineExceeded", "Job was active longer than specified deadline")
+	} else if job.Spec.ActiveDeadlineSeconds != nil && !jobSuspended(&job) {
+		syncDuration := time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second - time.Since(job.Status.StartTime.Time)
+		klog.V(2).InfoS("Job has activeDeadlineSeconds configuration. Will sync this job again", "job", key, "nextSyncIn", syncDuration)
+		jm.queue.AddAfter(key, syncDuration)
 	}
 
 	var prevSucceededIndexes, succeededIndexes orderedIntervals
