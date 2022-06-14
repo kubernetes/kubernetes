@@ -247,13 +247,8 @@ func CertOrKeyExist(pkiPath, name string) bool {
 
 	_, certErr := os.Stat(certificatePath)
 	_, keyErr := os.Stat(privateKeyPath)
-	if os.IsNotExist(certErr) && os.IsNotExist(keyErr) {
-		// The cert and the key do not exist
-		return false
-	}
 
-	// Both files exist or one of them
-	return true
+	return !(os.IsNotExist(certErr) && os.IsNotExist(keyErr))
 }
 
 // CSROrKeyExist returns true if one of the CSR or key exists
