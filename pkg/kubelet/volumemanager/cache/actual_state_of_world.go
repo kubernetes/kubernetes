@@ -196,9 +196,10 @@ func NewActualStateOfWorld(
 	nodeName types.NodeName,
 	volumePluginMgr *volume.VolumePluginMgr) ActualStateOfWorld {
 	return &actualStateOfWorld{
-		nodeName:        nodeName,
-		attachedVolumes: make(map[v1.UniqueVolumeName]attachedVolume),
-		volumePluginMgr: volumePluginMgr,
+		nodeName:                  nodeName,
+		attachedVolumes:           make(map[v1.UniqueVolumeName]attachedVolume),
+		foundDuringReconstruction: make(map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID),
+		volumePluginMgr:           volumePluginMgr,
 	}
 }
 
@@ -226,7 +227,8 @@ type actualStateOfWorld struct {
 	// state by default.
 	// The key in this map is the name of the volume and the value is an object
 	// containing more information about the attached volume.
-	attachedVolumes map[v1.UniqueVolumeName]attachedVolume
+	attachedVolumes           map[v1.UniqueVolumeName]attachedVolume
+	foundDuringReconstruction map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID
 
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
@@ -344,6 +346,40 @@ func (asw *actualStateOfWorld) MarkVolumeAsUncertain(
 func (asw *actualStateOfWorld) MarkVolumeAsDetached(
 	volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
 	asw.DeleteVolume(volumeName)
+}
+
+func (asw *actualStateOfWorld) AddVolumeViaReconstruction(opts operationexecutor.MarkVolumeOpts) error {
+	err := asw.MarkVolumeAsMounted(opts)
+	if err != nil {
+		return err
+	}
+	asw.Lock()
+	defer asw.Unlock()
+
+	podMap, ok := asw.foundDuringReconstruction[opts.VolumeName]
+	if !ok {
+		podMap = map[volumetypes.UniquePodName]types.UID{}
+	}
+	podMap[opts.PodName] = opts.PodUID
+	asw.foundDuringReconstruction[opts.VolumeName] = podMap
+	return nil
+}
+
+func (asw *actualStateOfWorld) IsVolumeReconstructed(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	volumeState := asw.GetVolumeMountState(volumeName, podName)
+	// only uncertain volumes are reconstructed
+	if volumeState != operationexecutor.VolumeMountUncertain {
+		return false
+	}
+	podMap, ok := asw.foundDuringReconstruction[volumeName]
+	if !ok {
+		return false
+	}
+	_, foundPod := podMap[podName]
+	return foundPod
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsMounted(markVolumeOpts operationexecutor.MarkVolumeOpts) error {
@@ -641,6 +677,12 @@ func (asw *actualStateOfWorld) DeletePodFromVolume(
 		delete(asw.attachedVolumes[volumeName].mountedPods, podName)
 	}
 
+	// if there were reconstructed volumes, we should remove them
+	_, podExists = asw.foundDuringReconstruction[volumeName]
+	if podExists {
+		delete(asw.foundDuringReconstruction[volumeName], podName)
+	}
+
 	return nil
 }
 
@@ -661,6 +703,7 @@ func (asw *actualStateOfWorld) DeleteVolume(volumeName v1.UniqueVolumeName) erro
 	}
 
 	delete(asw.attachedVolumes, volumeName)
+	delete(asw.foundDuringReconstruction, volumeName)
 	return nil
 }
 
@@ -739,7 +782,6 @@ func (asw *actualStateOfWorld) PodRemovedFromVolume(
 			return false
 		}
 	}
-
 	return true
 }
 
