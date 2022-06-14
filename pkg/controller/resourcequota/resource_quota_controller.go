@@ -269,6 +269,7 @@ func (rq *Controller) worker(ctx context.Context, queue workqueue.RateLimitingIn
 func (rq *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer rq.queue.ShutDown()
+	defer rq.missingUsageQueue.ShutDown()
 
 	klog.Infof("Starting resource quota controller")
 	defer klog.Infof("Shutting down resource quota controller")

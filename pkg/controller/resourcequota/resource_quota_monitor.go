@@ -305,6 +305,8 @@ func (qm *QuotaMonitor) IsSynced() bool {
 // Run sets the stop channel and starts monitor execution until stopCh is
 // closed. Any running monitors will be stopped before Run returns.
 func (qm *QuotaMonitor) Run(stopCh <-chan struct{}) {
+	defer utilruntime.HandleCrash()
+
 	klog.Infof("QuotaMonitor running")
 	defer klog.Infof("QuotaMonitor stopping")
 
@@ -317,6 +319,15 @@ func (qm *QuotaMonitor) Run(stopCh <-chan struct{}) {
 	// Start monitors and begin change processing until the stop channel is
 	// closed.
 	qm.StartMonitors()
+
+	// The following workers are hanging forever until the queue is
+	// shutted down, so we need to shut it down in a separate goroutine.
+	go func() {
+		defer utilruntime.HandleCrash()
+		defer qm.resourceChanges.ShutDown()
+
+		<-stopCh
+	}()
 	wait.Until(qm.runProcessResourceChanges, 1*time.Second, stopCh)
 
 	// Stop any running monitors.
