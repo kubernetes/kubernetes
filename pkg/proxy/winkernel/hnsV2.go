@@ -67,39 +67,6 @@ func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 		remoteSubnets: remoteSubnets,
 	}, nil
 }
-
-func (hns hnsV2) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointsInfo), error) {
-	hcnnetwork, err := hcn.GetNetworkByName(networkName)
-	if err != nil {
-		klog.ErrorS(err, "failed to get HNS network by name", "name", networkName)
-		return nil, err
-	}
-	endpoints, err := hcn.ListEndpointsOfNetwork(hcnnetwork.Id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list endpoints: %w", err)
-	}
-	endpointInfos := make(map[string]*(endpointsInfo))
-	for _, ep := range endpoints {
-		// Add to map with key endpoint ID or IP address
-		// Storing this is expensive in terms of memory, however there is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address.
-		// TODO: Store by IP only and remove any lookups by endpoint ID.
-		endpointInfos[ep.Id] = &endpointsInfo{
-			ip:         ep.IpConfigurations[0].IpAddress,
-			isLocal:    uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0,
-			macAddress: ep.MacAddress,
-			hnsID:      ep.Id,
-			hns:        hns,
-			// only ready and not terminating endpoints were added to HNS
-			ready:       true,
-			serving:     true,
-			terminating: false,
-		}
-		endpointInfos[ep.IpConfigurations[0].IpAddress] = endpointInfos[ep.Id]
-	}
-	klog.V(3).InfoS("Queried endpoints from network", "network", networkName)
-	return endpointInfos, nil
-}
-
 func (hns hnsV2) getEndpointByID(id string) (*endpointsInfo, error) {
 	hnsendpoint, err := hcn.GetEndpointByID(id)
 	if err != nil {
@@ -143,6 +110,7 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 			}, nil
 		}
 	}
+
 	return nil, fmt.Errorf("Endpoint %v not found on network %s", ip, networkName)
 }
 func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
@@ -213,43 +181,45 @@ func (hns hnsV2) deleteEndpoint(hnsID string) error {
 	}
 	return err
 }
-
-func (hns hnsV2) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
-	lbs, err := hcn.ListLoadBalancers()
-	var id loadBalancerIdentifier
+func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
+	plists, err := hcn.ListLoadBalancers()
 	if err != nil {
 		return nil, err
 	}
-	loadBalancers := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
-	for _, lb := range lbs {
-		portMap := lb.PortMappings[0]
-		if len(lb.FrontendVIPs) == 0 {
-			// Leave VIP uninitialized
-			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, endpointsCount: len(lb.HostComputeEndpoints)}
-		} else {
-			id = loadBalancerIdentifier{protocol: uint16(portMap.Protocol), internalPort: portMap.InternalPort, externalPort: portMap.ExternalPort, vip: lb.FrontendVIPs[0], endpointsCount: len(lb.HostComputeEndpoints)}
+
+	for _, plist := range plists {
+		if len(plist.HostComputeEndpoints) != len(endpoints) {
+			continue
 		}
-		loadBalancers[id] = &loadBalancerInfo{
-			hnsID: lb.Id,
+		// Validate if input meets any of the policy lists
+		lbPortMapping := plist.PortMappings[0]
+		if lbPortMapping.Protocol == uint32(protocol) && lbPortMapping.InternalPort == internalPort && lbPortMapping.ExternalPort == externalPort && (lbPortMapping.Flags&1 != 0) == flags.isILB {
+			if len(vip) > 0 {
+				if len(plist.FrontendVIPs) == 0 || plist.FrontendVIPs[0] != vip {
+					continue
+				}
+			} else if len(plist.FrontendVIPs) != 0 {
+				continue
+			}
+			LogJson("policyList", plist, "Found existing Hns loadbalancer policy resource", 1)
+			return &loadBalancerInfo{
+				hnsID: plist.Id,
+			}, nil
 		}
 	}
-	klog.V(3).InfoS("Queried load balancers", "count", len(lbs))
-	return loadBalancers, nil
-}
 
-func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
-	var id loadBalancerIdentifier
+	var hnsEndpoints []hcn.HostComputeEndpoint
+	for _, ep := range endpoints {
+		endpoint, err := hcn.GetEndpointByID(ep.hnsID)
+		if err != nil {
+			return nil, err
+		}
+		hnsEndpoints = append(hnsEndpoints, *endpoint)
+	}
+
 	vips := []string{}
 	if len(vip) > 0 {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: vip, endpointsCount: len(endpoints)}
 		vips = append(vips, vip)
-	} else {
-		id = loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, endpointsCount: len(endpoints)}
-	}
-
-	if lb, found := previousLoadBalancers[id]; found {
-		klog.V(1).InfoS("Found cached Hns loadbalancer policy resource", "policies", lb)
-		return lb, nil
 	}
 
 	lbPortMappingFlags := hcn.LoadBalancerPortMappingFlagsNone
@@ -300,8 +270,8 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 		Flags: lbFlags,
 	}
 
-	for _, ep := range endpoints {
-		loadBalancer.HostComputeEndpoints = append(loadBalancer.HostComputeEndpoints, ep.hnsID)
+	for _, endpoint := range hnsEndpoints {
+		loadBalancer.HostComputeEndpoints = append(loadBalancer.HostComputeEndpoints, endpoint.Id)
 	}
 
 	lb, err := loadBalancer.Create()
@@ -310,15 +280,12 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 		return nil, err
 	}
 
-	klog.V(1).InfoS("Created Hns loadbalancer policy resource", "loadBalancer", lb)
-	lbInfo := &loadBalancerInfo{
-		hnsID: lb.Id,
-	}
-	// Add to map of load balancers
-	previousLoadBalancers[id] = lbInfo
-	return lbInfo, err
-}
+	LogJson("hostComputeLoadBalancer", lb, "Hns loadbalancer policy resource", 1)
 
+	return &loadBalancerInfo{
+		hnsID: lb.Id,
+	}, err
+}
 func (hns hnsV2) deleteLoadBalancer(hnsID string) error {
 	lb, err := hcn.GetLoadBalancerByID(hnsID)
 	if err != nil {
