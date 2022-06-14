@@ -108,7 +108,7 @@ var registeredCodecs = make(map[string]Codec)
 // more details.
 //
 // NOTE: this function must only be called during initialization time (i.e. in
-// an init() function), and is not thread-safe.  If multiple Compressors are
+// an init() function), and is not thread-safe.  If multiple Codecs are
 // registered with the same name, the one registered last will take effect.
 func RegisterCodec(codec Codec) {
 	if codec == nil {
