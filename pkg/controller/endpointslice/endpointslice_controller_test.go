@@ -280,10 +280,9 @@ func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
 	assert.Nil(t, err, "Expected no error syncing service")
 
 	// The EndpointSlice marked for deletion should be ignored by the controller, and thus
-	// should not result in more than one action from the client (an update to the non-terminating
-	// EndpointSlice removing the trigger time annotation.)
-	if len(client.Actions()) != numActionsBefore+1 {
-		t.Errorf("Expected 1 more action, got %d", len(client.Actions())-numActionsBefore)
+	// should not result in any action.
+	if len(client.Actions()) != numActionsBefore {
+		t.Errorf("Expected 0 more actions, got %d", len(client.Actions())-numActionsBefore)
 	}
 }
 

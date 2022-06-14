@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -460,34 +459,154 @@ func TestReconcile1Pod(t *testing.T) {
 	}
 }
 
-// given an existing endpoint slice and no pods matching the service, the existing
-// slice should be updated to a placeholder (not deleted)
+// given an existing placeholder endpoint slice and no pods matching the service, the existing
+// slice should not change the placeholder
 func TestReconcile1EndpointSlice(t *testing.T) {
-	client := newClientset()
-	setupMetrics()
 	namespace := "test"
-	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
-	endpointSlice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
+	svc, epMeta := newServiceAndEndpointMeta("foo", namespace)
+	emptySlice := newEmptyEndpointSlice(1, namespace, epMeta, svc)
+	emptySlice.ObjectMeta.Labels = map[string]string{"bar": "baz"}
 
-	_, createErr := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), endpointSlice1, metav1.CreateOptions{})
-	assert.Nil(t, createErr, "Expected no error creating endpoint slice")
+	testCases := []struct {
+		desc        string
+		existing    *discovery.EndpointSlice
+		wantUpdate  bool
+		wantMetrics expectedMetrics
+	}{
+		{
+			desc:        "No existing placeholder",
+			wantUpdate:  true,
+			wantMetrics: expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 1},
+		},
+		{
+			desc:        "Existing placeholder that's the same",
+			existing:    newEndpointSlice(&svc, &endpointMeta{Ports: []discovery.EndpointPort{}, AddressType: discovery.AddressTypeIPv4}),
+			wantMetrics: expectedMetrics{desiredSlices: 0, actualSlices: 0, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 0},
+		},
+		{
+			desc:        "Existing placeholder that's different",
+			existing:    emptySlice,
+			wantUpdate:  true,
+			wantMetrics: expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 1, numDeleted: 0, slicesChangedPerSync: 1},
+		},
+	}
 
-	numActionsBefore := len(client.Actions())
-	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
-	reconcileHelper(t, r, &svc, []*corev1.Pod{}, []*discovery.EndpointSlice{endpointSlice1}, time.Now())
-	assert.Len(t, client.Actions(), numActionsBefore+1, "Expected 1 additional clientset action")
-	actions := client.Actions()
-	assert.True(t, actions[numActionsBefore].Matches("update", "endpointslices"), "Action should be update endpoint slice")
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			client := newClientset()
+			setupMetrics()
 
-	slices := fetchEndpointSlices(t, client, namespace)
-	assert.Len(t, slices, 1, "Expected 1 endpoint slices")
+			existingSlices := []*discovery.EndpointSlice{}
+			if tc.existing != nil {
+				existingSlices = append(existingSlices, tc.existing)
+				_, createErr := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), tc.existing, metav1.CreateOptions{})
+				assert.Nil(t, createErr, "Expected no error creating endpoint slice")
+			}
 
-	assert.Regexp(t, "^"+svc.Name, slices[0].Name)
-	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
-	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
-	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
-	expectTrackedGeneration(t, r.endpointSliceTracker, &slices[0], 1)
-	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 1, numDeleted: 0, slicesChangedPerSync: 1})
+			numActionsBefore := len(client.Actions())
+			r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+			reconcileHelper(t, r, &svc, []*corev1.Pod{}, existingSlices, time.Now())
+
+			var numUpdates int
+			if tc.wantUpdate {
+				numUpdates = 1
+			}
+			wantActions := numActionsBefore + numUpdates
+			assert.Len(t, client.Actions(), wantActions, "Expected %d additional clientset actions", numUpdates)
+
+			slices := fetchEndpointSlices(t, client, namespace)
+			assert.Len(t, slices, 1, "Expected 1 endpoint slices")
+
+			if !tc.wantUpdate {
+				assert.Regexp(t, "^"+svc.Name, slices[0].Name)
+				assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
+				assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
+				assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
+				if tc.existing == nil {
+					expectTrackedGeneration(t, r.endpointSliceTracker, &slices[0], 1)
+				}
+			}
+			expectMetrics(t, tc.wantMetrics)
+		})
+	}
+}
+
+func TestPlaceHolderSliceCompare(t *testing.T) {
+	testCases := []struct {
+		desc string
+		x    *discovery.EndpointSlice
+		y    *discovery.EndpointSlice
+		want bool
+	}{
+		{
+			desc: "Both nil",
+			want: true,
+		},
+		{
+			desc: "Y is nil",
+			x:    &discovery.EndpointSlice{},
+			want: false,
+		},
+		{
+			desc: "X is nil",
+			y:    &discovery.EndpointSlice{},
+			want: false,
+		},
+		{
+			desc: "Both are empty and non-nil",
+			x:    &discovery.EndpointSlice{},
+			y:    &discovery.EndpointSlice{},
+			want: true,
+		},
+		{
+			desc: "Only ObjectMeta.Name has diff",
+			x: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			}},
+			y: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+			}},
+			want: true,
+		},
+		{
+			desc: "Only ObjectMeta.Labels has diff",
+			x: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"foo": "true",
+				},
+			}},
+			y: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"bar": "true",
+				},
+			}},
+			want: false,
+		},
+		{
+			desc: "Creation time is different",
+			x: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.Unix(1, 0),
+			}},
+			y: &discovery.EndpointSlice{ObjectMeta: metav1.ObjectMeta{
+				CreationTimestamp: metav1.Unix(2, 0),
+			}},
+			want: true,
+		},
+		{
+			desc: "Different except for ObjectMeta",
+			x:    &discovery.EndpointSlice{AddressType: discovery.AddressTypeIPv4},
+			y:    &discovery.EndpointSlice{AddressType: discovery.AddressTypeIPv6},
+			want: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			got := placeholderSliceCompare.DeepEqual(tc.x, tc.y)
+			if got != tc.want {
+				t.Errorf("sliceEqual(%v, %v) = %t, want %t", tc.x, tc.y, got, tc.want)
+			}
+		})
+	}
 }
 
 // when a Service has PublishNotReadyAddresses set to true, corresponding
