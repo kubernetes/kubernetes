@@ -47,7 +47,7 @@ type PolicyRule struct {
 	Verbs []string
 
 	// APIGroups is the name of the APIGroup that contains the resources.
-	// If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.
+	// If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed. "" represents the core API group and "*" represents all API groups.
 	APIGroups []string
 	// Resources is a list of resources this rule applies to.  '*' represents all resources in the specified apiGroups.
 	// '*/foo' represents the subresource 'foo' for all resources in the specified apiGroups.
