@@ -1131,6 +1131,8 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Services should be able to change the type from NodePort to ExternalName [Conformance]": "should be able to change the type from NodePort to ExternalName [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[Top Level] [sig-network] Services should be able to connect to terminating and unready endpoints if PublishNotReadyAddresses is true": "should be able to connect to terminating and unready endpoints if PublishNotReadyAddresses is true [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[Top Level] [sig-network] Services should be able to create a functioning NodePort service [Conformance]": "should be able to create a functioning NodePort service [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should be able to switch session affinity for NodePort service [LinuxOnly] [Conformance]": "should be able to switch session affinity for NodePort service [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
@@ -1178,6 +1180,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-network] Services should implement service.kubernetes.io/headless": "should implement service.kubernetes.io/headless [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should implement service.kubernetes.io/service-proxy-name": "should implement service.kubernetes.io/service-proxy-name [Disabled:Broken] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Services should not be able to connect to terminating and unready endpoints if PublishNotReadyAddresses is false": "should not be able to connect to terminating and unready endpoints if PublishNotReadyAddresses is false [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should preserve source pod IP for traffic thru service cluster IP [LinuxOnly]": "should preserve source pod IP for traffic thru service cluster IP [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1454,6 +1458,10 @@ var annotations = map[string]string{
 	"[Top Level] [sig-node] Probing container should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20] [NodeConformance]": "should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20] [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-node] Probing container should have monotonically increasing restart count [NodeConformance] [Conformance]": "should have monotonically increasing restart count [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should mark readiness on pods to false and disable liveness probes while pod is in progress of terminating": "should mark readiness on pods to false and disable liveness probes while pod is in progress of terminating [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe": "should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-node] Probing container should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20] [NodeConformance]": "should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20] [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 

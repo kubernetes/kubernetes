@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
@@ -29,6 +29,8 @@ const (
 	UnknownContainerStatuses = "UnknownContainerStatuses"
 	// PodCompleted says that all related containers have succeeded.
 	PodCompleted = "PodCompleted"
+	// PodFailed says that the pod has failed and as such the containers have failed.
+	PodFailed = "PodFailed"
 	// ContainersNotReady says that one or more containers are not ready.
 	ContainersNotReady = "ContainersNotReady"
 	// ContainersNotInitialized says that one or more init containers have not succeeded.
@@ -62,11 +64,12 @@ func GenerateContainersReadyCondition(spec *v1.PodSpec, containerStatuses []v1.C
 
 	// If all containers are known and succeeded, just return PodCompleted.
 	if podPhase == v1.PodSucceeded && len(unknownContainers) == 0 {
-		return v1.PodCondition{
-			Type:   v1.ContainersReady,
-			Status: v1.ConditionFalse,
-			Reason: PodCompleted,
-		}
+		return generateContainersReadyConditionForTerminalPhase(podPhase)
+	}
+
+	// If the pod phase is failed, explicitly set the ready condition to false for containers since they may be in progress of terminating.
+	if podPhase == v1.PodFailed {
+		return generateContainersReadyConditionForTerminalPhase(podPhase)
 	}
 
 	// Generate message for containers in unknown condition.
@@ -190,4 +193,34 @@ func GeneratePodInitializedCondition(spec *v1.PodSpec, containerStatuses []v1.Co
 		Type:   v1.PodInitialized,
 		Status: v1.ConditionTrue,
 	}
+}
+
+func generateContainersReadyConditionForTerminalPhase(podPhase v1.PodPhase) v1.PodCondition {
+	condition := v1.PodCondition{
+		Type:   v1.ContainersReady,
+		Status: v1.ConditionFalse,
+	}
+
+	if podPhase == v1.PodFailed {
+		condition.Reason = PodFailed
+	} else if podPhase == v1.PodSucceeded {
+		condition.Reason = PodCompleted
+	}
+
+	return condition
+}
+
+func generatePodReadyConditionForTerminalPhase(podPhase v1.PodPhase) v1.PodCondition {
+	condition := v1.PodCondition{
+		Type:   v1.PodReady,
+		Status: v1.ConditionFalse,
+	}
+
+	if podPhase == v1.PodFailed {
+		condition.Reason = PodFailed
+	} else if podPhase == v1.PodSucceeded {
+		condition.Reason = PodCompleted
+	}
+
+	return condition
 }
