@@ -17,8 +17,9 @@ limitations under the License.
 package autoscaling
 
 import (
-	"k8s.io/pod-security-admission/api"
 	"time"
+
+	"k8s.io/pod-security-admission/api"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/test/e2e/framework"
