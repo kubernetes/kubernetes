@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -1631,7 +1632,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			if !errors.Is(err, tc.wantErr) {
 				t.Errorf("Got error %v, want %v", err, tc.wantErr)
 			}
-			if diff := cmp.Diff(tc.wantStatusUpdates, statusUpdates); diff != "" {
+			if diff := cmp.Diff(tc.wantStatusUpdates, statusUpdates, cmpopts.IgnoreFields(batch.JobCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
 				t.Errorf("Unexpected status updates (-want,+got):\n%s", diff)
 			}
 			rmFinalizers := len(fakePodControl.Patches)
@@ -1862,6 +1863,49 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	if actual != nil {
 		t.Error("Unexpected job modification")
 	}
+}
+
+func TestSingleJobFailedCondition(t *testing.T) {
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+	fakePodControl := controller.FakePodControl{}
+	manager.podControl = &fakePodControl
+	manager.podStoreSynced = alwaysReady
+	manager.jobStoreSynced = alwaysReady
+	var actual *batch.Job
+	manager.updateStatusHandler = func(ctx context.Context, job *batch.Job) (*batch.Job, error) {
+		actual = job
+		return job, nil
+	}
+
+	job := newJob(1, 1, 6, batch.NonIndexedCompletion)
+	activeDeadlineSeconds := int64(10)
+	job.Spec.ActiveDeadlineSeconds = &activeDeadlineSeconds
+	start := metav1.Unix(metav1.Now().Time.Unix()-15, 0)
+	job.Status.StartTime = &start
+	job.Status.Conditions = append(job.Status.Conditions, *newCondition(batch.JobFailed, v1.ConditionFalse, "DeadlineExceeded", "Job was active longer than specified deadline"))
+	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+	forget, err := manager.syncJob(context.TODO(), testutil.GetKey(job, t))
+	if err != nil {
+		t.Errorf("Unexpected error when syncing jobs %v", err)
+	}
+	if !forget {
+		t.Errorf("Unexpected forget value. Expected %v, saw %v\n", true, forget)
+	}
+	if len(fakePodControl.DeletePodName) != 0 {
+		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", 0, len(fakePodControl.DeletePodName))
+	}
+	if actual == nil {
+		t.Error("Expected job modification\n")
+	}
+	failedConditions := getConditionsByType(actual.Status.Conditions, batch.JobFailed)
+	if len(failedConditions) != 1 {
+		t.Error("Unexpected number of failed conditions\n")
+	}
+	if failedConditions[0].Status != v1.ConditionTrue {
+		t.Errorf("Unexpected status for the failed condition. Expected: %v, saw %v\n", v1.ConditionTrue, failedConditions[0].Status)
+	}
+
 }
 
 func TestSyncJobComplete(t *testing.T) {
@@ -3137,12 +3181,7 @@ func TestEnsureJobConditions(t *testing.T) {
 			if len(gotList) != len(tc.expectList) {
 				t.Errorf("got a list of length %d, want %d", len(gotList), len(tc.expectList))
 			}
-			for i := range gotList {
-				// Make timestamps the same before comparing the two lists.
-				gotList[i].LastProbeTime = tc.expectList[i].LastProbeTime
-				gotList[i].LastTransitionTime = tc.expectList[i].LastTransitionTime
-			}
-			if diff := cmp.Diff(tc.expectList, gotList); diff != "" {
+			if diff := cmp.Diff(tc.expectList, gotList, cmpopts.IgnoreFields(batch.JobCondition{}, "LastProbeTime", "LastTransitionTime")); diff != "" {
 				t.Errorf("Unexpected JobCondition list: (-want,+got):\n%s", diff)
 			}
 		})
@@ -3299,6 +3338,16 @@ func buildPod() podBuilder {
 			UID: types.UID(rand.String(5)),
 		},
 	}}
+}
+
+func getConditionsByType(list []batch.JobCondition, cType batch.JobConditionType) []*batch.JobCondition {
+	var result []*batch.JobCondition
+	for i := range list {
+		if list[i].Type == cType {
+			result = append(result, &list[i])
+		}
+	}
+	return result
 }
 
 func (pb podBuilder) name(n string) podBuilder {

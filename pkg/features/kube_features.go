@@ -692,6 +692,7 @@ const (
 	// owner: @aojea
 	// kep: http://kep.k8s.io/3070
 	// alpha: v1.24
+	// beta: v1.25
 	//
 	// Subdivide the ClusterIP range for dynamic and static IP allocation.
 	ServiceIPStaticSubrange featuregate.Feature = "ServiceIPStaticSubrange"
@@ -830,7 +831,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIMigrationAWS: {Default: true, PreRelease: featuregate.Beta},
 
-	CSIMigrationAzureDisk: {Default: true, PreRelease: featuregate.GA}, // On by default in 1.23 (requires Azure Disk CSI driver)
+	CSIMigrationAzureDisk: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // On by default in 1.23 (requires Azure Disk CSI driver)
 
 	CSIMigrationAzureFile: {Default: true, PreRelease: featuregate.Beta}, // On by default in 1.24 (requires Azure File CSI driver)
 
@@ -990,7 +991,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SeccompDefault: {Default: false, PreRelease: featuregate.Alpha},
 
-	ServiceIPStaticSubrange: {Default: false, PreRelease: featuregate.Alpha},
+	ServiceIPStaticSubrange: {Default: false, PreRelease: featuregate.Beta},
 
 	ServiceInternalTrafficPolicy: {Default: true, PreRelease: featuregate.Beta},
 

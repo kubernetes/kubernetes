@@ -26,28 +26,25 @@ import (
 
 // Body implements acceptable body over a string.
 type Body struct {
-	s             string
-	b             []byte
+	src           []byte
+	buf           []byte
 	isOpen        bool
 	closeAttempts int
 }
 
 // NewBody creates a new instance of Body.
 func NewBody(s string) *Body {
-	return (&Body{s: s}).reset()
+	return (&Body{src: []byte(s)}).reset()
 }
 
 // NewBodyWithBytes creates a new instance of Body.
 func NewBodyWithBytes(b []byte) *Body {
-	return &Body{
-		b:      b,
-		isOpen: true,
-	}
+	return (&Body{src: b}).reset()
 }
 
 // NewBodyClose creates a new instance of Body.
 func NewBodyClose(s string) *Body {
-	return &Body{s: s}
+	return &Body{src: []byte(s)}
 }
 
 // Read reads into the passed byte slice and returns the bytes read.
@@ -55,11 +52,11 @@ func (body *Body) Read(b []byte) (n int, err error) {
 	if !body.IsOpen() {
 		return 0, fmt.Errorf("ERROR: Body has been closed")
 	}
-	if len(body.b) == 0 {
+	if len(body.buf) == 0 {
 		return 0, io.EOF
 	}
-	n = copy(b, body.b)
-	body.b = body.b[n:]
+	n = copy(b, body.buf)
+	body.buf = body.buf[n:]
 	return n, nil
 }
 
@@ -84,7 +81,7 @@ func (body *Body) IsOpen() bool {
 
 func (body *Body) reset() *Body {
 	body.isOpen = true
-	body.b = []byte(body.s)
+	body.buf = body.src
 	return body
 }
 
@@ -93,7 +90,7 @@ func (body *Body) Length() int64 {
 	if body == nil {
 		return 0
 	}
-	return int64(len(body.b))
+	return int64(len(body.src))
 }
 
 type response struct {

@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"strings"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 
 	builderutil "k8s.io/kube-openapi/pkg/builder3/util"
 	"k8s.io/kube-openapi/pkg/common"

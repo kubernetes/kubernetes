@@ -368,6 +368,9 @@ func (c *Controller) syncService(key string) error {
 		return err
 	}
 
+	// Drop EndpointSlices that have been marked for deletion to prevent the controller from getting stuck.
+	endpointSlices = dropEndpointSlicesPendingDeletion(endpointSlices)
+
 	if c.endpointSliceTracker.StaleSlices(service, endpointSlices) {
 		return endpointsliceutil.NewStaleInformerCache("EndpointSlice informer cache is out of date")
 	}
@@ -560,4 +563,15 @@ func trackSync(err error) {
 		}
 	}
 	endpointslicemetrics.EndpointSliceSyncs.WithLabelValues(metricLabel).Inc()
+}
+
+func dropEndpointSlicesPendingDeletion(endpointSlices []*discovery.EndpointSlice) []*discovery.EndpointSlice {
+	n := 0
+	for _, endpointSlice := range endpointSlices {
+		if endpointSlice.DeletionTimestamp == nil {
+			endpointSlices[n] = endpointSlice
+			n++
+		}
+	}
+	return endpointSlices[:n]
 }
