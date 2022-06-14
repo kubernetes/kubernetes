@@ -141,16 +141,6 @@ func direntNamlen(buf []byte) (uint64, bool) {
 func PtraceAttach(pid int) (err error) { return ptrace(PT_ATTACH, pid, 0, 0) }
 func PtraceDetach(pid int) (err error) { return ptrace(PT_DETACH, pid, 0, 0) }
 
-type attrList struct {
-	bitmapCount uint16
-	_           uint16
-	CommonAttr  uint32
-	VolAttr     uint32
-	DirAttr     uint32
-	FileAttr    uint32
-	Forkattr    uint32
-}
-
 //sysnb	pipe(p *[2]int32) (err error)
 
 func Pipe(p []int) (err error) {
@@ -282,36 +272,7 @@ func Flistxattr(fd int, dest []byte) (sz int, err error) {
 	return flistxattr(fd, xattrPointer(dest), len(dest), 0)
 }
 
-func setattrlistTimes(path string, times []Timespec, flags int) error {
-	_p0, err := BytePtrFromString(path)
-	if err != nil {
-		return err
-	}
-
-	var attrList attrList
-	attrList.bitmapCount = ATTR_BIT_MAP_COUNT
-	attrList.CommonAttr = ATTR_CMN_MODTIME | ATTR_CMN_ACCTIME
-
-	// order is mtime, atime: the opposite of Chtimes
-	attributes := [2]Timespec{times[1], times[0]}
-	options := 0
-	if flags&AT_SYMLINK_NOFOLLOW != 0 {
-		options |= FSOPT_NOFOLLOW
-	}
-	return setattrlist(
-		_p0,
-		unsafe.Pointer(&attrList),
-		unsafe.Pointer(&attributes),
-		unsafe.Sizeof(attributes),
-		options)
-}
-
-//sys	setattrlist(path *byte, list unsafe.Pointer, buf unsafe.Pointer, size uintptr, options int) (err error)
-
-func utimensat(dirfd int, path string, times *[2]Timespec, flags int) error {
-	// Darwin doesn't support SYS_UTIMENSAT
-	return ENOSYS
-}
+//sys	utimensat(dirfd int, path string, times *[2]Timespec, flags int) (err error)
 
 /*
  * Wrapped
@@ -543,11 +504,12 @@ func SysctlKinfoProcSlice(name string, args ...int) ([]KinfoProc, error) {
 //sys	Mkdirat(dirfd int, path string, mode uint32) (err error)
 //sys	Mkfifo(path string, mode uint32) (err error)
 //sys	Mknod(path string, mode uint32, dev int) (err error)
+//sys	Mount(fsType string, dir string, flags int, data unsafe.Pointer) (err error)
 //sys	Open(path string, mode int, perm uint32) (fd int, err error)
 //sys	Openat(dirfd int, path string, mode int, perm uint32) (fd int, err error)
 //sys	Pathconf(path string, name int) (val int, err error)
-//sys	Pread(fd int, p []byte, offset int64) (n int, err error)
-//sys	Pwrite(fd int, p []byte, offset int64) (n int, err error)
+//sys	pread(fd int, p []byte, offset int64) (n int, err error)
+//sys	pwrite(fd int, p []byte, offset int64) (n int, err error)
 //sys	read(fd int, p []byte) (n int, err error)
 //sys	Readlink(path string, buf []byte) (n int, err error)
 //sys	Readlinkat(dirfd int, path string, buf []byte) (n int, err error)
@@ -611,7 +573,6 @@ func SysctlKinfoProcSlice(name string, args ...int) ([]KinfoProc, error) {
 // Nfssvc
 // Getfh
 // Quotactl
-// Mount
 // Csops
 // Waitid
 // Add_profil

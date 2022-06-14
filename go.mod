@@ -43,7 +43,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/cadvisor v0.44.1
 	github.com/google/gnostic v0.5.7-v3refs
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.8
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/heketi/heketi v10.3.0+incompatible
@@ -82,10 +82,10 @@ require (
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
-	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d
+	golang.org/x/sys v0.0.0-20220614162138-6c1b26c55098
 	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
 	golang.org/x/time v0.0.0-20220609170525-579cf78fd858
-	golang.org/x/tools v0.1.12-0.20220613210750-c15c04572c9d
+	golang.org/x/tools v0.1.12-0.20220614152012-ed2761110792
 	gonum.org/v1/gonum v0.6.2
 	google.golang.org/api v0.46.0
 	google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6
@@ -245,10 +245,10 @@ require (
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-	golang.org/x/exp v0.0.0-20210220032938-85be41e4509f // indirect
-	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
-	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d // indirect
+	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
+	golang.org/x/text v0.3.8-0.20220509174342-b4bca84b0361 // indirect
+	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f // indirect
 	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -268,7 +268,6 @@ replace (
 	cloud.google.com/go => cloud.google.com/go v0.81.0
 	cloud.google.com/go/bigquery => cloud.google.com/go/bigquery v1.8.0
 	cloud.google.com/go/storage => cloud.google.com/go/storage v1.10.0
-	dmitri.shuralyov.com/gpu/mtl => dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037
 	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v55.0.0+incompatible
 	github.com/Azure/go-ansiterm => github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
@@ -281,7 +280,6 @@ replace (
 	github.com/Azure/go-autorest/logger => github.com/Azure/go-autorest/logger v0.2.1
 	github.com/Azure/go-autorest/tracing => github.com/Azure/go-autorest/tracing v0.6.0
 	github.com/BurntSushi/toml => github.com/BurntSushi/toml v0.3.1
-	github.com/BurntSushi/xgb => github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802
 	github.com/GoogleCloudPlatform/k8s-cloud-provider => github.com/GoogleCloudPlatform/k8s-cloud-provider v1.16.1-0.20210702024009-ea6160c1d0e3
 	github.com/JeffAshton/win_pdh => github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/MakeNowJust/heredoc => github.com/MakeNowJust/heredoc v1.0.0
@@ -363,7 +361,6 @@ replace (
 	github.com/getsentry/raven-go => github.com/getsentry/raven-go v0.2.0
 	github.com/ghodss/yaml => github.com/ghodss/yaml v1.0.0
 	github.com/go-errors/errors => github.com/go-errors/errors v1.0.1
-	github.com/go-gl/glfw/v3.3/glfw => github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4
 	github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
 	github.com/go-kit/log => github.com/go-kit/log v0.1.0
 	github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.5.0
@@ -390,7 +387,7 @@ replace (
 	github.com/google/cadvisor => github.com/google/cadvisor v0.44.1
 	github.com/google/cel-go => github.com/google/cel-go v0.11.2
 	github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
-	github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp => github.com/google/go-cmp v0.5.8
 	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 	github.com/google/martian/v3 => github.com/google/martian/v3 v3.1.0
 	github.com/google/pprof => github.com/google/pprof v0.0.0-20210226084205-cbba55b83ad5
@@ -531,20 +528,19 @@ replace (
 	go.uber.org/multierr => go.uber.org/multierr v1.6.0
 	go.uber.org/zap => go.uber.org/zap v1.19.0
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
-	golang.org/x/exp => golang.org/x/exp v0.0.0-20210220032938-85be41e4509f
-	golang.org/x/image => golang.org/x/image v0.0.0-20190802002840-cff245a6509b
+	golang.org/x/exp => golang.org/x/exp v0.0.0-20220613132600-b0d781184e0d
+	golang.org/x/image => golang.org/x/image v0.0.0-20180708004352-c73c2afc3b81
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
-	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20201217150744-e6ae53a27f4f
-	golang.org/x/mod => golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
+	golang.org/x/mod => golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
 	golang.org/x/net => golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20220614162138-6c1b26c55098
 	golang.org/x/term => golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
-	golang.org/x/text => golang.org/x/text v0.3.7
+	golang.org/x/text => golang.org/x/text v0.3.8-0.20220509174342-b4bca84b0361
 	golang.org/x/time => golang.org/x/time v0.0.0-20220609170525-579cf78fd858
-	golang.org/x/tools => golang.org/x/tools v0.1.12-0.20220613210750-c15c04572c9d
-	golang.org/x/xerrors => golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
+	golang.org/x/tools => golang.org/x/tools v0.1.12-0.20220614152012-ed2761110792
+	golang.org/x/xerrors => golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f
 	gonum.org/v1/gonum => gonum.org/v1/gonum v0.6.2
 	gonum.org/v1/netlib => gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e
 	gonum.org/v1/plot => gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b

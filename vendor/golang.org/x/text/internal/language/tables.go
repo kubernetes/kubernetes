@@ -121,9 +121,10 @@ const langPrivateEnd = 0x3179
 // lang holds an alphabetically sorted list of ISO-639 language identifiers.
 // All entries are 4 bytes. The index of the identifier (divided by 4) is the language tag.
 // For 2-byte language identifiers, the two successive bytes have the following meaning:
-//     - if the first letter of the 2- and 3-letter ISO codes are the same:
-//       the second and third letter of the 3-letter ISO code.
-//     - otherwise: a 0 and a by 2 bits right-shifted index into altLangISO3.
+//   - if the first letter of the 2- and 3-letter ISO codes are the same:
+//     the second and third letter of the 3-letter ISO code.
+//   - otherwise: a 0 and a by 2 bits right-shifted index into altLangISO3.
+//
 // For 3-byte language identifiers the 4th byte is 0.
 const lang tag.Index = "" + // Size: 5324 bytes
 	"---\x00aaaraai\x00aak\x00aau\x00abbkabi\x00abq\x00abr\x00abt\x00aby\x00a" +
@@ -1086,9 +1087,9 @@ var regionTypes = [358]uint8{
 
 // regionISO holds a list of alphabetically sorted 2-letter ISO region codes.
 // Each 2-letter codes is followed by two bytes with the following meaning:
-//     - [A-Z}{2}: the first letter of the 2-letter code plus these two
-//                 letters form the 3-letter ISO code.
-//     - 0, n:     index into altRegionISO3.
+//   - [A-Z]{2}: the first letter of the 2-letter code plus these two
+//     letters form the 3-letter ISO code.
+//   - 0, n:     index into altRegionISO3.
 const regionISO tag.Index = "" + // Size: 1308 bytes
 	"AAAAACSCADNDAEREAFFGAGTGAIIAALLBAMRMANNTAOGOAQTAARRGASSMATUTAUUSAWBWAXLA" +
 	"AZZEBAIHBBRBBDGDBEELBFFABGGRBHHRBIDIBJENBLLMBMMUBNRNBOOLBQESBRRABSHSBTTN" +
@@ -1206,7 +1207,9 @@ var m49 = [358]int16{
 
 // m49Index gives indexes into fromM49 based on the three most significant bits
 // of a 10-bit UN.M49 code. To search an UN.M49 code in fromM49, search in
-//    fromM49[m49Index[msb39(code)]:m49Index[msb3(code)+1]]
+//
+//	fromM49[m49Index[msb39(code)]:m49Index[msb3(code)+1]]
+//
 // for an entry where the first 7 bits match the 7 lsb of the UN.M49 code.
 // The region code is stored in the 9 lsb of the indexed value.
 // Size: 18 bytes, 9 elements

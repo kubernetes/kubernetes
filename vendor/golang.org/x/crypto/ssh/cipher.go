@@ -640,7 +640,7 @@ const chacha20Poly1305ID = "chacha20-poly1305@openssh.com"
 // chacha20Poly1305Cipher implements the chacha20-poly1305@openssh.com
 // AEAD, which is described here:
 //
-//   https://tools.ietf.org/html/draft-josefsson-ssh-chacha20-poly1305-openssh-00
+//	https://tools.ietf.org/html/draft-josefsson-ssh-chacha20-poly1305-openssh-00
 //
 // the methods here also implement padding, which RFC4253 Section 6
 // also requires of stream ciphers.

@@ -15,14 +15,14 @@
 // For more information on using workload identity federation, refer to
 // https://cloud.google.com/iam/docs/how-to#using-workload-identity-federation.
 //
-// OAuth2 Configs
+// # OAuth2 Configs
 //
 // Two functions in this package return golang.org/x/oauth2.Config values from Google credential
 // data. Google supports two JSON formats for OAuth2 credentials: one is handled by ConfigFromJSON,
 // the other by JWTConfigFromJSON. The returned Config can be used to obtain a TokenSource or
 // create an http.Client.
 //
-// Workload Identity Federation
+// # Workload Identity Federation
 //
 // Using workload identity federation, your application can access Google Cloud
 // resources from Amazon Web Services (AWS), Microsoft Azure or any identity
@@ -36,9 +36,9 @@
 // Follow the detailed instructions on how to configure Workload Identity Federation
 // in various platforms:
 //
-//   Amazon Web Services (AWS): https://cloud.google.com/iam/docs/access-resources-aws
-//   Microsoft Azure: https://cloud.google.com/iam/docs/access-resources-azure
-//   OIDC identity provider: https://cloud.google.com/iam/docs/access-resources-oidc
+//	Amazon Web Services (AWS): https://cloud.google.com/iam/docs/access-resources-aws
+//	Microsoft Azure: https://cloud.google.com/iam/docs/access-resources-azure
+//	OIDC identity provider: https://cloud.google.com/iam/docs/access-resources-oidc
 //
 // For OIDC providers, the library can retrieve OIDC tokens either from a
 // local file location (file-sourced credentials) or from a local server
@@ -51,8 +51,7 @@
 // return the OIDC token. The response can be in plain text or JSON.
 // Additional required request headers can also be specified.
 //
-//
-// Credentials
+// # Credentials
 //
 // The Credentials type represents Google credentials, including Application Default
 // Credentials.

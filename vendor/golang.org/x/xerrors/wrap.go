@@ -35,6 +35,8 @@ func (e noWrapper) FormatError(p Printer) (next error) {
 
 // Unwrap returns the result of calling the Unwrap method on err, if err implements
 // Unwrap. Otherwise, Unwrap returns nil.
+//
+// Deprecated: As of Go 1.13, use errors.Unwrap instead.
 func Unwrap(err error) error {
 	u, ok := err.(Wrapper)
 	if !ok {
@@ -47,6 +49,8 @@ func Unwrap(err error) error {
 //
 // An error is considered to match a target if it is equal to that target or if
 // it implements a method Is(error) bool such that Is(target) returns true.
+//
+// Deprecated: As of Go 1.13, use errors.Is instead.
 func Is(err, target error) bool {
 	if target == nil {
 		return err == target
@@ -77,6 +81,8 @@ func Is(err, target error) bool {
 //
 // The As method should set the target to its value and return true if err
 // matches the type to which target points.
+//
+// Deprecated: As of Go 1.13, use errors.As instead.
 func As(err error, target interface{}) bool {
 	if target == nil {
 		panic("errors: target cannot be nil")

@@ -48,9 +48,9 @@ require (
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d // indirect
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
-	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d // indirect
+	golang.org/x/sys v0.0.0-20220614162138-6c1b26c55098 // indirect
 	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/text v0.3.8-0.20220509174342-b4bca84b0361 // indirect
 	golang.org/x/time v0.0.0-20220609170525-579cf78fd858 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
@@ -76,13 +76,3 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/sample-cli-plugin => ../sample-cli-plugin
 )
-
-replace golang.org/x/net => golang.org/x/net v0.0.0-20220607020251-c690dde0001d
-
-replace golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
-
-replace golang.org/x/sys => golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d
-
-replace golang.org/x/term => golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
-
-replace golang.org/x/time => golang.org/x/time v0.0.0-20220609170525-579cf78fd858

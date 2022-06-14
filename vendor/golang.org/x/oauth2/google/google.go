@@ -139,6 +139,7 @@ func (f *credentialsFile) jwtConfig(scopes []string, subject string) *jwt.Config
 		Scopes:       scopes,
 		TokenURL:     f.TokenURL,
 		Subject:      subject, // This is the user email to impersonate
+		Audience:     f.Audience,
 	}
 	if cfg.TokenURL == "" {
 		cfg.TokenURL = JWTTokenURL

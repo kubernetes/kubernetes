@@ -460,6 +460,8 @@ func (c *Certificate) SignCert(rand io.Reader, authority Signer) error {
 
 // certKeyAlgoNames is a mapping from known certificate algorithm names to the
 // corresponding public key signature algorithm.
+//
+// This map must be kept in sync with the one in agent/client.go.
 var certKeyAlgoNames = map[string]string{
 	CertAlgoRSAv01:        KeyAlgoRSA,
 	CertAlgoRSASHA256v01:  KeyAlgoRSASHA256,
