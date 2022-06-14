@@ -15,7 +15,8 @@ func (a *cpuAccumulator) getUnCoreCacheID(cpuid int) int {
 
 func (a *cpuAccumulator) tryTakeAlignedUncoreCacheCPUs(numCpus int) {
 	if numCpus <= 1 {
-		return // zero?? or one cpu is already aligned, let the next cpu manager allocate it better
+		fmt.Println("UCC IGNORE SINGLE NUM CPUS") // FIXME
+		return                                    // zero?? or one cpu is already aligned, let the next cpu manager allocate it better
 	}
 	if !isUncoreCacheAlignEnabled() {
 		return // TODO remove this when feature gate is default true... or not
@@ -26,13 +27,44 @@ func (a *cpuAccumulator) tryTakeAlignedUncoreCacheCPUs(numCpus int) {
 	fmt.Println("availcpus:", ua.AvailableCpuIdArray) // FIXME
 	fmt.Println("ucc2count:", ua.Ucc2Count)           // FIXME
 	if ua.numberAvailableCaches() <= 1 {
-		return // all remaining free cpus have same uncore cache, let the next cpu manager allocate it better
+		// all remaining free cpus have same uncore cache, let the next cpu manager allocate it better
+		fmt.Println("UCC IGNORE SINGLE CACHES") // FIXME
+		return
 	}
-	uccPick := ua.pickCache(numCpus)
+	uccPick := ua.pickCache()
 	if uccPick == -1 {
-		return // no available ucc big enough for numCpus
+		// no available ucc big enough for numCpus
+		fmt.Println("UCC NO CACHE BIG ENOUGH") // FIXME
+		return
 	}
 	ua.takeCpusFromCache(numCpus, uccPick)
+}
+
+func (a *cpuAccumulator) tryMaskUncoreCacheCPUs() {
+	if !isUncoreCacheAlignEnabled() {
+		return // TODO remove this when feature gate is default true... or not
+	}
+	if a.numCPUsNeeded <= 1 {
+		fmt.Println("UCC IGNORE SINGLE NUM CPUS") // FIXME
+		return                                    // zero?? or one cpu is already aligned, let the next cpu manager allocate it better
+	}
+	ua := newUncoreAccumulator(a)
+	fmt.Println("")                                   // FIXME
+	fmt.Println("numCpus: ", a.numCPUsNeeded)         // FIXME
+	fmt.Println("availcpus:", ua.AvailableCpuIdArray) // FIXME
+	fmt.Println("ucc2count:", ua.Ucc2Count)           // FIXME
+	if ua.numberAvailableCaches() <= 1 {
+		// all remaining free cpus have same uncore cache already
+		fmt.Println("UCC SINGLE CACHE ALREADY") // FIXME
+		return
+	}
+	uccPick := ua.pickCache()
+	if uccPick == -1 {
+		// no available ucc big enough for numCpus
+		fmt.Println("UCC NO CACHE BIG ENOUGH") // FIXME
+		return
+	}
+	ua.maskUncoreCacheCpus(uccPick)
 }
 
 func isUncoreCacheAlignEnabled() bool {
@@ -68,10 +100,11 @@ func (ua *UncoreAccumulator) numberAvailableCaches() int {
 	return len(ua.Ucc2Count)
 }
 
-func (ua *UncoreAccumulator) pickCache(numCpus int) int {
+func (ua *UncoreAccumulator) pickCache() int {
 	// Deterministically choose ucc to pick from, if possible
 	uccPick := -1
 	countMin := -1
+	numCpus := ua.CpuAccumulator.numCPUsNeeded
 	for _, cpu := range ua.AvailableCpuIdArray {
 		ucc := ua.CpuAccumulator.getUnCoreCacheID(cpu)
 		count := ua.Ucc2Count[ucc]
@@ -103,6 +136,19 @@ func (ua *UncoreAccumulator) takeCpusFromCache(numCpus int, uccPick int) {
 			return // SUCCESS
 		}
 	}
+}
+
+func (ua *UncoreAccumulator) maskUncoreCacheCpus(uccPick int) {
+	builder := cpuset.NewBuilder()
+	for _, cpu := range ua.AvailableCpuIdArray {
+		if ua.CpuAccumulator.getUnCoreCacheID(cpu) != uccPick {
+			continue // only taking cpus in uccPick
+		}
+		builder.Add(cpu)
+	}
+	// change the original accumulator details to only include cpus from ucc pick
+	ua.CpuAccumulator.details = ua.CpuAccumulator.topo.CPUDetails.KeepOnly(builder.Result())
+	// Now, the next cpu managers can only take from this uncore cache
 }
 
 func (a *cpuAccumulator) OLDtryTakeAlignedUncoreCacheCPUs(numCpus int) {

@@ -582,43 +582,75 @@ var (
 	}
 
 	AMD_EPYC_7502P_32_Core_Processor = &topology.CPUTopology{
-		NumCPUs:      32,
+		NumCPUs:      64,
 		NumCores:     32,
 		NumSockets:   1,
 		NumNUMANodes: 1,
 		CPUDetails: map[int]topology.CPUInfo{
 			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			32: {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
 			1:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			33: {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
 			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			34: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
 			3:  {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			5:  {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			7:  {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			8:  {CoreID: 8, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			9:  {CoreID: 9, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			10: {CoreID: 10, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			11: {CoreID: 11, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			12: {CoreID: 12, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			13: {CoreID: 13, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			14: {CoreID: 14, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			15: {CoreID: 15, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			16: {CoreID: 16, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			17: {CoreID: 17, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			18: {CoreID: 18, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			19: {CoreID: 19, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			20: {CoreID: 20, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			21: {CoreID: 21, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			22: {CoreID: 22, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			23: {CoreID: 23, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			24: {CoreID: 24, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			25: {CoreID: 25, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			26: {CoreID: 26, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			27: {CoreID: 27, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			28: {CoreID: 28, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			29: {CoreID: 29, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			30: {CoreID: 30, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			31: {CoreID: 31, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			35: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 1},
+			36: {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 1},
+			5:  {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 1},
+			37: {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 1},
+			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 1},
+			38: {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 1},
+			7:  {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 1},
+			39: {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 1},
+			8:  {CoreID: 8, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 2},
+			40: {CoreID: 8, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 2},
+			9:  {CoreID: 9, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 2},
+			41: {CoreID: 9, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 2},
+			10: {CoreID: 10, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 2},
+			42: {CoreID: 10, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 2},
+			11: {CoreID: 11, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 2},
+			43: {CoreID: 11, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 2},
+			12: {CoreID: 12, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 3},
+			44: {CoreID: 12, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 3},
+			13: {CoreID: 13, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 3},
+			45: {CoreID: 13, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 3},
+			14: {CoreID: 14, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 3},
+			46: {CoreID: 14, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 3},
+			15: {CoreID: 15, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 3},
+			47: {CoreID: 15, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 3},
+			16: {CoreID: 16, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 4},
+			48: {CoreID: 16, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 4},
+			17: {CoreID: 17, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 4},
+			49: {CoreID: 17, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 4},
+			18: {CoreID: 18, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 4},
+			50: {CoreID: 18, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 4},
+			19: {CoreID: 19, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 4},
+			51: {CoreID: 19, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 4},
+			20: {CoreID: 20, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 5},
+			52: {CoreID: 20, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 5},
+			21: {CoreID: 21, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 5},
+			53: {CoreID: 21, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 5},
+			22: {CoreID: 22, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 5},
+			54: {CoreID: 22, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 5},
+			23: {CoreID: 23, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 5},
+			55: {CoreID: 23, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 5},
+			24: {CoreID: 24, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 6},
+			56: {CoreID: 24, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 6},
+			25: {CoreID: 25, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 6},
+			57: {CoreID: 25, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 6},
+			26: {CoreID: 26, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 6},
+			58: {CoreID: 26, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 6},
+			27: {CoreID: 27, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 6},
+			59: {CoreID: 27, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 6},
+			28: {CoreID: 28, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 7},
+			60: {CoreID: 28, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 7},
+			29: {CoreID: 29, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 7},
+			61: {CoreID: 29, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 7},
+			30: {CoreID: 30, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 7},
+			62: {CoreID: 30, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 7},
+			31: {CoreID: 31, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 7},
+			63: {CoreID: 31, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 7},
 		},
 	}
 
@@ -850,6 +882,71 @@ var (
 			15: {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
 		},
 	}
+
+	Intel_R__Xeon_R__Gold_5120_CPU___2_20GHz = &topology.CPUTopology{
+		NumCPUs:      56,
+		NumCores:     28,
+		NumSockets:   2,
+		NumNUMANodes: 2,
+		CPUDetails: map[int]topology.CPUInfo{
+			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			28: {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			2:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			30: {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			4:  {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			32: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			6:  {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			34: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			8:  {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			36: {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			10: {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			38: {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			12: {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			40: {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			14: {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			42: {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			16: {CoreID: 8, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			44: {CoreID: 8, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			18: {CoreID: 9, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			46: {CoreID: 9, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			20: {CoreID: 10, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			48: {CoreID: 10, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			22: {CoreID: 11, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			50: {CoreID: 11, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			24: {CoreID: 12, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			52: {CoreID: 12, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			26: {CoreID: 13, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			54: {CoreID: 13, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
+			1:  {CoreID: 14, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			29: {CoreID: 14, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			3:  {CoreID: 15, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			31: {CoreID: 15, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			5:  {CoreID: 16, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			33: {CoreID: 16, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			7:  {CoreID: 17, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			35: {CoreID: 17, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			9:  {CoreID: 18, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			37: {CoreID: 18, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			11: {CoreID: 19, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			39: {CoreID: 19, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			13: {CoreID: 20, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			41: {CoreID: 20, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			15: {CoreID: 21, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			43: {CoreID: 21, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			17: {CoreID: 22, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			45: {CoreID: 22, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			19: {CoreID: 23, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			47: {CoreID: 23, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			21: {CoreID: 24, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			49: {CoreID: 24, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			23: {CoreID: 25, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			51: {CoreID: 25, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			25: {CoreID: 26, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			53: {CoreID: 26, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			27: {CoreID: 27, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+			55: {CoreID: 27, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 1},
+		},
+	}
 )
 
 func TestTakeTopology(t *testing.T) {
@@ -1071,7 +1168,7 @@ func TestTake_AMD_EPYC_7502P_32_Core_Processor(t *testing.T) {
 			"AMD_EPYC_7502P_32_Core_Processor",
 			AMD_EPYC_7502P_32_Core_Processor,
 			[]int{2, 4, 8},
-			"map[1:0-1 2:2-5 3:6-13]",
+			"map[1:0,32 2:1-2,33-34 3:4-7,36-39]",
 		},
 	}
 
@@ -1270,43 +1367,82 @@ func TestTake_AMD_EPYC_7443P_24_Core_Processor(t *testing.T) {
 }
 
 func TestTake_Intel_R__Xeon_R__E_2378G_CPU___2_80GHz(t *testing.T) {
-	testCases := []struct {
-		description string
-		topo        *topology.CPUTopology
-		//numCpus     int
+	examples := []struct {
 		takeNumCpus []int
 		expResult   string
 	}{
 		{
-			"Intel_R__Xeon_R__E_2378G_CPU___2_80GHz",
-			Intel_R__Xeon_R__E_2378G_CPU___2_80GHz,
+			[]int{1, 2, 3},
+			"map[1:0 2:1,9 3:2,8,10]",
+		},
+		{
 			[]int{2, 4, 8},
 			"map[1:0,8 2:1-2,9-10 3:3-6,11-14]",
 		},
 	}
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			results := make(map[int]cpuset.CPUSet)
-			cpuSet := cpusetForCPUTopology(tc.topo)
-			counter := 0
-			for _, takeCpus := range tc.takeNumCpus {
-				took, err := takeByTopologyNUMAPacked(tc.topo, cpuSet, takeCpus)
-				if err != nil {
-					t.Errorf("[%s] ERROR: %v", tc.description, err.Error())
-					break
-				}
-				counter += 1
-				results[counter] = took
-				// fmt.Println(counter, took)
-				fmt.Println("     TOOK:", took) // FIXME
-				cpuSet = cpuSet.Difference(took)
-			}
-			result := fmt.Sprint(results)
-			if result != tc.expResult {
-				t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expResult)
-			}
-		})
+	for _, tc := range examples {
+		result := take_iterator(Intel_R__Xeon_R__E_2378G_CPU___2_80GHz, tc.takeNumCpus, true, t)
+		if result != tc.expResult {
+			t.Errorf("\nEXPECTED: %v\nTO EQUAL: %v", result, tc.expResult)
+			return
+		}
 	}
+}
+
+func take_iterator(topo *topology.CPUTopology, takeNumCpus []int, featureFlag bool, t *testing.T) string {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, featureFlag)()
+	results := make(map[int]cpuset.CPUSet)
+	cpuSet := cpusetForCPUTopology(topo)
+	counter := 0
+	for _, takeCpus := range takeNumCpus {
+		took, err := takeByTopologyNUMAPacked(topo, cpuSet, takeCpus)
+		if err != nil {
+			return fmt.Sprint(err)
+		}
+		counter += 1
+		results[counter] = took
+		fmt.Println("     TOOK:", took) // FIXME
+		cpuSet = cpuSet.Difference(took)
+	}
+	result := fmt.Sprint(results)
+	return result
+}
+
+func TestTake_Intel_R__Xeon_R__Gold_5120_CPU___2_20GHz(t *testing.T) {
+	examples := []struct {
+		takeNumCpus []int
+		expOld      string
+		expNew      string
+	}{
+		{
+			[]int{1, 2, 3},
+			"map[1:0 2:2,30 3:4,28,32]",
+			"map[1:0 2:2,30 3:4,28,32]",
+		},
+		{
+			[]int{2, 4, 8, 15},
+			"map[1:0,28 2:2,4,30,32 3:6,8,10,12,34,36,38,40 4:1,14,16,18,20,22,24,26,42,44,46,48,50,52,54]",
+			"map[1:0,28 2:2,4,30,32 3:6,8,10,12,34,36,38,40 4:1,3,5,7,9,11,13,15,29,31,33,35,37,39,41]",
+		},
+	}
+
+	for _, tc := range examples {
+		oldResult, newResult := take_iterator_old_new(Intel_R__Xeon_R__Gold_5120_CPU___2_20GHz, tc.takeNumCpus, t)
+		if oldResult != tc.expOld {
+			t.Errorf("\nEXP__OLD: %v\nTO EQUAL: %v", tc.expOld, oldResult)
+			return
+		}
+		if newResult != tc.expNew {
+			t.Errorf("\nEXP__NEW: %v\nTO EQUAL: %v", tc.expNew, newResult)
+			return
+		}
+	}
+}
+
+func take_iterator_old_new(topo *topology.CPUTopology, takeNumCpus []int, t *testing.T) (string, string) {
+	oldResult := take_iterator(topo, takeNumCpus, false, t)
+	newResult := take_iterator(topo, takeNumCpus, true, t)
+	return oldResult, newResult
 }
