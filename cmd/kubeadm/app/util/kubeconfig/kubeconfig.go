@@ -124,7 +124,7 @@ func HasAuthenticationCredentials(config *clientcmdapi.Config) bool {
 	}
 
 	// token authentication
-	if len(authInfo.Token) != 0 {
+	if len(authInfo.Token) != 0 || len(authInfo.TokenFile) != 0 {
 		return true
 	}
 
@@ -175,6 +175,14 @@ func EnsureAuthenticationInfoAreEmbedded(config *clientcmdapi.Config) error {
 		}
 		authInfo.ClientKeyData = clientKey
 		authInfo.ClientKey = ""
+	}
+	if len(authInfo.Token) == 0 && len(authInfo.TokenFile) != 0 {
+		tokenBytes, err := os.ReadFile(authInfo.TokenFile)
+		if err != nil {
+			return errors.Wrap(err, "error while reading token file defined in kubeconfig")
+		}
+		authInfo.Token = string(tokenBytes)
+		authInfo.TokenFile = ""
 	}
 
 	return nil
