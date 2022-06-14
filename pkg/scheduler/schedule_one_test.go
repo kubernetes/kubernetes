@@ -1237,7 +1237,9 @@ func TestUpdatePod(t *testing.T) {
 
 			pod := st.MakePod().Name("foo").NominatedNodeName(test.currentNominatedNodeName).Conditions(test.currentPodConditions).Obj()
 
-			if err := updatePod(cs, pod, test.newPodCondition, test.newNominatingInfo); err != nil {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if err := updatePod(ctx, cs, pod, test.newPodCondition, test.newNominatingInfo); err != nil {
 				t.Fatalf("Error calling update: %v", err)
 			}
 

@@ -19,9 +19,10 @@ package util
 import (
 	"context"
 	"fmt"
-	"github.com/google/go-cmp/cmp"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -161,7 +162,9 @@ func TestRemoveNominatedNodeName(t *testing.T) {
 				Status:     v1.PodStatus{NominatedNodeName: test.currentNominatedNodeName},
 			}
 
-			if err := ClearNominatedNodeName(cs, pod); err != nil {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if err := ClearNominatedNodeName(ctx, cs, pod); err != nil {
 				t.Fatalf("Error calling removeNominatedNodeName: %v", err)
 			}
 
@@ -236,12 +239,14 @@ func TestPatchPodStatus(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = PatchPodStatus(client, &tc.pod, &tc.statusToUpdate)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			err = PatchPodStatus(ctx, client, &tc.pod, &tc.statusToUpdate)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			retrievedPod, err := client.CoreV1().Pods(tc.pod.Namespace).Get(context.TODO(), tc.pod.Name, metav1.GetOptions{})
+			retrievedPod, err := client.CoreV1().Pods(tc.pod.Namespace).Get(ctx, tc.pod.Name, metav1.GetOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
