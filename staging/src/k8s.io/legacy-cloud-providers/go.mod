@@ -14,7 +14,7 @@ require (
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v1.16.1-0.20210702024009-ea6160c1d0e3
 	github.com/aws/aws-sdk-go v1.38.49
 	github.com/golang/mock v1.6.0
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.6
 	github.com/gophercloud/gophercloud v0.1.0
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
@@ -89,7 +89,7 @@ require (
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6 // indirect
-	google.golang.org/grpc v1.44.0 // indirect
+	google.golang.org/grpc v1.47.0 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/warnings.v0 v0.1.1 // indirect

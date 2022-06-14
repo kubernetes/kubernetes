@@ -9,7 +9,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/cel-go v0.11.2
 	github.com/google/gnostic v0.5.7-v3refs
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.6
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/spf13/cobra v1.4.0
@@ -18,7 +18,7 @@ require (
 	go.etcd.io/etcd/client/pkg/v3 v3.5.1
 	go.etcd.io/etcd/client/v3 v3.5.1
 	google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6
-	google.golang.org/grpc v1.44.0
+	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.0.0

@@ -13,7 +13,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/gnostic v0.5.7-v3refs
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.6
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
@@ -35,7 +35,7 @@ require (
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158
-	google.golang.org/grpc v1.44.0
+	google.golang.org/grpc v1.47.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	k8s.io/api v0.0.0

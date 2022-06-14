@@ -26,13 +26,13 @@ import (
 const (
 	// XDSBootstrapFileNameEnv is the env variable to set bootstrap file name.
 	// Do not use this and read from env directly. Its value is read and kept in
-	// variable BootstrapFileName.
+	// variable XDSBootstrapFileName.
 	//
 	// When both bootstrap FileName and FileContent are set, FileName is used.
 	XDSBootstrapFileNameEnv = "GRPC_XDS_BOOTSTRAP"
-	// XDSBootstrapFileContentEnv is the env variable to set bootstrapp file
+	// XDSBootstrapFileContentEnv is the env variable to set bootstrap file
 	// content. Do not use this and read from env directly. Its value is read
-	// and kept in variable BootstrapFileName.
+	// and kept in variable XDSBootstrapFileContent.
 	//
 	// When both bootstrap FileName and FileContent are set, FileName is used.
 	XDSBootstrapFileContentEnv = "GRPC_XDS_BOOTSTRAP_CONFIG"
@@ -41,6 +41,7 @@ const (
 	clientSideSecuritySupportEnv = "GRPC_XDS_EXPERIMENTAL_SECURITY_SUPPORT"
 	aggregateAndDNSSupportEnv    = "GRPC_XDS_EXPERIMENTAL_ENABLE_AGGREGATE_AND_LOGICAL_DNS_CLUSTER"
 	rbacSupportEnv               = "GRPC_XDS_EXPERIMENTAL_RBAC"
+	outlierDetectionSupportEnv   = "GRPC_EXPERIMENTAL_ENABLE_OUTLIER_DETECTION"
 	federationEnv                = "GRPC_EXPERIMENTAL_XDS_FEDERATION"
 	rlsInXDSEnv                  = "GRPC_EXPERIMENTAL_XDS_RLS_LB"
 
@@ -82,7 +83,10 @@ var (
 	// which can be disabled by setting the environment variable
 	// "GRPC_XDS_EXPERIMENTAL_RBAC" to "false".
 	XDSRBAC = !strings.EqualFold(os.Getenv(rbacSupportEnv), "false")
-
+	// XDSOutlierDetection indicates whether outlier detection support is
+	// enabled, which can be enabled by setting the environment variable
+	// "GRPC_EXPERIMENTAL_ENABLE_OUTLIER_DETECTION" to "true".
+	XDSOutlierDetection = strings.EqualFold(os.Getenv(outlierDetectionSupportEnv), "true")
 	// XDSFederation indicates whether federation support is enabled.
 	XDSFederation = strings.EqualFold(os.Getenv(federationEnv), "true")
 

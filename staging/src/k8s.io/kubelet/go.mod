@@ -7,7 +7,7 @@ go 1.18
 require (
 	github.com/gogo/protobuf v1.3.2
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
-	google.golang.org/grpc v1.44.0
+	google.golang.org/grpc v1.47.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/component-base v0.0.0
@@ -16,7 +16,7 @@ require (
 require (
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/go-cmp v0.5.5 // indirect
+	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

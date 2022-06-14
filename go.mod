@@ -43,7 +43,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/cadvisor v0.44.1
 	github.com/google/gnostic v0.5.7-v3refs
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.6
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/heketi/heketi v10.3.0+incompatible
@@ -89,7 +89,7 @@ require (
 	gonum.org/v1/gonum v0.6.2
 	google.golang.org/api v0.46.0
 	google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6
-	google.golang.org/grpc v1.44.0
+	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
@@ -346,7 +346,7 @@ replace (
 	github.com/dustin/go-humanize => github.com/dustin/go-humanize v1.0.0
 	github.com/elazarl/goproxy => github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153 // 947c36da3153 is the SHA for git tag v1.11
 	github.com/emicklei/go-restful/v3 => github.com/emicklei/go-restful/v3 v3.8.0
-	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.9.10-0.20210907150352-cf90f659a021
+	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.10.2-0.20220325020618-49ff273808a1
 	github.com/envoyproxy/protoc-gen-validate => github.com/envoyproxy/protoc-gen-validate v0.1.0
 	github.com/euank/go-kmsg-parser => github.com/euank/go-kmsg-parser v2.0.0+incompatible
 	github.com/evanphx/json-patch => github.com/evanphx/json-patch v4.12.0+incompatible
@@ -390,7 +390,7 @@ replace (
 	github.com/google/cadvisor => github.com/google/cadvisor v0.44.1
 	github.com/google/cel-go => github.com/google/cel-go v0.11.2
 	github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
-	github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp => github.com/google/go-cmp v0.5.6
 	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 	github.com/google/martian/v3 => github.com/google/martian/v3 v3.1.0
 	github.com/google/pprof => github.com/google/pprof v0.0.0-20210226084205-cbba55b83ad5
@@ -551,7 +551,7 @@ replace (
 	google.golang.org/api => google.golang.org/api v0.46.0
 	google.golang.org/appengine => google.golang.org/appengine v1.6.7
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6
-	google.golang.org/grpc => google.golang.org/grpc v1.44.0
+	google.golang.org/grpc => google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf => google.golang.org/protobuf v1.27.1
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f
