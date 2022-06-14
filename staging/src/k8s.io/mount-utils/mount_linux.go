@@ -732,6 +732,9 @@ func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
 	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts.
 	resolvedFile, err := filepath.EvalSymlinks(file)
 	if err != nil {
+		if errors.Is(isMntErr, fs.ErrNotExist) {
+			return false, fs.ErrNotExist
+		}
 		return false, err
 	}
 
