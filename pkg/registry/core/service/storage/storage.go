@@ -422,13 +422,28 @@ func (r *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid service request %q", id))
 	}
 
+	// Lookup the referenced service
+	obj, err := r.Get(ctx, svcName, &metav1.GetOptions{})
+	if err != nil {
+		return nil, nil, err
+	}
+	svc := obj.(*api.Service)
+
+	// In case of an ExternalName type service, immediately return because there
+	// is no need for resolving endpoints.
+	if svc.Spec.Type == api.ServiceTypeExternalName {
+		host := svc.Spec.ExternalName
+		if len(portStr) > 0 {
+			host = net.JoinHostPort(host, portStr)
+		}
+		return &url.URL{
+			Scheme: svcScheme,
+			Host:   host,
+		}, r.proxyTransport, nil
+	}
+
 	// If a port *number* was specified, find the corresponding service port name
 	if portNum, err := strconv.ParseInt(portStr, 10, 64); err == nil {
-		obj, err := r.Get(ctx, svcName, &metav1.GetOptions{})
-		if err != nil {
-			return nil, nil, err
-		}
-		svc := obj.(*api.Service)
 		found := false
 		for _, svcPort := range svc.Spec.Ports {
 			if int64(svcPort.Port) == portNum {
@@ -443,7 +458,7 @@ func (r *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.
 		}
 	}
 
-	obj, err := r.endpoints.Get(ctx, svcName, &metav1.GetOptions{})
+	obj, err = r.endpoints.Get(ctx, svcName, &metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
