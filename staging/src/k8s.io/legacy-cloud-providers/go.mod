@@ -20,8 +20,8 @@ require (
 	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 	github.com/stretchr/testify v1.7.0
 	github.com/vmware/govmomi v0.20.3
-	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
-	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
+	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
 	google.golang.org/api v0.46.0
 	gopkg.in/gcfg.v1 v1.2.0
 	k8s.io/api v0.0.0
@@ -82,11 +82,11 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
 	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
+	golang.org/x/net v0.0.0-20220607020251-c690dde0001d // indirect
+	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d // indirect
+	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
+	golang.org/x/time v0.0.0-20220609170525-579cf78fd858 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6 // indirect
 	google.golang.org/grpc v1.44.0 // indirect
@@ -113,3 +113,15 @@ replace (
 	k8s.io/legacy-cloud-providers => ../legacy-cloud-providers
 	k8s.io/mount-utils => ../mount-utils
 )
+
+replace golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
+
+replace golang.org/x/net => golang.org/x/net v0.0.0-20220607020251-c690dde0001d
+
+replace golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
+
+replace golang.org/x/sys => golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d
+
+replace golang.org/x/term => golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
+
+replace golang.org/x/time => golang.org/x/time v0.0.0-20220609170525-579cf78fd858

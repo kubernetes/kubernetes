@@ -7,7 +7,7 @@ go 1.18
 require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
+	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
@@ -77,12 +77,12 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.0 // indirect
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158 // indirect
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
+	golang.org/x/net v0.0.0-20220607020251-c690dde0001d // indirect
+	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect
+	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d // indirect
+	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
+	golang.org/x/time v0.0.0-20220609170525-579cf78fd858 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6 // indirect
 	google.golang.org/grpc v1.44.0 // indirect
@@ -105,3 +105,15 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/controller-manager => ../controller-manager
 )
+
+replace golang.org/x/net => golang.org/x/net v0.0.0-20220607020251-c690dde0001d
+
+replace golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
+
+replace golang.org/x/sync => golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
+
+replace golang.org/x/sys => golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d
+
+replace golang.org/x/term => golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
+
+replace golang.org/x/time => golang.org/x/time v0.0.0-20220609170525-579cf78fd858

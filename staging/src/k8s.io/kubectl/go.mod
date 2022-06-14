@@ -27,7 +27,7 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158
+	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -81,11 +81,11 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca // indirect
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
-	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
+	golang.org/x/net v0.0.0-20220607020251-c690dde0001d // indirect
+	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
+	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
+	golang.org/x/time v0.0.0-20220609170525-579cf78fd858 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
@@ -107,3 +107,13 @@ replace (
 	k8s.io/kubectl => ../kubectl
 	k8s.io/metrics => ../metrics
 )
+
+replace golang.org/x/net => golang.org/x/net v0.0.0-20220607020251-c690dde0001d
+
+replace golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
+
+replace golang.org/x/sys => golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d
+
+replace golang.org/x/term => golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
+
+replace golang.org/x/time => golang.org/x/time v0.0.0-20220609170525-579cf78fd858

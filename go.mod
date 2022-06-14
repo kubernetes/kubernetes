@@ -78,14 +78,14 @@ require (
 	go.opentelemetry.io/otel/trace v0.20.0
 	go.opentelemetry.io/proto/otlp v0.7.0
 	go.uber.org/zap v1.19.0
-	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
-	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220209214540-3681064d5158
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
-	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
-	golang.org/x/tools v0.1.10-0.20220218145154-897bd77cd717
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
+	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
+	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
+	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
+	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d
+	golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
+	golang.org/x/time v0.0.0-20220609170525-579cf78fd858
+	golang.org/x/tools v0.1.12-0.20220613210750-c15c04572c9d
 	gonum.org/v1/gonum v0.6.2
 	google.golang.org/api v0.46.0
 	google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6
@@ -530,20 +530,20 @@ replace (
 	go.uber.org/goleak => go.uber.org/goleak v1.1.10
 	go.uber.org/multierr => go.uber.org/multierr v1.6.0
 	go.uber.org/zap => go.uber.org/zap v1.19.0
-	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
+	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
 	golang.org/x/exp => golang.org/x/exp v0.0.0-20210220032938-85be41e4509f
 	golang.org/x/image => golang.org/x/image v0.0.0-20190802002840-cff245a6509b
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/mobile => golang.org/x/mobile v0.0.0-20201217150744-e6ae53a27f4f
 	golang.org/x/mod => golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
-	golang.org/x/net => golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
-	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
-	golang.org/x/sync => golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20220209214540-3681064d5158
-	golang.org/x/term => golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
+	golang.org/x/net => golang.org/x/net v0.0.0-20220607020251-c690dde0001d
+	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
+	golang.org/x/sync => golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d
+	golang.org/x/term => golang.org/x/term v0.0.0-20220526004731-065cf7ba2467
 	golang.org/x/text => golang.org/x/text v0.3.7
-	golang.org/x/time => golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
-	golang.org/x/tools => golang.org/x/tools v0.1.10-0.20220218145154-897bd77cd717
+	golang.org/x/time => golang.org/x/time v0.0.0-20220609170525-579cf78fd858
+	golang.org/x/tools => golang.org/x/tools v0.1.12-0.20220613210750-c15c04572c9d
 	golang.org/x/xerrors => golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	gonum.org/v1/gonum => gonum.org/v1/gonum v0.6.2
 	gonum.org/v1/netlib => gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e

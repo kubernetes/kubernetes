@@ -21,8 +21,8 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd // indirect
-	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
+	golang.org/x/net v0.0.0-20220607020251-c690dde0001d // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -37,3 +37,7 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cluster-bootstrap => ../cluster-bootstrap
 )
+
+replace golang.org/x/crypto => golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
+
+replace golang.org/x/net => golang.org/x/net v0.0.0-20220607020251-c690dde0001d
