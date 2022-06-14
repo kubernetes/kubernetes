@@ -59,9 +59,10 @@ const (
 
 // Configurer is used for setting up DNS resolver configuration when launching pods.
 type Configurer struct {
-	recorder record.EventRecorder
-	nodeRef  *v1.ObjectReference
-	nodeIPs  []net.IP
+	recorder         record.EventRecorder
+	getHostDNSConfig func(string) (*runtimeapi.DNSConfig, error)
+	nodeRef          *v1.ObjectReference
+	nodeIPs          []net.IP
 
 	// If non-nil, use this for container DNS server.
 	clusterDNS []net.IP
@@ -76,12 +77,13 @@ type Configurer struct {
 // NewConfigurer returns a DNS configurer for launching pods.
 func NewConfigurer(recorder record.EventRecorder, nodeRef *v1.ObjectReference, nodeIPs []net.IP, clusterDNS []net.IP, clusterDomain, resolverConfig string) *Configurer {
 	return &Configurer{
-		recorder:       recorder,
-		nodeRef:        nodeRef,
-		nodeIPs:        nodeIPs,
-		clusterDNS:     clusterDNS,
-		ClusterDomain:  clusterDomain,
-		ResolverConfig: resolverConfig,
+		recorder:         recorder,
+		getHostDNSConfig: getHostDNSConfig,
+		nodeRef:          nodeRef,
+		nodeIPs:          nodeIPs,
+		clusterDNS:       clusterDNS,
+		ClusterDomain:    clusterDomain,
+		ResolverConfig:   resolverConfig,
 	}
 }
 
@@ -279,28 +281,6 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	return nameservers, searches, options, utilerrors.NewAggregate(allErrors)
 }
 
-func (c *Configurer) getHostDNSConfig() (*runtimeapi.DNSConfig, error) {
-	var hostDNS, hostSearch, hostOptions []string
-	// Get host DNS settings
-	if c.ResolverConfig != "" {
-		f, err := os.Open(c.ResolverConfig)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-
-		hostDNS, hostSearch, hostOptions, err = parseResolvConf(f)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return &runtimeapi.DNSConfig{
-		Servers:  hostDNS,
-		Searches: hostSearch,
-		Options:  hostOptions,
-	}, nil
-}
-
 func getPodDNSType(pod *v1.Pod) (podDNSType, error) {
 	dnsPolicy := pod.Spec.DNSPolicy
 	switch dnsPolicy {
@@ -384,7 +364,7 @@ func appendDNSConfig(existingDNSConfig *runtimeapi.DNSConfig, dnsConfig *v1.PodD
 
 // GetPodDNS returns DNS settings for the pod.
 func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
-	dnsConfig, err := c.getHostDNSConfig()
+	dnsConfig, err := c.getHostDNSConfig(c.ResolverConfig)
 	if err != nil {
 		return nil, err
 	}
