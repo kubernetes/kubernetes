@@ -208,7 +208,6 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 	if err := p.delete(namespace, name); err != nil {
 		return modified, nil, err
 	}
-	// TODO: use wait
 	if err := wait.PollImmediate(1*time.Second, p.Timeout, func() (bool, error) {
 		if _, err := p.Helper.Get(namespace, name); !errors.IsNotFound(err) {
 			return false, err
