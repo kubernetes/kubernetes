@@ -41,7 +41,9 @@ import (
 )
 
 var (
-	fetchEvent = func(recorder *record.FakeRecorder) string {
+	testHostNameserver = "8.8.8.8"
+	testHostDomain     = "host.domain"
+	fetchEvent         = func(recorder *record.FakeRecorder) string {
 		select {
 		case event := <-recorder.Events:
 			return event
@@ -591,8 +593,6 @@ func TestGetPodDNSCustom(t *testing.T) {
 	testSvcDomain := fmt.Sprintf("svc.%s", testClusterDNSDomain)
 	testNsSvcDomain := fmt.Sprintf("%s.svc.%s", testPodNamespace, testClusterDNSDomain)
 	testNdotsOptionValue := "3"
-	testHostNameserver := "8.8.8.8"
-	testHostDomain := "host.domain"
 
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -615,6 +615,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 	}
 
 	configurer := NewConfigurer(recorder, nodeRef, nil, []net.IP{netutils.ParseIPSloppy(testClusterNameserver)}, testClusterDNSDomain, tmpfile.Name())
+	configurer.getHostDNSConfig = fakeGetHostDNSConfigCustom
 
 	testCases := []struct {
 		desc              string
