@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -31,14 +30,13 @@ import (
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/controlplane"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -50,33 +48,27 @@ const (
 	timeout                           = time.Second * 10
 )
 
-func setup(t testing.TB, maxReadonlyRequestsInFlight, MaxMutatingRequestsInFlight int) (*httptest.Server, *rest.Config, framework.CloseFunc) {
-	opts := framework.ControlPlaneConfigOptions{EtcdOptions: framework.DefaultEtcdOptions()}
-	opts.EtcdOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
-	resourceConfig := controlplane.DefaultAPIResourceConfigSource()
-	resourceConfig.EnableVersions(schema.GroupVersion{
-		Group:   "flowcontrol.apiserver.k8s.io",
-		Version: "v1alpha1",
+func setup(t testing.TB, maxReadonlyRequestsInFlight, MaxMutatingRequestsInFlight int) (*rest.Config, framework.TearDownFunc) {
+	_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Ensure all clients are allowed to send requests.
+			opts.Authorization.Modes = []string{"AlwaysAllow"}
+			opts.GenericServerRunOptions.MaxRequestsInFlight = maxReadonlyRequestsInFlight
+			opts.GenericServerRunOptions.MaxMutatingRequestsInFlight = MaxMutatingRequestsInFlight
+		},
 	})
-	controlPlaneConfig.GenericConfig.MaxRequestsInFlight = maxReadonlyRequestsInFlight
-	controlPlaneConfig.GenericConfig.MaxMutatingRequestsInFlight = MaxMutatingRequestsInFlight
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-
-	return s, controlPlaneConfig.GenericConfig.LoopbackClientConfig, closeFn
+	return kubeConfig, tearDownFn
 }
 
 func TestPriorityLevelIsolation(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
 	// NOTE: disabling the feature should fail the test
-	_, loopbackConfig, closeFn := setup(t, 1, 1)
+	kubeConfig, closeFn := setup(t, 1, 1)
 	defer closeFn()
 
-	loopbackClient := clientset.NewForConfigOrDie(loopbackConfig)
-	noxu1Client := getClientFor(loopbackConfig, "noxu1")
-	noxu2Client := getClientFor(loopbackConfig, "noxu2")
+	loopbackClient := clientset.NewForConfigOrDie(kubeConfig)
+	noxu1Client := getClientFor(kubeConfig, "noxu1")
+	noxu2Client := getClientFor(kubeConfig, "noxu2")
 
 	queueLength := 50
 	concurrencyShares := 1
@@ -153,13 +145,9 @@ func TestPriorityLevelIsolation(t *testing.T) {
 }
 
 func getClientFor(loopbackConfig *rest.Config, username string) clientset.Interface {
-	config := &rest.Config{
-		Host:        loopbackConfig.Host,
-		QPS:         -1,
-		BearerToken: loopbackConfig.BearerToken,
-		Impersonate: rest.ImpersonationConfig{
-			UserName: username,
-		},
+	config := rest.CopyConfig(loopbackConfig)
+	config.Impersonate = rest.ImpersonationConfig{
+		UserName: username,
 	}
 	return clientset.NewForConfigOrDie(config)
 }
