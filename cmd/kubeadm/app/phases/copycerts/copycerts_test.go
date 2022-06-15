@@ -20,7 +20,7 @@ import (
 	"context"
 	"encoding/hex"
 	"os"
-	"path"
+	"path/filepath"
 	"regexp"
 	goruntime "runtime"
 	"testing"
@@ -55,7 +55,7 @@ func TestGetDataFromInitConfig(t *testing.T) {
 		t.Fatalf(dedent.Dedent("failed to decode key.\nfatal error: %v"), err)
 	}
 
-	if err := os.Mkdir(path.Join(tmpdir, "etcd"), 0755); err != nil {
+	if err := os.Mkdir(filepath.Join(tmpdir, "etcd"), 0755); err != nil {
 		t.Fatalf(dedent.Dedent("failed to create etcd cert dir.\nfatal error: %v"), err)
 	}
 
