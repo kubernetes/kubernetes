@@ -17,6 +17,10 @@ limitations under the License.
 package kubelet
 
 import (
+	"bytes"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -70,5 +74,32 @@ func TestCreateConfigMapRBACRules(t *testing.T) {
 
 	if err := createConfigMapRBACRules(client); err != nil {
 		t.Errorf("createConfigMapRBACRules: unexpected error %v", err)
+	}
+}
+
+func TestApplyKubeletConfigPatches(t *testing.T) {
+	var (
+		input          = []byte("bar: 0\nfoo: 0\n")
+		patch          = []byte("bar: 1\n")
+		expectedOutput = []byte("bar: 1\nfoo: 0\n")
+	)
+
+	dir, err := ioutil.TempDir("", "patches")
+	if err != nil {
+		t.Fatalf("could not create temp dir: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	if err := ioutil.WriteFile(filepath.Join(dir, "kubeletconfiguration.yaml"), patch, 0644); err != nil {
+		t.Fatalf("could not write patch file: %v", err)
+	}
+
+	output, err := applyKubeletConfigPatches(input, dir, ioutil.Discard)
+	if err != nil {
+		t.Fatalf("could not apply patch: %v", err)
+	}
+
+	if !bytes.Equal(output, expectedOutput) {
+		t.Fatalf("expected output:\n%s\ngot\n%s\n", expectedOutput, output)
 	}
 }
