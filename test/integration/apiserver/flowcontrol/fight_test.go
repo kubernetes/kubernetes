@@ -170,10 +170,10 @@ func (ft *fightTest) evaluate(tBeforeCreate, tAfterCreate time.Time) {
 }
 func TestConfigConsumerFight(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
-	_, loopbackConfig, closeFn := setup(t, 100, 100)
+	kubeConfig, closeFn := setup(t, 100, 100)
 	defer closeFn()
 	const teamSize = 3
-	ft := newFightTest(t, loopbackConfig, teamSize)
+	ft := newFightTest(t, kubeConfig, teamSize)
 	tBeforeCreate := time.Now()
 	ft.createMainInformer()
 	ft.foreach(ft.createController)
