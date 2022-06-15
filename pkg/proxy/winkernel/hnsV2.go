@@ -74,27 +74,29 @@ func (hns hnsV2) getAllEndpointsByNetwork(networkName string) (map[string]*(endp
 		klog.ErrorS(err, "failed to get HNS network by name", "name", networkName)
 		return nil, err
 	}
-	endpoints, err := hcn.ListEndpointsOfNetwork(hcnnetwork.Id)
+	endpoints, err := hcn.ListEndpoints()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list endpoints: %w", err)
 	}
 	endpointInfos := make(map[string]*(endpointsInfo))
 	for _, ep := range endpoints {
-		// Add to map with key endpoint ID or IP address
-		// Storing this is expensive in terms of memory, however there is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address.
-		// TODO: Store by IP only and remove any lookups by endpoint ID.
-		endpointInfos[ep.Id] = &endpointsInfo{
-			ip:         ep.IpConfigurations[0].IpAddress,
-			isLocal:    uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0,
-			macAddress: ep.MacAddress,
-			hnsID:      ep.Id,
-			hns:        hns,
-			// only ready and not terminating endpoints were added to HNS
-			ready:       true,
-			serving:     true,
-			terminating: false,
+		if strings.EqualFold(ep.HostComputeNetwork, hcnnetwork.Id) {
+			// Add to map with key endpoint ID or IP address
+			// Storing this is expensive in terms of memory, however there is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address.
+			// TODO: Store by IP only and remove any lookups by endpoint ID.
+			endpointInfos[ep.Id] = &endpointsInfo{
+				ip:         ep.IpConfigurations[0].IpAddress,
+				isLocal:    uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0,
+				macAddress: ep.MacAddress,
+				hnsID:      ep.Id,
+				hns:        hns,
+				// only ready and not terminating endpoints were added to HNS
+				ready:       true,
+				serving:     true,
+				terminating: false,
+			}
+			endpointInfos[ep.IpConfigurations[0].IpAddress] = endpointInfos[ep.Id]
 		}
-		endpointInfos[ep.IpConfigurations[0].IpAddress] = endpointInfos[ep.Id]
 	}
 	klog.V(3).InfoS("Queried endpoints from network", "network", networkName)
 	return endpointInfos, nil
