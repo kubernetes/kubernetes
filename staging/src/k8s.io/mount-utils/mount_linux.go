@@ -238,14 +238,10 @@ func detectSafeNotMountedBehavior() bool {
 
 // detectSafeNotMountedBehaviorWithExec is for testing with FakeExec.
 func detectSafeNotMountedBehaviorWithExec(exec utilexec.Interface) bool {
-	if _, err := exec.LookPath("umount"); err != nil {
-		klog.V(2).Infof("Failed to locate umount executable to detect safe 'not mounted' behavior")
-		return false
-	}
 	// create a temp dir and try to umount it
 	path, err := ioutil.TempDir("", "kubelet-detect-safe-umount")
 	if err != nil {
-		klog.V(2).Infof("Cannot create temp dir to detect safe 'not mounted' behavior: %v", err)
+		klog.V(4).Infof("Cannot create temp dir to detect safe 'not mounted' behavior: %v", err)
 		return false
 	}
 	defer os.RemoveAll(path)
@@ -253,12 +249,12 @@ func detectSafeNotMountedBehaviorWithExec(exec utilexec.Interface) bool {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		if strings.Contains(string(output), errNotMounted) {
-			klog.V(2).Infof("Detected umount with safe 'not mounted' behavior")
+			klog.V(4).Infof("Detected umount with safe 'not mounted' behavior")
 			return true
 		}
 		klog.V(4).Infof("'umount %s' failed with: %v, output: %s", path, err, string(output))
 	}
-	klog.V(2).Infof("Detected umount with unsafe 'not mounted' behavior")
+	klog.V(4).Infof("Detected umount with unsafe 'not mounted' behavior")
 	return false
 }
 
@@ -329,6 +325,7 @@ func AddSystemdScopeSensitive(systemdRunPath, mountName, command string, args []
 }
 
 // Unmount unmounts the target.
+// If the mounter has safe "not mounted" behavior, no error will be returned when the target is not a mount point.
 func (mounter *Mounter) Unmount(target string) error {
 	klog.V(4).Infof("Unmounting %s", target)
 	command := exec.Command("umount", target)
@@ -343,6 +340,7 @@ func (mounter *Mounter) Unmount(target string) error {
 			err = &exec.ExitError{ProcessState: command.ProcessState}
 		}
 		if mounter.withSafeNotMountedBehavior && strings.Contains(string(output), errNotMounted) {
+			klog.V(4).Infof("ignoring 'not mounted' error for %s", target)
 			return nil
 		}
 		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", err, target, string(output))
