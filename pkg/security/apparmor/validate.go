@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/apparmor"
@@ -133,7 +133,7 @@ func getAppArmorFS() (string, error) {
 			continue
 		}
 		if fields[2] == "securityfs" {
-			appArmorFS := path.Join(fields[1], "apparmor")
+			appArmorFS := filepath.Join(fields[1], "apparmor")
 			if ok, err := utilpath.Exists(utilpath.CheckFollowSymlink, appArmorFS); !ok {
 				msg := fmt.Sprintf("path %s does not exist", appArmorFS)
 				if err != nil {

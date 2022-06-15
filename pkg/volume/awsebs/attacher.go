@@ -22,7 +22,6 @@ package awsebs
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -276,7 +275,7 @@ func (plugin *awsElasticBlockStorePlugin) NewDeviceUnmounter() (volume.DeviceUnm
 }
 
 func (detacher *awsElasticBlockStoreDetacher) Detach(volumeName string, nodeName types.NodeName) error {
-	volumeID := aws.KubernetesVolumeID(path.Base(volumeName))
+	volumeID := aws.KubernetesVolumeID(filepath.Base(volumeName))
 
 	if _, err := detacher.awsVolumes.DetachDisk(volumeID, nodeName); err != nil {
 		klog.Errorf("Error detaching volumeID %q: %v", volumeID, err)

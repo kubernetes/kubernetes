@@ -21,6 +21,7 @@ package util
 
 import (
 	"os"
+	"path/filepath"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -76,6 +77,12 @@ type accessAllowedAce struct {
 	aceSize  uint16
 	mask     windows.ACCESS_MASK
 	sid      windows.SID
+}
+
+func isAbs(path string) bool {
+	// on Windows, filepath.IsAbs will not return True for paths prefixed with a slash, even
+	// though they can be used as absolute paths (https://docs.microsoft.com/en-us/dotnet/standard/io/file-path-formats).
+	return filepath.IsAbs(path) || (len(path) > 0 && (path[0] == '\\' || path[0] == '/'))
 }
 
 // Change the permissions of the specified file. Only the nine

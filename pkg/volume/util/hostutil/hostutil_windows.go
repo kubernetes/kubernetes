@@ -22,7 +22,6 @@ package hostutil
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -68,7 +67,7 @@ func getDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir s
 		}
 	}
 
-	return path.Base(mountPath), nil
+	return filepath.Base(mountPath), nil
 }
 
 // DeviceOpened determines if the device is in use elsewhere

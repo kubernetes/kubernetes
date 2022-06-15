@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -365,7 +364,7 @@ func (plugin *gcePersistentDiskPlugin) NewDeviceUnmounter() (volume.DeviceUnmoun
 // Callers are responsible for thread safety between concurrent attach and detach
 // operations.
 func (detacher *gcePersistentDiskDetacher) Detach(volumeName string, nodeName types.NodeName) error {
-	pdName := path.Base(volumeName)
+	pdName := filepath.Base(volumeName)
 
 	attached, err := detacher.gceDisks.DiskIsAttached(pdName, nodeName)
 	if err != nil {

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -280,7 +279,7 @@ func validatePath(targetPath string) error {
 	if targetPath == "" {
 		return fmt.Errorf("invalid path: must not be empty: %q", targetPath)
 	}
-	if path.IsAbs(targetPath) {
+	if isAbs(targetPath) {
 		return fmt.Errorf("invalid path: must be relative path: %s", targetPath)
 	}
 
