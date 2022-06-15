@@ -403,3 +403,89 @@ func TestStatefulSetStatusWithPodFail(t *testing.T) {
 		t.Fatalf("StatefulSet %s status has %d replicas, want replicas %d: %v", sts.Name, gotReplicas, wantReplicas, err)
 	}
 }
+
+func TestAutodeleteOwnerRefs(t *testing.T) {
+	tests := []struct {
+		name              string
+		policy            appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy
+		expectPodOwnerRef bool
+		expectSetOwnerRef bool
+	}{
+		{
+			name: "always retain",
+			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+			},
+			expectPodOwnerRef: false,
+			expectSetOwnerRef: false,
+		},
+		{
+			name: "delete on scaledown only",
+			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+			expectPodOwnerRef: true,
+			expectSetOwnerRef: false,
+		},
+		{
+			name: "delete with set only",
+			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+			},
+			expectPodOwnerRef: false,
+			expectSetOwnerRef: true,
+		},
+		{
+			name: "always delete",
+			policy: appsv1.StatefulSetPersistentVolumeClaimRetentionPolicy{
+				WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+				WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+			},
+			expectPodOwnerRef: true,
+			expectSetOwnerRef: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, true)()
+			closeFn, rm, informers, c := scSetup(t)
+			defer closeFn()
+			ns := framework.CreateNamespaceOrDie(c, "test-autodelete-ownerrefs", t)
+			defer framework.DeleteNamespaceOrDie(c, ns, t)
+			cancel := runControllerAndInformers(rm, informers)
+			defer cancel()
+
+			sts := newSTS("sts", ns.Name, 3)
+			sts.Spec.PersistentVolumeClaimRetentionPolicy = &test.policy
+			stss, _ := createSTSsPods(t, c, []*appsv1.StatefulSet{sts}, []*v1.Pod{})
+			sts = stss[0]
+			waitSTSStable(t, c, sts)
+
+			// Verify StatefulSet ownerref has been added as appropriate.
+			pvcClient := c.CoreV1().PersistentVolumeClaims(ns.Name)
+			pvcs := getStatefulSetPVCs(t, pvcClient, sts)
+			for _, pvc := range pvcs {
+				verifyOwnerRef(t, pvc, "StatefulSet", test.expectSetOwnerRef)
+				verifyOwnerRef(t, pvc, "Pod", false)
+			}
+
+			// Scale down to 1 pod and verify Pod ownerrefs as appropriate.
+			one := int32(1)
+			sts.Spec.Replicas = &one
+			waitSTSStable(t, c, sts)
+
+			pvcs = getStatefulSetPVCs(t, pvcClient, sts)
+			for i, pvc := range pvcs {
+				verifyOwnerRef(t, pvc, "StatefulSet", test.expectSetOwnerRef)
+				if i == 0 {
+					verifyOwnerRef(t, pvc, "Pod", false)
+				} else {
+					verifyOwnerRef(t, pvc, "Pod", test.expectPodOwnerRef)
+				}
+			}
+		})
+	}
+}
