@@ -2199,7 +2199,7 @@ func testSlowWebhookTimeoutNoError(f *framework.Framework) {
 }
 
 // createAdmissionWebhookMultiVersionTestCRDWithV1Storage creates a new CRD specifically
-// for the admissin webhook calling test.
+// for the admission webhook calling test.
 func createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f *framework.Framework, opts ...crd.Option) (*crd.TestCrd, error) {
 	group := fmt.Sprintf("%s.example.com", f.BaseName)
 	return crd.CreateMultiVersionTestCRD(f, group, append([]crd.Option{func(crd *apiextensionsv1.CustomResourceDefinition) {

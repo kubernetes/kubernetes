@@ -45,7 +45,7 @@ func TestWebhookLoopback(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
-			// Avoid resolveable kubernetes service
+			// Avoid resolvable kubernetes service
 			config.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
 
 			// Hook into audit to watch requests
