@@ -20,7 +20,6 @@ import (
 	"crypto/md5"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 	"time"
@@ -2306,8 +2305,8 @@ func TestSyncStates(t *testing.T) {
 		{
 			name: "when two pods are using same volume and both are deleted",
 			volumePaths: []string{
-				path.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
-				path.Join("pod2", "volumes", "fake-plugin", "pvc-abcdef"),
+				filepath.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
+				filepath.Join("pod2", "volumes", "fake-plugin", "pvc-abcdef"),
 			},
 			createMountPoint: true,
 			podInfos:         []podInfo{},
@@ -2322,8 +2321,8 @@ func TestSyncStates(t *testing.T) {
 		{
 			name: "when two pods are using same volume and one of them is deleted",
 			volumePaths: []string{
-				path.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
-				path.Join("pod2uid", "volumes", "fake-plugin", "volume-name"),
+				filepath.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
+				filepath.Join("pod2uid", "volumes", "fake-plugin", "volume-name"),
 			},
 			createMountPoint: true,
 			podInfos:         []podInfo{defaultPodInfo},
@@ -2342,7 +2341,7 @@ func TestSyncStates(t *testing.T) {
 		{
 			name: "when reconstruction fails for a volume, volumes should be cleaned up",
 			volumePaths: []string{
-				path.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
+				filepath.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
 			},
 			createMountPoint: false,
 			podInfos:         []podInfo{},
@@ -2359,7 +2358,7 @@ func TestSyncStates(t *testing.T) {
 		{
 			name: "when volume exists in dsow, volume should be recorded in skipped during reconstruction",
 			volumePaths: []string{
-				path.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
+				filepath.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
 			},
 			createMountPoint: true,
 			podInfos:         []podInfo{defaultPodInfo},

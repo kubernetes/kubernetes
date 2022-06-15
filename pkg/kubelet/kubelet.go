@@ -24,7 +24,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	sysruntime "runtime"
 	"sort"
@@ -1256,7 +1255,7 @@ func (kl *Kubelet) RlimitStats() (*statsapi.RlimitStats, error) {
 // 4.  the pod-resources directory
 // 5.  the checkpoint directory
 func (kl *Kubelet) setupDataDirs() error {
-	kl.rootDirectory = path.Clean(kl.rootDirectory)
+	kl.rootDirectory = filepath.Clean(kl.rootDirectory)
 	pluginRegistrationDir := kl.getPluginsRegistrationDir()
 	pluginsDir := kl.getPluginsDir()
 	if err := os.MkdirAll(kl.getRootDir(), 0750); err != nil {
