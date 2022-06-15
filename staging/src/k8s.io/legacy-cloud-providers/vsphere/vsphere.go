@@ -28,7 +28,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -542,7 +541,7 @@ func buildVSphereFromConfig(cfg VSphereConfig) (*VSphere, error) {
 		return nil, errors.New("Controller type not supported. Please configure 'lsilogic-sas' OR 'pvscsi'")
 	}
 	if cfg.Global.WorkingDir != "" {
-		cfg.Global.WorkingDir = path.Clean(cfg.Global.WorkingDir)
+		cfg.Global.WorkingDir = filepath.Clean(cfg.Global.WorkingDir)
 	}
 	if cfg.Global.RoundTripperCount == 0 {
 		cfg.Global.RoundTripperCount = RoundTripperDefaultCount

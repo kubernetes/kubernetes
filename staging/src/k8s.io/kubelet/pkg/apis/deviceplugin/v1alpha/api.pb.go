@@ -50,7 +50,7 @@ type RegisterRequest struct {
 	// Version of the API the Device Plugin was built against
 	Version string `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
 	// Name of the unix socket the device plugin is listening on
-	// PATH = path.Join(DevicePluginPath, endpoint)
+	// PATH = filepath.Join(DevicePluginPath, endpoint)
 	Endpoint string `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
 	// Schedulable resource name. As of now it's expected to be a DNS Label
 	ResourceName         string   `protobuf:"bytes,3,opt,name=resource_name,json=resourceName,proto3" json:"resource_name,omitempty"`

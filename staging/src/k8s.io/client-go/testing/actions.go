@@ -18,7 +18,7 @@ package testing
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -180,7 +180,7 @@ func NewRootPatchSubresourceAction(resource schema.GroupVersionResource, name st
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
-	action.Subresource = path.Join(subresources...)
+	action.Subresource = filepath.Join(subresources...)
 	action.Name = name
 	action.PatchType = pt
 	action.Patch = patch
@@ -192,7 +192,7 @@ func NewPatchSubresourceAction(resource schema.GroupVersionResource, namespace, 
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
-	action.Subresource = path.Join(subresources...)
+	action.Subresource = filepath.Join(subresources...)
 	action.Namespace = namespace
 	action.Name = name
 	action.PatchType = pt

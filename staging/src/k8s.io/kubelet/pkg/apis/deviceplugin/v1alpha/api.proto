@@ -28,7 +28,7 @@ message RegisterRequest {
 	// Version of the API the Device Plugin was built against
 	string version = 1;
 	// Name of the unix socket the device plugin is listening on
-	// PATH = path.Join(DevicePluginPath, endpoint)
+	// PATH = filepath.Join(DevicePluginPath, endpoint)
 	string endpoint = 2;
 	// Schedulable resource name. As of now it's expected to be a DNS Label
 	string resource_name = 3;

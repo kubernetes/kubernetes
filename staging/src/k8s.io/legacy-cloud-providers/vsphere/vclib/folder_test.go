@@ -18,7 +18,7 @@ package vclib
 
 import (
 	"context"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/vmware/govmomi"
@@ -55,14 +55,14 @@ func TestFolder(t *testing.T) {
 	}
 
 	const folderName = "F0"
-	vmFolder := path.Join("/", folderName, dc.Name(), "vm")
+	vmFolder := filepath.Join("/", folderName, dc.Name(), "vm")
 
 	tests := []struct {
 		folderPath string
 		expect     int
 	}{
 		{vmFolder, 0},
-		{path.Join(vmFolder, folderName), (model.Host + model.Cluster) * model.Machine},
+		{filepath.Join(vmFolder, folderName), (model.Host + model.Cluster) * model.Machine},
 	}
 
 	for i, test := range tests {

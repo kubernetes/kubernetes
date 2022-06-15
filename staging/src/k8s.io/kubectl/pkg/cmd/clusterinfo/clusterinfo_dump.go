@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -117,8 +117,8 @@ func setupOutputWriter(dir string, defaultWriter io.Writer, filename string, fil
 	if len(dir) == 0 || dir == "-" {
 		return defaultWriter
 	}
-	fullFile := path.Join(dir, filename) + fileExtension
-	parent := path.Dir(fullFile)
+	fullFile := filepath.Join(dir, filename) + fileExtension
+	parent := filepath.Dir(fullFile)
 	cmdutil.CheckErr(os.MkdirAll(parent, 0755))
 
 	file, err := os.Create(fullFile)
@@ -211,7 +211,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(events, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "events"), fileExtension)); err != nil {
+		if err := o.PrintObj(events, setupOutputWriter(o.OutputDir, o.Out, filepath.Join(namespace, "events"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -219,7 +219,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(rcs, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "replication-controllers"), fileExtension)); err != nil {
+		if err := o.PrintObj(rcs, setupOutputWriter(o.OutputDir, o.Out, filepath.Join(namespace, "replication-controllers"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -227,7 +227,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(svcs, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "services"), fileExtension)); err != nil {
+		if err := o.PrintObj(svcs, setupOutputWriter(o.OutputDir, o.Out, filepath.Join(namespace, "services"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -235,7 +235,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(sets, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "daemonsets"), fileExtension)); err != nil {
+		if err := o.PrintObj(sets, setupOutputWriter(o.OutputDir, o.Out, filepath.Join(namespace, "daemonsets"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -243,7 +243,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(deps, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "deployments"), fileExtension)); err != nil {
+		if err := o.PrintObj(deps, setupOutputWriter(o.OutputDir, o.Out, filepath.Join(namespace, "deployments"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -251,7 +251,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(rps, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "replicasets"), fileExtension)); err != nil {
+		if err := o.PrintObj(rps, setupOutputWriter(o.OutputDir, o.Out, filepath.Join(namespace, "replicasets"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -260,7 +260,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			return err
 		}
 
-		if err := o.PrintObj(pods, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "pods"), fileExtension)); err != nil {
+		if err := o.PrintObj(pods, setupOutputWriter(o.OutputDir, o.Out, filepath.Join(namespace, "pods"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -290,7 +290,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			pod := &pods.Items[ix]
 			initcontainers := pod.Spec.InitContainers
 			containers := pod.Spec.Containers
-			writer := setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, pod.Name, "logs"), ".txt")
+			writer := setupOutputWriter(o.OutputDir, o.Out, filepath.Join(namespace, pod.Name, "logs"), ".txt")
 
 			for i := range initcontainers {
 				printContainer(writer, initcontainers[i], pod)
