@@ -29,7 +29,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,7 +45,6 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-
 	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	appsconversion "k8s.io/kubernetes/pkg/apis/apps/v1"
 	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"

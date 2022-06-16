@@ -33,32 +33,60 @@ import (
 )
 
 type testListener struct {
-	genericTestListener
+	lock              sync.RWMutex
 	resyncPeriod      time.Duration
 	expectedItemNames sets.String
 	receivedItemNames []string
+	name              string
 }
 
 func newTestListener(name string, resyncPeriod time.Duration, expected ...string) *testListener {
 	l := &testListener{
-		genericTestListener: genericTestListener{name: name},
-		resyncPeriod:        resyncPeriod,
-		expectedItemNames:   sets.NewString(expected...),
+		resyncPeriod:      resyncPeriod,
+		expectedItemNames: sets.NewString(expected...),
+		name:              name,
 	}
-	l.genericTestListener.action = l.action
 	return l
 }
 
-func (l *testListener) action(obj interface{}) {
+func (l *testListener) OnAdd(obj interface{}) {
+	l.handle(obj)
+}
+
+func (l *testListener) OnUpdate(old, new interface{}) {
+	l.handle(new)
+}
+
+func (l *testListener) OnDelete(obj interface{}) {
+}
+
+func (l *testListener) handle(obj interface{}) {
 	key, _ := MetaNamespaceKeyFunc(obj)
 	fmt.Printf("%s: handle: %v\n", l.name, key)
+	l.lock.Lock()
+	defer l.lock.Unlock()
 
 	objectMeta, _ := meta.Accessor(obj)
 	l.receivedItemNames = append(l.receivedItemNames, objectMeta.GetName())
 }
 
 func (l *testListener) ok() bool {
-	return l.genericTestListener.ok(l.satisfiedExpectations)
+	fmt.Println("polling")
+	err := wait.PollImmediate(100*time.Millisecond, 2*time.Second, func() (bool, error) {
+		if l.satisfiedExpectations() {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return false
+	}
+
+	// wait just a bit to allow any unexpected stragglers to come in
+	fmt.Println("sleeping")
+	time.Sleep(1 * time.Second)
+	fmt.Println("final check")
+	return l.satisfiedExpectations()
 }
 
 func (l *testListener) satisfiedExpectations() bool {
@@ -84,7 +112,7 @@ func isStarted(i SharedInformer) bool {
 
 func isRegistered(i SharedInformer, h ResourceEventHandlerRegistration) bool {
 	s := i.(*sharedIndexInformer)
-	return s.isRegistered(h)
+	return s.processor.getListener(h) != nil
 }
 
 func TestListenerResyncPeriods(t *testing.T) {
@@ -187,59 +215,60 @@ func TestResyncCheckPeriod(t *testing.T) {
 
 	// listener 1, never resync
 	listener1 := newTestListener("listener1", 0)
-	informer.AddEventHandlerWithResyncPeriod(listener1, listener1.resyncPeriod)
+	listener1Registration, _ := informer.AddEventHandlerWithResyncPeriod(listener1, listener1.resyncPeriod)
+
 	if e, a := 12*time.Hour, informer.resyncCheckPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := time.Duration(0), informer.processor.listeners[0].resyncPeriod; e != a {
+	if e, a := time.Duration(0), informer.processor.getListener(listener1Registration).resyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
 
 	// listener 2, resync every minute
 	listener2 := newTestListener("listener2", 1*time.Minute)
-	informer.AddEventHandlerWithResyncPeriod(listener2, listener2.resyncPeriod)
+	listener2Registration, _ := informer.AddEventHandlerWithResyncPeriod(listener2, listener2.resyncPeriod)
 	if e, a := 1*time.Minute, informer.resyncCheckPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := time.Duration(0), informer.processor.listeners[0].resyncPeriod; e != a {
+	if e, a := time.Duration(0), informer.processor.getListener(listener1Registration).resyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := 1*time.Minute, informer.processor.listeners[1].resyncPeriod; e != a {
+	if e, a := 1*time.Minute, informer.processor.getListener(listener2Registration).resyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
 
 	// listener 3, resync every 55 seconds
 	listener3 := newTestListener("listener3", 55*time.Second)
-	informer.AddEventHandlerWithResyncPeriod(listener3, listener3.resyncPeriod)
+	listener3Registration, _ := informer.AddEventHandlerWithResyncPeriod(listener3, listener3.resyncPeriod)
 	if e, a := 55*time.Second, informer.resyncCheckPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := time.Duration(0), informer.processor.listeners[0].resyncPeriod; e != a {
+	if e, a := time.Duration(0), informer.processor.getListener(listener1Registration).resyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := 1*time.Minute, informer.processor.listeners[1].resyncPeriod; e != a {
+	if e, a := 1*time.Minute, informer.processor.getListener(listener2Registration).resyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := 55*time.Second, informer.processor.listeners[2].resyncPeriod; e != a {
+	if e, a := 55*time.Second, informer.processor.getListener(listener3Registration).resyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
 
 	// listener 4, resync every 5 seconds
 	listener4 := newTestListener("listener4", 5*time.Second)
-	informer.AddEventHandlerWithResyncPeriod(listener4, listener4.resyncPeriod)
+	listener4Registration, _ := informer.AddEventHandlerWithResyncPeriod(listener4, listener4.resyncPeriod)
 	if e, a := 5*time.Second, informer.resyncCheckPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := time.Duration(0), informer.processor.listeners[0].resyncPeriod; e != a {
+	if e, a := time.Duration(0), informer.processor.getListener(listener1Registration).resyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := 1*time.Minute, informer.processor.listeners[1].resyncPeriod; e != a {
+	if e, a := 1*time.Minute, informer.processor.getListener(listener2Registration).resyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := 55*time.Second, informer.processor.listeners[2].resyncPeriod; e != a {
+	if e, a := 55*time.Second, informer.processor.getListener(listener3Registration).resyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
-	if e, a := 5*time.Second, informer.processor.listeners[3].resyncPeriod; e != a {
+	if e, a := 5*time.Second, informer.processor.getListener(listener4Registration).resyncPeriod; e != a {
 		t.Errorf("expected %d, got %d", e, a)
 	}
 }
@@ -424,12 +453,12 @@ func TestSharedInformerRemoveForeignHandler(t *testing.T) {
 	source := fcache.NewFakeControllerSource()
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
-	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
 
 	source2 := fcache.NewFakeControllerSource()
 	source2.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
-	informer2 := NewSharedInformer(source2, &v1.Pod{}, 1*time.Second)
+	informer2 := NewSharedInformer(source2, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
 
 	handler1 := &ResourceEventHandlerFuncs{}
 	handle1, err := informer.AddEventHandler(handler1)
@@ -474,17 +503,6 @@ func TestSharedInformerRemoveForeignHandler(t *testing.T) {
 		t.Errorf("handle2 not registered anymore for informer")
 	}
 
-	// remove empty handle
-	empty := ResourceEventHandlerRegistration{}
-	if isRegistered(informer, empty) {
-		t.Errorf("empty registered for informer")
-	}
-	if isRegistered(informer, empty) {
-		t.Errorf("empty registered for informer")
-	}
-	if err := informer2.RemoveEventHandler(empty); err != nil {
-		t.Errorf("removing of empty handle failed: %s", err)
-	}
 	if eventHandlerCount(informer) != 2 {
 		t.Errorf("informer has %d registered handler, instead of 2", eventHandlerCount(informer))
 	}
@@ -555,7 +573,7 @@ func TestSharedInformerMultipleRegistration(t *testing.T) {
 	source := fcache.NewFakeControllerSource()
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
-	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
 
 	handler1 := &ResourceEventHandlerFuncs{}
 	reg1, err := informer.AddEventHandler(handler1)
@@ -706,17 +724,25 @@ func TestAddOnStoppedSharedInformer(t *testing.T) {
 	stop := make(chan struct{})
 	go informer.Run(stop)
 	close(stop)
-	if !checkCondition(informer.IsStopped) {
+
+	err := wait.PollImmediate(100*time.Millisecond, 2*time.Second, func() (bool, error) {
+		if informer.IsStopped() {
+			return true, nil
+		}
+		return false, nil
+	})
+
+	if err != nil {
 		t.Errorf("informer reports not to be stopped although stop channel closed")
 		return
 	}
 
-	_, err := informer.AddEventHandlerWithResyncPeriod(listener, listener.resyncPeriod)
+	_, err = informer.AddEventHandlerWithResyncPeriod(listener, listener.resyncPeriod)
 	if err == nil {
 		t.Errorf("stopped informer did not reject add handler")
 		return
 	}
-	if !strings.HasSuffix(err.Error(), "is not added to shared informer because it has stopped already") {
+	if !strings.HasSuffix(err.Error(), "was not added to shared informer because it has stopped already") {
 		t.Errorf("adding handler to a stopped informer yields unexpected error: %s", err)
 		return
 	}
@@ -757,11 +783,8 @@ func TestRemoveWhileActive(t *testing.T) {
 	// create the shared informer and resync every 12 hours
 	informer := NewSharedInformer(source, &v1.Pod{}, 0).(*sharedIndexInformer)
 
-	listener := &genericTestListener{name: "listener"}
+	listener := newTestListener("listener", 0, "pod1")
 	handle, _ := informer.AddEventHandler(listener)
-	listener.action = func(obj interface{}) {
-		informer.RemoveEventHandler(handle)
-	}
 
 	stop := make(chan struct{})
 	defer close(stop)
@@ -769,15 +792,22 @@ func TestRemoveWhileActive(t *testing.T) {
 	go informer.Run(stop)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
-	if !listener.ok(func() bool {
-		return listener.getCount() == 1
-	}) {
+	if !listener.ok() {
 		t.Errorf("event did not occur")
 		return
 	}
 
+	informer.RemoveEventHandler(handle)
+
 	if isRegistered(informer, handle) {
 		t.Errorf("handle is still active after successful remove")
+		return
+	}
+
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
+
+	if !listener.ok() {
+		t.Errorf("unexpected event occurred")
 		return
 	}
 }
@@ -788,17 +818,9 @@ func TestAddWhileActive(t *testing.T) {
 
 	// create the shared informer and resync every 12 hours
 	informer := NewSharedInformer(source, &v1.Pod{}, 0).(*sharedIndexInformer)
-
-	listener1 := &genericTestListener{name: "listener1"}
-	listener2 := &genericTestListener{name: "listener2"}
-
+	listener1 := newTestListener("originalListener", 0, "pod1")
+	listener2 := newTestListener("originalListener", 0, "pod1", "pod2")
 	handle1, _ := informer.AddEventHandler(listener1)
-	var handle2 ResourceEventHandlerRegistration
-	listener1.action = func(obj interface{}) {
-		listener1.action = nil
-		handle2, _ = informer.AddEventHandler(listener2)
-		source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
-	}
 
 	stop := make(chan struct{})
 	defer close(stop)
@@ -806,16 +828,15 @@ func TestAddWhileActive(t *testing.T) {
 	go informer.Run(stop)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
 
-	if !listener1.ok(func() bool {
-		return listener1.getCount() == 2
-	}) {
+	if !listener1.ok() {
 		t.Errorf("events on listener1 did not occur")
 		return
 	}
 
-	if !listener2.ok(func() bool {
-		return listener1.getCount() == 2
-	}) {
+	handle2, _ := informer.AddEventHandler(listener2)
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
+
+	if !listener2.ok() {
 		t.Errorf("event on listener2 did not occur")
 		return
 	}
@@ -828,63 +849,10 @@ func TestAddWhileActive(t *testing.T) {
 		t.Errorf("handle2 is not active")
 		return
 	}
-}
 
-////////////////////////////////////////////////////////////////////////////////
-
-type genericTestListener struct {
-	lock   sync.RWMutex
-	name   string
-	count  int
-	action func(obj interface{})
-}
-
-func (l *genericTestListener) OnAdd(obj interface{}) {
-	l.handle(obj)
-}
-
-func (l *genericTestListener) OnUpdate(old, new interface{}) {
-	l.handle(new)
-}
-
-func (l *genericTestListener) OnDelete(obj interface{}) {
-}
-
-func (l *genericTestListener) handle(obj interface{}) {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	l.count++
-	if l.action != nil {
-		l.action(obj)
+	listener1.expectedItemNames = listener2.expectedItemNames
+	if !listener1.ok() {
+		t.Errorf("events on listener1 did not occur")
+		return
 	}
-	fmt.Printf("%s: got event\n", l.name)
-}
-
-func (l *genericTestListener) getCount() int {
-	l.lock.RLock()
-	defer l.lock.RUnlock()
-	return l.count
-}
-
-func (l *genericTestListener) ok(check func() bool) bool {
-	return checkCondition(check)
-}
-
-func checkCondition(check func() bool) bool {
-	fmt.Println("polling")
-	err := wait.PollImmediate(100*time.Millisecond, 2*time.Second, func() (bool, error) {
-		if check() {
-			return true, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		return false
-	}
-
-	// wait just a bit to allow any unexpected stragglers to come in
-	fmt.Println("sleeping")
-	time.Sleep(1 * time.Second)
-	fmt.Println("final check")
-	return check()
 }
