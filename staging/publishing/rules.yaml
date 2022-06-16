@@ -1922,6 +1922,17 @@ rules:
       branch: release-1.24
       dir: staging/src/k8s.io/pod-security-admission
   library: true
+- destination: noderesourcetopology-api
+  branches:
+  - name: master
+    dependencies:
+    - repository: code-generator
+      branch: master
+      dir: staging/src/k8s.io/noderesourcetopology-api
+    source:
+       branch: master
+       dir: staging/src/k8s.io/noderesourcetopology-api
+  library: true
 recursive-delete-patterns:
 - BUILD
 - '*/BUILD'
