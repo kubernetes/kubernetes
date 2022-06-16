@@ -79,6 +79,13 @@ https://github.com/kubernetes/kubernetes-template-project.
 6. Make sure that the `.github/PULL_REQUEST_TEMPLATE.md` and
 `CONTRIBUTING.md` files mention that PRs are not directly accepted to the repo.
 
+7. Ensure that `docs.go` file is added. Refer to [#kubernetes/kubernetes#91354](https://github.com/kubernetes/kubernetes/blob/release-1.24/staging/src/k8s.io/client-go/doc.go) for reference.
+
+8. NOTE: Do not edit go.mod or go.sum in the new repo (staging/src/k8s.io/<newrepo>/) manually. Run the following instead:
+
+```
+  ./hack/update-vendor.sh
+```
 ### Creating the published repository
 
 1. Create an [issue](https://github.com/kubernetes/org/issues/new?template=repo-create.md)
