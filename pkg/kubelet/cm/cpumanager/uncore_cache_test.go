@@ -1383,7 +1383,7 @@ func TestTake_Intel_R__Xeon_R__E_2378G_CPU___2_80GHz(t *testing.T) {
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
 	for _, tc := range examples {
-		result := take_iterator(Intel_R__Xeon_R__E_2378G_CPU___2_80GHz, tc.takeNumCpus, true, t)
+		result := takeIterator(Intel_R__Xeon_R__E_2378G_CPU___2_80GHz, tc.takeNumCpus, true, t)
 		if result != tc.expResult {
 			t.Errorf("\nEXPECTED: %v\nTO EQUAL: %v", result, tc.expResult)
 			return
@@ -1391,7 +1391,8 @@ func TestTake_Intel_R__Xeon_R__E_2378G_CPU___2_80GHz(t *testing.T) {
 	}
 }
 
-func take_iterator(topo *topology.CPUTopology, takeNumCpus []int, featureFlag bool, t *testing.T) string {
+func takeIterator(topo *topology.CPUTopology, takeNumCpus []int, featureFlag bool, t *testing.T) string {
+	// Isolate the take operations ensuring the feature flag is dis/enabled
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, featureFlag)()
 	results := make(map[int]cpuset.CPUSet)
 	cpuSet := cpusetForCPUTopology(topo)
@@ -1408,41 +1409,57 @@ func take_iterator(topo *topology.CPUTopology, takeNumCpus []int, featureFlag bo
 	}
 	result := fmt.Sprint(results)
 	return result
-}
+} // the above defer statement should be unwound here
 
-func TestTake_Intel_R__Xeon_R__Gold_5120_CPU___2_20GHz(t *testing.T) {
+func TestTakeOldVsNew(t *testing.T) {
 	examples := []struct {
+		topo        *topology.CPUTopology
 		takeNumCpus []int
 		expOld      string
 		expNew      string
 	}{
 		{
-			[]int{1, 2, 3},
-			"map[1:0 2:2,30 3:4,28,32]",
-			"map[1:0 2:2,30 3:4,28,32]",
+			// This topology has eight UCCs on one NUMA (8x8 UCCs)
+			AMD_EPYC_7502P_32_Core_Processor,
+			// Take almost all the cpus per ucc per iteration (a degenerate, but interesting case)
+			[]int{7, 7, 7, 7, 7, 7, 7, 7},
+			// The old scheduler splits the cpus across ucc
+			"map[1:0-3,32-34 2:4-6,35-38 3:7-10,39-41 4:11-13,42-45 5:14-17,46-48 6:18-20,49-52 7:21-24,53-55 8:25-27,56-59]",
+			// The new scheduler prefers aligning - all takes below are from a unique ucc
+			"map[1:0-3,32-34 2:4-7,36-38 3:8-11,40-42 4:12-15,44-46 5:16-19,48-50 6:20-23,52-54 7:24-27,56-58 8:28-31,60-62]",
 		},
 		{
-			[]int{2, 4, 8, 15},
-			"map[1:0,28 2:2,4,30,32 3:6,8,10,12,34,36,38,40 4:1,14,16,18,20,22,24,26,42,44,46,48,50,52,54]",
-			"map[1:0,28 2:2,4,30,32 3:6,8,10,12,34,36,38,40 4:1,3,5,7,9,11,13,15,29,31,33,35,37,39,41]",
+			// This topology has two UCCs with matching NUMA (2x28 UCCs)
+			Intel_R__Xeon_R__Gold_5120_CPU___2_20GHz,
+			// Take an increasing number of cpus (in each iteration) to see the assignments
+			[]int{4, 5, 6, 7, 8}, // this combination exercises the lower level "takers", leaves holes, etc.
+			// The map below shows the "takes".  Notice the last take (8 cpus) yields from both UCC0 and UCC1
+			"map[1:0,2,28,30 2:4,6,8,32,34 3:10,12,14,38,40,42 4:16,18,20,36,44,46,48 5:1,22,24,26,29,50,52,54]",
+			// With the feature flag enabled the enhanced scheduler takes only from UCC1 to satisfy the entire request
+			"map[1:0,2,28,30 2:4,6,8,32,34 3:10,12,14,38,40,42 4:16,18,20,36,44,46,48 5:1,3,5,7,29,31,33,35]",
+		},
+		{
+			gold_5218_topology, // FIXME this topology is hard to understand??
+			[]int{1, 2, 3, 4, 5, 6},
+			"map[1:0 2:1,32 3:4-5,36 4:8-9,40-41 5:12-14,44-45 6:10-11,15,42-43,46]",
+			"map[1:0 2:4-5 3:8-9,12 4:10-11,14-15 5:2-3,6-7,16 6:20-21,24-25,28-29]",
+		},
+		{
+			gold_5218_topology, // FIXME this topology is hard to understand??
+			[]int{4, 5, 6, 7},
+			"map[1:0-1,32-33 2:4-5,8,36-37 3:9,12-13,40,44-45 4:10-11,14-15,42,46-47]",
+			"map[1:0-1,4-5 2:8-9,12-14 3:2-3,6-7,10-11 4:16-17,20-21,24-25,28]",
 		},
 	}
 
 	for _, tc := range examples {
-		oldResult, newResult := take_iterator_old_new(Intel_R__Xeon_R__Gold_5120_CPU___2_20GHz, tc.takeNumCpus, t)
+		oldResult := takeIterator(tc.topo, tc.takeNumCpus, false, t)
 		if oldResult != tc.expOld {
 			t.Errorf("\nEXP__OLD: %v\nTO EQUAL: %v", tc.expOld, oldResult)
-			return
 		}
+		newResult := takeIterator(tc.topo, tc.takeNumCpus, true, t)
 		if newResult != tc.expNew {
 			t.Errorf("\nEXP__NEW: %v\nTO EQUAL: %v", tc.expNew, newResult)
-			return
 		}
 	}
-}
-
-func take_iterator_old_new(topo *topology.CPUTopology, takeNumCpus []int, t *testing.T) (string, string) {
-	oldResult := take_iterator(topo, takeNumCpus, false, t)
-	newResult := take_iterator(topo, takeNumCpus, true, t)
-	return oldResult, newResult
 }
