@@ -81,17 +81,17 @@ type ControllerParameters struct {
 // NewController creates a new PersistentVolume controller
 func NewController(p ControllerParameters) (*PersistentVolumeController, error) {
 	eventRecorder := p.EventRecorder
+	var eventBroadcaster record.EventBroadcaster
 	if eventRecorder == nil {
-		broadcaster := record.NewBroadcaster()
-		broadcaster.StartStructuredLogging(0)
-		broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: p.KubeClient.CoreV1().Events("")})
-		eventRecorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
+		eventBroadcaster = record.NewBroadcaster()
+		eventRecorder = eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
 	}
 
 	controller := &PersistentVolumeController{
 		volumes:                       newPersistentVolumeOrderedIndex(),
 		claims:                        cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
 		kubeClient:                    p.KubeClient,
+		eventBroadcaster:              eventBroadcaster,
 		eventRecorder:                 eventRecorder,
 		runningOperations:             goroutinemap.NewGoRoutineMap(true /* exponentialBackOffOnError */),
 		cloud:                         p.Cloud,
@@ -307,6 +307,13 @@ func (ctrl *PersistentVolumeController) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer ctrl.claimQueue.ShutDown()
 	defer ctrl.volumeQueue.ShutDown()
+
+	// Start events processing pipeline.
+	if ctrl.eventBroadcaster != nil {
+		ctrl.eventBroadcaster.StartStructuredLogging(0)
+		ctrl.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: ctrl.kubeClient.CoreV1().Events("")})
+		defer ctrl.eventBroadcaster.Shutdown()
+	}
 
 	klog.Infof("Starting persistent volume controller")
 	defer klog.Infof("Shutting down persistent volume controller")

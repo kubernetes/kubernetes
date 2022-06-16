@@ -150,10 +150,8 @@ func NewAttachDetachController(
 		return nil, fmt.Errorf("could not initialize volume plugins for Attach/Detach Controller: %w", err)
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
+	adc.broadcaster = record.NewBroadcaster()
+	recorder := adc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
 	blkutil := volumepathhandler.NewBlockVolumePathHandler()
 
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
@@ -302,8 +300,8 @@ type attachDetachController struct {
 	// populate the current pods using podInformer.
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
 
-	// recorder is used to record events in the API server
-	recorder record.EventRecorder
+	// broadcaster is broadcasting events
+	broadcaster record.EventBroadcaster
 
 	// pvcQueue is used to queue pvc objects
 	pvcQueue workqueue.RateLimitingInterface
@@ -321,6 +319,11 @@ type attachDetachController struct {
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	defer adc.pvcQueue.ShutDown()
+
+	// Start events processing pipeline.
+	adc.broadcaster.StartStructuredLogging(0)
+	adc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: adc.kubeClient.CoreV1().Events("")})
+	defer adc.broadcaster.Shutdown()
 
 	klog.Infof("Starting attach detach controller")
 	defer klog.Infof("Shutting down attach detach controller")
@@ -910,7 +913,7 @@ func (adc *attachDetachController) GetNodeName() types.NodeName {
 }
 
 func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
-	return adc.recorder
+	return nil
 }
 
 func (adc *attachDetachController) GetSubpather() subpath.Interface {

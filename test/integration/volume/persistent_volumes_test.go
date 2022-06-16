@@ -699,7 +699,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	}
 
 	klog.V(2).Infof("TestPersistentVolumeMultiPVsPVCs: claims are bound")
-	stopCh <- struct{}{}
+	close(stopCh)
 
 	// check that everything is bound to something
 	for i := 0; i < objCount; i++ {
