@@ -92,7 +92,7 @@ type Event struct {
 
 	// The request URI as sent by the client to a server.
 	RequestURI string `json:"requestURI" protobuf:"bytes,4,opt,name=requestURI"`
-	// The kubernetes verb associated with the request.
+	// The kubernetes API verb associated with the request.
 	// For non-resource requests, this is the lower-cased HTTP method.
 	Verb string `json:"verb" protobuf:"bytes,5,opt,name=verb"`
 	// Authenticated user information.
@@ -321,7 +321,7 @@ type ObjectReference struct {
 	// The kind of the referred object.
 	// +optional
 	Resource string `json:"resource,omitempty" protobuf:"bytes,1,opt,name=resource"`
-	// The namespace of the referred object.
+	// The namespace of the referred object. Only set for requests made to namespace-scoped APIs.
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
 	// The name of the referred object.

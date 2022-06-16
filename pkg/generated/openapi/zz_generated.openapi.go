@@ -46321,7 +46321,7 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 					},
 					"verb": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The kubernetes verb associated with the request. For non-resource requests, this is the lower-cased HTTP method.",
+							Description: "The kubernetes API verb associated with the request. For non-resource requests, this is the lower-cased HTTP method.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -46542,7 +46542,7 @@ func schema_pkg_apis_audit_v1_ObjectReference(ref common.ReferenceCallback) comm
 					},
 					"namespace": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The namespace of the referred object.",
+							Description: "The namespace of the referred object. Only set for requests made to namespace-scoped APIs.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

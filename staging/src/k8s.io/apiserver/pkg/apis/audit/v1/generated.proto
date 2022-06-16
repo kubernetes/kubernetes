@@ -53,7 +53,7 @@ message Event {
   // The request URI as sent by the client to a server.
   optional string requestURI = 4;
 
-  // The kubernetes verb associated with the request.
+  // The kubernetes API verb associated with the request.
   // For non-resource requests, this is the lower-cased HTTP method.
   optional string verb = 5;
 
@@ -167,7 +167,7 @@ message ObjectReference {
   // +optional
   optional string resource = 1;
 
-  // The namespace of the referred object.
+  // The namespace of the referred object. Only set for requests made to namespace-scoped APIs.
   // +optional
   optional string namespace = 2;
 
