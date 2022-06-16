@@ -261,7 +261,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// log the kubelet's config for inspection
 			klog.V(5).InfoS("KubeletConfiguration", "configuration", config)
 
-			// set up signal context here in order to be reused by kubelet
+			// set up signal context for kubelet shutdown
 			ctx := genericapiserver.SetupSignalContext()
 
 			// run the kubelet
