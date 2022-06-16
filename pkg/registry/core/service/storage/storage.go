@@ -88,6 +88,7 @@ func NewREST(
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Service{} },
 		NewListFunc:              func() runtime.Object { return &api.ServiceList{} },
+		PredicateFunc:            svcreg.MatchService,
 		DefaultQualifiedResource: api.Resource("services"),
 		ReturnDeletedObject:      true,
 

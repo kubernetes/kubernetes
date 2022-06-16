@@ -22,6 +22,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -614,5 +616,38 @@ func TestDropTypeDependentFields(t *testing.T) {
 				t.Errorf("failed %q: expected LoadBalancerClass %v, got %v", tc.name, tc.expect.Spec.LoadBalancerClass, result.Spec.LoadBalancerClass)
 			}
 		})
+	}
+}
+
+func TestMatchService(t *testing.T) {
+	testCases := []struct {
+		in            *api.Service
+		fieldSelector fields.Selector
+		expectMatch   bool
+	}{
+		{
+			in: &api.Service{
+				Spec: api.ServiceSpec{Type: api.ServiceTypeClusterIP},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.type=ClusterIP"),
+			expectMatch:   true,
+		},
+		{
+			in: &api.Service{
+				Spec: api.ServiceSpec{ClusterIP: "1.1.1.1"},
+			},
+			fieldSelector: fields.ParseSelectorOrDie("spec.clusterIP=1.1.1.1"),
+			expectMatch:   true,
+		},
+	}
+	for _, testCase := range testCases {
+		m := MatchService(labels.Everything(), testCase.fieldSelector)
+		result, err := m.Matches(testCase.in)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		}
+		if result != testCase.expectMatch {
+			t.Errorf("Result %v, Expected %v, Selector: %v, Service: %v", result, testCase.expectMatch, testCase.fieldSelector.String(), testCase.in)
+		}
 	}
 }

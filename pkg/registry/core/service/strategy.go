@@ -18,11 +18,16 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -200,6 +205,37 @@ func (serviceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtim
 // WarningsOnUpdate returns warnings for the given update.
 func (serviceStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
+}
+
+// ToSelectableFields returns a field set that represents the object
+// TODO: fields are not labels, and the validation rules for them do not apply.
+func ToSelectableFields(svc *api.Service) fields.Set {
+	// The purpose of allocation with a given number of elements is to reduce
+	// amount of allocations needed to create the fields.Set. If you add any
+	// field here or the number of object-meta related fields changes, this should
+	// be adjusted.
+	svcSpecificFieldsSet := make(fields.Set, 2)
+	svcSpecificFieldsSet["spec.type"] = string(svc.Spec.Type)
+	svcSpecificFieldsSet["spec.clusterIP"] = string(svc.Spec.ClusterIP)
+	return generic.AddObjectMetaFieldsSet(svcSpecificFieldsSet, &svc.ObjectMeta, true)
+}
+
+// GetAttrs returns labels and fields of a given object for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	svc, ok := obj.(*api.Service)
+	if !ok {
+		return nil, nil, fmt.Errorf("not a service")
+	}
+	return labels.Set(svc.ObjectMeta.Labels), ToSelectableFields(svc), nil
+}
+
+// MatchService returns a generic matcher for a given label and field selector.
+func MatchService(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+	return storage.SelectionPredicate{
+		Label:    label,
+		Field:    field,
+		GetAttrs: GetAttrs,
+	}
 }
 
 func sameStringSlice(a []string, b []string) bool {
