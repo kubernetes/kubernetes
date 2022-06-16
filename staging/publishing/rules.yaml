@@ -2430,6 +2430,17 @@ rules:
     source:
       branch: release-1.26
       dir: staging/src/k8s.io/dynamic-resource-allocation
+- destination: noderesourcetopology-api
+  branches:
+  - name: master
+    dependencies:
+    - repository: code-generator
+      branch: master
+      dir: staging/src/k8s.io/noderesourcetopology-api
+    source:
+       branch: master
+       dir: staging/src/k8s.io/noderesourcetopology-api
+  library: true
 recursive-delete-patterns:
 - '*/.gitattributes'
 default-go-version: 1.19.4
