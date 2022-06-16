@@ -252,7 +252,6 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group := template
 		group.Root = "/" + grouplessPrefix
 		group.GroupVersion = grouplessGroupVersion
-		group.OptionsExternalVersion = &grouplessGroupVersion
 		group.Serializer = codecs
 		if _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
@@ -264,7 +263,6 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group := template
 		group.Root = "/" + prefix
 		group.GroupVersion = testGroupVersion
-		group.OptionsExternalVersion = &testGroupVersion
 		group.Serializer = codecs
 		if _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
@@ -276,7 +274,6 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		group := template
 		group.Root = "/" + prefix
 		group.GroupVersion = newGroupVersion
-		group.OptionsExternalVersion = &newGroupVersion
 		group.Serializer = codecs
 		if _, err := (&group).InstallREST(container); err != nil {
 			panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
@@ -3303,8 +3300,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 
 		Admit: admissionControl,
 
-		GroupVersion:           newGroupVersion,
-		OptionsExternalVersion: &newGroupVersion,
+		GroupVersion: newGroupVersion,
 
 		Serializer:     codecs,
 		ParameterCodec: parameterCodec,
@@ -3335,8 +3331,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 
 		Admit: admissionControl,
 
-		GroupVersion:           newGroupVersion,
-		OptionsExternalVersion: &newGroupVersion,
+		GroupVersion: newGroupVersion,
 
 		Serializer:     codecs,
 		ParameterCodec: parameterCodec,
@@ -4382,10 +4377,9 @@ func TestXGSubresource(t *testing.T) {
 
 		Admit: admissionControl,
 
-		Root:                   "/" + prefix,
-		GroupVersion:           testGroupVersion,
-		OptionsExternalVersion: &testGroupVersion,
-		Serializer:             codecs,
+		Root:         "/" + prefix,
+		GroupVersion: testGroupVersion,
+		Serializer:   codecs,
 	}
 
 	if _, err := (&group).InstallREST(container); err != nil {

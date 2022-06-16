@@ -190,11 +190,6 @@ func GetResourceKind(groupVersion schema.GroupVersion, storage rest.Storage, typ
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService) (*metav1.APIResource, *storageversion.ResourceInfo, error) {
 	admit := a.group.Admit
 
-	optionsExternalVersion := a.group.GroupVersion
-	if a.group.OptionsExternalVersion != nil {
-		optionsExternalVersion = *a.group.OptionsExternalVersion
-	}
-
 	resource, subresource, err := splitSubresource(path)
 	if err != nil {
 		return nil, nil, err
@@ -280,19 +275,20 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		versionedList = indirectArbitraryPointer(versionedListPtr)
 	}
 
-	versionedListOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ListOptions"))
+	builtinGroupVersion := &schema.GroupVersion{Version: "v1"}
+	versionedListOptions, err := a.group.Creater.New(builtinGroupVersion.WithKind("ListOptions"))
 	if err != nil {
 		return nil, nil, err
 	}
-	versionedCreateOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("CreateOptions"))
+	versionedCreateOptions, err := a.group.Creater.New(builtinGroupVersion.WithKind("CreateOptions"))
 	if err != nil {
 		return nil, nil, err
 	}
-	versionedPatchOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("PatchOptions"))
+	versionedPatchOptions, err := a.group.Creater.New(builtinGroupVersion.WithKind("PatchOptions"))
 	if err != nil {
 		return nil, nil, err
 	}
-	versionedUpdateOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("UpdateOptions"))
+	versionedUpdateOptions, err := a.group.Creater.New(builtinGroupVersion.WithKind("UpdateOptions"))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -301,7 +297,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var versionedDeleterObject interface{}
 	deleteReturnsDeletedObject := false
 	if isGracefulDeleter {
-		versionedDeleteOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind("DeleteOptions"))
+		versionedDeleteOptions, err = a.group.Creater.New(builtinGroupVersion.WithKind("DeleteOptions"))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -312,7 +308,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		}
 	}
 
-	versionedStatusPtr, err := a.group.Creater.New(optionsExternalVersion.WithKind("Status"))
+	versionedStatusPtr, err := a.group.Creater.New(builtinGroupVersion.WithKind("Status"))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -332,7 +328,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		getOptionsInternalKind = getOptionsInternalKinds[0]
 		versionedGetOptions, err = a.group.Creater.New(a.group.GroupVersion.WithKind(getOptionsInternalKind.Kind))
 		if err != nil {
-			versionedGetOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(getOptionsInternalKind.Kind))
+			versionedGetOptions, err = a.group.Creater.New(builtinGroupVersion.WithKind(getOptionsInternalKind.Kind))
 			if err != nil {
 				return nil, nil, err
 			}
@@ -366,7 +362,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			connectOptionsInternalKind = connectOptionsInternalKinds[0]
 			versionedConnectOptions, err = a.group.Creater.New(a.group.GroupVersion.WithKind(connectOptionsInternalKind.Kind))
 			if err != nil {
-				versionedConnectOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind))
+				versionedConnectOptions, err = a.group.Creater.New(builtinGroupVersion.WithKind(connectOptionsInternalKind.Kind))
 				if err != nil {
 					return nil, nil, err
 				}
