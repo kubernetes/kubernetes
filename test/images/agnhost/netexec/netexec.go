@@ -634,7 +634,7 @@ func redirectHandler(w http.ResponseWriter, r *http.Request) {
 // udp server supports the hostName, echo and clientIP commands.
 func startUDPServer(address string, udpPort int) {
 	serverAddress, err := net.ResolveUDPAddr("udp", net.JoinHostPort(address, strconv.Itoa(udpPort)))
-	assertNoError(err, fmt.Sprintf("failed to resolve UDP address for port %d", sctpPort))
+	assertNoError(err, fmt.Sprintf("failed to resolve UDP address for port %d", udpPort))
 	serverConn, err := net.ListenUDP("udp", serverAddress)
 	assertNoError(err, fmt.Sprintf("failed to create listener for UDP address %v", serverAddress))
 	defer serverConn.Close()
