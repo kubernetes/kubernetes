@@ -1475,7 +1475,7 @@ func TestReconcileTopology(t *testing.T) {
 		expectedCrossZoneHints: 1,
 		expectedMetrics: expectedMetrics{
 			desiredSlices:    1,
-			actualSlices:     1,
+			actualSlices:     2,
 			desiredEndpoints: 9,
 			addedPerSync:     0,
 			removedPerSync:   0,
@@ -1498,7 +1498,7 @@ func TestReconcileTopology(t *testing.T) {
 		expectedCrossZoneHints: 0,
 		expectedMetrics: expectedMetrics{
 			desiredSlices:        1,
-			actualSlices:         1,
+			actualSlices:         2,
 			desiredEndpoints:     9,
 			addedPerSync:         0,
 			removedPerSync:       0,
@@ -1531,6 +1531,9 @@ func TestReconcileTopology(t *testing.T) {
 			cmc.Check(t)
 			expectMetrics(t, tc.expectedMetrics)
 			fetchedSlices := fetchEndpointSlices(t, client, ns)
+			if len(fetchedSlices) != tc.expectedMetrics.actualSlices {
+				t.Fatalf("Actual slices %d doesn't match metric %d", len(fetchedSlices), tc.expectedMetrics.actualSlices)
+			}
 
 			if tc.expectedHints == nil {
 				for _, slice := range fetchedSlices {
@@ -1745,7 +1748,7 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 
 	actualNumSlices, err := testutil.GetGaugeMetricValue(metrics.NumEndpointSlices.WithLabelValues())
 	handleErr(t, err, "numEndpointSlices")
-	if actualDesiredSlices != float64(em.desiredSlices) {
+	if actualNumSlices != float64(em.actualSlices) {
 		t.Errorf("Expected numEndpointSlices to be %d, got %v", em.actualSlices, actualNumSlices)
 	}
 
