@@ -163,8 +163,10 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		userInfo, _ := request.UserFrom(ctx)
 
-		// if this object supports namespace info
 		if objectMeta, err := meta.Accessor(obj); err == nil {
+			// Wipe fields which cannot take user-provided values
+			rest.WipeObjectMetaSystemFields(objectMeta)
+
 			// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
 			if err := rest.EnsureObjectNamespaceMatchesRequestNamespace(rest.ExpectedNamespaceForResource(namespace, scope.Resource), objectMeta); err != nil {
 				scope.err(err, w, req)

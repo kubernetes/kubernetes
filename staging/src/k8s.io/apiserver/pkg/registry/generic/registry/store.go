@@ -382,6 +382,13 @@ func finishNothing(context.Context, bool) {}
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	var finishCreate FinishFunc = finishNothing
 
+	// Init metadata as early as possible.
+	if objectMeta, err := meta.Accessor(obj); err != nil {
+		return nil, err
+	} else {
+		rest.FillObjectMetaSystemFields(objectMeta)
+	}
+
 	if e.BeginCreate != nil {
 		fn, err := e.BeginCreate(ctx, obj, options)
 		if err != nil {
@@ -558,6 +565,13 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		doUnconditionalUpdate := newResourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 
 		if existingResourceVersion == 0 {
+			// Init metadata as early as possible.
+			if objectMeta, err := meta.Accessor(obj); err != nil {
+				return nil, nil, err
+			} else {
+				rest.FillObjectMetaSystemFields(objectMeta)
+			}
+
 			var finishCreate FinishFunc = finishNothing
 
 			if e.BeginCreate != nil {

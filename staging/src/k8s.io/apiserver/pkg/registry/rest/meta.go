@@ -23,11 +23,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
+// WipeObjectMetaSystemFields erases fields that are managed by the system on ObjectMeta.
+func WipeObjectMetaSystemFields(meta metav1.Object) {
+	meta.SetCreationTimestamp(metav1.Time{})
+	meta.SetUID("")
+	meta.SetDeletionTimestamp(nil)
+	meta.SetDeletionGracePeriodSeconds(nil)
+	meta.SetSelfLink("")
+}
+
 // FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
 func FillObjectMetaSystemFields(meta metav1.Object) {
 	meta.SetCreationTimestamp(metav1.Now())
 	meta.SetUID(uuid.NewUUID())
-	meta.SetSelfLink("")
 }
 
 // EnsureObjectNamespaceMatchesRequestNamespace returns an error if obj.Namespace and requestNamespace
