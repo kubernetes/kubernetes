@@ -106,7 +106,7 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 			if err := configutil.GetNodeRegistration(data.KubeConfigPath(), data.Client(), nro); err != nil {
 				return errors.Wrap(err, "could not retrieve the node registration options for this node")
 			}
-			missingURLScheme = strings.HasPrefix(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme)
+			missingURLScheme = !strings.HasPrefix(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme)
 		}
 		if missingURLScheme {
 			if !dryRun {
