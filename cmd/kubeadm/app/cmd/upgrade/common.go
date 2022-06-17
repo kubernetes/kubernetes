@@ -163,24 +163,6 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		newK8sVersion = cfg.KubernetesVersion
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
-	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
-
-	// Ensure the user is root
-	klog.V(1).Info("running preflight checks")
-	if err := runPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration, printer); err != nil {
-		return nil, nil, nil, err
-	}
-
-	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client, &cfg.ClusterConfiguration, ignorePreflightErrorsSet); err != nil {
-		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
-	}
-
 	// The version arg is mandatory, during upgrade apply, unless it's specified in the config file
 	if upgradeApply && newK8sVersion == "" {
 		if err := cmdutil.ValidateExactArgNumber(args, []string{"version"}); err != nil {
@@ -200,6 +182,24 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 			// installed one.
 			cfg.KubernetesVersion = newK8sVersion
 		}
+	}
+
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
+	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+
+	// Ensure the user is root
+	klog.V(1).Info("running preflight checks")
+	if err := runPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration, printer); err != nil {
+		return nil, nil, nil, err
+	}
+
+	// Run healthchecks against the cluster
+	if err := upgrade.CheckClusterHealth(client, &cfg.ClusterConfiguration, ignorePreflightErrorsSet); err != nil {
+		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
 	// If features gates are passed to the command line, use it (otherwise use featureGates from configuration)
