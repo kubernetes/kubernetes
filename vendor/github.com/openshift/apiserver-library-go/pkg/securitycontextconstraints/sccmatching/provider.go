@@ -170,9 +170,24 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 	// if we're using the non-root strategy set the marker that this container should not be
 	// run as root which will signal to the kubelet to do a final check either on the runAsUser
 	// or, if runAsUser is not set, the image
-	if sc.RunAsNonRoot() == nil && sc.RunAsUser() == nil && s.scc.RunAsUser.Type == securityv1.RunAsUserStrategyMustRunAsNonRoot {
-		nonRoot := true
-		sc.SetRunAsNonRoot(&nonRoot)
+	// Alternatively, also set the RunAsNonRoot to true in case the UID value is non-nil and non-zero
+	// to more easily satisfy the requirements of upstream PodSecurity admission "restricted" profile
+	// which currently requires all containers to have runAsNonRoot set to true, or to have this set
+	// in the whole pod's security context
+	if sc.RunAsNonRoot() == nil {
+		nonRoot := false
+		switch runAsUser := sc.RunAsUser(); {
+		case runAsUser == nil:
+			if s.scc.RunAsUser.Type == securityv1.RunAsUserStrategyMustRunAsNonRoot {
+				nonRoot = true
+			}
+		case *runAsUser > 0:
+			nonRoot = true
+		}
+
+		if nonRoot {
+			sc.SetRunAsNonRoot(&nonRoot)
+		}
 	}
 
 	caps, err := s.capabilitiesStrategy.Generate(pod, container)
