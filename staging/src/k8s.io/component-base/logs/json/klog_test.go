@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap/zapcore"
 
-	"k8s.io/component-base/config"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -241,7 +241,7 @@ func TestKlogIntegration(t *testing.T) {
 			var buffer bytes.Buffer
 			writer := zapcore.AddSync(&buffer)
 			// This level is high enough to enable all log messages from this test.
-			verbosityLevel := config.VerbosityLevel(100)
+			verbosityLevel := logsapi.VerbosityLevel(100)
 			logger, _ := NewJSONLogger(verbosityLevel, writer, nil, nil)
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()

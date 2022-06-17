@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logs
+package v1
 
 import (
 	"bytes"
@@ -32,10 +32,10 @@ import (
 )
 
 func TestFlags(t *testing.T) {
-	o := NewOptions()
+	c := NewLoggingConfiguration()
 	fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
 	output := bytes.Buffer{}
-	o.AddFlags(fs)
+	AddFlags(c, fs)
 	fs.SetOutput(&output)
 	fs.PrintDefaults()
 	want := `      --log-flush-frequency duration   Maximum number of seconds between log flushes (default 5s)
@@ -51,29 +51,29 @@ func TestFlags(t *testing.T) {
 }
 
 func TestOptions(t *testing.T) {
-	newOptions := NewOptions()
+	newOptions := NewLoggingConfiguration()
 	testcases := []struct {
 		name string
 		args []string
-		want *Options
+		want *LoggingConfiguration
 		errs field.ErrorList
 	}{
 		{
 			name: "Default log format",
-			want: newOptions,
+			want: newOptions.DeepCopy(),
 		},
 		{
 			name: "Text log format",
 			args: []string{"--logging-format=text"},
-			want: newOptions,
+			want: newOptions.DeepCopy(),
 		},
 		{
 			name: "Unsupported log format",
 			args: []string{"--logging-format=test"},
-			want: func() *Options {
-				c := newOptions.Config.DeepCopy()
+			want: func() *LoggingConfiguration {
+				c := newOptions.DeepCopy()
 				c.Format = "test"
-				return &Options{*c}
+				return c
 			}(),
 			errs: field.ErrorList{&field.Error{
 				Type:     "FieldValueInvalid",
@@ -86,19 +86,17 @@ func TestOptions(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			o := NewOptions()
+			c := NewLoggingConfiguration()
 			fs := pflag.NewFlagSet("addflagstest", pflag.ContinueOnError)
-			o.AddFlags(fs)
+			AddFlags(c, fs)
 			fs.Parse(tc.args)
-			if !assert.Equal(t, tc.want, o) {
-				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, o)
+			if !assert.Equal(t, tc.want, c) {
+				t.Errorf("Wrong Validate() result for %q. expect %v, got %v", tc.name, tc.want, c)
 			}
-			err := o.ValidateAndApply(nil /* We don't care about feature gates here. */)
+			errs := ValidateAndApply(c, nil /* We don't care about feature gates here. */)
 			defer klog.StopFlushDaemon()
-
-			if !assert.ElementsMatch(t, tc.errs.ToAggregate(), err) {
-				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, err)
-
+			if !assert.ElementsMatch(t, tc.errs, errs) {
+				t.Errorf("Wrong Validate() result for %q.\n expect:\t%+v\n got:\t%+v", tc.name, tc.errs, errs)
 			}
 		})
 	}
@@ -117,12 +115,12 @@ func TestContextualLogging(t *testing.T) {
 func testContextualLogging(t *testing.T, enabled bool) {
 	var err error
 
-	o := NewOptions()
+	c := NewLoggingConfiguration()
 	featureGate := featuregate.NewFeatureGate()
 	AddFeatureGates(featureGate)
 	err = featureGate.SetFromMap(map[string]bool{string(ContextualLogging): enabled})
 	require.NoError(t, err)
-	err = o.ValidateAndApply(featureGate)
+	err = ValidateAndApply(c, featureGate)
 	require.NoError(t, err)
 	defer klog.StopFlushDaemon()
 	defer klog.EnableContextualLogging(true)
