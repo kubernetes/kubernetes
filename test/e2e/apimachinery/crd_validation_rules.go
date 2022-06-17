@@ -205,7 +205,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 					    "type":"string"
 					  },
 					  "x-kubernetes-validations":[
-					    { "rule":"self.all(s, s == \"string constant\")" }
+					    { "rule":"self.all(s, s == 'string constant')" }
 					  ]
 				    }
 				  }
