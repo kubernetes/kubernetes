@@ -157,6 +157,18 @@ var _ = common.SIGDescribe("HostPort", func() {
 // create pod which using hostport on the specified node according to the nodeSelector
 // it starts an http server on the exposed port
 func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeName string) {
+
+	var netexecArgs []string
+	var readinessProbePort int32
+
+	if protocol == v1.ProtocolTCP {
+		readinessProbePort = 8080
+		netexecArgs = []string{"--http-port=8080", "--udp-port=-1"}
+	} else {
+		readinessProbePort = 8008
+		netexecArgs = []string{"--http-port=8008", "--udp-port=8080"}
+	}
+
 	hostPortPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
@@ -166,7 +178,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 				{
 					Name:  "agnhost",
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"netexec", "--http-port=8080", "--udp-port=8080"},
+					Args:  append([]string{"netexec"}, netexecArgs...),
 					Ports: []v1.ContainerPort{
 						{
 							HostPort:      port,
@@ -180,7 +192,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 							HTTPGet: &v1.HTTPGetAction{
 								Path: "/hostname",
 								Port: intstr.IntOrString{
-									IntVal: int32(8080),
+									IntVal: readinessProbePort,
 								},
 								Scheme: v1.URISchemeHTTP,
 							},
