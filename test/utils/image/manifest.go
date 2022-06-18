@@ -242,7 +242,7 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.29-2"}
 	configs[CudaVectorAdd] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
-	configs[DebianIptables] = Config{"gcr.io/k8s-staging-releng-test", "debian-iptables", "distroless-v1.0.0"} // TODO: revert, this is only for test
+	configs[DebianIptables] = Config{"gcr.io/k8s-staging-releng-test", "debian-iptables-amd64", "latest-distroless"} // TODO: revert, this is only for test gcr.io/k8s-staging-releng-test/debian-iptables-amd64:latest-distroless
 	configs[EchoServer] = Config{list.PromoterE2eRegistry, "echoserver", "2.4"}
 	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.4-0"}
 	configs[GlusterDynamicProvisioner] = Config{list.PromoterE2eRegistry, "glusterdynamic-provisioner", "v1.3"}

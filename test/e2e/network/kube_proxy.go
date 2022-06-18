@@ -108,7 +108,7 @@ var _ = common.SIGDescribe("KubeProxy", func() {
 						Name:            "e2e-net-exec",
 						Image:           imageutils.GetE2EImage(imageutils.DebianIptables),
 						ImagePullPolicy: v1.PullIfNotPresent,
-						Command:         []string{"cat"}, // TODO: Stupid way while I don't generate the image with sleep...
+						Command:         []string{"/bin/sleep", "600"},
 						SecurityContext: &v1.SecurityContext{
 							Privileged: &privileged,
 						},
