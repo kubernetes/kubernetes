@@ -5711,7 +5711,7 @@ type TopologySpreadConstraint struct {
 	// because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
 	// it will violate MaxSkew.
 	//
-	// This is an alpha field and requires enabling MinDomainsInPodTopologySpread feature gate.
+	// This is an beta field and requires enabling MinDomainsInPodTopologySpread feature gate.
 	// +optional
 	MinDomains *int32
 	// NodeAffinityPolicy indicates how we will treat Pod's nodeAffinity/nodeSelector
