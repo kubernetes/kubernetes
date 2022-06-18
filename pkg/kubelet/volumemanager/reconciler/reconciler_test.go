@@ -1642,20 +1642,6 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 			volumeName:             volumetesting.TimeoutOnSetupVolumeName,
 		},
 		{
-			name:                   "failed operation should result in not-mounted volume",
-			volumeState:            operationexecutor.VolumeNotMounted,
-			unmountDeviceCallCount: 1,
-			unmountVolumeCount:     0,
-			volumeName:             volumetesting.FailOnSetupVolumeName,
-		},
-		{
-			name:                   "timeout followed by failed operation should result in non-mounted volume",
-			volumeState:            operationexecutor.VolumeNotMounted,
-			unmountDeviceCallCount: 1,
-			unmountVolumeCount:     0,
-			volumeName:             volumetesting.TimeoutAndFailOnSetupVolumeName,
-		},
-		{
 			name:                   "success followed by timeout operation should result in mounted volume",
 			volumeState:            operationexecutor.VolumeMounted,
 			unmountDeviceCallCount: 1,
