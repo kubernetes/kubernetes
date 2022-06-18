@@ -648,7 +648,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				volume.DeviceMounterArgs{FsGroup: fsGroup},
 			)
 			if err != nil {
-				og.checkForFailedMount(volumeToMount, err)
+				og.addFailedMountEvent(volumeToMount, err)
 				og.markDeviceErrorState(volumeToMount, devicePath, deviceMountPath, err, actualStateOfWorld)
 				// On failure, return error. Caller will log and retry.
 				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.MountDevice failed", err)
@@ -688,8 +688,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			VolumeMountState:    VolumeMounted,
 		}
 		if mountErr != nil {
-			og.checkForFailedMount(volumeToMount, mountErr)
-			og.markVolumeErrorState(volumeToMount, markOpts, mountErr, actualStateOfWorld)
+			og.addFailedMountEvent(volumeToMount, mountErr)
+			og.markVolumeErrorState(volumeToMount, markOpts, actualStateOfWorld)
 			// On failure, return error. Caller will log and retry.
 			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.SetUp failed", mountErr)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
@@ -747,7 +747,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	}
 }
 
-func (og *operationGenerator) checkForFailedMount(volumeToMount VolumeToMount, mountError error) {
+func (og *operationGenerator) addFailedMountEvent(volumeToMount VolumeToMount, mountError error) {
 	pv := volumeToMount.VolumeSpec.PersistentVolume
 	if pv == nil {
 		return
@@ -782,24 +782,13 @@ func (og *operationGenerator) markDeviceErrorState(volumeToMount VolumeToMount, 
 
 }
 
-func (og *operationGenerator) markVolumeErrorState(volumeToMount VolumeToMount, markOpts MarkVolumeOpts, mountError error, actualStateOfWorld ActualStateOfWorldMounterUpdater) {
-	if volumetypes.IsOperationFinishedError(mountError) &&
-		actualStateOfWorld.GetVolumeMountState(volumeToMount.VolumeName, markOpts.PodName) == VolumeMountUncertain {
-		t := actualStateOfWorld.MarkVolumeAsUnmounted(volumeToMount.PodName, volumeToMount.VolumeName)
-		if t != nil {
-			klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeAsUnmounted failed", t).Error())
-		}
-		return
-	}
-
-	if volumetypes.IsUncertainProgressError(mountError) &&
-		actualStateOfWorld.GetVolumeMountState(volumeToMount.VolumeName, markOpts.PodName) == VolumeNotMounted {
+func (og *operationGenerator) markVolumeErrorState(volumeToMount VolumeToMount, markOpts MarkVolumeOpts, actualStateOfWorld ActualStateOfWorldMounterUpdater) {
+	if actualStateOfWorld.GetVolumeMountState(volumeToMount.VolumeName, markOpts.PodName) == VolumeNotMounted {
 		t := actualStateOfWorld.MarkVolumeMountAsUncertain(markOpts)
 		if t != nil {
 			klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", t).Error())
 		}
 	}
-
 }
 
 func (og *operationGenerator) GenerateUnmountVolumeFunc(
@@ -1118,7 +1107,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			pluginDevicePath, mapErr := customBlockVolumeMapper.MapPodDevice()
 			if mapErr != nil {
 				// On failure, return error. Caller will log and retry.
-				og.markVolumeErrorState(volumeToMount, markVolumeOpts, mapErr, actualStateOfWorld)
+				og.markVolumeErrorState(volumeToMount, markVolumeOpts, actualStateOfWorld)
 				eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.MapPodDevice failed", mapErr)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
@@ -1127,8 +1116,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			// so it is is unmapped when corresponding pod is deleted.
 			defer func() {
 				if operationContext.EventErr != nil {
-					errText := operationContext.EventErr.Error()
-					og.markVolumeErrorState(volumeToMount, markVolumeOpts, volumetypes.NewUncertainProgressError(errText), actualStateOfWorld)
+					og.markVolumeErrorState(volumeToMount, markVolumeOpts, actualStateOfWorld)
 				}
 			}()
 
