@@ -529,6 +529,7 @@ const (
 	// owner: @sanposhiho
 	// kep: http://kep.k8s.io/3022
 	// alpha: v1.24
+	// beta: v1.25
 	//
 	// Enable MinDomains in Pod Topology Spread.
 	MinDomainsInPodTopologySpread featuregate.Feature = "MinDomainsInPodTopologySpread"
@@ -941,7 +942,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MemoryQoS: {Default: false, PreRelease: featuregate.Alpha},
 
-	MinDomainsInPodTopologySpread: {Default: false, PreRelease: featuregate.Alpha},
+	MinDomainsInPodTopologySpread: {Default: false, PreRelease: featuregate.Beta},
 
 	MixedProtocolLBService: {Default: true, PreRelease: featuregate.Beta},
 
