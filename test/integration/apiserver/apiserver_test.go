@@ -725,6 +725,69 @@ func TestAPIListChunking(t *testing.T) {
 	}
 }
 
+func TestAPIListChunkingWithLabelSelector(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
+	clientSet, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	ns := framework.CreateNamespaceOrDie(clientSet, "list-paging-with-label-selector", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
+
+	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
+
+	for i := 0; i < 10; i++ {
+		rs := newRS(ns.Name)
+		rs.Name = fmt.Sprintf("test-%d", i)
+		odd := i%2 != 0
+		rs.Labels = map[string]string{"odd-index": strconv.FormatBool(odd)}
+		if _, err := rsClient.Create(context.TODO(), rs, metav1.CreateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	calls := 0
+	firstRV := ""
+	p := &pager.ListPager{
+		PageSize: 1,
+		PageFn: pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
+			calls++
+			list, err := rsClient.List(context.TODO(), opts)
+			if err != nil {
+				return nil, err
+			}
+			if calls == 1 {
+				firstRV = list.ResourceVersion
+			}
+			return list, err
+		}),
+	}
+	listObj, _, err := p.List(context.Background(), metav1.ListOptions{LabelSelector: "odd-index=true", Limit: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Errorf("unexpected list invocations: %d", calls)
+	}
+	list := listObj.(metav1.ListInterface)
+	if len(list.GetContinue()) != 0 {
+		t.Errorf("unexpected continue: %s", list.GetContinue())
+	}
+	if list.GetResourceVersion() != firstRV {
+		t.Errorf("unexpected resource version: %s instead of %s", list.GetResourceVersion(), firstRV)
+	}
+	var names []string
+	if err := meta.EachListItem(listObj, func(obj runtime.Object) error {
+		rs := obj.(*apps.ReplicaSet)
+		names = append(names, rs.Name)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(names, []string{"test-1", "test-3", "test-5", "test-7", "test-9"}) {
+		t.Errorf("unexpected items: %#v", list)
+	}
+}
+
 func makeSecret(name string) *v1.Secret {
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
