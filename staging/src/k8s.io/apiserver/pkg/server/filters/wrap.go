@@ -50,11 +50,11 @@ func WithPanicRecovery(handler http.Handler, resolver request.RequestInfoResolve
 			// This call can have different handlers, but the default chain rate limits. Call it after the metrics are updated
 			// in case the rate limit delays it.  If you outrun the rate for this one timed out requests, something has gone
 			// seriously wrong with your server, but generally having a logging signal for timeouts is useful.
-			runtime.HandleError(fmt.Errorf("timeout or abort while handling: method=%v URI=%q audit-ID=%q", req.Method, req.RequestURI, request.GetAuditIDTruncated(req)))
+			runtime.HandleError(fmt.Errorf("timeout or abort while handling: method=%v URI=%q audit-ID=%q", req.Method, req.RequestURI, request.GetAuditIDTruncated(req.Context())))
 			return
 		}
 		http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
-		klog.ErrorS(nil, "apiserver panic'd", "method", req.Method, "URI", req.RequestURI, "audit-ID", request.GetAuditIDTruncated(req))
+		klog.ErrorS(nil, "apiserver panic'd", "method", req.Method, "URI", req.RequestURI, "audit-ID", request.GetAuditIDTruncated(req.Context()))
 	})
 }
 
