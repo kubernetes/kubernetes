@@ -100,62 +100,64 @@ func (p *Patcher) delete(namespace, name string) error {
 	return err
 }
 
-func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
+func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, string, error) {
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
-		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("serializing current configuration from:\n%v\nfor:", obj), source, err)
+		return nil, nil, fmt.Sprintf("serializing current configuration from:\n%v\nfor:", obj), err
 	}
 
 	// Retrieve the original configuration of the object from the annotation.
 	original, err := util.GetOriginalConfiguration(obj)
 	if err != nil {
-		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("retrieving original configuration from:\n%v\nfor:", obj), source, err)
+		return nil, nil, fmt.Sprintf("retrieving original configuration from:\n%v\nfor:", obj), err
 	}
 
 	var patch []byte
 
 	patchType, err := p.getPatchType(p.Mapping.GroupVersionKind)
 	if err != nil {
-		return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf("getting patch type for %v:", p.Mapping.GroupVersionKind), source, err)
+		return nil, nil, fmt.Sprintf("getting patch type for %v:", p.Mapping.GroupVersionKind), err
 	}
 
 	switch patchType {
 	case types.MergePatchType:
-		patch, err = p.buildMergePatch(original, modified, current, source)
+		patch, err = p.buildMergePatch(original, modified, current)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Sprintf(createPatchErrFormat, original, modified, current), err
 		}
 	case types.StrategicMergePatchType:
 		// Try to use openapi first if the openapi spec is available and can successfully calculate the patch.
 		// Otherwise, fall back to baked-in types.
-		patch, err = p.buildStrategicMergeFromOpenAPI(p.Mapping.GroupVersionKind, original, modified, current)
-		if err != nil {
-			// Warn user about problem and continue strategic merge patching using builtin types.
-			fmt.Fprintf(errOut, "warning: error calculating patch from openapi spec: %v\n", err)
+		if p.OpenapiSchema != nil {
+			patch, err = p.buildStrategicMergeFromOpenAPI(p.Mapping.GroupVersionKind, original, modified, current)
+			if err != nil {
+				// Warn user about problem and continue strategic merge patching using builtin types.
+				fmt.Fprintf(errOut, "warning: error calculating patch from openapi spec: %v\n", err)
+			}
 		}
 
 		if patch == nil {
 			patch, err = p.buildStrategicMergeFromBuiltins(p.Mapping.GroupVersionKind, original, modified, current)
 			if err != nil {
-				return nil, nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
+				return nil, nil, fmt.Sprintf(createPatchErrFormat, original, modified, current), err
 			}
 		}
 	}
 
 	if string(patch) == "{}" {
-		return patch, obj, nil
+		return patch, obj, "", nil
 	}
 
 	if p.ResourceVersion != nil {
 		patch, err = addResourceVersion(patch, *p.ResourceVersion)
 		if err != nil {
-			return nil, nil, cmdutil.AddSourceToErr("Failed to insert resourceVersion in patch", source, err)
+			return nil, nil, "Failed to insert resourceVersion in patch", err
 		}
 	}
 
 	patchedObj, err := p.Helper.Patch(namespace, name, patchType, patch, nil)
-	return patch, patchedObj, err
+	return patch, patchedObj, "", err
 }
 
 // getPatchType returns correct PatchType for the given GVK.
@@ -173,7 +175,7 @@ func (p *Patcher) getPatchType(gvk schema.GroupVersionKind) (types.PatchType, er
 
 // buildMergePatch builds patch according to the JSONMergePatch which is used for
 // custom resource definitions.
-func (p *Patcher) buildMergePatch(original, modified, current []byte, source string) ([]byte, error) {
+func (p *Patcher) buildMergePatch(original, modified, current []byte) ([]byte, error) {
 	preconditions := []mergepatch.PreconditionFunc{mergepatch.RequireKeyUnchanged("apiVersion"),
 		mergepatch.RequireKeyUnchanged("kind"), mergepatch.RequireMetadataKeyUnchanged("name")}
 	patch, err := jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, current, preconditions...)
@@ -181,7 +183,7 @@ func (p *Patcher) buildMergePatch(original, modified, current []byte, source str
 		if mergepatch.IsPreconditionFailed(err) {
 			return nil, fmt.Errorf("%s", "At least one of apiVersion, kind and name was changed")
 		}
-		return nil, cmdutil.AddSourceToErr(fmt.Sprintf(createPatchErrFormat, original, modified, current), source, err)
+		return nil, err
 	}
 
 	return patch, nil
@@ -190,14 +192,12 @@ func (p *Patcher) buildMergePatch(original, modified, current []byte, source str
 // buildStrategicMergeFromOpenAPI builds patch from OpenAPI if it is enabled.
 // This is used for core types which is published in openapi.
 func (p *Patcher) buildStrategicMergeFromOpenAPI(gvk schema.GroupVersionKind, original, modified, current []byte) ([]byte, error) {
-	if p.OpenapiSchema != nil {
-		if s := p.OpenapiSchema.LookupResource(gvk); s != nil {
-			lookupPatchMeta := strategicpatch.PatchMetaFromOpenAPI{Schema: s}
-			if openapiPatch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.Overwrite); err != nil {
-				return nil, err
-			} else {
-				return openapiPatch, nil
-			}
+	if s := p.OpenapiSchema.LookupResource(gvk); s != nil {
+		lookupPatchMeta := strategicpatch.PatchMetaFromOpenAPI{Schema: s}
+		if openapiPatch, err := strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, p.Overwrite); err != nil {
+			return nil, err
+		} else {
+			return openapiPatch, nil
 		}
 	}
 
@@ -228,7 +228,7 @@ func (p *Patcher) buildStrategicMergeFromBuiltins(gvk schema.GroupVersionKind, o
 // the final patched object. On failure, returns an error.
 func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	var getErr error
-	patchBytes, patchObject, err := p.patchSimple(current, modified, source, namespace, name, errOut)
+	patchBytes, patchObject, errVerb, err := p.patchSimple(current, modified, namespace, name, errOut)
 	if p.Retries == 0 {
 		p.Retries = maxPatchRetry
 	}
@@ -240,10 +240,14 @@ func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespa
 		if getErr != nil {
 			return nil, nil, getErr
 		}
-		patchBytes, patchObject, err = p.patchSimple(current, modified, source, namespace, name, errOut)
+		patchBytes, patchObject, errVerb, err = p.patchSimple(current, modified, namespace, name, errOut)
 	}
-	if err != nil && (errors.IsConflict(err) || errors.IsInvalid(err)) && p.Force {
-		patchBytes, patchObject, err = p.deleteAndCreate(current, modified, namespace, name)
+	if err != nil {
+		if (errors.IsConflict(err) || errors.IsInvalid(err)) && p.Force {
+			patchBytes, patchObject, err = p.deleteAndCreate(current, modified, namespace, name)
+		} else if errVerb != "" {
+			err = cmdutil.AddSourceToErr(errVerb, source, err)
+		}
 	}
 	return patchBytes, patchObject, err
 }
