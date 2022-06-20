@@ -146,14 +146,15 @@ type remoteSubnetInfo struct {
 const NETWORK_TYPE_OVERLAY = "overlay"
 
 func newHostNetworkService() (HostNetworkService, hcn.SupportedFeatures) {
-	var hns HostNetworkService
-	hns = hnsV1{}
+	var h HostNetworkService
 	supportedFeatures := hcn.GetSupportedFeatures()
 	if supportedFeatures.Api.V2 {
-		hns = hnsV2{}
+		h = hns{}
+	} else {
+		panic("Windows HNS Api V2 required. This version of windows does not support API V2")
 	}
 
-	return hns, supportedFeatures
+	return h, supportedFeatures
 }
 
 func getNetworkName(hnsNetworkName string) (string, error) {
