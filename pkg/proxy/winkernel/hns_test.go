@@ -26,6 +26,8 @@ import (
 
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 const (
@@ -58,6 +60,27 @@ func TestGetNetworkByName(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func assertHCNDiff(x, y interface{}) string {
+	// We can ignore some fields since they are known only at creation time
+	var nx, ny interface{}
+	switch x.(type) {
+	case hcn.HostComputeEndpoint:
+		nx := x.(hcn.HostComputeEndpoint)
+		ny := y.(hcn.HostComputeEndpoint)
+		nx.Id = ny.Id
+		nx.Name = ny.Name
+		nx.HostComputeNetwork = ny.HostComputeNetwork
+		nx.Health = ny.Health
+	case hcn.HostComputeLoadBalancer:
+		nx := x.(hcn.HostComputeLoadBalancer)
+		ny := y.(hcn.HostComputeLoadBalancer)
+		nx.Id = ny.Id
+	}
+
+	diff := cmp.Diff(nx, ny)
+	return diff
 }
 
 func TestGetEndpointByID(t *testing.T) {
@@ -153,6 +176,25 @@ func TestCreateEndpointLocal(t *testing.T) {
 	hns := hns{}
 	Network := mustTestNetwork(t)
 
+	expectedEndpoint := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{{IpAddress: epIpAddress, PrefixLength: 24}},
+		MacAddress:       epMacAddress,
+		Policies: []hcn.EndpointPolicy{
+			{
+				Type:     "EncapOverhead",
+				Settings: json.RawMessage("{\"Overhead\":50}"),
+			},
+		},
+		SchemaVersion: hcn.Version{
+			Major: 2,
+		},
+		Health: hcn.Health{
+			Extra: hcn.ExtraParams{
+				SharedContainers: json.RawMessage("[]"),
+			},
+		},
+	}
+
 	endpoint := &endpointsInfo{
 		ip:         epIpAddress,
 		macAddress: epMacAddress,
@@ -167,14 +209,10 @@ func TestCreateEndpointLocal(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if !strings.EqualFold(endpoint.hnsID, Endpoint.Id) {
-		t.Errorf("%v does not match %v", endpoint.hnsID, Endpoint.Id)
-	}
-	if endpoint.ip != Endpoint.IpConfigurations[0].IpAddress {
-		t.Errorf("%v does not match %v", endpoint.ip, Endpoint.IpConfigurations[0].IpAddress)
-	}
-	if endpoint.macAddress != Endpoint.MacAddress {
-		t.Errorf("%v does not match %v", endpoint.macAddress, Endpoint.MacAddress)
+
+	diff := assertHCNDiff(*expectedEndpoint, *Endpoint)
+	if diff != "" {
+		t.Errorf("getEndpointByID(%s) returned a different endpoint. Diff: %s ", Endpoint.Name, diff)
 	}
 
 	err = Endpoint.Delete()
