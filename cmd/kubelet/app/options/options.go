@@ -139,6 +139,8 @@ type KubeletFlags struct {
 	// SeccompDefault enables the use of `RuntimeDefault` as the default seccomp profile for all workloads on the node.
 	// To use this flag, the corresponding SeccompDefault feature gate must be enabled.
 	SeccompDefault bool
+	// List of cadvisor metrics to exclude. Similar as --disable_metrics in cadvisor.
+	DisableCadvisorMetrics []string
 }
 
 // NewKubeletFlags will create a new KubeletFlags with default values
@@ -301,6 +303,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 
 	fs.StringVar(&f.RemoteRuntimeEndpoint, "container-runtime-endpoint", f.RemoteRuntimeEndpoint, "The endpoint of remote runtime service. Unix Domain Sockets are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'")
 	fs.StringVar(&f.RemoteImageEndpoint, "image-service-endpoint", f.RemoteImageEndpoint, "The endpoint of remote image service. If not specified, it will be the same with --container-runtime-endpoint by default. Unix Domain Socket are supported on Linux, while npipe and tcp endpoints are supported on Windows. Examples:'unix:///path/to/runtime.sock', 'npipe:////./pipe/runtime'")
+	fs.StringArrayVar(&f.DisableCadvisorMetrics, "disable-cadvisor-metrics", []string{}, "List of cadvisor metrics to exclude. Similar as --disable_metrics in cadvisor")
 
 	// EXPERIMENTAL FLAGS
 	bindableNodeLabels := cliflag.ConfigurationMap(f.NodeLabels)

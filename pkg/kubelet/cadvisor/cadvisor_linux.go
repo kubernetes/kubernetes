@@ -80,7 +80,7 @@ func init() {
 }
 
 // New creates a new cAdvisor Interface for linux systems.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats bool) (Interface, error) {
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats bool, disableMetrics []string) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
 	includedMetrics := cadvisormetrics.MetricSet{
@@ -107,6 +107,10 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 	housekeepingConfig := manager.HouskeepingConfig{
 		Interval:     &duration,
 		AllowDynamic: pointer.BoolPtr(allowDynamicHousekeeping),
+	}
+
+	for _, metric := range disableMetrics {
+		delete(includedMetrics, cadvisormetrics.MetricKind(metric))
 	}
 
 	// Create the cAdvisor container manager.
