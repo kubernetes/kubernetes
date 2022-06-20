@@ -169,7 +169,7 @@ func TestReconnectBrokenTCP(t *testing.T) {
 // 2. the connection has keepalive enabled so it will be reused
 // 3. break the TCP connection stopping the proxy
 // 4. close the idle connection to force creating a new connection
-// 5. count that there are 2 connection to the server (we didn't reuse the original connection)
+// 5. count that there are 2 connections to the server (we didn't reuse the original connection)
 func TestReconnectBrokenTCP_HTTP1(t *testing.T) {
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello, %s", r.Proto)
@@ -245,7 +245,7 @@ func TestReconnectBrokenTCP_HTTP1(t *testing.T) {
 // 1. connect to https server with http1.1 using a TCP proxy making the connection to timeout
 // 2. the connection has keepalive enabled so it will be reused
 // 3. close the in-flight connection to force creating a new connection
-// 4. count that there are 2 connection on the LB but only one succeeds
+// 4. count that there are 2 connections on the LB but only one succeeds
 func TestReconnectBrokenTCPInFlight_HTTP1(t *testing.T) {
 	done := make(chan struct{})
 	defer close(done)
