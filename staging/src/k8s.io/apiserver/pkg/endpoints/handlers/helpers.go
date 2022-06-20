@@ -83,7 +83,7 @@ type lazyAuditID struct {
 
 func (lazy *lazyAuditID) String() string {
 	if lazy.req != nil {
-		return request.GetAuditIDTruncated(lazy.req)
+		return request.GetAuditIDTruncated(lazy.req.Context())
 	}
 
 	return "unknown"
