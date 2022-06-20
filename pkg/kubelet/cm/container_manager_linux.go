@@ -32,8 +32,6 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/manager"
 	"github.com/opencontainers/runc/libcontainer/configs"
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
 	utilpath "k8s.io/utils/path"
 
 	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
@@ -736,6 +734,7 @@ func buildContainerMapFromRuntime(runtimeService internalapi.RuntimeService) con
 	containerList, _ := runtimeService.ListContainers(nil)
 	for _, c := range containerList {
 		if _, exists := podSandboxMap[c.PodSandboxId]; !exists {
+			runtimeService.RemoveContainer(c.Id)
 			klog.InfoS("no PodSandBox found for the container", "podSandboxId", c.PodSandboxId, "containerName", c.Metadata.Name, "containerId", c.Id)
 			continue
 		}
