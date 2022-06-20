@@ -164,32 +164,34 @@ func TestForwardPorts(t *testing.T) {
 				remoteToLocalMap[int32(forwardedPort.Remote)] = int32(forwardedPort.Local)
 			}
 
-			for port, data := range test.clientSends {
+			clientSend := func(port int32, data string) error {
 				clientConn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", remoteToLocalMap[port]))
 				if err != nil {
-					t.Errorf("%s: error dialing %d: %s", testName, port, err)
-					continue
+					return fmt.Errorf("%s: error dialing %d: %s", testName, port, err)
+
 				}
 				defer clientConn.Close()
 
 				n, err := clientConn.Write([]byte(data))
 				if err != nil && err != io.EOF {
-					t.Errorf("%s: Error sending data '%s': %s", testName, data, err)
-					continue
+					return fmt.Errorf("%s: Error sending data '%s': %s", testName, data, err)
 				}
 				if n == 0 {
-					t.Errorf("%s: unexpected write of 0 bytes", testName)
-					continue
+					return fmt.Errorf("%s: unexpected write of 0 bytes", testName)
 				}
 				b := make([]byte, 4)
 				_, err = clientConn.Read(b)
 				if err != nil && err != io.EOF {
-					t.Errorf("%s: Error reading data: %s", testName, err)
-					continue
+					return fmt.Errorf("%s: Error reading data: %s", testName, err)
 				}
 				if !bytes.Equal([]byte(test.serverSends[port]), b) {
-					t.Errorf("%s: expected to read '%s', got '%s'", testName, test.serverSends[port], b)
-					continue
+					return fmt.Errorf("%s: expected to read '%s', got '%s'", testName, test.serverSends[port], b)
+				}
+				return nil
+			}
+			for port, data := range test.clientSends {
+				if err := clientSend(port, data); err != nil {
+					t.Error(err)
 				}
 			}
 			// tell r.ForwardPorts to stop

@@ -188,8 +188,8 @@ func TestStream(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.TestName, func(t *testing.T) {
-			for _, exec := range []bool{true, false} {
+		for _, exec := range []bool{true, false} {
+			t.Run(testCase.TestName, func(t *testing.T) {
 				var name string
 				if exec {
 					name = testCase.TestName + " (exec)"
@@ -245,13 +245,11 @@ func TestStream(t *testing.T) {
 				}
 				transport, upgradeTransport, err := spdy.RoundTripperFor(conf)
 				if err != nil {
-					t.Errorf("%s: unexpected error: %v", name, err)
-					continue
+					t.Fatalf("%s: unexpected error: %v", name, err)
 				}
 				e, err := remoteclient.NewSPDYExecutorForProtocols(transport, upgradeTransport, "POST", req.URL(), testCase.ClientProtocols...)
 				if err != nil {
-					t.Errorf("%s: unexpected error: %v", name, err)
-					continue
+					t.Fatalf("%s: unexpected error: %v", name, err)
 				}
 				err = e.Stream(remoteclient.StreamOptions{
 					Stdin:  streamIn,
@@ -269,23 +267,22 @@ func TestStream(t *testing.T) {
 							t.Errorf("%s: expected error stream read %q, got %q", name, e, a)
 						}
 					}
-					continue
+					return
 				}
 
 				if hasErr {
-					t.Errorf("%s: unexpected error: %v", name, err)
-					continue
+					t.Fatalf("%s: unexpected error: %v", name, err)
 				}
 
 				if len(testCase.Stdout) > 0 {
 					if e, a := strings.Repeat(testCase.Stdout, testCase.MessageCount), localOut; e != a.String() {
-						t.Errorf("%s: expected stdout data %q, got %q", name, e, a)
+						t.Fatalf("%s: expected stdout data %q, got %q", name, e, a)
 					}
 				}
 
 				if testCase.Stderr != "" {
 					if e, a := strings.Repeat(testCase.Stderr, testCase.MessageCount), localErr; e != a.String() {
-						t.Errorf("%s: expected stderr data %q, got %q", name, e, a)
+						t.Fatalf("%s: expected stderr data %q, got %q", name, e, a)
 					}
 				}
 
@@ -294,8 +291,8 @@ func TestStream(t *testing.T) {
 				case <-time.After(time.Minute):
 					t.Errorf("%s: expected fakeServerInstance to receive request", name)
 				}
-			}
-		})
+			})
+		}
 	}
 }
 
