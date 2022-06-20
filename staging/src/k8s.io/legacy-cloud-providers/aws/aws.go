@@ -1206,7 +1206,7 @@ func init() {
 			creds = credentials.NewChainCredentials(
 				[]credentials.Provider{
 					&credentials.EnvProvider{},
-					provider,
+					assumeRoleProvider(provider),
 				})
 		}
 
