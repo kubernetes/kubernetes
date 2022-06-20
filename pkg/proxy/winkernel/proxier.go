@@ -235,6 +235,7 @@ type endpointsInfo struct {
 	refCount        *uint16
 	providerAddress string
 	hns             HostNetworkService
+	name            string
 
 	// conditions
 	ready       bool

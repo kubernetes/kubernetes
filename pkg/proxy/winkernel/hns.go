@@ -170,6 +170,7 @@ func (hns hns) getEndpointByName(name string) (*endpointsInfo, error) {
 		macAddress: hnsendpoint.MacAddress,
 		hnsID:      hnsendpoint.Id,
 		hns:        hns,
+		name:       hnsendpoint.Name,
 	}, nil
 }
 func (hns hns) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {

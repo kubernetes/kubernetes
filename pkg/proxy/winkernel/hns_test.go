@@ -26,8 +26,6 @@ import (
 
 	"strings"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 const (
@@ -109,6 +107,7 @@ func TestGetEndpointByIpAddressAndName(t *testing.T) {
 		IpAddress: epIpAddress,
 	}
 	Endpoint := &hcn.HostComputeEndpoint{
+		Name:             "TestEndpoint",
 		IpConfigurations: []hcn.IpConfig{*ipConfig},
 		MacAddress:       epMacAddress,
 		SchemaVersion: hcn.SchemaVersion{
@@ -136,9 +135,8 @@ func TestGetEndpointByIpAddressAndName(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	diff := cmp.Diff(endpoint, Endpoint)
-	if diff != "" {
-		t.Errorf("getEndpointByName(%s) returned a different endpoint. Diff: %s ", Endpoint.Name, diff)
+	if !strings.EqualFold(endpoint.name, Endpoint.Name) {
+		t.Errorf("%v does not match %v", endpoint.hnsID, Endpoint.Id)
 	}
 
 	err = Endpoint.Delete()
