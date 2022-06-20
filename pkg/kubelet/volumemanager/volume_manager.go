@@ -155,7 +155,7 @@ type VolumeManager interface {
 	MarkVolumesAsReportedInUse(volumesReportedAsInUse []v1.UniqueVolumeName)
 }
 
-// podStateProvider can determine if a pod is is going to be terminated
+// podStateProvider can determine if a pod is going to be terminated
 type podStateProvider interface {
 	ShouldPodContainersBeTerminating(k8stypes.UID) bool
 	ShouldPodRuntimeBeRemoved(k8stypes.UID) bool
