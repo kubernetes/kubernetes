@@ -892,7 +892,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		done := func() bool {
 			defer readAndCloseResponseBody(resp)
 
-			// if the the server returns an error in err, the response will be nil.
+			// if the server returns an error in err, the response will be nil.
 			f := func(req *http.Request, resp *http.Response) {
 				if resp == nil {
 					return
