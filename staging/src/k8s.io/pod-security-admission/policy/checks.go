@@ -93,7 +93,7 @@ type AggregateCheckResult struct {
 	ForbiddenDetails []string
 }
 
-// ForbiddenReason returns a comma-separated string of of the forbidden reasons.
+// ForbiddenReason returns a comma-separated string of the forbidden reasons.
 // Example: host ports, privileged containers, non-default capabilities
 func (a *AggregateCheckResult) ForbiddenReason() string {
 	return strings.Join(a.ForbiddenReasons, ", ")
