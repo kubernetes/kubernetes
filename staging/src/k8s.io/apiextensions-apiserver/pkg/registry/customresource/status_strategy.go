@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
+	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -96,6 +97,11 @@ func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obj
 	}
 
 	v := obj.GetObjectKind().GroupVersionKind().Version
+
+	// ratcheting validation of x-kubernetes-list-type value map and set
+	if oldErrs := structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchemas[v], uOld.Object); len(oldErrs) == 0 {
+		errs = append(errs, structurallisttype.ValidateListSetsAndMaps(nil, a.structuralSchemas[v], uNew.Object)...)
+	}
 
 	// validate x-kubernetes-validations rules
 	if celValidator, ok := a.customResourceStrategy.celValidators[v]; ok {
