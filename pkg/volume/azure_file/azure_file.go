@@ -92,6 +92,10 @@ func (plugin *azureFilePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *azureFilePlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *azureFilePlugin) SupportsMountOption() bool {
 	return true
 }

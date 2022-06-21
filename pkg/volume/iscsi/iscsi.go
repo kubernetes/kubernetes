@@ -85,6 +85,10 @@ func (plugin *iscsiPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *iscsiPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *iscsiPlugin) SupportsMountOption() bool {
 	return true
 }

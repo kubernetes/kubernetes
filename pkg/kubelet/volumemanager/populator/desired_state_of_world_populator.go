@@ -66,6 +66,8 @@ type DesiredStateOfWorldPopulator interface {
 	// a chance many or all pods are missing from the list of active pods and
 	// so few to none will have been added.
 	HasAddedPods() bool
+
+	ShouldPodRuntimeBeRemoved(types.UID) bool
 }
 
 // podStateProvider can determine if a pod is going to be terminated.
@@ -163,6 +165,10 @@ func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
 	dswp.hasAddedPodsLock.RLock()
 	defer dswp.hasAddedPodsLock.RUnlock()
 	return dswp.hasAddedPods
+}
+
+func (dswp *desiredStateOfWorldPopulator) ShouldPodRuntimeBeRemoved(uid types.UID) bool {
+	return dswp.podStateProvider.ShouldPodRuntimeBeRemoved(uid)
 }
 
 func (dswp *desiredStateOfWorldPopulator) populatorLoop() {

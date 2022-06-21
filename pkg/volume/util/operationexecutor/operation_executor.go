@@ -152,7 +152,7 @@ type OperationExecutor interface {
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
 	ReconstructVolumeOperation(volumeMode v1.PersistentVolumeMode, plugin volume.VolumePlugin, mapperPlugin volume.BlockVolumePlugin, uid types.UID, podName volumetypes.UniquePodName, volumeSpecName string, volumePath string, pluginName string) (*volume.Spec, error)
 	// CheckVolumeExistenceOperation checks volume existence
-	CheckVolumeExistenceOperation(volumeSpec *volume.Spec, mountPath, volumeName string, mounter mount.Interface, uniqueVolumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, podUID types.UID, attachable volume.AttachableVolumePlugin) (bool, error)
+	CheckVolumeExistenceOperation(volumeSpec *volume.Spec, mountPath, volumeName string, mounter mount.Interface, uniqueVolumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName, podUID types.UID, plugin volume.VolumePlugin) (bool, error)
 }
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
@@ -1069,35 +1069,33 @@ func (oe *operationExecutor) CheckVolumeExistenceOperation(
 	uniqueVolumeName v1.UniqueVolumeName,
 	podName volumetypes.UniquePodName,
 	podUID types.UID,
-	attachable volume.AttachableVolumePlugin) (bool, error) {
+	plugin volume.VolumePlugin) (bool, error) {
 	fsVolume, err := util.CheckVolumeModeFilesystem(volumeSpec)
 	if err != nil {
 		return false, err
 	}
 
 	// Filesystem Volume case
-	// For attachable volume case, check mount path directory if volume is still existing and mounted.
+	// For mountable volume case, check mount path directory if volume is still existing and mounted.
 	// Return true if volume is mounted.
 	if fsVolume {
-		if attachable != nil {
-			var isNotMount bool
-			var mountCheckErr error
-			if mounter == nil {
-				return false, fmt.Errorf("mounter was not set for a filesystem volume")
-			}
-			if isNotMount, mountCheckErr = mount.IsNotMountPoint(mounter, mountPath); mountCheckErr != nil {
-				return false, fmt.Errorf("could not check whether the volume %q (spec.Name: %q) pod %q (UID: %q) is mounted with: %v",
-					uniqueVolumeName,
-					volumeName,
-					podName,
-					podUID,
-					mountCheckErr)
-			}
-			return !isNotMount, nil
+		if !plugin.Mountable() {
+			return true, nil
 		}
-		// For non-attachable volume case, skip check and return true without mount point check
-		// since plugins may not have volume mount point.
-		return true, nil
+
+		if mounter == nil {
+			return false, fmt.Errorf("mounter was not set for a filesystem volume")
+		}
+		isNotMount, mountCheckErr := mount.IsNotMountPoint(mounter, mountPath)
+		if mountCheckErr != nil {
+			return false, fmt.Errorf("could not check whether the volume %q (spec.Name: %q) pod %q (UID: %q) is mounted with: %v",
+				uniqueVolumeName,
+				volumeName,
+				podName,
+				podUID,
+				mountCheckErr)
+		}
+		return !isNotMount, nil
 	}
 
 	// Block Volume case

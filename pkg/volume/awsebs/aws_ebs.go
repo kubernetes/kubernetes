@@ -92,6 +92,10 @@ func (plugin *awsElasticBlockStorePlugin) RequiresRemount(spec *volume.Spec) boo
 	return false
 }
 
+func (plugin *awsElasticBlockStorePlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *awsElasticBlockStorePlugin) SupportsMountOption() bool {
 	return true
 }

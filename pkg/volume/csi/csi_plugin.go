@@ -361,6 +361,10 @@ func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return *csiDriver.Spec.RequiresRepublish
 }
 
+func (p *csiPlugin) Mountable() bool {
+	return true
+}
+
 func (p *csiPlugin) NewMounter(
 	spec *volume.Spec,
 	pod *api.Pod,

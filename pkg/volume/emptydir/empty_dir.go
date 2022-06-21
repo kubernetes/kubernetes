@@ -95,6 +95,10 @@ func (plugin *emptyDirPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *emptyDirPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *emptyDirPlugin) SupportsMountOption() bool {
 	return false
 }

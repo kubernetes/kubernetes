@@ -100,6 +100,10 @@ func (plugin *hostPathPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *hostPathPlugin) Mountable() bool {
+	return false
+}
+
 func (plugin *hostPathPlugin) SupportsMountOption() bool {
 	return false
 }

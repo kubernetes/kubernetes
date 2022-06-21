@@ -957,6 +957,10 @@ func (plugin *mockVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *mockVolumePlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *mockVolumePlugin) SupportsMountOption() bool {
 	return false
 }

@@ -96,6 +96,10 @@ func (plugin *storageosPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *storageosPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *storageosPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

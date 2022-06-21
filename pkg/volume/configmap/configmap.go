@@ -82,6 +82,10 @@ func (plugin *configMapPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return true
 }
 
+func (plugin *configMapPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *configMapPlugin) SupportsMountOption() bool {
 	return false
 }

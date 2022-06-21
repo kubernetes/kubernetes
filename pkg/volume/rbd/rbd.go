@@ -117,6 +117,10 @@ func (plugin *rbdPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *rbdPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *rbdPlugin) SupportsMountOption() bool {
 	return true
 }

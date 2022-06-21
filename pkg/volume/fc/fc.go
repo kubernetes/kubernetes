@@ -91,6 +91,10 @@ func (plugin *fcPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *fcPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *fcPlugin) SupportsMountOption() bool {
 	return true
 }

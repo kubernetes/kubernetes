@@ -103,6 +103,10 @@ func (plugin *gcePersistentDiskPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *gcePersistentDiskPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *gcePersistentDiskPlugin) SupportsMountOption() bool {
 	return true
 }

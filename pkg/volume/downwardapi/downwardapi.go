@@ -84,6 +84,10 @@ func (plugin *downwardAPIPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return true
 }
 
+func (plugin *downwardAPIPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *downwardAPIPlugin) SupportsMountOption() bool {
 	return false
 }

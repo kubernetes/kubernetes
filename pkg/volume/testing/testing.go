@@ -271,6 +271,10 @@ func (plugin *FakeVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return plugin.SupportsRemount
 }
 
+func (plugin *FakeVolumePlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *FakeVolumePlugin) SupportsMountOption() bool {
 	return true
 }
@@ -536,6 +540,10 @@ func (f *FakeBasicVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return f.Plugin.RequiresRemount(spec)
 }
 
+func (f *FakeBasicVolumePlugin) Mountable() bool {
+	return true
+}
+
 func (f *FakeBasicVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return f.Plugin.SupportsBulkVolumeVerification()
 }
@@ -611,6 +619,10 @@ func (plugin *FakeFileVolumePlugin) CanSupport(spec *Spec) bool {
 
 func (plugin *FakeFileVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
+}
+
+func (plugin *FakeFileVolumePlugin) Mountable() bool {
+	return true
 }
 
 func (plugin *FakeFileVolumePlugin) SupportsMountOption() bool {

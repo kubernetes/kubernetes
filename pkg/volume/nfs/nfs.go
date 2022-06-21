@@ -97,6 +97,10 @@ func (plugin *nfsPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *nfsPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *nfsPlugin) SupportsMountOption() bool {
 	return true
 }

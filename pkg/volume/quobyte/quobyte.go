@@ -120,6 +120,10 @@ func (plugin *quobytePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *quobytePlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *quobytePlugin) SupportsMountOption() bool {
 	return true
 }

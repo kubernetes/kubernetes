@@ -386,6 +386,10 @@ func (plugin *TestPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *TestPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *TestPlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	plugin.pluginLock.Lock()
 	defer plugin.pluginLock.Unlock()

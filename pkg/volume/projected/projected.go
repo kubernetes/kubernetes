@@ -97,6 +97,10 @@ func (plugin *projectedPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return true
 }
 
+func (plugin *projectedPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *projectedPlugin) SupportsMountOption() bool {
 	return false
 }

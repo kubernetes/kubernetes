@@ -97,6 +97,10 @@ func (plugin *vsphereVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *vsphereVolumePlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *vsphereVolumePlugin) SupportsMountOption() bool {
 	return true
 }

@@ -77,6 +77,10 @@ func (plugin *cephfsPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *cephfsPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *cephfsPlugin) SupportsMountOption() bool {
 	return true
 }

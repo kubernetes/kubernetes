@@ -79,6 +79,10 @@ func (plugin *testPlugins) RequiresRemount(spec *Spec) bool {
 	return false
 }
 
+func (plugin *testPlugins) Mountable() bool {
+	return true
+}
+
 func (plugin *testPlugins) SupportsMountOption() bool {
 	return false
 }

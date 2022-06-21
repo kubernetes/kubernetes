@@ -102,6 +102,7 @@ func NewReconciler(
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
 	populatorHasAddedPods func() bool,
+	shouldPodRuntimeBeRemoved func(types.UID) bool,
 	operationExecutor operationexecutor.OperationExecutor,
 	mounter mount.Interface,
 	hostutil hostutil.HostUtils,
@@ -116,6 +117,7 @@ func NewReconciler(
 		desiredStateOfWorld:           desiredStateOfWorld,
 		actualStateOfWorld:            actualStateOfWorld,
 		populatorHasAddedPods:         populatorHasAddedPods,
+		shouldPodRuntimeBeRemoved:     shouldPodRuntimeBeRemoved,
 		operationExecutor:             operationExecutor,
 		mounter:                       mounter,
 		hostutil:                      hostutil,
@@ -134,6 +136,7 @@ type reconciler struct {
 	desiredStateOfWorld           cache.DesiredStateOfWorld
 	actualStateOfWorld            cache.ActualStateOfWorld
 	populatorHasAddedPods         func() bool
+	shouldPodRuntimeBeRemoved     func(types.UID) bool
 	operationExecutor             operationexecutor.OperationExecutor
 	mounter                       mount.Interface
 	hostutil                      hostutil.HostUtils
@@ -181,6 +184,10 @@ func (rc *reconciler) unmountVolumes() {
 	// Ensure volumes that should be unmounted are unmounted.
 	for _, mountedVolume := range rc.actualStateOfWorld.GetAllMountedVolumes() {
 		if !rc.desiredStateOfWorld.PodExistsInVolume(mountedVolume.PodName, mountedVolume.VolumeName) {
+			if !rc.shouldPodRuntimeBeRemoved(types.UID(mountedVolume.PodName)) {
+				klog.V(2).InfoS(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
+				continue
+			}
 			// Volume is mounted, unmount it
 			klog.V(5).InfoS(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
 			err := rc.operationExecutor.UnmountVolume(
@@ -559,7 +566,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	}
 
 	// Check existence of mount point for filesystem volume or symbolic link for block volume
-	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, checkPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, attachablePlugin)
+	isExist, checkErr := rc.operationExecutor.CheckVolumeExistenceOperation(volumeSpec, checkPath, volumeSpec.Name(), rc.mounter, uniqueVolumeName, volume.podName, pod.UID, plugin)
 	if checkErr != nil {
 		return nil, checkErr
 	}

@@ -88,6 +88,10 @@ func (plugin *localVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *localVolumePlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *localVolumePlugin) SupportsMountOption() bool {
 	return true
 }

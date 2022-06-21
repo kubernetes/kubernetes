@@ -85,6 +85,10 @@ func (plugin *secretPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return true
 }
 
+func (plugin *secretPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *secretPlugin) SupportsMountOption() bool {
 	return false
 }

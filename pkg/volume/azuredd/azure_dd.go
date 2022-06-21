@@ -126,6 +126,10 @@ func (plugin *azureDataDiskPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *azureDataDiskPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *azureDataDiskPlugin) SupportsMountOption() bool {
 	return true
 }

@@ -160,6 +160,9 @@ type VolumePlugin interface {
 	// this to update the contents of the volume.
 	RequiresRemount(spec *Spec) bool
 
+	// Mountable returns true if this plugin requires mount calls
+	Mountable() bool
+
 	// NewMounter creates a new volume.Mounter from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The v1.Volume spec

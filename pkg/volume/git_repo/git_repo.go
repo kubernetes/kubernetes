@@ -81,6 +81,10 @@ func (plugin *gitRepoPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *gitRepoPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *gitRepoPlugin) SupportsMountOption() bool {
 	return false
 }

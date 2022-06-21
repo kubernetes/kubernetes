@@ -112,6 +112,10 @@ func (p *flockerPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (p *flockerPlugin) Mountable() bool {
+	return true
+}
+
 func (p *flockerPlugin) SupportsMountOption() bool {
 	return false
 }

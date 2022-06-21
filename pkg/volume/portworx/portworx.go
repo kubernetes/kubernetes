@@ -109,6 +109,10 @@ func (plugin *portworxVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *portworxVolumePlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *portworxVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 	return []v1.PersistentVolumeAccessMode{
 		v1.ReadWriteOnce,

@@ -222,6 +222,7 @@ func NewVolumeManager(
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
 		vm.desiredStateOfWorldPopulator.HasAddedPods,
+		vm.desiredStateOfWorldPopulator.ShouldPodRuntimeBeRemoved,
 		vm.operationExecutor,
 		mounter,
 		hostutil,

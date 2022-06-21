@@ -152,6 +152,10 @@ func (plugin *flexVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *flexVolumePlugin) Mountable() bool {
+	return true
+}
+
 // GetAccessModes gets the allowed access modes for this plugin.
 func (plugin *flexVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	return []api.PersistentVolumeAccessMode{

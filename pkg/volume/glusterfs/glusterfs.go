@@ -124,6 +124,10 @@ func (plugin *glusterfsPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *glusterfsPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *glusterfsPlugin) SupportsMountOption() bool {
 	return true
 }

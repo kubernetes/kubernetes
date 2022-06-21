@@ -115,6 +115,10 @@ func (plugin *cinderPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
+func (plugin *cinderPlugin) Mountable() bool {
+	return true
+}
+
 func (plugin *cinderPlugin) SupportsMountOption() bool {
 	return true
 

@@ -52,6 +52,10 @@ func (n *noopExpandableVolumePluginInstance) RequiresRemount(spec *Spec) bool {
 	return false
 }
 
+func (n *noopExpandableVolumePluginInstance) Mountable() bool {
+	return true
+}
+
 func (n *noopExpandableVolumePluginInstance) NewMounter(spec *Spec, podRef *v1.Pod, opts VolumeOptions) (Mounter, error) {
 	return nil, nil
 }
