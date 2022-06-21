@@ -983,7 +983,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	SeccompDefault: {Default: false, PreRelease: featuregate.Alpha},
 
-	ServiceIPStaticSubrange: {Default: false, PreRelease: featuregate.Beta},
+	ServiceIPStaticSubrange: {Default: true, PreRelease: featuregate.Beta},
 
 	ServiceInternalTrafficPolicy: {Default: true, PreRelease: featuregate.Beta},
 
