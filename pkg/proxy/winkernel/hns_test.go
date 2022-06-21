@@ -195,7 +195,7 @@ func TestGetEndpointByIpAddressAndName(t *testing.T) {
 
 	diff := assertHCNDiff(*HCNEndpoint, *Endpoint)
 	if diff != "" {
-		t.Errorf("getEndpointByName(%s) returned a different endpoint. Diff: %s ", HCNEndpoint.Name, diff)
+		t.Errorf("getEndpointByID(%s) returned a different endpoint. Diff: %s ", HCNEndpoint.Name, diff)
 	}
 
 	err = Endpoint.Delete()
@@ -551,7 +551,7 @@ func TestDeleteLoadBalancer(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	// Load balancer should not longer exist here so err should not be null
+	// Load balancer should not longer exist
 	LoadBalancer, err = hcn.GetLoadBalancerByID(LoadBalancer.Id)
 	if err == nil {
 		t.Error(err)

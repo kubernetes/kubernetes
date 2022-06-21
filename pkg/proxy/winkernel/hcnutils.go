@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 	"k8s.io/klog/v2"
 
@@ -380,35 +379,6 @@ func (hns hcnutils) deleteLoadBalancer(hnsID string) error {
 
 	err = hns.hcninstance.DeleteLoadBalancer(lb)
 	return err
-}
-
-func deleteAllHnsLoadBalancerPolicy() {
-	plists, err := hcsshim.HNSListPolicyListRequest()
-	if err != nil {
-		return
-	}
-	for _, plist := range plists {
-		klog.V(3).InfoS("Remove policy", "policies", plist)
-		_, err = plist.Delete()
-		if err != nil {
-			klog.ErrorS(err, "Failed to delete policy list")
-		}
-	}
-
-}
-
-func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
-	hnsnetwork, err := hcsshim.GetHNSNetworkByName(hnsNetworkName)
-	if err != nil {
-		klog.ErrorS(err, "Failed to get HNS Network by name")
-		return nil, err
-	}
-
-	return &hnsNetworkInfo{
-		id:          hnsnetwork.Id,
-		name:        hnsnetwork.Name,
-		networkType: hnsnetwork.Type,
-	}, nil
 }
 
 func (h *ihcn) GetNetworkByName(networkName string) (*hcn.HostComputeNetwork, error) {

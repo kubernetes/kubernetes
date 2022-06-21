@@ -29,7 +29,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -74,7 +73,7 @@ type WindowsKernelCompatTester struct{}
 
 // IsCompatible returns true if winkernel can support this mode of proxy
 func (lkct WindowsKernelCompatTester) IsCompatible() error {
-	_, err := hcsshim.HNSListPolicyListRequest()
+	_, err := hcn.ListLoadBalancers()
 	if err != nil {
 		return fmt.Errorf("Windows kernel is not compatible for Kernel mode")
 	}
@@ -824,6 +823,34 @@ func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
 	}
 }
 
+func deleteAllHnsLoadBalancerPolicy() {
+	lbalancers, err := hcn.ListLoadBalancers()
+	if err != nil {
+		return
+	}
+	for _, lbalancer := range lbalancers {
+		klog.V(3).InfoS("Remove policy", "policies", lbalancer)
+		err = lbalancer.Delete()
+		if err != nil {
+			klog.ErrorS(err, "Failed to delete policy list")
+		}
+	}
+}
+
+func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
+	hnsnetwork, err := hcn.GetNetworkByName(hnsNetworkName)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get HNS Network by name")
+		return nil, err
+	}
+
+	return &hnsNetworkInfo{
+		id:          hnsnetwork.Id,
+		name:        hnsnetwork.Name,
+		networkType: string(hnsnetwork.Type),
+	}, nil
+}
+
 // Sync is called to synchronize the proxier state to hns as soon as possible.
 func (proxier *Proxier) Sync() {
 	if proxier.healthzServer != nil {
@@ -954,9 +981,6 @@ func isNetworkNotFoundError(err error) bool {
 		return false
 	}
 	if _, ok := err.(hcn.NetworkNotFoundError); ok {
-		return true
-	}
-	if _, ok := err.(hcsshim.NetworkNotFoundError); ok {
 		return true
 	}
 	return false
