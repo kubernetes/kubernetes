@@ -189,13 +189,14 @@ func TestStream(t *testing.T) {
 
 	for _, testCase := range testCases {
 		for _, exec := range []bool{true, false} {
-			t.Run(testCase.TestName, func(t *testing.T) {
-				var name string
-				if exec {
-					name = testCase.TestName + " (exec)"
-				} else {
-					name = testCase.TestName + " (attach)"
-				}
+			var name string
+			if exec {
+				name = testCase.TestName + " (exec)"
+			} else {
+				name = testCase.TestName + " (attach)"
+			}
+
+			t.Run(name, func(t *testing.T) {
 				var (
 					streamIn             io.Reader
 					streamOut, streamErr io.Writer
