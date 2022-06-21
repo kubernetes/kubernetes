@@ -50,6 +50,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	cloudproviderapi "k8s.io/cloud-provider/api"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	nodetopology "k8s.io/component-helpers/node/topology"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
@@ -99,15 +100,27 @@ var (
 		v1.NodePIDPressure: {
 			v1.ConditionTrue: v1.TaintNodePIDPressure,
 		},
+		v1.NodeCloudProviderUninitialized: {
+			v1.ConditionTrue: cloudproviderapi.TaintExternalCloudProvider,
+		},
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
-		v1.TaintNodeNotReady:           v1.NodeReady,
-		v1.TaintNodeUnreachable:        v1.NodeReady,
-		v1.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
-		v1.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
-		v1.TaintNodeDiskPressure:       v1.NodeDiskPressure,
-		v1.TaintNodePIDPressure:        v1.NodePIDPressure,
+		v1.TaintNodeNotReady:                        v1.NodeReady,
+		v1.TaintNodeUnreachable:                     v1.NodeReady,
+		v1.TaintNodeNetworkUnavailable:              v1.NodeNetworkUnavailable,
+		v1.TaintNodeMemoryPressure:                  v1.NodeMemoryPressure,
+		v1.TaintNodeDiskPressure:                    v1.NodeDiskPressure,
+		v1.TaintNodePIDPressure:                     v1.NodePIDPressure,
+		cloudproviderapi.TaintExternalCloudProvider: v1.NodeCloudProviderUninitialized,
+	}
+
+	// This map overrides the behavior of this controller on the specified taint when the
+	// corresponding node condition is absent.
+	// The default action will be to delete the taint.
+	// Add the taint into this map if the expected behavior is "no action".
+	taintNoModificationOnConditionAbsence = map[string]bool{
+		cloudproviderapi.TaintExternalCloudProvider: true,
 	}
 )
 
@@ -661,10 +674,44 @@ func (nc *Controller) doNoScheduleTaintingPass(ctx context.Context, nodeName str
 	if len(taintsToAdd) == 0 && len(taintsToDel) == 0 {
 		return nil
 	}
+
+	// Filter out the taints that we do not want to modify on absence of the
+	// corresponding node condition.
+	taintsToAdd, taintsToDel = filterOutTaintNoModificationOnConditionAbsence(taintsToAdd, taintsToDel, node)
+
 	if !controllerutil.SwapNodeControllerTaint(ctx, nc.kubeClient, taintsToAdd, taintsToDel, node) {
 		return fmt.Errorf("failed to swap taints of node %+v", node)
 	}
 	return nil
+}
+
+// Filter out the taints that we do not want to modify on absence of the
+// corresponding node condition.
+func filterOutTaintNoModificationOnConditionAbsence(taintsToAdd []*v1.Taint, taintsToDel []*v1.Taint, node *v1.Node) ([]*v1.Taint, []*v1.Taint) {
+	for k, _ := range taintNoModificationOnConditionAbsence {
+		absent := true
+		for _, c := range node.Status.Conditions {
+			if conT, found := taintKeyToNodeConditionMap[k]; found && conT == c.Type {
+				absent = false
+				break
+			}
+		}
+		if absent {
+			for idx, t := range taintsToDel {
+				if t.Key == k {
+					taintsToDel = append(taintsToDel[:idx], taintsToDel[idx+1:]...)
+					break
+				}
+			}
+			for idx, t := range taintsToAdd {
+				if t.Key == k {
+					taintsToAdd = append(taintsToAdd[:idx], taintsToAdd[idx+1:]...)
+					break
+				}
+			}
+		}
+	}
+	return taintsToAdd, taintsToDel
 }
 
 func (nc *Controller) doNoExecuteTaintingPass(ctx context.Context) {

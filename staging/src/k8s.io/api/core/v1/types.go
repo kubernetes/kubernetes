@@ -5147,6 +5147,8 @@ const (
 	NodePIDPressure NodeConditionType = "PIDPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
+	// NodeCloudProviderUninitialized means that cloud provider has not initialized the node.
+	NodeCloudProviderUninitialized NodeConditionType = "Uninitialized"
 )
 
 // NodeCondition contains condition information for a node.
