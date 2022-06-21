@@ -428,6 +428,7 @@ func TestAnnotateErrors(t *testing.T) {
 			iostreams, _, bufOut, bufErr := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 			cmd.SetOut(bufOut)
+			cmd.SetErr(bufOut)
 
 			for k, v := range testCase.flags {
 				cmd.Flags().Set(k, v)
@@ -491,6 +492,7 @@ func TestAnnotateObject(t *testing.T) {
 	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(bufOut)
+	cmd.SetErr(bufOut)
 	options := NewAnnotateOptions(iostreams)
 	args := []string{"pods/foo", "a=b", "c-"}
 	if err := options.Complete(tf, cmd, args); err != nil {
@@ -557,6 +559,7 @@ func TestAnnotateResourceVersion(t *testing.T) {
 	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(bufOut)
+	cmd.SetErr(bufOut)
 	options := NewAnnotateOptions(iostreams)
 	options.resourceVersion = "10"
 	args := []string{"pods/foo", "a=b"}
@@ -611,6 +614,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(bufOut)
+	cmd.SetErr(bufOut)
 	options := NewAnnotateOptions(iostreams)
 	options.Filenames = []string{"../../../testdata/controller.yaml"}
 	args := []string{"a=b", "c-"}
@@ -697,6 +701,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOut(iostreams.Out)
+	cmd.SetErr(iostreams.Out)
 	options := NewAnnotateOptions(iostreams)
 	options.all = true
 	args := []string{"pods", "a=b", "c-"}
