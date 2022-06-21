@@ -27,3 +27,26 @@ func TestStringDiff(t *testing.T) {
 		t.Errorf("diff returned %v", diff)
 	}
 }
+
+func TestLegacyDiff(t *testing.T) {
+	equalResult := legacyDiff(true, true)
+	diffResult := legacyDiff(true, "string")
+
+	if equalResult != "" {
+		t.Errorf("two param type are same, result should be empty, but now the result is: %v", equalResult)
+	}
+
+	expectDiffResult := "  interface{}(\n- \tbool(true),\n+ \tstring(\"string\"),\n  )\n"
+	if diffResult != expectDiffResult {
+		t.Errorf("two param type are not same, expect result is: %v, but now the result is: %v", expectDiffResult, diffResult)
+	}
+}
+
+func TestObjectGoPrintSideBySide(t *testing.T) {
+	result := ObjectGoPrintSideBySide("a", "ab")
+	expectResult := "(string) (len=1) \"a\" (string) (len=2) \"ab\"\n                     \n"
+
+	if expectResult != result {
+		t.Errorf("expectResult is: %v, but now the result is: %v", expectResult, result)
+	}
+}
