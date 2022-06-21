@@ -159,13 +159,14 @@ func (jm *ControllerV2) processNextWorkItem(ctx context.Context) bool {
 	defer jm.queue.Done(key)
 
 	requeueAfter, err := jm.sync(ctx, key.(string))
-	switch {
-	case err != nil:
+	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error syncing CronJobController %v, requeuing: %v", key.(string), err))
 		jm.queue.AddRateLimited(key)
-	case requeueAfter != nil:
+	} else if requeueAfter != nil {
 		jm.queue.Forget(key)
 		jm.queue.AddAfter(key, *requeueAfter)
+	} else {
+		jm.queue.Forget(key)
 	}
 	return true
 }
