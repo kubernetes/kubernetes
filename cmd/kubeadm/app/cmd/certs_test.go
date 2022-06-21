@@ -254,6 +254,8 @@ func TestRunRenewCommands(t *testing.T) {
 				}
 				if ModTime[cert.Name] == file.ModTime() {
 					t.Errorf("certificate %s was not renewed as expected", cert.Name)
+				} else {
+					t.Logf("Dave...certificate %s was renewed as expected", cert.Name)
 				}
 			}
 			for _, kubeConfig := range test.KubeconfigFiles {

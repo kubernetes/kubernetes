@@ -30,7 +30,6 @@ export KUBE_CACHE_MUTATION_DETECTOR
 # panic the server on watch decode errors since they are considered coder mistakes
 KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
-
 kube::test::find_dirs() {
   (
     cd "${KUBE_ROOT}"
@@ -51,10 +50,13 @@ kube::test::find_dirs() {
           -o -path './third_party/*' \
           -o -path './staging/*' \
           -o -path './vendor/*' \
+          -o -path './plugin/pkg/admission/*' \
+          -o -path './cmd/kubeadm/app/phases/*' \
+          -o -path './cmd/kubeadm/app/cmd/phases/init/*' \
         \) -prune \
-      \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed "s|^\./|${KUBE_GO_PACKAGE}/|" | LC_ALL=C sort -u
+      \) -name '*certs_test.go' -print0 | xargs -0n1 dirname | sed "s|^\./|${KUBE_GO_PACKAGE}/|" | LC_ALL=C sort -u
 
-    find ./staging -name '*_test.go' -not -path '*/test/integration/*' -prune -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
+    #find ./staging -name '*certs_test.go' -not -path '*/test/integration/*' -prune -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
   )
 }
 
@@ -85,7 +87,8 @@ if [[ -z "${KUBE_JUNIT_REPORT_DIR:-}" && -n "${ARTIFACTS:-}" ]]; then
 fi
 # Set to 'y' to keep the verbose stdout from tests when KUBE_JUNIT_REPORT_DIR is
 # set.
-KUBE_KEEP_VERBOSE_TEST_OUTPUT=${KUBE_KEEP_VERBOSE_TEST_OUTPUT:-n}
+#KUBE_KEEP_VERBOSE_TEST_OUTPUT=${KUBE_KEEP_VERBOSE_TEST_OUTPUT:-n}
+KUBE_KEEP_VERBOSE_TEST_OUTPUT="y"
 
 kube::test::usage() {
   kube::log::usage_from_stdin <<EOF
@@ -254,7 +257,8 @@ produceJUnitXMLReport() {
 runTests() {
   local junit_filename_prefix
   junit_filename_prefix=$(junitFilenamePrefix)
-
+  echo "Dave ...check the prefix"
+  echo $junit_filename_prefix
   verifyPathsToPackagesUnderTest "$@"
 
   # If we're not collecting coverage, run all requested tests with one 'go test'
@@ -267,6 +271,8 @@ runTests() {
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
      | grep --binary-files=text "${go_test_grep_pattern}" && rc=$? || rc=$?
     produceJUnitXMLReport "${junit_filename_prefix}"
+    echo "Dave...check the output here..."
+    cat "${junit_filename_prefix}.stdout"
     return ${rc}
   fi
 

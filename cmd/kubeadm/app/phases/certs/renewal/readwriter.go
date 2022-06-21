@@ -19,6 +19,7 @@ package renewal
 import (
 	"crypto"
 	"crypto/x509"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -63,6 +64,7 @@ func newPKICertificateReadWriter(certificateDir string, baseName string) *pkiCer
 // Exists checks if a certificate exist
 func (rw *pkiCertificateReadWriter) Exists() bool {
 	certificatePath, _ := pkiutil.PathsForCertAndKey(rw.certificateDir, rw.baseName)
+	fmt.Printf("Dave ... check the cert dir: %s\n", rw.certificateDir)
 	return fileExists(certificatePath)
 }
 

@@ -267,6 +267,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 		RunE: func(*cobra.Command, []string) error {
 			// Get cluster configuration (from --config, kubeadm-config ConfigMap, or default as a fallback)
 			internalcfg, err := getInternalCfg(flags.cfgPath, flags.kubeconfigPath, flags.cfg, out, "renew")
+			fmt.Printf("\nDave... check the cfgpath %s, and the kubeconfig path: %s\n", flags.cfgPath, flags.kubeconfigPath)
 			if err != nil {
 				return err
 			}
@@ -303,6 +304,8 @@ func addRenewFlags(cmd *cobra.Command, flags *renewFlags) {
 func renewCert(kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *renewal.CertificateRenewHandler) error {
 	// Get a renewal manager for the given cluster configuration
 	rm, err := renewal.NewManager(&internalcfg.ClusterConfiguration, kdir)
+	dir := internalcfg.ClusterConfiguration.CertificatesDir
+	fmt.Printf("\n Dave... check the certdir from the beginning: %s", dir)
 	if err != nil {
 		return err
 	}
@@ -329,8 +332,10 @@ func renewCert(kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *
 func getInternalCfg(cfgPath string, kubeconfigPath string, cfg kubeadmapiv1.ClusterConfiguration, out io.Writer, logPrefix string) (*kubeadmapi.InitConfiguration, error) {
 	// In case the user is not providing a custom config, try to get current config from the cluster.
 	// NB. this operation should not block, because we want to allow certificate renewal also in case of not-working clusters
+	fmt.Printf("\nDave ... check it again when loading the internal cfg %s\n", cfgPath)
 	if cfgPath == "" {
 		client, err := kubeconfigutil.ClientSetFromFile(kubeconfigPath)
+		fmt.Printf("\nDave ... see some error here %s\n", err)
 		if err == nil {
 			internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, logPrefix, false, false)
 			if err == nil {
@@ -341,6 +346,7 @@ func getInternalCfg(cfgPath string, kubeconfigPath string, cfg kubeadmapiv1.Clus
 		}
 	}
 
+	fmt.Println("Dave ... so we run into loading it from cfg")
 	// Otherwise read config from --config if provided, otherwise use default configuration
 	return configutil.LoadOrDefaultInitConfiguration(cfgPath, cmdutil.DefaultInitConfiguration(), &cfg)
 }
