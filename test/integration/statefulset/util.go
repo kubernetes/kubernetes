@@ -110,8 +110,8 @@ func newSTS(name, namespace string, replicas int) *appsv1.StatefulSet {
 						{
 							Name: "datadir",
 							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
-									Path: fmt.Sprintf("/tmp/%v", "datadir"),
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "fake-pvc-name",
 								},
 							},
 						},
@@ -277,6 +277,35 @@ func getPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]s
 		t.Fatalf("obtained a nil list of pods")
 	}
 	return pods
+}
+
+func getStatefulSetPVCs(t *testing.T, pvcClient typedv1.PersistentVolumeClaimInterface, sts *appsv1.StatefulSet) []*v1.PersistentVolumeClaim {
+	pvcs := []*v1.PersistentVolumeClaim{}
+	for i := int32(0); i < *sts.Spec.Replicas; i++ {
+		pvcName := fmt.Sprintf("%s-%s-%d", sts.Spec.VolumeClaimTemplates[0].Name, sts.Name, i)
+		pvc, err := pvcClient.Get(context.TODO(), pvcName, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("failed to get PVC %s: %v", pvcName, err)
+		}
+		pvcs = append(pvcs, pvc)
+	}
+	return pvcs
+}
+
+func verifyOwnerRef(t *testing.T, pvc *v1.PersistentVolumeClaim, kind string, expected bool) {
+	found := false
+	for _, ref := range pvc.GetOwnerReferences() {
+		if ref.Kind == kind {
+			if expected {
+				found = true
+			} else {
+				t.Fatalf("Found %s ref but expected none for PVC %s", kind, pvc.Name)
+			}
+		}
+	}
+	if expected && !found {
+		t.Fatalf("Expected %s ref but found none for PVC %s", kind, pvc.Name)
+	}
 }
 
 func updateSTS(t *testing.T, stsClient typedappsv1.StatefulSetInterface, stsName string, updateFunc func(*appsv1.StatefulSet)) *appsv1.StatefulSet {
