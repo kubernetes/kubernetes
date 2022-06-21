@@ -22,7 +22,6 @@ package winkernel
 import (
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -123,7 +122,7 @@ type serviceInfo struct {
 	nodePorthnsID          string
 	policyApplied          bool
 	remoteEndpoint         *endpointsInfo
-	hns                    HCNUtils
+	hns                    IHCNUtils
 	preserveDIP            bool
 	localTrafficDSR        bool
 }
@@ -145,41 +144,16 @@ type remoteSubnetInfo struct {
 const NETWORK_TYPE_OVERLAY = "overlay"
 const NETWORK_TYPE_L2BRIDGE = "L2Bridge"
 
-func newHostNetworkService() (HCNUtils, hcn.SupportedFeatures) {
-	var h HCNUtils
+func newHostNetworkService() (IHCNUtils, hcn.SupportedFeatures) {
+	var h IHCNUtils
 	supportedFeatures := hcn.GetSupportedFeatures()
 	if supportedFeatures.Api.V2 {
-		h = hcnutils{&ihcn{}}
+		h = hcnutils{&RealHCN{}}
 	} else {
 		panic("Windows HNS Api V2 required. This version of windows does not support API V2")
 	}
 
 	return h, supportedFeatures
-}
-
-func getNetworkName(hnsNetworkName string) (string, error) {
-	if len(hnsNetworkName) == 0 {
-		klog.V(3).InfoS("Flag --network-name not set, checking environment variable")
-		hnsNetworkName = os.Getenv("KUBE_NETWORK")
-		if len(hnsNetworkName) == 0 {
-			return "", fmt.Errorf("Environment variable KUBE_NETWORK and network-flag not initialized")
-		}
-	}
-	return hnsNetworkName, nil
-}
-
-func getNetworkInfo(hns HCNUtils, hnsNetworkName string) (*hnsNetworkInfo, error) {
-	hnsNetworkInfo, err := hns.getNetworkByName(hnsNetworkName)
-	for err != nil {
-		klog.ErrorS(err, "Unable to find HNS Network specified, please check network name and CNI deployment", "hnsNetworkName", hnsNetworkName)
-		time.Sleep(1 * time.Second)
-		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
-	}
-	return hnsNetworkInfo, err
-}
-
-func isOverlay(hnsNetworkInfo *hnsNetworkInfo) bool {
-	return strings.EqualFold(hnsNetworkInfo.networkType, NETWORK_TYPE_OVERLAY)
 }
 
 // StackCompatTester tests whether the required kernel and network are dualstack capable
@@ -234,7 +208,7 @@ type endpointsInfo struct {
 	hnsID           string
 	refCount        *uint16
 	providerAddress string
-	hns             HCNUtils
+	hns             IHCNUtils
 	name            string
 
 	// conditions
@@ -413,7 +387,7 @@ func (proxier *Proxier) newEndpointInfo(baseInfo *proxy.BaseEndpointInfo, _ *pro
 	return info
 }
 
-func newSourceVIP(hns HCNUtils, network string, ip string, mac string, providerAddress string) (*endpointsInfo, error) {
+func newSourceVIP(hns IHCNUtils, network string, ip string, mac string, providerAddress string) (*endpointsInfo, error) {
 	hnsEndpoint := &endpointsInfo{
 		ip:              ip,
 		isLocal:         true,
@@ -553,7 +527,7 @@ type Proxier struct {
 	// precomputing some number of those and cache for future reuse.
 	precomputedProbabilities []string
 
-	hns               HCNUtils
+	hns               IHCNUtils
 	network           hnsNetworkInfo
 	sourceVip         string
 	hostMac           string
@@ -780,75 +754,6 @@ func CleanupLeftovers() (encounteredError bool) {
 	// Delete all Hns Remote endpoints
 
 	return encounteredError
-}
-
-func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
-	klog.V(3).InfoS("Service cleanup", "serviceInfo", svcInfo)
-	// Skip the svcInfo.policyApplied check to remove all the policies
-	svcInfo.deleteAllHnsLoadBalancerPolicy()
-	// Cleanup Endpoints references
-	for _, ep := range endpoints {
-		epInfo, ok := ep.(*endpointsInfo)
-		if ok {
-			epInfo.Cleanup()
-		}
-	}
-	if svcInfo.remoteEndpoint != nil {
-		svcInfo.remoteEndpoint.Cleanup()
-	}
-
-	svcInfo.policyApplied = false
-}
-
-func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
-	// Remove the Hns Policy corresponding to this service
-	hns := svcInfo.hns
-	hns.deleteLoadBalancer(svcInfo.hnsID)
-	svcInfo.hnsID = ""
-
-	hns.deleteLoadBalancer(svcInfo.nodePorthnsID)
-	svcInfo.nodePorthnsID = ""
-
-	for _, externalIP := range svcInfo.externalIPs {
-		hns.deleteLoadBalancer(externalIP.hnsID)
-		externalIP.hnsID = ""
-	}
-	for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
-		hns.deleteLoadBalancer(lbIngressIP.hnsID)
-		lbIngressIP.hnsID = ""
-		if lbIngressIP.healthCheckHnsID != "" {
-			hns.deleteLoadBalancer(lbIngressIP.healthCheckHnsID)
-			lbIngressIP.healthCheckHnsID = ""
-		}
-	}
-}
-
-func deleteAllHnsLoadBalancerPolicy() {
-	lbalancers, err := hcn.ListLoadBalancers()
-	if err != nil {
-		return
-	}
-	for _, lbalancer := range lbalancers {
-		klog.V(3).InfoS("Remove policy", "policies", lbalancer)
-		err = lbalancer.Delete()
-		if err != nil {
-			klog.ErrorS(err, "Failed to delete policy list")
-		}
-	}
-}
-
-func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
-	hnsnetwork, err := hcn.GetNetworkByName(hnsNetworkName)
-	if err != nil {
-		klog.ErrorS(err, "Failed to get HNS Network by name")
-		return nil, err
-	}
-
-	return &hnsNetworkInfo{
-		id:          hnsnetwork.Id,
-		name:        hnsnetwork.Name,
-		networkType: string(hnsnetwork.Type),
-	}, nil
 }
 
 // Sync is called to synchronize the proxier state to hns as soon as possible.

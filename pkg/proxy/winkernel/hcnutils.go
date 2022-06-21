@@ -22,14 +22,17 @@ package winkernel
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/Microsoft/hcsshim/hcn"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/proxy"
 
 	"strings"
 )
 
-type HCN interface {
+type IHCN interface {
 	GetNetworkByName(networkName string) (*hcn.HostComputeNetwork, error)
 	ListEndpointsOfNetwork(networkId string) ([]hcn.HostComputeEndpoint, error)
 	GetEndpointByID(endpointId string) (*hcn.HostComputeEndpoint, error)
@@ -44,17 +47,20 @@ type HCN interface {
 	DeleteEndpoint(endpoint *hcn.HostComputeEndpoint) error
 }
 
-type ihcn struct{}
+// The RealHCN structure represents the real hcn, so we can call the real hcn.methods whenever we need them.
+// If you want to use hcnutils methods on the real hcn you should create it this way: hcnutils := NewHCNUtils(&RealHCN{})
+// Otherwise, if you want to use it on the fakeHCN (for testing purposes), use it this way: hcnutils := NewHCNUtils(&hcntesting.FakeHCN{})
+type RealHCN struct{}
 
 type hcnutils struct {
-	hcninstance HCN
+	hcninstance IHCN
 }
 
-func NewHCNUtils(hcnImpl HCN) *hcnutils {
+func NewHCNUtils(hcnImpl IHCN) *hcnutils {
 	return &hcnutils{hcnImpl}
 }
 
-type HCNUtils interface {
+type IHCNUtils interface {
 	getNetworkByName(name string) (*hnsNetworkInfo, error)
 	getAllEndpointsByNetwork(networkName string) (map[string]*endpointsInfo, error)
 	getEndpointByID(id string) (*endpointsInfo, error)
@@ -381,50 +387,146 @@ func (hns hcnutils) deleteLoadBalancer(hnsID string) error {
 	return err
 }
 
-func (h *ihcn) GetNetworkByName(networkName string) (*hcn.HostComputeNetwork, error) {
+func (h *RealHCN) GetNetworkByName(networkName string) (*hcn.HostComputeNetwork, error) {
 	return hcn.GetNetworkByName(networkName)
 }
 
-func (h *ihcn) ListEndpointsOfNetwork(networkId string) ([]hcn.HostComputeEndpoint, error) {
+func (h *RealHCN) ListEndpointsOfNetwork(networkId string) ([]hcn.HostComputeEndpoint, error) {
 	return hcn.ListEndpointsOfNetwork(networkId)
 }
 
-func (h *ihcn) GetEndpointByID(endpointId string) (*hcn.HostComputeEndpoint, error) {
+func (h *RealHCN) GetEndpointByID(endpointId string) (*hcn.HostComputeEndpoint, error) {
 	return hcn.GetEndpointByID(endpointId)
 }
 
-func (h *ihcn) ListEndpoints() ([]hcn.HostComputeEndpoint, error) {
+func (h *RealHCN) ListEndpoints() ([]hcn.HostComputeEndpoint, error) {
 	return hcn.ListEndpoints()
 }
 
-func (h *ihcn) GetEndpointByName(endpointName string) (*hcn.HostComputeEndpoint, error) {
+func (h *RealHCN) GetEndpointByName(endpointName string) (*hcn.HostComputeEndpoint, error) {
 	return hcn.GetEndpointByName(endpointName)
 }
 
-func (h *ihcn) ListLoadBalancers() ([]hcn.HostComputeLoadBalancer, error) {
+func (h *RealHCN) ListLoadBalancers() ([]hcn.HostComputeLoadBalancer, error) {
 	return hcn.ListLoadBalancers()
 }
 
-func (h *ihcn) GetLoadBalancerByID(loadBalancerId string) (*hcn.HostComputeLoadBalancer, error) {
+func (h *RealHCN) GetLoadBalancerByID(loadBalancerId string) (*hcn.HostComputeLoadBalancer, error) {
 	return hcn.GetLoadBalancerByID(loadBalancerId)
 }
 
-func (h *ihcn) CreateEndpoint(endpoint *hcn.HostComputeEndpoint, network *hcn.HostComputeNetwork) (*hcn.HostComputeEndpoint, error) {
+func (h *RealHCN) CreateEndpoint(endpoint *hcn.HostComputeEndpoint, network *hcn.HostComputeNetwork) (*hcn.HostComputeEndpoint, error) {
 	return network.CreateEndpoint(endpoint)
 }
 
-func (h *ihcn) CreateRemoteEndpoint(endpoint *hcn.HostComputeEndpoint, network *hcn.HostComputeNetwork) (*hcn.HostComputeEndpoint, error) {
+func (h *RealHCN) CreateRemoteEndpoint(endpoint *hcn.HostComputeEndpoint, network *hcn.HostComputeNetwork) (*hcn.HostComputeEndpoint, error) {
 	return network.CreateRemoteEndpoint(endpoint)
 }
 
-func (h *ihcn) CreateLoadBalancer(loadbalancer *hcn.HostComputeLoadBalancer) (*hcn.HostComputeLoadBalancer, error) {
+func (h *RealHCN) CreateLoadBalancer(loadbalancer *hcn.HostComputeLoadBalancer) (*hcn.HostComputeLoadBalancer, error) {
 	return loadbalancer.Create()
 }
 
-func (h *ihcn) DeleteLoadBalancer(loadbalancer *hcn.HostComputeLoadBalancer) error {
+func (h *RealHCN) DeleteLoadBalancer(loadbalancer *hcn.HostComputeLoadBalancer) error {
 	return loadbalancer.Delete()
 }
 
-func (h *ihcn) DeleteEndpoint(endpoint *hcn.HostComputeEndpoint) error {
+func (h *RealHCN) DeleteEndpoint(endpoint *hcn.HostComputeEndpoint) error {
 	return endpoint.Delete()
+}
+
+// Here are some helper methods for proxier.go
+
+func getNetworkName(hnsNetworkName string) (string, error) {
+	if len(hnsNetworkName) == 0 {
+		klog.V(3).InfoS("Flag --network-name not set, checking environment variable")
+		hnsNetworkName = os.Getenv("KUBE_NETWORK")
+		if len(hnsNetworkName) == 0 {
+			return "", fmt.Errorf("Environment variable KUBE_NETWORK and network-flag not initialized")
+		}
+	}
+	return hnsNetworkName, nil
+}
+
+func getNetworkInfo(hns IHCNUtils, hnsNetworkName string) (*hnsNetworkInfo, error) {
+	hnsNetworkInfo, err := hns.getNetworkByName(hnsNetworkName)
+	for err != nil {
+		klog.ErrorS(err, "Unable to find HNS Network specified, please check network name and CNI deployment", "hnsNetworkName", hnsNetworkName)
+		time.Sleep(1 * time.Second)
+		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
+	}
+	return hnsNetworkInfo, err
+}
+
+func isOverlay(hnsNetworkInfo *hnsNetworkInfo) bool {
+	return strings.EqualFold(hnsNetworkInfo.networkType, NETWORK_TYPE_OVERLAY)
+}
+
+func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
+	klog.V(3).InfoS("Service cleanup", "serviceInfo", svcInfo)
+	// Skip the svcInfo.policyApplied check to remove all the policies
+	svcInfo.deleteAllHnsLoadBalancerPolicy()
+	// Cleanup Endpoints references
+	for _, ep := range endpoints {
+		epInfo, ok := ep.(*endpointsInfo)
+		if ok {
+			epInfo.Cleanup()
+		}
+	}
+	if svcInfo.remoteEndpoint != nil {
+		svcInfo.remoteEndpoint.Cleanup()
+	}
+
+	svcInfo.policyApplied = false
+}
+
+func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
+	// Remove the Hns Policy corresponding to this service
+	hns := svcInfo.hns
+	hns.deleteLoadBalancer(svcInfo.hnsID)
+	svcInfo.hnsID = ""
+
+	hns.deleteLoadBalancer(svcInfo.nodePorthnsID)
+	svcInfo.nodePorthnsID = ""
+
+	for _, externalIP := range svcInfo.externalIPs {
+		hns.deleteLoadBalancer(externalIP.hnsID)
+		externalIP.hnsID = ""
+	}
+	for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
+		hns.deleteLoadBalancer(lbIngressIP.hnsID)
+		lbIngressIP.hnsID = ""
+		if lbIngressIP.healthCheckHnsID != "" {
+			hns.deleteLoadBalancer(lbIngressIP.healthCheckHnsID)
+			lbIngressIP.healthCheckHnsID = ""
+		}
+	}
+}
+
+func deleteAllHnsLoadBalancerPolicy() {
+	lbalancers, err := hcn.ListLoadBalancers()
+	if err != nil {
+		return
+	}
+	for _, lbalancer := range lbalancers {
+		klog.V(3).InfoS("Remove policy", "policies", lbalancer)
+		err = lbalancer.Delete()
+		if err != nil {
+			klog.ErrorS(err, "Failed to delete policy list")
+		}
+	}
+}
+
+func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
+	hnsnetwork, err := hcn.GetNetworkByName(hnsNetworkName)
+	if err != nil {
+		klog.ErrorS(err, "Failed to get HNS Network by name")
+		return nil, err
+	}
+
+	return &hnsNetworkInfo{
+		id:          hnsnetwork.Id,
+		name:        hnsnetwork.Name,
+		networkType: string(hnsnetwork.Type),
+	}, nil
 }

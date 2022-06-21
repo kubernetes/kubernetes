@@ -1,3 +1,22 @@
+//go:build windows
+// +build windows
+
+/*
+Copyright 2022 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package hcntesting
 
 import (
@@ -9,7 +28,16 @@ import (
 )
 
 const (
-	guid = "123ABC"
+	guid                        = "123ABC"
+	destinationPrefix           = "192.168.2.0/24"
+	isolationId                 = 4096
+	providerAddress             = "10.0.0.3"
+	distributedRouterMacAddress = "00-11-22-33-44-55"
+	macRangeStartAddress        = "00-15-5D-52-C0-00"
+	macRangeEndAddress          = "00-15-5D-52-CF-FF"
+	ipAddressPrefix             = "192.168.1.0/24"
+	subnetNextHop               = "192.168.1.1"
+	subnetDestinationPrefix     = "0.0.0.0/0"
 )
 
 //the fakeHCN saves the created endpoints and loadbalancers in slices to be able to work with them easier
@@ -20,10 +48,10 @@ type FakeHCN struct {
 
 func (HCN *FakeHCN) GetNetworkByName(networkName string) (*hcn.HostComputeNetwork, error) {
 	policysettings := &hcn.RemoteSubnetRoutePolicySetting{
-		DestinationPrefix:           "192.168.2.0/24",
-		IsolationId:                 4096,
-		ProviderAddress:             "10.0.0.3",
-		DistributedRouterMacAddress: "00-11-22-33-44-55",
+		DestinationPrefix:           destinationPrefix,
+		IsolationId:                 isolationId,
+		ProviderAddress:             providerAddress,
+		DistributedRouterMacAddress: distributedRouterMacAddress,
 	}
 
 	jsonsettings, err := json.Marshal(policysettings)
@@ -45,8 +73,8 @@ func (HCN *FakeHCN) GetNetworkByName(networkName string) (*hcn.HostComputeNetwor
 		MacPool: hcn.MacPool{
 			Ranges: []hcn.MacRange{
 				{
-					StartMacAddress: "00-15-5D-52-C0-00",
-					EndMacAddress:   "00-15-5D-52-CF-FF",
+					StartMacAddress: macRangeStartAddress,
+					EndMacAddress:   macRangeEndAddress,
 				},
 			},
 		},
@@ -55,11 +83,11 @@ func (HCN *FakeHCN) GetNetworkByName(networkName string) (*hcn.HostComputeNetwor
 				Type: "Static",
 				Subnets: []hcn.Subnet{
 					{
-						IpAddressPrefix: "192.168.1.0/24",
+						IpAddressPrefix: ipAddressPrefix,
 						Routes: []hcn.Route{
 							{
-								NextHop:           "192.168.1.1",
-								DestinationPrefix: "0.0.0.0/0",
+								NextHop:           subnetNextHop,
+								DestinationPrefix: subnetDestinationPrefix,
 							},
 						},
 					},
@@ -88,18 +116,7 @@ func (HCN *FakeHCN) GetEndpointByID(endpointId string) (*hcn.HostComputeEndpoint
 	endpoint := &hcn.HostComputeEndpoint{}
 	for _, ep := range HCN.Endpoints {
 		if ep.Id == endpointId {
-			endpoint.Id = endpointId
-			endpoint.Name = ep.Name
-			endpoint.HostComputeNetwork = ep.HostComputeNetwork
-			endpoint.HostComputeNamespace = ep.HostComputeNamespace
-			endpoint.IpConfigurations = ep.IpConfigurations
-			endpoint.Policies = ep.Policies
-			endpoint.Dns = ep.Dns
-			endpoint.Routes = ep.Routes
-			endpoint.MacAddress = ep.MacAddress
-			endpoint.Flags = ep.Flags
-			endpoint.Health = ep.Health
-			endpoint.SchemaVersion = ep.SchemaVersion
+			endpoint = ep
 			break
 		}
 	}
@@ -123,18 +140,7 @@ func (HCN *FakeHCN) GetEndpointByName(endpointName string) (*hcn.HostComputeEndp
 	endpoint := &hcn.HostComputeEndpoint{}
 	for _, ep := range HCN.Endpoints {
 		if ep.Name == endpointName {
-			endpoint.Id = ep.Id
-			endpoint.Name = endpointName
-			endpoint.HostComputeNetwork = ep.HostComputeNetwork
-			endpoint.Health = ep.Health
-			endpoint.IpConfigurations = ep.IpConfigurations
-			endpoint.HostComputeNamespace = ep.HostComputeNamespace
-			endpoint.Policies = ep.Policies
-			endpoint.Dns = ep.Dns
-			endpoint.Routes = ep.Routes
-			endpoint.MacAddress = ep.MacAddress
-			endpoint.Flags = ep.Flags
-			endpoint.SchemaVersion = ep.SchemaVersion
+			endpoint = ep
 			break
 		}
 	}
@@ -157,13 +163,7 @@ func (HCN *FakeHCN) GetLoadBalancerByID(loadBalancerId string) (*hcn.HostCompute
 	loadbalancer := &hcn.HostComputeLoadBalancer{}
 	for _, lb := range HCN.Loadbalancers {
 		if lb.Id == loadBalancerId {
-			loadbalancer.Id = loadBalancerId
-			loadbalancer.Flags = lb.Flags
-			loadbalancer.HostComputeEndpoints = lb.HostComputeEndpoints
-			loadbalancer.SourceVIP = lb.SourceVIP
-			loadbalancer.SchemaVersion = lb.SchemaVersion
-			loadbalancer.PortMappings = lb.PortMappings
-			loadbalancer.FrontendVIPs = lb.FrontendVIPs
+			loadbalancer = lb
 			break
 		}
 	}
