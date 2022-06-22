@@ -218,7 +218,12 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	// When no endpoint slices would usually exist, we need to add a placeholder.
 	if len(existingSlices) == len(slicesToDelete) && len(slicesToCreate) < 1 {
 		placeholderSlice := newEndpointSlice(service, &endpointMeta{Ports: []discovery.EndpointPort{}, AddressType: addressType})
-		slicesToCreate = append(slicesToCreate, placeholderSlice)
+		if len(slicesToDelete) == 1 && placeholderSliceCompare.DeepEqual(slicesToDelete[0], placeholderSlice) {
+			// We are about to unnecessarily delete/recreate the placeholder, remove it now.
+			slicesToDelete = slicesToDelete[:0]
+		} else {
+			slicesToCreate = append(slicesToCreate, placeholderSlice)
+		}
 		spMetrics.Set(endpointutil.NewPortMapKey(placeholderSlice.Ports), metrics.EfficiencyInfo{
 			Endpoints: 0,
 			Slices:    1,

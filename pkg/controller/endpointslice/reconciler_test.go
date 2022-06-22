@@ -466,15 +466,52 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	client := newClientset()
 	setupMetrics()
 	namespace := "test"
-	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
-	endpointSlice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
+	svc, epMeta := newServiceAndEndpointMeta("foo", namespace)
+	emptySlice := newEmptyEndpointSlice(1, namespace, epMeta, svc)
+	emptySlice.ObjectMeta.Labels = map[string]string{"bar": "baz"}
 
-	_, createErr := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), endpointSlice1, metav1.CreateOptions{})
+	testCases := []struct {
+		desc        string
+		existing    *discovery.EndpointSlice
+		wantUpdate  bool
+		wantMetrics expectedMetrics
+	}{
+		{
+			desc:        "No existing placeholder",
+			wantUpdate:  true,
+			wantMetrics: expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 1},
+		},
+		{
+			desc:        "Existing placeholder that's the same",
+			existing:    newEndpointSlice(&svc, &epMeta{Ports: []discovery.EndpointPort{}, AddressType: discovery.AddressTypeIPv4}),
+			wantMetrics: expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 0},
+		},
+		{
+			desc:        "Existing placeholder that's different",
+			existing:    emptySlice,
+			wantUpdate:  true,
+			wantMetrics: expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 1, numDeleted: 0, slicesChangedPerSync: 1},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			client := newClientset()
+			setupMetrics()
+
+			existingSlices := []*discovery.EndpointSlice{}
+			if tc.existing != nil {
+				existingSlices = append(existingSlices, tc.existing)
+				_, createErr := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), tc.existing, metav1.CreateOptions{})
+				assert.Nil(t, createErr, "Expected no error creating endpoint slice")
+			}
+
+	_, createErr := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), emptySlice, metav1.CreateOptions{})
 	assert.Nil(t, createErr, "Expected no error creating endpoint slice")
 
 	numActionsBefore := len(client.Actions())
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
-	reconcileHelper(t, r, &svc, []*corev1.Pod{}, []*discovery.EndpointSlice{endpointSlice1}, time.Now())
+	reconcileHelper(t, r, &svc, []*corev1.Pod{}, []*discovery.EndpointSlice{emptySlice}, time.Now())
 	assert.Len(t, client.Actions(), numActionsBefore+1, "Expected 1 additional clientset action")
 	actions := client.Actions()
 	assert.True(t, actions[numActionsBefore].Matches("update", "endpointslices"), "Action should be update endpoint slice")
