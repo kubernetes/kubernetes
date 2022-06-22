@@ -53,7 +53,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
@@ -492,7 +491,7 @@ func LoadConfig() (config *restclient.Config, err error) {
 			testDesc := ginkgo.CurrentGinkgoTestDescription()
 			if len(testDesc.ComponentTexts) > 0 {
 				componentTexts := strings.Join(testDesc.ComponentTexts, " ")
-				config.UserAgent = fmt.Sprintf("%s -- %s", rest.DefaultKubernetesUserAgent(), componentTexts)
+				config.UserAgent = fmt.Sprintf("%s -- %s", restclient.DefaultKubernetesUserAgent(), componentTexts)
 			}
 		}
 	}()
@@ -1357,7 +1356,7 @@ func PrettyPrintJSON(metrics interface{}) string {
 		Logf("Error indenting: %v", err)
 		return ""
 	}
-	return string(formatted.Bytes())
+	return formatted.String()
 }
 
 // taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
@@ -1422,7 +1421,7 @@ retriesLoop:
 					break actualWatchEventsLoop
 				}
 			}
-			if foundExpectedWatchEvent == false {
+			if !foundExpectedWatchEvent {
 				errs.Insert(fmt.Sprintf("Watch event %v not found", expectedWatchEvent.Type))
 			}
 			totalValidWatchEvents++
