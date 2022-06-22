@@ -329,6 +329,7 @@ func TestTimeoutWithLogging(t *testing.T) {
 				WithTimeoutForNonLongRunningRequests(
 					http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 						// trigger the timeout
+						time.Sleep(2 * time.Second)
 						cancel()
 						// mutate request Headers
 						// Authorization filter does it for example
