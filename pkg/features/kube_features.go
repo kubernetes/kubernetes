@@ -819,7 +819,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIInlineVolume: {Default: true, PreRelease: featuregate.Beta},
 
-	CSIMigration: {Default: true, PreRelease: featuregate.Beta},
+	CSIMigration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
 	CSIMigrationAWS: {Default: true, PreRelease: featuregate.Beta},
 
