@@ -223,11 +223,11 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 			slicesToDelete = slicesToDelete[:0]
 		} else {
 			slicesToCreate = append(slicesToCreate, placeholderSlice)
-			spMetrics.Set(endpointutil.NewPortMapKey(placeholderSlice.Ports), metrics.EfficiencyInfo{
-				Endpoints: 0,
-				Slices:    1,
-			})
 		}
+		spMetrics.Set(endpointutil.NewPortMapKey(placeholderSlice.Ports), metrics.EfficiencyInfo{
+			Endpoints: 0,
+			Slices:    1,
+		})
 	}
 
 	metrics.EndpointsAddedPerSync.WithLabelValues().Observe(float64(totalAdded))
