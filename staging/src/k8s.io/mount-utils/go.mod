@@ -6,7 +6,7 @@ go 1.18
 
 require (
 	github.com/stretchr/testify v1.7.0
-	k8s.io/klog/v2 v2.60.1
+	k8s.io/klog/v2 v2.70.0
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9
 )
 
