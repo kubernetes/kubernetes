@@ -674,15 +674,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			removedRelease string
 		)
 
-		{
-			versionedPtrWithGVK := versionedPtr.DeepCopyObject()
-			versionedPtrWithGVK.GetObjectKind().SetGroupVersionKind(fqKindToRegister)
-			currentMajor, currentMinor, _ := deprecation.MajorMinor(versioninfo.Get())
-			deprecated = deprecation.IsDeprecated(versionedPtrWithGVK, currentMajor, currentMinor)
-			if deprecated {
-				removedRelease = deprecation.RemovedRelease(versionedPtrWithGVK)
-				warnings = append(warnings, deprecation.WarningMessage(versionedPtrWithGVK))
-			}
+		versionedPtrWithGVK := versionedPtr.DeepCopyObject()
+		versionedPtrWithGVK.GetObjectKind().SetGroupVersionKind(fqKindToRegister)
+		currentMajor, currentMinor, _ := deprecation.MajorMinor(versioninfo.Get())
+		deprecated = deprecation.IsDeprecated(versionedPtrWithGVK, currentMajor, currentMinor)
+		if deprecated {
+			removedRelease = deprecation.RemovedRelease(versionedPtrWithGVK)
+			warnings = append(warnings, deprecation.WarningMessage(versionedPtrWithGVK))
 		}
 
 		switch action.Verb {
