@@ -226,6 +226,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := k8stypes.NodeName("node-name")
 	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
+
 	volumeExists := dsw.VolumeExists(volumeName, nodeName)
 	if volumeExists {
 		t.Fatalf(
@@ -819,6 +820,261 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	waitForVolumeAttachedToNode(t, generatedVolumeName, nodeName2, asw)
 	verifyVolumeAttachedToNode(t, generatedVolumeName, nodeName2, cache.AttachStateAttached, asw)
 
+}
+
+// Populates desiredStateOfWorld cache with one node/volume/pod tuple.
+// The node has node.kubernetes.io/out-of-service taint present.
+//
+// The maxWaitForUnmountDuration is longer (in this case it is 4200 * time.Second so that detach does not happen
+// immediately due to timeout.
+//
+// Calls Run()
+// Verifies there is one attach call and no detach calls.
+// Deletes the pod from desiredStateOfWorld cache without first marking the node/volume as unmounted.
+// Verifies there is one detach call and no (new) attach calls.
+func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeOutOfServiceVolumeDetach, true)()
+	// Arrange
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		fakeKubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		fakeHandler))
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	reconciler := NewReconciler(
+		reconcilerLoopPeriod, maxLongWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad,
+		nsu, nodeLister, fakeRecorder)
+	podName1 := "pod-uid1"
+	volumeName1 := v1.UniqueVolumeName("volume-name1")
+	volumeSpec1 := controllervolumetesting.GetTestVolumeSpec(string(volumeName1), volumeName1)
+	nodeName1 := k8stypes.NodeName("worker-0")
+	node1 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: string(nodeName1)},
+		Spec: v1.NodeSpec{
+			Taints: []v1.Taint{{Key: v1.TaintNodeOutOfService, Effect: v1.TaintEffectNoExecute}},
+		},
+	}
+	informerFactory.Core().V1().Nodes().Informer().GetStore().Add(node1)
+	dsw.AddNode(nodeName1, false /*keepTerminatedPodVolumes*/)
+	volumeExists := dsw.VolumeExists(volumeName1, nodeName1)
+	if volumeExists {
+		t.Fatalf(
+			"Volume %q/node %q should not exist, but it does.",
+			volumeName1,
+			nodeName1)
+	}
+
+	generatedVolumeName, podErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1,
+		podName1), volumeSpec1, nodeName1)
+	if podErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podErr)
+	}
+
+	// Act
+	ch := make(chan struct{})
+	go reconciler.Run(ch)
+	defer close(ch)
+
+	// Assert
+	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
+	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
+	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
+	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
+	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
+
+	// Delete the pod and the volume will be detached only after the maxLongWaitForUnmountDuration expires as volume is
+	//not unmounted. Here maxLongWaitForUnmountDuration is used to mimic that node is out of service.
+	// But in this case the node has the node.kubernetes.io/out-of-service taint and hence it will not wait for
+	// maxLongWaitForUnmountDuration and will progress to detach immediately.
+	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
+	// Assert -- Detach will be triggered if node has out of service taint
+	waitForNewDetacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
+	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
+	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
+	verifyNewDetacherCallCount(t, false /* expectZeroNewDetacherCallCount */, fakePlugin)
+	waitForDetachCallCount(t, 1 /* expectedDetachCallCount */, fakePlugin)
+}
+
+// Populates desiredStateOfWorld cache with one node/volume/pod tuple.
+// The node does not have the node.kubernetes.io/out-of-service taint present.
+//
+// The maxWaitForUnmountDuration is longer (in this case it is 4200 * time.Second so that detach does not happen
+// immediately due to timeout.
+//
+// Calls Run()
+// Verifies there is one attach call and no detach calls.
+// Deletes the pod from desiredStateOfWorld cache without first marking the node/volume as unmounted.
+// Verifies there is no detach call and no (new) attach calls.
+func Test_Run_OneVolumeDetachOnNoOutOfServiceTaintedNode(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeOutOfServiceVolumeDetach, true)()
+	// Arrange
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		fakeKubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		fakeHandler))
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	reconciler := NewReconciler(
+		reconcilerLoopPeriod, maxLongWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad,
+		nsu, nodeLister, fakeRecorder)
+	podName1 := "pod-uid1"
+	volumeName1 := v1.UniqueVolumeName("volume-name1")
+	volumeSpec1 := controllervolumetesting.GetTestVolumeSpec(string(volumeName1), volumeName1)
+	nodeName1 := k8stypes.NodeName("worker-0")
+	node1 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: string(nodeName1)},
+	}
+	informerFactory.Core().V1().Nodes().Informer().GetStore().Add(node1)
+	dsw.AddNode(nodeName1, false /*keepTerminatedPodVolumes*/)
+	volumeExists := dsw.VolumeExists(volumeName1, nodeName1)
+	if volumeExists {
+		t.Fatalf(
+			"Volume %q/node %q should not exist, but it does.",
+			volumeName1,
+			nodeName1)
+	}
+
+	generatedVolumeName, podErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1,
+		podName1), volumeSpec1, nodeName1)
+	if podErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podErr)
+	}
+
+	// Act
+	ch := make(chan struct{})
+	go reconciler.Run(ch)
+	defer close(ch)
+
+	// Assert
+	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
+	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
+	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
+	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
+	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
+
+	// Delete the pod and the volume will be detached only after the maxLongWaitForUnmountDuration expires as volume is
+	// not unmounted. Here maxLongWaitForUnmountDuration is used to mimic that node is out of service.
+	// But in this case the node does not have the node.kubernetes.io/out-of-service taint and hence it will wait for
+	// maxLongWaitForUnmountDuration and will not be detached immediately.
+	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
+	// Assert -- Detach will be triggered only after maxLongWaitForUnmountDuration expires
+	waitForNewDetacherCallCount(t, 0 /* expectedCallCount */, fakePlugin)
+	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
+	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
+	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
+	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
+}
+
+// Populates desiredStateOfWorld cache with one node/volume/pod tuple.
+// The node starts as healthy.
+//
+// Calls Run()
+// Verifies there is one attach call and no detach calls.
+// Deletes the pod from desiredStateOfWorld cache without first marking the node/volume as unmounted.
+// Verifies that the volume is NOT detached after maxWaitForUnmountDuration.
+// Marks the node as unhealthy.
+// Verifies that the volume is detached after maxWaitForUnmountDuration.
+func Test_Run_OneVolumeDetachOnUnhealthyNode(t *testing.T) {
+	// Arrange
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		fakeKubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		fakeHandler))
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	reconciler := NewReconciler(
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad,
+		nsu, nodeLister, fakeRecorder)
+	podName1 := "pod-uid1"
+	volumeName1 := v1.UniqueVolumeName("volume-name1")
+	volumeSpec1 := controllervolumetesting.GetTestVolumeSpec(string(volumeName1), volumeName1)
+	nodeName1 := k8stypes.NodeName("worker-0")
+	node1 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: string(nodeName1)},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+	}
+	informerFactory.Core().V1().Nodes().Informer().GetStore().Add(node1)
+	dsw.AddNode(nodeName1, false /*keepTerminatedPodVolumes*/)
+	volumeExists := dsw.VolumeExists(volumeName1, nodeName1)
+	if volumeExists {
+		t.Fatalf(
+			"Volume %q/node %q should not exist, but it does.",
+			volumeName1,
+			nodeName1)
+	}
+
+	generatedVolumeName, podErr := dsw.AddPod(types.UniquePodName(podName1), controllervolumetesting.NewPod(podName1,
+		podName1), volumeSpec1, nodeName1)
+	if podErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podErr)
+	}
+
+	// Act
+	ch := make(chan struct{})
+	go reconciler.Run(ch)
+	defer close(ch)
+
+	// Assert
+	waitForNewAttacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
+	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
+	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
+	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
+	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
+
+	// Act
+	// Delete the pod and the volume will be detached even after the maxWaitForUnmountDuration expires as volume is
+	// not unmounted and the node is healthy.
+	dsw.DeletePod(types.UniquePodName(podName1), generatedVolumeName, nodeName1)
+	time.Sleep(maxWaitForUnmountDuration * 5)
+	// Assert
+	waitForNewDetacherCallCount(t, 0 /* expectedCallCount */, fakePlugin)
+	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
+	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
+	verifyNewDetacherCallCount(t, true /* expectZeroNewDetacherCallCount */, fakePlugin)
+	waitForDetachCallCount(t, 0 /* expectedDetachCallCount */, fakePlugin)
+
+	// Act
+	// Mark the node unhealthy
+	node2 := node1.DeepCopy()
+	node2.Status.Conditions[0].Status = v1.ConditionFalse
+	informerFactory.Core().V1().Nodes().Informer().GetStore().Update(node2)
+	// Assert -- Detach was triggered after maxWaitForUnmountDuration
+	waitForNewDetacherCallCount(t, 1 /* expectedCallCount */, fakePlugin)
+	verifyNewAttacherCallCount(t, false /* expectZeroNewAttacherCallCount */, fakePlugin)
+	waitForAttachCallCount(t, 1 /* expectedAttachCallCount */, fakePlugin)
+	verifyNewDetacherCallCount(t, false /* expectZeroNewDetacherCallCount */, fakePlugin)
+	waitForDetachCallCount(t, 1 /* expectedDetachCallCount */, fakePlugin)
 }
 
 func Test_ReportMultiAttachError(t *testing.T) {
