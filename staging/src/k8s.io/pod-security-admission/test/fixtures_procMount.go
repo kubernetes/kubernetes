@@ -17,7 +17,6 @@ limitations under the License.
 package test
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/pod-security-admission/api"
@@ -28,7 +27,7 @@ func init() {
 		expectErrorSubstring: "procMount",
 		generatePass: func(p *v1.Pod) []*v1.Pod {
 			p = ensureSecurityContext(p)
-			return []*corev1.Pod{
+			return []*v1.Pod{
 				// set proc mount of container and init container to a valid value
 				tweak(p, func(copy *v1.Pod) {
 					validProcMountType := v1.DefaultProcMount
@@ -40,7 +39,7 @@ func init() {
 		failRequiresFeatures: []featuregate.Feature{"ProcMountType"},
 		generateFail: func(p *v1.Pod) []*v1.Pod {
 			p = ensureSecurityContext(p)
-			return []*corev1.Pod{
+			return []*v1.Pod{
 				// set proc mount of container to a forbidden value
 				tweak(p, func(copy *v1.Pod) {
 					unmaskedProcMountType := v1.UnmaskedProcMount
