@@ -22,8 +22,10 @@ import (
 	"io"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/jonboulle/clockwork"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -100,17 +102,17 @@ func (p *Patcher) delete(namespace, name string) error {
 	return err
 }
 
-func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, string, error) {
+func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
-		return nil, nil, fmt.Sprintf("serializing current configuration from:\n%v\nfor:", obj), err
+		return nil, nil, errors.Wrapf(err, "serializing current configuration from:\n%v\nfor:", obj)
 	}
 
 	// Retrieve the original configuration of the object from the annotation.
 	original, err := util.GetOriginalConfiguration(obj)
 	if err != nil {
-		return nil, nil, fmt.Sprintf("retrieving original configuration from:\n%v\nfor:", obj), err
+		return nil, nil, errors.Wrapf(err, "retrieving original configuration from:\n%v\nfor:", obj)
 	}
 
 	var patch []byte
@@ -119,7 +121,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 	_, err = scheme.Scheme.New(p.Mapping.GroupVersionKind)
 	if err != nil {
 		if !runtime.IsNotRegisteredError(err) {
-			return nil, nil, fmt.Sprintf("getting instance of versioned object for %v:", p.Mapping.GroupVersionKind), err
+			return nil, nil, errors.Wrapf(err, "getting instance of versioned object for %v:", p.Mapping.GroupVersionKind)
 		}
 		patchType = types.MergePatchType
 	}
@@ -128,7 +130,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 	case types.MergePatchType:
 		patch, err = p.buildMergePatch(original, modified, current)
 		if err != nil {
-			return nil, nil, fmt.Sprintf(createPatchErrFormat, original, modified, current), err
+			return nil, nil, errors.Wrapf(err, createPatchErrFormat, original, modified, current)
 		}
 	case types.StrategicMergePatchType:
 		// Try to use openapi first if the openapi spec is available and can successfully calculate the patch.
@@ -144,24 +146,24 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 		if patch == nil {
 			patch, err = p.buildStrategicMergeFromBuiltins(p.Mapping.GroupVersionKind, original, modified, current)
 			if err != nil {
-				return nil, nil, fmt.Sprintf(createPatchErrFormat, original, modified, current), err
+				return nil, nil, errors.Wrapf(err, createPatchErrFormat, original, modified, current)
 			}
 		}
 	}
 
 	if string(patch) == "{}" {
-		return patch, obj, "", nil
+		return patch, obj, nil
 	}
 
 	if p.ResourceVersion != nil {
 		patch, err = addResourceVersion(patch, *p.ResourceVersion)
 		if err != nil {
-			return nil, nil, "Failed to insert resourceVersion in patch", err
+			return nil, nil, errors.Wrap(err, "Failed to insert resourceVersion in patch")
 		}
 	}
 
 	patchedObj, err := p.Helper.Patch(namespace, name, patchType, patch, nil)
-	return patch, patchedObj, "", err
+	return patch, patchedObj, err
 }
 
 // buildMergePatch builds patch according to the JSONMergePatch which is used for
@@ -219,11 +221,11 @@ func (p *Patcher) buildStrategicMergeFromBuiltins(gvk schema.GroupVersionKind, o
 // the final patched object. On failure, returns an error.
 func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	var getErr error
-	patchBytes, patchObject, errVerb, err := p.patchSimple(current, modified, namespace, name, errOut)
+	patchBytes, patchObject, err := p.patchSimple(current, modified, namespace, name, errOut)
 	if p.Retries == 0 {
 		p.Retries = maxPatchRetry
 	}
-	for i := 1; i <= p.Retries && errors.IsConflict(err); i++ {
+	for i := 1; i <= p.Retries && apierrors.IsConflict(err); i++ {
 		if i > triesBeforeBackOff {
 			p.BackOff.Sleep(backOffPeriod)
 		}
@@ -231,13 +233,13 @@ func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespa
 		if getErr != nil {
 			return nil, nil, getErr
 		}
-		patchBytes, patchObject, errVerb, err = p.patchSimple(current, modified, namespace, name, errOut)
+		patchBytes, patchObject, err = p.patchSimple(current, modified, namespace, name, errOut)
 	}
 	if err != nil {
-		if (errors.IsConflict(err) || errors.IsInvalid(err)) && p.Force {
+		if (apierrors.IsConflict(err) || apierrors.IsInvalid(err)) && p.Force {
 			patchBytes, patchObject, err = p.deleteAndCreate(current, modified, namespace, name)
-		} else if errVerb != "" {
-			err = cmdutil.AddSourceToErr(errVerb, source, err)
+		} else {
+			err = cmdutil.AddSourceToErr("patching", source, err)
 		}
 	}
 	return patchBytes, patchObject, err
@@ -249,7 +251,7 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 	}
 	// TODO: use wait
 	if err := wait.PollImmediate(1*time.Second, p.Timeout, func() (bool, error) {
-		if _, err := p.Helper.Get(namespace, name); !errors.IsNotFound(err) {
+		if _, err := p.Helper.Get(namespace, name); !apierrors.IsNotFound(err) {
 			return false, err
 		}
 		return true, nil
