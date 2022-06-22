@@ -91,6 +91,10 @@ func (spc *ServicePortCache) totals(maxEndpointsPerSlice int) (int, int, int) {
 		actualSlices += eInfo.Slices
 		desiredSlices += numDesiredSlices(eInfo.Endpoints, maxEndpointsPerSlice)
 	}
+	// there is always a placeholder slice
+	if desiredSlices == 0 {
+		desiredSlices = 1
+	}
 	return actualSlices, desiredSlices, endpoints
 }
 
@@ -148,6 +152,9 @@ func (c *Cache) updateMetrics() {
 // numDesiredSlices calculates the number of EndpointSlices that would exist
 // with ideal endpoint distribution.
 func numDesiredSlices(numEndpoints, maxEndpointsPerSlice int) int {
+	if numEndpoints == 0 {
+		return 0
+	}
 	if numEndpoints <= maxEndpointsPerSlice {
 		return 1
 	}
