@@ -115,9 +115,13 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 
 	var patch []byte
 
-	patchType, err := p.getPatchType(p.Mapping.GroupVersionKind)
+	patchType := types.StrategicMergePatchType
+	_, err = scheme.Scheme.New(p.Mapping.GroupVersionKind)
 	if err != nil {
-		return nil, nil, fmt.Sprintf("getting patch type for %v:", p.Mapping.GroupVersionKind), err
+		if !runtime.IsNotRegisteredError(err) {
+			return nil, nil, fmt.Sprintf("getting instance of versioned object for %v:", p.Mapping.GroupVersionKind), err
+		}
+		patchType = types.MergePatchType
 	}
 
 	switch patchType {
@@ -158,19 +162,6 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 
 	patchedObj, err := p.Helper.Patch(namespace, name, patchType, patch, nil)
 	return patch, patchedObj, "", err
-}
-
-// getPatchType returns correct PatchType for the given GVK.
-func (p *Patcher) getPatchType(gvk schema.GroupVersionKind) (types.PatchType, error) {
-	_, err := scheme.Scheme.New(gvk)
-	if err == nil {
-		return types.StrategicMergePatchType, nil
-	}
-	if runtime.IsNotRegisteredError(err) {
-		return types.MergePatchType, nil
-	}
-
-	return types.MergePatchType, err
 }
 
 // buildMergePatch builds patch according to the JSONMergePatch which is used for
