@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -154,6 +155,15 @@ func (rc *reconciler) hasOutOfServiceTaint(nodeName types.NodeName) (bool, error
 	return false, nil
 }
 
+// nodeIsHealthy returns true if the node looks healthy.
+func (rc *reconciler) nodeIsHealthy(nodeName types.NodeName) (bool, error) {
+	node, err := rc.nodeLister.Get(string(nodeName))
+	if err != nil {
+		return false, err
+	}
+	return nodeutil.IsNodeReady(node), nil
+}
+
 func (rc *reconciler) reconcile() {
 	// Detaches are triggered before attaches so that volumes referenced by
 	// pods that are rescheduled to a different node are detached first.
@@ -204,14 +214,22 @@ func (rc *reconciler) reconcile() {
 			// Check whether timeout has reached the maximum waiting time
 			timeout := elapsedTime > rc.maxWaitForUnmountDuration
 
+			isHealthy, err := rc.nodeIsHealthy(attachedVolume.NodeName)
+			if err != nil {
+				klog.Errorf("failed to get health of node %s: %s", attachedVolume.NodeName, err.Error())
+			}
+
+			// Force detach volumes from unhealthy nodes after maxWaitForUnmountDuration.
+			forceDetach := !isHealthy && timeout
+
 			hasOutOfServiceTaint, err := rc.hasOutOfServiceTaint(attachedVolume.NodeName)
 			if err != nil {
 				klog.Errorf("failed to get taint specs for node %s: %s", attachedVolume.NodeName, err.Error())
 			}
 
-			// Check whether volume is still mounted. Skip detach if it is still mounted unless timeout
+			// Check whether volume is still mounted. Skip detach if it is still mounted unless force detach timeout
 			// or the node has `node.kubernetes.io/out-of-service` taint.
-			if attachedVolume.MountedByNode && !timeout && !hasOutOfServiceTaint {
+			if attachedVolume.MountedByNode && !forceDetach && !hasOutOfServiceTaint {
 				klog.V(5).InfoS("Cannot detach volume because it is still mounted", "volume", attachedVolume)
 				continue
 			}
