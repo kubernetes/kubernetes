@@ -130,6 +130,7 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 // slices (by address type) for the given service. It creates, updates, or deletes endpoint slices
 // to ensure the desired set of pods are represented by endpoint slices.
 func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*corev1.Pod, existingSlices []*discovery.EndpointSlice, triggerTime time.Time, addressType discovery.AddressType) error {
+	errs := []error{}
 
 	slicesToCreate := []*discovery.EndpointSlice{}
 	slicesToUpdate := []*discovery.EndpointSlice{}
@@ -173,7 +174,23 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 
 		node, err := r.nodeLister.Get(pod.Spec.NodeName)
 		if err != nil {
-			return err
+			// we are getting the information from the local informer,
+			// an error different than IsNotFound should not happen
+			if !errors.IsNotFound(err) {
+				return err
+			}
+			// If the Node specified by the Pod doesn't exist we want to requeue the Service so we
+			// retry later, but also update the EndpointSlice without the problematic Pod.
+			// Theoretically, the pod Garbage Collector will remove the Pod, but we want to avoid
+			// situations where a reference from a Pod to a missing node can leave the EndpointSlice
+			// stuck forever.
+			// On the other side, if the service.Spec.PublishNotReadyAddresses is set we just add the
+			// Pod, since the user is explicitly indicating that the Pod address should be published.
+			if !service.Spec.PublishNotReadyAddresses {
+				klog.Warningf("skipping Pod %s for Service %s/%s: Node %s Not Found", pod.Name, service.Namespace, service.Name, pod.Spec.NodeName)
+				errs = append(errs, fmt.Errorf("skipping Pod %s for Service %s/%s: Node %s Not Found", pod.Name, service.Namespace, service.Name, pod.Spec.NodeName))
+				continue
+			}
 		}
 		endpoint := podToEndpoint(pod, node, service, addressType)
 		if len(endpoint.Addresses) > 0 {
@@ -223,11 +240,11 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 			slicesToDelete = slicesToDelete[:0]
 		} else {
 			slicesToCreate = append(slicesToCreate, placeholderSlice)
-			spMetrics.Set(endpointutil.NewPortMapKey(placeholderSlice.Ports), metrics.EfficiencyInfo{
-				Endpoints: 0,
-				Slices:    1,
-			})
 		}
+		spMetrics.Set(endpointutil.NewPortMapKey(placeholderSlice.Ports), metrics.EfficiencyInfo{
+			Endpoints: 0,
+			Slices:    1,
+		})
 	}
 
 	metrics.EndpointsAddedPerSync.WithLabelValues().Observe(float64(totalAdded))
@@ -255,7 +272,12 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 		slicesToCreate, slicesToUpdate = topologycache.RemoveHintsFromSlices(si)
 	}
 
-	return r.finalize(service, slicesToCreate, slicesToUpdate, slicesToDelete, triggerTime)
+	err := r.finalize(service, slicesToCreate, slicesToUpdate, slicesToDelete, triggerTime)
+	if err != nil {
+		errs = append(errs, err)
+	}
+	return utilerrors.NewAggregate(errs)
+
 }
 
 // placeholderSliceCompare is a conversion func for comparing two placeholder endpoint slices.
