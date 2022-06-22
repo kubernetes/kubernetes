@@ -481,7 +481,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 		{
 			desc:        "Existing placeholder that's the same",
 			existing:    newEndpointSlice(&svc, &endpointMeta{Ports: []discovery.EndpointPort{}, AddressType: discovery.AddressTypeIPv4}),
-			wantMetrics: expectedMetrics{desiredSlices: 0, actualSlices: 0, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 0},
+			wantMetrics: expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 0, numDeleted: 0, slicesChangedPerSync: 0},
 		},
 		{
 			desc:        "Existing placeholder that's different",
@@ -1438,6 +1438,191 @@ func TestReconcilerFinalizeSvcDeletionTimestamp(t *testing.T) {
 	}
 }
 
+// When a Pod references a Node that is not present in the informer cache the
+// EndpointSlices will continue to allow create, updates and deletes through.
+// The Pod with the missing reference will be published or retried depending of
+// the service.spec.PublishNotReadyAddresses.
+// The test considers two Pods on different nodes, one of the Nodes is not present.
+func TestReconcilerPodMissingNode(t *testing.T) {
+	namespace := "test"
+
+	nodes := make([]*corev1.Node, 2)
+	nodes[0] = &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-0"}}
+	nodes[1] = &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}
+
+	pods := make([]*corev1.Pod, 2)
+	pods[0] = newPod(0, namespace, true, 1, false)
+	pods[0].Spec.NodeName = nodes[0].Name
+	pods[1] = newPod(1, namespace, true, 1, false)
+	pods[1].Spec.NodeName = nodes[1].Name
+
+	service, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
+
+	testCases := []struct {
+		name            string
+		publishNotReady bool
+		existingNodes   []*corev1.Node
+		existingSlice   func() *discovery.EndpointSlice
+		expectedMetrics expectedMetrics
+		expectError     bool
+	}{{
+		name:            "Create and publishNotReady false",
+		publishNotReady: false,
+		existingNodes:   []*corev1.Node{nodes[0]},
+		expectedMetrics: expectedMetrics{
+			desiredSlices:        1,
+			actualSlices:         1,
+			desiredEndpoints:     1,
+			addedPerSync:         1,
+			removedPerSync:       0,
+			numCreated:           1,
+			numUpdated:           0,
+			numDeleted:           0,
+			slicesChangedPerSync: 1,
+		},
+		expectError: true,
+	}, {
+		name:            "Create and publishNotReady true",
+		publishNotReady: true,
+		existingNodes:   []*corev1.Node{nodes[0]},
+		expectedMetrics: expectedMetrics{
+			desiredSlices:        1,
+			actualSlices:         1,
+			desiredEndpoints:     2,
+			addedPerSync:         2,
+			removedPerSync:       0,
+			numCreated:           1,
+			numUpdated:           0,
+			numDeleted:           0,
+			slicesChangedPerSync: 1,
+		},
+		expectError: false,
+	}, {
+		name:            "Update and publishNotReady false",
+		publishNotReady: false,
+		existingNodes:   []*corev1.Node{nodes[0]},
+		existingSlice: func() *discovery.EndpointSlice {
+			slice := newEmptyEndpointSlice(1, namespace, endpointMeta, service)
+			slice.Endpoints = append(slice.Endpoints, podToEndpoint(pods[0], nodes[0], &service, discovery.AddressTypeIPv4))
+			slice.Endpoints = append(slice.Endpoints, podToEndpoint(pods[1], nodes[1], &service, discovery.AddressTypeIPv4))
+			return slice
+		},
+		expectedMetrics: expectedMetrics{
+			desiredSlices:        1,
+			actualSlices:         1,
+			desiredEndpoints:     1,
+			addedPerSync:         0,
+			removedPerSync:       1,
+			numCreated:           0,
+			numUpdated:           1,
+			numDeleted:           0,
+			slicesChangedPerSync: 1,
+		},
+		expectError: true,
+	}, {
+		name:            "Update and publishNotReady true and all nodes missing",
+		publishNotReady: true,
+		existingSlice: func() *discovery.EndpointSlice {
+			slice := newEmptyEndpointSlice(1, namespace, endpointMeta, service)
+			slice.Endpoints = append(slice.Endpoints, podToEndpoint(pods[0], nodes[0], &service, discovery.AddressTypeIPv4))
+			slice.Endpoints = append(slice.Endpoints, podToEndpoint(pods[1], nodes[1], &service, discovery.AddressTypeIPv4))
+			return slice
+		},
+		expectedMetrics: expectedMetrics{
+			desiredSlices:        1,
+			actualSlices:         1,
+			desiredEndpoints:     2,
+			addedPerSync:         0,
+			removedPerSync:       0,
+			numCreated:           0,
+			numUpdated:           0,
+			numDeleted:           0,
+			slicesChangedPerSync: 0,
+		},
+		expectError: false,
+	}, {
+		name:            "Update and publishNotReady true",
+		publishNotReady: true,
+		existingNodes:   []*corev1.Node{nodes[0]},
+		existingSlice: func() *discovery.EndpointSlice {
+			slice := newEmptyEndpointSlice(1, namespace, endpointMeta, service)
+			slice.Endpoints = append(slice.Endpoints, podToEndpoint(pods[0], nodes[0], &service, discovery.AddressTypeIPv4))
+			slice.Endpoints = append(slice.Endpoints, podToEndpoint(pods[1], nodes[1], &service, discovery.AddressTypeIPv4))
+			return slice
+		},
+		expectedMetrics: expectedMetrics{
+			desiredSlices:        1,
+			actualSlices:         1,
+			desiredEndpoints:     2,
+			addedPerSync:         0,
+			removedPerSync:       0,
+			numCreated:           0,
+			numUpdated:           0,
+			numDeleted:           0,
+			slicesChangedPerSync: 0,
+		},
+		expectError: false,
+	}, {
+		name:            "Update if publishNotReady false and no nodes are present",
+		publishNotReady: false,
+		existingNodes:   []*corev1.Node{},
+		existingSlice: func() *discovery.EndpointSlice {
+			slice := newEmptyEndpointSlice(1, namespace, endpointMeta, service)
+			slice.Endpoints = append(slice.Endpoints, podToEndpoint(pods[0], nodes[0], &service, discovery.AddressTypeIPv4))
+			slice.Endpoints = append(slice.Endpoints, podToEndpoint(pods[1], nodes[1], &service, discovery.AddressTypeIPv4))
+			return slice
+		},
+		expectedMetrics: expectedMetrics{
+			desiredSlices:    1,
+			actualSlices:     1,
+			desiredEndpoints: 0,
+			addedPerSync:     0,
+			removedPerSync:   2,
+			numCreated:       0,
+			// the slice is updated not deleted
+			numUpdated:           1,
+			numDeleted:           0,
+			slicesChangedPerSync: 1,
+		},
+		expectError: true,
+	},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			client := newClientset()
+			setupMetrics()
+			r := newReconciler(client, tc.existingNodes, defaultMaxEndpointsPerSlice)
+
+			svc := service.DeepCopy()
+			svc.Spec.PublishNotReadyAddresses = tc.publishNotReady
+			existingSlices := []*discovery.EndpointSlice{}
+			if tc.existingSlice != nil {
+				slice := tc.existingSlice()
+				existingSlices = append(existingSlices, slice)
+				_, createErr := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), slice, metav1.CreateOptions{})
+				if createErr != nil {
+					t.Errorf("Expected no error creating endpoint slice")
+				}
+			}
+			err := r.reconcile(svc, pods, existingSlices, time.Now())
+			if err == nil && tc.expectError {
+				t.Errorf("Expected error but no error received")
+			}
+			if err != nil && !tc.expectError {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			fetchedSlices := fetchEndpointSlices(t, client, namespace)
+			if len(fetchedSlices) != tc.expectedMetrics.actualSlices {
+				t.Fatalf("Actual slices %d doesn't match metric %d", len(fetchedSlices), tc.expectedMetrics.actualSlices)
+			}
+			expectMetrics(t, tc.expectedMetrics)
+
+		})
+	}
+}
+
 func TestReconcileTopology(t *testing.T) {
 	ns := "testing"
 	svc, endpointMeta := newServiceAndEndpointMeta("foo", ns)
@@ -1594,7 +1779,7 @@ func TestReconcileTopology(t *testing.T) {
 		expectedCrossZoneHints: 1,
 		expectedMetrics: expectedMetrics{
 			desiredSlices:    1,
-			actualSlices:     1,
+			actualSlices:     2,
 			desiredEndpoints: 9,
 			addedPerSync:     0,
 			removedPerSync:   0,
@@ -1617,7 +1802,7 @@ func TestReconcileTopology(t *testing.T) {
 		expectedCrossZoneHints: 0,
 		expectedMetrics: expectedMetrics{
 			desiredSlices:        1,
-			actualSlices:         1,
+			actualSlices:         2,
 			desiredEndpoints:     9,
 			addedPerSync:         0,
 			removedPerSync:       0,
@@ -1650,6 +1835,9 @@ func TestReconcileTopology(t *testing.T) {
 			cmc.Check(t)
 			expectMetrics(t, tc.expectedMetrics)
 			fetchedSlices := fetchEndpointSlices(t, client, ns)
+			if len(fetchedSlices) != tc.expectedMetrics.actualSlices {
+				t.Fatalf("Actual slices %d doesn't match metric %d", len(fetchedSlices), tc.expectedMetrics.actualSlices)
+			}
 
 			if tc.expectedHints == nil {
 				for _, slice := range fetchedSlices {
@@ -1864,7 +2052,7 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 
 	actualNumSlices, err := testutil.GetGaugeMetricValue(metrics.NumEndpointSlices.WithLabelValues())
 	handleErr(t, err, "numEndpointSlices")
-	if actualDesiredSlices != float64(em.desiredSlices) {
+	if actualNumSlices != float64(em.actualSlices) {
 		t.Errorf("Expected numEndpointSlices to be %d, got %v", em.actualSlices, actualNumSlices)
 	}
 

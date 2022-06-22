@@ -60,6 +60,23 @@ func TestNumEndpointsAndSlices(t *testing.T) {
 	expectNumEndpointsAndSlices(t, c, 4, 4, 160)
 }
 
+func TestPlaceHolderSlice(t *testing.T) {
+	c := NewCache(int32(100))
+
+	p80 := int32(80)
+	p443 := int32(443)
+
+	pmKey80443 := endpointutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}, {Port: &p443}})
+	pmKey80 := endpointutil.NewPortMapKey([]discovery.EndpointPort{{Port: &p80}})
+
+	sp := NewServicePortCache()
+	sp.Set(pmKey80, EfficiencyInfo{Endpoints: 0, Slices: 1})
+	sp.Set(pmKey80443, EfficiencyInfo{Endpoints: 0, Slices: 1})
+
+	c.UpdateServicePortCache(types.NamespacedName{Namespace: "ns1", Name: "svc1"}, sp)
+	expectNumEndpointsAndSlices(t, c, 1, 2, 0)
+}
+
 func expectNumEndpointsAndSlices(t *testing.T, c *Cache, desired int, actual int, numEndpoints int) {
 	t.Helper()
 	if c.numSlicesDesired != desired {
