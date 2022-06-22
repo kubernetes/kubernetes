@@ -38,13 +38,13 @@ var joinCommandTemplate = template.Must(template.New("join").Parse(`` +
 ))
 
 // GetJoinWorkerCommand returns the kubeadm join command for a given token and
-// and Kubernetes cluster (the current cluster in the kubeconfig file)
+//  Kubernetes cluster (the current cluster in the kubeconfig file)
 func GetJoinWorkerCommand(kubeConfigFile, token string, skipTokenPrint bool) (string, error) {
 	return getJoinCommand(kubeConfigFile, token, "", false, skipTokenPrint, false)
 }
 
 // GetJoinControlPlaneCommand returns the kubeadm join command for a given token and
-// and Kubernetes cluster (the current cluster in the kubeconfig file)
+//  Kubernetes cluster (the current cluster in the kubeconfig file)
 func GetJoinControlPlaneCommand(kubeConfigFile, token, key string, skipTokenPrint, skipCertificateKeyPrint bool) (string, error) {
 	return getJoinCommand(kubeConfigFile, token, key, true, skipTokenPrint, skipCertificateKeyPrint)
 }
