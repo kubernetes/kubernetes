@@ -134,6 +134,15 @@ func (rc *reconciler) syncStates() {
 	rc.attacherDetacher.VerifyVolumesAreAttached(volumesPerNode, rc.actualStateOfWorld)
 }
 
+// nodeIsHealthy returns true if the node looks healthy.
+func (rc *reconciler) nodeIsHealthy(nodeName types.NodeName) (bool, error) {
+	node, err := rc.nodeLister.Get(string(nodeName))
+	if err != nil {
+		return false, err
+	}
+	return nodeutil.IsNodeReady(node), nil
+}
+
 func (rc *reconciler) reconcile() {
 	// Detaches are triggered before attaches so that volumes referenced by
 	// pods that are rescheduled to a different node are detached first.
@@ -185,9 +194,18 @@ func (rc *reconciler) reconcile() {
 			}
 			// Check whether timeout has reached the maximum waiting time
 			timeout := elapsedTime > rc.maxWaitForUnmountDuration
-			// Check whether volume is still mounted. Skip detach if it is still mounted unless timeout
-			if attachedVolume.MountedByNode && !timeout {
-				klog.V(5).Infof(attachedVolume.GenerateMsgDetailed("Cannot detach volume because it is still mounted", ""))
+
+			isHealthy, err := rc.nodeIsHealthy(attachedVolume.NodeName)
+			if err != nil {
+				klog.Errorf("failed to get health of node %s: %s", attachedVolume.NodeName, err.Error())
+			}
+
+			// Force detach volumes from unhealthy nodes after maxWaitForUnmountDuration.
+			forceDetach := !isHealthy && timeout
+
+			// Check whether volume is still mounted. Skip detach if it is still mounted unless force detach timeout
+			if attachedVolume.MountedByNode && !forceDetach {
+				klog.V(5).InfoS("Cannot detach volume because it is still mounted", "volume", attachedVolume)
 				continue
 			}
 
