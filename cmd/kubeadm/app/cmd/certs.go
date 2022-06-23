@@ -257,6 +257,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 		}(handler)
 		// install the implementation into the command
 		cmd.RunE = func(*cobra.Command, []string) error { return renewalFunc() }
+		cmd.Args = cobra.NoArgs
 		cmdList = append(cmdList, cmd)
 	}
 
