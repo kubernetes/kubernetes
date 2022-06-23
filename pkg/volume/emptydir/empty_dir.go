@@ -445,31 +445,31 @@ func (ed *emptyDir) setupDir(dir string) error {
 		return err
 	}
 
-	// stat the directory to read permission bits
-	fileinfo, err := os.Lstat(dir)
+	// read the permission bits
+	mode, err := volumeutil.GetFileMode(dir)
 	if err != nil {
 		return err
 	}
 
-	if fileinfo.Mode().Perm() != perm.Perm() {
+	if mode != perm.Perm() {
 		// If the permissions on the created directory are wrong, the
 		// kubelet is probably running with a umask set.  In order to
 		// avoid clearing the umask for the entire process or locking
 		// the thread, clearing the umask, creating the dir, restoring
 		// the umask, and unlocking the thread, we do a chmod to set
 		// the specific bits we need.
-		err := os.Chmod(dir, perm)
+		err := volumeutil.Chmod(dir, perm)
 		if err != nil {
 			return err
 		}
 
-		fileinfo, err = os.Lstat(dir)
+		mode, err = volumeutil.GetFileMode(dir)
 		if err != nil {
 			return err
 		}
 
-		if fileinfo.Mode().Perm() != perm.Perm() {
-			klog.Errorf("Expected directory %q permissions to be: %s; got: %s", dir, perm.Perm(), fileinfo.Mode().Perm())
+		if mode != perm.Perm() {
+			klog.Errorf("Expected directory %q permissions to be: %s; got: %s", dir, perm.Perm(), mode)
 		}
 	}
 

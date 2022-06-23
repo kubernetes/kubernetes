@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -175,9 +176,9 @@ func TestDownwardAPI(t *testing.T) {
 		{
 			name:  "test_item_mode",
 			files: map[string]string{"name_file_name": "metadata.name"},
-			modes: map[string]int32{"name_file_name": 0400},
+			modes: map[string]int32{"name_file_name": 0600},
 			steps: []testStep{
-				verifyMode{stepName{"name_file_name"}, 0400},
+				verifyMode{stepName{"name_file_name"}, 0600},
 			},
 		},
 	}
@@ -350,13 +351,21 @@ type verifyMode struct {
 }
 
 func (step verifyMode) run(test *downwardAPITest) {
-	fileInfo, err := os.Stat(filepath.Join(test.volumePath, step.name))
+	p := filepath.Join(test.volumePath, step.name)
+
+	// For the Windows case, we should evaluate the file mode of the target file, rather
+	// that the symlink's.
+	p, err := filepath.EvalSymlinks(p)
 	if err != nil {
 		test.t.Errorf(err.Error())
 		return
 	}
 
-	actualMode := fileInfo.Mode()
+	actualMode, err := util.GetFileMode(p)
+	if err != nil {
+		test.t.Errorf(err.Error())
+		return
+	}
 	expectedMode := os.FileMode(step.expectedMode)
 	if actualMode != expectedMode {
 		test.t.Errorf("Found mode `%v` expected %v", actualMode, expectedMode)
