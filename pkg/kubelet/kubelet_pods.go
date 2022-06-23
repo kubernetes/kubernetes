@@ -112,7 +112,7 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 	var devices []kubecontainer.DeviceInfo
 	for _, device := range container.VolumeDevices {
 		// check path is absolute
-		if !filepath.IsAbs(device.DevicePath) {
+		if !isAbs(device.DevicePath) {
 			return nil, fmt.Errorf("error DevicePath `%s` must be an absolute path", device.DevicePath)
 		}
 		vol, ok := podVolumes[device.Name]
@@ -193,7 +193,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		}
 
 		if subPath != "" {
-			if filepath.IsAbs(subPath) {
+			if isAbs(subPath) {
 				return nil, cleanupAction, fmt.Errorf("error SubPath `%s` must not be an absolute path", subPath)
 			}
 
@@ -2067,4 +2067,14 @@ func (kl *Kubelet) hasHostMountPVC(pod *v1.Pod) bool {
 		}
 	}
 	return false
+}
+
+func isAbs(path string) bool {
+	if filepath.IsAbs(path) {
+		return true
+	}
+
+	// on Windows, filepath.IsAbs will not return True for paths prefixed with a slash, even
+	// though they can be used as absolute paths.
+	return runtime.GOOS == "windows" && len(path) > 0 && (path[0] == '\\' || path[0] == '/')
 }

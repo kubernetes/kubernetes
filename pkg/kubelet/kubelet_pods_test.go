@@ -23,7 +23,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,10 +57,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func TestMakeMounts(t *testing.T) {
@@ -66,6 +68,17 @@ func TestMakeMounts(t *testing.T) {
 	propagationHostToContainer := v1.MountPropagationHostToContainer
 	propagationBidirectional := v1.MountPropagationBidirectional
 	propagationNone := v1.MountPropagationNone
+
+	pathPrefix := ""
+	expectedPropagationHostToContainer := runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER
+	expectedPropagationBidirectional := runtimeapi.MountPropagation_PROPAGATION_BIDIRECTIONAL
+	if goruntime.GOOS == "windows" {
+		pathPrefix = "c:"
+		// Windows containers doesn't support mount propagation, use private for it.
+		// Refer https://docs.docker.com/storage/bind-mounts/#configure-bind-propagation.
+		expectedPropagationHostToContainer = runtimeapi.MountPropagation_PROPAGATION_PRIVATE
+		expectedPropagationBidirectional = runtimeapi.MountPropagation_PROPAGATION_PRIVATE
+	}
 
 	testCases := map[string]struct {
 		container      v1.Container
@@ -84,7 +97,7 @@ func TestMakeMounts(t *testing.T) {
 				Name: "container1",
 				VolumeMounts: []v1.VolumeMount{
 					{
-						MountPath:        "/etc/hosts",
+						MountPath:        etcHostsPath,
 						Name:             "disk",
 						ReadOnly:         false,
 						MountPropagation: &propagationHostToContainer,
@@ -110,32 +123,32 @@ func TestMakeMounts(t *testing.T) {
 			expectedMounts: []kubecontainer.Mount{
 				{
 					Name:           "disk",
-					ContainerPath:  "/etc/hosts",
-					HostPath:       "/mnt/disk",
+					ContainerPath:  etcHostsPath,
+					HostPath:       pathPrefix + "/mnt/disk",
 					ReadOnly:       false,
 					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+					Propagation:    expectedPropagationHostToContainer,
 				},
 				{
 					Name:           "disk",
-					ContainerPath:  "/mnt/path3",
-					HostPath:       "/mnt/disk",
+					ContainerPath:  pathPrefix + "/mnt/path3",
+					HostPath:       pathPrefix + "/mnt/disk",
 					ReadOnly:       true,
 					SELinuxRelabel: false,
 					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
 				},
 				{
 					Name:           "disk4",
-					ContainerPath:  "/mnt/path4",
-					HostPath:       "/mnt/host",
+					ContainerPath:  pathPrefix + "/mnt/path4",
+					HostPath:       pathPrefix + "/mnt/host",
 					ReadOnly:       false,
 					SELinuxRelabel: false,
 					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
 				},
 				{
 					Name:           "disk5",
-					ContainerPath:  "/mnt/path5",
-					HostPath:       "/var/lib/kubelet/podID/volumes/empty/disk5",
+					ContainerPath:  pathPrefix + "/mnt/path5",
+					HostPath:       pathPrefix + "/var/lib/kubelet/podID/volumes/empty/disk5",
 					ReadOnly:       false,
 					SELinuxRelabel: false,
 					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
@@ -153,7 +166,7 @@ func TestMakeMounts(t *testing.T) {
 				Name: "container1",
 				VolumeMounts: []v1.VolumeMount{
 					{
-						MountPath:        "/etc/hosts",
+						MountPath:        etcHostsPath,
 						Name:             "disk",
 						ReadOnly:         false,
 						MountPropagation: &propagationBidirectional,
@@ -177,24 +190,24 @@ func TestMakeMounts(t *testing.T) {
 			expectedMounts: []kubecontainer.Mount{
 				{
 					Name:           "disk",
-					ContainerPath:  "/etc/hosts",
-					HostPath:       "/mnt/disk",
+					ContainerPath:  etcHostsPath,
+					HostPath:       pathPrefix + "/mnt/disk",
 					ReadOnly:       false,
 					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_BIDIRECTIONAL,
+					Propagation:    expectedPropagationBidirectional,
 				},
 				{
 					Name:           "disk",
-					ContainerPath:  "/mnt/path3",
-					HostPath:       "/mnt/disk",
+					ContainerPath:  pathPrefix + "/mnt/path3",
+					HostPath:       pathPrefix + "/mnt/disk",
 					ReadOnly:       true,
 					SELinuxRelabel: false,
-					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+					Propagation:    expectedPropagationHostToContainer,
 				},
 				{
 					Name:           "disk4",
-					ContainerPath:  "/mnt/path4",
-					HostPath:       "/mnt/host",
+					ContainerPath:  pathPrefix + "/mnt/path4",
+					HostPath:       pathPrefix + "/mnt/host",
 					ReadOnly:       false,
 					SELinuxRelabel: false,
 					Propagation:    runtimeapi.MountPropagation_PROPAGATION_PRIVATE,
@@ -340,22 +353,22 @@ func TestMakeBlockVolumes(t *testing.T) {
 			expectedDevices: []kubecontainer.DeviceInfo{
 				{
 					PathInContainer: "/dev/sda",
-					PathOnHost:      "/dev/sda",
+					PathOnHost:      strings.Replace("/dev/sda", "/", string(os.PathSeparator), -1),
 					Permissions:     "mrw",
 				},
 				{
 					PathInContainer: "/dev/xvda",
-					PathOnHost:      "/dev/disk/by-path/diskPath",
+					PathOnHost:      strings.Replace("/dev/disk/by-path/diskPath", "/", string(os.PathSeparator), -1),
 					Permissions:     "r",
 				},
 				{
 					PathInContainer: "/dev/xvdb",
-					PathOnHost:      "/dev/disk/by-id/diskUuid",
+					PathOnHost:      strings.Replace("/dev/disk/by-id/diskUuid", "/", string(os.PathSeparator), -1),
 					Permissions:     "mrw",
 				},
 				{
 					PathInContainer: "/mnt/rawdisk",
-					PathOnHost:      "/var/lib/rawdisk",
+					PathOnHost:      strings.Replace("/var/lib/rawdisk", "/", string(os.PathSeparator), -1),
 					Permissions:     "r",
 				},
 			},
