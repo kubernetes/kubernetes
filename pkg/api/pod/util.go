@@ -810,7 +810,7 @@ func AppArmorAnnotationForField(field *api.AppArmorProfile) string {
 func AppArmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
 	// If only AppArmor annotations are specified, copy the values into the
 	// corresponding fields. This ensures that existing applications continue
-	// to enforce AppARmor, and prevents the kubelet from needing to resolve
+	// to enforce AppArmor, and prevents the kubelet from needing to resolve
 	// annotations & fields.
 	if annotation == v1.AppArmorBetaProfileNameUnconfined {
 		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined}
