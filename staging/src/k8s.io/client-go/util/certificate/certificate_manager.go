@@ -126,7 +126,7 @@ type Config struct {
 	// allows one to setup monitoring and alerting of unexpected rotation
 	// behavior and track trends in rotation frequency.
 	CertificateRotation Histogram
-	// CertifcateRenewFailure will record a metric that keeps track of
+	// CertificateRenewFailure will record a metric that keeps track of
 	// certificate renewal failures.
 	CertificateRenewFailure Counter
 	// Name is an optional string that will be used when writing log output
