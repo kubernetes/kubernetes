@@ -66,6 +66,12 @@ type CanIOptions struct {
 	WarningPrinter *printers.WarningPrinter
 }
 
+type NonStandardResource struct {
+	groupResource      schema.GroupResource
+	ResourceSingular   string
+	acceptsSubResource bool
+}
+
 var (
 	canILong = templates.LongDesc(`
 		Check whether an action is allowed.
@@ -105,8 +111,38 @@ var (
 
 	resourceVerbs       = sets.NewString("get", "list", "watch", "create", "update", "patch", "delete", "deletecollection", "use", "bind", "impersonate", "*")
 	nonResourceURLVerbs = sets.NewString("get", "put", "post", "head", "options", "delete", "patch", "*")
-	// holds all the server-supported resources that cannot be discovered by clients. i.e. users and groups for the impersonate verb
-	nonStandardResourceNames = sets.NewString("users", "groups")
+	// holds all the server-supported resources that cannot be discovered by clients. e.g. users and groups for the impersonate verb
+	nonStandardResources = []NonStandardResource{
+		{
+			groupResource: schema.GroupResource{
+				Group:    "",
+				Resource: "users",
+			},
+			ResourceSingular: "user",
+		},
+		{
+			groupResource: schema.GroupResource{
+				Group:    "",
+				Resource: "groups",
+			},
+			ResourceSingular: "group",
+		},
+		{
+			groupResource: schema.GroupResource{
+				Group:    "authentication.k8s.io",
+				Resource: "uids",
+			},
+			ResourceSingular: "uid",
+		},
+		{
+			groupResource: schema.GroupResource{
+				Group:    "authentication.k8s.io",
+				Resource: "userextras",
+			},
+			ResourceSingular:   "userextra",
+			acceptsSubResource: true,
+		},
+	}
 )
 
 // NewCmdCanI returns an initialized Command for 'auth can-i' sub command
@@ -176,7 +212,12 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 			if err != nil {
 				return err
 			}
-			o.Resource = o.resourceFor(restMapper, resourceTokens[0])
+			discoveryClient, err := f.ToDiscoveryClient()
+			if err != nil {
+				return err
+			}
+			o.DiscoveryClient = discoveryClient
+			o.Resource = o.resourceFor(restMapper, resourceTokens[0], o.Subresource)
 			if len(resourceTokens) > 1 {
 				o.ResourceName = resourceTokens[1]
 			}
@@ -193,7 +234,13 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 		return err
 	}
 	o.AuthClient = client.AuthorizationV1()
-	o.DiscoveryClient = client.Discovery()
+	if o.DiscoveryClient == nil {
+		discoveryClient, err := f.ToDiscoveryClient()
+		if err != nil {
+			return err
+		}
+		o.DiscoveryClient = discoveryClient
+	}
 	o.Namespace = ""
 	if !o.AllNamespaces {
 		o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
@@ -309,28 +356,64 @@ func (o *CanIOptions) RunAccessCheck() (bool, error) {
 	return response.Status.Allowed, nil
 }
 
-func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string) schema.GroupVersionResource {
-	if resourceArg == "*" {
-		return schema.GroupVersionResource{Resource: resourceArg}
+func (o *CanIOptions) resourceFor(mapper meta.RESTMapper, resourceArg string, subresourceArg string) schema.GroupVersionResource {
+	gvrNonStandardResourceSupplier := func(resource, subresource string) (schema.GroupVersionResource, error) {
+		if resource == "*" {
+			return schema.GroupVersionResource{Resource: resource}, nil
+		}
+
+		_, groupResource := schema.ParseResourceArg(strings.ToLower(resource))
+
+		for _, nonStandardResource := range nonStandardResources {
+			if (nonStandardResource.groupResource.Resource == groupResource.Resource || nonStandardResource.ResourceSingular == groupResource.Resource) &&
+				(nonStandardResource.groupResource.Group == groupResource.Group || groupResource.Group == "") {
+				var retErr error
+				if len(subresource) > 0 && !nonStandardResource.acceptsSubResource {
+					retErr = fmt.Errorf("the server doesn't have a subresource %s\n", groupResourceDescription(schema.GroupResource{
+						Group:    nonStandardResource.groupResource.Group,
+						Resource: fmt.Sprintf("%v/%v", nonStandardResource.groupResource.Resource, subresource),
+					}))
+				}
+				return schema.GroupVersionResource{Group: nonStandardResource.groupResource.Group, Resource: nonStandardResource.groupResource.Resource}, retErr
+			}
+		}
+		return schema.GroupVersionResource{}, nil
 	}
 
-	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(strings.ToLower(resourceArg))
-	gvr := schema.GroupVersionResource{}
-	if fullySpecifiedGVR != nil {
-		gvr, _ = mapper.ResourceFor(*fullySpecifiedGVR)
-	}
-	if gvr.Empty() {
-		var err error
-		gvr, err = mapper.ResourceFor(groupResource.WithVersion(""))
-		if err != nil {
-			if !nonStandardResourceNames.Has(groupResource.String()) {
-				if len(groupResource.Group) == 0 {
-					o.WarningPrinter.Print(fmt.Sprintf("the server doesn't have a resource type '%s'\n", groupResource.Resource))
-				} else {
-					o.WarningPrinter.Print(fmt.Sprintf("the server doesn't have a resource type '%s' in group '%s'\n", groupResource.Resource, groupResource.Group))
-				}
+	gvrSupplier := func(mapper meta.RESTMapper, resource string) (schema.GroupVersionResource, error) {
+		fullySpecifiedGVR, groupResource := schema.ParseResourceArg(strings.ToLower(resource))
+
+		if fullySpecifiedGVR != nil {
+			if gvr, err := mapper.ResourceFor(*fullySpecifiedGVR); err == nil && !gvr.Empty() {
+				return gvr, nil
 			}
-			return schema.GroupVersionResource{Resource: resourceArg}
+		}
+		if gvr, err := mapper.ResourceFor(groupResource.WithVersion("")); err == nil && !gvr.Empty() {
+			return gvr, nil
+		}
+
+		return schema.GroupVersionResource{Group: groupResource.Group, Resource: groupResource.Resource},
+			fmt.Errorf("the server doesn't have a resource type %s\n", groupResourceDescription(groupResource))
+	}
+
+	// try to match a non-standard resource first
+	gvr, err := gvrNonStandardResourceSupplier(resourceArg, subresourceArg)
+	if err != nil {
+		o.WarningPrinter.Print(err.Error())
+	}
+	if !gvr.Empty() {
+		return gvr
+	}
+
+	// try to match as a standard resource
+	gvr, err = gvrSupplier(mapper, resourceArg)
+	if err != nil {
+		o.WarningPrinter.Print(err.Error())
+	} else if len(subresourceArg) > 0 {
+		// resolve subresource if gvr was resolved correctly
+		err := hasSubresource(o.DiscoveryClient, gvr, subresourceArg)
+		if err != nil {
+			o.WarningPrinter.Print(err.Error())
 		}
 	}
 
@@ -423,6 +506,40 @@ func isNamespaced(gvr schema.GroupVersionResource, discoveryClient discovery.Dis
 	}
 
 	return false, fmt.Errorf("the server doesn't have a resource type '%s' in group '%s'", gvr.Resource, gvr.Group)
+}
+
+func hasSubresource(discoveryClient discovery.DiscoveryInterface, gvr schema.GroupVersionResource, subresource string) error {
+	groupVersion := gvr.GroupVersion().String()
+	resourceAndSubresource := fmt.Sprintf("%v/%v", gvr.Resource, subresource)
+
+	var apiResourceList *metav1.APIResourceList
+	if len(groupVersion) > 0 {
+		apiResourceList, _ = discoveryClient.ServerResourcesForGroupVersion(groupVersion)
+	}
+
+	if apiResourceList != nil {
+		for _, apiResource := range apiResourceList.APIResources {
+			// Group and Version can be empty for subresources
+			if apiResource.Name == resourceAndSubresource &&
+				(apiResource.Group == "" || apiResource.Group == gvr.Group) &&
+				(apiResource.Version == "" || apiResource.Version == gvr.Version) {
+				return nil
+			}
+		}
+	}
+
+	return fmt.Errorf("the server doesn't have a subresource %s\n", groupResourceDescription(schema.GroupResource{
+		Group:    gvr.Group,
+		Resource: resourceAndSubresource,
+	}))
+}
+
+func groupResourceDescription(groupResource schema.GroupResource) string {
+	if len(groupResource.Group) == 0 {
+		return fmt.Sprintf("'%s'", groupResource.Resource)
+	}
+	return fmt.Sprintf("'%s' in group '%s'", groupResource.Resource, groupResource.Group)
+
 }
 
 func isKnownResourceVerb(s string) bool {

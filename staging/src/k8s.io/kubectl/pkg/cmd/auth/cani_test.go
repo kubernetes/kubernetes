@@ -233,9 +233,10 @@ func TestRunAccessList(t *testing.T) {
 
 func TestRunResourceFor(t *testing.T) {
 	tests := []struct {
-		name        string
-		o           *CanIOptions
-		resourceArg string
+		name           string
+		o              *CanIOptions
+		resourceArg    string
+		subResourceArg string
 
 		expectGVR      schema.GroupVersionResource
 		expectedErrOut string
@@ -300,7 +301,7 @@ func TestRunResourceFor(t *testing.T) {
 				t.Errorf("got unexpected error when do tf.ToRESTMapper(): %v", err)
 				return
 			}
-			gvr := test.o.resourceFor(restMapper, test.resourceArg)
+			gvr := test.o.resourceFor(restMapper, test.resourceArg, test.subResourceArg)
 			if gvr != test.expectGVR {
 				t.Errorf("expected %v\n but got %v\n", test.expectGVR, gvr)
 			}
