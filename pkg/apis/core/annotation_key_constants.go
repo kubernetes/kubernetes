@@ -34,7 +34,7 @@ const (
 	// in the Annotations of a Node.
 	TaintsAnnotationKey string = "scheduler.alpha.kubernetes.io/taints"
 
-	// AppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
+	// AppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's AppArmor profile.
 	AppArmorBetaContainerAnnotationKeyPrefix string = "container.apparmor.security.beta.kubernetes.io/"
 
 	// AppArmorBetaDefaultProfileAnnotationKey is the annotation key specifying the default AppArmor profile.

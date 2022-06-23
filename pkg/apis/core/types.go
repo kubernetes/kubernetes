@@ -3151,13 +3151,13 @@ type PodSecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SeccompProfile *SeccompProfile
-	// The apparmor options to use by the containers in this pod.
+	// The AppArmor options to use by the containers in this pod.
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	AppArmorProfile *AppArmorProfile
 }
 
-// AppArmorProfile defines a pod/container's apparmor profile settings.
+// AppArmorProfile defines a pod/container's AppArmor profile settings.
 // Only one profile source may be set.
 // +union
 type AppArmorProfile struct {
@@ -3174,11 +3174,11 @@ type AppArmorProfile struct {
 type AppArmorProfileType string
 
 const (
-	// AppArmorProfileTypeUnconfined is when no apparmor profile is applied (A.K.A. unconfined).
+	// AppArmorProfileTypeUnconfined is when no AppArmor profile is applied (also referred to as unconfined).
 	AppArmorProfileTypeUnconfined AppArmorProfileType = "Unconfined"
-	// AppArmorProfileTypeRuntimeDefault represents the default container runtime apparmor profile.
+	// AppArmorProfileTypeRuntimeDefault represents the default container runtime AppArmor profile.
 	AppArmorProfileTypeRuntimeDefault AppArmorProfileType = "RuntimeDefault"
-	// AppArmorProfileTypeLocalhost represents custom made profiles stored on the node's disk.
+	// AppArmorProfileTypeLocalhost represents custom made profiles found in the node's filesystem tree.
 	AppArmorProfileTypeLocalhost AppArmorProfileType = "Localhost"
 )
 
@@ -5535,10 +5535,10 @@ type SecurityContext struct {
 	// Note that this field cannot be set when spec.os.name is windows.
 	// +optional
 	SeccompProfile *SeccompProfile
-	// The apparmor options to use by this container. If apparmor options are
+	// The AppArmor options to use for this container. If AppArmor options are
 	// provided at both the pod & container level, the container options
 	// override the pod options.
-	// Note that this field cannot be set when spec.os.name is windows.
+	// Note that this field cannot be set when spec.os.name is "windows".
 	// +optional
 	AppArmorProfile *AppArmorProfile
 }

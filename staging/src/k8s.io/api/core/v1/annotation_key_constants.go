@@ -54,7 +54,7 @@ const (
 	// SeccompLocalhostProfileNamePrefix is the prefix for specifying profiles loaded from the node's disk.
 	SeccompLocalhostProfileNamePrefix = "localhost/"
 
-	// AppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's apparmor profile.
+	// AppArmorBetaContainerAnnotationKeyPrefix is the prefix to an annotation key specifying a container's AppArmor profile.
 	// Deprecated: set a container security context `appArmorProfile` field.
 	AppArmorBetaContainerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
 

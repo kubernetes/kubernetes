@@ -4043,13 +4043,13 @@ func validateAppArmorProfileField(ap *core.AppArmorProfile, fldPath *field.Path)
 
 	if ap.Type == core.AppArmorProfileTypeLocalhost {
 		if ap.LocalhostProfile == nil {
-			allErrs = append(allErrs, field.Required(fldPath.Child("localhostProfile"), "must be set when apparmor type is Localhost"))
+			allErrs = append(allErrs, field.Required(fldPath.Child("localhostProfile"), "must be set when AppArmor type is Localhost"))
 		} else {
 			allErrs = append(allErrs, validateLocalDescendingPath(*ap.LocalhostProfile, fldPath.Child("localhostProfile"))...)
 		}
 	} else {
 		if ap.LocalhostProfile != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("localhostProfile"), ap, "can only be set when apparmor type is Localhost"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("localhostProfile"), ap, "can only be set when AppArmor type is Localhost"))
 		}
 	}
 
@@ -4301,7 +4301,7 @@ func validateSeccompAnnotationsAndFieldsMatch(annotationValue string, seccompFie
 	return nil
 }
 
-// ValidateAppArmorAnnotationsAndFields iterates through all containers and ensure that when both appArmorProfile and apparmor annotations exist they match.
+// ValidateAppArmorAnnotationsAndFields iterates through all containers and ensure that when both appArmorProfile and AppArmor annotations exist they match.
 func validateAppArmorAnnotationsAndFields(objectMeta metav1.ObjectMeta, podSpec *core.PodSpec, specPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
