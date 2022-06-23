@@ -779,7 +779,7 @@ func growSlice(v reflect.Value, maxCapacity int, sizes ...int) {
 		return
 	}
 	if v.Len() > 0 {
-		extra := reflect.MakeSlice(v.Type(), 0, max)
+		extra := reflect.MakeSlice(v.Type(), v.Len(), max)
 		reflect.Copy(extra, v)
 		v.Set(extra)
 	} else {
