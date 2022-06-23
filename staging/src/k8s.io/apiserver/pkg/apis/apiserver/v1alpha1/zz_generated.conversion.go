@@ -24,6 +24,7 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	apiserver "k8s.io/apiserver/pkg/apis/apiserver"
@@ -337,6 +338,7 @@ func Convert_apiserver_TracingConfiguration_To_v1alpha1_TracingConfiguration(in 
 func autoConvert_v1alpha1_Transport_To_apiserver_Transport(in *Transport, out *apiserver.Transport, s conversion.Scope) error {
 	out.TCP = (*apiserver.TCPTransport)(unsafe.Pointer(in.TCP))
 	out.UDS = (*apiserver.UDSTransport)(unsafe.Pointer(in.UDS))
+	out.MaxTunnelLifetime = (*v1.Duration)(unsafe.Pointer(in.MaxTunnelLifetime))
 	return nil
 }
 
@@ -348,6 +350,7 @@ func Convert_v1alpha1_Transport_To_apiserver_Transport(in *Transport, out *apise
 func autoConvert_apiserver_Transport_To_v1alpha1_Transport(in *apiserver.Transport, out *Transport, s conversion.Scope) error {
 	out.TCP = (*TCPTransport)(unsafe.Pointer(in.TCP))
 	out.UDS = (*UDSTransport)(unsafe.Pointer(in.UDS))
+	out.MaxTunnelLifetime = (*v1.Duration)(unsafe.Pointer(in.MaxTunnelLifetime))
 	return nil
 }
 

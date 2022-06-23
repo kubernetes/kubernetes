@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"reflect"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 )
@@ -214,6 +216,94 @@ egressSelections:
 			expectedError: nil,
 		},
 		{
+			name:       "grpc-uds",
+			createFile: true,
+			contents: `
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: "cluster"
+  connection:
+    proxyProtocol: "GRPC"
+    transport:
+      uds:
+        udsName: "/etc/srv/kubernetes/konnectivity/konnectivity-server.socket"
+`,
+			expectedResult: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "cluster",
+						Connection: apiserver.Connection{
+							ProxyProtocol: "GRPC",
+							Transport: &apiserver.Transport{
+								UDS: &apiserver.UDSTransport{
+									UDSName: "/etc/srv/kubernetes/konnectivity/konnectivity-server.socket",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "grpc-uds-maxlifetime",
+			createFile: true,
+			contents: `
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: "cluster"
+  connection:
+    proxyProtocol: "GRPC"
+    transport:
+      uds:
+        udsName: "/etc/srv/kubernetes/konnectivity/konnectivity-server.socket"
+      maxTunnelLifetime: "10h"
+`,
+			expectedResult: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "cluster",
+						Connection: apiserver.Connection{
+							ProxyProtocol: "GRPC",
+							Transport: &apiserver.Transport{
+								UDS: &apiserver.UDSTransport{
+									UDSName: "/etc/srv/kubernetes/konnectivity/konnectivity-server.socket",
+								},
+								MaxTunnelLifetime: &metav1.Duration{Duration: 10 * time.Hour},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:       "grpc-uds-invalid-maxlifetime",
+			createFile: true,
+			contents: `
+		apiVersion: apiserver.k8s.io/v1beta1
+		kind: EgressSelectorConfiguration
+		egressSelections:
+		- name: "cluster"
+		  connection:
+		    proxyProtocol: "GRPC"
+		    transport:
+		      uds:
+		        udsName: "/etc/srv/kubernetes/konnectivity/konnectivity-server.socket"
+		      maxTunnelLifetime: "not a duration"
+		`,
+			expectedResult: nil,
+			expectedError:  strptr("error converting"),
+		},
+		{
 			name:       "wrong_type",
 			createFile: true,
 			contents: `
@@ -294,11 +384,11 @@ spec:
 			if err != nil && tc.expectedError == nil {
 				t.Errorf("unexpected error calling ReadEgressSelectorConfiguration got: %#v", err)
 			}
-			if err != nil && tc.expectedError != nil && err.Error() != *tc.expectedError {
-				t.Errorf("calling ReadEgressSelectorConfiguration expected error: %s, got %#v", *tc.expectedError, err)
+			if err != nil && tc.expectedError != nil && !strings.Contains(err.Error(), *tc.expectedError) {
+				t.Errorf("calling ReadEgressSelectorConfiguration expected error contains: %s, got %#v", *tc.expectedError, err)
 			}
-			if !reflect.DeepEqual(config, tc.expectedResult) {
-				t.Errorf("problem with configuration returned from ReadEgressSelectorConfiguration expected: %#v, got: %#v", tc.expectedResult, config)
+			if d := cmp.Diff(tc.expectedResult, config); d != "" {
+				t.Fatalf("ReadEgressSelectorConfiguration (-want +got):\n%s", d)
 			}
 		})
 	}

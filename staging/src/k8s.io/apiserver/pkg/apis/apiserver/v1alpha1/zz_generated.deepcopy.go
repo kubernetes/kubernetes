@@ -22,6 +22,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -231,6 +232,11 @@ func (in *Transport) DeepCopyInto(out *Transport) {
 	if in.UDS != nil {
 		in, out := &in.UDS, &out.UDS
 		*out = new(UDSTransport)
+		**out = **in
+	}
+	if in.MaxTunnelLifetime != nil {
+		in, out := &in.MaxTunnelLifetime, &out.MaxTunnelLifetime
+		*out = new(v1.Duration)
 		**out = **in
 	}
 	return

@@ -32,6 +32,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	egressmetrics "k8s.io/apiserver/pkg/server/egressselector/metrics"
@@ -195,27 +196,30 @@ func (u *udsHTTPConnectConnector) connect(ctx context.Context) (proxier, error) 
 }
 
 type udsGRPCConnector struct {
-	udsName string
+	udsName           string
+	maxTunnelLifetime *v1.Duration
 }
 
 // connect establishes a connection to a proxy over gRPC.
 // TODO At the moment, it does not use the provided context.
-func (u *udsGRPCConnector) connect(_ context.Context) (proxier, error) {
+func (u *udsGRPCConnector) connect(connectCtx context.Context) (proxier, error) {
 	udsName := u.udsName
-	dialOption := grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+	dialOption := grpc.WithContextDialer(func(dialCtx context.Context, addr string) (net.Conn, error) {
 		var d net.Dialer
-		c, err := d.DialContext(ctx, "unix", udsName)
+		c, err := d.DialContext(dialCtx, "unix", udsName)
 		if err != nil {
 			klog.Errorf("failed to create connection to uds name %s, error: %v", udsName, err)
 		}
 		return c, err
 	})
 
-	// CreateSingleUseGrpcTunnel() unfortunately couples dial and connection contexts. Because of that,
-	// we cannot use ctx just for dialing and control the connection lifetime separately.
-	// See https://github.com/kubernetes-sigs/apiserver-network-proxy/issues/357.
-	tunnelCtx := context.TODO()
-	tunnel, err := client.CreateSingleUseGrpcTunnel(tunnelCtx, udsName, dialOption,
+	tunnelCtx := context.Background()
+	if u.maxTunnelLifetime != nil {
+		// A single use tunnel is normally closed when the underlying
+		// connection is closed. This option protects against leaks.
+		tunnelCtx, _ = context.WithTimeout(tunnelCtx, u.maxTunnelLifetime.Duration)
+	}
+	tunnel, err := client.CreateSingleUseGrpcTunnelWithContext(connectCtx, tunnelCtx, udsName, dialOption,
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
@@ -333,7 +337,8 @@ func connectionToDialerCreator(c apiserver.Connection) (*dialerCreator, error) {
 		if c.Transport.UDS != nil {
 			return &dialerCreator{
 				connector: &udsGRPCConnector{
-					udsName: c.Transport.UDS.UDSName,
+					udsName:           c.Transport.UDS.UDSName,
+					maxTunnelLifetime: c.Transport.MaxTunnelLifetime,
 				},
 				options: metricsOptions{
 					transport: egressmetrics.TransportUDS,

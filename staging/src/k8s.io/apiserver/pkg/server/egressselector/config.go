@@ -122,6 +122,19 @@ func ValidateEgressSelectorConfiguration(config *apiserver.EgressSelectorConfigu
 	return allErrs
 }
 
+func validateTransport(transport *apiserver.Transport, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if transport.MaxTunnelLifetime != nil {
+		if transport.MaxTunnelLifetime.Duration < 0 {
+			allErrs = append(allErrs, field.Invalid(
+				fldPath.Child("maxTunnelLifetime"),
+				transport.MaxTunnelLifetime,
+				"must be greater than or equal to 0"))
+		}
+	}
+	return allErrs
+}
+
 func validateHTTPConnectTransport(transport *apiserver.Transport, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if transport == nil {
@@ -130,7 +143,7 @@ func validateHTTPConnectTransport(transport *apiserver.Transport, fldPath *field
 			"transport must be set for HTTPConnect"))
 		return allErrs
 	}
-
+	allErrs = append(allErrs, validateTransport(transport, fldPath)...)
 	if transport.TCP != nil && transport.UDS != nil {
 		allErrs = append(allErrs, field.Invalid(
 			fldPath.Child("tcp"),
@@ -156,7 +169,7 @@ func validateGRPCTransport(transport *apiserver.Transport, fldPath *field.Path) 
 			"transport must be set for GRPC"))
 		return allErrs
 	}
-
+	allErrs = append(allErrs, validateTransport(transport, fldPath)...)
 	if transport.UDS != nil {
 		allErrs = append(allErrs, validateUDSConnection(transport.UDS, fldPath)...)
 	} else {
@@ -185,7 +198,7 @@ func validateUDSConnection(udsConfig *apiserver.UDSTransport, fldPath *field.Pat
 		allErrs = append(allErrs, field.Invalid(
 			fldPath.Child("udsName"),
 			"nil",
-			"UDSName should be present for UDS connections"))
+			"UDSName must be present for UDS connections"))
 	}
 	return allErrs
 }

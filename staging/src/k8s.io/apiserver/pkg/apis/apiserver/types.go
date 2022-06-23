@@ -105,6 +105,10 @@ type Transport struct {
 	// Requires at least one of TCP or UDS to be set
 	// +optional
 	UDS *UDSTransport
+
+	// MaxTunnelLifetime is the maximum tunnel lifetime, after which underlying connections will be closed and resources cleaned up.
+	// This option is an extra guard against resource leaks.
+	MaxTunnelLifetime *metav1.Duration
 }
 
 // TCPTransport provides the information to connect to konnectivity server via TCP
