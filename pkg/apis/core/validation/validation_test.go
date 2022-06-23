@@ -8751,6 +8751,37 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     core.DNSDefault,
 			},
 		},
+		"default AppArmor profile for a pod": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{Type: core.AppArmorProfileTypeRuntimeDefault},
+				},
+				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSDefault,
+			},
+		},
+		"localhost AppArmor profile for a pod": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					AppArmorProfile: &core.AppArmorProfile{
+						Type:             core.AppArmorProfileTypeLocalhost,
+						LocalhostProfile: utilpointer.StringPtr("filename.json"),
+					},
+				},
+				Containers:    []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSDefault,
+			},
+		},
 		"default AppArmor profile annotation for a container": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "123",
@@ -8769,10 +8800,7 @@ func TestValidatePod(t *testing.T) {
 			Spec: core.PodSpec{
 				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
 					SecurityContext: &core.SecurityContext{
-						AppArmorProfile: &core.AppArmorProfile{
-							Type:             core.AppArmorProfileTypeLocalhost,
-							LocalhostProfile: utilpointer.StringPtr("filename.json"),
-						},
+						AppArmorProfile: &core.AppArmorProfile{Type: core.AppArmorProfileTypeRuntimeDefault},
 					},
 				}},
 				RestartPolicy: core.RestartPolicyAlways,
@@ -8819,6 +8847,24 @@ func TestValidatePod(t *testing.T) {
 				},
 			},
 			Spec: validPodSpec(nil),
+		},
+		"localhost AppArmor profile for a container": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: core.PodSpec{
+				Containers: []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+					SecurityContext: &core.SecurityContext{
+						AppArmorProfile: &core.AppArmorProfile{
+							Type:             core.AppArmorProfileTypeLocalhost,
+							LocalhostProfile: utilpointer.StringPtr("filename.json"),
+						},
+					},
+				}},
+				RestartPolicy: core.RestartPolicyAlways,
+				DNSPolicy:     core.DNSDefault,
+			},
 		},
 		"syntactically valid sysctls": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -9643,26 +9689,6 @@ func TestValidatePod(t *testing.T) {
 			},
 		},
 		"AppArmor profile annotation must apply to a container": {
-			expectedError: "metadata.annotations[container.apparmor.security.beta.kubernetes.io/fake-ctr]",
-			spec: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "123",
-					Namespace: "ns",
-					Annotations: map[string]string{
-						v1.AppArmorBetaContainerAnnotationKeyPrefix + "ctr":      v1.AppArmorBetaProfileRuntimeDefault,
-						v1.AppArmorBetaContainerAnnotationKeyPrefix + "init-ctr": v1.AppArmorBetaProfileRuntimeDefault,
-						v1.AppArmorBetaContainerAnnotationKeyPrefix + "fake-ctr": v1.AppArmorBetaProfileRuntimeDefault,
-					},
-				},
-				Spec: core.PodSpec{
-					InitContainers: []core.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					Containers:     []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-					RestartPolicy:  core.RestartPolicyAlways,
-					DNSPolicy:      core.DNSClusterFirst,
-				},
-			},
-		},
-		"AppArmor profile must apply to a container": {
 			expectedError: "metadata.annotations[container.apparmor.security.beta.kubernetes.io/fake-ctr]",
 			spec: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{

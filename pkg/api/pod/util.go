@@ -780,10 +780,10 @@ func csiInUse(podSpec *api.PodSpec) bool {
 	return false
 }
 
-// AppArmorAnnotationForField takes a pod seccomp profile field and returns the
+// AppArmorAnnotationForField takes a pod AppArmor profile field and returns the
 // converted annotation value
 func AppArmorAnnotationForField(field *api.AppArmorProfile) string {
-	// If only seccomp fields are specified, add the corresponding annotations.
+	// If only AppArmor fields are specified, add the corresponding annotations.
 	// This ensures that the fields are enforced even if the node version
 	// trails the API version
 	switch field.Type {
@@ -806,11 +806,11 @@ func AppArmorAnnotationForField(field *api.AppArmorProfile) string {
 }
 
 // AppArmorFieldForAnnotation takes a pod annotation and returns the converted
-// seccomp profile field.
+// AppArmor profile field.
 func AppArmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
-	// If only seccomp annotations are specified, copy the values into the
+	// If only AppArmor annotations are specified, copy the values into the
 	// corresponding fields. This ensures that existing applications continue
-	// to enforce seccomp, and prevents the kubelet from needing to resolve
+	// to enforce AppARmor, and prevents the kubelet from needing to resolve
 	// annotations & fields.
 	if annotation == v1.AppArmorBetaProfileNameUnconfined {
 		return &api.AppArmorProfile{Type: api.AppArmorProfileTypeUnconfined}

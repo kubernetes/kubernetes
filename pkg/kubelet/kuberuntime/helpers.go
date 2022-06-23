@@ -263,20 +263,12 @@ func annotationSeccompProfile(profile, profileRootPath string) string {
 		name := strings.TrimPrefix(profile, v1.SeccompLocalhostProfileNamePrefix)
 		fname := filepath.Join(profileRootPath, filepath.FromSlash(name))
 		return v1.SeccompLocalhostProfileNamePrefix + fname
-	} else if strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
-		name := strings.TrimPrefix(profile, v1.AppArmorBetaProfileNamePrefix)
-		fname := filepath.Join(profileRootPath, filepath.FromSlash(name))
-		return v1.AppArmorBetaProfileNamePrefix + fname
 	}
 	return profile
 }
 
 func annotationAppArmorProfile(profile, profileRootPath string) string {
-	if strings.HasPrefix(profile, v1.SeccompLocalhostProfileNamePrefix) {
-		name := strings.TrimPrefix(profile, v1.SeccompLocalhostProfileNamePrefix)
-		fname := filepath.Join(profileRootPath, filepath.FromSlash(name))
-		return v1.SeccompLocalhostProfileNamePrefix + fname
-	} else if strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
+	if strings.HasPrefix(profile, v1.AppArmorBetaProfileNamePrefix) {
 		name := strings.TrimPrefix(profile, v1.AppArmorBetaProfileNamePrefix)
 		fname := filepath.Join(profileRootPath, filepath.FromSlash(name))
 		return v1.AppArmorBetaProfileNamePrefix + fname
@@ -401,12 +393,12 @@ func (m *kubeGenericRuntimeManager) getAppArmorProfile(annotations map[string]st
 	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) *runtimeapi.SecurityProfile {
 	// container fields are applied first
 	if containerSecContext != nil && containerSecContext.AppArmorProfile != nil {
-		return fieldSeccompProfile(containerSecContext.AppArmorProfile, m.apparmorProfileRoot, fallbackToRuntimeDefault)
+		return fieldAppArmorProfile(containerSecContext.AppArmorProfile, m.apparmorProfileRoot, fallbackToRuntimeDefault)
 	}
 
 	// when container seccomp is not defined, try to apply from pod field
 	if podSecContext != nil && podSecContext.AppArmorProfile != nil {
-		return fieldSeccompProfile(podSecContext.AppArmorProfile, m.apparmorProfileRoot, fallbackToRuntimeDefault)
+		return fieldAppArmorProfile(podSecContext.AppArmorProfile, m.apparmorProfileRoot, fallbackToRuntimeDefault)
 	}
 
 	if fallbackToRuntimeDefault {
