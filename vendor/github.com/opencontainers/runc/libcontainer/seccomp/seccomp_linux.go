@@ -113,8 +113,8 @@ func InitSeccomp(config *configs.Seccomp) (int, error) {
 // Convert Libcontainer Action to Libseccomp ScmpAction
 func getAction(act configs.Action, errnoRet *uint) (libseccomp.ScmpAction, error) {
 	switch act {
-	case configs.Kill:
-		return libseccomp.ActKill, nil
+	case configs.Kill, configs.KillThread:
+		return libseccomp.ActKillThread, nil
 	case configs.Errno:
 		if errnoRet != nil {
 			return libseccomp.ActErrno.SetReturnCode(int16(*errnoRet)), nil
@@ -133,8 +133,6 @@ func getAction(act configs.Action, errnoRet *uint) (libseccomp.ScmpAction, error
 		return libseccomp.ActLog, nil
 	case configs.Notify:
 		return libseccomp.ActNotify, nil
-	case configs.KillThread:
-		return libseccomp.ActKillThread, nil
 	case configs.KillProcess:
 		return libseccomp.ActKillProcess, nil
 	default:

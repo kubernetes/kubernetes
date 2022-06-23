@@ -671,7 +671,7 @@ github.com/onsi/gomega/types
 # github.com/opencontainers/go-digest v1.0.0 => github.com/opencontainers/go-digest v1.0.0
 ## explicit; go 1.13
 github.com/opencontainers/go-digest
-# github.com/opencontainers/runc v1.1.1 => github.com/opencontainers/runc v1.1.1
+# github.com/opencontainers/runc v1.1.3 => github.com/opencontainers/runc v1.1.3
 ## explicit; go 1.16
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
@@ -755,7 +755,7 @@ github.com/russross/blackfriday
 # github.com/russross/blackfriday/v2 v2.1.0 => github.com/russross/blackfriday/v2 v2.1.0
 ## explicit
 github.com/russross/blackfriday/v2
-# github.com/seccomp/libseccomp-golang v0.9.2-0.20210429002308-3879420cc921 => github.com/seccomp/libseccomp-golang v0.9.2-0.20210429002308-3879420cc921
+# github.com/seccomp/libseccomp-golang v0.9.2-0.20220502022130-f33da4d89646 => github.com/seccomp/libseccomp-golang v0.9.2-0.20220502022130-f33da4d89646
 ## explicit; go 1.14
 github.com/seccomp/libseccomp-golang
 # github.com/sirupsen/logrus v1.8.1 => github.com/sirupsen/logrus v1.8.1
@@ -2749,7 +2749,7 @@ sigs.k8s.io/yaml
 # github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 # github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 # github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.2
-# github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.1
+# github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.3
 # github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 # github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.10.0
 # github.com/opentracing/opentracing-go => github.com/opentracing/opentracing-go v1.1.0
@@ -2770,7 +2770,7 @@ sigs.k8s.io/yaml
 # github.com/rubiojr/go-vhd => github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 # github.com/russross/blackfriday => github.com/russross/blackfriday v1.5.2
 # github.com/russross/blackfriday/v2 => github.com/russross/blackfriday/v2 v2.1.0
-# github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.9.2-0.20210429002308-3879420cc921
+# github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.9.2-0.20220502022130-f33da4d89646
 # github.com/sergi/go-diff => github.com/sergi/go-diff v1.1.0
 # github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.8.1
 # github.com/smartystreets/assertions => github.com/smartystreets/assertions v1.1.0
