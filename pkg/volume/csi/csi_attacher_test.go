@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
+	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
@@ -1327,7 +1328,7 @@ func TestAttacherMountDevice(t *testing.T) {
 				if err != nil {
 					t.Errorf("error attempting to populate file on parent path: %v", err)
 				}
-				err = os.Chmod(parent, 0555)
+				err = util.Chmod(parent, 0555)
 				if err != nil {
 					t.Errorf("error attempting to modify directory permissions: %v", err)
 				}
@@ -1356,7 +1357,7 @@ func TestAttacherMountDevice(t *testing.T) {
 					if os.IsNotExist(err) {
 						t.Errorf("expecting file to exist after err received: %v", err)
 					}
-					err = os.Chmod(parent, 0777)
+					err = util.Chmod(parent, 0777)
 					if err != nil {
 						t.Errorf("failed to modify permissions after test: %v", err)
 					}
