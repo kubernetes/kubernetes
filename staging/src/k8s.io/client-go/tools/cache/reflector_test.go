@@ -139,7 +139,7 @@ func TestReflectorWatchHandlerError(t *testing.T) {
 		fw.Stop()
 	}()
 	var resumeRV string
-	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, wait.NeverStop)
+	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.expectedTypeName, g.setLastSyncResourceVersion, g.clock, &resumeRV, nevererrc, wait.NeverStop)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -159,7 +159,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 		fw.Stop()
 	}()
 	var resumeRV string
-	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, wait.NeverStop)
+	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.expectedTypeName, g.setLastSyncResourceVersion, g.clock, &resumeRV, nevererrc, wait.NeverStop)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -208,7 +208,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	var resumeRV string
 	stopWatch := make(chan struct{}, 1)
 	stopWatch <- struct{}{}
-	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, stopWatch)
+	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.expectedTypeName, g.setLastSyncResourceVersion, g.clock, &resumeRV, nevererrc, stopWatch)
 	if err != errorStopRequested {
 		t.Errorf("expected stop error, got %q", err)
 	}
