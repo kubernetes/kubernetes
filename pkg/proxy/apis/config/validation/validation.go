@@ -211,7 +211,7 @@ func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Pat
 		return nil
 	}
 
-	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace])", strings.Join(validModes.List(), ","))
+	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace(will be 'kernelspace' in a future release)])", strings.Join(validModes.List(), ","))
 	return field.ErrorList{field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg)}
 }
 
