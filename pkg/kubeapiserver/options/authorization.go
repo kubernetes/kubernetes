@@ -23,9 +23,11 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/webhook"
 	versionedinformers "k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -125,7 +127,7 @@ func (o *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ToAuthorizationConfig convert BuiltInAuthorizationOptions to authorizer.Config
-func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFactory versionedinformers.SharedInformerFactory) authorizer.Config {
+func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFactory versionedinformers.SharedInformerFactory, serviceResolver webhook.ServiceResolver, customDial net.DialFunc) authorizer.Config {
 	return authorizer.Config{
 		AuthorizationModes:          o.Modes,
 		PolicyFile:                  o.PolicyFile,
@@ -135,5 +137,6 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 		WebhookCacheUnauthorizedTTL: o.WebhookCacheUnauthorizedTTL,
 		VersionedInformerFactory:    versionedInformerFactory,
 		WebhookRetryBackoff:         o.WebhookRetryBackoff,
+		CustomDial:                  newWebhookDialer(serviceResolver, customDial),
 	}
 }

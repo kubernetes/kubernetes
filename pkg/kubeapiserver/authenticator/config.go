@@ -17,7 +17,11 @@ limitations under the License.
 package authenticator
 
 import (
+	"crypto/tls"
+	x509util "crypto/x509"
 	"errors"
+	"fmt"
+	"net/http"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -38,7 +42,9 @@ import (
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
+	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kubernetes/pkg/proxy/util"
 
 	// Initialize all known client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -152,12 +158,20 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	// update the keys, causing performance hits.
 	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
 		// TODO(enj): wire up the Notifier and ControllerRunner bits when OIDC supports CA reload
-		var oidcCAContent oidc.CAContentProvider
+		var (
+			oidcCAContent oidc.CAContentProvider
+			roots         *x509util.CertPool
+		)
 		if len(config.OIDCCAFile) != 0 {
 			var oidcCAErr error
 			oidcCAContent, oidcCAErr = dynamiccertificates.NewDynamicCAContentFromFile("oidc-authenticator", config.OIDCCAFile)
 			if oidcCAErr != nil {
 				return nil, nil, oidcCAErr
+			}
+
+			roots, oidcCAErr = certutil.NewPoolFromBytes(oidcCAContent.CurrentCABundleContent())
+			if oidcCAErr != nil {
+				return nil, nil, fmt.Errorf("Failed to read the CA contents: %v", oidcCAErr)
 			}
 		}
 
@@ -171,6 +185,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 			GroupsPrefix:         config.OIDCGroupsPrefix,
 			SupportedSigningAlgs: config.OIDCSigningAlgs,
 			RequiredClaims:       config.OIDCRequiredClaims,
+			Client:               buildClient(config.CustomDial, roots),
 		})
 		if err != nil {
 			return nil, nil, err
@@ -222,6 +237,19 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	}
 
 	return authenticator, &securityDefinitions, nil
+}
+
+// buildClient return a *http.Client
+func buildClient(customDial util.DialContext, roots *x509util.CertPool) *http.Client {
+	// Copied http.DefaultTransport from staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc/oidc.go:267
+	tr := utilnet.SetTransportDefaults(&http.Transport{
+		// According to golang's doc, if RootCAs is nil,
+		// TLS uses the host's root CA set.
+		TLSClientConfig: &tls.Config{RootCAs: roots},
+		DialContext:     customDial,
+	})
+
+	return &http.Client{Transport: tr, Timeout: 30 * time.Second}
 }
 
 // IsValidServiceAccountKeyFile returns true if a valid public RSA key can be read from the given file

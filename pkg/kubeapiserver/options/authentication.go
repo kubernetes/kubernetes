@@ -32,6 +32,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -454,7 +455,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 }
 
 // ApplyTo requires already applied OpenAPIConfig and EgressSelector if present.
-func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.AuthenticationInfo, secureServing *genericapiserver.SecureServingInfo, egressSelector *egressselector.EgressSelector, openAPIConfig *openapicommon.Config, openAPIV3Config *openapicommon.Config, extclient kubernetes.Interface, versionedInformer informers.SharedInformerFactory) error {
+func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.AuthenticationInfo, secureServing *genericapiserver.SecureServingInfo, egressSelector *egressselector.EgressSelector, openAPIConfig *openapicommon.Config, openAPIV3Config *openapicommon.Config, extclient kubernetes.Interface, versionedInformer informers.SharedInformerFactory, serviceResolver webhook.ServiceResolver) error {
 	if o == nil {
 		return nil
 	}
@@ -502,6 +503,8 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 		}
 		authenticatorConfig.CustomDial = egressDialer
 	}
+
+	authenticatorConfig.CustomDial = newWebhookDialer(serviceResolver, authenticatorConfig.CustomDial)
 
 	authInfo.Authenticator, openAPIConfig.SecurityDefinitions, err = authenticatorConfig.New()
 	if openAPIV3Config != nil {

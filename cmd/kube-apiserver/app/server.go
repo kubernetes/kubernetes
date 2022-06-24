@@ -442,11 +442,11 @@ func buildGenericConfig(
 	versionedInformers = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
 
 	// Authentication.ApplyTo requires already applied OpenAPIConfig and EgressSelector if present
-	if lastErr = s.Authentication.ApplyTo(&genericConfig.Authentication, genericConfig.SecureServing, genericConfig.EgressSelector, genericConfig.OpenAPIConfig, genericConfig.OpenAPIV3Config, clientgoExternalClient, versionedInformers); lastErr != nil {
+	if lastErr = s.Authentication.ApplyTo(&genericConfig.Authentication, genericConfig.SecureServing, genericConfig.EgressSelector, genericConfig.OpenAPIConfig, genericConfig.OpenAPIV3Config, clientgoExternalClient, versionedInformers, serviceResolver); lastErr != nil {
 		return
 	}
 
-	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, genericConfig.EgressSelector, versionedInformers)
+	genericConfig.Authorization.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, genericConfig.EgressSelector, versionedInformers, serviceResolver)
 	if err != nil {
 		lastErr = fmt.Errorf("invalid authorization config: %v", err)
 		return
@@ -491,16 +491,17 @@ func buildGenericConfig(
 }
 
 // BuildAuthorizer constructs the authorizer
-func BuildAuthorizer(s *options.ServerRunOptions, EgressSelector *egressselector.EgressSelector, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
-	authorizationConfig := s.Authorization.ToAuthorizationConfig(versionedInformers)
-
+func BuildAuthorizer(s *options.ServerRunOptions, EgressSelector *egressselector.EgressSelector, versionedInformers clientgoinformers.SharedInformerFactory, serviceResolver webhook.ServiceResolver) (authorizer.Authorizer, authorizer.RuleResolver, error) {
+	var customDial utilnet.DialFunc
 	if EgressSelector != nil {
 		egressDialer, err := EgressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())
 		if err != nil {
 			return nil, nil, err
 		}
-		authorizationConfig.CustomDial = egressDialer
+		customDial = egressDialer
 	}
+
+	authorizationConfig := s.Authorization.ToAuthorizationConfig(versionedInformers, serviceResolver, customDial)
 
 	return authorizationConfig.New()
 }
