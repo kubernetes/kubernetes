@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// To regenerate service.pb.go run hack/update-generated-kms.sh
+// To regenerate api.pb.go run hack/update-generated-kms.sh
 syntax = "proto3";
 
 package v1beta1;
