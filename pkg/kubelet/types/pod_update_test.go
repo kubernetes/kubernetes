@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -31,7 +32,7 @@ var (
 )
 
 // getTestPod generates a new instance of an empty test Pod
-func getTestPod(annotations map[string]string, podPriority *int32) *v1.Pod {
+func getTestPod(annotations map[string]string, podPriority *int32, priorityClassName string) *v1.Pod {
 	pod := v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -48,6 +49,7 @@ func getTestPod(annotations map[string]string, podPriority *int32) *v1.Pod {
 			Priority: podPriority,
 		}
 	}
+	pod.Spec.PriorityClassName = priorityClassName
 	// Set annotations if exists
 	if annotations != nil {
 		pod.Annotations = annotations
@@ -118,13 +120,13 @@ func TestGetPodSource(t *testing.T) {
 	}{
 		{
 			name:        "cannot get pod source",
-			pod:         getTestPod(nil, nil),
+			pod:         getTestPod(nil, nil, ""),
 			expected:    "",
 			errExpected: true,
 		},
 		{
 			name:        "valid annotation returns the source",
-			pod:         getTestPod(configSourceAnnotation("host-ipc-sources"), nil),
+			pod:         getTestPod(configSourceAnnotation("host-ipc-sources"), nil, ""),
 			expected:    "host-ipc-sources",
 			errExpected: false,
 		},
@@ -185,12 +187,12 @@ func TestIsMirrorPod(t *testing.T) {
 	}{
 		{
 			name:     "mirror pod",
-			pod:      getTestPod(configMirrorAnnotation(), nil),
+			pod:      getTestPod(configMirrorAnnotation(), nil, ""),
 			expected: true,
 		},
 		{
 			name:     "not a mirror pod",
-			pod:      getTestPod(nil, nil),
+			pod:      getTestPod(nil, nil, ""),
 			expected: false,
 		},
 	}
@@ -210,17 +212,17 @@ func TestIsStaticPod(t *testing.T) {
 	}{
 		{
 			name:     "static pod with file source",
-			pod:      getTestPod(configSourceAnnotation(FileSource), nil),
+			pod:      getTestPod(configSourceAnnotation(FileSource), nil, ""),
 			expected: true,
 		},
 		{
 			name:     "static pod with http source",
-			pod:      getTestPod(configSourceAnnotation(HTTPSource), nil),
+			pod:      getTestPod(configSourceAnnotation(HTTPSource), nil, ""),
 			expected: true,
 		},
 		{
 			name:     "static pod with api server source",
-			pod:      getTestPod(configSourceAnnotation(ApiserverSource), nil),
+			pod:      getTestPod(configSourceAnnotation(ApiserverSource), nil, ""),
 			expected: false,
 		},
 	}
@@ -241,32 +243,32 @@ func TestIsCriticalPod(t *testing.T) {
 	}{
 		{
 			name:     "critical pod with file source",
-			pod:      getTestPod(configSourceAnnotation(FileSource), nil),
+			pod:      getTestPod(configSourceAnnotation(FileSource), nil, ""),
 			expected: true,
 		},
 		{
 			name:     "critical pod with mirror annotation",
-			pod:      getTestPod(configMirrorAnnotation(), nil),
+			pod:      getTestPod(configMirrorAnnotation(), nil, ""),
 			expected: true,
 		},
 		{
 			name:     "critical pod using system priority",
-			pod:      getTestPod(nil, &systemPriority),
+			pod:      getTestPod(nil, &systemPriority, ""),
 			expected: true,
 		},
 		{
 			name:     "critical pod using greater than system priority",
-			pod:      getTestPod(nil, &systemPriorityUpper),
+			pod:      getTestPod(nil, &systemPriorityUpper, ""),
 			expected: true,
 		},
 		{
 			name:     "not a critical pod with api server annotation",
-			pod:      getTestPod(configSourceAnnotation(ApiserverSource), nil),
+			pod:      getTestPod(configSourceAnnotation(ApiserverSource), nil, ""),
 			expected: false,
 		},
 		{
 			name:     "not critical if not static, mirror or without a priority",
-			pod:      getTestPod(nil, nil),
+			pod:      getTestPod(nil, nil, ""),
 			expected: false,
 		},
 	}
@@ -287,38 +289,38 @@ func TestPreemptable(t *testing.T) {
 	}{
 		{
 			name:      "a critical preemptor pod preempts a non critical pod",
-			preemptor: getTestPod(configSourceAnnotation(FileSource), nil),
-			preemptee: getTestPod(nil, nil),
+			preemptor: getTestPod(configSourceAnnotation(FileSource), nil, ""),
+			preemptee: getTestPod(nil, nil, ""),
 			expected:  true,
 		},
 		{
 			name:      "a preemptor pod with higher priority preempts a critical pod",
-			preemptor: getTestPod(configSourceAnnotation(FileSource), &systemPriorityUpper),
-			preemptee: getTestPod(configSourceAnnotation(FileSource), &systemPriority),
+			preemptor: getTestPod(configSourceAnnotation(FileSource), &systemPriorityUpper, ""),
+			preemptee: getTestPod(configSourceAnnotation(FileSource), &systemPriority, ""),
 			expected:  true,
 		},
 		{
 			name:      "a not critical pod with higher priority preempts a critical pod",
-			preemptor: getTestPod(configSourceAnnotation(ApiserverSource), &systemPriorityUpper),
-			preemptee: getTestPod(configSourceAnnotation(FileSource), &systemPriority),
+			preemptor: getTestPod(configSourceAnnotation(ApiserverSource), &systemPriorityUpper, ""),
+			preemptee: getTestPod(configSourceAnnotation(FileSource), &systemPriority, ""),
 			expected:  true,
 		},
 		{
 			name:      "a critical pod with less priority do not preempts a critical pod",
-			preemptor: getTestPod(configSourceAnnotation(FileSource), &systemPriority),
-			preemptee: getTestPod(configSourceAnnotation(FileSource), &systemPriorityUpper),
+			preemptor: getTestPod(configSourceAnnotation(FileSource), &systemPriority, ""),
+			preemptee: getTestPod(configSourceAnnotation(FileSource), &systemPriorityUpper, ""),
 			expected:  false,
 		},
 		{
 			name:      "a critical pod without priority do not preempts a critical pod without priority",
-			preemptor: getTestPod(configSourceAnnotation(FileSource), nil),
-			preemptee: getTestPod(configSourceAnnotation(FileSource), nil),
+			preemptor: getTestPod(configSourceAnnotation(FileSource), nil, ""),
+			preemptee: getTestPod(configSourceAnnotation(FileSource), nil, ""),
 			expected:  false,
 		},
 		{
 			name:      "a critical pod with priority do not preempts a critical pod with the same priority",
-			preemptor: getTestPod(configSourceAnnotation(FileSource), &systemPriority),
-			preemptee: getTestPod(configSourceAnnotation(FileSource), &systemPriority),
+			preemptor: getTestPod(configSourceAnnotation(FileSource), &systemPriority, ""),
+			preemptee: getTestPod(configSourceAnnotation(FileSource), &systemPriority, ""),
 			expected:  false,
 		},
 	}
@@ -353,6 +355,56 @@ func TestIsCriticalPodBasedOnPriority(t *testing.T) {
 			if actual != test.expected {
 				t.Errorf("IsCriticalPodBased on priority should have returned %v for test %v but got %v", test.expected, test.name, actual)
 			}
+		})
+	}
+}
+
+func TestIsNodeCriticalPod(t *testing.T) {
+	tests := []struct {
+		name     string
+		pod      *v1.Pod
+		expected bool
+	}{
+		{
+			name:     "critical pod with file source and systemNodeCritical",
+			pod:      getTestPod(configSourceAnnotation(FileSource), nil, scheduling.SystemNodeCritical),
+			expected: true,
+		},
+		{
+			name:     "critical pod with mirror annotation and systemNodeCritical",
+			pod:      getTestPod(configMirrorAnnotation(), nil, scheduling.SystemNodeCritical),
+			expected: true,
+		},
+		{
+			name:     "critical pod using system priority and systemNodeCritical",
+			pod:      getTestPod(nil, &systemPriority, scheduling.SystemNodeCritical),
+			expected: true,
+		},
+		{
+			name:     "critical pod using greater than system priority and systemNodeCritical",
+			pod:      getTestPod(nil, &systemPriorityUpper, scheduling.SystemNodeCritical),
+			expected: true,
+		},
+		{
+			name:     "not a critical pod with api server annotation and systemNodeCritical",
+			pod:      getTestPod(configSourceAnnotation(ApiserverSource), nil, scheduling.SystemNodeCritical),
+			expected: false,
+		},
+		{
+			name:     "not critical if not static, mirror or without a priority and systemNodeCritical",
+			pod:      getTestPod(nil, nil, scheduling.SystemNodeCritical),
+			expected: false,
+		},
+		{
+			name:     "not critical if not static, mirror or without a priority",
+			pod:      getTestPod(nil, nil, ""),
+			expected: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			isNodeCriticalPod := IsNodeCriticalPod(test.pod)
+			require.Equal(t, test.expected, isNodeCriticalPod)
 		})
 	}
 }
