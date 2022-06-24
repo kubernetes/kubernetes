@@ -503,6 +503,10 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 }
 
 func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	attempts := int64(0)
 	failureCallbacks := int64(0)
 

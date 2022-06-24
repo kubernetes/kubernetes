@@ -35,6 +35,10 @@ import (
 )
 
 func TestListVolumesForPod(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -95,6 +99,10 @@ func TestListVolumesForPod(t *testing.T) {
 }
 
 func TestPodVolumesExist(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -207,6 +215,10 @@ func TestPodVolumesExist(t *testing.T) {
 }
 
 func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -264,6 +276,10 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 }
 
 func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
@@ -351,6 +367,10 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 }
 
 func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
 
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
@@ -433,6 +453,10 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 }
 
 func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
 
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
