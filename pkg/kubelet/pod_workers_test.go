@@ -614,6 +614,10 @@ func TestTerminalPhaseTransition(t *testing.T) {
 }
 
 func TestStaticPodExclusion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	podWorkers, processed := createPodWorkers()
 	var channels WorkChannel
 	podWorkers.workerChannelFn = channels.Intercept
