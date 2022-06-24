@@ -486,7 +486,7 @@ func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, n
 	}
 
 	if err := opts.Run(); err != nil {
-		fmt.Fprintf(opts.ErrOut, "Error attaching, falling back to logs: %v\n", err)
+		fmt.Fprintf(opts.ErrOut, "warning: couldn't attach to pod/%s, falling back to streaming logs: %v\n", name, err)
 		return logOpts(f, pod, opts)
 	}
 	return nil
