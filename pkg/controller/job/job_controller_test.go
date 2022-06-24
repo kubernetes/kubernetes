@@ -1840,6 +1840,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	sharedInformerFactory.Start(ctx.Done())
+	sharedInformerFactory.WaitForCacheSync(ctx.Done())
 
 	go manager.Run(ctx, 1)
 
@@ -1878,7 +1879,7 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 				t.Fatalf("Failed to insert job in index: %v", err)
 			}
 			var j *batch.Job
-			err = wait.Poll(200*time.Millisecond, 10*time.Second, func() (done bool, err error) {
+			err = wait.Poll(200*time.Millisecond, 3*time.Second, func() (done bool, err error) {
 				j, err = clientset.BatchV1().Jobs(metav1.NamespaceDefault).Get(ctx, job.GetName(), metav1.GetOptions{})
 				if err != nil {
 					return false, nil
