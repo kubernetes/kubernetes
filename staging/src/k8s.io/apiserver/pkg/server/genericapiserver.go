@@ -497,7 +497,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	if s.ShutdownSendRetryAfter {
 		// when this mode is enabled, we do the following:
 		// - the server will continue to listen until all existing requests in flight
-		//   (not including active long runnning requests) have been drained.
+		//   (not including active long running requests) have been drained.
 		// - once drained, http Server Shutdown is invoked with a timeout of 2s,
 		//   net/http waits for 1s for the peer to respond to a GO_AWAY frame, so
 		//   we should wait for a minimum of 2s
