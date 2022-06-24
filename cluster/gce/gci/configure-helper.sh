@@ -1901,6 +1901,7 @@ def resolve(host):
   sed -i -e "s@{{ *etcdctl_certs *}}@$etcdctl_certs@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_apiserver_creds *}}@$etcd_apiserver_creds@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_extra_args *}}@$etcd_extra_args@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_listen_metrics_port *}}@$etcd_listen_metrics_port@g" "${temp_file}"
   if [[ -n "${ETCD_VERSION:-}" ]]; then
     sed -i -e "s@{{ *pillar\.get('etcd_version', '\(.*\)') *}}@${ETCD_VERSION}@g" "${temp_file}"
   else

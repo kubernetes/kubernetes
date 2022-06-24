@@ -82,6 +82,18 @@
       "periodSeconds": 5,
       "failureThreshold": 5
     },
+    "startupProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "path": "/health?serializable=false",
+        "port": {{ etcd_listen_metrics_port }},
+        "scheme": "HTTP"
+      },
+      "initialDelaySeconds": 10,
+      "periodSeconds": 10,
+      "timeoutSeconds": 15,
+      "failureThreshold": 24
+    },
     "ports": [
       { "name": "serverport",
         "containerPort": {{ server_port }},
