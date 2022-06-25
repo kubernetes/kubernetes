@@ -389,7 +389,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 	resourcename = strings.ToLower(resourcename)
 	resourcePaths := sets.NewString()
 
-	if tp.Kind() == reflect.Ptr {
+	if tp.Kind() == reflect.Pointer {
 		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
 		return resourcePaths
 	}
@@ -399,7 +399,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 	}
 
 	switch tp.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
 	case reflect.Struct:
 		// ObjectMeta is generic and therefore should never have a field with a specific resource's name;

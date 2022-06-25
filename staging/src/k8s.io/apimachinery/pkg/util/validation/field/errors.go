@@ -66,7 +66,7 @@ func (v *Error) ErrorBody() string {
 		valueType := reflect.TypeOf(value)
 		if value == nil || valueType == nil {
 			value = "null"
-		} else if valueType.Kind() == reflect.Ptr {
+		} else if valueType.Kind() == reflect.Pointer {
 			if reflectValue := reflect.ValueOf(value); reflectValue.IsNil() {
 				value = "null"
 			} else {

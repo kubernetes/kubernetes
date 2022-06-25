@@ -182,7 +182,7 @@ func isLess(i, j reflect.Value) (bool, error) {
 		return i.Float() < j.Float(), nil
 	case reflect.String:
 		return sortorder.NaturalLess(i.String(), j.String()), nil
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return isLess(i.Elem(), j.Elem())
 	case reflect.Struct:
 		// sort metav1.Time

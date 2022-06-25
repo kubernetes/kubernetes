@@ -76,7 +76,7 @@ func ensureNoTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflec
 	parents = append(parents, tp)
 
 	switch tp.Kind() {
-	case reflect.Map, reflect.Slice, reflect.Ptr:
+	case reflect.Map, reflect.Slice, reflect.Pointer:
 		errs = append(errs, ensureNoTags(gvk, tp.Elem(), parents, typesAllowedTags)...)
 
 	case reflect.String, reflect.Bool, reflect.Float32, reflect.Float64, reflect.Int32, reflect.Int64, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.Interface:
@@ -106,7 +106,7 @@ func ensureNoTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflec
 func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.Type, allowedNonstandardJSONNames map[reflect.Type]string) []error {
 	errs := []error{}
 	// This type handles its own encoding/decoding and doesn't need json tags
-	if tp.Implements(marshalerType) && (tp.Implements(unmarshalerType) || reflect.PtrTo(tp).Implements(unmarshalerType)) {
+	if tp.Implements(marshalerType) && (tp.Implements(unmarshalerType) || reflect.PointerTo(tp).Implements(unmarshalerType)) {
 		return errs
 	}
 
@@ -117,7 +117,7 @@ func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.
 	parents = append(parents, tp)
 
 	switch tp.Kind() {
-	case reflect.Map, reflect.Slice, reflect.Ptr:
+	case reflect.Map, reflect.Slice, reflect.Pointer:
 		errs = append(errs, ensureTags(gvk, tp.Elem(), parents, allowedNonstandardJSONNames)...)
 
 	case reflect.String, reflect.Bool, reflect.Float32, reflect.Float64, reflect.Int32, reflect.Int64, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr, reflect.Interface:

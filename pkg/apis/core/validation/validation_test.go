@@ -17759,7 +17759,7 @@ func collectResourcePaths(t *testing.T, skipRecurseList sets.String, tp reflect.
 
 	paths := sets.NewString()
 	switch tp.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		paths.Insert(collectResourcePaths(t, skipRecurseList, tp.Elem(), path).List()...)
 	case reflect.Struct:
 		for i := 0; i < tp.NumField(); i++ {

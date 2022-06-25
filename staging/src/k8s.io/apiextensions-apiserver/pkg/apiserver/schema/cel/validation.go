@@ -131,7 +131,7 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 	if oldObj != nil {
 		v := reflect.ValueOf(oldObj)
 		switch v.Kind() {
-		case reflect.Map, reflect.Ptr, reflect.Interface, reflect.Slice:
+		case reflect.Map, reflect.Pointer, reflect.Interface, reflect.Slice:
 			if v.IsNil() {
 				oldObj = nil // +k8s:verify-mutation:reason=clone
 			}

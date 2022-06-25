@@ -392,7 +392,7 @@ func detectDefaults(t *testing.T, obj runtime.Object, v reflect.Value) map[strin
 				t.Logf("unhandled non-primitive map type %s: %s", visit.path, visit.value.Type().Elem())
 			}
 
-		case visit.value.Kind() == reflect.Ptr:
+		case visit.value.Kind() == reflect.Pointer:
 			if visit.value.IsNil() {
 				if visit.value.Type().Elem().Kind() == reflect.Struct {
 					visit.value.Set(reflect.New(visit.value.Type().Elem()))
