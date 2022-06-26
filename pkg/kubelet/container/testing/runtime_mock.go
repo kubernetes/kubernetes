@@ -315,18 +315,34 @@ func (mr *MockRuntimeMockRecorder) Status() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Status", reflect.TypeOf((*MockRuntime)(nil).Status))
 }
 
-// SyncPod mocks base method.
-func (m *MockRuntime) SyncPod(pod *v1.Pod, podStatus *container.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) container.PodSyncResult {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SyncPod", pod, podStatus, pullSecrets, backOff)
+// SyncPodSandbox mocks base method.
+func (r *MockRuntime) SyncPodSandbox(pod *v1.Pod, status *container.PodStatus) (result container.PodSyncResult, podIPs []string, podSandboxID string) {
+	r.ctrl.T.Helper()
+	ret := r.ctrl.Call(r, "SyncPodSandbox", pod, status)
+	ret0, _ := ret[0].(container.PodSyncResult)
+	ret1, _ := ret[1].([]string)
+	ret2, _ := ret[2].(string)
+	return ret0, ret1, ret2
+}
+
+// SyncPod indicates an expected call of SyncPodSandbox.
+func (mr *MockRuntimeMockRecorder) SyncPodSandbox(pod *v1.Pod, podStatus *container.PodStatus) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncPodSandbox", reflect.TypeOf((*MockRuntime)(nil).SyncPodSandbox), pod, podStatus)
+}
+
+// SyncPodContainers mocks base method.
+func (r *MockRuntime) SyncPodContainers(pod *v1.Pod, status *container.PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff, podIPs []string, podSandboxID string) container.PodSyncResult {
+	r.ctrl.T.Helper()
+	ret := r.ctrl.Call(r, "SyncPodContainers", pod, status, secrets, backOff, podIPs, podSandboxID)
 	ret0, _ := ret[0].(container.PodSyncResult)
 	return ret0
 }
 
-// SyncPod indicates an expected call of SyncPod.
-func (mr *MockRuntimeMockRecorder) SyncPod(pod, podStatus, pullSecrets, backOff interface{}) *gomock.Call {
+// SyncPodContainers indicates an expected call of SyncPodContainers.
+func (mr *MockRuntimeMockRecorder) SyncPodContainers(pod *v1.Pod, podStatus *container.PodStatus, pullSecrets, backOff interface{}, podIPs []string, podSandboxID string) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncPod", reflect.TypeOf((*MockRuntime)(nil).SyncPod), pod, podStatus, pullSecrets, backOff)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncPodContainers", reflect.TypeOf((*MockRuntime)(nil).SyncPodContainers), pod, podStatus, pullSecrets, backOff, podIPs, podSandboxID)
 }
 
 // Type mocks base method.

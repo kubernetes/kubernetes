@@ -94,8 +94,10 @@ type Runtime interface {
 	// will be GC'd.
 	// TODO: Revisit this method and make it cleaner.
 	GarbageCollect(gcPolicy GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error
-	// SyncPod syncs the running pod into the desired pod.
-	SyncPod(pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) PodSyncResult
+	// SyncPodSandbox syncs pod by creating sandbox, if needed
+	SyncPodSandbox(pod *v1.Pod, podStatus *PodStatus) (PodSyncResult, []string, string)
+	// SyncPodContainers syncs the running pod into the desired pod.
+	SyncPodContainers(pod *v1.Pod, podStatus *PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, podIPs []string, podSandboxID string) PodSyncResult
 	// KillPod kills all the containers of a pod. Pod may be nil, running pod must not be.
 	// TODO(random-liu): Return PodSyncResult in KillPod.
 	// gracePeriodOverride if specified allows the caller to override the pod default grace period.
@@ -340,6 +342,9 @@ type Status struct {
 // FindContainerStatusByName returns container status in the pod status with the given name.
 // When there are multiple containers' statuses with the same name, the first match will be returned.
 func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Status {
+	if podStatus == nil {
+		return nil
+	}
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.Name == containerName {
 			return containerStatus

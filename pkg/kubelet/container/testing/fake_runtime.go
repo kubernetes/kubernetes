@@ -222,11 +222,15 @@ func (f *FakeRuntime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	return pods, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+func (f *FakeRuntime) SyncPodSandbox(pod *v1.Pod, _ *kubecontainer.PodStatus) (result kubecontainer.PodSyncResult, podIPs []string, podSandboxID string) {
+	return
+}
+
+func (f *FakeRuntime) SyncPodContainers(pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, podIPs []string, podSandboxID string) (result kubecontainer.PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
 
-	f.CalledFunctions = append(f.CalledFunctions, "SyncPod")
+	f.CalledFunctions = append(f.CalledFunctions, "SyncPodContainers")
 	f.StartedPods = append(f.StartedPods, string(pod.UID))
 	for _, c := range pod.Spec.Containers {
 		f.StartedContainers = append(f.StartedContainers, c.Name)
