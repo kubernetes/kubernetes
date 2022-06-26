@@ -126,13 +126,8 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 	}
 	cliflag.PrintFlags(cmd.Flags())
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := server.SetupNotifySignalContext()
 	defer cancel()
-	go func() {
-		stopCh := server.SetupSignalHandler()
-		<-stopCh
-		cancel()
-	}()
 
 	cc, sched, err := Setup(ctx, opts, registryOptions...)
 	if err != nil {

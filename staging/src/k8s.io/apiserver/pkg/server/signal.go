@@ -54,6 +54,12 @@ func SetupSignalContext() context.Context {
 	return ctx
 }
 
+// SetupNotifySignalContext registered for SIGTERM and SIGINT. A context.Context and a context.CancelFunc are returned.
+// Only one of SetupSignalContext, SetupSignalHandler and SetupNotifySignalContext should be called, and only can be called once.
+func SetupNotifySignalContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), shutdownSignals...)
+}
+
 // RequestShutdown emulates a received event that is considered as shutdown signal (SIGTERM/SIGINT)
 // This returns whether a handler was notified
 func RequestShutdown() bool {
