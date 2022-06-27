@@ -20,15 +20,35 @@ limitations under the License.
 package pluginwatcher
 
 import (
+	"fmt"
+	"io/ioutil"
 	"os"
+	"testing"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/stretchr/testify/assert"
 )
 
-func getStat(event fsnotify.Event) (os.FileInfo, error) {
-	return os.Stat(event.Name)
+func init() {
+
+	d, err := ioutil.TempDir("", "plugin_test")
+	if err != nil {
+		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
+	}
+
+	socketDir = d
+}
+func TestGetStat(t *testing.T) {
+	event := fsnotify.Event{Name: "name", Op: fsnotify.Create}
+	fi, err := getStat(event)
+	fiExpected, errExpected := os.Stat(event.Name)
+
+	assert.Equal(t, fi, fiExpected)
+	assert.Equal(t, err, errExpected)
 }
 
-func getSocketPath(socketPath string) string {
-	return socketPath
+func TestGetSocketPath(t *testing.T) {
+	socketPath := fmt.Sprintf("%s/plugin.sock", socketDir)
+
+	assert.Equal(t, socketPath, getSocketPath(socketPath))
 }

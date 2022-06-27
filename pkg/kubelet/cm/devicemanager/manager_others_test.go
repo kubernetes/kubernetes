@@ -17,18 +17,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pluginwatcher
+package devicemanager
 
 import (
-	"os"
+	"testing"
 
-	"github.com/fsnotify/fsnotify"
+	"github.com/stretchr/testify/assert"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
-func getStat(event fsnotify.Event) (os.FileInfo, error) {
-	return os.Stat(event.Name)
-}
+func TestGetSocketPath(t *testing.T) {
 
-func getSocketPath(socketPath string) string {
-	return socketPath
+	assert.Equal(t, getSocketPath(), pluginapi.KubeletSocket)
+
 }
