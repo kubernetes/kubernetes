@@ -157,6 +157,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 		// DisableFlagParsing=true provides the full set of flags passed to the kubelet in the
 		// `args` arg to Run, without Cobra's interference.
 		DisableFlagParsing: true,
+		SilenceUsage:       true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// initial flag parse, since we disable cobra's flag parsing
 			if err := cleanFlagSet.Parse(args); err != nil {
