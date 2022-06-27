@@ -19,6 +19,7 @@ package metricsutil
 import (
 	"fmt"
 	"io"
+	"math"
 	"sort"
 
 	"k8s.io/api/core/v1"
@@ -52,7 +53,7 @@ func NewTopCmdPrinter(out io.Writer) *TopCmdPrinter {
 	return &TopCmdPrinter{out: out}
 }
 
-func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics, availableResources map[string]v1.ResourceList, noHeaders bool, sortBy string) error {
+func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics, availableResources map[string]v1.ResourceList, noHeaders bool, sortBy string, unit bool) error {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -71,7 +72,7 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 			Name:      m.Name,
 			Metrics:   usage,
 			Available: availableResources[m.Name],
-		})
+		}, unit)
 		delete(availableResources, m.Name)
 	}
 
@@ -82,7 +83,7 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	return nil
 }
 
-func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, noHeaders bool, sortBy string, sum bool) error {
+func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, printContainers bool, withNamespace bool, noHeaders bool, sortBy string, sum bool, unit bool) error {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -107,9 +108,9 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 	for _, m := range metrics {
 		if printContainers {
 			sort.Sort(NewContainerMetricsSorter(m.Containers, sortBy))
-			printSinglePodContainerMetrics(w, &m, withNamespace)
+			printSinglePodContainerMetrics(w, &m, withNamespace, unit)
 		} else {
-			printSinglePodMetrics(w, &m, withNamespace)
+			printSinglePodMetrics(w, &m, withNamespace, unit)
 		}
 
 	}
@@ -119,7 +120,7 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 		for _, m := range metrics {
 			adder.AddPodMetrics(&m)
 		}
-		printPodResourcesSum(w, adder.total, columnWidth)
+		printPodResourcesSum(w, adder.total, columnWidth, unit)
 	}
 
 	return nil
@@ -132,7 +133,7 @@ func printColumnNames(out io.Writer, names []string) {
 	fmt.Fprint(out, "\n")
 }
 
-func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool) {
+func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool, unit bool) {
 	podMetrics := getPodMetrics(m)
 	if withNamespace {
 		printValue(out, m.Namespace)
@@ -141,10 +142,10 @@ func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespac
 		Name:      m.Name,
 		Metrics:   podMetrics,
 		Available: v1.ResourceList{},
-	})
+	}, unit)
 }
 
-func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool) {
+func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool, unit bool) {
 	for _, c := range m.Containers {
 		if withNamespace {
 			printValue(out, m.Namespace)
@@ -154,7 +155,7 @@ func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, wit
 			Name:      c.Name,
 			Metrics:   c.Usage,
 			Available: v1.ResourceList{},
-		})
+		}, unit)
 	}
 }
 
@@ -174,9 +175,9 @@ func getPodMetrics(m *metricsapi.PodMetrics) v1.ResourceList {
 	return podMetrics
 }
 
-func printMetricsLine(out io.Writer, metrics *ResourceMetricsInfo) {
+func printMetricsLine(out io.Writer, metrics *ResourceMetricsInfo, unit bool) {
 	printValue(out, metrics.Name)
-	printAllResourceUsages(out, metrics)
+	printAllResourceUsages(out, metrics, unit)
 	fmt.Fprint(out, "\n")
 }
 
@@ -194,10 +195,10 @@ func printValue(out io.Writer, value interface{}) {
 	fmt.Fprintf(out, "%v\t", value)
 }
 
-func printAllResourceUsages(out io.Writer, metrics *ResourceMetricsInfo) {
+func printAllResourceUsages(out io.Writer, metrics *ResourceMetricsInfo, unit bool) {
 	for _, res := range MeasuredResources {
 		quantity := metrics.Metrics[res]
-		printSingleResourceUsage(out, res, quantity)
+		printSingleResourceUsage(out, res, quantity, unit)
 		fmt.Fprint(out, "\t")
 		if available, found := metrics.Available[res]; found {
 			fraction := float64(quantity.MilliValue()) / float64(available.MilliValue()) * 100
@@ -206,18 +207,28 @@ func printAllResourceUsages(out io.Writer, metrics *ResourceMetricsInfo) {
 	}
 }
 
-func printSingleResourceUsage(out io.Writer, resourceType v1.ResourceName, quantity resource.Quantity) {
+func printSingleResourceUsage(out io.Writer, resourceType v1.ResourceName, quantity resource.Quantity, unit bool) {
 	switch resourceType {
 	case v1.ResourceCPU:
-		fmt.Fprintf(out, "%vm", quantity.MilliValue())
+		if unit {
+			v, u := quantityPrintCpuValue(quantity.MilliValue())
+			fmt.Fprintf(out, "%v%s", v, u)
+		} else {
+			fmt.Fprintf(out, "%vm", quantity.MilliValue())
+		}
 	case v1.ResourceMemory:
-		fmt.Fprintf(out, "%vMi", quantity.Value()/(1024*1024))
+		if unit {
+			v, u := quantityPrintMemValue(quantity.Value())
+			fmt.Fprintf(out, "%v%s", v, u)
+		} else {
+			fmt.Fprintf(out, "%vMi", quantity.Value()/(1024*1024))
+		}
 	default:
 		fmt.Fprintf(out, "%v", quantity.Value())
 	}
 }
 
-func printPodResourcesSum(out io.Writer, total v1.ResourceList, columnWidth int) {
+func printPodResourcesSum(out io.Writer, total v1.ResourceList, columnWidth int, unit bool) {
 	for i := 0; i < columnWidth-2; i++ {
 		printValue(out, "")
 	}
@@ -231,6 +242,28 @@ func printPodResourcesSum(out io.Writer, total v1.ResourceList, columnWidth int)
 		Name:      "",
 		Metrics:   total,
 		Available: v1.ResourceList{},
-	})
+	}, unit)
 
+}
+
+func quantityPrintCpuValue(value int64) (int64, string) {
+	if value >= 10e3 {
+		return int64(math.Floor(float64(value)/1000 + 0.5)), ""
+	} else {
+		return value, "m"
+	}
+}
+
+func quantityPrintMemValue(value int64) (int64, string) {
+	if value >= 1024 && value < 1024*1024 {
+		return int64(math.Floor(float64(value)/1024 + 0.5)), "Ki"
+	} else if value >= 1024*1024 && value < 1024*1024*1024 {
+		return int64(math.Floor(float64(value)/1024/1024 + 0.5)), "Mi"
+	} else if value >= 1024*1024*1024 && value < 1024*1024*1024*1024 {
+		return int64(math.Floor(float64(value)/1024/1024/1024 + 0.5)), "Gi"
+	} else if value >= 1024*1024*1024*1024 {
+		return int64(math.Floor(float64(value)/1024/1024/1024/1024 + 0.5)), "Ti"
+	} else {
+		return value, ""
+	}
 }

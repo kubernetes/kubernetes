@@ -45,6 +45,7 @@ type TopNodeOptions struct {
 	NoHeaders          bool
 	UseProtocolBuffers bool
 	ShowCapacity       bool
+	Unit               bool
 
 	NodeClient      corev1client.CoreV1Interface
 	Printer         *metricsutil.TopCmdPrinter
@@ -95,6 +96,7 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
 	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
 	cmd.Flags().BoolVar(&o.ShowCapacity, "show-capacity", o.ShowCapacity, "Print node resources based on Capacity instead of Allocatable(default) of the nodes.")
+	cmd.Flags().BoolVar(&o.Unit, "format-unit", o.Unit, "Print the suitable unit of the resource usage")
 
 	return cmd
 }
@@ -200,7 +202,7 @@ func (o TopNodeOptions) RunTopNode() error {
 		}
 	}
 
-	return o.Printer.PrintNodeMetrics(metrics.Items, availableResources, o.NoHeaders, o.SortBy)
+	return o.Printer.PrintNodeMetrics(metrics.Items, availableResources, o.NoHeaders, o.SortBy, o.Unit)
 }
 
 func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, resourceName string, selector labels.Selector) (*metricsapi.NodeMetricsList, error) {
