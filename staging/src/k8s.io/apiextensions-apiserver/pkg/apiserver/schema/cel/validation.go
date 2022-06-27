@@ -51,6 +51,10 @@ type Validator struct {
 	// isResourceRoot is true if this validator node is for the root of a resource. Either the root of the
 	// custom resource being validated, or the root of an XEmbeddedResource object.
 	isResourceRoot bool
+
+	// celActivationFactory produces an Activation, which resolves identifiers (e.g. self and
+	// oldSelf) to CEL values.
+	celActivationFactory func(sts *schema.Structural, obj, oldObj interface{}) interpreter.Activation
 }
 
 // NewValidator returns compiles all the CEL programs defined in x-kubernetes-validations extensions
@@ -82,6 +86,14 @@ func validator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *
 		additionalPropertiesValidator = validator(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource, perCallLimit)
 	}
 	if len(compiledRules) > 0 || err != nil || itemsValidator != nil || additionalPropertiesValidator != nil || len(propertiesValidators) > 0 {
+		var activationFactory func(*schema.Structural, interface{}, interface{}) interpreter.Activation = validationActivationWithoutOldSelf
+		for _, rule := range compiledRules {
+			if rule.TransitionRule {
+				activationFactory = validationActivationWithOldSelf
+				break
+			}
+		}
+
 		return &Validator{
 			compiledRules:        compiledRules,
 			compilationErr:       err,
@@ -89,6 +101,7 @@ func validator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *
 			Items:                itemsValidator,
 			AdditionalProperties: additionalPropertiesValidator,
 			Properties:           propertiesValidators,
+			celActivationFactory: activationFactory,
 		}
 	}
 
@@ -159,7 +172,7 @@ func (s *Validator) validateExpressions(ctx context.Context, fldPath *field.Path
 	if s.isResourceRoot {
 		sts = model.WithTypeAndObjectMeta(sts)
 	}
-	var activation interpreter.Activation = NewValidationActivation(obj, oldObj, sts)
+	activation := s.celActivationFactory(sts, obj, oldObj)
 	for i, compiled := range s.compiledRules {
 		rule := sts.XValidations[i]
 		if compiled.Error != nil {
@@ -231,15 +244,21 @@ type validationActivation struct {
 	hasOldSelf    bool
 }
 
-func NewValidationActivation(obj, oldObj interface{}, structural *schema.Structural) *validationActivation {
+func validationActivationWithOldSelf(sts *schema.Structural, obj, oldObj interface{}) interpreter.Activation {
 	va := &validationActivation{
-		self: UnstructuredToVal(obj, structural),
+		self: UnstructuredToVal(obj, sts),
 	}
 	if oldObj != nil {
-		va.oldSelf = UnstructuredToVal(oldObj, structural) // +k8s:verify-mutation:reason=clone
-		va.hasOldSelf = true                               // +k8s:verify-mutation:reason=clone
+		va.oldSelf = UnstructuredToVal(oldObj, sts) // +k8s:verify-mutation:reason=clone
+		va.hasOldSelf = true                        // +k8s:verify-mutation:reason=clone
 	}
 	return va
+}
+
+func validationActivationWithoutOldSelf(sts *schema.Structural, obj, _ interface{}) interpreter.Activation {
+	return &validationActivation{
+		self: UnstructuredToVal(obj, sts),
+	}
 }
 
 func (a *validationActivation) ResolveName(name string) (interface{}, bool) {
