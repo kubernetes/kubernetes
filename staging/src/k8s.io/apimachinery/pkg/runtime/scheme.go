@@ -141,7 +141,7 @@ func (s *Scheme) AddKnownTypes(gv schema.GroupVersion, types ...Object) {
 	s.addObservedVersion(gv)
 	for _, obj := range types {
 		t := reflect.TypeOf(obj)
-		if t.Kind() != reflect.Ptr {
+		if t.Kind() != reflect.Pointer {
 			panic("All types must be pointers to structs.")
 		}
 		t = t.Elem()
@@ -159,7 +159,7 @@ func (s *Scheme) AddKnownTypeWithName(gvk schema.GroupVersionKind, obj Object) {
 	if len(gvk.Version) == 0 {
 		panic(fmt.Sprintf("version is required on all types: %s %v", gvk, t))
 	}
-	if t.Kind() != reflect.Ptr {
+	if t.Kind() != reflect.Pointer {
 		panic("All types must be pointers to structs.")
 	}
 	t = t.Elem()
@@ -462,7 +462,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	} else {
 		// determine the incoming kinds with as few allocations as possible.
 		t = reflect.TypeOf(in)
-		if t.Kind() != reflect.Ptr {
+		if t.Kind() != reflect.Pointer {
 			return nil, fmt.Errorf("only pointer types may be converted: %v", t)
 		}
 		t = t.Elem()
