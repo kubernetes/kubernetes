@@ -19,6 +19,7 @@ package sysctl
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 
 	"github.com/stretchr/testify/assert"
@@ -39,6 +40,8 @@ func TestConvertSysctlVariableToDotsSeparator(t *testing.T) {
 		{in: "net/ipv4/ip_local_port_range", out: "net.ipv4.ip_local_port_range"},
 		{in: "kernel/msgmax", out: "kernel.msgmax"},
 		{in: "kernel/sem", out: "kernel.sem"},
+		{in: "kernel", out: "kernel"},
+		{in: "", out: ""},
 	}
 
 	for _, test := range valid {
@@ -50,48 +53,60 @@ func TestConvertSysctlVariableToDotsSeparator(t *testing.T) {
 // TestConvertPodSysctlsVariableToDotsSeparator tests whether the sysctls variable
 // can be correctly converted to a dot as a separator.
 func TestConvertPodSysctlsVariableToDotsSeparator(t *testing.T) {
-
-	sysctls := []v1.Sysctl{
+	tests := []struct {
+		securityContext *v1.PodSecurityContext
+		exceptSysctls   []v1.Sysctl
+	}{
 		{
-			Name:  "kernel.msgmax",
-			Value: "8192",
+			securityContext: &v1.PodSecurityContext{
+				Sysctls: []v1.Sysctl{
+					{
+						Name:  "kernel.msgmax",
+						Value: "8192",
+					},
+					{
+						Name:  "kernel.shm_rmid_forced",
+						Value: "1",
+					},
+					{
+						Name:  "net.ipv4.conf.eno2/100.rp_filter",
+						Value: "1",
+					},
+					{
+						Name:  "net/ipv4/ip_local_port_range",
+						Value: "1024 65535",
+					},
+				},
+			},
+			exceptSysctls: []v1.Sysctl{
+				{
+					Name:  "kernel.msgmax",
+					Value: "8192",
+				},
+				{
+					Name:  "kernel.shm_rmid_forced",
+					Value: "1",
+				},
+				{
+					Name:  "net.ipv4.conf.eno2/100.rp_filter",
+					Value: "1",
+				},
+				{
+					Name:  "net.ipv4.ip_local_port_range",
+					Value: "1024 65535",
+				},
+			},
 		},
 		{
-			Name:  "kernel.shm_rmid_forced",
-			Value: "1",
-		},
-		{
-			Name:  "net.ipv4.conf.eno2/100.rp_filter",
-			Value: "1",
-		},
-		{
-			Name:  "net/ipv4/ip_local_port_range",
-			Value: "1024 65535",
+			securityContext: nil,
+			exceptSysctls:   nil,
 		},
 	}
-	exceptSysctls := []v1.Sysctl{
-		{
-			Name:  "kernel.msgmax",
-			Value: "8192",
-		},
-		{
-			Name:  "kernel.shm_rmid_forced",
-			Value: "1",
-		},
-		{
-			Name:  "net.ipv4.conf.eno2/100.rp_filter",
-			Value: "1",
-		},
-		{
-			Name:  "net.ipv4.ip_local_port_range",
-			Value: "1024 65535",
-		},
-	}
-	securityContext := &v1.PodSecurityContext{
-		Sysctls: sysctls,
-	}
 
-	ConvertPodSysctlsVariableToDotsSeparator(securityContext)
-	assert.Equalf(t, securityContext.Sysctls, exceptSysctls, "The sysctls name was not converted correctly. got: %s, want: %s", securityContext.Sysctls, exceptSysctls)
-
+	for _, test := range tests {
+		ConvertPodSysctlsVariableToDotsSeparator(test.securityContext)
+		if test.securityContext != nil {
+			require.Equalf(t, test.securityContext.Sysctls, test.exceptSysctls, "The sysctls name was not converted correctly. got: %s, want: %s", test.securityContext.Sysctls, test.exceptSysctls)
+		}
+	}
 }

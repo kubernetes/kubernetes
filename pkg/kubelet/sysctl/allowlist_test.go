@@ -17,7 +17,12 @@ limitations under the License.
 package sysctl
 
 import (
+	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 func TestNewAllowlist(t *testing.T) {
@@ -26,6 +31,7 @@ func TestNewAllowlist(t *testing.T) {
 		err     bool
 	}
 	for _, test := range []Test{
+		{sysctls: []string{"*", "kernel.sem"}, err: true},
 		{sysctls: []string{"kernel.msg*", "kernel.sem"}},
 		{sysctls: []string{"kernel/msg*", "kernel/sem"}},
 		{sysctls: []string{" kernel.msg*"}, err: true},
@@ -64,10 +70,11 @@ func TestAllowlist(t *testing.T) {
 		{sysctl: "net.a.b.c", hostNet: false},
 		{sysctl: "net.ipv4.ip_local_port_range.a.b.c", hostNet: false},
 		{sysctl: "kernel.msgmax", hostIPC: true},
+		{sysctl: "net.msgmax", hostNet: true},
 		{sysctl: "kernel.sem", hostIPC: true},
 	}
 
-	w, err := NewAllowlist(append(SafeSysctlAllowlist(), "kernel.msg*", "kernel.sem"))
+	w, err := NewAllowlist(append(SafeSysctlAllowlist(), "kernel.msg*", "kernel.sem", "net.msg*"))
 	if err != nil {
 		t.Fatalf("failed to create allowlist: %v", err)
 	}
@@ -82,5 +89,66 @@ func TestAllowlist(t *testing.T) {
 		if err := w.validateSysctl(test.sysctl, test.hostNet, test.hostIPC); err == nil {
 			t.Errorf("expected to be rejected: %+v", test)
 		}
+	}
+}
+
+func TestAdmit(t *testing.T) {
+	tests := []struct {
+		name           string
+		attrs          *lifecycle.PodAdmitAttributes
+		expectedResult lifecycle.PodAdmitResult
+	}{
+		{
+			name:  "no Sysctls info",
+			attrs: &lifecycle.PodAdmitAttributes{Pod: &metav1.Pod{}, OtherPods: []*metav1.Pod{}},
+			expectedResult: lifecycle.PodAdmitResult{
+				Admit: true,
+			},
+		},
+		{
+			name: "valid sysctls",
+			attrs: &lifecycle.PodAdmitAttributes{Pod: &metav1.Pod{
+				Spec: metav1.PodSpec{
+					SecurityContext: &metav1.PodSecurityContext{
+						Sysctls: []metav1.Sysctl{
+							{Name: "kernel.shm_rmid_forced"},
+						},
+					},
+					HostIPC:     false,
+					HostNetwork: false,
+				},
+			}, OtherPods: []*metav1.Pod{}},
+			expectedResult: lifecycle.PodAdmitResult{
+				Admit: true,
+			},
+		},
+		{
+			name: "Invalid sysctls",
+			attrs: &lifecycle.PodAdmitAttributes{Pod: &metav1.Pod{
+				Spec: metav1.PodSpec{
+					SecurityContext: &metav1.PodSecurityContext{
+						Sysctls: []metav1.Sysctl{
+							{Name: "kernel.shm_rmid_forced"},
+						},
+					},
+					HostIPC:     true,
+					HostNetwork: false,
+				},
+			}, OtherPods: []*metav1.Pod{}},
+			expectedResult: lifecycle.PodAdmitResult{
+				Admit:   false,
+				Reason:  ForbiddenReason,
+				Message: fmt.Sprint("forbidden sysctl: \"kernel.shm_rmid_forced\" not allowed with host ipc enabled"),
+			},
+		},
+	}
+	w, err := NewAllowlist(append(SafeSysctlAllowlist(), "kernel.msg*", "kernel.sem"))
+	if err != nil {
+		t.Fatalf("failed to create allowlist: %v", err)
+	}
+
+	for _, test := range tests {
+		result := w.Admit(test.attrs)
+		require.Equal(t, test.expectedResult, result)
 	}
 }
