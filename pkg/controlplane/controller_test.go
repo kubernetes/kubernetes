@@ -576,10 +576,7 @@ func TestEmptySubsets(t *testing.T) {
 			Subsets:    nil,
 		}},
 	}
-	fakeClient := fake.NewSimpleClientset()
-	if endpoints != nil {
-		fakeClient = fake.NewSimpleClientset(endpoints)
-	}
+	fakeClient := fake.NewSimpleClientset(endpoints)
 	epAdapter := reconcilers.NewEndpointsAdapter(fakeClient.CoreV1(), nil)
 	reconciler := reconcilers.NewMasterCountEndpointReconciler(1, epAdapter)
 	endpointPorts := []corev1.EndpointPort{
