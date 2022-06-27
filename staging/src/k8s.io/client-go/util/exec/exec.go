@@ -26,6 +26,14 @@ type ExitError interface {
 	ExitStatus() int
 }
 
+// NewCodeExitError returns a new CodeExitError.
+func NewCodeExitError(err error, code int) *CodeExitError {
+	return &CodeExitError{
+		Err:  err,
+		Code: code,
+	}
+}
+
 // CodeExitError is an implementation of ExitError consisting of an error object
 // and an exit code (the upper bits of os.exec.ExitStatus).
 type CodeExitError struct {

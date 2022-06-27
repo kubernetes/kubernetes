@@ -18,11 +18,11 @@ package exec
 
 import (
 	"bytes"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/probe"
+	"strings"
 
 	"k8s.io/klog/v2"
 	"k8s.io/utils/exec"
@@ -66,7 +66,13 @@ func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
 			if exit.ExitStatus() == 0 {
 				return probe.Success, string(data), nil
 			}
-			return probe.Failure, string(data), nil
+			probeFailedMsg := string(data)
+			if len(probeFailedMsg) > 0 && !strings.HasSuffix(strings.Trim(probeFailedMsg, " "), "\n") {
+				probeFailedMsg += "\n"
+			}
+			// exit.Error() is a summary of why the process halted with exit status
+			probeFailedMsg += exit.Error()
+			return probe.Failure, probeFailedMsg, nil
 		}
 
 		timeoutErr, ok := err.(*TimeoutError)

@@ -17,8 +17,10 @@ limitations under the License.
 package exec
 
 import (
-	"fmt"
+	"errors"
+	"github.com/stretchr/testify/assert"
 	"io"
+	"k8s.io/client-go/util/exec"
 	"strings"
 	"testing"
 	"time"
@@ -79,70 +81,77 @@ func (f *FakeCmd) StderrPipe() (io.ReadCloser, error) {
 	return nil, nil
 }
 
-type fakeExitError struct {
-	exited     bool
-	statusCode int
-}
-
-func (f *fakeExitError) String() string {
-	return f.Error()
-}
-
-func (f *fakeExitError) Error() string {
-	return "fake exit"
-}
-
-func (f *fakeExitError) Exited() bool {
-	return f.exited
-}
-
-func (f *fakeExitError) ExitStatus() int {
-	return f.statusCode
-}
-
 func TestExec(t *testing.T) {
 	prober := New()
 
 	tenKilobyte := strings.Repeat("logs-123", 128*10)      // 8*128*10=10240 = 10KB of text.
 	elevenKilobyte := strings.Repeat("logs-123", 8*128*11) // 8*128*11=11264 = 11KB of text.
+	fakeExecRunOutput := "fake output (combined stdout and stderr, this content depends on the output of user script)"
+	fakeProcessHaltedMsg := "command terminated with exit code 1"
 
-	tests := []struct {
+	cases := []struct {
+		name           string
 		expectedStatus probe.Result
-		expectError    bool
-		input          string
-		output         string
-		err            error
+		expectOutput   string
+		expectGetError bool
+		cmdError       error
+		cmdOutput      string
 	}{
-		// Ok
-		{probe.Success, false, "OK", "OK", nil},
-		// Ok
-		{probe.Success, false, "OK", "OK", &fakeExitError{true, 0}},
-		// Ok - truncated output
-		{probe.Success, false, elevenKilobyte, tenKilobyte, nil},
-		// Run returns error
-		{probe.Unknown, true, "", "", fmt.Errorf("test error")},
-		// Unhealthy
-		{probe.Failure, false, "Fail", "", &fakeExitError{true, 1}},
-		// Timeout
-		{probe.Failure, false, "", "command testcmd timed out", NewTimeoutError(fmt.Errorf("command testcmd timed out"), time.Second)},
+		{
+			name:           "exec probe success",
+			expectedStatus: probe.Success,
+			expectOutput:   fakeExecRunOutput,
+			cmdOutput:      fakeExecRunOutput,
+		},
+		{
+			name:           "exec probe success with truncated output",
+			expectedStatus: probe.Success,
+			expectOutput:   tenKilobyte,
+			cmdOutput:      elevenKilobyte,
+		},
+		{
+			name:           "exec probe success with 0 exit code",
+			expectedStatus: probe.Success,
+			expectOutput:   fakeExecRunOutput,
+			cmdError:       exec.NewCodeExitError(errors.New("no error"), 0),
+			cmdOutput:      fakeExecRunOutput,
+		},
+		{
+			name:           "exec probe failed with non-0 exit code",
+			expectedStatus: probe.Failure,
+			expectOutput:   "fake output (combined stdout and stderr, this content depends on the output of user script)\ncommand terminated with exit code 1",
+			cmdError:       exec.NewCodeExitError(errors.New(fakeProcessHaltedMsg), 1),
+			cmdOutput:      fakeExecRunOutput,
+		},
+		{
+			name:           "exec probe failed with timeout",
+			expectedStatus: probe.Failure,
+			expectOutput:   "command testcmd timed out",
+			cmdError:       NewTimeoutError(errors.New("command testcmd timed out"), time.Second),
+		},
+		{
+			name:           "unknown exec probe result",
+			expectedStatus: probe.Unknown,
+			cmdError:       errors.New("unexpected error(not CodeExitError & TimeoutError)"),
+			expectGetError: true,
+		},
 	}
-	for i, test := range tests {
-		fake := FakeCmd{
-			out: []byte(test.output),
-			err: test.err,
-		}
-		status, output, err := prober.Probe(&fake)
-		if status != test.expectedStatus {
-			t.Errorf("[%d] expected %v, got %v", i, test.expectedStatus, status)
-		}
-		if err != nil && test.expectError == false {
-			t.Errorf("[%d] unexpected error: %v", i, err)
-		}
-		if err == nil && test.expectError == true {
-			t.Errorf("[%d] unexpected non-error", i)
-		}
-		if test.output != output {
-			t.Errorf("[%d] expected %s, got %s", i, test.output, output)
-		}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fake := FakeCmd{
+				out: []byte(c.cmdOutput),
+				err: c.cmdError,
+			}
+			status, output, err := prober.Probe(&fake)
+
+			assert.Equal(t, c.expectedStatus, status)
+			assert.Equal(t, c.expectOutput, output)
+			if c.expectGetError {
+				assert.Error(t, err)
+			} else {
+				assert.Nil(t, err)
+			}
+		})
 	}
 }
