@@ -72,6 +72,7 @@ type managerImpl struct {
 	nodeRef      *v1.ObjectReference
 	probeManager prober.Manager
 
+	extraInhibitPeriodSeconds        time.Duration
 	shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 
 	getPods        eviction.ActivePodsFunc
@@ -132,11 +133,13 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 		storage: localStorage{
 			Path: filepath.Join(conf.StateDirectory, localStorageStateFile),
 		},
+		extraInhibitPeriodSeconds: conf.ExtraInhibitPeriodSeconds,
 	}
 	manager.logger.Info("Creating node shutdown manager",
 		"shutdownGracePeriodRequested", conf.ShutdownGracePeriodRequested,
 		"shutdownGracePeriodCriticalPods", conf.ShutdownGracePeriodCriticalPods,
 		"shutdownGracePeriodByPodPriority", shutdownGracePeriodByPodPriority,
+		"extraInhibitPeriodSeconds", conf.ExtraInhibitPeriodSeconds,
 	)
 	return manager, manager
 }
@@ -322,8 +325,15 @@ func (m *managerImpl) processShutdownEvent() error {
 	activePods := m.getPods()
 
 	defer func() {
-		m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
 		m.logger.V(1).Info("Shutdown manager completed processing shutdown event, node will shutdown shortly")
+		if m.extraInhibitPeriodSeconds > 0 {
+			m.logger.V(1).Info("Shutdown manager will release inhibit lock after extraInhibitPeriodSeconds", "extraInhibitPeriodSeconds", m.extraInhibitPeriodSeconds)
+			time.Sleep(m.extraInhibitPeriodSeconds)
+		}
+		err := m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
+		if err != nil {
+			m.logger.V(1).Error(err, "Failed to release inhibit lock")
+		}
 	}()
 
 	if m.enableMetrics && m.storage != nil {
@@ -413,7 +423,7 @@ func (m *managerImpl) periodRequested() time.Duration {
 	for _, period := range m.shutdownGracePeriodByPodPriority {
 		sum += period.ShutdownGracePeriodSeconds
 	}
-	return time.Duration(sum) * time.Second
+	return time.Duration(sum)*time.Second + m.extraInhibitPeriodSeconds
 }
 
 func migrateConfig(shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods time.Duration) []kubeletconfig.ShutdownGracePeriodByPodPriority {

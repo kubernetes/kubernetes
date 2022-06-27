@@ -50,6 +50,7 @@ type Config struct {
 	ShutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 	StateDirectory                   string
 	Clock                            clock.Clock
+	ExtraInhibitPeriodSeconds        time.Duration
 }
 
 // managerStub is a fake node shutdown managerImpl .

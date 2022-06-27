@@ -175,6 +175,9 @@ const (
 
 	// nodeLeaseRenewIntervalFraction is the fraction of lease duration to renew the lease
 	nodeLeaseRenewIntervalFraction = 0.25
+
+	// nodeShutdownExtraInhibitPeriod is wait time before releasing inhibit lock.
+	nodeShutdownExtraInhibitPeriod = time.Second * 1
 )
 
 var etcHostsPath = getContainerEtcHostsPath()
@@ -832,6 +835,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		ShutdownGracePeriodCriticalPods:  kubeCfg.ShutdownGracePeriodCriticalPods.Duration,
 		ShutdownGracePeriodByPodPriority: kubeCfg.ShutdownGracePeriodByPodPriority,
 		StateDirectory:                   rootDirectory,
+		ExtraInhibitPeriodSeconds:        nodeShutdownExtraInhibitPeriod,
 	})
 	klet.shutdownManager = shutdownManager
 	klet.admitHandlers.AddPodAdmitHandler(shutdownAdmitHandler)
