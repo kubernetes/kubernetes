@@ -340,7 +340,9 @@ func (s unstructuredJSONScheme) Decode(data []byte, _ *schema.GroupVersionKind, 
 	if len(gvk.Kind) == 0 {
 		return nil, &gvk, runtime.NewMissingKindErr(string(data))
 	}
-	// TODO(109023): require apiVersion here as well
+	if gvk.GroupVersion().Empty() {
+		return nil, &gvk, runtime.NewMissingVersionErr(string(data))
+	}
 
 	return obj, &gvk, nil
 }

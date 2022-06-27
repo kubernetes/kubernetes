@@ -212,19 +212,17 @@ func TestDecode(t *testing.T) {
 			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
 			into:  &unstructured.Unstructured{},
 
-			expectedGVK:    &schema.GroupVersionKind{Kind: "Foo"},
-			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"kind": "Foo"}},
-			// TODO(109023): expect this to error; unstructured decoding currently only requires kind to be set, not apiVersion
+			expectedGVK: &schema.GroupVersionKind{Kind: "Foo"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'apiVersion' is missing in") },
 		},
 		{
 			data:  []byte(`{"kind":"Foo"}`),
 			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
 			into:  &unstructured.Unstructured{},
 
-			expectedGVK:    &schema.GroupVersionKind{Kind: "Foo"},
-			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"kind": "Foo"}},
-			strict:         true,
-			// TODO(109023): expect this to error; unstructured decoding currently only requires kind to be set, not apiVersion
+			expectedGVK: &schema.GroupVersionKind{Kind: "Foo"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'apiVersion' is missing in") },
+			strict:      true,
 		},
 
 		{
@@ -287,19 +285,17 @@ func TestDecode(t *testing.T) {
 			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
 			into:  &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "into/v1", "kind": "Into"}},
 
-			expectedGVK:    &schema.GroupVersionKind{Kind: "Foo"},
-			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"kind": "Foo"}},
-			// TODO(109023): expect this to error; unstructured decoding currently only requires kind to be set, not apiVersion
+			expectedGVK: &schema.GroupVersionKind{Kind: "Foo"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'apiVersion' is missing in") },
 		},
 		{
 			data:  []byte(`{"kind":"Foo"}`),
 			typer: &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
 			into:  &unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "into/v1", "kind": "Into"}},
 
-			expectedGVK:    &schema.GroupVersionKind{Kind: "Foo"},
-			expectedObject: &unstructured.Unstructured{Object: map[string]interface{}{"kind": "Foo"}},
-			strict:         true,
-			// TODO(109023): expect this to error; unstructured decoding currently only requires kind to be set, not apiVersion
+			expectedGVK: &schema.GroupVersionKind{Kind: "Foo"},
+			errFn:       func(err error) bool { return strings.Contains(err.Error(), "Object 'apiVersion' is missing in") },
+			strict:      true,
 		},
 
 		{
@@ -638,10 +634,10 @@ func TestDecode(t *testing.T) {
 		},
 		// Duplicate fields should return an error from the strict JSON deserializer for unstructured.
 		{
-			data:        []byte(`{"kind":"Custom","value":1,"value":1}`),
+			data:        []byte(`{"kind":"Custom","apiVersion":"foo/v1","value":1,"value":1}`),
 			into:        &unstructured.Unstructured{},
 			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
-			expectedGVK: &schema.GroupVersionKind{Kind: "Custom"},
+			expectedGVK: &schema.GroupVersionKind{Group: "foo", Version: "v1", Kind: "Custom"},
 			errFn: func(err error) bool {
 				return strings.Contains(err.Error(), `duplicate field "value"`)
 			},
@@ -650,11 +646,12 @@ func TestDecode(t *testing.T) {
 		// Duplicate fields should return an error from the strict YAML deserializer for unstructured.
 		{
 			data: []byte("kind: Custom\n" +
+				"apiVersion: foo/v1\n" +
 				"value: 1\n" +
 				"value: 1\n"),
 			into:        &unstructured.Unstructured{},
 			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
-			expectedGVK: &schema.GroupVersionKind{Kind: "Custom"},
+			expectedGVK: &schema.GroupVersionKind{Group: "foo", Version: "v1", Kind: "Custom"},
 			errFn: func(err error) bool {
 				return strings.Contains(err.Error(), `"value" already set in map`)
 			},
