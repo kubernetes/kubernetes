@@ -257,3 +257,66 @@ func TestGetValueFromIntOrPercentNil(t *testing.T) {
 		t.Errorf("expected error got none")
 	}
 }
+
+func TestMarshalJSON(t *testing.T) {
+	tests := []struct {
+		desc        string
+		input       IntOrString
+		expectError bool
+	}{
+		{
+			desc:        "marshal int value",
+			input:       FromInt(123),
+			expectError: false,
+		},
+		{
+			desc:        "marshal string value",
+			input:       FromString("str"),
+			expectError: false,
+		},
+		{
+			desc:        "marshal error type and have error",
+			input:       IntOrString{Type: 2},
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		_, err := test.input.MarshalJSON()
+		if test.expectError && err == nil {
+			t.Errorf("expected error, but got none")
+		}
+		if !test.expectError && err != nil {
+			t.Errorf("unexpected err: %v", err)
+		}
+	}
+}
+
+func TestValueOrDefault(t *testing.T) {
+	tests := []struct {
+		desc         string
+		input        *IntOrString
+		defaultValue IntOrString
+		expectValue  string
+	}{
+		{
+			desc:         "intput value is not nil",
+			input:        &IntOrString{StrVal: "input"},
+			defaultValue: FromString("default"),
+			expectValue:  "input",
+		},
+		{
+			desc:         "input value is nil",
+			input:        nil,
+			defaultValue: FromString("default"),
+			expectValue:  "default",
+		},
+	}
+
+	for _, test := range tests {
+		result := ValueOrDefault(test.input, test.defaultValue)
+		if test.expectValue != result.StrVal {
+			t.Errorf("test %v, expectValue is: %v, but now the result is: %v", test.desc, test.expectValue, result)
+		}
+	}
+}
