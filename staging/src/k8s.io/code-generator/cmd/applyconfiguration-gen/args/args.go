@@ -36,7 +36,7 @@ type CustomArgs struct {
 	//
 	// E.g. if a type references appsv1.Deployment, the location of its apply configuration should
 	// be provided:
-	//   k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1
+	//   k8s.io/api/apps/v1#Deployment:k8s.io/client-go/applyconfigurations/apps/v1
 	//
 	// meta/v1 types (TypeMeta and ObjectMeta) are always included and do not need to be passed in.
 	ExternalApplyConfigurations map[types.Name]string
@@ -50,8 +50,9 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	customArgs := &CustomArgs{
 		ExternalApplyConfigurations: map[types.Name]string{
 			// Always include TypeMeta and ObjectMeta. They are sufficient for the vast majority of use cases.
-			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "TypeMeta"}:   "k8s.io/client-go/applyconfigurations/meta/v1",
-			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ObjectMeta"}: "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "TypeMeta"}:       "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ObjectMeta"}:     "k8s.io/client-go/applyconfigurations/meta/v1",
+			{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "OwnerReference"}: "k8s.io/client-go/applyconfigurations/meta/v1",
 		},
 	}
 	genericArgs.CustomArgs = customArgs
@@ -66,7 +67,7 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet, inputBase string) {
 	pflag.Var(NewExternalApplyConfigurationValue(&ca.ExternalApplyConfigurations, nil), "external-applyconfigurations",
 		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form."+
-			"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
+			"For example: k8s.io/api/apps/v1#Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
 	pflag.StringVar(&ca.OpenAPISchemaFilePath, "openapi-schema", "",
 		"path to the openapi schema containing all the types that apply configurations will be generated for")
 }

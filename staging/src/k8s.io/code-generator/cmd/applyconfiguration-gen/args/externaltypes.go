@@ -114,7 +114,7 @@ func parseExternalMapping(mapping string) (typ types.Name, pkg string, err error
 	}
 	packageTypeStr := parts[0]
 	pkg = parts[1]
-	ptParts := strings.Split(packageTypeStr, ".")
+	ptParts := strings.Split(packageTypeStr, "#")
 	if len(ptParts) != 2 {
 		return types.Name{}, "", fmt.Errorf("expected package and type of the form <package>#<typeName> but got %s", packageTypeStr)
 	}
