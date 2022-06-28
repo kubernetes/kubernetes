@@ -1006,7 +1006,7 @@ func (test setConfigTest) run(t *testing.T) {
 	defer func(name string) {
 		err := os.Remove(name)
 		if err != nil {
-
+			t.Error("Failed to remove test file")
 		}
 	}(fakeKubeFile.Name())
 	err = clientcmd.WriteToFile(test.config, fakeKubeFile.Name())

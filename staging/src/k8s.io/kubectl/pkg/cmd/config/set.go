@@ -215,7 +215,7 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 		var jsonPathTraverser []string
 		innerNodeList := outerNodeList.(*jsonpath.ListNode).Nodes // The Root.Nodes type will always be a ListNode so this assertion is safe
 
-		// This is where we enter the actual list of nodes that are contained within the {} in the jsonpath langauge
+		// This is where we enter the actual list of nodes that are contained within the {} in the jsonpath language
 		// e.g. {.node1.node2.node3}
 		for nodeIterator, node := range innerNodeList {
 			// For set, it only makes sense to use field, array, and filter node types, so we will be ignoring
