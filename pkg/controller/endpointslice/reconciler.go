@@ -225,9 +225,7 @@ func (r *reconciler) reconcileByAddressType(service *corev1.Service, pods []*cor
 	// the corresponding endpoint slices for deletion.
 	for portMap, existingSlices := range existingSlicesByPortMap {
 		if _, ok := desiredEndpointsByPortMap[portMap]; !ok {
-			for _, existingSlice := range existingSlices {
-				slicesToDelete = append(slicesToDelete, existingSlice)
-			}
+			slicesToDelete = append(slicesToDelete, existingSlices...)
 		}
 	}
 
