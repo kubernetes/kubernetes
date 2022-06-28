@@ -17,10 +17,9 @@ limitations under the License.
 package runtime
 
 import (
+	"fmt"
 	"os"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	utilsexec "k8s.io/utils/exec"
@@ -57,7 +56,7 @@ func NewContainerRuntime(execer utilsexec.Interface, criSocket string) (Containe
 	const toolName = "crictl"
 	crictlPath, err := execer.LookPath(toolName)
 	if err != nil {
-		return nil, errors.Wrapf(err, "%s is required by the container runtime", toolName)
+		return nil, fmt.Errorf("%s is required by the container runtime: %w", toolName, err)
 	}
 	return &CRIRuntime{execer, criSocket, crictlPath}, nil
 }
@@ -77,7 +76,7 @@ func (runtime *CRIRuntime) crictl(args ...string) utilsexec.Cmd {
 // IsRunning checks if runtime is running
 func (runtime *CRIRuntime) IsRunning() error {
 	if out, err := runtime.crictl("info").CombinedOutput(); err != nil {
-		return errors.Wrapf(err, "container runtime is not running: output: %s, error", string(out))
+		return fmt.Errorf("container runtime is not running: output: %s, error: %w", string(out), err)
 	}
 	return nil
 }
@@ -86,7 +85,7 @@ func (runtime *CRIRuntime) IsRunning() error {
 func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 	out, err := runtime.crictl("pods", "-q").CombinedOutput()
 	if err != nil {
-		return nil, errors.Wrapf(err, "output: %s, error", string(out))
+		return nil, fmt.Errorf("output: %s, error: %w", string(out), err)
 	}
 	pods := []string{}
 	pods = append(pods, strings.Fields(string(out))...)
@@ -100,11 +99,11 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 		out, err := runtime.crictl("stopp", container).CombinedOutput()
 		if err != nil {
 			// don't stop on errors, try to remove as many containers as possible
-			errs = append(errs, errors.Wrapf(err, "failed to stop running pod %s: output: %s, error", container, string(out)))
+			errs = append(errs, fmt.Errorf("failed to stop running pod %s: output: %s, error: %w", container, string(out), err))
 		} else {
 			out, err = runtime.crictl("rmp", container).CombinedOutput()
 			if err != nil {
-				errs = append(errs, errors.Wrapf(err, "failed to remove running container %s: output: %s, error", container, string(out)))
+				errs = append(errs, fmt.Errorf("failed to remove running container %s: output: %s, error: %w", container, string(out), err))
 			}
 		}
 	}
@@ -121,7 +120,7 @@ func (runtime *CRIRuntime) PullImage(image string) error {
 			return nil
 		}
 	}
-	return errors.Wrapf(err, "output: %s, error", out)
+	return fmt.Errorf("output: %s, error: %w", out, err)
 }
 
 // ImageExists checks to see if the image exists on the system
@@ -149,7 +148,7 @@ func detectCRISocketImpl(isSocket func(string) bool, knownCRISockets []string) (
 		return foundCRISockets[0], nil
 	default:
 		// Multiple CRIs installed?
-		return "", errors.Errorf("Found multiple CRI endpoints on the host. Please define which one do you wish "+
+		return "", fmt.Errorf("found multiple CRI endpoints on the host. Please define which one do you wish "+
 			"to use by setting the 'criSocket' field in the kubeadm configuration file: %s",
 			strings.Join(foundCRISockets, ", "))
 	}

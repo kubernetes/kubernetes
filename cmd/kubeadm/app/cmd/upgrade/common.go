@@ -19,13 +19,12 @@ package upgrade
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,7 +89,7 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	// Otherwise, we have a config file. Let's load it.
 	configBytes, err := os.ReadFile(cfgPath)
 	if err != nil {
-		return nil, false, errors.Wrapf(err, "unable to load config from file %q", cfgPath)
+		return nil, false, fmt.Errorf("unable to load config from file %q: %w", cfgPath, err)
 	}
 
 	// Split the YAML documents in the file into a DocumentMap
@@ -137,7 +136,7 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool, printer output.Printer) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
-		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
+		return nil, nil, nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %w", flags.kubeConfigPath, err)
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
@@ -155,9 +154,9 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 			printer.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
 			printer.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
 			printer.Println()
-			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+			err = fmt.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
-		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
+		return nil, nil, nil, fmt.Errorf("[upgrade/config] FATAL: %w", err)
 	} else if legacyReconfigure {
 		// Set the newK8sVersion to the value in the ClusterConfiguration. This is done, so that users who use the --config option
 		// to supply a new ClusterConfiguration don't have to specify the Kubernetes version twice,
@@ -201,14 +200,14 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 
 	// Run healthchecks against the cluster
 	if err := upgrade.CheckClusterHealth(client, &cfg.ClusterConfiguration, ignorePreflightErrorsSet); err != nil {
-		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
+		return nil, nil, nil, fmt.Errorf("[upgrade/health] FATAL: %w", err)
 	}
 
 	// If features gates are passed to the command line, use it (otherwise use featureGates from configuration)
 	if flags.featureGatesString != "" {
 		cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
 		if err != nil {
-			return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
+			return nil, nil, nil, fmt.Errorf("[upgrade/config] FATAL: %w", err)
 		}
 	}
 
@@ -235,11 +234,11 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		cfg.NodeRegistration.CRISocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + socket
 		hostname, err := os.Hostname()
 		if err != nil {
-			return nil, nil, nil, errors.Wrapf(err, "failed to get hostname")
+			return nil, nil, nil, fmt.Errorf("failed to get hostname: %w", err)
 		}
 		klog.V(2).Infof("ensuring that Node %q has a CRI socket annotation with correct URL scheme %q", hostname, cfg.NodeRegistration.CRISocket)
 		if err := patchnodephase.AnnotateCRISocket(client, hostname, cfg.NodeRegistration.CRISocket); err != nil {
-			return nil, nil, nil, errors.Wrapf(err, "error updating the CRI socket for Node %q", cfg.NodeRegistration.CRISocket)
+			return nil, nil, nil, fmt.Errorf("error updating the CRI socket for Node %q: %w", cfg.NodeRegistration.CRISocket, err)
 		}
 	}
 
@@ -292,7 +291,7 @@ func getClient(file string, dryRun bool) (clientset.Interface, error) {
 		// API Server's version
 		realServerVersion, err := dryRunGetter.Client().Discovery().ServerVersion()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get server version")
+			return nil, fmt.Errorf("failed to get server version: %w", err)
 		}
 
 		// Get the fake clientset
@@ -330,7 +329,7 @@ func InteractivelyConfirmUpgrade(question string) error {
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Scan()
 	if err := scanner.Err(); err != nil {
-		return errors.Wrap(err, "couldn't read from standard input")
+		return fmt.Errorf("couldn't read from standard input: %w", err)
 	}
 	answer := scanner.Text()
 	if strings.ToLower(answer) == "y" || strings.ToLower(answer) == "yes" {

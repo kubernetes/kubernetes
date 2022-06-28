@@ -17,13 +17,13 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"text/template"
 	"time"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -75,7 +75,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	// TODO: think of a better place to move this call - e.g. a hidden phase.
 	if data.DryRun() {
 		if err := dryrunutil.PrintFilesIfDryRunning(true /* needPrintManifest */, data.ManifestDir(), data.OutputWriter()); err != nil {
-			return errors.Wrap(err, "error printing files on dryrun")
+			return fmt.Errorf("error printing files on dryrun: %w", err)
 		}
 	}
 
@@ -84,13 +84,13 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 
 	client, err := data.Client()
 	if err != nil {
-		return errors.Wrap(err, "cannot obtain client")
+		return fmt.Errorf("cannot obtain client: %w", err)
 	}
 
 	timeout := data.Cfg().ClusterConfiguration.APIServer.TimeoutForControlPlane.Duration
 	waiter, err := newControlPlaneWaiter(data.DryRun(), timeout, client, data.OutputWriter())
 	if err != nil {
-		return errors.Wrap(err, "error creating waiter")
+		return fmt.Errorf("error creating waiter: %w", err)
 	}
 
 	fmt.Printf("[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory %q. This can take up to %v\n", data.ManifestDir(), timeout)

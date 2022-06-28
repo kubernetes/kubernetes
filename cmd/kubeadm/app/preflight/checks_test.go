@@ -18,6 +18,7 @@ package preflight
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -27,7 +28,6 @@ import (
 	"testing"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"

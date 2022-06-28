@@ -17,13 +17,12 @@ limitations under the License.
 package upgrade
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -227,7 +226,7 @@ func upgradeComponent(component string, certsRenewMgr *renewal.Manager, waiter a
 	if certsRenewMgr != nil {
 		// renew all the certificates used by the current component
 		if err := renewCertsByComponent(cfg, component, certsRenewMgr); err != nil {
-			return rollbackOldManifests(recoverManifests, errors.Wrapf(err, "failed to renew certificates for component %q", component), pathMgr, recoverEtcd)
+			return rollbackOldManifests(recoverManifests, fmt.Errorf("failed to renew certificates for component %q: %w", component, err), pathMgr, recoverEtcd)
 		}
 	}
 
@@ -274,14 +273,14 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 	// Checking health state of etcd before proceeding with the upgrade
 	err := oldEtcdClient.CheckClusterHealth()
 	if err != nil {
-		return true, errors.Wrap(err, "etcd cluster is not healthy")
+		return true, fmt.Errorf("etcd cluster is not healthy: %w", err)
 	}
 
 	// Backing up etcd data store
 	backupEtcdDir := pathMgr.BackupEtcdDir()
 	runningEtcdDir := cfg.Etcd.Local.DataDir
 	if err := kubeadmutil.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
-		return true, errors.Wrap(err, "failed to back up etcd data")
+		return true, fmt.Errorf("failed to back up etcd data: %w", err)
 	}
 
 	// Get the desired etcd version. That's either the one specified by the user in cfg.Etcd.Local.ImageTag
@@ -291,14 +290,14 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 		desiredEtcdVersion, err = version.ParseSemantic(
 			convertImageTagMetadataToSemver(cfg.Etcd.Local.ImageTag))
 		if err != nil {
-			return true, errors.Wrapf(err, "failed to parse tag %q as a semantic version", cfg.Etcd.Local.ImageTag)
+			return true, fmt.Errorf("failed to parse tag %q as a semantic version: %w", cfg.Etcd.Local.ImageTag, err)
 		}
 	} else {
 		// Need to check currently used version and version from constants, if differs then upgrade
 		var warning error
 		desiredEtcdVersion, warning, err = constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, cfg.KubernetesVersion)
 		if err != nil {
-			return true, errors.Wrap(err, "failed to retrieve an etcd version for the target Kubernetes version")
+			return true, fmt.Errorf("failed to retrieve an etcd version for the target Kubernetes version: %w", err)
 		}
 		if warning != nil {
 			klog.Warningf("[upgrade/etcd] %v", warning)
@@ -308,15 +307,15 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 	// Get the etcd version of the local/stacked etcd member running on the current machine
 	currentEtcdVersionStr, err := GetEtcdImageTagFromStaticPod(pathMgr.RealManifestDir())
 	if err != nil {
-		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
+		return true, fmt.Errorf("failed to retrieve the current etcd version: %w", err)
 	}
 
 	cmpResult, err := desiredEtcdVersion.Compare(currentEtcdVersionStr)
 	if err != nil {
-		return true, errors.Wrapf(err, "failed comparing the current etcd version %q to the desired one %q", currentEtcdVersionStr, desiredEtcdVersion)
+		return true, fmt.Errorf("failed comparing the current etcd version %q to the desired one %q: %w", currentEtcdVersionStr, desiredEtcdVersion, err)
 	}
 	if cmpResult < 0 {
-		return false, errors.Errorf("the desired etcd version %q is older than the currently installed %q. Skipping etcd upgrade", desiredEtcdVersion, currentEtcdVersionStr)
+		return false, fmt.Errorf("the desired etcd version %q is older than the currently installed %q. Skipping etcd upgrade", desiredEtcdVersion, currentEtcdVersionStr)
 	}
 
 	beforeEtcdPodHash, err := waiter.WaitForStaticPodSingleHash(cfg.NodeRegistration.Name, constants.Etcd)
@@ -327,7 +326,7 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 	// Write the updated etcd static Pod manifest into the temporary directory, at this point no etcd change
 	// has occurred in any aspects.
 	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), pathMgr.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, false /* isDryRun */); err != nil {
-		return true, errors.Wrap(err, "error creating local etcd static pod manifest file")
+		return true, fmt.Errorf("error creating local etcd static pod manifest file: %w", err)
 	}
 
 	retries := 10
@@ -346,7 +345,7 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 			fmt.Println("[upgrade/etcd] Rolling back etcd data")
 			if err := rollbackEtcdData(cfg, pathMgr); err != nil {
 				// Even copying back datastore failed, no options for recovery left, bailing out
-				return true, errors.Errorf("fatal error rolling back local etcd cluster datadir: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
+				return true, fmt.Errorf("fatal error rolling back local etcd cluster datadir: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
 			}
 			fmt.Println("[upgrade/etcd] Etcd data rollback successful")
 
@@ -355,7 +354,7 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 			if _, err := oldEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
 				fmt.Printf("[upgrade/etcd] Failed to healthcheck previous etcd: %v\n", err)
 				// Nothing else left to try to recover etcd cluster
-				return true, errors.Wrapf(err, "fatal error rolling back local etcd cluster manifest, the backup of etcd database is stored here:(%s)", backupEtcdDir)
+				return true, fmt.Errorf("fatal error rolling back local etcd cluster manifest, the backup of etcd database is stored here:(%s): %w", backupEtcdDir, err)
 			}
 
 			// We've recovered to the previous etcd from this case
@@ -363,14 +362,14 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 		fmt.Println("[upgrade/etcd] Etcd was rolled back and is now available")
 
 		// Since etcd cluster came back up with the old manifest
-		return true, errors.Wrap(err, "fatal error when trying to upgrade the etcd cluster, rolled the state back to pre-upgrade state")
+		return true, fmt.Errorf("fatal error when trying to upgrade the etcd cluster, rolled the state back to pre-upgrade state: %w", err)
 	}
 
 	// Initialize the new etcd client if it wasn't pre-initialized
 	if newEtcdClient == nil {
 		etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
 		if err != nil {
-			return true, errors.Wrap(err, "fatal error creating etcd client")
+			return true, fmt.Errorf("fatal error creating etcd client: %w", err)
 		}
 		newEtcdClient = etcdClient
 	}
@@ -384,7 +383,7 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 		fmt.Println("[upgrade/etcd] Rolling back etcd data")
 		if err := rollbackEtcdData(cfg, pathMgr); err != nil {
 			// Even copying back datastore failed, no options for recovery left, bailing out
-			return true, errors.Wrapf(err, "fatal error rolling back local etcd cluster datadir, the backup of etcd database is stored here:(%s)", backupEtcdDir)
+			return true, fmt.Errorf("fatal error rolling back local etcd cluster datadir, the backup of etcd database is stored here:(%s): %w", backupEtcdDir, err)
 		}
 		fmt.Println("[upgrade/etcd] Etcd data rollback successful")
 
@@ -398,12 +397,12 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 		if _, err := oldEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
 			fmt.Printf("[upgrade/etcd] Failed to healthcheck previous etcd: %v\n", err)
 			// Nothing else left to try to recover etcd cluster
-			return true, errors.Wrapf(err, "fatal error rolling back local etcd cluster manifest, the backup of etcd database is stored here:(%s)", backupEtcdDir)
+			return true, fmt.Errorf("fatal error rolling back local etcd cluster manifest, the backup of etcd database is stored here:(%s): %w", backupEtcdDir, err)
 		}
 		fmt.Println("[upgrade/etcd] Etcd was rolled back and is now available")
 
 		// We've successfully rolled back etcd, and now return an error describing that the upgrade failed
-		return true, errors.Wrap(err, "fatal error upgrading local etcd cluster, rolled the state back to pre-upgrade state")
+		return true, fmt.Errorf("fatal error upgrading local etcd cluster, rolled the state back to pre-upgrade state: %w", err)
 	}
 
 	return false, nil
@@ -430,7 +429,7 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 				cfg.Etcd.External.KeyFile,
 			)
 			if err != nil {
-				return errors.Wrap(err, "failed to create etcd client for external etcd")
+				return fmt.Errorf("failed to create etcd client for external etcd: %w", err)
 			}
 			oldEtcdClient = etcdClient
 			// Since etcd is managed externally, the new etcd client will be the same as the old client
@@ -441,7 +440,7 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 			// etcd Static Pod
 			etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
 			if err != nil {
-				return errors.Wrap(err, "failed to create etcd client")
+				return fmt.Errorf("failed to create etcd client: %w", err)
 			}
 			oldEtcdClient = etcdClient
 		}
@@ -451,7 +450,7 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 	if renewCerts {
 		certsRenewMgr, err = renewal.NewManager(&cfg.ClusterConfiguration, pathMgr.KubernetesDir())
 		if err != nil {
-			return errors.Wrap(err, "failed to create the certificate renewal manager")
+			return fmt.Errorf("failed to create the certificate renewal manager: %w", err)
 		}
 	}
 
@@ -474,7 +473,7 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 	fmt.Printf("[upgrade/staticpods] Writing new Static Pod manifests to %q\n", pathMgr.TempManifestDir())
 	err = controlplane.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), pathMgr.PatchesDir(), cfg, false /* isDryRun */)
 	if err != nil {
-		return errors.Wrap(err, "error creating init static pod manifest files")
+		return fmt.Errorf("error creating init static pod manifest files: %w", err)
 	}
 
 	for _, component := range constants.ControlPlaneComponents {
@@ -487,7 +486,7 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 		// renew the certificate embedded in the admin.conf file
 		renewed, err := certsRenewMgr.RenewUsingLocalCA(constants.AdminKubeConfigFileName)
 		if err != nil {
-			return rollbackOldManifests(recoverManifests, errors.Wrapf(err, "failed to upgrade the %s certificates", constants.AdminKubeConfigFileName), pathMgr, false)
+			return rollbackOldManifests(recoverManifests, fmt.Errorf("failed to upgrade the %s certificates: %w", constants.AdminKubeConfigFileName, err), pathMgr, false)
 		}
 
 		if !renewed {
@@ -521,8 +520,7 @@ func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr
 		}
 	}
 	// Let the user know there were problems, but we tried to recover
-	return errors.Wrap(utilerrors.NewAggregate(errs),
-		"couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced")
+	return fmt.Errorf("couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: %w", utilerrors.NewAggregate(errs))
 }
 
 // rollbackEtcdData rolls back the content of etcd folder if something went wrong.
@@ -533,7 +531,7 @@ func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathMa
 
 	if err := kubeadmutil.CopyDir(backupEtcdDir, runningEtcdDir); err != nil {
 		// Let the user know there we're problems, but we tried to reçover
-		return errors.Wrapf(err, "couldn't recover etcd database with error, the location of etcd backup: %s ", backupEtcdDir)
+		return fmt.Errorf("couldn't recover etcd database with error, the location of etcd backup: %s : %w", backupEtcdDir, err)
 	}
 
 	return nil

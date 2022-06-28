@@ -27,8 +27,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -165,7 +163,7 @@ func PatchStaticPod(pod *v1.Pod, patchesDir string, output io.Writer) (*v1.Pod, 
 	// Marshal the Pod manifest into YAML.
 	podYAML, err := kubeadmutil.MarshalToYaml(pod, v1.SchemeGroupVersion)
 	if err != nil {
-		return pod, errors.Wrapf(err, "failed to marshal Pod manifest to YAML")
+		return pod, fmt.Errorf("failed to marshal Pod manifest to YAML: %w", err)
 	}
 
 	patchManager, err := patches.GetPatchManagerForPath(patchesDir, patches.KnownTargets(), output)
@@ -184,12 +182,12 @@ func PatchStaticPod(pod *v1.Pod, patchesDir string, output io.Writer) (*v1.Pod, 
 
 	obj, err := kubeadmutil.UnmarshalFromYaml(patchTarget.Data, v1.SchemeGroupVersion)
 	if err != nil {
-		return pod, errors.Wrap(err, "failed to unmarshal patched manifest from YAML")
+		return pod, fmt.Errorf("failed to unmarshal patched manifest from YAML: %w", err)
 	}
 
 	pod2, ok := obj.(*v1.Pod)
 	if !ok {
-		return pod, errors.Wrap(err, "patched manifest is not a valid Pod object")
+		return pod, fmt.Errorf("patched manifest is not a valid Pod object: %w", err)
 	}
 
 	return pod2, nil
@@ -200,19 +198,19 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(manifestDir, 0700); err != nil {
-		return errors.Wrapf(err, "failed to create directory %q", manifestDir)
+		return fmt.Errorf("failed to create directory %q: %w", manifestDir, err)
 	}
 
 	// writes the pod to disk
 	serialized, err := kubeadmutil.MarshalToYaml(&pod, v1.SchemeGroupVersion)
 	if err != nil {
-		return errors.Wrapf(err, "failed to marshal manifest for %q to YAML", componentName)
+		return fmt.Errorf("failed to marshal manifest for %q to YAML: %w", componentName, err)
 	}
 
 	filename := kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir)
 
 	if err := os.WriteFile(filename, serialized, 0600); err != nil {
-		return errors.Wrapf(err, "failed to write static pod manifest file for %q (%q)", componentName, filename)
+		return fmt.Errorf("failed to write static pod manifest file for %q (%q): %w", componentName, filename, err)
 	}
 
 	return nil
@@ -222,12 +220,12 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 	buf, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return &v1.Pod{}, errors.Wrapf(err, "failed to read manifest for %q", manifestPath)
+		return &v1.Pod{}, fmt.Errorf("failed to read manifest for %q: %w", manifestPath, err)
 	}
 
 	obj, err := kubeadmutil.UnmarshalFromYaml(buf, v1.SchemeGroupVersion)
 	if err != nil {
-		return &v1.Pod{}, errors.Errorf("failed to unmarshal manifest for %q from YAML: %v", manifestPath, err)
+		return &v1.Pod{}, fmt.Errorf("failed to unmarshal manifest for %q from YAML: %v", manifestPath, err)
 	}
 
 	pod := obj.(*v1.Pod)

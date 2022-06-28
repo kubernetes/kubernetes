@@ -17,12 +17,11 @@ limitations under the License.
 package kubelet
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -59,7 +58,7 @@ func WriteConfigToDisk(cfg *kubeadmapi.ClusterConfiguration, kubeletDir, patches
 	if len(patchesDir) != 0 {
 		kubeletBytes, err = applyKubeletConfigPatches(kubeletBytes, patchesDir, output)
 		if err != nil {
-			return errors.Wrap(err, "could not apply patches to the KubeletConfiguration")
+			return fmt.Errorf("could not apply patches to the KubeletConfiguration: %w", err)
 		}
 	}
 
@@ -101,7 +100,7 @@ func CreateConfigMap(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inte
 	}
 
 	if err := createConfigMapRBACRules(client); err != nil {
-		return errors.Wrap(err, "error creating kubelet configuration configmap RBAC rules")
+		return fmt.Errorf("error creating kubelet configuration configmap RBAC rules: %w", err)
 	}
 	return nil
 }
@@ -155,11 +154,11 @@ func writeConfigBytesToDisk(b []byte, kubeletDir string) error {
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(kubeletDir, 0700); err != nil {
-		return errors.Wrapf(err, "failed to create directory %q", kubeletDir)
+		return fmt.Errorf("failed to create directory %q: %w", kubeletDir, err)
 	}
 
 	if err := os.WriteFile(configFile, b, 0644); err != nil {
-		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", configFile)
+		return fmt.Errorf("failed to write kubelet configuration to the file %q: %w", configFile, err)
 	}
 	return nil
 }

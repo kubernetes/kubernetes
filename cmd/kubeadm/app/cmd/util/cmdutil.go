@@ -17,7 +17,8 @@ limitations under the License.
 package util
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -37,10 +38,10 @@ import (
 func SubCmdRunE(name string) func(*cobra.Command, []string) error {
 	return func(_ *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			return errors.Errorf("missing subcommand; %q is not meant to be run on its own", name)
+			return fmt.Errorf("missing subcommand; %q is not meant to be run on its own", name)
 		}
 
-		return errors.Errorf("invalid subcommand: %q", args[0])
+		return fmt.Errorf("invalid subcommand: %q", args[0])
 	}
 }
 
@@ -55,12 +56,12 @@ func ValidateExactArgNumber(args []string, supportedArgs []string) error {
 		}
 		// break early for too many arguments
 		if validArgs > lenSupported {
-			return errors.Errorf("too many arguments. Required arguments: %v", supportedArgs)
+			return fmt.Errorf("too many arguments. Required arguments: %v", supportedArgs)
 		}
 	}
 
 	if validArgs < lenSupported {
-		return errors.Errorf("missing one or more required arguments. Required arguments: %v", supportedArgs)
+		return fmt.Errorf("missing one or more required arguments. Required arguments: %v", supportedArgs)
 	}
 	return nil
 }

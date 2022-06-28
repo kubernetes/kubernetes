@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -24,7 +25,6 @@ import (
 	"text/template"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
@@ -372,7 +372,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		// directory from the command line. This makes it possible to run "kubeadm init" integration
 		// tests without root.
 		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm(os.Getenv("KUBEADM_INIT_DRYRUN_DIR"), "kubeadm-init-dryrun"); err != nil {
-			return nil, errors.Wrap(err, "couldn't create a temporary directory")
+			return nil, fmt.Errorf("couldn't create a temporary directory: %w", err)
 		}
 	}
 
@@ -382,7 +382,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		// In case the certificates signed by CA (that should be provided by the user) are missing or invalid,
 		// returns, because kubeadm can't regenerate them without the CA Key
 		if err != nil {
-			return nil, errors.Wrapf(err, "invalid or incomplete external CA")
+			return nil, fmt.Errorf("invalid or incomplete external CA: %w", err)
 		}
 
 		// Validate that also the required kubeconfig files exists and are invalid, because
@@ -399,7 +399,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		// In case the certificates signed by Front-Proxy CA (that should be provided by the user) are missing or invalid,
 		// returns, because kubeadm can't regenerate them without the Front-Proxy CA Key
 		if err != nil {
-			return nil, errors.Wrapf(err, "invalid or incomplete external front-proxy CA")
+			return nil, fmt.Errorf("invalid or incomplete external front-proxy CA: %w", err)
 		}
 	}
 
@@ -527,7 +527,7 @@ func (d *initData) Client() (clientset.Interface, error) {
 		if d.dryRun {
 			svcSubnetCIDR, err := kubeadmconstants.GetKubernetesServiceCIDR(d.cfg.Networking.ServiceSubnet)
 			if err != nil {
-				return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", d.cfg.Networking.ServiceSubnet)
+				return nil, fmt.Errorf("unable to get internal Kubernetes Service IP from the given service CIDR (%s): %w", d.cfg.Networking.ServiceSubnet, err)
 			}
 			// If we're dry-running, we should create a faked client that answers some GETs in order to be able to do the full init flow and just logs the rest of requests
 			dryRunGetter := apiclient.NewInitDryRunGetter(d.cfg.NodeRegistration.Name, svcSubnetCIDR.String())
@@ -594,7 +594,7 @@ func showJoinCommand(i *initData, out io.Writer) error {
 	// Prints the join command, multiple times in case the user has multiple tokens
 	for _, token := range i.Tokens() {
 		if err := printJoinCommand(out, adminKubeConfigPath, token, i); err != nil {
-			return errors.Wrap(err, "failed to print join command")
+			return fmt.Errorf("failed to print join command: %w", err)
 		}
 	}
 

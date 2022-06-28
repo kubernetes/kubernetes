@@ -17,9 +17,8 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"

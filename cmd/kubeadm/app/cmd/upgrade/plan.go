@@ -25,7 +25,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,7 +62,7 @@ func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 		RunE: func(_ *cobra.Command, args []string) error {
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
-				return errors.Wrap(err, "could not construct output printer")
+				return fmt.Errorf("could not construct output printer: %w", err)
 			}
 
 			return runPlan(flags, args, printer)
@@ -168,7 +167,7 @@ func newUpgradePlanJSONYAMLPrinter(resourcePrinter printers.ResourcePrinter, err
 func (p *upgradePlanJSONYAMLPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 	item, ok := obj.(*outputapiv1alpha2.ComponentUpgradePlan)
 	if !ok {
-		return errors.Errorf("expected ComponentUpgradePlan, but got %+v", obj)
+		return fmt.Errorf("expected ComponentUpgradePlan, but got %+v", obj)
 	}
 	p.Buffer = append(p.Buffer, *item)
 	return nil
@@ -219,7 +218,7 @@ func (p *upgradePlanTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) 
 
 	item, ok := obj.(*outputapiv1alpha2.ComponentUpgradePlan)
 	if !ok {
-		return errors.Errorf("expected ComponentUpgradePlan, but got %+v", obj)
+		return fmt.Errorf("expected ComponentUpgradePlan, but got %+v", obj)
 	}
 
 	// Print item
@@ -263,14 +262,14 @@ func runPlan(flags *planFlags, args []string, printer output.Printer) error {
 	klog.V(1).Infoln("[upgrade/plan] computing upgrade possibilities")
 	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, isExternalEtcd, client, constants.GetStaticPodDirectory(), printer)
 	if err != nil {
-		return errors.Wrap(err, "[upgrade/versions] FATAL")
+		return fmt.Errorf("[upgrade/versions] FATAL: %w", err)
 	}
 
 	// Fetch the current state of the component configs
 	klog.V(1).Infoln("[upgrade/plan] analysing component config version states")
 	configVersionStates, err := getComponentConfigVersionStates(&cfg.ClusterConfiguration, client, flags.cfgPath)
 	if err != nil {
-		return errors.WithMessage(err, "[upgrade/versions] FATAL")
+		return fmt.Errorf("[upgrade/versions] FATAL: %w", err)
 	}
 
 	// No upgrades available
@@ -315,7 +314,7 @@ func appendDNSComponent(components []outputapiv1alpha2.ComponentUpgradePlan, up 
 func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapiv1alpha2.UpgradePlan, string, error) {
 	newK8sVersion, err := version.ParseSemantic(up.After.KubeVersion)
 	if err != nil {
-		return nil, "", errors.Wrapf(err, "Unable to parse normalized version %q as a semantic version", up.After.KubeVersion)
+		return nil, "", fmt.Errorf("Unable to parse normalized version %q as a semantic version: %w", up.After.KubeVersion, err)
 	}
 
 	unstableVersionFlag := ""
@@ -358,7 +357,7 @@ func getComponentConfigVersionStates(cfg *kubeadmapi.ClusterConfiguration, clien
 	if cfgPath != "" {
 		bytes, err := os.ReadFile(cfgPath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "unable to read config file %q", cfgPath)
+			return nil, fmt.Errorf("unable to read config file %q: %w", cfgPath, err)
 		}
 
 		docmap, err = kubeadmutil.SplitYAMLDocuments(bytes)

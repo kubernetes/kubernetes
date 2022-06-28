@@ -18,11 +18,10 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"net"
 	"reflect"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -76,7 +75,7 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 	gvString := gv.String()
 
 	if useKubeadmVersion := oldKnownAPIVersions[gvString]; useKubeadmVersion != "" {
-		return errors.Errorf("your configuration file uses an old API spec: %q. Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String(), useKubeadmVersion)
+		return fmt.Errorf("your configuration file uses an old API spec: %q. Please use kubeadm %s instead and run 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String(), useKubeadmVersion)
 	}
 
 	if _, present := deprecatedAPIVersions[gvString]; present && !allowDeprecated {
@@ -105,7 +104,7 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	// Parse the given kubernetes version and make sure it's higher than the lowest supported
 	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't parse Kubernetes version %q", cfg.KubernetesVersion)
+		return fmt.Errorf("couldn't parse Kubernetes version %q: %w", cfg.KubernetesVersion, err)
 	}
 
 	// During the k8s release process, a kubeadm version in the main branch could be 1.23.0-pre,
@@ -122,7 +121,7 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	}
 	// If not a pre-release version, handle the validation normally.
 	if k8sVersion.LessThan(mcpVersion) {
-		return errors.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s",
+		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s",
 			mcpVersion, cfg.KubernetesVersion)
 	}
 	return nil
@@ -144,7 +143,7 @@ func LowercaseSANs(sans []string) {
 func VerifyAPIServerBindAddress(address string) error {
 	ip := netutils.ParseIPSloppy(address)
 	if ip == nil {
-		return errors.Errorf("cannot parse IP address: %s", address)
+		return fmt.Errorf("cannot parse IP address: %s", address)
 	}
 	// There are users with network setups where default routes are present, but network interfaces
 	// use only link-local addresses (e.g. as described in RFC5549).
@@ -155,7 +154,7 @@ func VerifyAPIServerBindAddress(address string) error {
 		return nil
 	}
 	if !ip.IsGlobalUnicast() {
-		return errors.Errorf("cannot use %q as the bind address for the API Server", address)
+		return fmt.Errorf("cannot use %q as the bind address for the API Server", address)
 	}
 	return nil
 }
@@ -169,7 +168,7 @@ func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 			klog.Warningf("WARNING: could not obtain a bind address for the API Server: %v; using: %s", err, constants.DefaultAPIServerBindAddress)
 			defaultIP := netutils.ParseIPSloppy(constants.DefaultAPIServerBindAddress)
 			if defaultIP == nil {
-				return nil, errors.Errorf("cannot parse default IP address: %s", constants.DefaultAPIServerBindAddress)
+				return nil, fmt.Errorf("cannot parse default IP address: %s", constants.DefaultAPIServerBindAddress)
 			}
 			return defaultIP, nil
 		}

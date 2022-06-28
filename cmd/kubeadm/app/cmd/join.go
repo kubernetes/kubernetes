@@ -25,7 +25,6 @@ import (
 	"text/template"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
@@ -403,7 +402,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		klog.V(1).Infof("[preflight] found %s. Use it for skipping discovery", adminKubeConfigPath)
 		tlsBootstrapCfg, err = clientcmd.LoadFromFile(adminKubeConfigPath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Error loading %s", adminKubeConfigPath)
+			return nil, fmt.Errorf("Error loading %s: %w", adminKubeConfigPath, err)
 		}
 	}
 
@@ -420,7 +419,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 	// in case the command doesn't have flags for discovery, makes the join cfg validation pass checks on discovery
 	if cmd.Flags().Lookup(options.FileDiscovery) == nil {
 		if _, err := os.Stat(adminKubeConfigPath); os.IsNotExist(err) {
-			return nil, errors.Errorf("File %s does not exists. Please use 'kubeadm join phase control-plane-prepare' subcommands to generate it.", adminKubeConfigPath)
+			return nil, fmt.Errorf("File %s does not exists. Please use 'kubeadm join phase control-plane-prepare' subcommands to generate it.", adminKubeConfigPath)
 		}
 		klog.V(1).Infof("[preflight] found discovery flags missing for this command. using FileDiscovery: %s", adminKubeConfigPath)
 		opt.externalcfg.Discovery.File = &kubeadmapiv1.FileDiscovery{KubeConfigPath: adminKubeConfigPath}
@@ -457,7 +456,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 	dryRunDir := ""
 	if opt.dryRun {
 		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-join-dryrun"); err != nil {
-			return nil, errors.Wrap(err, "couldn't create a temporary directory on dryrun")
+			return nil, fmt.Errorf("couldn't create a temporary directory on dryrun: %w", err)
 		}
 	}
 
@@ -556,7 +555,7 @@ func (j *joinData) Client() (clientset.Interface, error) {
 
 	client, err := kubeconfigutil.ClientSetFromFile(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "[preflight] couldn't create Kubernetes client")
+		return nil, fmt.Errorf("[preflight] couldn't create Kubernetes client: %w", err)
 	}
 	j.client = client
 	return client, nil
@@ -614,13 +613,13 @@ func fetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.I
 	// creates a client to access the cluster using the bootstrap token identity
 	tlsClient, err := kubeconfigutil.ToClientSet(tlsBootstrapCfg)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to access the cluster")
+		return nil, fmt.Errorf("unable to access the cluster: %w", err)
 	}
 
 	// Fetches the init configuration
 	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(tlsClient, nil, "preflight", true, false)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
+		return nil, fmt.Errorf("unable to fetch the kubeadm-config ConfigMap: %w", err)
 	}
 
 	return initConfiguration, nil

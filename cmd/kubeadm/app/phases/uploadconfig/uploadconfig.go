@@ -19,7 +19,6 @@ package uploadconfig
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,8 +133,8 @@ func MutateImageRepository(cfg *kubeadmapi.InitConfiguration, client clientset.I
 	klog.V(1).Info("updating the ClusterConfiguration.ImageRepository field in the kube-system/kubeadm-config " +
 		"ConfigMap to be 'registry.k8s.io' instead of the legacy default of 'k8s.gcr.io'")
 	if err := UploadConfiguration(cfg, client); err != nil {
-		return errors.Wrap(err, "could not mutate the ClusterConfiguration.ImageRepository field in "+
-			"the kube-system/kubeadm-config ConfigMap")
+		return fmt.Errorf("could not mutate the ClusterConfiguration.ImageRepository field in "+
+			"the kube-system/kubeadm-config ConfigMap: %w", err)
 	}
 	return nil
 }

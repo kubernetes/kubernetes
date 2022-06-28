@@ -17,10 +17,10 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"io"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
@@ -128,7 +128,7 @@ func addUpgradeNodeFlags(flagSet *flag.FlagSet, nodeOptions *nodeOptions) {
 func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions, out io.Writer) (*nodeData, error) {
 	client, err := getClient(options.kubeConfigPath, options.dryRun)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", options.kubeConfigPath)
+		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %w", options.kubeConfigPath, err)
 	}
 
 	// isControlPlane checks if a node is a control-plane node by looking up
@@ -144,7 +144,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions, out io
 	//    (worker node), we are not reading local API address and the CRI socket from the node object
 	cfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", !isControlPlaneNode, false)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
+		return nil, fmt.Errorf("unable to fetch the kubeadm-config ConfigMap: %w", err)
 	}
 	// In case we fetch a configuration from the cluster, mutate the ImageRepository field
 	// to be 'registry.k8s.io', if it was 'k8s.gcr.io'. Don't mutate the in-cluster value by passing

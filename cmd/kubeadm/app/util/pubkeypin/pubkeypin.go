@@ -22,9 +22,8 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"fmt"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 const (
@@ -52,7 +51,7 @@ func (s *Set) Allow(pubKeyHashes ...string) error {
 	for _, pubKeyHash := range pubKeyHashes {
 		parts := strings.Split(pubKeyHash, ":")
 		if len(parts) != 2 {
-			return errors.Errorf("invalid hash, expected \"format:hex-value\". "+
+			return fmt.Errorf("invalid hash, expected \"format:hex-value\". "+
 				"Known format(s) are: %s", supportedFormats)
 		}
 		format, value := parts[0], parts[1]
@@ -60,10 +59,10 @@ func (s *Set) Allow(pubKeyHashes ...string) error {
 		switch strings.ToLower(format) {
 		case "sha256":
 			if err := s.allowSHA256(value); err != nil {
-				return errors.Errorf("invalid hash %q, %v", pubKeyHash, err)
+				return fmt.Errorf("invalid hash %q, %v", pubKeyHash, err)
 			}
 		default:
-			return errors.Errorf("unknown hash format %q. Known format(s) are: %s", format, supportedFormats)
+			return fmt.Errorf("unknown hash format %q. Known format(s) are: %s", format, supportedFormats)
 		}
 	}
 	return nil
@@ -80,7 +79,7 @@ func (s *Set) CheckAny(certificates []*x509.Certificate) error {
 
 		hashes = append(hashes, Hash(certificate))
 	}
-	return errors.Errorf("none of the public keys %q are pinned", strings.Join(hashes, ":"))
+	return fmt.Errorf("none of the public keys %q are pinned", strings.Join(hashes, ":"))
 }
 
 // Empty returns true if the Set contains no pinned public keys.
@@ -101,13 +100,13 @@ func (s *Set) allowSHA256(hash string) error {
 	// validate that the hash is the right length to be a full SHA-256 hash
 	hashLength := hex.DecodedLen(len(hash))
 	if hashLength != sha256.Size {
-		return errors.Errorf("expected a %d byte SHA-256 hash, found %d bytes", sha256.Size, hashLength)
+		return fmt.Errorf("expected a %d byte SHA-256 hash, found %d bytes", sha256.Size, hashLength)
 	}
 
 	// validate that the hash is valid hex
 	_, err := hex.DecodeString(hash)
 	if err != nil {
-		return errors.Wrap(err, "could not decode SHA-256 from hex")
+		return fmt.Errorf("could not decode SHA-256 from hex: %w", err)
 	}
 
 	// in the end, just store the original hex string in memory (in lowercase)

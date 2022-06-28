@@ -18,11 +18,11 @@ package phases
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"text/template"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
 	utilsexec "k8s.io/utils/exec"

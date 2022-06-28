@@ -17,11 +17,10 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
 )

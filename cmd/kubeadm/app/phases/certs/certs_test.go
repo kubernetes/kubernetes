@@ -21,13 +21,13 @@ import (
 	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"os"
 	"path"
 	"path/filepath"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -832,7 +832,7 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 func deleteCertOrKey(name string) func(*kubeadmapi.InitConfiguration) error {
 	return func(cfg *kubeadmapi.InitConfiguration) error {
 		if err := os.Remove(filepath.Join(cfg.CertificatesDir, name)); err != nil {
-			return errors.Wrapf(err, "failed removing %s", name)
+			return fmt.Errorf("failed removing %s: %w", name, err)
 		}
 		return nil
 	}

@@ -17,9 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"testing"
-
-	"github.com/pkg/errors"
 )
 
 type pferror struct{}

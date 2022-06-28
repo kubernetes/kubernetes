@@ -17,13 +17,12 @@ limitations under the License.
 package runtime
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"reflect"
 	"runtime"
 	"testing"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -36,7 +35,7 @@ func TestNewContainerRuntime(t *testing.T) {
 		LookPathFunc: func(cmd string) (string, error) { return "/usr/bin/crictl", nil },
 	}
 	execLookPathErr := fakeexec.FakeExec{
-		LookPathFunc: func(cmd string) (string, error) { return "", errors.Errorf("%s not found", cmd) },
+		LookPathFunc: func(cmd string) (string, error) { return "", fmt.Errorf("%s not found", cmd) },
 	}
 	cases := []struct {
 		name    string

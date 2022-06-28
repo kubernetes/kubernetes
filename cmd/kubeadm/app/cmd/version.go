@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
@@ -61,7 +60,7 @@ func RunVersion(out io.Writer, cmd *cobra.Command) error {
 	const flag = "output"
 	of, err := cmd.Flags().GetString(flag)
 	if err != nil {
-		return errors.Wrapf(err, "error accessing flag %s for command %s", flag, cmd.Name())
+		return fmt.Errorf("error accessing flag %s for command %s: %w", flag, cmd.Name(), err)
 	}
 
 	switch of {
@@ -82,7 +81,7 @@ func RunVersion(out io.Writer, cmd *cobra.Command) error {
 		}
 		fmt.Fprintln(out, string(y))
 	default:
-		return errors.Errorf("invalid output format: %s", of)
+		return fmt.Errorf("invalid output format: %s", of)
 	}
 
 	return nil

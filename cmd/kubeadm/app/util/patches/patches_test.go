@@ -18,13 +18,12 @@ package patches
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"

@@ -17,9 +17,8 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -109,7 +108,7 @@ func runUploadKubeadmConfig(c workflow.RunData) error {
 
 	klog.V(1).Infoln("[upload-config] Uploading the kubeadm ClusterConfiguration to a ConfigMap")
 	if err := uploadconfig.UploadConfiguration(cfg, client); err != nil {
-		return errors.Wrap(err, "error uploading the kubeadm ClusterConfiguration")
+		return fmt.Errorf("error uploading the kubeadm ClusterConfiguration: %w", err)
 	}
 	return nil
 }
@@ -123,12 +122,12 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 
 	klog.V(1).Infoln("[upload-config] Uploading the kubelet component config to a ConfigMap")
 	if err = kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, client); err != nil {
-		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
+		return fmt.Errorf("error creating kubelet configuration ConfigMap: %w", err)
 	}
 
 	klog.V(1).Infoln("[upload-config] Preserving the CRISocket information for the control-plane node")
 	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-		return errors.Wrap(err, "Error writing Crisocket information for the control-plane node")
+		return fmt.Errorf("Error writing Crisocket information for the control-plane node: %w", err)
 	}
 	return nil
 }

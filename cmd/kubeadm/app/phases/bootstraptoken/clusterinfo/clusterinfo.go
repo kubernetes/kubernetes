@@ -19,9 +19,7 @@ package clusterinfo
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -47,7 +45,7 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 	klog.V(1).Infoln("[bootstrap-token] loading admin kubeconfig")
 	adminConfig, err := clientcmd.LoadFromFile(file)
 	if err != nil {
-		return errors.Wrap(err, "failed to load admin kubeconfig")
+		return fmt.Errorf("failed to load admin kubeconfig: %w", err)
 	}
 	if err = clientcmdapi.FlattenConfig(adminConfig); err != nil {
 		return err

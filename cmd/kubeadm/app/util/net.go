@@ -17,10 +17,10 @@ limitations under the License.
 package util
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // GetHostname returns OS's hostname if 'hostnameOverride' is empty; otherwise, return 'hostnameOverride'
@@ -30,7 +30,7 @@ func GetHostname(hostnameOverride string) (string, error) {
 	if len(hostName) == 0 {
 		nodeName, err := os.Hostname()
 		if err != nil {
-			return "", errors.Wrap(err, "couldn't determine hostname")
+			return "", fmt.Errorf("couldn't determine hostname: %w", err)
 		}
 		hostName = nodeName
 	}

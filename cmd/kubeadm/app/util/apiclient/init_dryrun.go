@@ -17,7 +17,7 @@ limitations under the License.
 package apiclient
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -85,12 +85,12 @@ func (idr *InitDryRunGetter) handleKubernetesService(action core.GetAction) (boo
 
 	_, svcSubnet, err := netutils.ParseCIDRSloppy(idr.serviceSubnet)
 	if err != nil {
-		return true, nil, errors.Wrapf(err, "error parsing CIDR %q", idr.serviceSubnet)
+		return true, nil, fmt.Errorf("error parsing CIDR %q: %w", idr.serviceSubnet, err)
 	}
 
 	internalAPIServerVirtualIP, err := netutils.GetIndexedIP(svcSubnet, 1)
 	if err != nil {
-		return true, nil, errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", svcSubnet.String())
+		return true, nil, fmt.Errorf("unable to get first IP address from the given CIDR (%s): %w", svcSubnet.String(), err)
 	}
 
 	// The only used field of this Service object is the ClusterIP, which CoreDNS uses to calculate its own IP

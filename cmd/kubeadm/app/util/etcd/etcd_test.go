@@ -17,12 +17,11 @@ limitations under the License.
 package etcd
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
 	"testing"
-
-	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"

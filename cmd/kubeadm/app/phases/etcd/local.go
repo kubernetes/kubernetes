@@ -17,6 +17,7 @@ limitations under the License.
 package etcd
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -24,8 +25,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -80,7 +79,7 @@ func CheckLocalEtcdClusterStatus(client clientset.Interface, certificatesDir str
 	// Checking health state
 	err = etcdClient.CheckClusterHealth()
 	if err != nil {
-		return errors.Wrap(err, "etcd cluster is not healthy")
+		return fmt.Errorf("etcd cluster is not healthy: %w", err)
 	}
 
 	return nil
@@ -273,12 +272,12 @@ func prepareAndWriteEtcdStaticPod(manifestDir string, patchesDir string, cfg *ku
 		} else {
 			usersAndGroups, err = staticpodutil.GetUsersAndGroups()
 			if err != nil {
-				return errors.Wrap(err, "failed to create users and groups")
+				return fmt.Errorf("failed to create users and groups: %w", err)
 			}
 			// usersAndGroups is nil on non-linux.
 			if usersAndGroups != nil {
 				if err := staticpodutil.RunComponentAsNonRoot(kubeadmconstants.Etcd, &spec, usersAndGroups, cfg); err != nil {
-					return errors.Wrapf(err, "failed to run component %q as non-root", kubeadmconstants.Etcd)
+					return fmt.Errorf("failed to run component %q as non-root: %w", kubeadmconstants.Etcd, err)
 				}
 			}
 		}
@@ -288,7 +287,7 @@ func prepareAndWriteEtcdStaticPod(manifestDir string, patchesDir string, cfg *ku
 	if patchesDir != "" {
 		patchedSpec, err := staticpodutil.PatchStaticPod(&spec, patchesDir, os.Stdout)
 		if err != nil {
-			return errors.Wrapf(err, "failed to patch static Pod manifest file for %q", kubeadmconstants.Etcd)
+			return fmt.Errorf("failed to patch static Pod manifest file for %q: %w", kubeadmconstants.Etcd, err)
 		}
 		spec = *patchedSpec
 	}

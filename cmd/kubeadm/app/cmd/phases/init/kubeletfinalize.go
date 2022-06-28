@@ -17,11 +17,10 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/pkg/errors"
 
 	clientcmd "k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
@@ -109,14 +108,14 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 	// Load the kubeconfig from disk.
 	kubeconfig, err := clientcmd.LoadFromFile(kubeconfigPath)
 	if err != nil {
-		return errors.Wrapf(err, "could not load %q", kubeconfigPath)
+		return fmt.Errorf("could not load %q: %w", kubeconfigPath, err)
 	}
 
 	// Perform basic validation. The errors here can only happen if the kubelet.conf was corrupted.
 	userName := fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name)
 	info, ok := kubeconfig.AuthInfos[userName]
 	if !ok {
-		return errors.Errorf("the file %q does not contain authentication for user %q", kubeconfigPath, cfg.NodeRegistration.Name)
+		return fmt.Errorf("the file %q does not contain authentication for user %q", kubeconfigPath, cfg.NodeRegistration.Name)
 	}
 
 	// Update the client certificate and key of the node authorizer to point to the PEM symbolic link.
@@ -127,7 +126,7 @@ func runKubeletFinalizeCertRotation(c workflow.RunData) error {
 
 	// Writes the kubeconfig back to disk.
 	if err = clientcmd.WriteToFile(*kubeconfig, kubeconfigPath); err != nil {
-		return errors.Wrapf(err, "failed to serialize %q", kubeconfigPath)
+		return fmt.Errorf("failed to serialize %q: %w", kubeconfigPath, err)
 	}
 
 	// Restart the kubelet.

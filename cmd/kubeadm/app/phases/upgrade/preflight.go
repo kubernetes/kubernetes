@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/coredns/corefile-migration/migration"
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -95,7 +94,7 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 			"Once ready, the upgrade can be initiated by skipping the preflight check. During the upgrade, " +
 			"kubeadm will migrate the configuration while leaving the listed plugin configs untouched, " +
 			"but cannot guarantee that they will work with the newer version of CoreDNS.")
-		return errors.Errorf("CoreDNS cannot migrate the following plugins:\n%s", UnsupportedPlugins)
+		return fmt.Errorf("CoreDNS cannot migrate the following plugins:\n%s", UnsupportedPlugins)
 	}
 	return nil
 }
@@ -111,7 +110,7 @@ func checkMigration(client clientset.Interface) error {
 	currentInstalledCoreDNSversion = strings.TrimLeft(currentInstalledCoreDNSversion, "v")
 	_, err = migration.Migrate(currentInstalledCoreDNSversion, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"), corefile, false)
 	if err != nil {
-		return errors.Wrap(err, "CoreDNS will not be upgraded")
+		return fmt.Errorf("CoreDNS will not be upgraded: %w", err)
 	}
 	return nil
 }

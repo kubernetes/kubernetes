@@ -19,7 +19,6 @@ package upgrade
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -118,7 +117,7 @@ func runApply(flags *applyFlags, args []string) error {
 	// Use normalized version string in all following code.
 	newK8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
 	if err != nil {
-		return errors.Errorf("unable to parse normalized version %q as a semantic version", cfg.KubernetesVersion)
+		return fmt.Errorf("unable to parse normalized version %q as a semantic version", cfg.KubernetesVersion)
 	}
 
 	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
@@ -128,7 +127,7 @@ func runApply(flags *applyFlags, args []string) error {
 	// Enforce the version skew policies
 	klog.V(1).Infoln("[upgrade/version] enforcing version skew policies")
 	if err := EnforceVersionPolicies(cfg.KubernetesVersion, newK8sVersion, flags, versionGetter); err != nil {
-		return errors.Wrap(err, "[upgrade/version] FATAL")
+		return fmt.Errorf("[upgrade/version] FATAL: %w", err)
 	}
 
 	// If the current session is interactive, ask the user whether they really want to upgrade.
@@ -153,7 +152,7 @@ func runApply(flags *applyFlags, args []string) error {
 
 	// Now; perform the upgrade procedure
 	if err := PerformControlPlaneUpgrade(flags, client, waiter, cfg); err != nil {
-		return errors.Wrap(err, "[upgrade/apply] FATAL")
+		return fmt.Errorf("[upgrade/apply] FATAL: %w", err)
 	}
 
 	// Clean this up in 1.26
@@ -169,7 +168,7 @@ func runApply(flags *applyFlags, args []string) error {
 	// Upgrade RBAC rules and addons.
 	klog.V(1).Infoln("[upgrade/postupgrade] upgrading RBAC rules and addons")
 	if err := upgrade.PerformPostUpgradeTasks(client, cfg, flags.patchesDir, flags.dryRun, flags.applyPlanFlags.out); err != nil {
-		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
+		return fmt.Errorf("[upgrade/postupgrade] FATAL post-upgrade error: %w", err)
 	}
 
 	if flags.dryRun {
@@ -194,14 +193,14 @@ func EnforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Vers
 	if versionSkewErrs != nil {
 
 		if len(versionSkewErrs.Mandatory) > 0 {
-			return errors.Errorf("the --version argument is invalid due to these fatal errors:\n\n%v\nPlease fix the misalignments highlighted above and try upgrading again",
+			return fmt.Errorf("the --version argument is invalid due to these fatal errors:\n\n%v\nPlease fix the misalignments highlighted above and try upgrading again",
 				kubeadmutil.FormatErrMsg(versionSkewErrs.Mandatory))
 		}
 
 		if len(versionSkewErrs.Skippable) > 0 {
 			// Return the error if the user hasn't specified the --force flag
 			if !flags.force {
-				return errors.Errorf("the --version argument is invalid due to these errors:\n\n%v\nCan be bypassed if you pass the --force flag",
+				return fmt.Errorf("the --version argument is invalid due to these errors:\n\n%v\nCan be bypassed if you pass the --force flag",
 					kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
 			}
 			// Soft errors found, but --force was specified

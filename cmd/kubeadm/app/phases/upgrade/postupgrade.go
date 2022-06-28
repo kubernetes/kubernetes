@@ -23,8 +23,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,7 +59,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 
 	// Create the new, version-branched kubelet ComponentConfig ConfigMap
 	if err := kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, client); err != nil {
-		errs = append(errs, errors.Wrap(err, "error creating kubelet configuration ConfigMap"))
+		errs = append(errs, fmt.Errorf("error creating kubelet configuration ConfigMap: %w", err))
 	}
 
 	// Write the new kubelet config down to disk and the env file if needed
@@ -73,7 +71,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	// --cri-socket.
 	// TODO: In the future we want to use something more official like NodeStatus or similar for detecting this properly
 	if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-		errs = append(errs, errors.Wrap(err, "error uploading crisocket"))
+		errs = append(errs, fmt.Errorf("error uploading crisocket: %w", err))
 	}
 
 	// Create RBAC rules that makes the bootstrap tokens able to get nodes
@@ -168,7 +166,7 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 	errs := []error{}
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
 	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, out); err != nil {
-		errs = append(errs, errors.Wrap(err, "error writing kubelet configuration to file"))
+		errs = append(errs, fmt.Errorf("error writing kubelet configuration to file: %w", err))
 	}
 
 	if dryRun { // Print what contents would be written
@@ -205,7 +203,7 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 			errs = append(errs, err)
 		}
 	}
-	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
+	return fmt.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
 }
 
 // RemoveOldControlPlaneTaint finds all nodes with the new "control-plane" node-role label
@@ -219,7 +217,7 @@ func RemoveOldControlPlaneTaint(client clientset.Interface) error {
 		LabelSelector: selectorControlPlane.String(),
 	})
 	if err != nil {
-		return errors.Wrapf(err, "could not list nodes labeled with %q", kubeadmconstants.LabelNodeRoleControlPlane)
+		return fmt.Errorf("could not list nodes labeled with %q: %w", kubeadmconstants.LabelNodeRoleControlPlane, err)
 	}
 
 	for _, n := range nodes.Items {

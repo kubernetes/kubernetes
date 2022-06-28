@@ -17,15 +17,14 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
 	"os"
-
-	"github.com/pkg/errors"
 )
 
 // CreateDataDirectory creates the etcd data directory (commonly /var/lib/etcd) with the right permissions.
 func CreateDataDirectory(dir string) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		return errors.Wrapf(err, "failed to create the etcd data directory: %q", dir)
+		return fmt.Errorf("failed to create the etcd data directory: %q: %w", dir, err)
 	}
 	return nil
 }

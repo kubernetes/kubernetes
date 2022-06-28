@@ -18,12 +18,11 @@ package apiclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -250,7 +249,7 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 		return lastErr
 	}
 	if err != nil {
-		return errors.Wrapf(err, "static Pod hash for component %s on Node %s did not change after %v", component, nodeName, w.timeout)
+		return fmt.Errorf("static Pod hash for component %s on Node %s did not change after %v: %w", component, nodeName, w.timeout, err)
 	}
 	return nil
 }
@@ -261,7 +260,7 @@ func getStaticPodSingleHash(client clientset.Interface, nodeName string, compone
 	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
 	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), staticPodName, metav1.GetOptions{})
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to obtain static Pod hash for component %s on Node %s", component, nodeName)
+		return "", fmt.Errorf("failed to obtain static Pod hash for component %s on Node %s: %w", component, nodeName, err)
 	}
 
 	staticPodHash := staticPod.Annotations["kubernetes.io/config.hash"]

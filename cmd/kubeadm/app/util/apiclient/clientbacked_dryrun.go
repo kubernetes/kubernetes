@@ -21,8 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,11 +62,11 @@ func NewClientBackedDryRunGetter(config *rest.Config) (*ClientBackedDryRunGetter
 func NewClientBackedDryRunGetterFromKubeconfig(file string) (*ClientBackedDryRunGetter, error) {
 	config, err := clientcmd.LoadFromFile(file)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load kubeconfig")
+		return nil, fmt.Errorf("failed to load kubeconfig: %w", err)
 	}
 	clientConfig, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create API client configuration from kubeconfig")
+		return nil, fmt.Errorf("failed to create API client configuration from kubeconfig: %w", err)
 	}
 	return NewClientBackedDryRunGetter(clientConfig)
 }

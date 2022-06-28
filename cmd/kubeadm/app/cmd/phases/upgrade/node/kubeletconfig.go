@@ -17,12 +17,12 @@ limitations under the License.
 package node
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -87,7 +87,7 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		// If we're dry-running, print the generated manifests
 		if dryRun {
 			if err := printFilesIfDryRunning(dryRun, kubeletDir); err != nil {
-				return errors.Wrap(err, "error printing files on dryrun")
+				return fmt.Errorf("error printing files on dryrun: %w", err)
 			}
 			return nil
 		}
@@ -100,7 +100,7 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		nro := &kubeadmapi.NodeRegistrationOptions{}
 		if !dryRun {
 			if err := configutil.GetNodeRegistration(data.KubeConfigPath(), data.Client(), nro); err != nil {
-				return errors.Wrap(err, "could not retrieve the node registration options for this node")
+				return fmt.Errorf("could not retrieve the node registration options for this node: %w", err)
 			}
 			dupURLScheme = strings.HasPrefix(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://"+kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://")
 		}
@@ -110,7 +110,7 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 				newSocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + newSocket
 				klog.V(2).Infof("ensuring that Node %q has a CRI socket annotation with correct URL scheme %q", nro.Name, newSocket)
 				if err := patchnodephase.AnnotateCRISocket(data.Client(), nro.Name, newSocket); err != nil {
-					return errors.Wrapf(err, "error updating the CRI socket for Node %q", nro.Name)
+					return fmt.Errorf("error updating the CRI socket for Node %q: %w", nro.Name, err)
 				}
 			} else {
 				fmt.Println("[upgrade] Would update the node CRI socket path to remove dup URL scheme prefix")

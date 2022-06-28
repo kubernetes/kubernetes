@@ -17,11 +17,11 @@ limitations under the License.
 package util
 
 import (
+	"errors"
+	"fmt"
 	"net"
 	"net/url"
 	"strconv"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
@@ -47,7 +47,7 @@ func GetControlPlaneEndpoint(controlPlaneEndpoint string, localEndpoint *kubeadm
 		var host, port string
 		var err error
 		if host, port, err = ParseHostPort(controlPlaneEndpoint); err != nil {
-			return "", errors.Wrapf(err, "invalid value %q given for controlPlaneEndpoint", controlPlaneEndpoint)
+			return "", fmt.Errorf("invalid value %q given for controlPlaneEndpoint: %w", controlPlaneEndpoint, err)
 		}
 
 		// if a port is provided within the controlPlaneAddress warn the users we are using it, else use the bindport
@@ -95,7 +95,7 @@ func ParseHostPort(hostport string) (string, string, error) {
 	// if port is defined, parse and validate it
 	if port != "" {
 		if _, err := ParsePort(port); err != nil {
-			return "", "", errors.Errorf("hostport %s: port %s must be a valid number between 1 and 65535, inclusive", hostport, port)
+			return "", "", fmt.Errorf("hostport %s: port %s must be a valid number between 1 and 65535, inclusive", hostport, port)
 		}
 	}
 
@@ -109,7 +109,7 @@ func ParseHostPort(hostport string) (string, string, error) {
 		return host, port, nil
 	}
 
-	return "", "", errors.Errorf("hostport %s: host '%s' must be a valid IP address or a valid RFC-1123 DNS subdomain", hostport, host)
+	return "", "", fmt.Errorf("hostport %s: host '%s' must be a valid IP address or a valid RFC-1123 DNS subdomain", hostport, host)
 }
 
 // ParsePort parses a string representing a TCP port.
@@ -129,13 +129,13 @@ func parseAPIEndpoint(localEndpoint *kubeadmapi.APIEndpoint) (net.IP, string, er
 	// parse the bind port
 	bindPortString := strconv.Itoa(int(localEndpoint.BindPort))
 	if _, err := ParsePort(bindPortString); err != nil {
-		return nil, "", errors.Wrapf(err, "invalid value %q given for api.bindPort", localEndpoint.BindPort)
+		return nil, "", fmt.Errorf("invalid value %q given for api.bindPort: %w", localEndpoint.BindPort, err)
 	}
 
 	// parse the AdvertiseAddress
 	var ip = netutils.ParseIPSloppy(localEndpoint.AdvertiseAddress)
 	if ip == nil {
-		return nil, "", errors.Errorf("invalid value `%s` given for api.advertiseAddress", localEndpoint.AdvertiseAddress)
+		return nil, "", fmt.Errorf("invalid value `%s` given for api.advertiseAddress", localEndpoint.AdvertiseAddress)
 	}
 
 	return ip, bindPortString, nil
