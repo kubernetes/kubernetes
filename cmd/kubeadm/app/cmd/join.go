@@ -86,8 +86,10 @@ var (
 
 		There are 2 main schemes for discovery. The first is to use a shared
 		token along with the IP address of the API server. The second is to
-		provide a file - a subset of the standard kubeconfig file. This file
-		can be a local file or downloaded via an HTTPS URL. The forms are
+		provide a file - a subset of the standard kubeconfig file. The
+		discovery/kubeconfig file supports token, client-go authentication
+		plugins ("exec"), "tokenFile", and "authProvider". This file can be a
+		local file or downloaded via an HTTPS URL. The forms are
 		kubeadm join --discovery-token abcdef.1234567890abcdef 1.2.3.4:6443,
 		kubeadm join --discovery-file path/to/file.conf, or kubeadm join
 		--discovery-file https://url/file.conf. Only one form can be used. If
