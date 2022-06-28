@@ -105,9 +105,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				setIngressEmptyFirstElement(np)
 			}
 			np.Spec.Ingress[0].Ports = make([]networking.NetworkPolicyPort, len(ports))
-			for i, p := range ports {
-				np.Spec.Ingress[0].Ports[i] = p
-			}
+			copy(np.Spec.Ingress[0].Ports, ports)
 		}
 	}
 
@@ -199,9 +197,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				setEgressEmptyFirstElement(np)
 			}
 			np.Spec.Egress[0].Ports = make([]networking.NetworkPolicyPort, len(ports))
-			for i, p := range ports {
-				np.Spec.Egress[0].Ports[i] = p
-			}
+			copy(np.Spec.Egress[0].Ports, ports)
 		}
 	}
 
