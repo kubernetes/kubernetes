@@ -139,12 +139,14 @@ type ParamsEntry struct {
 type ArrayNode struct {
 	NodeType
 	Params [3]ParamsEntry // start, end, step
+	Value  string
 }
 
-func newArray(params [3]ParamsEntry) *ArrayNode {
+func newArray(params [3]ParamsEntry, value string) *ArrayNode {
 	return &ArrayNode{
 		NodeType: NodeArray,
 		Params:   params,
+		Value:    value,
 	}
 }
 
@@ -158,14 +160,16 @@ type FilterNode struct {
 	Left     *ListNode
 	Right    *ListNode
 	Operator string
+	Value    string
 }
 
-func newFilter(left, right *ListNode, operator string) *FilterNode {
+func newFilter(left, right *ListNode, operator, value string) *FilterNode {
 	return &FilterNode{
 		NodeType: NodeFilter,
 		Left:     left,
 		Right:    right,
 		Operator: operator,
+		Value:    value,
 	}
 }
 

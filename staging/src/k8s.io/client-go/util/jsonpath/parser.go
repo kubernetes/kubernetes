@@ -267,6 +267,7 @@ Loop:
 		}
 	}
 	text := p.consumeText()
+	valueText := text
 	text = text[1 : len(text)-1]
 	if text == "*" {
 		text = ":"
@@ -333,14 +334,14 @@ Loop:
 			}
 		}
 	}
-	cur.append(newArray(params))
+	cur.append(newArray(params, valueText))
 	return p.parseInsideAction(cur)
 }
 
 // parseFilter scans filter inside array selection
 func (p *Parser) parseFilter(cur *ListNode) error {
 	p.pos += len("[?(")
-	p.consumeText()
+	valueText := p.consumeText()
 	begin := false
 	end := false
 	var pair rune
@@ -375,6 +376,7 @@ Loop:
 	}
 	reg := regexp.MustCompile(`^([^!<>=]+)([!<>=]+)(.+?)$`)
 	text := p.consumeText()
+	valueText += text
 	text = text[:len(text)-2]
 	value := reg.FindStringSubmatch(text)
 	if value == nil {
@@ -382,7 +384,7 @@ Loop:
 		if err != nil {
 			return err
 		}
-		cur.append(newFilter(parser.Root, newList(), "exists"))
+		cur.append(newFilter(parser.Root, newList(), "exists", valueText))
 	} else {
 		leftParser, err := parseAction("left", value[1])
 		if err != nil {
@@ -392,7 +394,7 @@ Loop:
 		if err != nil {
 			return err
 		}
-		cur.append(newFilter(leftParser.Root, rightParser.Root, value[2]))
+		cur.append(newFilter(leftParser.Root, rightParser.Root, value[2], valueText))
 	}
 	return p.parseInsideAction(cur)
 }
