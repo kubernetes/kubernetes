@@ -395,8 +395,8 @@ func (obj InfoObject) Merged() (runtime.Object, error) {
 		ResourceVersion: resourceVersion,
 	}
 
-	_, result, err := patcher.Patch(obj.Info.Object, modified, obj.Info.Source, obj.Info.Namespace, obj.Info.Name, obj.ErrOut)
-	return result, err
+	_, err = patcher.Patch(obj.Info, modified, obj.ErrOut)
+	return obj.Info.Object, err
 }
 
 func (obj InfoObject) Name() string {

@@ -103,17 +103,17 @@ func (p *Patcher) delete(namespace, name string) error {
 	return err
 }
 
-func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
+func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, name string, errOut io.Writer) (bool, runtime.Object, error) {
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "serializing current configuration from:\n%v\nfor:", obj)
+		return false, nil, errors.Wrapf(err, "serializing current configuration from:\n%v\nfor:", obj)
 	}
 
 	// Retrieve the original configuration of the object from the annotation.
 	original, err := util.GetOriginalConfiguration(obj)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "retrieving original configuration from:\n%v\nfor:", obj)
+		return false, nil, errors.Wrapf(err, "retrieving original configuration from:\n%v\nfor:", obj)
 	}
 
 	var patch []byte
@@ -122,7 +122,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 	_, err = scheme.Scheme.New(p.Mapping.GroupVersionKind)
 	if err != nil {
 		if !runtime.IsNotRegisteredError(err) {
-			return nil, nil, errors.Wrapf(err, "getting instance of versioned object for %v:", p.Mapping.GroupVersionKind)
+			return false, nil, errors.Wrapf(err, "getting instance of versioned object for %v:", p.Mapping.GroupVersionKind)
 		}
 		patchType = types.MergePatchType
 	}
@@ -131,7 +131,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 	case types.MergePatchType:
 		patch, err = p.buildMergePatch(original, modified, current)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, createPatchErrFormat, original, modified, current)
+			return false, nil, errors.Wrapf(err, createPatchErrFormat, original, modified, current)
 		}
 	case types.StrategicMergePatchType:
 		// Try to use openapi first if the openapi spec is available and can successfully calculate the patch.
@@ -147,24 +147,24 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 		if patch == nil {
 			patch, err = p.buildStrategicMergeFromBuiltins(p.Mapping.GroupVersionKind, original, modified, current)
 			if err != nil {
-				return nil, nil, errors.Wrapf(err, createPatchErrFormat, original, modified, current)
+				return false, nil, errors.Wrapf(err, createPatchErrFormat, original, modified, current)
 			}
 		}
 	}
 
 	if string(patch) == "{}" {
-		return patch, obj, nil
+		return false, obj, nil
 	}
 
 	if p.ResourceVersion != nil {
 		patch, err = addResourceVersion(patch, *p.ResourceVersion)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "Failed to insert resourceVersion in patch")
+			return true, nil, errors.Wrap(err, "Failed to insert resourceVersion in patch")
 		}
 	}
 
 	patchedObj, err := p.Helper.Patch(namespace, name, patchType, patch, nil)
-	return patch, patchedObj, err
+	return true, patchedObj, err
 }
 
 // buildMergePatch builds patch according to the JSONMergePatch which is used for
@@ -224,9 +224,8 @@ func (p *Patcher) buildStrategicMergeFromBuiltins(gvk schema.GroupVersionKind, o
 
 // Patch tries to patch an OpenAPI resource. On success, returns the merge patch as well
 // the final patched object. On failure, returns an error.
-func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
-	var getErr error
-	patchBytes, patchObject, err := p.patchSimple(current, modified, namespace, name, errOut)
+func (p *Patcher) Patch(info *resource.Info, modified []byte, errOut io.Writer) (bool, error) {
+	changed, patchObject, err := p.patchSimple(info.Object, modified, info.Namespace, info.Name, errOut)
 	if p.Retries == 0 {
 		p.Retries = maxPatchRetry
 	}
@@ -234,25 +233,32 @@ func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespa
 		if i > triesBeforeBackOff {
 			p.BackOff.Sleep(backOffPeriod)
 		}
-		current, getErr = p.Helper.Get(namespace, name)
-		if getErr != nil {
-			return nil, nil, getErr
+		info.Object, err = p.Helper.Get(info.Namespace, info.Name)
+		if err != nil {
+			return changed, err
 		}
-		patchBytes, patchObject, err = p.patchSimple(current, modified, namespace, name, errOut)
+		changed, patchObject, err = p.patchSimple(info.Object, modified, info.Namespace, info.Name, errOut)
 	}
 	if err != nil {
 		if (apierrors.IsConflict(err) || apierrors.IsInvalid(err)) && p.Force {
-			patchBytes, patchObject, err = p.deleteAndCreate(current, modified, namespace, name)
+			patchObject, err = p.deleteAndCreate(info.Object, modified, info.Namespace, info.Name)
 		} else {
-			err = cmdutil.AddSourceToErr("patching", source, err)
+			err = cmdutil.AddSourceToErr("patching", info.Source, err)
+		}
+
+		if err != nil {
+			return changed, err
 		}
 	}
-	return patchBytes, patchObject, err
+
+	info.Refresh(patchObject, true)
+
+	return changed, err
 }
 
-func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, namespace, name string) ([]byte, runtime.Object, error) {
+func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, namespace, name string) (runtime.Object, error) {
 	if err := p.delete(namespace, name); err != nil {
-		return modified, nil, err
+		return nil, err
 	}
 	// TODO: use wait
 	if err := wait.PollImmediate(1*time.Second, p.Timeout, func() (bool, error) {
@@ -261,11 +267,11 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 		}
 		return true, nil
 	}); err != nil {
-		return modified, nil, err
+		return nil, err
 	}
 	versionedObject, _, err := unstructured.UnstructuredJSONScheme.Decode(modified, nil, nil)
 	if err != nil {
-		return modified, nil, err
+		return nil, err
 	}
 	createdObject, err := p.Helper.Create(namespace, true, versionedObject)
 	if err != nil {
@@ -278,7 +284,7 @@ func (p *Patcher) deleteAndCreate(original runtime.Object, modified []byte, name
 			createdObject = recreated
 		}
 	}
-	return modified, createdObject, err
+	return createdObject, err
 }
 
 func addResourceVersion(patch []byte, rv string) ([]byte, error) {

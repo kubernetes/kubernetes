@@ -624,16 +624,14 @@ See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`
 		if err != nil {
 			return err
 		}
-		patchBytes, patchedObject, err := patcher.Patch(info.Object, modified, info.Source, info.Namespace, info.Name, o.ErrOut)
+		changed, err := patcher.Patch(info, modified, o.ErrOut)
 		if err != nil {
-			return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
+			return err
 		}
-
-		info.Refresh(patchedObject, true)
 
 		WarnIfDeleting(info.Object, o.ErrOut)
 
-		if string(patchBytes) == "{}" && !o.shouldPrintObject() {
+		if !changed && !o.shouldPrintObject() {
 			printer, err := o.ToPrinter("unchanged")
 			if err != nil {
 				return err
