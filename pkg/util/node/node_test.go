@@ -152,17 +152,6 @@ func TestGetNodeHostIPs(t *testing.T) {
 			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
 		},
 		{
-			name: "dual-stack node",
-			addresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
-				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
-			},
-			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
-		},
-		{
 			name: "dual-stack node, different order",
 			addresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
@@ -172,27 +161,6 @@ func TestGetNodeHostIPs(t *testing.T) {
 				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
 			},
 			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
-		},
-		{
-			name: "dual-stack node, different order",
-			addresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
-				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
-			},
-			expectIPs: []net.IP{netutils.ParseIPSloppy("1.2.3.4"), netutils.ParseIPSloppy("a:b::c:d")},
-		},
-		{
-			name: "dual-stack node, IPv6-first, no internal IPv4",
-			addresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
-				{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-				{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-			},
-			expectIPs: []net.IP{netutils.ParseIPSloppy("a:b::c:d"), netutils.ParseIPSloppy("4.3.2.1")},
 		},
 		{
 			name: "dual-stack node, IPv6-first, no internal IPv4, dual-stack cluster",
@@ -267,17 +235,20 @@ func TestGetHostname(t *testing.T) {
 func TestGetNodeIP(t *testing.T) {
 
 	testCases := []struct {
-		name   string
-		Node   *v1.Node
-		expect net.IP
+		name     string
+		nodeName string
+		node     *v1.Node
+		expect   net.IP
 	}{
 		{
-			name:   "",
-			expect: nil,
+			name:     "failed to get nodeIP,can't find the node",
+			nodeName: "",
+			expect:   nil,
 		},
 		{
-			name: "node1",
-			Node: &v1.Node{
+			name:     "failed to get nodeIP",
+			nodeName: "node1",
+			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node1",
 				},
@@ -287,8 +258,56 @@ func TestGetNodeIP(t *testing.T) {
 			expect: nil,
 		},
 		{
-			name: "node1",
-			Node: &v1.Node{
+			name:     "IPv4-only, simple",
+			nodeName: "node1",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+				Spec: v1.NodeSpec{},
+				Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
+					{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
+					{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+					{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+				}},
+			},
+			expect: netutils.ParseIPSloppy("1.2.3.4"),
+		},
+		{
+			name:     "IPv4-only, external-first",
+			nodeName: "node1",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+				Spec: v1.NodeSpec{},
+				Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
+					{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+					{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+					{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
+				}},
+			},
+			expect: netutils.ParseIPSloppy("1.2.3.4"),
+		},
+		{
+			name:     "IPv4-only, no internal",
+			nodeName: "node1",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+				Spec: v1.NodeSpec{},
+				Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
+					{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+					{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+				}},
+			},
+			expect: netutils.ParseIPSloppy("4.3.2.1"),
+		},
+		{
+			name:     "dual-stack node",
+			nodeName: "node1",
+			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node1",
 				},
@@ -301,27 +320,67 @@ func TestGetNodeIP(t *testing.T) {
 					{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
 				}},
 			},
-			expect: []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 1, 2, 3, 4},
+			expect: netutils.ParseIPSloppy("1.2.3.4"),
+		},
+		{
+			name:     "dual-stack node, different order",
+			nodeName: "node1",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+				Spec: v1.NodeSpec{},
+				Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
+					{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
+					{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
+					{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+					{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+					{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
+				}},
+			},
+			expect: netutils.ParseIPSloppy("1.2.3.4"),
+		},
+		{
+			name:     "dual-stack node, IPv6-first, no internal IPv4",
+			nodeName: "node1",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+				Spec: v1.NodeSpec{},
+				Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
+					{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
+					{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
+					{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+					{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+				}},
+			},
+			expect: netutils.ParseIPSloppy("a:b::c:d"),
 		},
 	}
 	for _, test := range testCases {
-		kubeClientSet := kubeclientfake.NewSimpleClientset()
-		if test.Node != nil {
-			if _, err := kubeClientSet.CoreV1().Nodes().Create(context.Background(), test.Node, metav1.CreateOptions{}); err != nil {
-				t.Error("create node error")
+		t.Run(test.name, func(t *testing.T) {
+			kubeClientSet := kubeclientfake.NewSimpleClientset()
+			if test.node != nil {
+				if _, err := kubeClientSet.CoreV1().Nodes().Create(context.Background(), test.node, metav1.CreateOptions{}); err != nil {
+					t.Error("create node error")
+				}
 			}
-		}
-		result := GetNodeIP(kubeClientSet, test.name)
-		assert.Equal(t, test.expect, result)
+			result := GetNodeIP(kubeClientSet, test.nodeName)
+			assert.Equal(t, test.expect, result)
+		})
+
 	}
 }
 
 func TestIsNodeReady(t *testing.T) {
 	testCases := []struct {
+		name   string
 		Node   *v1.Node
 		expect bool
 	}{
 		{
+			name: "case that returns true",
 			Node: &v1.Node{
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
@@ -335,6 +394,7 @@ func TestIsNodeReady(t *testing.T) {
 			expect: true,
 		},
 		{
+			name: "case that returns false",
 			Node: &v1.Node{
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
@@ -348,6 +408,7 @@ func TestIsNodeReady(t *testing.T) {
 			expect: false,
 		},
 		{
+			name: "case that returns false",
 			Node: &v1.Node{
 				Status: v1.NodeStatus{
 					Conditions: []v1.NodeCondition{
@@ -362,7 +423,9 @@ func TestIsNodeReady(t *testing.T) {
 		},
 	}
 	for _, test := range testCases {
-		result := IsNodeReady(test.Node)
-		assert.Equal(t, test.expect, result)
+		t.Run(test.name, func(t *testing.T) {
+			result := IsNodeReady(test.Node)
+			assert.Equal(t, test.expect, result)
+		})
 	}
 }
