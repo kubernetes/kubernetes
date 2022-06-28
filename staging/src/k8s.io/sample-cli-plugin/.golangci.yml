@@ -1,0 +1,21 @@
+linters:
+  enable:
+  - asciicheck
+  - deadcode
+  - depguard
+  - errcheck
+  - errorlint
+  - forcetypeassert
+  - gofmt
+  - goimports
+  - gosec
+  - gocritic
+  - importas
+  - prealloc
+  - revive
+  - misspell
+  - stylecheck
+  - unconvert
+  - whitespace
+run:
+  timeout: 10m
