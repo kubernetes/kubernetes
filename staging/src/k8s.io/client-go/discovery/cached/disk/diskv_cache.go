@@ -17,7 +17,8 @@ limitations under the License.
 package disk
 
 // NOTE(negz): This file is copied from the upstream httpcache implementation,
-// which is no longer maintained.
+// which is no longer maintained. It has been altered to prevent each cache
+// write being fsynced.
 // https://github.com/gregjones/httpcache/blob/901d90/diskcache/diskcache.go
 
 import (
@@ -28,6 +29,16 @@ import (
 
 	"github.com/peterbourgon/diskv"
 )
+
+// The httpcache package creates a cache entry for each HTTP response body that
+// it caches, and each cache entry corresponds to an individual file. Calling
+// the file's Sync() method after each value is written ensures data is always
+// flushed to disk, but doing so is very slow on MacOS.  We bias for speed at
+// the expense of potentially losing (easily recreatable) cache data by not
+// calling Sync().
+//
+// See https://github.com/kubernetes/kubernetes/issues/110753 for more.
+const syncFile = false
 
 // Cache is an implementation of httpcache.Cache that supplements the in-memory map with persistent storage
 type Cache struct {
@@ -47,7 +58,7 @@ func (c *Cache) Get(key string) (resp []byte, ok bool) {
 // Set saves a response to the cache as key
 func (c *Cache) Set(key string, resp []byte) {
 	key = keyToFilename(key)
-	c.d.WriteStream(key, bytes.NewReader(resp), true)
+	c.d.WriteStream(key, bytes.NewReader(resp), syncFile)
 }
 
 // Delete removes the response with key from the cache
