@@ -115,7 +115,9 @@ func (c *controller) sync() {
 	}
 
 	lease, created := c.backoffEnsureLease()
-	c.latestLease = lease
+	if lease != nil {
+		c.latestLease = lease
+	}
 	// we don't need to update the lease if we just created it
 	if !created && lease != nil {
 		if err := c.retryUpdateLease(lease); err != nil {
@@ -187,7 +189,12 @@ func (c *controller) retryUpdateLease(base *coordinationv1.Lease) error {
 		klog.Errorf("failed to update lease, error: %v", err)
 		// OptimisticLockError requires getting the newer version of lease to proceed.
 		if apierrors.IsConflict(err) {
-			base, _ = c.backoffEnsureLease()
+			fresh, err := c.leaseClient.Get(context.TODO(), c.holderIdentity, metav1.GetOptions{})
+			if err != nil {
+				klog.Errorf("failed to get latest lease, error: %v", err)
+				continue
+			}
+			base = fresh
 			continue
 		}
 		if i > 0 && c.onRepeatedHeartbeatFailure != nil {
