@@ -1,0 +1,64 @@
+# Copyright 2022 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['main']
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+
+permissions: read-all
+
+env:
+  GO_VERSION: 1.18
+
+jobs:
+  unit-tests:
+    name: Run unit tests
+    permissions:
+      contents: read
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    env:
+      OS: ${{ matrix.os }}
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@b22fbbc2921299758641fab08929b4ac52b32923 # v3.2.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Fetch Repository
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v3.2.0
+      - name: Run Go tests
+        run: go test -race $(go list ./...)
+
+  golangci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v3.2.0
+      - uses: actions/setup-go@b22fbbc2921299758641fab08929b4ac52b32923 # v3.2.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@422f9850577bea9cfda8186a8db1bf2022936c1f # v3.2.0
+        with:
+          version: v1.46.2
