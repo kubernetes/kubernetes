@@ -33,9 +33,21 @@ import (
 
 // Utilities for dealing with Jobs and CronJobs and time.
 
-func inActiveList(cj batchv1.CronJob, uid types.UID) bool {
+// inActiveList checks if cronjob's .status.active has a job with the same UID.
+func inActiveList(cj *batchv1.CronJob, uid types.UID) bool {
 	for _, j := range cj.Status.Active {
 		if j.UID == uid {
+			return true
+		}
+	}
+	return false
+}
+
+// inActiveListByName checks if cronjob's status.active has a job with the same
+// name and namespace.
+func inActiveListByName(cj *batchv1.CronJob, job *batchv1.Job) bool {
+	for _, j := range cj.Status.Active {
+		if j.Name == job.Name && j.Namespace == job.Namespace {
 			return true
 		}
 	}
@@ -200,31 +212,12 @@ func IsJobFinished(j *batchv1.Job) bool {
 }
 
 // byJobStartTime sorts a list of jobs by start timestamp, using their names as a tie breaker.
-type byJobStartTime []batchv1.Job
+type byJobStartTime []*batchv1.Job
 
 func (o byJobStartTime) Len() int      { return len(o) }
 func (o byJobStartTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o byJobStartTime) Less(i, j int) bool {
-	if o[i].Status.StartTime == nil && o[j].Status.StartTime != nil {
-		return false
-	}
-	if o[i].Status.StartTime != nil && o[j].Status.StartTime == nil {
-		return true
-	}
-	if o[i].Status.StartTime.Equal(o[j].Status.StartTime) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].Status.StartTime.Before(o[j].Status.StartTime)
-}
-
-// byJobStartTimeStar sorts a list of jobs by start timestamp, using their names as a tie breaker.
-type byJobStartTimeStar []*batchv1.Job
-
-func (o byJobStartTimeStar) Len() int      { return len(o) }
-func (o byJobStartTimeStar) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o byJobStartTimeStar) Less(i, j int) bool {
 	if o[i].Status.StartTime == nil && o[j].Status.StartTime != nil {
 		return false
 	}

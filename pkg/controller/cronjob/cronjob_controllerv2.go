@@ -431,13 +431,13 @@ func (jm *ControllerV2) syncCronJob(
 	childrenJobs := make(map[types.UID]bool)
 	for _, j := range jobs {
 		childrenJobs[j.ObjectMeta.UID] = true
-		found := inActiveList(*cronJob, j.ObjectMeta.UID)
+		found := inActiveList(cronJob, j.ObjectMeta.UID)
 		if !found && !IsJobFinished(j) {
 			cjCopy, err := jm.cronJobControl.GetCronJob(ctx, cronJob.Namespace, cronJob.Name)
 			if err != nil {
 				return nil, nil, updateStatus, err
 			}
-			if inActiveList(*cjCopy, j.ObjectMeta.UID) {
+			if inActiveList(cjCopy, j.ObjectMeta.UID) {
 				cronJob = cjCopy
 				continue
 			}
@@ -553,11 +553,11 @@ func (jm *ControllerV2) syncCronJob(
 		t := nextScheduledTimeDuration(*cronJob, sched, now)
 		return cronJob, t, updateStatus, nil
 	}
-	if isJobInActiveList(&batchv1.Job{
+	if inActiveListByName(cronJob, &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      getJobName(cronJob, *scheduledTime),
 			Namespace: cronJob.Namespace,
-		}}, cronJob.Status.Active) || cronJob.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
+		}}) || cronJob.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
 		klog.V(4).InfoS("Not starting job because the scheduled time is already processed", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "schedule", scheduledTime)
 		t := nextScheduledTimeDuration(*cronJob, sched, now)
 		return cronJob, t, updateStatus, nil
@@ -724,7 +724,7 @@ func (jm *ControllerV2) removeOldestJobs(cj *batchv1.CronJob, js []*batchv1.Job,
 
 	klog.V(4).InfoS("Cleaning up jobs from CronJob list", "deletejobnum", numToDelete, "jobnum", len(js), "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
 
-	sort.Sort(byJobStartTimeStar(js))
+	sort.Sort(byJobStartTime(js))
 	for i := 0; i < numToDelete; i++ {
 		klog.V(4).InfoS("Removing job from CronJob list", "job", js[i].Name, "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
 		if deleteJob(cj, js[i], jm.jobControl, jm.recorder) {
@@ -732,17 +732,6 @@ func (jm *ControllerV2) removeOldestJobs(cj *batchv1.CronJob, js []*batchv1.Job,
 		}
 	}
 	return updateStatus
-}
-
-// isJobInActiveList take a job and checks if activeJobs has a job with the same
-// name and namespace.
-func isJobInActiveList(job *batchv1.Job, activeJobs []corev1.ObjectReference) bool {
-	for _, j := range activeJobs {
-		if j.Name == job.Name && j.Namespace == job.Namespace {
-			return true
-		}
-	}
-	return false
 }
 
 // deleteJob reaps a job, deleting the job, the pods and the reference in the active list
