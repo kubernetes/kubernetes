@@ -442,10 +442,10 @@ func TestAnnotateErrors(t *testing.T) {
 				return
 			}
 			if bufOut.Len() > 0 {
-				t.Errorf("buffer should be empty: %s", string(bufOut.Bytes()))
+				t.Errorf("buffer should be empty: %s", bufOut.String())
 			}
 			if bufErr.Len() > 0 {
-				t.Errorf("buffer should be empty: %s", string(bufErr.Bytes()))
+				t.Errorf("buffer should be empty: %s", bufErr.String())
 			}
 		})
 	}

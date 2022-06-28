@@ -155,7 +155,7 @@ func (o *ViewLastAppliedOptions) RunApplyViewLastApplied(cmd *cobra.Command) err
 			if err != nil {
 				return err
 			}
-			fmt.Fprint(o.Out, string(jsonBuffer.Bytes()))
+			fmt.Fprint(o.Out, jsonBuffer.String())
 		case "yaml":
 			yamlOutput, err := yaml.JSONToYAML([]byte(str))
 			if err != nil {

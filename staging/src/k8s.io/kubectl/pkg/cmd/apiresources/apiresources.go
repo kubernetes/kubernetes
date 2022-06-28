@@ -193,7 +193,7 @@ func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Facto
 		}
 	}
 
-	if o.NoHeaders == false && o.Output != "name" {
+	if !o.NoHeaders && o.Output != "name" {
 		if err = printContextHeaders(w, o.Output); err != nil {
 			return err
 		}
