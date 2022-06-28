@@ -1,0 +1,32 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: plugin-scaffolding
+spec:
+  version: {{ .TagName }}
+  homepage: https://github.com/kubernetes/sample-cli-plugin
+  shortDescription: A simple yet kubectl plugin
+  description: |
+    Each Krew plugin has a “plugin manifest”, which is a YAML file that
+    describes the plugin, how it can be downloaded, and how it is installed
+    on a machine. Tutorials for creating plugin manifests can be found on the
+    https://krew.sigs.k8s.io/docs/developer-guide/plugin-manifest/
+  platforms:
+    - selector:
+        matchLabels:
+          os: darwin
+          arch: amd64
+      {{ addURIAndSha "https://github.com/kubernetes/sample-cli-plugin/releases/download/{{ .TagName }}/kubectl-plugin-scaffolding_{{ .TagName }}_darwin_amd64.tar.gz" .TagName | indent 6}}
+      bin: kubectl-plugin-scaffolding
+    - selector:
+        matchLabels:
+          os: linux
+          arch: amd64
+      {{ addURIAndSha "https://github.com/kubernetes/sample-cli-plugin/releases/download/{{ .TagName }}/kubectl-plugin-scaffolding_{{ .TagName }}_linux_amd64.tar.gz" .TagName | indent 6}}
+      bin: kubectl-plugin-scaffolding
+    - selector:
+        matchLabels:
+          os: linux
+          arch: 386
+      {{ addURIAndSha "https://github.com/kubernetes/sample-cli-plugin/releases/download/{{ .TagName }}/kubectl-plugin-scaffolding_{{ .TagName }}_linux_386.tar.gz" .TagName | indent 6}}
+      bin: kubectl-plugin-scaffolding
