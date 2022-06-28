@@ -17,12 +17,16 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"net"
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeclientfake "k8s.io/client-go/kubernetes/fake"
 	netutils "k8s.io/utils/net"
 )
 
@@ -257,5 +261,108 @@ func TestGetHostname(t *testing.T) {
 			t.Errorf("[%d]: expected output %q, got %q", idx, test.expectedHostName, hostName)
 		}
 
+	}
+}
+
+func TestGetNodeIP(t *testing.T) {
+
+	testCases := []struct {
+		name   string
+		Node   *v1.Node
+		expect net.IP
+	}{
+		{
+			name:   "",
+			expect: nil,
+		},
+		{
+			name: "node1",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+				Spec:   v1.NodeSpec{},
+				Status: v1.NodeStatus{},
+			},
+			expect: nil,
+		},
+		{
+			name: "node1",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node1",
+				},
+				Spec: v1.NodeSpec{},
+				Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
+					{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
+					{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
+					{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
+					{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
+					{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
+				}},
+			},
+			expect: []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 1, 2, 3, 4},
+		},
+	}
+	for _, test := range testCases {
+		kubeClientSet := kubeclientfake.NewSimpleClientset()
+		if test.Node != nil {
+			if _, err := kubeClientSet.CoreV1().Nodes().Create(context.Background(), test.Node, metav1.CreateOptions{}); err != nil {
+				t.Error("create node error")
+			}
+		}
+		result := GetNodeIP(kubeClientSet, test.name)
+		assert.Equal(t, test.expect, result)
+	}
+}
+
+func TestIsNodeReady(t *testing.T) {
+	testCases := []struct {
+		Node   *v1.Node
+		expect bool
+	}{
+		{
+			Node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					},
+				},
+			},
+			expect: true,
+		},
+		{
+			Node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionFalse,
+						},
+					},
+				},
+			},
+			expect: false,
+		},
+		{
+			Node: &v1.Node{
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:   v1.NodeMemoryPressure,
+							Status: v1.ConditionFalse,
+						},
+					},
+				},
+			},
+			expect: false,
+		},
+	}
+	for _, test := range testCases {
+		result := IsNodeReady(test.Node)
+		assert.Equal(t, test.expect, result)
 	}
 }
