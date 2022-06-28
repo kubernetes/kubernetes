@@ -101,12 +101,19 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		// TODO: this workaround can be removed in 1.25 once all user node sockets have a URL scheme:
 		// https://github.com/kubernetes/kubeadm/issues/2426
 		var missingURLScheme bool
+		// Handle a dupliate prefix URL scheme in the Node CRI socket.
+		// Older versions of kubeadm(v1.24.0~1) upgrade may add one or two extra prefix `unix://`
+		// TODO: this fix can be removed in 1.26 once all user node sockets have a correct URL scheme:
+		// https://github.com/kubernetes/kubeadm/issues/2426
+		var dupURLScheme bool
+
 		nro := &kubeadmapi.NodeRegistrationOptions{}
 		if !dryRun {
 			if err := configutil.GetNodeRegistration(data.KubeConfigPath(), data.Client(), nro); err != nil {
 				return errors.Wrap(err, "could not retrieve the node registration options for this node")
 			}
-			missingURLScheme = strings.HasPrefix(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme)
+			missingURLScheme = !strings.HasPrefix(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme)
+			dupURLScheme = strings.HasPrefix(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://"+kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://")
 		}
 		if missingURLScheme {
 			if !dryRun {
@@ -117,6 +124,17 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 				}
 			} else {
 				fmt.Println("[upgrade] Would update the node CRI socket path to include an URL scheme")
+			}
+		} else if dupURLScheme {
+			if !dryRun {
+				newSocket := strings.ReplaceAll(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://", "")
+				newSocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + newSocket
+				klog.V(2).Infof("ensuring that Node %q has a CRI socket annotation with correct URL scheme %q", nro.Name, newSocket)
+				if err := patchnodephase.AnnotateCRISocket(data.Client(), nro.Name, newSocket); err != nil {
+					return errors.Wrapf(err, "error updating the CRI socket for Node %q", nro.Name)
+				}
+			} else {
+				fmt.Println("[upgrade] Would update the node CRI socket path to remove dup URL scheme prefix")
 			}
 		}
 
