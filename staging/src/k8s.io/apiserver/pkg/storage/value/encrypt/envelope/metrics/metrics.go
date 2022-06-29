@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package envelope
+package metrics
 
 import (
 	"sync"
@@ -27,8 +27,8 @@ import (
 const (
 	namespace        = "apiserver"
 	subsystem        = "envelope_encryption"
-	fromStorageLabel = "from_storage"
-	toStorageLabel   = "to_storage"
+	FromStorageLabel = "from_storage"
+	ToStorageLabel   = "to_storage"
 )
 
 /*
@@ -71,16 +71,16 @@ var (
 
 var registerMetricsFunc sync.Once
 
-func registerMetrics() {
+func RegisterMetrics() {
 	registerMetricsFunc.Do(func() {
 		legacyregistry.MustRegister(dekCacheFillPercent)
 		legacyregistry.MustRegister(dekCacheInterArrivals)
 	})
 }
 
-func recordArrival(transformationType string, start time.Time) {
+func RecordArrival(transformationType string, start time.Time) {
 	switch transformationType {
-	case fromStorageLabel:
+	case FromStorageLabel:
 		lockLastFromStorage.Lock()
 		defer lockLastFromStorage.Unlock()
 
@@ -89,7 +89,7 @@ func recordArrival(transformationType string, start time.Time) {
 		}
 		dekCacheInterArrivals.WithLabelValues(transformationType).Observe(start.Sub(lastFromStorage).Seconds())
 		lastFromStorage = start
-	case toStorageLabel:
+	case ToStorageLabel:
 		lockLastToStorage.Lock()
 		defer lockLastToStorage.Unlock()
 
@@ -99,4 +99,8 @@ func recordArrival(transformationType string, start time.Time) {
 		dekCacheInterArrivals.WithLabelValues(transformationType).Observe(start.Sub(lastToStorage).Seconds())
 		lastToStorage = start
 	}
+}
+
+func RecordDekCacheFillPercent(percent float64) {
+	dekCacheFillPercent.Set(percent)
 }

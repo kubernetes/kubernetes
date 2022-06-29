@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package envelope transforms values for storage at rest using a Envelope provider
-package envelope
+// Package kmsv2 transforms values for storage at rest using a Envelope v2 provider
+package kmsv2
 
 import (
 	"context"
@@ -26,24 +26,27 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/storage/value"
+	kmstypes "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2/v2alpha1"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/metrics"
 	"k8s.io/utils/lru"
-
-	"golang.org/x/crypto/cryptobyte"
 )
 
-func init() {
-	value.RegisterMetrics()
-	metrics.RegisterMetrics()
-}
+const (
+	// KMSAPIVersion is the version of the KMS API.
+	KMSAPIVersion = "v2alpha1"
+)
 
 // Service allows encrypting and decrypting data using an external Key Management Service.
 type Service interface {
 	// Decrypt a given bytearray to obtain the original data as bytes.
-	Decrypt(data []byte) ([]byte, error)
+	Decrypt(ctx context.Context, uid string, req *DecryptRequest) ([]byte, error)
 	// Encrypt bytes to a ciphertext.
-	Encrypt(data []byte) ([]byte, error)
+	Encrypt(ctx context.Context, uid string, data []byte) (*EncryptResponse, error)
+	// Status returns the status of the KMS.
+	Status(ctx context.Context) (*StatusResponse, error)
 }
 
 type envelopeTransformer struct {
@@ -57,6 +60,29 @@ type envelopeTransformer struct {
 
 	cacheSize    int
 	cacheEnabled bool
+
+	pluginName string
+}
+
+// EncryptResponse is the response from the Envelope service when encrypting data.
+type EncryptResponse struct {
+	Ciphertext  []byte
+	KeyID       string
+	Annotations map[string][]byte
+}
+
+// DecryptRequest is the request to the Envelope service when decrypting data.
+type DecryptRequest struct {
+	Ciphertext  []byte
+	KeyID       string
+	Annotations map[string][]byte
+}
+
+// StatusResponse is the response from the Envelope service when getting the status of the service.
+type StatusResponse struct {
+	Version string
+	Healthz string
+	KeyID   string
 }
 
 // NewEnvelopeTransformer returns a transformer which implements a KEK-DEK based envelope encryption scheme.
@@ -64,13 +90,14 @@ type envelopeTransformer struct {
 // the data items they encrypt. A cache (of size cacheSize) is maintained to store the most recently
 // used decrypted DEKs in memory.
 func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransformerFunc func(cipher.Block) value.Transformer) (value.Transformer, error) {
-	var (
-		cache *lru.Cache
-	)
+	var cache *lru.Cache
 
 	if cacheSize > 0 {
+		// TODO(aramase): Switch to using expiring cache: kubernetes/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/cache/expiring.go.
+		// It handles scans a lot better, doesn't have to be right sized, and don't have a global lock on reads.
 		cache = lru.New(cacheSize)
 	}
+
 	return &envelopeTransformer{
 		envelopeService:     envelopeService,
 		transformers:        cache,
@@ -84,38 +111,35 @@ func NewEnvelopeTransformer(envelopeService Service, cacheSize int, baseTransfor
 func (t *envelopeTransformer) TransformFromStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, bool, error) {
 	metrics.RecordArrival(metrics.FromStorageLabel, time.Now())
 
-	// Read the 16 bit length-of-DEK encoded at the start of the encrypted DEK. 16 bits can
-	// represent a maximum key length of 65536 bytes. We are using a 256 bit key, whose
-	// length cannot fit in 8 bits (1 byte). Thus, we use 16 bits (2 bytes) to store the length.
-	var encKey cryptobyte.String
-	s := cryptobyte.String(data)
-	if ok := s.ReadUint16LengthPrefixed(&encKey); !ok {
-		return nil, false, fmt.Errorf("invalid data encountered by envelope transformer: failed to read uint16 length prefixed data")
+	// Deserialize the EncryptedObject from the data.
+	encryptedObject, err := t.doDecode(data)
+	if err != nil {
+		return nil, false, err
 	}
 
-	encData := []byte(s)
-
 	// Look up the decrypted DEK from cache or Envelope.
-	transformer := t.getTransformer(encKey)
+	transformer := t.getTransformer(encryptedObject.EncryptedDEK)
 	if transformer == nil {
 		if t.cacheEnabled {
 			value.RecordCacheMiss()
 		}
-		key, err := t.envelopeService.Decrypt(encKey)
+		uid := string(uuid.NewUUID())
+		key, err := t.envelopeService.Decrypt(ctx, uid, &DecryptRequest{
+			Ciphertext:  encryptedObject.EncryptedDEK,
+			KeyID:       encryptedObject.KeyID,
+			Annotations: encryptedObject.Annotations,
+		})
 		if err != nil {
-			// Do NOT wrap this err using fmt.Errorf() or similar functions
-			// because this gRPC status error has useful error code when
-			// record the metric.
-			return nil, false, err
+			return nil, false, fmt.Errorf("failed to decrypt DEK, error: %w", err)
 		}
 
-		transformer, err = t.addTransformer(encKey, key)
+		transformer, err = t.addTransformer(encryptedObject.EncryptedDEK, key)
 		if err != nil {
 			return nil, false, err
 		}
 	}
 
-	return transformer.TransformFromStorage(ctx, encData, dataCtx)
+	return transformer.TransformFromStorage(ctx, encryptedObject.EncryptedData, dataCtx)
 }
 
 // TransformToStorage encrypts data to be written to disk using envelope encryption.
@@ -126,15 +150,13 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 		return nil, err
 	}
 
-	encKey, err := t.envelopeService.Encrypt(newKey)
+	uid := string(uuid.NewUUID())
+	resp, err := t.envelopeService.Encrypt(ctx, uid, newKey)
 	if err != nil {
-		// Do NOT wrap this err using fmt.Errorf() or similar functions
-		// because this gRPC status error has useful error code when
-		// record the metric.
-		return nil, err
+		return nil, fmt.Errorf("failed to encrypt DEK, error: %w", err)
 	}
 
-	transformer, err := t.addTransformer(encKey, newKey)
+	transformer, err := t.addTransformer(resp.Ciphertext, newKey)
 	if err != nil {
 		return nil, err
 	}
@@ -143,17 +165,17 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 	if err != nil {
 		return nil, err
 	}
-	// Append the length of the encrypted DEK as the first 2 bytes.
-	b := cryptobyte.NewBuilder(nil)
-	b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
-		b.AddBytes([]byte(encKey))
-	})
-	b.AddBytes(result)
 
-	return b.Bytes()
+	encObject := &kmstypes.EncryptedObject{
+		KeyID:         resp.KeyID,
+		EncryptedDEK:  resp.Ciphertext,
+		EncryptedData: result,
+		Annotations:   resp.Annotations,
+	}
+
+	// Serialize the EncryptedObject to a byte array.
+	return t.doEncode(encObject)
 }
-
-var _ value.Transformer = &envelopeTransformer{}
 
 // addTransformer inserts a new transformer to the Envelope cache of DEKs for future reads.
 func (t *envelopeTransformer) addTransformer(encKey []byte, key []byte) (value.Transformer, error) {
@@ -182,6 +204,32 @@ func (t *envelopeTransformer) getTransformer(encKey []byte) value.Transformer {
 		return _transformer.(value.Transformer)
 	}
 	return nil
+}
+
+// doEncode encodes the EncryptedObject to a byte array.
+func (t *envelopeTransformer) doEncode(request *kmstypes.EncryptedObject) ([]byte, error) {
+	return proto.Marshal(request)
+}
+
+// doDecode decodes the byte array to an EncryptedObject.
+func (t *envelopeTransformer) doDecode(originalData []byte) (*kmstypes.EncryptedObject, error) {
+	o := &kmstypes.EncryptedObject{}
+	if err := proto.Unmarshal(originalData, o); err != nil {
+		return nil, err
+	}
+
+	// validate the EncryptedObject
+	if o.EncryptedData == nil {
+		return nil, fmt.Errorf("encrypted data is nil after unmarshal")
+	}
+	if o.KeyID == "" {
+		return nil, fmt.Errorf("keyID is empty after unmarshal")
+	}
+	if o.EncryptedDEK == nil {
+		return nil, fmt.Errorf("encrypted dek is nil after unmarshal")
+	}
+
+	return o, nil
 }
 
 // generateKey generates a random key using system randomness.
