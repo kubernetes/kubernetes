@@ -20,6 +20,7 @@ limitations under the License.
 package nodeshutdown
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -34,8 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2/ktesting"
-	_ "k8s.io/klog/v2/ktesting/init" // activate ktesting command line flags
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -45,6 +45,14 @@ import (
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
+
+	// https://github.com/kubernetes/kubernetes/pull/110504 started using
+	// ktesting for the first time in Kubernetes and therefore added it to
+	// "vendor". We need to revert that PR for a short while (see
+	// https://github.com/kubernetes/kubernetes/issues/110854) but to
+	// make the revert local to this directory, we keep importing that
+	// package (no change to vendor).
+	_ "k8s.io/klog/v2/ktesting/init"
 )
 
 // lock is to prevent systemDbus from being modified in the case of concurrency.
@@ -211,8 +219,6 @@ func TestManager(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
-
 			activePodsFunc := func() []*v1.Pod {
 				return tc.activePods
 			}
@@ -245,7 +251,6 @@ func TestManager(t *testing.T) {
 			fakeRecorder := &record.FakeRecorder{}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 			manager, _ := NewManager(&Config{
-				Logger:                          logger,
 				ProbeManager:                    proberManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
@@ -329,7 +334,6 @@ func TestFeatureEnabled(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
 			activePodsFunc := func() []*v1.Pod {
 				return nil
 			}
@@ -343,7 +347,6 @@ func TestFeatureEnabled(t *testing.T) {
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			manager, _ := NewManager(&Config{
-				Logger:                          logger,
 				ProbeManager:                    proberManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
@@ -360,7 +363,6 @@ func TestFeatureEnabled(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	systemDbusTmp := systemDbus
 	defer func() {
 		systemDbus = systemDbusTmp
@@ -399,7 +401,6 @@ func TestRestart(t *testing.T) {
 	fakeRecorder := &record.FakeRecorder{}
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	manager, _ := NewManager(&Config{
-		Logger:                          logger,
 		ProbeManager:                    proberManager,
 		Recorder:                        fakeRecorder,
 		NodeRef:                         nodeRef,
@@ -624,6 +625,23 @@ func Test_groupByPriority(t *testing.T) {
 	}
 }
 
+type buffer struct {
+	b  bytes.Buffer
+	rw sync.RWMutex
+}
+
+func (b *buffer) String() string {
+	b.rw.RLock()
+	defer b.rw.RUnlock()
+	return b.b.String()
+}
+
+func (b *buffer) Write(p []byte) (n int, err error) {
+	b.rw.Lock()
+	defer b.rw.Unlock()
+	return b.b.Write(p)
+}
+
 func Test_managerImpl_processShutdownEvent(t *testing.T) {
 	var (
 		probeManager   = probetest.FakeManager{}
@@ -647,10 +665,10 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 		clock                            clock.Clock
 	}
 	tests := []struct {
-		name                   string
-		fields                 fields
-		wantErr                bool
-		expectedOutputContains string
+		name                 string
+		fields               fields
+		wantErr              bool
+		exceptOutputContains string
 	}{
 		{
 			name: "kill pod func take too long",
@@ -682,17 +700,20 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 				clock:          fakeclock,
 				dbusCon:        &fakeDbus{},
 			},
-			wantErr:                false,
-			expectedOutputContains: "Shutdown manager pod killing time out",
+			wantErr:              false,
+			exceptOutputContains: "Shutdown manager pod killing time out",
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			l := klog.Level(1)
+			l.Set("1")
+			// hijack the klog output
+			tmpWriteBuffer := new(buffer)
+			klog.SetOutput(tmpWriteBuffer)
+			klog.LogToStderr(false)
 
 			m := &managerImpl{
-				logger:                           logger,
 				recorder:                         tt.fields.recorder,
 				nodeRef:                          tt.fields.nodeRef,
 				probeManager:                     tt.fields.probeManager,
@@ -709,17 +730,11 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 			if err := m.processShutdownEvent(); (err != nil) != tt.wantErr {
 				t.Errorf("managerImpl.processShutdownEvent() error = %v, wantErr %v", err, tt.wantErr)
 			}
+			klog.Flush()
 
-			underlier, ok := logger.GetSink().(ktesting.Underlier)
-			if !ok {
-				t.Fatalf("Should have had a ktesting LogSink, got %T", logger.GetSink())
-			}
-
-			log := underlier.GetBuffer().String()
-			if !strings.Contains(log, tt.expectedOutputContains) {
-				// Log will be shown on failure. To see it
-				// during a successful run use "go test -v".
-				t.Errorf("managerImpl.processShutdownEvent() should have logged %s, see actual output above.", tt.expectedOutputContains)
+			log := tmpWriteBuffer.String()
+			if !strings.Contains(log, tt.exceptOutputContains) {
+				t.Errorf("managerImpl.processShutdownEvent() should log %s, got %s", tt.exceptOutputContains, log)
 			}
 		})
 	}
