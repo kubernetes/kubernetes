@@ -174,7 +174,7 @@ func TestParseSystemdToCgroupName(t *testing.T) {
 	}
 }
 
-func TestName(t *testing.T) {
+func TestCgroupManagerName(t *testing.T) {
 	testCases := []struct {
 		name       string
 		input      CgroupName
