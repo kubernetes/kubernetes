@@ -17,13 +17,17 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"reflect"
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -114,4 +118,62 @@ var _ = SIGDescribe("Services", func() {
 
 	})
 
+	ginkgo.It("should have the ability to delete and recreate services in such a way that load balancing rules for pods are recovered by whatever chosen service proxy is being utilized", func() {
+		serviceName := "clusterip-test"
+		ns := f.Namespace.Name
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		ginkgo.By("creating service " + serviceName + " with type=ClusterIP in namespace " + ns)
+		_, err := jig.CreateTCPService(func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("creating Pod to be part of service " + serviceName)
+		// tweak the Jig to use windows...
+		windowsNodeSelectorTweak := func(rc *v1.ReplicationController) {
+			rc.Spec.Template.Spec.NodeSelector = map[string]string{
+				"kubernetes.io/os": "windows",
+			}
+			var replicas int32 = 3
+			rc.Spec.Replicas = &replicas
+		}
+		_, err = jig.Run(windowsNodeSelectorTweak)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("getting the endpoints of the " + serviceName + " service")
+		epList1, err := cs.CoreV1().Endpoints(ns).Get(context.TODO(), serviceName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("deleting the the " + serviceName + " service")
+		err = cs.CoreV1().Services(ns).Delete(context.TODO(), serviceName, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for the " + serviceName + " service to disappear")
+		if pollErr := wait.PollImmediate(e2eservice.LoadBalancerPollInterval, e2eservice.GetServiceLoadBalancerCreationTimeout(cs), func() (bool, error) {
+			_, err := cs.CoreV1().Services(ns).Get(context.TODO(), serviceName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					framework.Logf("Service %s/%s is gone.", ns, serviceName)
+					return true, nil
+				}
+				return false, err
+			}
+			framework.Logf("Service %s/%s still exists", ns, serviceName)
+			return false, nil
+		}); pollErr != nil {
+			framework.Failf("Failed to wait for service to disappear: %v", pollErr)
+		}
+
+		ginkgo.By("re-creating service " + serviceName + " with type=ClusterIP in namespace " + ns)
+		_, err = jig.CreateTCPService(func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("checking the endpoints of the new service should remain the same")
+		epList2, err := cs.CoreV1().Endpoints(ns).Get(context.TODO(), serviceName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(reflect.DeepEqual(epList1, epList2), true)
+	})
 })
