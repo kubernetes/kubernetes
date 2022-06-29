@@ -80,6 +80,11 @@ const (
 
 	// kube proxy canary chain is used for monitoring rule reload
 	kubeProxyCanaryChain utiliptables.Chain = "KUBE-PROXY-CANARY"
+
+	// largeClusterEndpointsThreshold is the number of endpoints at which
+	// we switch into "large cluster mode" and optimize for iptables
+	// performance over iptables debuggability
+	largeClusterEndpointsThreshold = 1000
 )
 
 // KernelCompatTester tests whether the required kernel capabilities are
@@ -191,6 +196,7 @@ type Proxier struct {
 	initialized          int32
 	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
 	syncPeriod           time.Duration
+	lastIPTablesCleanup  time.Time
 
 	// These are effectively const and do not need the mutex to be held.
 	iptables       utiliptables.Interface
@@ -219,11 +225,10 @@ type Proxier struct {
 	natChains                utilproxy.LineBuffer
 	natRules                 utilproxy.LineBuffer
 
-	// endpointChainsNumber is the total amount of endpointChains across all
-	// services that we will generate (it is computed at the beginning of
-	// syncProxyRules method). If that is large enough, comments in some
-	// iptable rules are dropped to improve performance.
-	endpointChainsNumber int
+	// largeClusterMode is set at the beginning of syncProxyRules if we are
+	// going to end up outputting "lots" of iptables rules and so we need to
+	// optimize for performance over debuggability.
+	largeClusterMode bool
 
 	// Values are as a parameter to select the interfaces where nodeport works.
 	nodePortAddresses []string
@@ -787,14 +792,12 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 	}
 }
 
-const endpointChainsNumberThreshold = 1000
-
 // Assumes proxier.mu is held.
 func (proxier *Proxier) appendServiceCommentLocked(args []string, svcName string) []string {
 	// Not printing these comments, can reduce size of iptables (in case of large
 	// number of endpoints) even by 40%+. So if total number of endpoint chains
 	// is large enough, we simply drop those comments.
-	if proxier.endpointChainsNumber > endpointChainsNumberThreshold {
+	if proxier.largeClusterMode {
 		return args
 	}
 	return append(args, "-m", "comment", "--comment", svcName)
@@ -888,17 +891,6 @@ func (proxier *Proxier) syncProxyRules() {
 	// Below this point we will not return until we try to write the iptables rules.
 	//
 
-	// Get iptables-save output so we can check for existing chains and rules.
-	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
-	existingNATChains := make(map[utiliptables.Chain]struct{})
-	proxier.iptablesData.Reset()
-	err := proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData)
-	if err != nil {
-		klog.ErrorS(err, "Failed to execute iptables-save: stale chains will not be deleted")
-	} else {
-		existingNATChains = utiliptables.GetChainsFromTable(proxier.iptablesData.Bytes())
-	}
-
 	// Reset all buffers used later.
 	// This is to avoid memory reallocations and thus improve performance.
 	proxier.filterChains.Reset()
@@ -956,11 +948,13 @@ func (proxier *Proxier) syncProxyRules() {
 	// is just for efficiency, not correctness.
 	args := make([]string, 64)
 
-	// Compute total number of endpoint chains across all services.
-	proxier.endpointChainsNumber = 0
+	// Compute total number of endpoint chains across all services to get
+	// a sense of how big the cluster is.
+	totalEndpoints := 0
 	for svcName := range proxier.serviceMap {
-		proxier.endpointChainsNumber += len(proxier.endpointsMap[svcName])
+		totalEndpoints += len(proxier.endpointsMap[svcName])
 	}
+	proxier.largeClusterMode = (totalEndpoints > largeClusterEndpointsThreshold)
 
 	nodeAddresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
 	if err != nil {
@@ -1335,19 +1329,34 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	// Delete chains no longer in use.
-	for chain := range existingNATChains {
-		if !activeNATChains[chain] {
-			chainString := string(chain)
-			if !isServiceChainName(chainString) {
-				// Ignore chains that aren't ours.
-				continue
+	// Delete chains no longer in use. Since "iptables-save" can take several seconds
+	// to run on hosts with lots of iptables rules, we don't bother to do this on
+	// every sync in large clusters. (Stale chains will not be referenced by any
+	// active rules, so they're harmless other than taking up memory.)
+	if !proxier.largeClusterMode || time.Since(proxier.lastIPTablesCleanup) > proxier.syncPeriod {
+		var existingNATChains map[utiliptables.Chain]struct{}
+
+		proxier.iptablesData.Reset()
+		if err := proxier.iptables.SaveInto(utiliptables.TableNAT, proxier.iptablesData); err == nil {
+			existingNATChains = utiliptables.GetChainsFromTable(proxier.iptablesData.Bytes())
+
+			for chain := range existingNATChains {
+				if !activeNATChains[chain] {
+					chainString := string(chain)
+					if !isServiceChainName(chainString) {
+						// Ignore chains that aren't ours.
+						continue
+					}
+					// We must (as per iptables) write a chain-line
+					// for it, which has the nice effect of flushing
+					// the chain. Then we can remove the chain.
+					proxier.natChains.Write(utiliptables.MakeChainLine(chain))
+					proxier.natRules.Write("-X", chainString)
+				}
 			}
-			// We must (as per iptables) write a chain-line for it, which has
-			// the nice effect of flushing the chain.  Then we can remove the
-			// chain.
-			proxier.natChains.Write(utiliptables.MakeChainLine(chain))
-			proxier.natRules.Write("-X", chainString)
+			proxier.lastIPTablesCleanup = time.Now()
+		} else {
+			klog.ErrorS(err, "Failed to execute iptables-save: stale chains will not be deleted")
 		}
 	}
 
@@ -1422,7 +1431,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	klog.V(2).InfoS("Reloading service iptables data",
 		"numServices", len(proxier.serviceMap),
-		"numEndpoints", proxier.endpointChainsNumber,
+		"numEndpoints", totalEndpoints,
 		"numFilterChains", proxier.filterChains.Lines(),
 		"numFilterRules", proxier.filterRules.Lines(),
 		"numNATChains", proxier.natChains.Lines(),
