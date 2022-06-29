@@ -765,7 +765,7 @@ func (rc *reconciler) markVolumeState(volume *reconstructedVolume, volumeState o
 		OuterVolumeSpecName: volume.outerVolumeSpecName,
 		VolumeGidVolume:     volume.volumeGidValue,
 		VolumeSpec:          volume.volumeSpec,
-		VolumeMountState:    operationexecutor.VolumeMounted,
+		VolumeMountState:    volumeState,
 	}
 	err := rc.actualStateOfWorld.MarkVolumeAsMounted(markVolumeOpts)
 	return err

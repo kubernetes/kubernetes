@@ -216,8 +216,12 @@ type ActualStateOfWorldMounterUpdater interface {
 	// volume expansion must not be retried for this volume
 	MarkForInUseExpansionError(volumeName v1.UniqueVolumeName)
 
+	// AddVolumeViaReconstruction adds the volume to actual state of the world and also
+	// marks the volume as one found during reconstruction.
 	AddVolumeViaReconstruction(opts MarkVolumeOpts) error
 
+	// IsVolumeReconstructed returns true if volume currently added to actual state of the world
+	// was found during reconstruction.
 	IsVolumeReconstructed(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
 }
 
