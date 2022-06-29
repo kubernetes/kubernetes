@@ -84,7 +84,7 @@ INFO: Ignoring NotFound error while getting pod default/no-such-pod
 INFO: Unexpected error: 
     <*fmt.wrapError>: {
         msg: "error while waiting for pod default/no-such-pod to be running: pods \"no-such-pod\" not found",
-        err: {
+        err: <*errors.StatusError>{
             ErrStatus: {
                 TypeMeta: {Kind: "", APIVersion: ""},
                 ListMeta: {
@@ -131,7 +131,7 @@ INFO: Unexpected error: wait for pod pending-pod running:
     <*pod.timeoutError>: {
         msg: "timed out while waiting for pod default/pending-pod to be running",
         observedObjects: [
-            {
+            <*v1.Pod>{
                 TypeMeta: {Kind: "", APIVersion: ""},
                 ObjectMeta: {
                     Name: "pending-pod",
