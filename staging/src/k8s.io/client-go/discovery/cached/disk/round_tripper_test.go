@@ -25,6 +25,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gregjones/httpcache/diskcache"
+	"github.com/peterbourgon/diskv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,6 +40,38 @@ type testRoundTripper struct {
 func (rt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	rt.Request = req
 	return rt.Response, rt.Err
+}
+
+// NOTE(negz): We're adding a benchmark for an external dependency in order to
+// prove that one that will be added in a subsequent commit improves write
+// performance.
+func BenchmarkDiskCache(b *testing.B) {
+	cacheDir, err := ioutil.TempDir("", "cache-rt")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(cacheDir)
+
+	d := diskv.New(diskv.Options{
+		PathPerm: os.FileMode(0750),
+		FilePerm: os.FileMode(0660),
+		BasePath: cacheDir,
+		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
+	})
+
+	k := "localhost:8080/apis/batch/v1.json"
+	v, err := ioutil.ReadFile("../../testdata/apis/batch/v1.json")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	c := diskcache.NewWithDiskv(d)
+
+	for n := 0; n < b.N; n++ {
+		c.Set(k, v)
+		c.Get(k)
+		c.Delete(k)
+	}
 }
 
 func TestCacheRoundTripper(t *testing.T) {
