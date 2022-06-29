@@ -124,17 +124,17 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 		labelKey         string
 		labelValue       string
 		matchExpressions []metav1.LabelSelectorRequirement
-		want             map[string]string
+		wantMatchLabels  map[string]string
 	}{
 		{
-			labels: labels,
-			want:   labels,
+			labels:          labels,
+			wantMatchLabels: labels,
 		},
 		{
 			labels:     labels,
 			labelKey:   "foo4",
 			labelValue: "89",
-			want: map[string]string{
+			wantMatchLabels: map[string]string{
 				"foo1": "bar1",
 				"foo2": "bar2",
 				"foo3": "bar3",
@@ -145,7 +145,7 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 			labels:     nil,
 			labelKey:   "foo4",
 			labelValue: "12",
-			want: map[string]string{
+			wantMatchLabels: map[string]string{
 				"foo4": "12",
 			},
 		},
@@ -160,7 +160,7 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 					Values:   []string{"cache"},
 				},
 			},
-			want: map[string]string{
+			wantMatchLabels: map[string]string{
 				"foo1": "bar1",
 				"foo2": "bar2",
 				"foo3": "bar3",
@@ -178,7 +178,7 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 					Values:   nil,
 				},
 			},
-			want: map[string]string{
+			wantMatchLabels: map[string]string{
 				"foo1": "bar1",
 				"foo2": "bar2",
 				"foo3": "bar3",
@@ -189,11 +189,11 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 
 	for _, tc := range cases {
 		ls_in := metav1.LabelSelector{MatchLabels: tc.labels, MatchExpressions: tc.matchExpressions}
-		ls_out := metav1.LabelSelector{MatchLabels: tc.want, MatchExpressions: tc.matchExpressions}
+		ls_out := metav1.LabelSelector{MatchLabels: tc.wantMatchLabels, MatchExpressions: tc.matchExpressions}
 
 		got := CloneSelectorAndAddLabel(&ls_in, tc.labelKey, tc.labelValue)
 		if !reflect.DeepEqual(got, &ls_out) {
-			t.Errorf("got %v, want %v", got, tc.want)
+			t.Errorf("got %v, want %v", got, ls_out)
 		}
 	}
 }
