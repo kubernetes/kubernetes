@@ -609,7 +609,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	if s.Etcd.EnableWatchCache {
 		sizes := kubeapiserver.DefaultWatchCacheSizes()
 		// Ensure that overrides parse correctly.
-		userSpecified, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes)
+		userSpecified, err := serveroptions.ParseWatchCacheSizesWithOnce(s.Etcd.WatchCacheSizes)
 		if err != nil {
 			return options, err
 		}

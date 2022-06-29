@@ -179,7 +179,7 @@ func TestParseWatchCacheSizes(t *testing.T) {
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
-			result, err := ParseWatchCacheSizes(testcase.cacheSizes)
+			result, err := parseWatchCacheSizes(testcase.cacheSizes)
 			if len(testcase.expectErr) != 0 && !strings.Contains(err.Error(), testcase.expectErr) {
 				t.Errorf("got err: %v, expected err: %s", err, testcase.expectErr)
 			}
@@ -193,6 +193,35 @@ func TestParseWatchCacheSizes(t *testing.T) {
 						}
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestParseWatchCacheSizesWithOnce(t *testing.T) {
+	testCases := []struct {
+		name       string
+		cacheSizes []string
+		expectErr  string
+	}{
+		{
+			name:       "test when invalid value of watch cache size",
+			cacheSizes: []string{"deployments.apps#65536", "replicasets.extensions"},
+			expectErr:  "invalid value of watch cache size",
+		},
+		{
+			name:       "test output should be consistent with last case when using sync.once",
+			cacheSizes: []string{"deployments.apps#65536", "replicasets.extensions#65536"},
+			expectErr:  "invalid value of watch cache size",
+		},
+	}
+
+	for _, testcase := range testCases {
+		t.Run(testcase.name, func(t *testing.T) {
+			_, err := ParseWatchCacheSizesWithOnce(testcase.cacheSizes)
+			// We just concern err output here.
+			if !strings.Contains(err.Error(), testcase.expectErr) {
+				t.Errorf("got err: %v, expected err: %s", err, testcase.expectErr)
 			}
 		})
 	}

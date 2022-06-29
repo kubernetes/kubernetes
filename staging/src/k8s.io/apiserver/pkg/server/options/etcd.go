@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -63,6 +64,12 @@ type EtcdOptions struct {
 
 var storageTypes = sets.NewString(
 	storagebackend.StorageTypeETCD3,
+)
+
+var (
+	parseWatchCacheSizesOnce sync.Once
+	watchCacheSizes          = make(map[schema.GroupResource]int)
+	parseWatchCacheSizesErr  error
 )
 
 func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
@@ -266,7 +273,7 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 		}
 	}
 	if f.Options.EnableWatchCache {
-		sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)
+		sizes, err := ParseWatchCacheSizesWithOnce(f.Options.WatchCacheSizes)
 		if err != nil {
 			return generic.RESTOptions{}, err
 		}
@@ -306,7 +313,7 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		StorageObjectCountTracker: f.Options.StorageConfig.StorageObjectCountTracker,
 	}
 	if f.Options.EnableWatchCache {
-		sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)
+		sizes, err := ParseWatchCacheSizesWithOnce(f.Options.WatchCacheSizes)
 		if err != nil {
 			return generic.RESTOptions{}, err
 		}
@@ -324,9 +331,9 @@ func (f *StorageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 	return ret, nil
 }
 
-// ParseWatchCacheSizes turns a list of cache size values into a map of group resources
+// parseWatchCacheSizes turns a list of cache size values into a map of group resources
 // to requested sizes.
-func ParseWatchCacheSizes(cacheSizes []string) (map[schema.GroupResource]int, error) {
+func parseWatchCacheSizes(cacheSizes []string) (map[schema.GroupResource]int, error) {
 	watchCacheSizes := make(map[schema.GroupResource]int)
 	for _, c := range cacheSizes {
 		tokens := strings.Split(c, "#")
@@ -344,6 +351,14 @@ func ParseWatchCacheSizes(cacheSizes []string) (map[schema.GroupResource]int, er
 		watchCacheSizes[schema.ParseGroupResource(tokens[0])] = size
 	}
 	return watchCacheSizes, nil
+}
+
+// ParseWatchCacheSizesWithOnce is a wrapper of parseWatchCacheSizes for cleanliness and testing.
+func ParseWatchCacheSizesWithOnce(cacheSizes []string) (map[schema.GroupResource]int, error) {
+	parseWatchCacheSizesOnce.Do(func() {
+		watchCacheSizes, parseWatchCacheSizesErr = parseWatchCacheSizes(cacheSizes)
+	})
+	return watchCacheSizes, parseWatchCacheSizesErr
 }
 
 // WriteWatchCacheSizes turns a map of cache size values into a list of string specifications.
