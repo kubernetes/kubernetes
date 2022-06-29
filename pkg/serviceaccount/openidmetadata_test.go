@@ -234,7 +234,9 @@ func TestURLBoundaries(t *testing.T) {
 		WantOK bool
 	}{
 		{"OIDC config path", "/.well-known/openid-configuration", true},
+		{"OIDC config path with trailing slash", "/.well-known/openid-configuration/", true},
 		{"JWKS path", "/openid/v1/jwks", true},
+		{"JWKS path with trailing slash", "/openid/v1/jwks/", true},
 		{"well-known", "/.well-known", false},
 		{"subpath", "/openid/v1/jwks/foo", false},
 		{"query", "/openid/v1/jwks?format=yaml", true},

@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"net/url"
 
-	jose "gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2"
 
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -36,12 +36,14 @@ const (
 	// an OIDC Provider Configuration Information document, corresponding
 	// to the Kubernetes Service Account key issuer.
 	// https://openid.net/specs/openid-connect-discovery-1_0.html
-	OpenIDConfigPath = "/.well-known/openid-configuration"
+	OpenIDConfigPath       = "/openid-configuration"
+	OpenIDConfigPathPrefix = "/.well-known"
 
 	// JWKSPath is the URL path at which the API server serves a JWKS
 	// containing the public keys that may be used to sign Kubernetes
 	// Service Account keys.
-	JWKSPath = "/openid/v1/jwks"
+	JWKSPath       = "/jwks"
+	JWKSPathPrefix = "/openid/v1"
 )
 
 // OpenIDMetadata contains the pre-rendered responses for OIDC discovery endpoints.
