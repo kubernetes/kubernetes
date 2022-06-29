@@ -19,7 +19,7 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdapiv1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	"reflect"
@@ -36,6 +36,8 @@ type unsetOptions struct {
 	configAccess clientcmd.ConfigAccess
 	propertyName string
 	jsonPath     bool
+
+	streams genericclioptions.IOStreams
 }
 
 var (
@@ -56,8 +58,8 @@ var (
 )
 
 // NewCmdConfigUnset returns a Command instance for 'config unset' sub command
-func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &unsetOptions{configAccess: configAccess, jsonPath: false}
+func NewCmdConfigUnset(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &unsetOptions{configAccess: configAccess, jsonPath: false, streams: streams}
 
 	cmd := &cobra.Command{
 		Use:                   "unset PROPERTY_NAME",
@@ -67,7 +69,7 @@ func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobr
 		Example:               unsetExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd, args))
-			cmdutil.CheckErr(options.run(out))
+			cmdutil.CheckErr(options.run())
 
 		},
 	}
@@ -75,7 +77,7 @@ func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobr
 	return cmd
 }
 
-func (o unsetOptions) run(out io.Writer) error {
+func (o unsetOptions) run() error {
 	err := o.validate()
 	if err != nil {
 		return err
@@ -104,6 +106,9 @@ func (o unsetOptions) run(out io.Writer) error {
 		}
 		config = finalConfig
 	} else {
+		if _, err := fmt.Fprintln(o.streams.ErrOut, "Warning: usage of dot delimited path for setting config values is deprecated, please use jsonpath syntax instead."); err != nil {
+			return fmt.Errorf("failed to write warning message to user")
+		}
 		steps, err := newNavigationSteps(o.propertyName)
 		if err != nil {
 			return err
@@ -117,7 +122,7 @@ func (o unsetOptions) run(out io.Writer) error {
 	if err := clientcmd.ModifyConfig(o.configAccess, *config, false); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(out, "Property %q unset.\n", o.propertyName); err != nil {
+	if _, err := fmt.Fprintf(o.streams.Out, "Property %q unset.\n", o.propertyName); err != nil {
 		return err
 	}
 

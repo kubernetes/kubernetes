@@ -20,7 +20,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"reflect"
 	"strings"
 
@@ -44,6 +44,8 @@ type setOptions struct {
 	setRawBytes   cliflag.Tristate
 	jsonPath      bool
 	deduplicate   bool
+
+	streams genericclioptions.IOStreams
 }
 
 var (
@@ -92,8 +94,8 @@ var (
 )
 
 // NewCmdConfigSet returns a Command instance for 'config set' sub command
-func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &setOptions{configAccess: configAccess, jsonPath: false}
+func NewCmdConfigSet(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &setOptions{configAccess: configAccess, jsonPath: false, streams: streams}
 
 	cmd := &cobra.Command{
 		Use:                   "set PROPERTY_NAME PROPERTY_VALUE",
@@ -104,7 +106,7 @@ func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())
-			fmt.Fprintf(out, "Property %q set.\n", options.propertyName)
+			fmt.Fprintf(options.streams.Out, "Property %q set.\n", options.propertyName)
 		},
 	}
 
@@ -144,6 +146,9 @@ func (o setOptions) run() error {
 		}
 		config = finalConfig
 	} else {
+		if _, err := fmt.Fprintln(o.streams.ErrOut, "Warning: usage of dot delimited path for setting config values is deprecated, please use jsonpath syntax instead."); err != nil {
+			return fmt.Errorf("failed to write warning message to user")
+		}
 		steps, err := newNavigationSteps(o.propertyName)
 		if err != nil {
 			return err
