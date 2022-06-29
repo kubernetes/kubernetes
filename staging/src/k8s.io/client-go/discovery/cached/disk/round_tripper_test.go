@@ -18,6 +18,8 @@ package disk
 
 import (
 	"bytes"
+	"encoding/binary"
+	"hash/crc32"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -25,7 +27,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gregjones/httpcache/diskcache"
 	"github.com/peterbourgon/diskv"
 	"github.com/stretchr/testify/assert"
 )
@@ -42,9 +43,6 @@ func (rt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 	return rt.Response, rt.Err
 }
 
-// NOTE(negz): We're adding a benchmark for an external dependency in order to
-// prove that one that will be added in a subsequent commit improves write
-// performance.
 func BenchmarkDiskCache(b *testing.B) {
 	cacheDir, err := ioutil.TempDir("", "cache-rt")
 	if err != nil {
@@ -65,7 +63,7 @@ func BenchmarkDiskCache(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	c := diskcache.NewWithDiskv(d)
+	c := crcDiskCache{disk: d}
 
 	for n := 0; n < b.N; n++ {
 		c.Set(k, v)
@@ -178,4 +176,148 @@ func TestCacheRoundTripperPathPerm(t *testing.T) {
 		return nil
 	})
 	assert.NoError(err)
+}
+
+func TestCRCDiskCache(t *testing.T) {
+	assert := assert.New(t)
+
+	// Ensure that we'll return a cache miss if the backing file doesn't exist.
+	t.Run("NoSuchKey", func(t *testing.T) {
+		cacheDir, err := ioutil.TempDir("", "cache-crc")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(cacheDir)
+		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		crc := &crcDiskCache{disk: d}
+
+		key := "testing"
+
+		got, ok := crc.Get(key)
+		assert.False(ok)
+		assert.Equal([]byte{}, got)
+	})
+
+	// Ensure that we'll return a cache miss if the backing file is empty.
+	t.Run("EmptyFile", func(t *testing.T) {
+		cacheDir, err := ioutil.TempDir("", "cache-crc")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(cacheDir)
+		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		crc := &crcDiskCache{disk: d}
+
+		key := "testing"
+
+		f, err := os.Create(filepath.Join(cacheDir, sanitize(key)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+
+		got, ok := crc.Get(key)
+		assert.False(ok)
+		assert.Equal([]byte{}, got)
+	})
+
+	// Ensure that we'll return a cache miss if the backing has an invalid
+	// checksum.
+	t.Run("InvalidChecksum", func(t *testing.T) {
+		cacheDir, err := ioutil.TempDir("", "cache-crc")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(cacheDir)
+		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		crc := &crcDiskCache{disk: d}
+
+		key := "testing"
+		value := []byte("testing")
+		mismatchedValue := []byte("testink")
+		sum := make([]byte, binary.MaxVarintLen32)
+		binary.PutUvarint(sum, uint64(crc32.ChecksumIEEE(value)))
+
+		// Create a file with the checksum of 'value' followed by the bytes of
+		// 'mismatchedValue'.
+		f, err := os.Create(filepath.Join(cacheDir, sanitize(key)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Write(sum)
+		f.Write(mismatchedValue)
+		f.Close()
+
+		// The mismatched checksum should result in a cache miss.
+		got, ok := crc.Get(key)
+		assert.False(ok)
+		assert.Equal([]byte{}, got)
+	})
+
+	// Ensure that our disk cache will happily cache over the top of an existing
+	// value. We depend on this behaviour to recover from corrupted cache
+	// entries. When Get detects a bad checksum it will return a cache miss.
+	// This should cause httpcache to fall back to its underlying transport and
+	// to subsequently cache the new value, overwriting the corrupt one.
+	t.Run("OverwriteExistingKey", func(t *testing.T) {
+		cacheDir, err := ioutil.TempDir("", "cache-crc")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(cacheDir)
+		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		crc := &crcDiskCache{disk: d}
+
+		key := "testing"
+		value := []byte("cool value!")
+
+		// Write a value.
+		crc.Set(key, value)
+		got, ok := crc.Get(key)
+
+		// Ensure we can read back what we wrote.
+		assert.True(ok)
+		assert.Equal(value, got)
+
+		differentValue := []byte("I'm different!")
+
+		// Write a different value.
+		crc.Set(key, differentValue)
+		got, ok = crc.Get(key)
+
+		// Ensure we can read back the different value.
+		assert.True(ok)
+		assert.Equal(differentValue, got)
+	})
+
+	// Ensure that deleting a key does in fact delete it.
+	t.Run("DeleteKey", func(t *testing.T) {
+		cacheDir, err := ioutil.TempDir("", "cache-crc")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.RemoveAll(cacheDir)
+		d := diskv.New(diskv.Options{BasePath: cacheDir, TempDir: filepath.Join(cacheDir, ".diskv-temp")})
+		crc := &crcDiskCache{disk: d}
+
+		key := "testing"
+		value := []byte("coolValue")
+
+		crc.Set(key, value)
+
+		// Ensure we successfully set the value.
+		got, ok := crc.Get(key)
+		assert.True(ok)
+		assert.Equal(value, got)
+
+		crc.Delete(key)
+
+		// Ensure the value is gone.
+		got, ok = crc.Get(key)
+		assert.False(ok)
+		assert.Equal([]byte{}, got)
+
+		// Ensure that deleting a non-existent value is a no-op.
+		crc.Delete(key)
+	})
 }

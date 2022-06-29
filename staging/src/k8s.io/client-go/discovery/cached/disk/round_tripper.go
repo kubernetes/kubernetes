@@ -17,12 +17,15 @@ limitations under the License.
 package disk
 
 import (
+	"encoding/binary"
+	"fmt"
+	"hash/crc32"
+	"hash/fnv"
 	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/gregjones/httpcache"
-	"github.com/gregjones/httpcache/diskcache"
 	"github.com/peterbourgon/diskv"
 	"k8s.io/klog/v2"
 )
@@ -41,7 +44,7 @@ func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripp
 		BasePath: cacheDir,
 		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
 	})
-	t := httpcache.NewTransport(diskcache.NewWithDiskv(d))
+	t := httpcache.NewTransport(&crcDiskCache{disk: d})
 	t.Transport = rt
 
 	return &cacheRoundTripper{rt: t}
@@ -63,3 +66,54 @@ func (rt *cacheRoundTripper) CancelRequest(req *http.Request) {
 }
 
 func (rt *cacheRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt.Transport }
+
+// A crcDiskCache is a cache backend for github.com/gregjones/httpcache. It is
+// similar to httpcache's diskcache package, but uses checksums to ensure cache
+// integrity rather than fsyncing each cache entry in order to avoid performance
+// degradation on MacOS.
+//
+// See https://github.com/kubernetes/kubernetes/issues/110753 for more.
+type crcDiskCache struct {
+	disk *diskv.Diskv
+}
+
+// Get the requested key from the cache on disk. If Get encounters an error, or
+// the returned value is not a CRC-32 checksum followed by bytes with a matching
+// checksum it will return false to indicate a cache miss.
+func (c *crcDiskCache) Get(key string) ([]byte, bool) {
+	b, err := c.disk.Read(sanitize(key))
+	if err != nil || len(b) < binary.MaxVarintLen32 {
+		return []byte{}, false
+	}
+
+	response := b[binary.MaxVarintLen32:]
+	sum, _ := binary.Uvarint(b[:binary.MaxVarintLen32])
+	if crc32.ChecksumIEEE(response) != uint32(sum) {
+		return []byte{}, false
+	}
+
+	return response, true
+}
+
+// Set writes the response to a file on disk. The filename will be the FNV-32a
+// hash of the key. The file will contain the CRC-32 checksum of the response
+// bytes, followed by said response bytes.
+func (c *crcDiskCache) Set(key string, response []byte) {
+	sum := make([]byte, binary.MaxVarintLen32)
+	_ = binary.PutUvarint(sum, uint64(crc32.ChecksumIEEE(response)))
+	_ = c.disk.Write(sanitize(key), append(sum, response...)) // Nothing we can do with this error.
+}
+
+func (c *crcDiskCache) Delete(key string) {
+	_ = c.disk.Erase(sanitize(key)) // Nothing we can do with this error.
+}
+
+// Sanitize an httpcache key such that it can be used as a diskv key, which must
+// be a valid filename. The httpcache key will either be the requested URL (if
+// the request method was GET) or "<method> <url>" for other methods, per the
+// httpcache.cacheKey function.
+func sanitize(key string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(key)) // Writing to a hash never returns an error.
+	return fmt.Sprintf("%X", h.Sum32())
+}
