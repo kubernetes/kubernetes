@@ -205,59 +205,49 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 		gc.workerLock.Lock()
 		defer gc.workerLock.Unlock()
 
-		// Once we get here, we should not unpause workers until we've successfully synced
-		attempt := 0
-		wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
-			attempt++
+		// Note: The syncing may fail if the CRDs have broken conversion webhooks,
+		// but it should not block the gc working.
+		newResources = GetDeletableResources(discoveryClient)
+		if len(newResources) == 0 {
+			klog.V(2).Infof("no resources reported by discovery")
+			metrics.GarbageCollectorResourcesSyncError.Inc()
+			return
+		}
 
-			// On a reattempt, check if available resources have changed
-			if attempt > 1 {
-				newResources = GetDeletableResources(discoveryClient)
-				if len(newResources) == 0 {
-					klog.V(2).Infof("no resources reported by discovery (attempt %d)", attempt)
-					metrics.GarbageCollectorResourcesSyncError.Inc()
-					return false, nil
-				}
-			}
+		klog.V(2).Infof("syncing garbage collector with updated resources from discovery %s", printDiff(oldResources, newResources))
 
-			klog.V(2).Infof("syncing garbage collector with updated resources from discovery (attempt %d): %s", attempt, printDiff(oldResources, newResources))
+		// Resetting the REST mapper will also invalidate the underlying discovery
+		// client. This is a leaky abstraction and assumes behavior about the REST
+		// mapper, but we'll deal with it for now.
+		gc.restMapper.Reset()
+		klog.V(4).Infof("reset restmapper")
 
-			// Resetting the REST mapper will also invalidate the underlying discovery
-			// client. This is a leaky abstraction and assumes behavior about the REST
-			// mapper, but we'll deal with it for now.
-			gc.restMapper.Reset()
-			klog.V(4).Infof("reset restmapper")
+		// Perform the monitor resync and wait for controllers to report cache sync.
+		//
+		// NOTE: It's possible that newResources will diverge from the resources
+		// discovered by restMapper during the call to Reset, since they are
+		// distinct discovery clients invalidated at different times. For example,
+		// newResources may contain resources not returned in the restMapper's
+		// discovery call if the resources appeared in-between the calls. In that
+		// case, the restMapper will fail to map some of newResources until the next
+		// attempt.
+		if err := gc.resyncMonitors(newResources); err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors: %v", err))
+			metrics.GarbageCollectorResourcesSyncError.Inc()
+			return
+		}
+		klog.V(4).Infof("resynced monitors")
 
-			// Perform the monitor resync and wait for controllers to report cache sync.
-			//
-			// NOTE: It's possible that newResources will diverge from the resources
-			// discovered by restMapper during the call to Reset, since they are
-			// distinct discovery clients invalidated at different times. For example,
-			// newResources may contain resources not returned in the restMapper's
-			// discovery call if the resources appeared in-between the calls. In that
-			// case, the restMapper will fail to map some of newResources until the next
-			// attempt.
-			if err := gc.resyncMonitors(newResources); err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors (attempt %d): %v", attempt, err))
-				metrics.GarbageCollectorResourcesSyncError.Inc()
-				return false, nil
-			}
-			klog.V(4).Infof("resynced monitors")
-
-			// wait for caches to fill for a while (our sync period) before attempting to rediscover resources and retry syncing.
-			// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
-			// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
-			// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
-			// note that workers stay paused until we successfully resync.
-			if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(stopCh, period), gc.dependencyGraphBuilder.IsSynced) {
-				utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync (attempt %d)", attempt))
-				metrics.GarbageCollectorResourcesSyncError.Inc()
-				return false, nil
-			}
-
-			// success, break out of the loop
-			return true, nil
-		}, stopCh)
+		// wait for caches to fill for a while (our sync period) before attempting to rediscover resources and retry syncing.
+		// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
+		// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
+		// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
+		// note that workers stay paused until we successfully resync.
+		if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(stopCh, period), gc.dependencyGraphBuilder.IsSynced) {
+			utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync"))
+			metrics.GarbageCollectorResourcesSyncError.Inc()
+			return
+		}
 
 		// Finally, keep track of our new state. Do this after all preceding steps
 		// have succeeded to ensure we'll retry on subsequent syncs if an error
