@@ -15,14 +15,14 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/openid/v1/jwks/": {
+    "/.well-known/openid-configuration": {
       "get": {
-        "description": "get service account issuer OpenID JSON Web Key Set (contains public token verification keys)",
-        "operationId": "getServiceAccountIssuerOpenIDKeyset",
+        "description": "get service account issuer OpenID configuration, also known as the 'OIDC discovery doc'",
+        "operationId": "getServiceAccountIssuerOpenIDConfiguration",
         "responses": {
           "200": {
             "content": {
-              "application/jwk-set+json": {
+              "application/json": {
                 "schema": {
                   "type": "string"
                 }
@@ -35,7 +35,7 @@
           }
         },
         "tags": [
-          "openid"
+          "WellKnown"
         ]
       }
     }

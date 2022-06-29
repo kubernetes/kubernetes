@@ -18113,7 +18113,7 @@
     }
   },
   "paths": {
-    "/.well-known/openid-configuration/": {
+    "/.well-known/openid-configuration": {
       "get": {
         "description": "get service account issuer OpenID configuration, also known as the 'OIDC discovery doc'",
         "operationId": "getServiceAccountIssuerOpenIDConfiguration",
@@ -76042,7 +76042,7 @@
         }
       ]
     },
-    "/openid/v1/jwks/": {
+    "/openid/v1/jwks": {
       "get": {
         "description": "get service account issuer OpenID JSON Web Key Set (contains public token verification keys)",
         "operationId": "getServiceAccountIssuerOpenIDKeyset",
