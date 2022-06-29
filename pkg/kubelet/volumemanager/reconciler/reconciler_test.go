@@ -2239,10 +2239,12 @@ func getReconciler(kubeletDir string, t *testing.T, volumePaths []string) (Recon
 
 func TestSyncStates(t *testing.T) {
 	tests := []struct {
-		name             string
-		volumePaths      []string
-		createMountPoint bool
-		verifyFunc       func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error
+		name                 string
+		volumePaths          []string
+		createMountPoint     bool
+		addToDSOW            bool
+		postSyncStatCallback func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error
+		verifyFunc           func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error
 	}{
 		{
 			name: "when two pods are using same volume and both are deleted",
@@ -2275,6 +2277,29 @@ func TestSyncStates(t *testing.T) {
 				})
 			},
 		},
+		{
+			name: "when volume exists in dsow, volume should be recorded in skipped during reconstruction",
+			volumePaths: []string{
+				path.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
+			},
+			createMountPoint: true,
+			addToDSOW:        true,
+			postSyncStatCallback: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
+				skippedVolumes := rcInstance.skippedDuringReconstruction
+				if len(skippedVolumes) != 1 {
+					return fmt.Errorf("expected 1 pods to in skippedDuringReconstruction got %d", len(skippedVolumes))
+				}
+				rcInstance.processReconstructedVolumes()
+				return nil
+			},
+			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
+				mountedPods := rcInstance.actualStateOfWorld.GetAllMountedVolumes()
+				if len(mountedPods) != 1 {
+					return fmt.Errorf("expected 1 pods to in mounted volume list got %d", len(mountedPods))
+				}
+				return nil
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2283,6 +2308,28 @@ func TestSyncStates(t *testing.T) {
 				t.Fatalf("can't make a temp directory for kubeletPods: %v", err)
 			}
 			defer os.RemoveAll(tmpKubeletDir)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod1",
+					UID:  "pod1uid",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "volume-name",
+							VolumeSource: v1.VolumeSource{
+								GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+									PDName: "volume-name",
+								},
+							},
+						},
+					},
+				},
+			}
+
+			volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+			podName := util.GetUniquePodName(pod)
 
 			// create kubelet pod directory
 			tmpKubeletPodDir := filepath.Join(tmpKubeletDir, "pods")
@@ -2301,11 +2348,27 @@ func TestSyncStates(t *testing.T) {
 
 			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths)
 			rcInstance, _ := rc.(*reconciler)
+
+			if tc.addToDSOW {
+				volumeName, err := rcInstance.desiredStateOfWorld.AddPodToVolume(
+					podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
+				if err != nil {
+					t.Fatalf("error adding volume %s to dsow: %v", volumeSpec.Name(), err)
+				}
+				rcInstance.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, "")
+			}
+
 			rcInstance.syncStates(tmpKubeletPodDir)
+			if tc.postSyncStatCallback != nil {
+				err := tc.postSyncStatCallback(rcInstance, fakePlugin)
+				if err != nil {
+					t.Errorf("test %s, postSyncStatCallback failed: %v", tc.name, err)
+				}
+			}
+
 			if err := tc.verifyFunc(rcInstance, fakePlugin); err != nil {
 				t.Errorf("test %s failed: %v", tc.name, err)
 			}
 		})
 	}
-
 }

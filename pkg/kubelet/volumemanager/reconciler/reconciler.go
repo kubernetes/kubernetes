@@ -290,7 +290,7 @@ func (rc *reconciler) processReconstructedVolumes() {
 		}
 
 		if uncertainVolumeCount > 0 {
-			// If the volume has device to mount, we mark its device as mounted.
+			// If the volume has device to mount, we mark its device as uncertain
 			if glblVolumeInfo.deviceMounter != nil || glblVolumeInfo.blockVolumeMapper != nil {
 				deviceMountPath, err := getDeviceMountPath(glblVolumeInfo)
 				if err != nil {
