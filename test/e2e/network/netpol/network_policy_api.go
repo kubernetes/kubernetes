@@ -219,7 +219,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		- EndPort field cannot be defined if the Port field is defined as a named (string) port.
 		- EndPort field must be equal or greater than port.
 	*/
-	ginkgo.It("should support creating NetworkPolicy API with endport field [Feature:NetworkPolicyEndPort]", func() {
+	ginkgo.It("should support creating NetworkPolicy API with endport field", func() {
 		ns := f.Namespace.Name
 		npClient := f.ClientSet.NetworkingV1().NetworkPolicies(ns)
 

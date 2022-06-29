@@ -545,6 +545,7 @@ const (
 	// kep: http://kep.k8s.io/2079
 	// alpha: v1.21
 	// beta:  v1.22
+	// ga: v1.25
 	//
 	// Enables the endPort field in NetworkPolicy to enable a Port Range behavior in Network Policies.
 	NetworkPolicyEndPort featuregate.Feature = "NetworkPolicyEndPort"
@@ -945,7 +946,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	MixedProtocolLBService: {Default: true, PreRelease: featuregate.Beta},
 
-	NetworkPolicyEndPort: {Default: true, PreRelease: featuregate.Beta},
+	NetworkPolicyEndPort: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
 	NetworkPolicyStatus: {Default: false, PreRelease: featuregate.Alpha},
 
