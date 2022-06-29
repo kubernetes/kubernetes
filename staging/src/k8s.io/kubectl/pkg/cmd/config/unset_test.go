@@ -17,8 +17,8 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"io/ioutil"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"os"
 	"testing"
 
@@ -1420,18 +1420,19 @@ func (test unsetConfigTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
+	streams, _, _, _ := genericclioptions.NewTestIOStreams()
 
-	buf := bytes.NewBuffer([]byte{})
 	opts := &unsetOptions{
 		configAccess: pathOptions,
 		propertyName: test.args[0],
+		streams:      streams,
 	}
 	if string(test.args[0][0]) == "{" {
 		opts.jsonPath = true
 	}
 
 	// Must use opts.run to get error outputs
-	if err := opts.run(buf); test.expectedErr == "" && err != nil {
+	if err := opts.run(); test.expectedErr == "" && err != nil {
 		t.Errorf("Failed in: %q\n unexpected error: %v", test.name, err)
 	}
 

@@ -18,6 +18,7 @@ package config
 
 import (
 	"io/ioutil"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"os"
 	"testing"
 
@@ -1016,11 +1017,13 @@ func (test setConfigTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
+	streams, _, _, _ := genericclioptions.NewTestIOStreams()
 
 	opts := &setOptions{
 		configAccess:  pathOptions,
 		propertyName:  test.args[0],
 		propertyValue: test.args[1],
+		streams:       streams,
 	}
 	if sets.NewString(test.args...).Has("--set-raw-bytes=true") {
 		opts.setRawBytes = 1
