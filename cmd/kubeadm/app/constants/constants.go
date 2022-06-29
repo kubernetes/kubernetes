@@ -218,6 +218,8 @@ const (
 	APICallWithReadTimeout = 15 * time.Second
 	// PullImageRetry specifies how many times ContainerRuntime retries when pulling image failed
 	PullImageRetry = 5
+	// RemoveContainerRetry specifies how many times ContainerRuntime retries when removing container failed
+	RemoveContainerRetry = 5
 
 	// DefaultControlPlaneTimeout specifies the default control plane (actually API Server) timeout for use by kubeadm
 	DefaultControlPlaneTimeout = 4 * time.Minute
