@@ -160,7 +160,7 @@ func (rc *resourceMetricsCollector) collectNodeMemoryMetrics(ch chan<- metrics.M
 }
 
 func (rc *resourceMetricsCollector) collectContainerStartTime(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
-	if s.StartTime.Unix() == 0 {
+	if s.StartTime.Unix() <= 0 {
 		return
 	}
 
