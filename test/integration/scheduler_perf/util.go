@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"path"
@@ -44,6 +43,7 @@ import (
 	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -75,6 +75,8 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
 func mustSetupScheduler(config *config.KubeSchedulerConfiguration) (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
+	// Run API server with minimimal logging by default. Can be raised with -v.
+	framework.MinVerbosity = 0
 	apiURL, apiShutdown := util.StartApiserver()
 	var err error
 
@@ -178,7 +180,7 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 	if err := json.Indent(formatted, b, "", "  "); err != nil {
 		return fmt.Errorf("indenting error: %v", err)
 	}
-	return ioutil.WriteFile(destFile, formatted.Bytes(), 0644)
+	return os.WriteFile(destFile, formatted.Bytes(), 0644)
 }
 
 type labelValues struct {
@@ -241,7 +243,12 @@ func collectHistogramVec(metric string, labels map[string]string, lvMap map[stri
 	}
 
 	if err := vec.Validate(); err != nil {
-		klog.Error(err)
+		klog.ErrorS(err, "the validation for HistogramVec is failed. The data for this metric won't be stored in a benchmark result file", "metric", metric, "labels", labels)
+		return nil
+	}
+
+	if vec.GetAggregatedSampleCount() == 0 {
+		klog.InfoS("It is expected that this metric wasn't recorded. The data for this metric won't be stored in a benchmark result file", "metric", metric, "labels", labels)
 		return nil
 	}
 

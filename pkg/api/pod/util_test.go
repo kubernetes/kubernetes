@@ -33,6 +33,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 )
 
 func TestVisitContainers(t *testing.T) {
@@ -388,7 +389,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 	resourcename = strings.ToLower(resourcename)
 	resourcePaths := sets.NewString()
 
-	if tp.Kind() == reflect.Ptr {
+	if tp.Kind() == reflect.Pointer {
 		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
 		return resourcePaths
 	}
@@ -398,7 +399,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 	}
 
 	switch tp.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
 	case reflect.Struct:
 		// ObjectMeta is generic and therefore should never have a field with a specific resource's name;
@@ -1519,7 +1520,7 @@ func TestHaveSameExpandedDNSConfig(t *testing.T) {
 	}
 }
 
-func TestDropDisabledPodAffinityTermFields(t *testing.T) {
+func TestDropDisabledTopologySpreadConstraintsFields(t *testing.T) {
 	testCases := []struct {
 		name        string
 		enabled     bool
@@ -1528,147 +1529,157 @@ func TestDropDisabledPodAffinityTermFields(t *testing.T) {
 		wantPodSpec *api.PodSpec
 	}{
 		{
-			name:        "nil affinity",
+			name:        "TopologySpreadConstraints is nil",
 			podSpec:     &api.PodSpec{},
+			oldPodSpec:  &api.PodSpec{},
 			wantPodSpec: &api.PodSpec{},
 		},
 		{
-			name:        "empty affinity",
-			podSpec:     &api.PodSpec{Affinity: &api.Affinity{}},
-			wantPodSpec: &api.PodSpec{Affinity: &api.Affinity{}},
+			name:        "TopologySpreadConstraints is empty",
+			podSpec:     &api.PodSpec{TopologySpreadConstraints: []api.TopologySpreadConstraint{}},
+			oldPodSpec:  &api.PodSpec{TopologySpreadConstraints: []api.TopologySpreadConstraint{}},
+			wantPodSpec: &api.PodSpec{TopologySpreadConstraints: []api.TopologySpreadConstraint{}},
 		},
 		{
-			name: "NamespaceSelector cleared",
-			podSpec: &api.PodSpec{Affinity: &api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns1"}, TopologyKey: "region1", NamespaceSelector: &metav1.LabelSelector{}},
-					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns2"}, TopologyKey: "region2", NamespaceSelector: &metav1.LabelSelector{}}},
-					},
+			name: "TopologySpreadConstraints is not empty, but all constraints don't have minDomains",
+			podSpec: &api.PodSpec{TopologySpreadConstraints: []api.TopologySpreadConstraint{
+				{
+					MinDomains: nil,
 				},
-				PodAntiAffinity: &api.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns3"}, TopologyKey: "region3", NamespaceSelector: &metav1.LabelSelector{}},
-					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns4"}, TopologyKey: "region4", NamespaceSelector: &metav1.LabelSelector{}}},
-					},
+				{
+					MinDomains: nil,
 				},
 			}},
-			oldPodSpec: &api.PodSpec{Affinity: &api.Affinity{}},
-			wantPodSpec: &api.PodSpec{Affinity: &api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns1"}, TopologyKey: "region1"},
-					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns2"}, TopologyKey: "region2"}},
-					},
+			oldPodSpec: &api.PodSpec{TopologySpreadConstraints: []api.TopologySpreadConstraint{
+				{
+					MinDomains: nil,
 				},
-				PodAntiAffinity: &api.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns3"}, TopologyKey: "region3"},
-					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns4"}, TopologyKey: "region4"}},
-					},
+				{
+					MinDomains: nil,
+				},
+			}},
+			wantPodSpec: &api.PodSpec{TopologySpreadConstraints: []api.TopologySpreadConstraint{
+				{
+					MinDomains: nil,
+				},
+				{
+					MinDomains: nil,
 				},
 			}},
 		},
 		{
-			name: "NamespaceSelector not cleared since old spec already sets it",
-			podSpec: &api.PodSpec{Affinity: &api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns1"}, TopologyKey: "region1", NamespaceSelector: &metav1.LabelSelector{}},
+			name: "one constraint in podSpec has non-empty minDomains, feature gate is disabled " +
+				"and all constraint in oldPodSpec doesn't have minDomains",
+			enabled: false,
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						MinDomains: pointer.Int32(2),
 					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns2"}, TopologyKey: "region2", NamespaceSelector: &metav1.LabelSelector{}}},
-					},
-				},
-				PodAntiAffinity: &api.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns3"}, TopologyKey: "region3", NamespaceSelector: &metav1.LabelSelector{}},
-					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns4"}, TopologyKey: "region4", NamespaceSelector: &metav1.LabelSelector{}}},
+					{
+						MinDomains: nil,
 					},
 				},
-			}},
-			oldPodSpec: &api.PodSpec{Affinity: &api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns1"}, TopologyKey: "region1", NamespaceSelector: &metav1.LabelSelector{}},
+			},
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						MinDomains: nil,
+					},
+					{
+						MinDomains: nil,
 					},
 				},
-			}},
-			wantPodSpec: &api.PodSpec{Affinity: &api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns1"}, TopologyKey: "region1", NamespaceSelector: &metav1.LabelSelector{}},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						// cleared.
+						MinDomains: nil,
 					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns2"}, TopologyKey: "region2", NamespaceSelector: &metav1.LabelSelector{}}},
-					},
-				},
-				PodAntiAffinity: &api.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns3"}, TopologyKey: "region3", NamespaceSelector: &metav1.LabelSelector{}},
-					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns4"}, TopologyKey: "region4", NamespaceSelector: &metav1.LabelSelector{}}},
+					{
+						MinDomains: nil,
 					},
 				},
-			}},
+			},
 		},
 		{
-			name:    "NamespaceSelector not cleared since feature is enabled",
+			name: "one constraint in podSpec has non-empty minDomains, feature gate is disabled " +
+				"and one constraint in oldPodSpec has minDomains",
+			enabled: false,
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						MinDomains: pointer.Int32(2),
+					},
+					{
+						MinDomains: nil,
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						MinDomains: pointer.Int32(2),
+					},
+					{
+						MinDomains: nil,
+					},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						// not cleared.
+						MinDomains: pointer.Int32(2),
+					},
+					{
+						MinDomains: nil,
+					},
+				},
+			},
+		},
+		{
+			name: "one constraint in podSpec has non-empty minDomains, feature gate is enabled" +
+				"and all constraint in oldPodSpec doesn't have minDomains",
 			enabled: true,
-			podSpec: &api.PodSpec{Affinity: &api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns1"}, TopologyKey: "region1", NamespaceSelector: &metav1.LabelSelector{}},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						MinDomains: pointer.Int32(2),
 					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns2"}, TopologyKey: "region2", NamespaceSelector: &metav1.LabelSelector{}}},
-					},
-				},
-				PodAntiAffinity: &api.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns3"}, TopologyKey: "region3", NamespaceSelector: &metav1.LabelSelector{}},
-					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns4"}, TopologyKey: "region4", NamespaceSelector: &metav1.LabelSelector{}}},
+					{
+						MinDomains: nil,
 					},
 				},
-			}},
-			wantPodSpec: &api.PodSpec{Affinity: &api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns1"}, TopologyKey: "region1", NamespaceSelector: &metav1.LabelSelector{}},
+			},
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						MinDomains: nil,
 					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns2"}, TopologyKey: "region2", NamespaceSelector: &metav1.LabelSelector{}}},
-					},
-				},
-				PodAntiAffinity: &api.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns3"}, TopologyKey: "region3", NamespaceSelector: &metav1.LabelSelector{}},
-					},
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns4"}, TopologyKey: "region4", NamespaceSelector: &metav1.LabelSelector{}}},
+					{
+						MinDomains: nil,
 					},
 				},
-			}},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						// not cleared.
+						MinDomains: pointer.Int32(2),
+					},
+					{
+						MinDomains: nil,
+					},
+				},
+			},
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodAffinityNamespaceSelector, tc.enabled)()
-			dropDisabledPodAffinityTermFields(tc.podSpec, tc.oldPodSpec)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MinDomainsInPodTopologySpread, tc.enabled)()
+			dropDisabledFields(tc.podSpec, nil, tc.oldPodSpec, nil)
 			if diff := cmp.Diff(tc.wantPodSpec, tc.podSpec); diff != "" {
 				t.Errorf("unexpected pod spec (-want, +got):\n%s", diff)
 			}
@@ -1755,5 +1766,249 @@ func TestDropOSField(t *testing.T) {
 				})
 			}
 		}
+	}
+}
+
+func TestDropNodeInclusionPolicyFields(t *testing.T) {
+	ignore := api.NodeInclusionPolicyIgnore
+	honor := api.NodeInclusionPolicyHonor
+
+	tests := []struct {
+		name        string
+		enabled     bool
+		podSpec     *api.PodSpec
+		oldPodSpec  *api.PodSpec
+		wantPodSpec *api.PodSpec
+	}{
+		{
+			name:    "feature disabled, both pods don't use the fields",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+		},
+		{
+			name:    "feature disabled, only old pod use NodeAffinityPolicy field",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeAffinityPolicy: &honor},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+		},
+		{
+			name:    "feature disabled, only old pod use NodeTaintsPolicy field",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeTaintsPolicy: &ignore},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+		},
+		{
+			name:    "feature disabled, only current pod use NodeAffinityPolicy field",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeAffinityPolicy: &honor},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					NodeAffinityPolicy: nil,
+				}},
+			},
+		},
+		{
+			name:    "feature disabled, only current pod use NodeTaintsPolicy field",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeTaintsPolicy: &ignore},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeTaintsPolicy: nil},
+				},
+			},
+		},
+		{
+			name:    "feature disabled, both pods use NodeAffinityPolicy fields",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeAffinityPolicy: &honor},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeAffinityPolicy: &ignore},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeAffinityPolicy: &ignore},
+				},
+			},
+		},
+		{
+			name:    "feature disabled, both pods use NodeTaintsPolicy fields",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeTaintsPolicy: &ignore},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeTaintsPolicy: &honor},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeTaintsPolicy: &honor},
+				},
+			},
+		},
+		{
+			name:    "feature enabled, both pods use the fields",
+			enabled: true,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeAffinityPolicy: &ignore,
+						NodeTaintsPolicy:   &honor,
+					},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeAffinityPolicy: &honor,
+						NodeTaintsPolicy:   &ignore,
+					},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeAffinityPolicy: &honor,
+						NodeTaintsPolicy:   &ignore,
+					},
+				},
+			},
+		},
+		{
+			name:    "feature enabled, only old pod use NodeAffinityPolicy field",
+			enabled: true,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeAffinityPolicy: &honor,
+					},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+		},
+		{
+			name:    "feature enabled, only old pod use NodeTaintsPolicy field",
+			enabled: true,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeTaintsPolicy: &ignore,
+					},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+		},
+		{
+			name:    "feature enabled, only current pod use NodeAffinityPolicy field",
+			enabled: true,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeAffinityPolicy: &ignore,
+					},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeAffinityPolicy: &ignore,
+					},
+				},
+			},
+		},
+		{
+			name:    "feature enabled, only current pod use NodeTaintsPolicy field",
+			enabled: true,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeTaintsPolicy: &honor,
+					},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeTaintsPolicy: &honor,
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, test.enabled)()
+
+			dropDisabledFields(test.podSpec, nil, test.oldPodSpec, nil)
+			if diff := cmp.Diff(test.wantPodSpec, test.podSpec); diff != "" {
+				t.Errorf("unexpected pod spec (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }

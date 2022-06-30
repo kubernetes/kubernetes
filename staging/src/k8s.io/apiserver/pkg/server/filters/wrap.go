@@ -41,8 +41,7 @@ func WithPanicRecovery(handler http.Handler, resolver request.RequestInfoResolve
 			// the client sees an interrupted response but the server doesn't log
 			// an error, panic with the value ErrAbortHandler.
 			//
-			// Note that the ReallyCrash variable controls the behaviour of the HandleCrash function
-			// So it might actually crash, after calling the handlers
+			// Note that HandleCrash function is actually crashing, after calling the handlers
 			if info, err := resolver.NewRequestInfo(req); err != nil {
 				metrics.RecordRequestAbort(req, nil)
 			} else {

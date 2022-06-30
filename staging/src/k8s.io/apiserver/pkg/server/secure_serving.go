@@ -93,36 +93,45 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		if s.Cert != nil {
 			s.Cert.AddListener(dynamicCertificateController)
 		}
-
+		// generate a context from stopCh. This is to avoid modifying files which are relying on apiserver
+		// TODO: See if we can pass ctx to the current method
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			select {
+			case <-stopCh:
+				cancel() // stopCh closed, so cancel our context
+			case <-ctx.Done():
+			}
+		}()
 		// start controllers if possible
 		if controller, ok := s.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
-			if err := controller.RunOnce(); err != nil {
+			if err := controller.RunOnce(ctx); err != nil {
 				klog.Warningf("Initial population of client CA failed: %v", err)
 			}
 
-			go controller.Run(1, stopCh)
+			go controller.Run(ctx, 1)
 		}
 		if controller, ok := s.Cert.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
-			if err := controller.RunOnce(); err != nil {
+			if err := controller.RunOnce(ctx); err != nil {
 				klog.Warningf("Initial population of default serving certificate failed: %v", err)
 			}
 
-			go controller.Run(1, stopCh)
+			go controller.Run(ctx, 1)
 		}
 		for _, sniCert := range s.SNICerts {
 			sniCert.AddListener(dynamicCertificateController)
 			if controller, ok := sniCert.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 				// Files are required to be populated already, so this is for convenience.
-				if err := controller.RunOnce(); err != nil {
+				if err := controller.RunOnce(ctx); err != nil {
 					klog.Warningf("Initial population of SNI serving certificate failed: %v", err)
 				}
 
-				go controller.Run(1, stopCh)
+				go controller.Run(ctx, 1)
 			}
 		}
 
@@ -142,73 +151,8 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 // Serve runs the secure http server. It fails only if certificates cannot be loaded or the initial listen call fails.
 // The actual server loop (stoppable by closing stopCh) runs in a go routine, i.e. Serve does not block.
 // It returns a stoppedCh that is closed when all non-hijacked active requests have been processed.
-func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) (<-chan struct{}, error) {
-	if s.Listener == nil {
-		return nil, fmt.Errorf("listener must not be nil")
-	}
-
-	tlsConfig, err := s.tlsConfig(stopCh)
-	if err != nil {
-		return nil, err
-	}
-
-	secureServer := &http.Server{
-		Addr:           s.Listener.Addr().String(),
-		Handler:        handler,
-		MaxHeaderBytes: 1 << 20,
-		TLSConfig:      tlsConfig,
-
-		IdleTimeout:       90 * time.Second, // matches http.DefaultTransport keep-alive timeout
-		ReadHeaderTimeout: 32 * time.Second, // just shy of requestTimeoutUpperBound
-	}
-
-	// At least 99% of serialized resources in surveyed clusters were smaller than 256kb.
-	// This should be big enough to accommodate most API POST requests in a single frame,
-	// and small enough to allow a per connection buffer of this size multiplied by `MaxConcurrentStreams`.
-	const resourceBody99Percentile = 256 * 1024
-
-	http2Options := &http2.Server{
-		IdleTimeout: 90 * time.Second, // matches http.DefaultTransport keep-alive timeout
-	}
-
-	// shrink the per-stream buffer and max framesize from the 1MB default while still accommodating most API POST requests in a single frame
-	http2Options.MaxUploadBufferPerStream = resourceBody99Percentile
-	http2Options.MaxReadFrameSize = resourceBody99Percentile
-
-	// use the overridden concurrent streams setting or make the default of 250 explicit so we can size MaxUploadBufferPerConnection appropriately
-	if s.HTTP2MaxStreamsPerConnection > 0 {
-		http2Options.MaxConcurrentStreams = uint32(s.HTTP2MaxStreamsPerConnection)
-	} else {
-		http2Options.MaxConcurrentStreams = 250
-	}
-
-	// increase the connection buffer size from the 1MB default to handle the specified number of concurrent streams
-	http2Options.MaxUploadBufferPerConnection = http2Options.MaxUploadBufferPerStream * int32(http2Options.MaxConcurrentStreams)
-
-	if !s.DisableHTTP2 {
-		// apply settings to the server
-		if err := http2.ConfigureServer(secureServer, http2Options); err != nil {
-			return nil, fmt.Errorf("error configuring http2: %v", err)
-		}
-	}
-
-	// use tlsHandshakeErrorWriter to handle messages of tls handshake error
-	tlsErrorWriter := &tlsHandshakeErrorWriter{os.Stderr}
-	tlsErrorLogger := log.New(tlsErrorWriter, "", 0)
-	secureServer.ErrorLog = tlsErrorLogger
-
-	klog.Infof("Serving securely on %s", secureServer.Addr)
-	stoppedCh, _, err := RunServer(secureServer, s.Listener, shutdownTimeout, stopCh)
-	return stoppedCh, err
-}
-
-// ServeWithListenerStopped runs the secure http server. It fails only if certificates cannot be loaded or the initial listen call fails.
-// The actual server loop (stoppable by closing stopCh) runs in a go routine, i.e. ServeWithListenerStopped does not block.
-// It returns a stoppedCh that is closed when all non-hijacked active requests have been processed.
 // It returns a listenerStoppedCh that is closed when the underlying http Server has stopped listening.
-// TODO: do a follow up PR to remove this function, change 'Serve' to return listenerStoppedCh
-//  and update all components that call 'Serve'
-func (s *SecureServingInfo) ServeWithListenerStopped(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) (<-chan struct{}, <-chan struct{}, error) {
+func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) (<-chan struct{}, <-chan struct{}, error) {
 	if s.Listener == nil {
 		return nil, nil, fmt.Errorf("listener must not be nil")
 	}

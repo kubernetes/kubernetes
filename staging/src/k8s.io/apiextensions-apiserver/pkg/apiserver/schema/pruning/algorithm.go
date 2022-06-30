@@ -189,7 +189,7 @@ func skipPrune(x interface{}, s *structuralschema.Structural, opts *PruneOptions
 	case []interface{}:
 		for i, v := range x {
 			opts.appendIndex(i)
-			prune(v, s.Items, opts)
+			skipPrune(v, s.Items, opts)
 			opts.parentPath = opts.parentPath[:origPathLen]
 		}
 	default:

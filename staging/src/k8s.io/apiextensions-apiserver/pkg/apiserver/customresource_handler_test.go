@@ -17,8 +17,10 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net"
@@ -33,8 +35,10 @@ import (
 
 	"sigs.k8s.io/yaml"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
@@ -44,12 +48,14 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	serializerjson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -470,7 +476,10 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	defer server.Terminate(t)
 
 	crd := multiVersionFixture.DeepCopy()
-	if _, err := cl.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
+	// Create a context with metav1.NamespaceNone as the namespace since multiVersionFixture
+	// is a cluster scoped CRD.
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceNone)
+	if _, err := cl.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if err := crdInformer.Informer().GetStore().Add(crd); err != nil {
@@ -526,12 +535,12 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		u := &unstructured.Unstructured{Object: map[string]interface{}{}}
 		u.SetGroupVersionKind(schema.GroupVersionKind{Group: "stable.example.com", Version: "v1beta1", Kind: "MultiVersion"})
 		u.SetName("marker")
-		if item, err := crdInfo.storages["v1beta1"].CustomResource.Create(context.TODO(), u, validateFunc, &metav1.CreateOptions{}); err != nil {
+		if item, err := crdInfo.storages["v1beta1"].CustomResource.Create(ctx, u, validateFunc, &metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		} else {
 			startResourceVersion = item.(*unstructured.Unstructured).GetResourceVersion()
 		}
-		if _, _, err := crdInfo.storages["v1beta1"].CustomResource.Delete(context.TODO(), u.GetName(), validateFunc, &metav1.DeleteOptions{}); err != nil {
+		if _, _, err := crdInfo.storages["v1beta1"].CustomResource.Delete(ctx, u.GetName(), validateFunc, &metav1.DeleteOptions{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -545,7 +554,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		unstructured.SetNestedField(u.Object, int64(1), "spec", "num")
 
 		// Create
-		if item, err := crdInfo.storages[version.Name].CustomResource.Create(context.TODO(), u, validateFunc, &metav1.CreateOptions{}); err != nil {
+		if item, err := crdInfo.storages[version.Name].CustomResource.Create(ctx, u, validateFunc, &metav1.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		} else if item.GetObjectKind().GroupVersionKind() != expectGVK {
 			t.Errorf("expected create result to be %#v, got %#v", expectGVK, item.GetObjectKind().GroupVersionKind())
@@ -555,14 +564,14 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 
 		// Update
 		u.SetAnnotations(map[string]string{"updated": "true"})
-		if item, _, err := crdInfo.storages[version.Name].CustomResource.Update(context.TODO(), u.GetName(), rest.DefaultUpdatedObjectInfo(u), validateFunc, updateValidateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		if item, _, err := crdInfo.storages[version.Name].CustomResource.Update(ctx, u.GetName(), rest.DefaultUpdatedObjectInfo(u), validateFunc, updateValidateFunc, false, &metav1.UpdateOptions{}); err != nil {
 			t.Fatal(err)
 		} else if item.GetObjectKind().GroupVersionKind() != expectGVK {
 			t.Errorf("expected update result to be %#v, got %#v", expectGVK, item.GetObjectKind().GroupVersionKind())
 		}
 
 		// Get
-		if item, err := crdInfo.storages[version.Name].CustomResource.Get(context.TODO(), u.GetName(), &metav1.GetOptions{}); err != nil {
+		if item, err := crdInfo.storages[version.Name].CustomResource.Get(ctx, u.GetName(), &metav1.GetOptions{}); err != nil {
 			t.Fatal(err)
 		} else if item.GetObjectKind().GroupVersionKind() != expectGVK {
 			t.Errorf("expected get result to be %#v, got %#v", expectGVK, item.GetObjectKind().GroupVersionKind())
@@ -572,7 +581,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 			// Allow time to propagate the create into the cache
 			time.Sleep(time.Second)
 			// Get cached
-			if item, err := crdInfo.storages[version.Name].CustomResource.Get(context.TODO(), u.GetName(), &metav1.GetOptions{ResourceVersion: "0"}); err != nil {
+			if item, err := crdInfo.storages[version.Name].CustomResource.Get(ctx, u.GetName(), &metav1.GetOptions{ResourceVersion: "0"}); err != nil {
 				t.Fatal(err)
 			} else if item.GetObjectKind().GroupVersionKind() != expectGVK {
 				t.Errorf("expected cached get result to be %#v, got %#v", expectGVK, item.GetObjectKind().GroupVersionKind())
@@ -584,7 +593,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	for _, version := range crd.Spec.Versions {
 		expectGVK := schema.GroupVersionKind{Group: "stable.example.com", Version: version.Name, Kind: "MultiVersion"}
 
-		if list, err := crdInfo.storages[version.Name].CustomResource.List(context.TODO(), &metainternalversion.ListOptions{}); err != nil {
+		if list, err := crdInfo.storages[version.Name].CustomResource.List(ctx, &metainternalversion.ListOptions{}); err != nil {
 			t.Fatal(err)
 		} else {
 			for _, item := range list.(*unstructured.UnstructuredList).Items {
@@ -596,7 +605,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 
 		if enableWatchCache {
 			// List from watch cache
-			if list, err := crdInfo.storages[version.Name].CustomResource.List(context.TODO(), &metainternalversion.ListOptions{ResourceVersion: "0"}); err != nil {
+			if list, err := crdInfo.storages[version.Name].CustomResource.List(ctx, &metainternalversion.ListOptions{ResourceVersion: "0"}); err != nil {
 				t.Fatal(err)
 			} else {
 				for _, item := range list.(*unstructured.UnstructuredList).Items {
@@ -607,7 +616,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 			}
 		}
 
-		watch, err := crdInfo.storages[version.Name].CustomResource.Watch(context.TODO(), &metainternalversion.ListOptions{ResourceVersion: startResourceVersion})
+		watch, err := crdInfo.storages[version.Name].CustomResource.Watch(ctx, &metainternalversion.ListOptions{ResourceVersion: startResourceVersion})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -636,6 +645,197 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		case <-time.After(time.Second):
 		}
 	}
+}
+
+func TestDecoder(t *testing.T) {
+	multiVersionJSON := `
+	{
+	"apiVersion": "stable.example.com/v1beta1",
+	"kind": "MultiVersion",
+	"metadata": {
+		"name": "my-mv"
+	},
+	"num": 1,
+	"num": 2,
+	"unknown": "foo"
+	}
+	`
+	multiVersionYAML := `
+apiVersion: stable.example.com/v1beta1
+kind: MultiVersion
+metadata:
+  name: my-mv
+num: 1
+num: 2
+unknown: foo`
+
+	expectedObjUnknownNotPreserved := &unstructured.Unstructured{}
+	err := expectedObjUnknownNotPreserved.UnmarshalJSON([]byte(`
+	{
+	"apiVersion": "stable.example.com/v1beta1",
+	"kind": "MultiVersion",
+	"metadata": {
+		"creationTimestamp": null,
+		"generation": 1,
+		"name": "my-mv"
+	},
+	"num": 2
+	}
+	`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedObjUnknownPreserved := &unstructured.Unstructured{}
+	err = expectedObjUnknownPreserved.UnmarshalJSON([]byte(`
+	{
+	"apiVersion": "stable.example.com/v1beta1",
+	"kind": "MultiVersion",
+	"metadata": {
+		"creationTimestamp": null,
+		"generation": 1,
+		"name": "my-mv"
+	},
+	"num": 2,
+	"unknown": "foo"
+	}
+	`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testcases := []struct {
+		name                  string
+		body                  string
+		yaml                  bool
+		strictDecoding        bool
+		preserveUnknownFields bool
+		expectedObj           *unstructured.Unstructured
+		expectedErr           error
+	}{
+		{
+			name:           "strict-decoding",
+			body:           multiVersionJSON,
+			strictDecoding: true,
+			expectedObj:    expectedObjUnknownNotPreserved,
+			expectedErr:    errors.New(`strict decoding error: duplicate field "num", unknown field "unknown"`),
+		},
+		{
+			name:           "non-strict-decoding",
+			body:           multiVersionJSON,
+			strictDecoding: false,
+			expectedObj:    expectedObjUnknownNotPreserved,
+			expectedErr:    nil,
+		},
+		{
+			name:                  "strict-decoding-preserve-unknown",
+			body:                  multiVersionJSON,
+			strictDecoding:        true,
+			preserveUnknownFields: true,
+			expectedObj:           expectedObjUnknownPreserved,
+			expectedErr:           errors.New(`strict decoding error: duplicate field "num"`),
+		},
+		{
+			name:                  "non-strict-decoding-preserve-unknown",
+			body:                  multiVersionJSON,
+			strictDecoding:        false,
+			preserveUnknownFields: true,
+			expectedObj:           expectedObjUnknownPreserved,
+			expectedErr:           nil,
+		},
+		{
+			name:           "strict-decoding-yaml",
+			body:           multiVersionYAML,
+			yaml:           true,
+			strictDecoding: true,
+			expectedObj:    expectedObjUnknownNotPreserved,
+			expectedErr: errors.New(`strict decoding error: yaml: unmarshal errors:
+  line 7: key "num" already set in map, unknown field "unknown"`),
+		},
+		{
+			name:           "non-strict-decoding-yaml",
+			body:           multiVersionYAML,
+			yaml:           true,
+			strictDecoding: false,
+			expectedObj:    expectedObjUnknownNotPreserved,
+			expectedErr:    nil,
+		},
+		{
+			name:                  "strict-decoding-preserve-unknown-yaml",
+			body:                  multiVersionYAML,
+			yaml:                  true,
+			strictDecoding:        true,
+			preserveUnknownFields: true,
+			expectedObj:           expectedObjUnknownPreserved,
+			expectedErr: errors.New(`strict decoding error: yaml: unmarshal errors:
+  line 7: key "num" already set in map`),
+		},
+		{
+			name:                  "non-strict-decoding-preserve-unknown-yaml",
+			body:                  multiVersionYAML,
+			yaml:                  true,
+			strictDecoding:        false,
+			preserveUnknownFields: true,
+			expectedObj:           expectedObjUnknownPreserved,
+			expectedErr:           nil,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := "v1beta1"
+			structuralSchemas := map[string]*structuralschema.Structural{}
+			structuralSchema, err := structuralschema.NewStructural(&apiextensions.JSONSchemaProps{
+				Type:       "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{"num": {Type: "integer", Description: "v1beta1 num field"}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			structuralSchemas[v] = structuralSchema
+			delegate := serializerjson.NewSerializerWithOptions(serializerjson.DefaultMetaFactory, unstructuredCreator{}, nil, serializerjson.SerializerOptions{tc.yaml, false, tc.strictDecoding})
+			decoder := &schemaCoercingDecoder{
+				delegate: delegate,
+				validator: unstructuredSchemaCoercer{
+					dropInvalidMetadata: true,
+					repairGeneration:    true,
+					structuralSchemas:   structuralSchemas,
+					structuralSchemaGK: schema.GroupKind{
+						Group: "stable.example.com",
+						Kind:  "MultiVersion",
+					},
+					returnUnknownFieldPaths: tc.strictDecoding,
+					preserveUnknownFields:   tc.preserveUnknownFields,
+				},
+			}
+
+			obj, _, err := decoder.Decode([]byte(tc.body), nil, nil)
+			if obj != nil {
+				unstructured, ok := obj.(*unstructured.Unstructured)
+				if !ok {
+					t.Fatalf("obj is not an unstructured: %v", obj)
+				}
+				objBytes, err := unstructured.MarshalJSON()
+				if err != nil {
+					t.Fatalf("err marshaling json: %v", err)
+				}
+				expectedBytes, err := tc.expectedObj.MarshalJSON()
+				if err != nil {
+					t.Fatalf("err marshaling json: %v", err)
+				}
+				if bytes.Compare(objBytes, expectedBytes) != 0 {
+					t.Fatalf("expected obj: \n%v\n got obj: \n%v\n", tc.expectedObj, obj)
+				}
+			}
+			if err == nil || tc.expectedErr == nil {
+				if err != nil || tc.expectedErr != nil {
+					t.Fatalf("expected err: %v, got err: %v", tc.expectedErr, err)
+				}
+			} else if err.Error() != tc.expectedErr.Error() {
+				t.Fatalf("expected err: \n%v\n got err: \n%v\n", tc.expectedErr, err)
+			}
+		})
+	}
+
 }
 
 type dummyAdmissionImpl struct{}

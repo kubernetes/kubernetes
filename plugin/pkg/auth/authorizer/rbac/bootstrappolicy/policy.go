@@ -24,9 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // Write and other vars are slices of the allowed verbs.
@@ -57,6 +55,7 @@ const (
 	storageGroup           = "storage.k8s.io"
 	resMetricsGroup        = "metrics.k8s.io"
 	customMetricsGroup     = "custom.metrics.k8s.io"
+	externalMetricsGroup   = "external.metrics.k8s.io"
 	networkingGroup        = "networking.k8s.io"
 	eventsGroup            = "events.k8s.io"
 	internalAPIServerGroup = "internal.apiserver.k8s.io"
@@ -160,12 +159,10 @@ func NodeRules() []rbacv1.PolicyRule {
 		rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie(),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		// Use the Node authorization mode to limit a node to update status of pvc objects referenced by pods bound to itself.
-		// Use the NodeRestriction admission plugin to limit a node to just update the status stanza.
-		pvcStatusPolicyRule := rbacv1helpers.NewRule("get", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie()
-		nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
-	}
+	// Use the Node authorization mode to limit a node to update status of pvc objects referenced by pods bound to itself.
+	// Use the NodeRestriction admission plugin to limit a node to just update the status stanza.
+	pvcStatusPolicyRule := rbacv1helpers.NewRule("get", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims/status").RuleOrDie()
+	nodePolicyRules = append(nodePolicyRules, pvcStatusPolicyRule)
 
 	// CSI
 	csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie()
@@ -284,8 +281,10 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule("impersonate").Groups(legacyGroup).Resources("serviceaccounts").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
+				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("pods/eviction").RuleOrDie(),
 				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
 					"services", "services/proxy", "persistentvolumeclaims", "configmaps", "secrets", "events").RuleOrDie(),
+				rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("serviceaccounts/token").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Write...).Groups(appsGroup).Resources(
 					"statefulsets", "statefulsets/scale",
@@ -549,12 +548,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csinodes").RuleOrDie(),
 		// Needed for namespaceSelector feature in pod affinity
 		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
-		kubeSchedulerRules = append(kubeSchedulerRules,
-			rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csidrivers").RuleOrDie(),
-			rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csistoragecapacities").RuleOrDie(),
-		)
+		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csidrivers").RuleOrDie(),
+		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csistoragecapacities").RuleOrDie(),
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler

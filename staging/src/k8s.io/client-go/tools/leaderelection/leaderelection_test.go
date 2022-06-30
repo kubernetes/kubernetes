@@ -66,11 +66,6 @@ func createLockObject(t *testing.T, objectType, namespace, name string, record *
 	return
 }
 
-// Will test leader election using endpoints as the resource
-func TestTryAcquireOrRenewEndpoints(t *testing.T) {
-	testTryAcquireOrRenew(t, "endpoints")
-}
-
 type Reactor struct {
 	verb       string
 	objectType string
@@ -259,24 +254,14 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			})
 
 			switch objectType {
-			case "endpoints":
-				lock = &rl.EndpointsLock{
-					EndpointsMeta: objectMeta,
-					LockConfig:    resourceLockConfig,
-					Client:        c.CoreV1(),
-				}
-			case "configmaps":
-				lock = &rl.ConfigMapLock{
-					ConfigMapMeta: objectMeta,
-					LockConfig:    resourceLockConfig,
-					Client:        c.CoreV1(),
-				}
 			case "leases":
 				lock = &rl.LeaseLock{
 					LeaseMeta:  objectMeta,
 					LockConfig: resourceLockConfig,
 					Client:     c.CoordinationV1(),
 				}
+			default:
+				t.Fatalf("Unknown objectType: %v", objectType)
 			}
 
 			lec := LeaderElectionConfig{
@@ -325,11 +310,6 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 	}
 }
 
-// Will test leader election using configmap as the resource
-func TestTryAcquireOrRenewConfigMaps(t *testing.T) {
-	testTryAcquireOrRenew(t, "configmaps")
-}
-
 // Will test leader election using lease as the resource
 func TestTryAcquireOrRenewLeases(t *testing.T) {
 	testTryAcquireOrRenew(t, "leases")
@@ -364,9 +344,9 @@ func TestLeaseSpecToLeaderElectionRecordRoundTrip(t *testing.T) {
 func multiLockType(t *testing.T, objectType string) (primaryType, secondaryType string) {
 	switch objectType {
 	case rl.EndpointsLeasesResourceLock:
-		return rl.EndpointsResourceLock, rl.LeasesResourceLock
+		return "endpoints", rl.LeasesResourceLock
 	case rl.ConfigMapsLeasesResourceLock:
-		return rl.ConfigMapsResourceLock, rl.LeasesResourceLock
+		return "configmaps", rl.LeasesResourceLock
 	default:
 		t.Fatal("unexpected objType:" + objectType)
 	}
@@ -818,9 +798,7 @@ func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
 			var wg sync.WaitGroup
 			wg.Add(1)
 			var reportedLeader string
-			var lock rl.Interface
 
-			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
 			resourceLockConfig := rl.ResourceLockConfig{
 				Identity:      "baz",
 				EventRecorder: &record.FakeRecorder{},
@@ -834,33 +812,9 @@ func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
 				return true, nil, fmt.Errorf("unreachable action")
 			})
 
-			switch objectType {
-			case rl.EndpointsLeasesResourceLock:
-				lock = &rl.MultiLock{
-					Primary: &rl.EndpointsLock{
-						EndpointsMeta: objectMeta,
-						LockConfig:    resourceLockConfig,
-						Client:        c.CoreV1(),
-					},
-					Secondary: &rl.LeaseLock{
-						LeaseMeta:  objectMeta,
-						LockConfig: resourceLockConfig,
-						Client:     c.CoordinationV1(),
-					},
-				}
-			case rl.ConfigMapsLeasesResourceLock:
-				lock = &rl.MultiLock{
-					Primary: &rl.ConfigMapLock{
-						ConfigMapMeta: objectMeta,
-						LockConfig:    resourceLockConfig,
-						Client:        c.CoreV1(),
-					},
-					Secondary: &rl.LeaseLock{
-						LeaseMeta:  objectMeta,
-						LockConfig: resourceLockConfig,
-						Client:     c.CoordinationV1(),
-					},
-				}
+			lock, err := rl.New(objectType, "foo", "bar", c.CoreV1(), c.CoordinationV1(), resourceLockConfig)
+			if err != nil {
+				t.Fatalf("Couldn't create lock: %v", err)
 			}
 
 			lec := LeaderElectionConfig{
@@ -983,24 +937,14 @@ func testReleaseLease(t *testing.T, objectType string) {
 			})
 
 			switch objectType {
-			case "endpoints":
-				lock = &rl.EndpointsLock{
-					EndpointsMeta: objectMeta,
-					LockConfig:    resourceLockConfig,
-					Client:        c.CoreV1(),
-				}
-			case "configmaps":
-				lock = &rl.ConfigMapLock{
-					ConfigMapMeta: objectMeta,
-					LockConfig:    resourceLockConfig,
-					Client:        c.CoreV1(),
-				}
 			case "leases":
 				lock = &rl.LeaseLock{
 					LeaseMeta:  objectMeta,
 					LockConfig: resourceLockConfig,
 					Client:     c.CoordinationV1(),
 				}
+			default:
+				t.Fatalf("Unknown objectType: %v", objectType)
 			}
 
 			lec := LeaderElectionConfig{
@@ -1059,26 +1003,8 @@ func testReleaseLease(t *testing.T, objectType string) {
 }
 
 // Will test leader election using endpoints as the resource
-func TestReleaseLeaseEndpoints(t *testing.T) {
-	testReleaseLease(t, "endpoints")
-}
-
-// Will test leader election using endpoints as the resource
-func TestReleaseLeaseConfigMaps(t *testing.T) {
-	testReleaseLease(t, "configmaps")
-}
-
-// Will test leader election using endpoints as the resource
 func TestReleaseLeaseLeases(t *testing.T) {
 	testReleaseLease(t, "leases")
-}
-
-func TestReleaseOnCancellation_Endpoints(t *testing.T) {
-	testReleaseOnCancellation(t, "endpoints")
-}
-
-func TestReleaseOnCancellation_ConfigMaps(t *testing.T) {
-	testReleaseOnCancellation(t, "configmaps")
 }
 
 func TestReleaseOnCancellation_Leases(t *testing.T) {

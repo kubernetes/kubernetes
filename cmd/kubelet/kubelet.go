@@ -22,14 +22,12 @@ limitations under the License.
 package main
 
 import (
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/component-base/cli"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/logs/json/register" // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/restclient"
 	_ "k8s.io/component-base/metrics/prometheus/version" // for version metric registration
@@ -48,12 +46,6 @@ func main() {
 }
 
 func run(command *cobra.Command) int {
-	defer logs.FlushLogs()
-	rand.Seed(time.Now().UnixNano())
-
 	command.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
-	if err := command.Execute(); err != nil {
-		return 1
-	}
-	return 0
+	return cli.Run(command)
 }

@@ -24,9 +24,11 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
@@ -582,4 +584,22 @@ func (ao ascendingOrdinal) Swap(i, j int) {
 
 func (ao ascendingOrdinal) Less(i, j int) bool {
 	return getOrdinal(ao[i]) < getOrdinal(ao[j])
+}
+
+// getStatefulSetMaxUnavailable calculates the real maxUnavailable number according to the replica count
+// and maxUnavailable from rollingUpdateStrategy. The number defaults to 1 if the maxUnavailable field is
+// not set, and it will be round down to at least 1 if the maxUnavailable value is a percentage.
+// Note that API validation has already guaranteed the maxUnavailable field to be >1 if it is an integer
+// or 0% < value <= 100% if it is a percentage, so we don't have to consider other cases.
+func getStatefulSetMaxUnavailable(maxUnavailable *intstr.IntOrString, replicaCount int) (int, error) {
+	maxUnavailableNum, err := intstrutil.GetScaledValueFromIntOrPercent(intstrutil.ValueOrDefault(maxUnavailable, intstrutil.FromInt(1)), replicaCount, false)
+	if err != nil {
+		return 0, err
+	}
+	// maxUnavailable might be zero for small percentage with round down.
+	// So we have to enforce it not to be less than 1.
+	if maxUnavailableNum < 1 {
+		maxUnavailableNum = 1
+	}
+	return maxUnavailableNum, nil
 }

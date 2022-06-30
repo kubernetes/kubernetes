@@ -24,19 +24,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/kubectl/pkg/util/podutils"
+
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	"github.com/godbus/dbus/v5"
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -45,6 +53,7 @@ import (
 
 var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShutdown] [NodeFeature:GracefulNodeShutdownBasedOnPodPriority]", func() {
 	f := framework.NewDefaultFramework("graceful-node-shutdown")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when gracefully shutting down", func() {
 
 		const (
@@ -97,6 +106,34 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 			})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(list.Items), len(pods), "the number of pods is not as expected")
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			go func() {
+				defer ginkgo.GinkgoRecover()
+				w := &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Watch(context.TODO(), options)
+					},
+				}
+
+				// Setup watch to continuously monitor any pod events and detect invalid pod status updates
+				_, err = watchtools.Until(ctx, list.ResourceVersion, w, func(event watch.Event) (bool, error) {
+					if pod, ok := event.Object.(*v1.Pod); ok {
+						if isPodStatusAffectedByIssue108594(pod) {
+							return false, fmt.Errorf("failing test due to detecting invalid pod status")
+						}
+						// Watch will never terminate (only when the test ends due to context cancellation)
+						return false, nil
+					}
+					return false, nil
+				})
+
+				// Ignore timeout error since the context will be explicitly cancelled and the watch will never return true
+				if err != nil && err != wait.ErrWaitTimeout {
+					framework.Failf("watch for invalid pod status failed: %v", err.Error())
+				}
+			}()
 
 			ginkgo.By("Verifying batch pods are running")
 			for _, pod := range list.Items {
@@ -158,6 +195,7 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 				// Critical pod starts shutdown after (nodeShutdownGracePeriod-nodeShutdownGracePeriodCriticalPods)
 				podStatusUpdateTimeout+(nodeShutdownGracePeriod-nodeShutdownGracePeriodCriticalPods),
 				pollInterval).Should(gomega.BeNil())
+
 		})
 
 		ginkgo.It("should be able to handle a cancelled shutdown", func() {
@@ -217,8 +255,9 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 	ginkgo.Context("when gracefully shutting down with Pod priority", func() {
 
 		const (
-			pollInterval           = 1 * time.Second
-			podStatusUpdateTimeout = 10 * time.Second
+			pollInterval                 = 1 * time.Second
+			podStatusUpdateTimeout       = 10 * time.Second
+			priorityClassesCreateTimeout = 10 * time.Second
 		)
 
 		var (
@@ -260,11 +299,22 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("Wait for the node to be ready")
 			waitForNodeReady()
-
-			for _, customClass := range []*schedulingv1.PriorityClass{customClassA, customClassB, customClassC} {
+			customClasses := []*schedulingv1.PriorityClass{customClassA, customClassB, customClassC}
+			for _, customClass := range customClasses {
 				_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(context.Background(), customClass, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
+				if err != nil && !apierrors.IsAlreadyExists(err) {
+					framework.ExpectNoError(err)
+				}
 			}
+			gomega.Eventually(func() error {
+				for _, customClass := range customClasses {
+					_, err := f.ClientSet.SchedulingV1().PriorityClasses().Get(context.Background(), customClass.Name, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			}, priorityClassesCreateTimeout, pollInterval).Should(gomega.BeNil())
 		})
 
 		ginkgo.AfterEach(func() {
@@ -374,6 +424,11 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeFeature:GracefulNodeShut
 					return nil
 				}, podStatusUpdateTimeout, pollInterval).Should(gomega.BeNil())
 			}
+
+			ginkgo.By("should have state file")
+			stateFile := "/var/lib/kubelet/graceful_node_shutdown_state"
+			_, err = os.Stat(stateFile)
+			framework.ExpectNoError(err)
 		})
 	})
 })
@@ -435,9 +490,12 @@ while true; do sleep 5; done
 
 // Emits a fake PrepareForShutdown dbus message on system dbus. Will cause kubelet to react to an active shutdown event.
 func emitSignalPrepareForShutdown(b bool) error {
-	cmd := "dbus-send --system /org/freedesktop/login1 org.freedesktop.login1.Manager.PrepareForShutdown boolean:" + strconv.FormatBool(b)
-	_, err := runCommand("sh", "-c", cmd)
-	return err
+	conn, err := dbus.ConnectSystemBus()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	return conn.Emit("/org/freedesktop/login1", "org.freedesktop.login1.Manager.PrepareForShutdown", b)
 }
 
 func getNodeReadyStatus(f *framework.Framework) bool {
@@ -510,5 +568,10 @@ func isPodShutdown(pod *v1.Pod) bool {
 		}
 	}
 
-	return pod.Status.Message == podShutdownMessage && pod.Status.Reason == podShutdownReason && hasContainersNotReadyCondition
+	return pod.Status.Message == podShutdownMessage && pod.Status.Reason == podShutdownReason && hasContainersNotReadyCondition && pod.Status.Phase == v1.PodFailed
+}
+
+// Pods should never report failed phase and have ready condition = true (https://github.com/kubernetes/kubernetes/issues/108594)
+func isPodStatusAffectedByIssue108594(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodFailed && podutils.IsPodReady(pod)
 }

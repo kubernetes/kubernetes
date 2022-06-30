@@ -62,7 +62,7 @@ func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.File
 
 // given a wwn and lun, find the device and associated devicemapper parent
 func findDisk(wwn, lun string, io ioHandler, deviceUtil volumeutil.DeviceUtil) (string, string) {
-	fcPathExp := "^(pci-.*-fc|fc)-0x" + wwn + "-lun-" + lun
+	fcPathExp := "^(pci-.*-fc|fc)-0x" + wwn + "-lun-" + lun + "$"
 	r := regexp.MustCompile(fcPathExp)
 	devPath := byPath
 	if dirs, err := io.ReadDir(devPath); err == nil {
@@ -71,7 +71,7 @@ func findDisk(wwn, lun string, io ioHandler, deviceUtil volumeutil.DeviceUtil) (
 			if r.MatchString(name) {
 				if disk, err1 := io.EvalSymlinks(devPath + name); err1 == nil {
 					dm := deviceUtil.FindMultipathDeviceForDevice(disk)
-					klog.Infof("fc: find disk: %v, dm: %v", disk, dm)
+					klog.Infof("fc: find disk: %v, dm: %v, fc path: %v", disk, dm, name)
 					return disk, dm
 				}
 			}
@@ -254,7 +254,15 @@ func (util *fcUtil) AttachDisk(b fcDiskMounter) (string, error) {
 		return "", err
 	}
 
-	return devicePath, nil
+	exists, err := mount.PathExists(devicePath)
+	if exists && err == nil {
+		return devicePath, nil
+	}
+	if exists == false {
+		return "", fmt.Errorf("device %s does not exist", devicePath)
+	} else {
+		return "", err
+	}
 }
 
 // DetachDisk removes scsi device file such as /dev/sdX from the node.

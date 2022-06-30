@@ -1,4 +1,4 @@
-### k8s.gcr.io/etcd docker image
+### registry.k8s.io/etcd docker image
 
 Provides docker images containing etcd and etcdctl binaries for multiple etcd
 version as well as a migration operator utility for upgrading and downgrading
@@ -6,14 +6,14 @@ etcd--it's data directory in particular--to a target version.
 
 #### Versioning
 
-Each `k8s.gcr.io/etcd` docker image is tagged with an version string of the form
+Each `registry.k8s.io/etcd` docker image is tagged with an version string of the form
 `<etcd-version>-<image-revision>`, e.g. `3.0.17-0`.  The etcd version is the
 SemVer of latest etcd version available in the image. The image revision
 distinguishes between docker images with the same lastest etcd version but
 changes (bug fixes and backward compatible improvements) to the migration
 utility bundled with the image.
 
-In addition to the latest etcd version, each `k8s.gcr.io/etcd` image contains
+In addition to the latest etcd version, each `registry.k8s.io/etcd` image contains
 etcd and etcdctl binaries for older versions of etcd. These are used by the
 migration operator utility when performing downgrades and multi-step upgrades,
 but can also be used as the etcd target version.
@@ -41,7 +41,7 @@ Downgrades to the previous minor version of the 3.x series is supported.
 
 By default, `migrate` will write data directory files with default permissions
 according to the umask it is run with. When run in the published
-`k8s.gcr.io/etcd` images the default umask is 0022 which will result in 0755
+`registry.k8s.io/etcd` images the default umask is 0022 which will result in 0755
 directory permissions and 0644 file permissions.
 
 #### Cross building

@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -39,7 +38,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/version"
@@ -98,7 +96,6 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 // generated in this directory, and cluster logs will also be saved.
 // This function is called on each Ginkgo node in parallel mode.
 func RunE2ETests(t *testing.T) {
-	runtimeutils.ReallyCrash = true
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
@@ -300,7 +297,7 @@ func logClusterImageSources() {
 
 	outputBytes, _ := json.MarshalIndent(images, "", "  ")
 	filePath := filepath.Join(framework.TestContext.ReportDir, "images.json")
-	if err := ioutil.WriteFile(filePath, outputBytes, 0644); err != nil {
+	if err := os.WriteFile(filePath, outputBytes, 0644); err != nil {
 		framework.Logf("cluster images sources, could not write to %q: %v", filePath, err)
 	}
 }

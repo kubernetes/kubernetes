@@ -36,6 +36,11 @@ type NetworkPolicy struct {
 	// Specification of the desired behavior for this NetworkPolicy.
 	// +optional
 	Spec NetworkPolicySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+
+	// Status is the current state of the NetworkPolicy.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Status NetworkPolicyStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // PolicyType string describes the NetworkPolicy type
@@ -200,6 +205,48 @@ type NetworkPolicyPeer struct {
 	IPBlock *IPBlock `json:"ipBlock,omitempty" protobuf:"bytes,3,rep,name=ipBlock"`
 }
 
+// NetworkPolicyConditionType is the type for status conditions on
+// a NetworkPolicy. This type should be used with the
+// NetworkPolicyStatus.Conditions field.
+type NetworkPolicyConditionType string
+
+const (
+	// NetworkPolicyConditionStatusAccepted represents status of a Network Policy that could be properly parsed by
+	// the Network Policy provider and will be implemented in the cluster
+	NetworkPolicyConditionStatusAccepted NetworkPolicyConditionType = "Accepted"
+
+	// NetworkPolicyConditionStatusPartialFailure represents status of a Network Policy that could be partially
+	// parsed by the Network Policy provider and may not be completely implemented due to a lack of a feature or some
+	// other condition
+	NetworkPolicyConditionStatusPartialFailure NetworkPolicyConditionType = "PartialFailure"
+
+	// NetworkPolicyConditionStatusFailure represents status of a Network Policy that could not be parsed by the
+	// Network Policy provider and will not be implemented in the cluster
+	NetworkPolicyConditionStatusFailure NetworkPolicyConditionType = "Failure"
+)
+
+// NetworkPolicyConditionReason defines the set of reasons that explain why a
+// particular NetworkPolicy condition type has been raised.
+type NetworkPolicyConditionReason string
+
+const (
+	// NetworkPolicyConditionReasonFeatureNotSupported represents a reason where the Network Policy may not have been
+	// implemented in the cluster due to a lack of some feature not supported by the Network Policy provider
+	NetworkPolicyConditionReasonFeatureNotSupported NetworkPolicyConditionReason = "FeatureNotSupported"
+)
+
+// NetworkPolicyStatus describe the current state of the NetworkPolicy.
+type NetworkPolicyStatus struct {
+	// Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy.
+	// Current service state
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // NetworkPolicyList is a list of NetworkPolicy objects.
@@ -255,16 +302,16 @@ type IngressList struct {
 
 // IngressSpec describes the Ingress the user wishes to exist.
 type IngressSpec struct {
-	// IngressClassName is the name of the IngressClass cluster resource. The
-	// associated IngressClass defines which controller will implement the
-	// resource. This replaces the deprecated `kubernetes.io/ingress.class`
-	// annotation. For backwards compatibility, when that annotation is set, it
-	// must be given precedence over this field. The controller may emit a
-	// warning if the field and annotation have different values.
-	// Implementations of this API should ignore Ingresses without a class
-	// specified. An IngressClass resource may be marked as default, which can
-	// be used to set a default value for this field. For more information,
-	// refer to the IngressClass documentation.
+	// IngressClassName is the name of an IngressClass cluster resource. Ingress
+	// controller implementations use this field to know whether they should be
+	// serving this Ingress resource, by a transitive connection
+	// (controller -> IngressClass -> Ingress resource). Although the
+	// `kubernetes.io/ingress.class` annotation (simple constant name) was never
+	// formally defined, it was widely supported by Ingress controllers to create
+	// a direct binding between Ingress controller and Ingress resources. Newly
+	// created Ingress resources should prefer using the field. However, even
+	// though the annotation is officially deprecated, for backwards compatibility
+	// reasons, ingress controllers should still honor that annotation if present.
 	// +optional
 	IngressClassName *string `json:"ingressClassName,omitempty" protobuf:"bytes,4,opt,name=ingressClassName"`
 
@@ -517,7 +564,7 @@ const (
 	// IngressClassParametersReferenceScopeNamespace indicates that the
 	// referenced Parameters resource is namespace-scoped.
 	IngressClassParametersReferenceScopeNamespace = "Namespace"
-	// IngressClassParametersReferenceScopeNamespace indicates that the
+	// IngressClassParametersReferenceScopeCluster indicates that the
 	// referenced Parameters resource is cluster-scoped.
 	IngressClassParametersReferenceScopeCluster = "Cluster"
 )

@@ -88,7 +88,8 @@ func TestPrune(t *testing.T) {
      "unspecified": "bar",
      "unspecifiedObject": {"unspecified": "bar"},
      "pruning": {"unspecified": "bar"},
-     "preserving": {"unspecified": "bar"}
+     "preserving": {"unspecified": "bar"},
+     "preservingUnknownType": [{"foo":true},{"bar":true}]
   },
   "preservingAdditionalPropertiesNotInheritingXPreserveUnknownFields": {
      "foo": {
@@ -127,6 +128,10 @@ func TestPrune(t *testing.T) {
 					Properties: map[string]structuralschema.Structural{
 						"preserving": {
 							Generic:    structuralschema.Generic{Type: "object"},
+							Extensions: structuralschema.Extensions{XPreserveUnknownFields: true},
+						},
+						"preservingUnknownType": {
+							Generic:    structuralschema.Generic{Type: ""},
 							Extensions: structuralschema.Extensions{XPreserveUnknownFields: true},
 						},
 						"pruning": {
@@ -177,7 +182,8 @@ func TestPrune(t *testing.T) {
      "unspecified": "bar",
      "unspecifiedObject": {"unspecified": "bar"},
      "pruning": {},
-     "preserving": {"unspecified": "bar"}
+     "preserving": {"unspecified": "bar"},
+     "preservingUnknownType": [{"foo":true},{"bar":true}]
   },
   "preservingAdditionalPropertiesNotInheritingXPreserveUnknownFields": {
      "foo": {
@@ -377,6 +383,8 @@ func TestPrune(t *testing.T) {
   "kind": "Foo",
   "metadata": {
     "name": "instance",
+    "namespace": "myns",
+    "labels":{"foo":"bar"},
     "unspecified": "bar"
   },
   "unspecified":"bar",
@@ -386,6 +394,8 @@ func TestPrune(t *testing.T) {
     "unspecified": "bar",
     "metadata": {
       "name": "instance",
+      "namespace": "myns",
+      "labels":{"foo":"bar"},
       "unspecified": "bar"
     },
     "spec": {
@@ -398,6 +408,8 @@ func TestPrune(t *testing.T) {
     "unspecified": "bar",
     "metadata": {
       "name": "instance",
+      "namespace": "myns",
+      "labels":{"foo":"bar"},
       "unspecified": "bar"
     },
     "spec": {
@@ -410,6 +422,8 @@ func TestPrune(t *testing.T) {
     "unspecified": "bar",
     "metadata": {
       "name": "instance",
+      "namespace": "myns",
+      "labels":{"foo":"bar"},
       "unspecified": "bar"
     },
     "spec": {
@@ -420,6 +434,8 @@ func TestPrune(t *testing.T) {
         "unspecified": "bar",
         "metadata": {
           "name": "instance",
+          "namespace": "myns",
+          "labels":{"foo":"bar"},
           "unspecified": "bar"
         },
         "spec": {
@@ -432,12 +448,18 @@ func TestPrune(t *testing.T) {
 `, isResourceRoot: true, schema: &structuralschema.Structural{
 			Generic: structuralschema.Generic{Type: "object"},
 			Properties: map[string]structuralschema.Structural{
+				"metadata": {
+					Generic: structuralschema.Generic{Type: "object"},
+				},
 				"pruned": {
 					Generic: structuralschema.Generic{Type: "object"},
 					Extensions: structuralschema.Extensions{
 						XEmbeddedResource: true,
 					},
 					Properties: map[string]structuralschema.Structural{
+						"metadata": {
+							Generic: structuralschema.Generic{Type: "object"},
+						},
 						"spec": {
 							Generic: structuralschema.Generic{Type: "object"},
 						},
@@ -465,6 +487,9 @@ func TestPrune(t *testing.T) {
 										XEmbeddedResource: true,
 									},
 									Properties: map[string]structuralschema.Structural{
+										"metadata": {
+											Generic: structuralschema.Generic{Type: "object"},
+										},
 										"spec": {
 											Generic: structuralschema.Generic{Type: "object"},
 										},
@@ -481,6 +506,8 @@ func TestPrune(t *testing.T) {
   "kind": "Foo",
   "metadata": {
     "name": "instance",
+    "namespace": "myns",
+    "labels": {"foo": "bar"},
     "unspecified": "bar"
   },
   "pruned": {
@@ -488,6 +515,8 @@ func TestPrune(t *testing.T) {
     "kind": "Foo",
     "metadata": {
       "name": "instance",
+      "namespace": "myns",
+      "labels": {"foo": "bar"},
       "unspecified": "bar"
     },
     "spec": {
@@ -499,6 +528,8 @@ func TestPrune(t *testing.T) {
     "unspecified": "bar",
     "metadata": {
       "name": "instance",
+      "namespace": "myns",
+      "labels": {"foo": "bar"},
       "unspecified": "bar"
     },
     "spec": {
@@ -510,6 +541,8 @@ func TestPrune(t *testing.T) {
     "kind": "Foo",
     "metadata": {
       "name": "instance",
+      "namespace": "myns",
+      "labels": {"foo": "bar"},
       "unspecified": "bar"
     },
     "spec": {
@@ -518,6 +551,8 @@ func TestPrune(t *testing.T) {
         "kind": "Foo",
         "metadata": {
           "name": "instance",
+          "namespace": "myns",
+          "labels": {"foo": "bar"},
           "unspecified": "bar"
         },
         "spec": {

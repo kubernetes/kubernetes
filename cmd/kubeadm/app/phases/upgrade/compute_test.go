@@ -18,7 +18,6 @@ package upgrade
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -32,6 +31,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 type fakeVersionGetter struct {
@@ -83,7 +83,7 @@ metadata:
 spec:
   containers:
   - name: etcd
-    image: k8s.gcr.io/etcd:` + fakeCurrentEtcdVersion
+    image: registry.k8s.io/etcd:` + fakeCurrentEtcdVersion
 
 func getEtcdVersion(v *versionutil.Version) string {
 	etcdVer, _, _ := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, v.String())
@@ -643,17 +643,17 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				},
 			})
 
-			manifestsDir, err := ioutil.TempDir("", "GetAvailableUpgrades-test-manifests")
+			manifestsDir, err := os.MkdirTemp("", "GetAvailableUpgrades-test-manifests")
 			if err != nil {
 				t.Fatalf("Unable to create temporary directory: %v", err)
 			}
 			defer os.RemoveAll(manifestsDir)
 
-			if err = ioutil.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0644); err != nil {
+			if err = os.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0644); err != nil {
 				t.Fatalf("Unable to create test static pod manifest: %v", err)
 			}
 
-			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, rt.externalEtcd, client, manifestsDir)
+			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, rt.externalEtcd, client, manifestsDir, &output.TextPrinter{})
 			if !reflect.DeepEqual(actualUpgrades, rt.expectedUpgrades) {
 				t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades: %v\n\tgot: %v", rt.expectedUpgrades, actualUpgrades)
 			}

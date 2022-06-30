@@ -217,40 +217,38 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	var migratedPlugins = map[string](func() bool){
 		csitranslationplugins.GCEPDInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
 		},
 		csitranslationplugins.AWSEBSInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAWS)
 		},
 		csitranslationplugins.CinderInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationOpenStack)
+			return true
 		},
 		csitranslationplugins.AzureDiskInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureDisk)
 		},
 		csitranslationplugins.AzureFileInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationAzureFile)
 		},
 		csitranslationplugins.VSphereInTreePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationvSphere)
 		},
 		csitranslationplugins.PortworxVolumePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
 		},
 		csitranslationplugins.RBDVolumePluginName: func() bool {
-			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
 		},
 	}
 
 	// Initializing the label management channels
 	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host, migratedPlugins)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
-		// This function prevents Kubelet from posting Ready status until CSINode
-		// is both installed and initialized
-		if err := initializeCSINode(host); err != nil {
-			return errors.New(log("failed to initialize CSINode: %v", err))
-		}
+	// This function prevents Kubelet from posting Ready status until CSINode
+	// is both installed and initialized
+	if err := initializeCSINode(host); err != nil {
+		return errors.New(log("failed to initialize CSINode: %v", err))
 	}
 
 	return nil
@@ -896,11 +894,6 @@ func (p *csiPlugin) getVolumeLifecycleMode(spec *volume.Spec) (storage.VolumeLif
 // getFSGroupPolicy returns if the CSI driver supports a volume in the given mode.
 // An error indicates that it isn't supported and explains why.
 func (p *csiPlugin) getFSGroupPolicy(driver string) (storage.FSGroupPolicy, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
-		// feature is disabled, default to ReadWriteOnceWithFSTypeFSGroupPolicy
-		return storage.ReadWriteOnceWithFSTypeFSGroupPolicy, nil
-	}
-
 	// Retrieve CSIDriver. It's not an error if that isn't
 	// possible (we don't have the lister if CSIDriverRegistry is
 	// disabled) or the driver isn't found (CSIDriver is

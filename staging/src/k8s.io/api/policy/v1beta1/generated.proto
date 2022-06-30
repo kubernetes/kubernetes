@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/api/policy/v1beta1";
 
 // AllowedCSIDriver represents a single inline CSI Driver that is allowed to be used.
 message AllowedCSIDriver {
@@ -144,7 +144,6 @@ message PodDisruptionBudgetSpec {
   // A null selector selects no pods.
   // An empty selector ({}) also selects no pods, which differs from standard behavior of selecting all pods.
   // In policy/v1, an empty selector will select all pods in the namespace.
-  // +patchStrategy=replace
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 

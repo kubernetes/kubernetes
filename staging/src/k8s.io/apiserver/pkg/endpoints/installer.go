@@ -19,14 +19,13 @@ package endpoints
 import (
 	"fmt"
 	"net/http"
-	gpath "path"
 	"reflect"
 	"sort"
 	"strings"
 	"time"
 	"unicode"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -428,10 +427,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Namespaced = false
 		apiResource.Kind = resourceKind
 		namer := handlers.ContextBasedNaming{
-			SelfLinker:         a.group.Linker,
-			ClusterScoped:      true,
-			SelfLinkPathPrefix: gpath.Join(a.prefix, resource) + "/",
-			SelfLinkPathSuffix: suffix,
+			Namer:         a.group.Namer,
+			ClusterScoped: true,
 		}
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -477,10 +474,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Namespaced = true
 		apiResource.Kind = resourceKind
 		namer := handlers.ContextBasedNaming{
-			SelfLinker:         a.group.Linker,
-			ClusterScoped:      false,
-			SelfLinkPathPrefix: gpath.Join(a.prefix, namespaceParamName) + "/",
-			SelfLinkPathSuffix: itemPathSuffix,
+			Namer:         a.group.Namer,
+			ClusterScoped: false,
 		}
 
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer, false}, isLister)
@@ -1055,7 +1050,7 @@ func AddObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj in
 			}
 			switch sf.Type.Kind() {
 			case reflect.Interface, reflect.Struct:
-			case reflect.Ptr:
+			case reflect.Pointer:
 				// TODO: This is a hack to let metav1.Time through. This needs to be fixed in a more generic way eventually. bug #36191
 				if (sf.Type.Elem().Kind() == reflect.Interface || sf.Type.Elem().Kind() == reflect.Struct) && strings.TrimPrefix(sf.Type.String(), "*") != "metav1.Time" {
 					continue

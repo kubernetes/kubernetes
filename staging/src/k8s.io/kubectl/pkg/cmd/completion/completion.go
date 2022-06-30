@@ -17,6 +17,7 @@ limitations under the License.
 package completion
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -130,7 +131,7 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "completion SHELL",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Output shell completion code for the specified shell (bash, zsh or fish)"),
+		Short:                 i18n.T("Output shell completion code for the specified shell (bash, zsh, fish, or powershell)"),
 		Long:                  completionLong,
 		Example:               completionExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -166,11 +167,11 @@ func runCompletionBash(out io.Writer, boilerPlate string, kubectl *cobra.Command
 		return err
 	}
 
-	return kubectl.GenBashCompletion(out)
+	return kubectl.GenBashCompletionV2(out, false) // TODO: Upgrade to Cobra 1.3.0 or later before including descriptions (See https://github.com/spf13/cobra/pull/1509)
 }
 
 func runCompletionZsh(out io.Writer, boilerPlate string, kubectl *cobra.Command) error {
-	zshHead := "#compdef kubectl\ncompdef _kubectl kubectl\n"
+	zshHead := fmt.Sprintf("#compdef %[1]s\ncompdef _%[1]s %[1]s\n", kubectl.Name())
 	out.Write([]byte(zshHead))
 
 	if len(boilerPlate) == 0 {

@@ -143,7 +143,6 @@ func NewExpandController(
 		kubeClient,
 		&expc.volumePluginMgr,
 		expc.recorder,
-		false,
 		blkutil)
 
 	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
@@ -454,6 +453,10 @@ func (expc *expandController) GetConfigMapFunc() func(namespace, name string) (*
 	return func(_, _ string) (*v1.ConfigMap, error) {
 		return nil, fmt.Errorf("GetConfigMap unsupported in expandController")
 	}
+}
+
+func (expc *expandController) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error) {
+	return map[v1.UniqueVolumeName]string{}, nil
 }
 
 func (expc *expandController) GetServiceAccountTokenFunc() func(_, _ string, _ *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error) {

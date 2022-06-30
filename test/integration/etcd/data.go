@@ -315,7 +315,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/storage/v1beta1
-		// k8s.io/kubernetes/pkg/apis/storage/v1beta1
 		gvr("storage.k8s.io", "v1beta1", "csistoragecapacities"): {
 			Stub:             `{"metadata": {"name": "csc-12345-2"}, "storageClassName": "sc1"}`,
 			ExpectedEtcdPath: "/registry/csistoragecapacities/" + namespace + "/csc-12345-2",
@@ -326,6 +325,11 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("storage.k8s.io", "v1", "storageclasses"): {
 			Stub:             `{"metadata": {"name": "sc2"}, "provisioner": "aws"}`,
 			ExpectedEtcdPath: "/registry/storageclasses/sc2",
+		},
+		gvr("storage.k8s.io", "v1", "csistoragecapacities"): {
+			Stub:             `{"metadata": {"name": "csc-12345-3"}, "storageClassName": "sc1"}`,
+			ExpectedEtcdPath: "/registry/csistoragecapacities/" + namespace + "/csc-12345-3",
+			ExpectedGVK:      gvkP("storage.k8s.io", "v1beta1", "CSIStorageCapacity"),
 		},
 		// --
 
@@ -403,14 +407,6 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 		gvr("random.numbers.com", "v1", "integers"): {
 			Stub:             `{"kind": "Integer", "apiVersion": "random.numbers.com/v1", "metadata": {"name": "fortytwo"}, "value": 42, "garbage": "oiujnasdf"}`, // requires TypeMeta due to CRD scheme's UnstructuredObjectTyper
 			ExpectedEtcdPath: "/registry/random.numbers.com/integers/fortytwo",
-		},
-		// --
-
-		// k8s.io/kubernetes/pkg/apis/node/v1alpha1
-		gvr("node.k8s.io", "v1alpha1", "runtimeclasses"): {
-			Stub:             `{"metadata": {"name": "rc1"}, "spec": {"runtimeHandler": "h1"}}`,
-			ExpectedEtcdPath: "/registry/runtimeclasses/rc1",
-			ExpectedGVK:      gvkP("node.k8s.io", "v1", "RuntimeClass"),
 		},
 		// --
 

@@ -35,18 +35,14 @@ fi
 log INFO "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_INTERVAL_SEC=${ADDON_CHECK_INTERVAL_SEC} =="
 
 # Wait for the default service account to be created in the kube-system namespace.
-token_found=""
-while [ -z "${token_found}" ]; do
-  sleep .5
-  # shellcheck disable=SC2086
-  # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
-  if ! token_found=$(${KUBECTL} ${KUBECTL_OPTS} get --namespace="${SYSTEM_NAMESPACE}" serviceaccount default -o go-template="{{with index .secrets 0}}{{.name}}{{end}}"); then
-    token_found="";
-    log WRN "== Error getting default service account, retry in 0.5 second =="
-  fi
+# shellcheck disable=SC2086
+# Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
+while ! ${KUBECTL} ${KUBECTL_OPTS} get --namespace="${SYSTEM_NAMESPACE}" serviceaccount default; do
+  log WRN "== Error getting default service account, retry in 0.5 second =="
+  sleep 0.5
 done
 
-log INFO "== Default service account in the ${SYSTEM_NAMESPACE} namespace has token ${token_found} =="
+log INFO "== Default service account in the ${SYSTEM_NAMESPACE} namespace =="
 
 # Create admission_control objects if defined before any other addon services. If the limits
 # are defined in a namespace other than default, we should still create the limits for the

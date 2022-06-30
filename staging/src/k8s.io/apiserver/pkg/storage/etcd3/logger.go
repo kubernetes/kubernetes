@@ -32,20 +32,20 @@ type klogWrapper struct{}
 const klogWrapperDepth = 4
 
 func (klogWrapper) Info(args ...interface{}) {
-	if klog.V(5).Enabled() {
-		klog.InfoDepth(klogWrapperDepth, args...)
+	if klogV := klog.V(5); klogV.Enabled() {
+		klogV.InfoSDepth(klogWrapperDepth, fmt.Sprint(args...))
 	}
 }
 
 func (klogWrapper) Infoln(args ...interface{}) {
-	if klog.V(5).Enabled() {
-		klog.InfoDepth(klogWrapperDepth, fmt.Sprintln(args...))
+	if klogV := klog.V(5); klogV.Enabled() {
+		klogV.InfoSDepth(klogWrapperDepth, fmt.Sprintln(args...))
 	}
 }
 
 func (klogWrapper) Infof(format string, args ...interface{}) {
-	if klog.V(5).Enabled() {
-		klog.InfoDepth(klogWrapperDepth, fmt.Sprintf(format, args...))
+	if klogV := klog.V(5); klogV.Enabled() {
+		klog.V(5).InfoSDepth(klogWrapperDepth, fmt.Sprintf(format, args...))
 	}
 }
 

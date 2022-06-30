@@ -58,9 +58,9 @@ func TestRepair(t *testing.T) {
 		item: &api.RangeAllocation{Range: "100-200"},
 	}
 	pr, _ := net.ParsePortRange(registry.item.Range)
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), *pr, registry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
 
-	if err := r.RunOnce(); err != nil {
+	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
 	if !registry.updateCalled || registry.updated == nil || registry.updated.Range != pr.String() || registry.updated != registry.item {
@@ -71,8 +71,8 @@ func TestRepair(t *testing.T) {
 		item:      &api.RangeAllocation{Range: "100-200"},
 		updateErr: fmt.Errorf("test error"),
 	}
-	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), *pr, registry)
-	if err := r.RunOnce(); !strings.Contains(err.Error(), ": test error") {
+	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	if err := r.runOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
 }
@@ -102,10 +102,10 @@ func TestRepairLeak(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), *pr, registry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
-		if err := r.RunOnce(); err != nil {
+		if err := r.runOnce(); err != nil {
 			t.Fatal(err)
 		}
 		after, err := portallocator.NewFromSnapshot(registry.updated)
@@ -117,7 +117,7 @@ func TestRepairLeak(t *testing.T) {
 		}
 	}
 	// Run one more time to actually remove the leak.
-	if err := r.RunOnce(); err != nil {
+	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
 	after, err := portallocator.NewFromSnapshot(registry.updated)
@@ -190,8 +190,8 @@ func TestRepairWithExisting(t *testing.T) {
 			Data:  dst.Data,
 		},
 	}
-	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.CoreV1(), *pr, registry)
-	if err := r.RunOnce(); err != nil {
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
 	after, err := portallocator.NewFromSnapshot(registry.updated)

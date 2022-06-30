@@ -28,14 +28,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
@@ -72,13 +73,6 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 
 		ginkgo.It("processes in containers sharing a pod namespace should be able to see each other", func() {
-			ginkgo.By("Check whether shared PID namespace is supported.")
-			isEnabled, err := isSharedPIDNamespaceSupported()
-			framework.ExpectNoError(err)
-			if !isEnabled {
-				e2eskipper.Skipf("Skipped because shared PID namespace is not supported by this docker version.")
-			}
-
 			ginkgo.By("Create a pod with shared PID namespace.")
 			f.PodClient().CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "shared-pid-ns-test-pod"},

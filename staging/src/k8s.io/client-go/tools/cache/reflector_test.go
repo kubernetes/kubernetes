@@ -813,7 +813,6 @@ func TestReflectorFullListIfExpired(t *testing.T) {
 				t.Error(err)
 				return nil, err
 			}
-			return nil, nil
 		},
 	}
 	r := NewReflector(lw, &v1.Pod{}, s, 0)

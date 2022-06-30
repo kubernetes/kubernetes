@@ -60,7 +60,7 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 	celValidators := map[string]*cel.Validator{}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CustomResourceValidationExpressions) {
 		for name, s := range structuralSchemas {
-			v := cel.NewValidator(s) // CEL programs are compiled and cached here
+			v := cel.NewValidator(s, cel.PerCallLimit) // CEL programs are compiled and cached here
 			if v != nil {
 				celValidators[name] = v
 			}
@@ -174,7 +174,12 @@ func (a customResourceStrategy) Validate(ctx context.Context, obj runtime.Object
 
 		// validate x-kubernetes-validations rules
 		if celValidator, ok := a.celValidators[v]; ok {
-			errs = append(errs, celValidator.Validate(nil, a.structuralSchemas[v], u.Object)...)
+			if has, err := hasBlockingErr(errs); has {
+				errs = append(errs, err)
+			} else {
+				err, _ := celValidator.Validate(ctx, nil, a.structuralSchemas[v], u.Object, nil, cel.RuntimeCELCostBudget)
+				errs = append(errs, err...)
+			}
 		}
 	}
 
@@ -226,7 +231,12 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 
 	// validate x-kubernetes-validations rules
 	if celValidator, ok := a.celValidators[v]; ok {
-		errs = append(errs, celValidator.Validate(nil, a.structuralSchemas[v], uNew.Object)...)
+		if has, err := hasBlockingErr(errs); has {
+			errs = append(errs, err)
+		} else {
+			err, _ := celValidator.Validate(ctx, nil, a.structuralSchemas[v], uNew.Object, uOld.Object, cel.RuntimeCELCostBudget)
+			errs = append(errs, err...)
+		}
 	}
 
 	return errs
@@ -268,4 +278,14 @@ func (a customResourceStrategy) MatchCustomResourceDefinitionStorage(label label
 		Field:    field,
 		GetAttrs: a.GetAttrs,
 	}
+}
+
+// OpenAPIv3 type/maxLength/maxItems/MaxProperties/required/wrong type field validation failures are viewed as blocking err for CEL validation
+func hasBlockingErr(errs field.ErrorList) (bool, *field.Error) {
+	for _, err := range errs {
+		if err.Type == field.ErrorTypeRequired || err.Type == field.ErrorTypeTooLong || err.Type == field.ErrorTypeTooMany || err.Type == field.ErrorTypeTypeInvalid {
+			return true, field.Invalid(nil, nil, "some validation rules were not checked because the object was invalid; correct the existing errors to complete validation")
+		}
+	}
+	return false, nil
 }

@@ -22,7 +22,7 @@ limitations under the License.
  * The test creates a server pod, exporting simple 'index.html' file.
  * Then it uses appropriate VolumeSource to import this file into a client pod
  * and checks that the pod can see the file. It does so by importing the file
- * into web server root and loadind the index.html from it.
+ * into web server root and loading the index.html from it.
  *
  * These tests work only when privileged containers are allowed, exporting
  * various filesystems (NFS, GlusterFS, ...) usually needs some mounting or
@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -59,6 +60,7 @@ import (
 // TODO(#99468): Check if these tests are still needed.
 var _ = SIGDescribe("Volumes", func() {
 	f := framework.NewDefaultFramework("volume")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// note that namespace deletion is handled by delete-namespace flag
 	// filled in BeforeEach

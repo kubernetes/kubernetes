@@ -33,6 +33,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 /*
@@ -47,6 +48,7 @@ import (
 */
 var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vcp-stress")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		client        clientset.Interface
 		namespace     string
@@ -156,12 +158,12 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		pod, err = client.CoreV1().Pods(namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By(fmt.Sprintf("%v Verifing the volume: %v is attached to the node VM: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
+		ginkgo.By(fmt.Sprintf("%v Verifying the volume: %v is attached to the node VM: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
 		isVolumeAttached, verifyDiskAttachedError := diskIsAttached(persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
 		framework.ExpectEqual(isVolumeAttached, true)
 		framework.ExpectNoError(verifyDiskAttachedError)
 
-		ginkgo.By(fmt.Sprintf("%v Verifing the volume: %v is accessible in the pod: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Name))
+		ginkgo.By(fmt.Sprintf("%v Verifying the volume: %v is accessible in the pod: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Name))
 		verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 
 		ginkgo.By(fmt.Sprintf("%v Deleting pod: %v", logPrefix, pod.Name))

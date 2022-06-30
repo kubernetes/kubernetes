@@ -39,8 +39,8 @@ func Test_hostStatsProvider_getPodEtcHostsStats(t *testing.T) {
 	}{
 		{
 			name: "Should return nil for runtimes that do not support etc host file",
-			podEtcHostsPathFunc: func(podUID types.UID) (string, bool) {
-				return "", false
+			podEtcHostsPathFunc: func(podUID types.UID) string {
+				return ""
 			},
 			podUID:     "fake0001",
 			rootFsInfo: nil,

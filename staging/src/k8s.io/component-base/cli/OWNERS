@@ -5,8 +5,8 @@
 # (b) flags are the bread-and-butter of cli tools.
 
 approvers:
-- sig-cli-maintainers
+  - sig-cli-maintainers
 reviewers:
-- sig-cli
+  - sig-cli-reviewers
 labels:
-- sig/cli
+  - sig/cli

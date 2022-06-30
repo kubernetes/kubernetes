@@ -19,7 +19,6 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -53,6 +53,7 @@ const (
 var _ = SIGDescribe("Device Manager  [Serial] [Feature:DeviceManager][NodeFeature:DeviceManager]", func() {
 	checkpointFullPath := filepath.Join(devicePluginDir, checkpointName)
 	f := framework.NewDefaultFramework("devicemanager-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("With SRIOV devices in the system", func() {
 		// this test wants to reproduce what happened in https://github.com/kubernetes/kubernetes/issues/102880
@@ -306,8 +307,8 @@ func rewriteCheckpointAsV1(dir, name string) error {
 
 	// TODO: why `checkpointManager.CreateCheckpoint(name, cpV1)` doesn't seem to work?
 	ckPath := filepath.Join(dir, name)
-	ioutil.WriteFile(filepath.Join("/tmp", name), blob, 0600)
-	return ioutil.WriteFile(ckPath, blob, 0600)
+	os.WriteFile(filepath.Join("/tmp", name), blob, 0600)
+	return os.WriteFile(ckPath, blob, 0600)
 }
 
 func convertPodDeviceEntriesToV1(entries []checkpoint.PodDevicesEntry) []checkpoint.PodDevicesEntryV1 {

@@ -1,12 +1,8 @@
-// +build linux
-
 package fs
 
 import (
 	"bufio"
-	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -38,8 +34,8 @@ func (s *CpuacctGroup) Name() string {
 	return "cpuacct"
 }
 
-func (s *CpuacctGroup) Apply(path string, d *cgroupData) error {
-	return join(path, d.pid)
+func (s *CpuacctGroup) Apply(path string, _ *configs.Resources, pid int) error {
+	return apply(path, pid)
 }
 
 func (s *CpuacctGroup) Set(_ string, _ *configs.Resources) error {
@@ -85,45 +81,43 @@ func getCpuUsageBreakdown(path string) (uint64, uint64, error) {
 	const (
 		userField   = "user"
 		systemField = "system"
+		file        = cgroupCpuacctStat
 	)
 
 	// Expected format:
 	// user <usage in ticks>
 	// system <usage in ticks>
-	data, err := cgroups.ReadFile(path, cgroupCpuacctStat)
+	data, err := cgroups.ReadFile(path, file)
 	if err != nil {
 		return 0, 0, err
 	}
+	// TODO: use strings.SplitN instead.
 	fields := strings.Fields(data)
-	if len(fields) < 4 {
-		return 0, 0, fmt.Errorf("failure - %s is expected to have at least 4 fields", filepath.Join(path, cgroupCpuacctStat))
-	}
-	if fields[0] != userField {
-		return 0, 0, fmt.Errorf("unexpected field %q in %q, expected %q", fields[0], cgroupCpuacctStat, userField)
-	}
-	if fields[2] != systemField {
-		return 0, 0, fmt.Errorf("unexpected field %q in %q, expected %q", fields[2], cgroupCpuacctStat, systemField)
+	if len(fields) < 4 || fields[0] != userField || fields[2] != systemField {
+		return 0, 0, malformedLine(path, file, data)
 	}
 	if userModeUsage, err = strconv.ParseUint(fields[1], 10, 64); err != nil {
-		return 0, 0, err
+		return 0, 0, &parseError{Path: path, File: file, Err: err}
 	}
 	if kernelModeUsage, err = strconv.ParseUint(fields[3], 10, 64); err != nil {
-		return 0, 0, err
+		return 0, 0, &parseError{Path: path, File: file, Err: err}
 	}
 
 	return (userModeUsage * nanosecondsInSecond) / clockTicks, (kernelModeUsage * nanosecondsInSecond) / clockTicks, nil
 }
 
 func getPercpuUsage(path string) ([]uint64, error) {
+	const file = "cpuacct.usage_percpu"
 	percpuUsage := []uint64{}
-	data, err := cgroups.ReadFile(path, "cpuacct.usage_percpu")
+	data, err := cgroups.ReadFile(path, file)
 	if err != nil {
 		return percpuUsage, err
 	}
+	// TODO: use strings.SplitN instead.
 	for _, value := range strings.Fields(data) {
 		value, err := strconv.ParseUint(value, 10, 64)
 		if err != nil {
-			return percpuUsage, fmt.Errorf("Unable to convert param value to uint64: %s", err)
+			return percpuUsage, &parseError{Path: path, File: file, Err: err}
 		}
 		percpuUsage = append(percpuUsage, value)
 	}
@@ -133,16 +127,17 @@ func getPercpuUsage(path string) ([]uint64, error) {
 func getPercpuUsageInModes(path string) ([]uint64, []uint64, error) {
 	usageKernelMode := []uint64{}
 	usageUserMode := []uint64{}
+	const file = cgroupCpuacctUsageAll
 
-	file, err := cgroups.OpenFile(path, cgroupCpuacctUsageAll, os.O_RDONLY)
+	fd, err := cgroups.OpenFile(path, file, os.O_RDONLY)
 	if os.IsNotExist(err) {
 		return usageKernelMode, usageUserMode, nil
 	} else if err != nil {
 		return nil, nil, err
 	}
-	defer file.Close()
+	defer fd.Close()
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(fd)
 	scanner.Scan() // skipping header line
 
 	for scanner.Scan() {
@@ -153,19 +148,18 @@ func getPercpuUsageInModes(path string) ([]uint64, []uint64, error) {
 
 		usageInKernelMode, err := strconv.ParseUint(lineFields[kernelModeColumn], 10, 64)
 		if err != nil {
-			return nil, nil, fmt.Errorf("Unable to convert CPU usage in kernel mode to uint64: %s", err)
+			return nil, nil, &parseError{Path: path, File: file, Err: err}
 		}
 		usageKernelMode = append(usageKernelMode, usageInKernelMode)
 
 		usageInUserMode, err := strconv.ParseUint(lineFields[userModeColumn], 10, 64)
 		if err != nil {
-			return nil, nil, fmt.Errorf("Unable to convert CPU usage in user mode to uint64: %s", err)
+			return nil, nil, &parseError{Path: path, File: file, Err: err}
 		}
 		usageUserMode = append(usageUserMode, usageInUserMode)
 	}
-
 	if err := scanner.Err(); err != nil {
-		return nil, nil, fmt.Errorf("Problem in reading %s line by line, %s", cgroupCpuacctUsageAll, err)
+		return nil, nil, &parseError{Path: path, File: file, Err: err}
 	}
 
 	return usageKernelMode, usageUserMode, nil

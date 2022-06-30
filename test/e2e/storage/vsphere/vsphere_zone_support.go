@@ -36,6 +36,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 /*
@@ -87,6 +88,7 @@ import (
 
 var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("zone-support")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		client          clientset.Interface
 		namespace       string
@@ -107,6 +109,7 @@ var _ = utils.SIGDescribe("Zone Support [Feature:vsphere]", func() {
 		e2eskipper.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
+		e2eskipper.SkipUnlessMultizone(client)
 		namespace = f.Namespace.Name
 		vsanDatastore1 = GetAndExpectStringEnvVar(VCPZoneVsanDatastore1)
 		vsanDatastore2 = GetAndExpectStringEnvVar(VCPZoneVsanDatastore2)

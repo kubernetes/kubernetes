@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -70,12 +69,12 @@ func NewFromInterface(tokenReview authenticationv1client.AuthenticationV1Interfa
 	return newWithBackoff(tokenReviewClient, retryBackoff, implicitAuds, requestTimeout, metrics)
 }
 
-// New creates a new WebhookTokenAuthenticator from the provided kubeconfig
-// file. It is recommend to wrap this authenticator with the token cache
+// New creates a new WebhookTokenAuthenticator from the provided rest
+// config. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func New(kubeConfigFile string, version string, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (*WebhookTokenAuthenticator, error) {
-	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile, version, retryBackoff, customDial)
+func New(config *rest.Config, version string, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff) (*WebhookTokenAuthenticator, error) {
+	tokenReview, err := tokenReviewInterfaceFromConfig(config, version, retryBackoff)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +136,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 
 		start := time.Now()
 		result, statusCode, tokenReviewErr = w.tokenReview.Create(ctx, r, metav1.CreateOptions{})
-		latency := time.Now().Sub(start)
+		latency := time.Since(start)
 
 		if statusCode != 0 {
 			w.metrics.RecordRequestTotal(ctx, strconv.Itoa(statusCode))
@@ -195,10 +194,10 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	}, true, nil
 }
 
-// tokenReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
+// tokenReviewInterfaceFromConfig builds a client from the specified kubeconfig file,
 // and returns a TokenReviewInterface that uses that client. Note that the client submits TokenReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
-func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (tokenReviewer, error) {
+func tokenReviewInterfaceFromConfig(config *rest.Config, version string, retryBackoff wait.Backoff) (tokenReviewer, error) {
 	localScheme := runtime.NewScheme()
 	if err := scheme.AddToScheme(localScheme); err != nil {
 		return nil, err
@@ -210,7 +209,7 @@ func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, r
 		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
 			return nil, err
 		}
-		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff, customDial)
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, config, groupVersions, retryBackoff)
 		if err != nil {
 			return nil, err
 		}
@@ -221,7 +220,7 @@ func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string, version string, r
 		if err := localScheme.SetVersionPriority(groupVersions...); err != nil {
 			return nil, err
 		}
-		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff, customDial)
+		gw, err := webhook.NewGenericWebhook(localScheme, scheme.Codecs, config, groupVersions, retryBackoff)
 		if err != nil {
 			return nil, err
 		}

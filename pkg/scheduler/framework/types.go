@@ -198,8 +198,8 @@ type AffinityTerm struct {
 }
 
 // Matches returns true if the pod matches the label selector and namespaces or namespace selector.
-func (at *AffinityTerm) Matches(pod *v1.Pod, nsLabels labels.Set, nsSelectorEnabled bool) bool {
-	if at.Namespaces.Has(pod.Namespace) || (nsSelectorEnabled && at.NamespaceSelector.Matches(nsLabels)) {
+func (at *AffinityTerm) Matches(pod *v1.Pod, nsLabels labels.Set) bool {
+	if at.Namespaces.Has(pod.Namespace) || at.NamespaceSelector.Matches(nsLabels) {
 		return at.Selector.Matches(labels.Set(pod.Labels))
 	}
 	return false
@@ -215,6 +215,8 @@ type WeightedAffinityTerm struct {
 type Diagnosis struct {
 	NodeToStatusMap      NodeToStatusMap
 	UnschedulablePlugins sets.String
+	// PostFilterMsg records the messages returned from PostFilterPlugins.
+	PostFilterMsg string
 }
 
 // FitError describes a fit error of a pod.
@@ -224,10 +226,8 @@ type FitError struct {
 	Diagnosis   Diagnosis
 }
 
-const (
-	// NoNodeAvailableMsg is used to format message when no nodes available.
-	NoNodeAvailableMsg = "0/%v nodes are available"
-)
+// NoNodeAvailableMsg is used to format message when no nodes available.
+const NoNodeAvailableMsg = "0/%v nodes are available"
 
 // Error returns detailed information of why the pod failed to fit on each node
 func (f *FitError) Error() string {
@@ -247,6 +247,10 @@ func (f *FitError) Error() string {
 		return reasonStrings
 	}
 	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
+	postFilterMsg := f.Diagnosis.PostFilterMsg
+	if postFilterMsg != "" {
+		reasonMsg += " " + postFilterMsg
+	}
 	return reasonMsg
 }
 
@@ -543,7 +547,7 @@ func (n *NodeInfo) Clone() *NodeInfo {
 		Allocatable:      n.Allocatable.Clone(),
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      n.ImageStates,
-		PVCRefCounts:     n.PVCRefCounts,
+		PVCRefCounts:     make(map[string]int),
 		Generation:       n.Generation,
 	}
 	if len(n.Pods) > 0 {
@@ -564,6 +568,9 @@ func (n *NodeInfo) Clone() *NodeInfo {
 	}
 	if len(n.PodsWithRequiredAntiAffinity) > 0 {
 		clone.PodsWithRequiredAntiAffinity = append([]*PodInfo(nil), n.PodsWithRequiredAntiAffinity...)
+	}
+	for key, value := range n.PVCRefCounts {
+		clone.PVCRefCounts[key] = value
 	}
 	return clone
 }
@@ -730,7 +737,7 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if pod.Spec.Overhead != nil {
 		resPtr.Add(pod.Spec.Overhead)
 		if _, found := pod.Spec.Overhead[v1.ResourceCPU]; found {
 			non0CPU += pod.Spec.Overhead.Cpu().MilliValue()
@@ -764,7 +771,7 @@ func (n *NodeInfo) updatePVCRefCounts(pod *v1.Pod, add bool) {
 			continue
 		}
 
-		key := pod.Namespace + "/" + v.PersistentVolumeClaim.ClaimName
+		key := GetNamespacedName(pod.Namespace, v.PersistentVolumeClaim.ClaimName)
 		if add {
 			n.PVCRefCounts[key] += 1
 		} else {
@@ -789,40 +796,6 @@ func (n *NodeInfo) RemoveNode() {
 	n.Generation = nextGeneration()
 }
 
-// FilterOutPods receives a list of pods and filters out those whose node names
-// are equal to the node of this NodeInfo, but are not found in the pods of this NodeInfo.
-//
-// Preemption logic simulates removal of pods on a node by removing them from the
-// corresponding NodeInfo. In order for the simulation to work, we call this method
-// on the pods returned from SchedulerCache, so that predicate functions see
-// only the pods that are not removed from the NodeInfo.
-func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
-	node := n.Node()
-	if node == nil {
-		return pods
-	}
-	filtered := make([]*v1.Pod, 0, len(pods))
-	for _, p := range pods {
-		if p.Spec.NodeName != node.Name {
-			filtered = append(filtered, p)
-			continue
-		}
-		// If pod is on the given node, add it to 'filtered' only if it is present in nodeInfo.
-		podKey, err := GetPodKey(p)
-		if err != nil {
-			continue
-		}
-		for _, np := range n.Pods {
-			npodkey, _ := GetPodKey(np.Pod)
-			if npodkey == podKey {
-				filtered = append(filtered, p)
-				break
-			}
-		}
-	}
-	return filtered
-}
-
 // GetPodKey returns the string key of a pod.
 func GetPodKey(pod *v1.Pod) (string, error) {
 	uid := string(pod.UID)
@@ -830,6 +803,11 @@ func GetPodKey(pod *v1.Pod) (string, error) {
 		return "", errors.New("cannot get cache key for pod with empty UID")
 	}
 	return uid, nil
+}
+
+// GetNamespacedName returns the string format of a namespaced resource name.
+func GetNamespacedName(namespace, name string) string {
+	return fmt.Sprintf("%s/%s", namespace, name)
 }
 
 // DefaultBindAllHostIP defines the default ip address used to bind to all host.

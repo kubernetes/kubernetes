@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -40,7 +39,7 @@ import (
 	"time"
 
 	"github.com/elazarl/goproxy"
-	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
 
 	"sigs.k8s.io/yaml"
 
@@ -75,6 +74,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	uexec "k8s.io/utils/exec"
 	"k8s.io/utils/pointer"
 
@@ -103,6 +103,10 @@ const (
 	httpdDeployment3Filename  = "httpd-deployment3.yaml.in"
 	metaPattern               = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
+
+func unknownFieldMetadataJSON(gvk schema.GroupVersionKind, name string) string {
+	return fmt.Sprintf(`"kind":"%s","apiVersion":"%s/%s","metadata":{"unknownMeta": "foo", "name":"%s"}`, gvk.Kind, gvk.Group, gvk.Version, name)
+}
 
 var (
 	nautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
@@ -162,6 +166,29 @@ properties:
               description: Indicates to external qux type.
               pattern: in-tree|out-of-tree
               type: string`)
+
+var schemaFooEmbedded = []byte(`description: Foo CRD with an embedded resource
+type: object
+properties:
+  spec:
+    type: object
+    properties:
+      template:
+        type: object
+        x-kubernetes-embedded-resource: true
+        properties:
+          metadata:
+            type: object
+            properties:
+              name:
+                type: string
+          spec:
+            type: object
+  metadata:
+    type: object
+    properties:
+      name:
+        type: string`)
 
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
 // Aware of the kubectl example files map.
@@ -226,6 +253,7 @@ func runKubectlRetryOrDie(ns string, args ...string) string {
 var _ = SIGDescribe("Kubectl client", func() {
 	defer ginkgo.GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	// Reusable cluster state function.  This won't be adversely affected by lazy initialization of framework.
 	clusterState := func() *framework.ClusterVerification {
@@ -280,7 +308,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 			framework.Logf("%s modified at %s (current time: %s)", path, info.ModTime(), time.Now())
 
-			data, readError := ioutil.ReadFile(path)
+			data, readError := os.ReadFile(path)
 			if readError != nil {
 				framework.Logf("%s error: %v", path, readError)
 			} else {
@@ -691,11 +719,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			// Build a kubeconfig file that will make use of the injected ca and token,
 			// but point at the DNS host and the default namespace
-			tmpDir, err := ioutil.TempDir("", "icc-override")
+			tmpDir, err := os.MkdirTemp("", "icc-override")
 			overrideKubeconfigName := "icc-override.kubeconfig"
 			framework.ExpectNoError(err)
 			defer func() { os.Remove(tmpDir) }()
-			framework.ExpectNoError(ioutil.WriteFile(filepath.Join(tmpDir, overrideKubeconfigName), []byte(`
+			framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, overrideKubeconfigName), []byte(`
 kind: Config
 apiVersion: v1
 clusters:
@@ -719,14 +747,14 @@ users:
 			framework.Logf("copying override kubeconfig to the %s pod", simplePodName)
 			framework.RunKubectlOrDie(ns, "cp", filepath.Join(tmpDir, overrideKubeconfigName), ns+"/"+simplePodName+":/tmp/")
 
-			framework.ExpectNoError(ioutil.WriteFile(filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), []byte(`
+			framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), []byte(`
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: "configmap with namespace and invalid name"
   namespace: configmap-namespace
 `), os.FileMode(0755)))
-			framework.ExpectNoError(ioutil.WriteFile(filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), []byte(`
+			framework.ExpectNoError(os.WriteFile(filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), []byte(`
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -1002,7 +1030,7 @@ metadata:
 		return nil
 	}
 
-	ginkgo.Describe("Kubectl client-side validation", func() {
+	ginkgo.Describe("Kubectl validation", func() {
 		ginkgo.It("should create/apply a CR with unknown fields for CRD with no validation schema", func() {
 			ginkgo.By("create CRD with no validation schema")
 			crd, err := crd.CreateTestCRD(f)
@@ -1072,9 +1100,133 @@ metadata:
 			framework.ExpectNotEqual(schema, nil, "retrieving a schema for the crd")
 
 			meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
-			validArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
+
+			// unknown fields on the root are considered valid
+			validArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]},"extraProperty":"arbitrary-value"}`, meta)
 			err = createApplyCustomResource(validArbitraryCR, f.Namespace.Name, "test-cr", crd)
 			framework.ExpectNoError(err, "creating custom resource")
+		})
+
+		ginkgo.It("should detect unknown metadata fields in both the root and embedded object of a CR", func() {
+			ginkgo.By("prepare CRD with x-kubernetes-embedded-resource: true")
+			opt := func(crd *apiextensionsv1.CustomResourceDefinition) {
+				props := &apiextensionsv1.JSONSchemaProps{}
+				if err := yaml.Unmarshal(schemaFooEmbedded, props); err != nil {
+					framework.Failf("failed to unmarshal schema: %v", err)
+				}
+				crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
+					{
+						Name:    "v1",
+						Served:  true,
+						Storage: true,
+						Schema: &apiextensionsv1.CustomResourceValidation{
+							OpenAPIV3Schema: props,
+						},
+					},
+				}
+			}
+
+			group := fmt.Sprintf("%s.example.com", f.BaseName)
+			testCRD, err := crd.CreateMultiVersionTestCRD(f, group, opt)
+			if err != nil {
+				framework.Failf("failed to create test CRD: %v", err)
+			}
+			defer testCRD.CleanUp()
+
+			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
+			time.Sleep(10 * time.Second)
+
+			ginkgo.By("attempting to create a CR with unknown metadata fields at the root level")
+			gvk := schema.GroupVersionKind{Group: testCRD.Crd.Spec.Group, Version: testCRD.Crd.Spec.Versions[0].Name, Kind: testCRD.Crd.Spec.Names.Kind}
+			schema := schemaForGVK(gvk)
+			framework.ExpectNotEqual(schema, nil, "retrieving a schema for the crd")
+			embeddedCRPattern := `
+
+{%s,
+  "spec": {
+    "template": {
+      "apiVersion": "foo/v1",
+      "kind": "Sub",
+      "metadata": {
+        %s
+        "name": "subobject",
+        "namespace": "%s"
+      }
+    }
+  }
+}`
+			meta := unknownFieldMetadataJSON(gvk, "test-cr")
+			unknownRootMetaCR := fmt.Sprintf(embeddedCRPattern, meta, "", ns)
+			_, err = framework.RunKubectlInput(ns, unknownRootMetaCR, "create", "--validate=true", "-f", "-")
+			if err == nil {
+				framework.Failf("unexpected nil error when creating CR with unknown root metadata field")
+			}
+			if !(strings.Contains(err.Error(), `unknown field "unknownMeta"`) || strings.Contains(err.Error(), `unknown field "metadata.unknownMeta"`)) {
+				framework.Failf("error missing root unknown metadata field, got: %v", err)
+			}
+			if strings.Contains(err.Error(), `unknown field "namespace"`) || strings.Contains(err.Error(), `unknown field "metadata.namespace"`) {
+				framework.Failf("unexpected error, CR's root metadata namespace field unrecognized: %v", err)
+			}
+
+			ginkgo.By("attempting to create a CR with unknown metadata fields in the embedded object")
+			metaEmbedded := fmt.Sprintf(metaPattern, testCRD.Crd.Spec.Names.Kind, testCRD.Crd.Spec.Group, testCRD.Crd.Spec.Versions[0].Name, "test-cr-embedded")
+			unknownEmbeddedMetaCR := fmt.Sprintf(embeddedCRPattern, metaEmbedded, `"unknownMetaEmbedded": "bar",`, ns)
+			_, err = framework.RunKubectlInput(ns, unknownEmbeddedMetaCR, "create", "--validate=true", "-f", "-")
+			if err == nil {
+				framework.Failf("unexpected nil error when creating CR with unknown embedded metadata field")
+			}
+			if !(strings.Contains(err.Error(), `unknown field "unknownMetaEmbedded"`) || strings.Contains(err.Error(), `unknown field "spec.template.metadata.unknownMetaEmbedded"`)) {
+				framework.Failf("error missing embedded unknown metadata field, got: %v", err)
+			}
+			if strings.Contains(err.Error(), `unknown field "namespace"`) || strings.Contains(err.Error(), `unknown field "spec.template.metadata.namespace"`) {
+				framework.Failf("unexpected error, CR's embedded metadata namespace field unrecognized: %v", err)
+			}
+		})
+
+		ginkgo.It("should detect unknown metadata fields of a typed object", func() {
+			ginkgo.By("calling kubectl create deployment")
+			invalidMetaDeployment := `
+	{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "my-dep",
+			"unknownMeta": "foo",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					"app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}
+		`
+			_, err := framework.RunKubectlInput(ns, invalidMetaDeployment, "create", "-f", "-")
+			if err == nil {
+				framework.Failf("unexpected nil error when creating deployment with unknown metadata field")
+			}
+			if !(strings.Contains(err.Error(), `unknown field "unknownMeta"`) || strings.Contains(err.Error(), `unknown field "metadata.unknownMeta"`)) {
+				framework.Failf("error missing unknown metadata field, got: %v", err)
+			}
+			if strings.Contains(err.Error(), `unknown field "namespace"`) || strings.Contains(err.Error(), `unknown field "metadata.namespace"`) {
+				framework.Failf("unexpected error, deployment's metadata namespace field unrecognized: %v", err)
+			}
+
 		})
 	})
 
@@ -1385,7 +1537,7 @@ metadata:
 		ginkgo.It("should copy a file from a running Pod", func() {
 			remoteContents := "foobar\n"
 			podSource := fmt.Sprintf("%s:/root/foo/bar/foo.bar", busyboxPodName)
-			tempDestination, err := ioutil.TempFile(os.TempDir(), "copy-foobar")
+			tempDestination, err := os.CreateTemp(os.TempDir(), "copy-foobar")
 			if err != nil {
 				framework.Failf("Failed creating temporary destination file: %v", err)
 			}
@@ -1393,7 +1545,7 @@ metadata:
 			ginkgo.By("specifying a remote filepath " + podSource + " on the pod")
 			framework.RunKubectlOrDie(ns, "cp", podSource, tempDestination.Name())
 			ginkgo.By("verifying that the contents of the remote file " + podSource + " have been copied to a local file " + tempDestination.Name())
-			localData, err := ioutil.ReadAll(tempDestination)
+			localData, err := io.ReadAll(tempDestination)
 			if err != nil {
 				framework.Failf("Failed reading temporary local file: %v", err)
 			}
@@ -1648,7 +1800,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should support --unix-socket=/path ", func() {
 			ginkgo.By("Starting the proxy")
-			tmpdir, err := ioutil.TempDir("", "kubectl-proxy-unix")
+			tmpdir, err := os.MkdirTemp("", "kubectl-proxy-unix")
 			if err != nil {
 				framework.Failf("Failed to create temporary directory: %v", err)
 			}
@@ -1958,7 +2110,7 @@ func curlTransport(url string, transport *http.Transport) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -2150,7 +2302,7 @@ func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
 }
 
 // createApplyCustomResource asserts that given CustomResource be created and applied
-// without being rejected by client-side validation
+// without being rejected by kubectl validation
 func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCrd) error {
 	ginkgo.By("successfully create CR")
 	if _, err := framework.RunKubectlInput(namespace, resource, "create", "--validate=true", "-f", "-"); err != nil {

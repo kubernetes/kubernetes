@@ -25,15 +25,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func TestDefaultBinder(t *testing.T) {
-	testPod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"},
-	}
+	testPod := st.MakePod().Name("foo").Namespace("ns").Obj()
 	testNode := "foohost.kubernetes.mydomain.com"
 	tests := []struct {
 		name        string
@@ -66,7 +66,7 @@ func TestDefaultBinder(t *testing.T) {
 				return true, gotBinding, nil
 			})
 
-			fh, err := frameworkruntime.NewFramework(nil, nil, frameworkruntime.WithClientSet(client))
+			fh, err := frameworkruntime.NewFramework(nil, nil, wait.NeverStop, frameworkruntime.WithClientSet(client))
 			if err != nil {
 				t.Fatal(err)
 			}

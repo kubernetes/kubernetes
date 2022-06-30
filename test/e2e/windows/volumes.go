@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -42,6 +43,7 @@ var (
 
 var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
 	f := framework.NewDefaultFramework("windows-volumes")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		emptyDirSource = v1.VolumeSource{
 			EmptyDir: &v1.EmptyDirVolumeSource{
@@ -143,7 +145,7 @@ func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, vol
 	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, writecmd...)
 	framework.ExpectEqual(stderr, "Access is denied.")
 
-	ginkgo.By("verifying that pod can read from the the volume that is readonly")
+	ginkgo.By("verifying that pod can read from a volume that is readonly")
 	readcmd := []string{"cmd", "/c", "type", filePath}
 	readout, readerr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, readcmd...)
 	readmsg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", readcmd, readout, readerr)

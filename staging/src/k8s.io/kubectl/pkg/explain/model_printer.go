@@ -68,7 +68,7 @@ func (m *modelPrinter) PrintDescription(schema proto.Schema) error {
 				return err
 			}
 		}
-		if err := m.Writer.Indent(descriptionIndentLevel).WriteWrapped(desc); err != nil {
+		if err := m.Writer.Indent(descriptionIndentLevel).WriteWrapped("%s", desc); err != nil {
 			return err
 		}
 	}

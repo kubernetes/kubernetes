@@ -151,11 +151,11 @@ func (s *ServerRunOptions) Validate() []error {
 	}
 
 	if s.JSONPatchMaxCopyBytes < 0 {
-		errors = append(errors, fmt.Errorf("--json-patch-max-copy-bytes can not be negative value"))
+		errors = append(errors, fmt.Errorf("ServerRunOptions.JSONPatchMaxCopyBytes can not be negative value"))
 	}
 
 	if s.MaxRequestBodyBytes < 0 {
-		errors = append(errors, fmt.Errorf("--max-resource-write-bytes can not be negative value"))
+		errors = append(errors, fmt.Errorf("ServerRunOptions.MaxRequestBodyBytes can not be negative value"))
 	}
 
 	if err := validateHSTSDirectives(s.HSTSDirectives); err != nil {
@@ -201,11 +201,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.HSTSDirectives, "strict-transport-security-directives", s.HSTSDirectives, ""+
 		"List of directives for HSTS, comma separated. If this list is empty, then HSTS directives will not "+
 		"be added. Example: 'max-age=31536000,includeSubDomains,preload'")
-
-	deprecatedTargetRAMMB := 0
-	fs.IntVar(&deprecatedTargetRAMMB, "target-ram-mb", deprecatedTargetRAMMB,
-		"DEPRECATED: Memory limit for apiserver in MB (used to configure sizes of caches, etc.)")
-	fs.MarkDeprecated("target-ram-mb", "This flag will be removed in v1.23")
 
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs or OpenID Discovery).")

@@ -216,7 +216,6 @@ func TestFinishSeries(t *testing.T) {
 	hostname, _ := os.Hostname()
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			SelfLink:  "/api/v1/namespaces/baz/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "bar",
@@ -288,7 +287,6 @@ func TestRefreshExistingEventSeries(t *testing.T) {
 	hostname, _ := os.Hostname()
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			SelfLink:  "/api/v1/namespaces/baz/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "bar",

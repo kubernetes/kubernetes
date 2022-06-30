@@ -211,7 +211,7 @@ func assertStorageVersionEntries(t *testing.T, client kubernetes.Interface,
 			return false, nil
 		}
 		if sv.Status.StorageVersions[0].APIServerID != firstID {
-			lastErr = fmt.Errorf("unexpected fisrt storage version entry id, expected %v, got: %v",
+			lastErr = fmt.Errorf("unexpected first storage version entry id, expected %v, got: %v",
 				firstID, sv.Status.StorageVersions[0].APIServerID)
 			return false, nil
 		}

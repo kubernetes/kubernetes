@@ -34,6 +34,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 /*
@@ -56,6 +57,7 @@ import (
 
 var _ = utils.SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-disk-format")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	const (
 		NodeLabelKey = "vsphere_e2e_label_volume_diskformat"
 	)

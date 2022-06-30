@@ -97,7 +97,7 @@ func getItemsPtr(list runtime.Object) (interface{}, error) {
 		return nil, errExpectFieldItems
 	}
 	switch items.Kind() {
-	case reflect.Interface, reflect.Ptr:
+	case reflect.Interface, reflect.Pointer:
 		target := reflect.TypeOf(items.Interface()).Elem()
 		if target.Kind() != reflect.Slice {
 			return nil, errExpectSliceItems
@@ -130,7 +130,7 @@ func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
 		return nil
 	}
 	takeAddr := false
-	if elemType := items.Type().Elem(); elemType.Kind() != reflect.Ptr && elemType.Kind() != reflect.Interface {
+	if elemType := items.Type().Elem(); elemType.Kind() != reflect.Pointer && elemType.Kind() != reflect.Interface {
 		if !items.Index(0).CanAddr() {
 			return fmt.Errorf("unable to take address of items in %T for EachListItem", obj)
 		}

@@ -63,7 +63,7 @@ type SetServiceAccountOptions struct {
 
 	fileNameOptions        resource.FilenameOptions
 	dryRunStrategy         cmdutil.DryRunStrategy
-	dryRunVerifier         *resource.DryRunVerifier
+	dryRunVerifier         *resource.QueryParamVerifier
 	shortOutput            bool
 	all                    bool
 	output                 string
@@ -142,7 +142,7 @@ func (o *SetServiceAccountOptions) Complete(f cmdutil.Factory, cmd *cobra.Comman
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.dryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 	o.output = cmdutil.GetFlagString(cmd, "output")
 	o.updatePodSpecForObject = polymorphichelpers.UpdatePodSpecForObjectFn
 

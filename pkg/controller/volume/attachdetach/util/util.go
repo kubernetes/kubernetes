@@ -24,12 +24,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -188,10 +186,10 @@ func DetermineVolumeAction(pod *v1.Pod, desiredStateOfWorld cache.DesiredStateOf
 	if pod == nil || len(pod.Spec.Volumes) <= 0 {
 		return defaultAction
 	}
-	nodeName := types.NodeName(pod.Spec.NodeName)
-	keepTerminatedPodVolume := desiredStateOfWorld.GetKeepTerminatedPodVolumesForNode(nodeName)
 
 	if util.IsPodTerminated(pod, pod.Status) {
+		nodeName := types.NodeName(pod.Spec.NodeName)
+		keepTerminatedPodVolume := desiredStateOfWorld.GetKeepTerminatedPodVolumesForNode(nodeName)
 		// if pod is terminate we let kubelet policy dictate if volume
 		// should be detached or not
 		return keepTerminatedPodVolume
@@ -315,11 +313,6 @@ func translateInTreeSpecToCSIIfNeeded(spec *volume.Spec, nodeName types.NodeName
 }
 
 func isCSIMigrationSupportedOnNode(nodeName types.NodeName, spec *volume.Spec, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
-		// If CSIMigration is disabled, CSI migration paths will not be taken for the node.
-		return false, nil
-	}
-
 	pluginName, err := csiMigratedPluginManager.GetInTreePluginNameFromSpec(spec.PersistentVolume, spec.Volume)
 	if err != nil {
 		return false, err

@@ -156,7 +156,7 @@ func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
 }
 
 func TestPolicySingleNumaNodeMerge(t *testing.T) {
-	numaNodes := []int{0, 1}
+	numaNodes := []int{0, 1, 2, 3}
 	policy := NewSingleNumaNodePolicy(numaNodes)
 
 	tcases := commonPolicyMergeTestCases(numaNodes)

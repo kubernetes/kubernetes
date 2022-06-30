@@ -93,6 +93,10 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	resultCh := make(chan interface{})
 	var tw timeoutWriter
 	tw, w = newTimeoutWriter(w)
+
+	// Make a copy of request and work on it in new goroutine
+	// to avoid race condition when accessing/modifying request (e.g. headers)
+	rCopy := r.Clone(r.Context())
 	go func() {
 		defer func() {
 			err := recover()
@@ -107,7 +111,7 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			resultCh <- err
 		}()
-		t.handler.ServeHTTP(w, r)
+		t.handler.ServeHTTP(w, rCopy)
 	}()
 	select {
 	case err := <-resultCh:
@@ -138,7 +142,7 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}()
 		}()
 
-		postTimeoutFn()
+		defer postTimeoutFn()
 		tw.timeout(err)
 	}
 }
@@ -149,7 +153,7 @@ type timeoutWriter interface {
 }
 
 func newTimeoutWriter(w http.ResponseWriter) (timeoutWriter, http.ResponseWriter) {
-	base := &baseTimeoutWriter{w: w}
+	base := &baseTimeoutWriter{w: w, handlerHeaders: w.Header().Clone()}
 	wrapped := responsewriter.WrapForHTTP1Or2(base)
 
 	return base, wrapped
@@ -160,6 +164,9 @@ var _ responsewriter.UserProvidedDecorator = &baseTimeoutWriter{}
 
 type baseTimeoutWriter struct {
 	w http.ResponseWriter
+
+	// headers written by the normal handler
+	handlerHeaders http.Header
 
 	mu sync.Mutex
 	// if the timeout handler has timeout
@@ -182,7 +189,7 @@ func (tw *baseTimeoutWriter) Header() http.Header {
 		return http.Header{}
 	}
 
-	return tw.w.Header()
+	return tw.handlerHeaders
 }
 
 func (tw *baseTimeoutWriter) Write(p []byte) (int, error) {
@@ -196,7 +203,10 @@ func (tw *baseTimeoutWriter) Write(p []byte) (int, error) {
 		return 0, http.ErrHijacked
 	}
 
-	tw.wroteHeader = true
+	if !tw.wroteHeader {
+		copyHeaders(tw.w.Header(), tw.handlerHeaders)
+		tw.wroteHeader = true
+	}
 	return tw.w.Write(p)
 }
 
@@ -221,8 +231,15 @@ func (tw *baseTimeoutWriter) WriteHeader(code int) {
 		return
 	}
 
+	copyHeaders(tw.w.Header(), tw.handlerHeaders)
 	tw.wroteHeader = true
 	tw.w.WriteHeader(code)
+}
+
+func copyHeaders(dst, src http.Header) {
+	for k, v := range src {
+		dst[k] = v
+	}
 }
 
 func (tw *baseTimeoutWriter) timeout(err *apierrors.StatusError) {

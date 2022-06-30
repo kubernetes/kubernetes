@@ -95,6 +95,12 @@ func (r *EvictionREST) New() runtime.Object {
 	return &policy.Eviction{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *EvictionREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Propagate dry-run takes the dry-run option from the request and pushes it into the eviction object.
 // It returns an error if they have non-matching dry-run options.
 func propagateDryRun(eviction *policy.Eviction, options *metav1.CreateOptions) (*metav1.DeleteOptions, error) {
@@ -385,6 +391,7 @@ func (r *EvictionREST) getPodDisruptionBudgets(ctx context.Context, pod *api.Pod
 		}
 		selector, err := metav1.LabelSelectorAsSelector(pdb.Spec.Selector)
 		if err != nil {
+			// This object has an invalid selector, it does not match the pod
 			continue
 		}
 		// If a PDB with a nil or empty selector creeps in, it should match nothing, not everything.

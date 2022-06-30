@@ -1464,7 +1464,7 @@ func TestDropNonEphemeralContainerUpdates(t *testing.T) {
 					Namespace:       "test-ns",
 					ResourceVersion: "1",
 					Annotations:     map[string]string{"foo": "bar", "whiz": "pop"},
-					ClusterName:     "milo",
+					Finalizers:      []string{"milo"},
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{

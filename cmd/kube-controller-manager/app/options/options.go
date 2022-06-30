@@ -22,20 +22,19 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	clientgokubescheme "k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	cpoptions "k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	cmoptions "k8s.io/controller-manager/options"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
@@ -222,20 +221,6 @@ func NewDefaultComponentConfig() (kubectrlmgrconfig.KubeControllerManagerConfigu
 	return internal, nil
 }
 
-// TODO: remove these insecure flags in v1.24
-func addDummyInsecureFlags(fs *pflag.FlagSet) {
-	var (
-		bindAddr = net.IPv4(127, 0, 0, 1)
-		bindPort = 0
-	)
-	fs.IPVar(&bindAddr, "address", bindAddr,
-		"The IP address on which to serve the insecure --port (set to 0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
-	fs.MarkDeprecated("address", "This flag has no effect now and will be removed in v1.24.")
-
-	fs.IntVar(&bindPort, "port", bindPort, "The port on which to serve unsecured, unauthenticated access. Set to 0 to disable.")
-	fs.MarkDeprecated("port", "This flag has no effect now and will be removed in v1.24.")
-}
-
 // Flags returns flags for a specific APIServer by section name
 func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledByDefaultControllers []string) cliflag.NamedFlagSets {
 	fss := cliflag.NamedFlagSets{}
@@ -244,7 +229,6 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.ServiceController.AddFlags(fss.FlagSet("service controller"))
 
 	s.SecureServing.AddFlags(fss.FlagSet("secure serving"))
-	addDummyInsecureFlags(fss.FlagSet("insecure serving"))
 	s.Authentication.AddFlags(fss.FlagSet("authentication"))
 	s.Authorization.AddFlags(fss.FlagSet("authorization"))
 
@@ -273,7 +257,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.SAController.AddFlags(fss.FlagSet("serviceaccount controller"))
 	s.TTLAfterFinishedController.AddFlags(fss.FlagSet("ttl-after-finished controller"))
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
-	s.Logs.AddFlags(fss.FlagSet("logs"))
+	logsapi.AddFlags(s.Logs, fss.FlagSet("logs"))
 
 	fs := fss.FlagSet("misc")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
@@ -446,12 +430,14 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		return nil, err
 	}
 
-	eventRecorder := createRecorder(client, KubeControllerManagerUserAgent)
+	eventBroadcaster := record.NewBroadcaster()
+	eventRecorder := eventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: KubeControllerManagerUserAgent})
 
 	c := &kubecontrollerconfig.Config{
-		Client:        client,
-		Kubeconfig:    kubeconfig,
-		EventRecorder: eventRecorder,
+		Client:           client,
+		Kubeconfig:       kubeconfig,
+		EventBroadcaster: eventBroadcaster,
+		EventRecorder:    eventRecorder,
 	}
 	if err := s.ApplyTo(c); err != nil {
 		return nil, err
@@ -459,11 +445,4 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 	s.Metrics.Apply()
 
 	return c, nil
-}
-
-func createRecorder(kubeClient clientset.Interface, userAgent string) record.EventRecorder {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	return eventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: userAgent})
 }

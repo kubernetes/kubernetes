@@ -16,6 +16,7 @@ package cel
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/google/cel-go/checker"
@@ -31,9 +32,7 @@ import (
 )
 
 // Source interface representing a user-provided expression.
-type Source interface {
-	common.Source
-}
+type Source = common.Source
 
 // Ast representing the checked or unchecked expression, its source, and related metadata such as
 // source position information.
@@ -55,7 +54,7 @@ func (ast *Ast) IsChecked() bool {
 	return ast.typeMap != nil && len(ast.typeMap) > 0
 }
 
-// SourceInfo returns character offset and newling position information about expression elements.
+// SourceInfo returns character offset and newline position information about expression elements.
 func (ast *Ast) SourceInfo() *exprpb.SourceInfo {
 	return ast.info
 }
@@ -89,13 +88,18 @@ type Env struct {
 	adapter      ref.TypeAdapter
 	provider     ref.TypeProvider
 	features     map[int]bool
-	// program options tied to the environment.
-	progOpts []ProgramOption
+
+	// Internal parser representation
+	prsr *parser.Parser
 
 	// Internal checker representation
-	chk    *checker.Env
-	chkErr error
-	once   sync.Once
+	chk     *checker.Env
+	chkErr  error
+	chkOnce sync.Once
+	chkOpts []checker.Option
+
+	// Program options tied to the environment
+	progOpts []ProgramOption
 }
 
 // NewEnv creates a program environment configured with the standard library of CEL functions and
@@ -105,8 +109,16 @@ type Env struct {
 // See the EnvOption helper functions for the options that can be used to configure the
 // environment.
 func NewEnv(opts ...EnvOption) (*Env, error) {
-	stdOpts := append([]EnvOption{StdLib()}, opts...)
-	return NewCustomEnv(stdOpts...)
+	// Extend the statically configured standard environment, disabling eager validation to ensure
+	// the cost of setup for the environment is still just as cheap as it is in v0.11.x and earlier
+	// releases. The user provided options can easily re-enable the eager validation as they are
+	// processed after this default option.
+	stdOpts := append([]EnvOption{EagerlyValidateDeclarations(false)}, opts...)
+	env, err := getStdEnv()
+	if err != nil {
+		return nil, err
+	}
+	return env.Extend(stdOpts...)
 }
 
 // NewCustomEnv creates a custom program environment which is not automatically configured with the
@@ -147,21 +159,8 @@ func (e *Env) Check(ast *Ast) (*Ast, *Issues) {
 	pe, _ := AstToParsedExpr(ast)
 
 	// Construct the internal checker env, erroring if there is an issue adding the declarations.
-	e.once.Do(func() {
-		ce := checker.NewEnv(e.Container, e.provider)
-		ce.EnableDynamicAggregateLiterals(true)
-		if e.HasFeature(FeatureDisableDynamicAggregateLiterals) {
-			ce.EnableDynamicAggregateLiterals(false)
-		}
-		err := ce.Add(e.declarations...)
-		if err != nil {
-			e.chkErr = err
-		} else {
-			e.chk = ce
-		}
-	})
-	// The once call will ensure that this value is set or nil for all invocations.
-	if e.chkErr != nil {
+	err := e.initChecker()
+	if err != nil {
 		errs := common.NewErrors(ast.Source())
 		errs.ReportError(common.NoLocation, e.chkErr.Error())
 		return nil, NewIssues(errs)
@@ -201,17 +200,16 @@ func (e *Env) Compile(txt string) (*Ast, *Issues) {
 // issues discovered during Check.
 //
 // Note, for parse-only uses of CEL use Parse.
-func (e *Env) CompileSource(src common.Source) (*Ast, *Issues) {
+func (e *Env) CompileSource(src Source) (*Ast, *Issues) {
 	ast, iss := e.ParseSource(src)
 	if iss.Err() != nil {
 		return nil, iss
 	}
 	checked, iss2 := e.Check(ast)
-	iss = iss.Append(iss2)
-	if iss.Err() != nil {
-		return nil, iss
+	if iss2.Err() != nil {
+		return nil, iss2
 	}
-	return checked, iss
+	return checked, iss2
 }
 
 // Extend the current environment with additional options to produce a new Env.
@@ -225,11 +223,29 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 	if e.chkErr != nil {
 		return nil, e.chkErr
 	}
-	// Copy slices.
-	decsCopy := make([]*exprpb.Decl, len(e.declarations))
+
+	// The type-checker is configured with Declarations. The declarations may either be provided
+	// as options which have not yet been validated, or may come from a previous checker instance
+	// whose types have already been validated.
+	chkOptsCopy := make([]checker.Option, len(e.chkOpts))
+	copy(chkOptsCopy, e.chkOpts)
+
+	// Copy the declarations if needed.
+	decsCopy := []*exprpb.Decl{}
+	if e.chk != nil {
+		// If the type-checker has already been instantiated, then the e.declarations have been
+		// valdiated within the chk instance.
+		chkOptsCopy = append(chkOptsCopy, checker.ValidatedDeclarations(e.chk))
+	} else {
+		// If the type-checker has not been instantiated, ensure the unvalidated declarations are
+		// provided to the extended Env instance.
+		decsCopy = make([]*exprpb.Decl, len(e.declarations))
+		copy(decsCopy, e.declarations)
+	}
+
+	// Copy macros and program options
 	macsCopy := make([]parser.Macro, len(e.macros))
 	progOptsCopy := make([]ProgramOption, len(e.progOpts))
-	copy(decsCopy, e.declarations)
 	copy(macsCopy, e.macros)
 	copy(progOptsCopy, e.progOpts)
 
@@ -273,6 +289,7 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 		adapter:      adapter,
 		features:     featuresCopy,
 		provider:     provider,
+		chkOpts:      chkOptsCopy,
 	}
 	return ext.configure(opts)
 }
@@ -280,13 +297,13 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 // HasFeature checks whether the environment enables the given feature
 // flag, as enumerated in options.go.
 func (e *Env) HasFeature(flag int) bool {
-	_, has := e.features[flag]
-	return has
+	enabled, has := e.features[flag]
+	return has && enabled
 }
 
 // Parse parses the input expression value `txt` to a Ast and/or a set of Issues.
 //
-// This form of Parse creates a common.Source value for the input `txt` and forwards to the
+// This form of Parse creates a Source value for the input `txt` and forwards to the
 // ParseSource method.
 func (e *Env) Parse(txt string) (*Ast, *Issues) {
 	src := common.NewTextSource(txt)
@@ -300,15 +317,15 @@ func (e *Env) Parse(txt string) (*Ast, *Issues) {
 //
 // It is possible to have both non-nil Ast and Issues values returned from this call; however,
 // the mere presence of an Ast does not imply that it is valid for use.
-func (e *Env) ParseSource(src common.Source) (*Ast, *Issues) {
-	res, errs := parser.ParseWithMacros(src, e.macros)
+func (e *Env) ParseSource(src Source) (*Ast, *Issues) {
+	res, errs := e.prsr.Parse(src)
 	if len(errs.GetErrors()) > 0 {
 		return nil, &Issues{errs: errs}
 	}
 	// Manually create the Ast to ensure that the text source information is propagated on
 	// subsequent calls to Check.
 	return &Ast{
-		source: Source(src),
+		source: src,
 		expr:   res.GetExpr(),
 		info:   res.GetSourceInfo()}, nil
 }
@@ -323,11 +340,6 @@ func (e *Env) Program(ast *Ast, opts ...ProgramOption) (Program, error) {
 		optSet = mergedOpts
 	}
 	return newProgram(e, ast, optSet)
-}
-
-// SetFeature sets the given feature flag, as enumerated in options.go.
-func (e *Env) SetFeature(flag int) {
-	e.features[flag] = true
 }
 
 // TypeAdapter returns the `ref.TypeAdapter` configured for the environment.
@@ -402,6 +414,16 @@ func (e *Env) ResidualAst(a *Ast, details *EvalDetails) (*Ast, error) {
 	return checked, nil
 }
 
+// EstimateCost estimates the cost of a type checked CEL expression using the length estimates of input data and
+// extension functions provided by estimator.
+func (e *Env) EstimateCost(ast *Ast, estimator checker.CostEstimator) (checker.CostEstimate, error) {
+	checked, err := AstToCheckedExpr(ast)
+	if err != nil {
+		return checker.CostEstimate{}, fmt.Errorf("EsimateCost could not inspect Ast: %v", err)
+	}
+	return checker.Cost(checked, estimator), nil
+}
+
 // configure applies a series of EnvOptions to the current environment.
 func (e *Env) configure(opts []EnvOption) (*Env, error) {
 	// Customized the environment using the provided EnvOption values. If an error is
@@ -413,7 +435,52 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 			return nil, err
 		}
 	}
+
+	// Configure the parser.
+	prsrOpts := []parser.Option{parser.Macros(e.macros...)}
+	if e.HasFeature(featureEnableMacroCallTracking) {
+		prsrOpts = append(prsrOpts, parser.PopulateMacroCalls(true))
+	}
+	e.prsr, err = parser.NewParser(prsrOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	// The simplest way to eagerly validate declarations on environment creation is to compile
+	// a dummy program and check for the presence of e.chkErr being non-nil.
+	if e.HasFeature(featureEagerlyValidateDeclarations) {
+		err := e.initChecker()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return e, nil
+}
+
+func (e *Env) initChecker() error {
+	e.chkOnce.Do(func() {
+		chkOpts := []checker.Option{}
+		chkOpts = append(chkOpts, e.chkOpts...)
+		chkOpts = append(chkOpts,
+			checker.HomogeneousAggregateLiterals(
+				e.HasFeature(featureDisableDynamicAggregateLiterals)),
+			checker.CrossTypeNumericComparisons(
+				e.HasFeature(featureCrossTypeNumericComparisons)))
+
+		ce, err := checker.NewEnv(e.Container, e.provider, chkOpts...)
+		if err != nil {
+			e.chkErr = err
+			return
+		}
+		err = ce.Add(e.declarations...)
+		if err != nil {
+			e.chkErr = err
+			return
+		}
+		e.chk = ce
+	})
+	return e.chkErr
 }
 
 // Issues defines methods for inspecting the error details of parse and check calls.
@@ -454,6 +521,9 @@ func (i *Issues) Append(other *Issues) *Issues {
 	if i == nil {
 		return other
 	}
+	if other == nil {
+		return i
+	}
 	return NewIssues(i.errs.Append(other.errs.GetErrors()))
 }
 
@@ -464,3 +534,17 @@ func (i *Issues) String() string {
 	}
 	return i.errs.ToDisplayString()
 }
+
+// getStdEnv lazy initializes the CEL standard environment.
+func getStdEnv() (*Env, error) {
+	stdEnvInit.Do(func() {
+		stdEnv, stdEnvErr = NewCustomEnv(StdLib(), EagerlyValidateDeclarations(true))
+	})
+	return stdEnv, stdEnvErr
+}
+
+var (
+	stdEnvInit sync.Once
+	stdEnv     *Env
+	stdEnvErr  error
+)

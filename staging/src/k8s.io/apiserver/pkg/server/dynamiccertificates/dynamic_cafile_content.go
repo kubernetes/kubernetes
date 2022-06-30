@@ -18,6 +18,7 @@ package dynamiccertificates
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
@@ -39,10 +40,10 @@ var FileRefreshDuration = 1 * time.Minute
 // ControllerRunner is a generic interface for starting a controller
 type ControllerRunner interface {
 	// RunOnce runs the sync loop a single time.  This useful for synchronous priming
-	RunOnce() error
+	RunOnce(ctx context.Context) error
 
 	// Run should be called a go .Run
-	Run(workers int, stopCh <-chan struct{})
+	Run(ctx context.Context, workers int)
 }
 
 // DynamicFileCAContent provides a CAContentProvider that can dynamically react to new file content
@@ -144,12 +145,12 @@ func (c *DynamicFileCAContent) hasCAChanged(caBundle []byte) bool {
 }
 
 // RunOnce runs a single sync loop
-func (c *DynamicFileCAContent) RunOnce() error {
+func (c *DynamicFileCAContent) RunOnce(ctx context.Context) error {
 	return c.loadCABundle()
 }
 
 // Run starts the controller and blocks until stopCh is closed.
-func (c *DynamicFileCAContent) Run(workers int, stopCh <-chan struct{}) {
+func (c *DynamicFileCAContent) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
@@ -157,16 +158,16 @@ func (c *DynamicFileCAContent) Run(workers int, stopCh <-chan struct{}) {
 	defer klog.InfoS("Shutting down controller", "name", c.name)
 
 	// doesn't matter what workers say, only start one.
-	go wait.Until(c.runWorker, time.Second, stopCh)
+	go wait.Until(c.runWorker, time.Second, ctx.Done())
 
 	// start the loop that watches the CA file until stopCh is closed.
 	go wait.Until(func() {
-		if err := c.watchCAFile(stopCh); err != nil {
+		if err := c.watchCAFile(ctx.Done()); err != nil {
 			klog.ErrorS(err, "Failed to watch CA file, will retry later")
 		}
-	}, time.Minute, stopCh)
+	}, time.Minute, ctx.Done())
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 func (c *DynamicFileCAContent) watchCAFile(stopCh <-chan struct{}) error {

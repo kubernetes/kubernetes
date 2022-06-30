@@ -30,6 +30,10 @@ const (
 	minimumSeats = 1
 
 	// the maximum number of seats a request can occupy
+	//
+	// NOTE: work_estimate_seats_samples metric uses the value of maximumSeats
+	// as the upper bound, so when we change maximumSeats we should also
+	// update the buckets of the metric.
 	maximumSeats = 10
 )
 

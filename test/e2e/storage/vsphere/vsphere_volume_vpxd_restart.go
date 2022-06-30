@@ -34,6 +34,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 /*
@@ -53,6 +54,7 @@ import (
 */
 var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vsphere][Serial][Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart-vpxd")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	type node struct {
 		name     string

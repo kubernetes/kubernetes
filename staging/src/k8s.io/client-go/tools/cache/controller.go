@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -370,8 +371,8 @@ type TransformFunc func(interface{}) (interface{}, error)
 // the returned Store for Get/List operations; Add/Modify/Deletes will cause
 // the event notifications to be faulty.
 // The given transform function will be called on all objects before they will
-// put put into the Store and corresponding Add/Modify/Delete handlers will
-// be invokved for them.
+// put into the Store and corresponding Add/Modify/Delete handlers will
+// be invoked for them.
 func NewTransformingInformer(
 	lw ListerWatcher,
 	objType runtime.Object,
@@ -404,6 +405,49 @@ func NewTransformingIndexerInformer(
 	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
 
 	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState, transformer)
+}
+
+// Multiplexes updates in the form of a list of Deltas into a Store, and informs
+// a given handler of events OnUpdate, OnAdd, OnDelete
+func processDeltas(
+	// Object which receives event notifications from the given deltas
+	handler ResourceEventHandler,
+	clientState Store,
+	transformer TransformFunc,
+	deltas Deltas,
+) error {
+	// from oldest to newest
+	for _, d := range deltas {
+		obj := d.Object
+		if transformer != nil {
+			var err error
+			obj, err = transformer(obj)
+			if err != nil {
+				return err
+			}
+		}
+
+		switch d.Type {
+		case Sync, Replaced, Added, Updated:
+			if old, exists, err := clientState.Get(obj); err == nil && exists {
+				if err := clientState.Update(obj); err != nil {
+					return err
+				}
+				handler.OnUpdate(old, obj)
+			} else {
+				if err := clientState.Add(obj); err != nil {
+					return err
+				}
+				handler.OnAdd(obj)
+			}
+		case Deleted:
+			if err := clientState.Delete(obj); err != nil {
+				return err
+			}
+			handler.OnDelete(obj)
+		}
+	}
+	return nil
 }
 
 // newInformer returns a controller for populating the store while also
@@ -444,38 +488,10 @@ func newInformer(
 		RetryOnError:     false,
 
 		Process: func(obj interface{}) error {
-			// from oldest to newest
-			for _, d := range obj.(Deltas) {
-				obj := d.Object
-				if transformer != nil {
-					var err error
-					obj, err = transformer(obj)
-					if err != nil {
-						return err
-					}
-				}
-
-				switch d.Type {
-				case Sync, Replaced, Added, Updated:
-					if old, exists, err := clientState.Get(obj); err == nil && exists {
-						if err := clientState.Update(obj); err != nil {
-							return err
-						}
-						h.OnUpdate(old, obj)
-					} else {
-						if err := clientState.Add(obj); err != nil {
-							return err
-						}
-						h.OnAdd(obj)
-					}
-				case Deleted:
-					if err := clientState.Delete(obj); err != nil {
-						return err
-					}
-					h.OnDelete(obj)
-				}
+			if deltas, ok := obj.(Deltas); ok {
+				return processDeltas(h, clientState, transformer, deltas)
 			}
-			return nil
+			return errors.New("object given as Process argument is not Deltas")
 		},
 	}
 	return New(cfg)

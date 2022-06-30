@@ -34,8 +34,9 @@ make --no-print-directory -C "${KUBE_ROOT}" generated_files
 # that library doesn't work well with multiple modules.  Until that is done,
 # force this tooling to run in a fake GOPATH.
 ret=0
+TYPECHECK_SERIAL="${TYPECHECK_SERIAL:-false}"
 hack/run-in-gopath.sh \
-    go run test/typecheck/main.go "$@" || ret=$?
+    go run test/typecheck/main.go "$@" "--serial=$TYPECHECK_SERIAL" || ret=$?
 if [[ $ret -ne 0 ]]; then
   echo "!!! Type Check has failed. This may cause cross platform build failures." >&2
   echo "!!! Please see https://git.k8s.io/kubernetes/test/typecheck for more information." >&2

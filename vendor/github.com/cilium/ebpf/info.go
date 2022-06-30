@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cilium/ebpf/internal"
+	"github.com/cilium/ebpf/internal/btf"
 )
 
 // MapInfo describes a map.
@@ -87,17 +88,30 @@ type ProgramInfo struct {
 	Tag string
 	// Name as supplied by user space at load time.
 	Name string
+	// BTF for the program.
+	btf btf.ID
+	// IDS map ids related to program.
+	ids []MapID
 
 	stats *programStats
 }
 
 func newProgramInfoFromFd(fd *internal.FD) (*ProgramInfo, error) {
-	info, err := bpfGetProgInfoByFD(fd)
+	info, err := bpfGetProgInfoByFD(fd, nil)
 	if errors.Is(err, syscall.EINVAL) {
 		return newProgramInfoFromProc(fd)
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	var mapIDs []MapID
+	if info.nr_map_ids > 0 {
+		mapIDs = make([]MapID, info.nr_map_ids)
+		info, err = bpfGetProgInfoByFD(fd, mapIDs)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &ProgramInfo{
@@ -107,6 +121,8 @@ func newProgramInfoFromFd(fd *internal.FD) (*ProgramInfo, error) {
 		Tag: hex.EncodeToString(info.tag[:]),
 		// name is available from 4.15.
 		Name: internal.CString(info.name[:]),
+		btf:  btf.ID(info.btf_id),
+		ids:  mapIDs,
 		stats: &programStats{
 			runtime:  time.Duration(info.run_time_ns),
 			runCount: info.run_cnt,
@@ -142,6 +158,17 @@ func (pi *ProgramInfo) ID() (ProgramID, bool) {
 	return pi.id, pi.id > 0
 }
 
+// BTFID returns the BTF ID associated with the program.
+//
+// Available from 5.0.
+//
+// The bool return value indicates whether this optional field is available and
+// populated. (The field may be available but not populated if the kernel
+// supports the field but the program was loaded without BTF information.)
+func (pi *ProgramInfo) BTFID() (btf.ID, bool) {
+	return pi.btf, pi.btf > 0
+}
+
 // RunCount returns the total number of times the program was called.
 //
 // Can return 0 if the collection of statistics is not enabled. See EnableStats().
@@ -162,6 +189,13 @@ func (pi *ProgramInfo) Runtime() (time.Duration, bool) {
 		return pi.stats.runtime, true
 	}
 	return time.Duration(0), false
+}
+
+// MapIDs returns the maps related to the program.
+//
+// The bool return value indicates whether this optional field is available.
+func (pi *ProgramInfo) MapIDs() ([]MapID, bool) {
+	return pi.ids, pi.ids != nil
 }
 
 func scanFdInfo(fd *internal.FD, fields map[string]interface{}) error {

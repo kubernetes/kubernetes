@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,10 +33,6 @@ import (
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/podutils"
 )
-
-// defaultLogsContainerAnnotationName is an annotation name that can be used to preselect the interesting container
-// from a pod when running kubectl logs. It is deprecated and will be remove in 1.25.
-const defaultLogsContainerAnnotationName = "kubectl.kubernetes.io/default-logs-container"
 
 func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
@@ -86,13 +81,6 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 				var defaultContainer string
 				if len(annotations[podcmd.DefaultContainerAnnotationName]) > 0 {
 					defaultContainer = annotations[podcmd.DefaultContainerAnnotationName]
-				} else if len(annotations[defaultLogsContainerAnnotationName]) > 0 {
-					// Only log deprecation if we have only the old annotation. This allows users to
-					// set both to support multiple versions of kubectl; if they are setting both
-					// they must already know it is deprecated, so we don't need to add noisy
-					// warnings.
-					defaultContainer = annotations[defaultLogsContainerAnnotationName]
-					fmt.Fprintf(os.Stderr, "Using deprecated annotation `kubectl.kubernetes.io/default-logs-container` in pod/%v. Please use `kubectl.kubernetes.io/default-container` instead\n", t.Name)
 				}
 				if len(defaultContainer) > 0 {
 					if exists, _ := podcmd.FindContainerByName(t, defaultContainer); exists == nil {
@@ -104,23 +92,11 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 			}
 
 			if currOpts.Container == "" {
-				// We don't know container name. In this case we expect only one container to be present in the pod (ignoring InitContainers).
-				// If there is more than one container, we should return an error showing all container names.
-				if len(t.Spec.Containers) != 1 {
-					containerNames := getContainerNames(t.Spec.Containers)
-					initContainerNames := getContainerNames(t.Spec.InitContainers)
-					ephemeralContainerNames := getContainerNames(ephemeralContainersToContainers(t.Spec.EphemeralContainers))
-					err := fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", t.Name, containerNames)
-					if len(initContainerNames) > 0 {
-						err += fmt.Sprintf(" or one of the init containers: [%s]", initContainerNames)
-					}
-					if len(ephemeralContainerNames) > 0 {
-						err += fmt.Sprintf(" or one of the ephemeral containers: [%s]", ephemeralContainerNames)
-					}
-
-					return nil, errors.New(err)
-				}
+				// Default to the first container name(aligning behavior with `kubectl exec').
 				currOpts.Container = t.Spec.Containers[0].Name
+				if len(t.Spec.Containers) > 1 || len(t.Spec.InitContainers) > 0 || len(t.Spec.EphemeralContainers) > 0 {
+					fmt.Fprintf(os.Stderr, "Defaulted container %q out of: %s\n", currOpts.Container, podcmd.AllContainerNames(t))
+				}
 			}
 
 			container, fieldPath := podcmd.FindContainerByName(t, currOpts.Container)
@@ -190,21 +166,4 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 	}
 
 	return logsForObjectWithClient(clientset, pod, options, timeout, allContainers)
-}
-
-// getContainerNames returns a formatted string containing the container names
-func getContainerNames(containers []corev1.Container) string {
-	names := []string{}
-	for _, c := range containers {
-		names = append(names, c.Name)
-	}
-	return strings.Join(names, " ")
-}
-
-func ephemeralContainersToContainers(containers []corev1.EphemeralContainer) []corev1.Container {
-	var ec []corev1.Container
-	for i := range containers {
-		ec = append(ec, corev1.Container(containers[i].EphemeralContainerCommon))
-	}
-	return ec
 }

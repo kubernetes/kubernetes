@@ -5,9 +5,7 @@ reviewers:
   - neolit123
   - johnSchnake
   - SataQiu
-  - tanjunchen
 approvers:
-  - alejandrox1
   - andrewsykim
   - aojea
   - BenTheElder
@@ -17,7 +15,6 @@ approvers:
   - dims
   - MrHohn
   - deads2k
-  - enisoc
   - enj
   - janetkuo
   - liggitt
@@ -32,7 +29,6 @@ approvers:
   - smarterclayton
   - soltysh
   - sttts
-  - timothysc
 emeritus_approvers:
   - eparis
   - foxish
@@ -47,7 +43,9 @@ emeritus_approvers:
   - ncdc
   - vishh
   - shyamjvs
-
+  - enisoc
+  - alejandrox1
+  - timothysc
 labels:
-- area/test
-- sig/testing
+  - area/test
+  - sig/testing

@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -72,10 +71,11 @@ func (pt probeType) RetprobeBit() (uint64, error) {
 // given kernel symbol starts executing. See /proc/kallsyms for available
 // symbols. For example, printk():
 //
-//	Kprobe("printk", prog)
+//	kp, err := Kprobe("printk", prog)
 //
-// The resulting Link must be Closed during program shutdown to avoid leaking
-// system resources.
+// Losing the reference to the resulting Link (kp) will close the Kprobe
+// and prevent further execution of prog. The Link must be Closed during
+// program shutdown to avoid leaking system resources.
 func Kprobe(symbol string, prog *ebpf.Program) (Link, error) {
 	k, err := kprobe(symbol, prog, false)
 	if err != nil {
@@ -95,10 +95,11 @@ func Kprobe(symbol string, prog *ebpf.Program) (Link, error) {
 // before the given kernel symbol exits, with the function stack left intact.
 // See /proc/kallsyms for available symbols. For example, printk():
 //
-//	Kretprobe("printk", prog)
+//	kp, err := Kretprobe("printk", prog)
 //
-// The resulting Link must be Closed during program shutdown to avoid leaking
-// system resources.
+// Losing the reference to the resulting Link (kp) will close the Kretprobe
+// and prevent further execution of prog. The Link must be Closed during
+// program shutdown to avoid leaking system resources.
 func Kretprobe(symbol string, prog *ebpf.Program) (Link, error) {
 	k, err := kprobe(symbol, prog, true)
 	if err != nil {
@@ -157,7 +158,7 @@ func kprobe(symbol string, prog *ebpf.Program, ret bool) (*perfEvent, error) {
 // pmuKprobe opens a perf event based on the kprobe PMU.
 // Returns os.ErrNotExist if the given symbol does not exist in the kernel.
 func pmuKprobe(symbol string, ret bool) (*perfEvent, error) {
-	return pmuProbe(kprobeType, symbol, "", 0, ret)
+	return pmuProbe(kprobeType, symbol, "", 0, perfAllThreads, ret)
 }
 
 // pmuProbe opens a perf event based on a Performance Monitoring Unit.
@@ -167,7 +168,7 @@ func pmuKprobe(symbol string, ret bool) (*perfEvent, error) {
 // 33ea4b24277b "perf/core: Implement the 'perf_uprobe' PMU"
 //
 // Returns ErrNotSupported if the kernel doesn't support perf_[k,u]probe PMU
-func pmuProbe(typ probeType, symbol, path string, offset uint64, ret bool) (*perfEvent, error) {
+func pmuProbe(typ probeType, symbol, path string, offset uint64, pid int, ret bool) (*perfEvent, error) {
 	// Getting the PMU type will fail if the kernel doesn't support
 	// the perf_[k,u]probe PMU.
 	et, err := getPMUEventType(typ)
@@ -191,7 +192,7 @@ func pmuProbe(typ probeType, symbol, path string, offset uint64, ret bool) (*per
 	switch typ {
 	case kprobeType:
 		// Create a pointer to a NUL-terminated string for the kernel.
-		sp, err := unsafeStringPtr(symbol)
+		sp, err = unsafeStringPtr(symbol)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +203,7 @@ func pmuProbe(typ probeType, symbol, path string, offset uint64, ret bool) (*per
 			Config: config,              // Retprobe flag
 		}
 	case uprobeType:
-		sp, err := unsafeStringPtr(path)
+		sp, err = unsafeStringPtr(path)
 		if err != nil {
 			return nil, err
 		}
@@ -220,13 +221,18 @@ func pmuProbe(typ probeType, symbol, path string, offset uint64, ret bool) (*per
 		}
 	}
 
-	fd, err := unix.PerfEventOpen(&attr, perfAllThreads, 0, -1, unix.PERF_FLAG_FD_CLOEXEC)
+	fd, err := unix.PerfEventOpen(&attr, pid, 0, -1, unix.PERF_FLAG_FD_CLOEXEC)
 
 	// Since commit 97c753e62e6c, ENOENT is correctly returned instead of EINVAL
 	// when trying to create a kretprobe for a missing symbol. Make sure ENOENT
 	// is returned to the caller.
 	if errors.Is(err, os.ErrNotExist) || errors.Is(err, unix.EINVAL) {
 		return nil, fmt.Errorf("symbol '%s' not found: %w", symbol, os.ErrNotExist)
+	}
+	// Since at least commit cb9a19fe4aa51, ENOTSUPP is returned
+	// when attempting to set a uprobe on a trap instruction.
+	if errors.Is(err, unix.ENOTSUPP) {
+		return nil, fmt.Errorf("failed setting uprobe on offset %#x (possible trap insn): %w", offset, err)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("opening perf event: %w", err)
@@ -246,7 +252,7 @@ func pmuProbe(typ probeType, symbol, path string, offset uint64, ret bool) (*per
 
 // tracefsKprobe creates a Kprobe tracefs entry.
 func tracefsKprobe(symbol string, ret bool) (*perfEvent, error) {
-	return tracefsProbe(kprobeType, symbol, "", 0, ret)
+	return tracefsProbe(kprobeType, symbol, "", 0, perfAllThreads, ret)
 }
 
 // tracefsProbe creates a trace event by writing an entry to <tracefs>/[k,u]probe_events.
@@ -255,7 +261,7 @@ func tracefsKprobe(symbol string, ret bool) (*perfEvent, error) {
 // Path and offset are only set in the case of uprobe(s) and are used to set
 // the executable/library path on the filesystem and the offset where the probe is inserted.
 // A perf event is then opened on the newly-created trace event and returned to the caller.
-func tracefsProbe(typ probeType, symbol, path string, offset uint64, ret bool) (*perfEvent, error) {
+func tracefsProbe(typ probeType, symbol, path string, offset uint64, pid int, ret bool) (*perfEvent, error) {
 	// Generate a random string for each trace event we attempt to create.
 	// This value is used as the 'group' token in tracefs to allow creating
 	// multiple kprobe trace events with the same name.
@@ -288,7 +294,7 @@ func tracefsProbe(typ probeType, symbol, path string, offset uint64, ret bool) (
 	}
 
 	// Kprobes are ephemeral tracepoints and share the same perf event type.
-	fd, err := openTracepointPerfEvent(tid)
+	fd, err := openTracepointPerfEvent(tid, pid)
 	if err != nil {
 		return nil, err
 	}
@@ -413,7 +419,7 @@ func probePrefix(ret bool) string {
 func determineRetprobeBit(typ probeType) (uint64, error) {
 	p := filepath.Join("/sys/bus/event_source/devices/", typ.String(), "/format/retprobe")
 
-	data, err := ioutil.ReadFile(p)
+	data, err := os.ReadFile(p)
 	if err != nil {
 		return 0, err
 	}

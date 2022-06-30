@@ -260,7 +260,12 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 
 		// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/*
 		fullContainerDirPath := filepath.Join(subPathDir, containerDir.Name())
-		err = filepath.Walk(fullContainerDirPath, func(path string, info os.FileInfo, _ error) error {
+		// The original traversal method here was ReadDir, which was not so robust to handle some error such as "stale NFS file handle",
+		// so it was replaced with filepath.Walk in a later patch, which can pass through error and handled by the callback WalkFunc.
+		// After go 1.16, WalkDir was introduced, it's more effective than Walk because the callback WalkDirFunc is called before
+		// reading a directory, making it save some time when a container's subPath contains lots of dirs.
+		// See https://github.com/kubernetes/kubernetes/pull/71804 and https://github.com/kubernetes/kubernetes/issues/107667 for more details.
+		err = filepath.WalkDir(fullContainerDirPath, func(path string, info os.DirEntry, _ error) error {
 			if path == fullContainerDirPath {
 				// Skip top level directory
 				return nil

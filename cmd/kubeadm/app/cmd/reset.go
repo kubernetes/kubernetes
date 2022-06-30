@@ -64,6 +64,7 @@ type resetOptions struct {
 	forceReset            bool
 	ignorePreflightErrors []string
 	kubeconfigPath        string
+	dryRun                bool
 }
 
 // resetData defines all the runtime information used when running the kubeadm reset workflow;
@@ -78,6 +79,7 @@ type resetData struct {
 	outputWriter          io.Writer
 	cfg                   *kubeadmapi.InitConfiguration
 	dirsToClean           []string
+	dryRun                bool
 }
 
 // newResetOptions returns a struct ready for being used for creating cmd join flags.
@@ -96,7 +98,7 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 	client, err := getClientset(options.kubeconfigPath, false)
 	if err == nil {
 		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", options.kubeconfigPath)
-		cfg, err = configutil.FetchInitConfigurationFromCluster(client, out, "reset", false, false)
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "reset", false, false)
 		if err != nil {
 			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
 		}
@@ -134,6 +136,7 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		inputReader:           in,
 		outputWriter:          out,
 		cfg:                   cfg,
+		dryRun:                options.dryRun,
 	}, nil
 }
 
@@ -153,6 +156,10 @@ func AddResetFlags(flagSet *flag.FlagSet, resetOptions *resetOptions) {
 	flagSet.BoolVarP(
 		&resetOptions.forceReset, options.ForceReset, "f", false,
 		"Reset the node without prompting for confirmation.",
+	)
+	flagSet.BoolVar(
+		&resetOptions.dryRun, options.DryRun, resetOptions.dryRun,
+		"Don't apply any changes; just output what would be done.",
 	)
 
 	options.AddKubeConfigFlag(flagSet, &resetOptions.kubeconfigPath)
@@ -214,6 +221,11 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 }
 
 func cleanDirs(data *resetData) {
+	if data.DryRun() {
+		fmt.Printf("[reset] Would delete contents of stateful directories: %v\n", data.dirsToClean)
+		return
+	}
+
 	fmt.Printf("[reset] Deleting contents of stateful directories: %v\n", data.dirsToClean)
 	for _, dir := range data.dirsToClean {
 		klog.V(1).Infof("[reset] Deleting contents of %s", dir)
@@ -226,6 +238,11 @@ func cleanDirs(data *resetData) {
 // Cfg returns the InitConfiguration.
 func (r *resetData) Cfg() *kubeadmapi.InitConfiguration {
 	return r.cfg
+}
+
+// DryRun returns the DryRun flag.
+func (r *resetData) DryRun() bool {
+	return r.dryRun
 }
 
 // CertificatesDir returns the CertificatesDir.

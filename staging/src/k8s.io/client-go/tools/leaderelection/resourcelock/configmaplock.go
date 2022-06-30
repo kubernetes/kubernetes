@@ -32,7 +32,7 @@ import (
 // and use ConfigMaps as the means to pass that configuration
 // data we will likely move to deprecate the Endpoints lock.
 
-type ConfigMapLock struct {
+type configMapLock struct {
 	// ConfigMapMeta should contain a Name and a Namespace of a
 	// ConfigMapMeta object that the LeaderElector will attempt to lead.
 	ConfigMapMeta metav1.ObjectMeta
@@ -42,7 +42,7 @@ type ConfigMapLock struct {
 }
 
 // Get returns the election record from a ConfigMap Annotation
-func (cml *ConfigMapLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, error) {
+func (cml *configMapLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, error) {
 	var record LeaderElectionRecord
 	var err error
 	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Get(ctx, cml.ConfigMapMeta.Name, metav1.GetOptions{})
@@ -63,7 +63,7 @@ func (cml *ConfigMapLock) Get(ctx context.Context) (*LeaderElectionRecord, []byt
 }
 
 // Create attempts to create a LeaderElectionRecord annotation
-func (cml *ConfigMapLock) Create(ctx context.Context, ler LeaderElectionRecord) error {
+func (cml *configMapLock) Create(ctx context.Context, ler LeaderElectionRecord) error {
 	recordBytes, err := json.Marshal(ler)
 	if err != nil {
 		return err
@@ -81,7 +81,7 @@ func (cml *ConfigMapLock) Create(ctx context.Context, ler LeaderElectionRecord) 
 }
 
 // Update will update an existing annotation on a given resource.
-func (cml *ConfigMapLock) Update(ctx context.Context, ler LeaderElectionRecord) error {
+func (cml *configMapLock) Update(ctx context.Context, ler LeaderElectionRecord) error {
 	if cml.cm == nil {
 		return errors.New("configmap not initialized, call get or create first")
 	}
@@ -102,7 +102,7 @@ func (cml *ConfigMapLock) Update(ctx context.Context, ler LeaderElectionRecord) 
 }
 
 // RecordEvent in leader election while adding meta-data
-func (cml *ConfigMapLock) RecordEvent(s string) {
+func (cml *configMapLock) RecordEvent(s string) {
 	if cml.LockConfig.EventRecorder == nil {
 		return
 	}
@@ -116,11 +116,11 @@ func (cml *ConfigMapLock) RecordEvent(s string) {
 
 // Describe is used to convert details on current resource lock
 // into a string
-func (cml *ConfigMapLock) Describe() string {
+func (cml *configMapLock) Describe() string {
 	return fmt.Sprintf("%v/%v", cml.ConfigMapMeta.Namespace, cml.ConfigMapMeta.Name)
 }
 
 // Identity returns the Identity of the lock
-func (cml *ConfigMapLock) Identity() string {
+func (cml *configMapLock) Identity() string {
 	return cml.LockConfig.Identity
 }

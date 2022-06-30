@@ -1,12 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-- thockin
-- lavalamp
-- smarterclayton
-- wojtek-t
-- derekwaynecarr
-- mikedanese
-- saad-ali
-- janetkuo
-- xiang90
+  - thockin
+  - lavalamp
+  - smarterclayton
+  - wojtek-t
+  - derekwaynecarr
+  - mikedanese
+  - saad-ali
+  - janetkuo

@@ -27,7 +27,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 
 	"math/rand"
 	"os"
@@ -40,6 +39,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -47,6 +47,7 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	"k8s.io/kubernetes/test/e2e_node/services"
@@ -63,6 +64,8 @@ import (
 
 var (
 	e2es *services.E2EServices
+	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	featureGates map[string]bool
 
 	// TODO(random-liu): Change the following modes to sub-command.
 	runServicesMode    = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
@@ -93,6 +96,7 @@ func registerNodeFlags(flags *flag.FlagSet) {
 	flag.StringVar(&framework.TestContext.ClusterDNSDomain, "dns-domain", "", "The DNS Domain of the cluster.")
 	flag.Var(cliflag.NewMapStringString(&framework.TestContext.RuntimeConfig), "runtime-config", "The runtime configuration used on node e2e tests.")
 	flags.BoolVar(&framework.TestContext.RequireDevices, "require-devices", false, "If true, require device plugins to be installed in the running environment.")
+	flags.Var(cliflag.NewMapStringBool(&featureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 }
 
 func init() {
@@ -119,6 +123,10 @@ func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	pflag.Parse()
 	framework.AfterReadingAllFlags(&framework.TestContext)
+	if err := e2eskipper.InitFeatureGates(utilfeature.DefaultFeatureGate, featureGates); err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: initialize feature gates: %v", err)
+		os.Exit(1)
+	}
 	setExtraEnvs()
 	os.Exit(m.Run())
 }
@@ -141,7 +149,7 @@ func TestE2eNode(t *testing.T) {
 	}
 	if *runKubeletMode {
 		// If run-kubelet-mode is specified, only start kubelet.
-		services.RunKubelet()
+		services.RunKubelet(featureGates)
 		return
 	}
 	if *systemValidateMode {
@@ -163,7 +171,7 @@ func TestE2eNode(t *testing.T) {
 				klog.Exitf("chroot %q failed: %v", rootfs, err)
 			}
 		}
-		if _, err := system.ValidateSpec(*spec, framework.TestContext.ContainerRuntime); len(err) != 0 {
+		if _, err := system.ValidateSpec(*spec, "remote"); len(err) != 0 {
 			klog.Exitf("system validation failed: %v", err)
 		}
 		return
@@ -210,7 +218,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		// If the services are expected to stop after test, they should monitor the test process.
 		// If the services are expected to keep running after test, they should not monitor the test process.
 		e2es = services.NewE2EServices(*stopServices)
-		gomega.Expect(e2es.Start()).To(gomega.Succeed(), "should be able to start node services.")
+		gomega.Expect(e2es.Start(featureGates)).To(gomega.Succeed(), "should be able to start node services.")
 	} else {
 		klog.Infof("Running tests without starting services.")
 	}
@@ -260,7 +268,7 @@ func validateSystem() error {
 }
 
 func maskLocksmithdOnCoreos() {
-	data, err := ioutil.ReadFile("/etc/os-release")
+	data, err := os.ReadFile("/etc/os-release")
 	if err != nil {
 		// Not all distros contain this file.
 		klog.Infof("Could not read /etc/os-release: %v", err)
@@ -350,7 +358,7 @@ func getAPIServerClient() (*clientset.Clientset, error) {
 // loadSystemSpecFromFile returns the system spec from the file with the
 // filename.
 func loadSystemSpecFromFile(filename string) (*system.SysSpec, error) {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

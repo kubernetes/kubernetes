@@ -408,7 +408,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	assert.True(t, reflectorRunning())
 }
 
-func TestReflectorNotStopedOnSlowInitialization(t *testing.T) {
+func TestReflectorNotStoppedOnSlowInitialization(t *testing.T) {
 	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "name",

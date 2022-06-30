@@ -55,7 +55,8 @@ func (s *replicaSetLister) GetPodReplicaSets(pod *v1.Pod) ([]*apps.ReplicaSet, e
 		}
 		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
-			return nil, fmt.Errorf("invalid selector: %v", err)
+			// This object has an invalid selector, it does not match the pod
+			continue
 		}
 
 		// If a ReplicaSet with a nil or empty selector creeps in, it should match nothing, not everything.

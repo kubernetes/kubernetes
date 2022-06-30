@@ -18,10 +18,13 @@ package portworx
 
 import (
 	"fmt"
+	"net"
+	"os"
+	"strconv"
+
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
-	"os"
 
 	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
 	v1 "k8s.io/api/core/v1"
@@ -64,13 +67,12 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 }
 
 func (plugin *portworxVolumePlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx)
 }
 
 func (plugin *portworxVolumePlugin) Init(host volume.VolumeHost) error {
 	client, err := volumeclient.NewDriverClient(
-		fmt.Sprintf("http://%s:%d", host.GetHostName(), osdMgmtDefaultPort),
+		fmt.Sprintf("http://%s", net.JoinHostPort(host.GetHostName(), strconv.Itoa(osdMgmtDefaultPort))),
 		pxdDriverName, osdDriverVersion, pxDriverName)
 	if err != nil {
 		return err
@@ -287,17 +289,10 @@ var _ volume.Mounter = &portworxVolumeMounter{}
 
 func (b *portworxVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         !b.readOnly,
-		SupportsSELinux: false,
+		ReadOnly:       b.readOnly,
+		Managed:        !b.readOnly,
+		SELinuxRelabel: false,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *portworxVolumeMounter) CanMount() error {
-	return nil
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.

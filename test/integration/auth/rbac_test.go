@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	gopath "path"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -47,7 +47,7 @@ import (
 	"k8s.io/client-go/transport"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
@@ -62,11 +62,11 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func clientForToken(user string) *http.Client {
+func clientForToken(user string, rt http.RoundTripper) *http.Client {
 	return &http.Client{
 		Transport: transport.NewBearerAuthRoundTripper(
 			user,
-			transport.DebugWrappers(http.DefaultTransport),
+			transport.DebugWrappers(rt),
 		),
 	}
 }
@@ -518,139 +518,152 @@ func TestRBAC(t *testing.T) {
 	}
 
 	for i, tc := range tests {
-		// Create an API Server.
-		controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-		controlPlaneConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, controlPlaneConfig)
-		controlPlaneConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
-			superUser:                          {Name: "admin", Groups: []string{"system:masters"}},
-			"any-rolebinding-writer":           {Name: "any-rolebinding-writer"},
-			"any-rolebinding-writer-namespace": {Name: "any-rolebinding-writer-namespace"},
-			"bob":                              {Name: "bob"},
-			"job-writer":                       {Name: "job-writer"},
-			"job-writer-namespace":             {Name: "job-writer-namespace"},
-			"nonescalating-rolebinding-writer": {Name: "nonescalating-rolebinding-writer"},
-			"pod-reader":                       {Name: "pod-reader"},
-			"limitrange-updater":               {Name: "limitrange-updater"},
-			"limitrange-patcher":               {Name: "limitrange-patcher"},
-			"user-with-no-permissions":         {Name: "user-with-no-permissions"},
-		}))
-		controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-		_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-		defer closeFn()
+		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+			authenticator := group.NewAuthenticatedGroupAdder(bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+				superUser:                          {Name: "admin", Groups: []string{"system:masters"}},
+				"any-rolebinding-writer":           {Name: "any-rolebinding-writer"},
+				"any-rolebinding-writer-namespace": {Name: "any-rolebinding-writer-namespace"},
+				"bob":                              {Name: "bob"},
+				"job-writer":                       {Name: "job-writer"},
+				"job-writer-namespace":             {Name: "job-writer-namespace"},
+				"nonescalating-rolebinding-writer": {Name: "nonescalating-rolebinding-writer"},
+				"pod-reader":                       {Name: "pod-reader"},
+				"limitrange-updater":               {Name: "limitrange-updater"},
+				"limitrange-patcher":               {Name: "limitrange-patcher"},
+				"user-with-no-permissions":         {Name: "user-with-no-permissions"},
+			})))
 
-		clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
+			_, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+					// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+					// Also disable namespace lifecycle to workaroung the test limitation that first creates
+					// roles/rolebindings and only then creates corresponding namespaces.
+					opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "NamespaceLifecycle"}
+				},
+				ModifyServerConfig: func(config *controlplane.Config) {
+					config.GenericConfig.Authentication.Authenticator = authenticator
+					config.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, config)
+				},
+			})
+			defer tearDownFn()
 
-		// Bootstrap the API Server with the test case's initial roles.
-		superuserClient, _ := clientsetForToken(superUser, clientConfig)
-		if err := tc.bootstrapRoles.bootstrap(superuserClient); err != nil {
-			t.Errorf("case %d: failed to apply initial roles: %v", i, err)
-			continue
-		}
-		previousResourceVersion := make(map[string]float64)
-
-		for j, r := range tc.requests {
-			path := "/"
-			if r.apiGroup == "" {
-				path = gopath.Join(path, "api/v1")
-			} else {
-				path = gopath.Join(path, "apis", r.apiGroup, "v1")
-			}
-			if r.namespace != "" {
-				path = gopath.Join(path, "namespaces", r.namespace)
-			}
-			if r.resource != "" {
-				path = gopath.Join(path, r.resource)
-			}
-			if r.name != "" {
-				path = gopath.Join(path, r.name)
-			}
-
-			var body io.Reader
-			if r.body != "" {
-				sub := ""
-				if r.verb == "PUT" {
-					// For update operations, insert previous resource version
-					if resVersion := previousResourceVersion[getPreviousResourceVersionKey(path, "")]; resVersion != 0 {
-						sub += fmt.Sprintf(",\"resourceVersion\": \"%v\"", resVersion)
-					}
-				}
-				body = strings.NewReader(fmt.Sprintf(r.body, sub))
-			}
-
-			req, err := http.NewRequest(r.verb, s.URL+path, body)
-			if r.verb == "PATCH" {
-				// For patch operations, use the apply content type
-				req.Header.Add("Content-Type", string(types.ApplyPatchType))
-				q := req.URL.Query()
-				q.Add("fieldManager", "rbac_test")
-				req.URL.RawQuery = q.Encode()
-			}
-
+			transport, err := restclient.TransportFor(kubeConfig)
 			if err != nil {
-				t.Fatalf("failed to create request: %v", err)
+				t.Fatal(err)
 			}
 
-			func() {
-				reqDump, err := httputil.DumpRequest(req, true)
-				if err != nil {
-					t.Fatalf("failed to dump request: %v", err)
-					return
+			// Bootstrap the API Server with the test case's initial roles.
+			superuserClient, _ := clientsetForToken(superUser, kubeConfig)
+			if err := tc.bootstrapRoles.bootstrap(superuserClient); err != nil {
+				t.Errorf("case %d: failed to apply initial roles: %v", i, err)
+				return
+			}
+			previousResourceVersion := make(map[string]float64)
+
+			for j, r := range tc.requests {
+				path := "/"
+				if r.apiGroup == "" {
+					path = gopath.Join(path, "api/v1")
+				} else {
+					path = gopath.Join(path, "apis", r.apiGroup, "v1")
+				}
+				if r.namespace != "" {
+					path = gopath.Join(path, "namespaces", r.namespace)
+				}
+				if r.resource != "" {
+					path = gopath.Join(path, r.resource)
+				}
+				if r.name != "" {
+					path = gopath.Join(path, r.name)
 				}
 
-				resp, err := clientForToken(r.token).Do(req)
-				if err != nil {
-					t.Errorf("case %d, req %d: failed to make request: %v", i, j, err)
-					return
-				}
-				defer resp.Body.Close()
-
-				respDump, err := httputil.DumpResponse(resp, true)
-				if err != nil {
-					t.Fatalf("failed to dump response: %v", err)
-					return
-				}
-
-				if resp.StatusCode != r.expectedStatus {
-					// When debugging is on, dump the entire request and response. Very helpful for
-					// debugging malformed test cases.
-					//
-					// To turn on debugging, use the '-args' flag.
-					//
-					//    go test -v -tags integration -run RBAC -args -v 10
-					//
-					klog.V(8).Infof("case %d, req %d: %s\n%s\n", i, j, reqDump, respDump)
-					t.Errorf("case %d, req %d: %s expected %q got %q", i, j, r, statusCode(r.expectedStatus), statusCode(resp.StatusCode))
-				}
-
-				b, _ := ioutil.ReadAll(resp.Body)
-
-				if r.verb == "POST" && (resp.StatusCode/100) == 2 {
-					// For successful create operations, extract resourceVersion
-					id, currentResourceVersion, err := parseResourceVersion(b)
-					if err == nil {
-						key := getPreviousResourceVersionKey(path, id)
-						previousResourceVersion[key] = currentResourceVersion
-					} else {
-						t.Logf("error in trying to extract resource version: %s", err)
+				var body io.Reader
+				if r.body != "" {
+					sub := ""
+					if r.verb == "PUT" {
+						// For update operations, insert previous resource version
+						if resVersion := previousResourceVersion[getPreviousResourceVersionKey(path, "")]; resVersion != 0 {
+							sub += fmt.Sprintf(",\"resourceVersion\": \"%v\"", resVersion)
+						}
 					}
+					body = strings.NewReader(fmt.Sprintf(r.body, sub))
 				}
-			}()
-		}
+
+				req, err := http.NewRequest(r.verb, kubeConfig.Host+path, body)
+				if r.verb == "PATCH" {
+					// For patch operations, use the apply content type
+					req.Header.Add("Content-Type", string(types.ApplyPatchType))
+					q := req.URL.Query()
+					q.Add("fieldManager", "rbac_test")
+					req.URL.RawQuery = q.Encode()
+				}
+
+				if err != nil {
+					t.Fatalf("failed to create request: %v", err)
+				}
+
+				func() {
+					reqDump, err := httputil.DumpRequest(req, true)
+					if err != nil {
+						t.Fatalf("failed to dump request: %v", err)
+						return
+					}
+
+					resp, err := clientForToken(r.token, transport).Do(req)
+					if err != nil {
+						t.Errorf("case %d, req %d: failed to make request: %v", i, j, err)
+						return
+					}
+					defer resp.Body.Close()
+
+					respDump, err := httputil.DumpResponse(resp, true)
+					if err != nil {
+						t.Fatalf("failed to dump response: %v", err)
+						return
+					}
+
+					if resp.StatusCode != r.expectedStatus {
+						// When debugging is on, dump the entire request and response. Very helpful for
+						// debugging malformed test cases.
+						//
+						// To turn on debugging, use the '-args' flag.
+						//
+						//    go test -v -tags integration -run RBAC -args -v 10
+						//
+						klog.V(8).Infof("case %d, req %d: %s\n%s\n", i, j, reqDump, respDump)
+						t.Errorf("case %d, req %d: %s expected %q got %q", i, j, r, statusCode(r.expectedStatus), statusCode(resp.StatusCode))
+					}
+
+					b, _ := io.ReadAll(resp.Body)
+
+					if r.verb == "POST" && (resp.StatusCode/100) == 2 {
+						// For successful create operations, extract resourceVersion
+						id, currentResourceVersion, err := parseResourceVersion(b)
+						if err == nil {
+							key := getPreviousResourceVersionKey(path, id)
+							previousResourceVersion[key] = currentResourceVersion
+						} else {
+							t.Logf("error in trying to extract resource version: %s", err)
+						}
+					}
+				}()
+			}
+		})
 	}
 }
 
 func TestBootstrapping(t *testing.T) {
 	superUser := "admin/system:masters"
 
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, controlPlaneConfig)
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
-		superUser: {Name: "admin", Groups: []string{"system:masters"}},
-	}))
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
-
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL})
+	clientset, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+				superUser: {Name: "admin", Groups: []string{"system:masters"}},
+			}))
+			config.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, config)
+		},
+	})
+	defer tearDownFn()
 
 	watcher, err := clientset.RbacV1().ClusterRoles().Watch(context.TODO(), metav1.ListOptions{ResourceVersion: "0"})
 	if err != nil {
@@ -703,14 +716,19 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 
 	superUser := "admin/system:masters"
 
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, controlPlaneConfig)
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
-		superUser: {Name: "admin", Groups: []string{"system:masters"}},
-	}))
-	_, s, tearDownFn := framework.RunAnAPIServer(controlPlaneConfig)
-
-	client := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL})
+	etcdConfig := framework.SharedEtcd()
+	client, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Ensure we're using the same etcd across apiserver restarts.
+			opts.Etcd.StorageConfig = *etcdConfig
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+				superUser: {Name: "admin", Groups: []string{"system:masters"}},
+			}))
+			config.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, config)
+		},
+	})
 
 	// Modify the default RBAC discovery ClusterRoleBidnings to look more like the defaults that
 	// existed prior to v1.14, but with user modifications.
@@ -752,9 +770,18 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 
 	// Check that upgraded API servers inherit `system:public-info-viewer` settings from
 	// `system:discovery`, and respect auto-reconciliation annotations.
-	_, s, tearDownFn = framework.RunAnAPIServer(controlPlaneConfig)
-
-	client = clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL})
+	client, _, tearDownFn = framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Ensure we're using the same etcd across apiserver restarts.
+			opts.Etcd.StorageConfig = *etcdConfig
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
+				superUser: {Name: "admin", Groups: []string{"system:masters"}},
+			}))
+			config.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, config)
+		},
+	})
 
 	newDiscRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get(context.TODO(), "system:discovery", metav1.GetOptions{})
 	if err != nil {

@@ -51,6 +51,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -88,6 +89,7 @@ var httpProbe = &v1.Probe{
 // GCE Api requirements: nodes and master need storage r/w permissions.
 var _ = SIGDescribe("StatefulSet", func() {
 	f := framework.NewDefaultFramework("statefulset")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var ns string
 	var c clientset.Interface
 

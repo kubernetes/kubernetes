@@ -46,6 +46,7 @@ import (
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/utils/pointer"
 
@@ -70,6 +71,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	})
 
 	f := framework.NewDefaultFramework("aggregator")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	// We want namespace initialization BeforeEach inserted by
 	// NewDefaultFramework to happen before this, so we put this BeforeEach
@@ -512,7 +514,9 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 			break
 		}
 	}
-	framework.ExpectEqual(locatedWardle, true, "Unable to find v1alpha1.wardle.example.com in APIServiceList")
+	if !locatedWardle {
+		framework.Failf("Unable to find v1alpha1.wardle.example.com in APIServiceList")
+	}
 
 	// kubectl delete flunder test-flunder
 	err = dynamicClient.Delete(context.TODO(), flunderName, metav1.DeleteOptions{})

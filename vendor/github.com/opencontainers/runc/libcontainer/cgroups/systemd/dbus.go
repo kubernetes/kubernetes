@@ -1,9 +1,9 @@
-// +build linux
-
 package systemd
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 
 	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
@@ -54,7 +54,10 @@ func (d *dbusConnManager) getConnection() (*systemdDbus.Conn, error) {
 
 	conn, err := d.newConnection()
 	if err != nil {
-		return nil, err
+		// When dbus-user-session is not installed, we can't detect whether we should try to connect to user dbus or system dbus, so d.dbusRootless is set to false.
+		// This may fail with a cryptic error "read unix @->/run/systemd/private: read: connection reset by peer: unknown."
+		// https://github.com/moby/moby/issues/42793
+		return nil, fmt.Errorf("failed to connect to dbus (hint: for rootless containers, maybe you need to install dbus-user-session package, see https://github.com/opencontainers/runc/blob/master/docs/cgroup-v2.md): %w", err)
 	}
 	dbusC = conn
 	return conn, nil
@@ -78,8 +81,6 @@ func (d *dbusConnManager) resetConnection(conn *systemdDbus.Conn) {
 	}
 }
 
-var errDbusConnClosed = dbus.ErrClosed.Error()
-
 // retryOnDisconnect calls op, and if the error it returns is about closed dbus
 // connection, the connection is re-established and the op is retried. This helps
 // with the situation when dbus is restarted and we have a stale connection.
@@ -90,7 +91,10 @@ func (d *dbusConnManager) retryOnDisconnect(op func(*systemdDbus.Conn) error) er
 			return err
 		}
 		err = op(conn)
-		if !isDbusError(err, errDbusConnClosed) {
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, dbus.ErrClosed) {
 			return err
 		}
 		d.resetConnection(conn)

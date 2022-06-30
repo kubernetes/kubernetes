@@ -18,6 +18,7 @@ package statusupdater
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func NewFakeNodeStatusUpdater(returnError bool) NodeStatusUpdater {
@@ -31,6 +32,14 @@ type fakeNodeStatusUpdater struct {
 }
 
 func (fnsu *fakeNodeStatusUpdater) UpdateNodeStatuses() error {
+	if fnsu.returnError {
+		return fmt.Errorf("fake error on update node status")
+	}
+
+	return nil
+}
+
+func (fnsu *fakeNodeStatusUpdater) UpdateNodeStatusForNode(nodeName types.NodeName) error {
 	if fnsu.returnError {
 		return fmt.Errorf("fake error on update node status")
 	}

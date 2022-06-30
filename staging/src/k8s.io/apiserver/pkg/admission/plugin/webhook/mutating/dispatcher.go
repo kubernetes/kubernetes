@@ -178,7 +178,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 			if ignoreClientCallFailures {
 				klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
-
+				admissionmetrics.Metrics.ObserveWebhookFailOpen(ctx, hook.Name, "admit")
 				annotator.addFailedOpenAnnotation()
 
 				utilruntime.HandleError(callErr)
@@ -265,9 +265,9 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	}
 
 	do := func() { err = r.Do(ctx).Into(response) }
-	if wd, ok := endpointsrequest.WebhookDurationFrom(ctx); ok {
+	if wd, ok := endpointsrequest.LatencyTrackersFrom(ctx); ok {
 		tmp := do
-		do = func() { wd.AdmitTracker.Track(tmp) }
+		do = func() { wd.MutatingWebhookTracker.Track(tmp) }
 	}
 	do()
 	if err != nil {

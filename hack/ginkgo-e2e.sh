@@ -45,7 +45,7 @@ GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
 # - `dlv exec` if set to "delve"
 # - `gdb` if set to "gdb"
 # NOTE: for this to work the e2e.test binary has to be compiled with
-# make WHAT=test/e2e/e2e.test GOGCFLAGS="all=-N -l" GOLDFLAGS=""
+# make DBG=1 WHAT=test/e2e/e2e.test
 E2E_TEST_DEBUG_TOOL=${E2E_TEST_DEBUG_TOOL:-}
 
 : "${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}"
@@ -151,8 +151,6 @@ if [[ "${GINKGO_NO_COLOR}" == "y" ]]; then
   ginkgo_args+=("--noColor")
 fi
 
-CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-${KUBE_CONTAINER_RUNTIME:-}}
-
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.
@@ -191,7 +189,6 @@ fi
   --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
   --prepull-images="${PREPULL_IMAGES:-false}" \
   --ginkgo.slowSpecThreshold="${GINKGO_SLOW_SPEC_THRESHOLD:-300}" \
-  ${CONTAINER_RUNTIME:+"--container-runtime=${CONTAINER_RUNTIME}"} \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \
   ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \

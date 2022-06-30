@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	"k8s.io/klog/v2"
@@ -165,6 +166,8 @@ func makePodToVerifyCgroupRemoved(baseName string) *v1.Pod {
 
 var _ = SIGDescribe("Kubelet Cgroup Manager", func() {
 	f := framework.NewDefaultFramework("kubelet-cgroup-manager")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+
 	ginkgo.Describe("QOS containers", func() {
 		ginkgo.Context("On enabling QOS cgroup hierarchy", func() {
 			ginkgo.It("Top level QoS containers should have been created [NodeConformance]", func() {

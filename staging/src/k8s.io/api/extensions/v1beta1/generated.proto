@@ -28,7 +28,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/api/extensions/v1beta1";
 
 // AllowedCSIDriver represents a single inline CSI Driver that is allowed to be used.
 message AllowedCSIDriver {
@@ -664,6 +664,11 @@ message NetworkPolicy {
   // Specification of the desired behavior for this NetworkPolicy.
   // +optional
   optional NetworkPolicySpec spec = 2;
+
+  // Status is the current state of the NetworkPolicy.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+  // +optional
+  optional NetworkPolicyStatus status = 3;
 }
 
 // DEPRECATED 1.9 - This group version of NetworkPolicyEgressRule is deprecated by networking/v1/NetworkPolicyEgressRule.
@@ -811,6 +816,18 @@ message NetworkPolicySpec {
   // This field is beta-level in 1.8
   // +optional
   repeated string policyTypes = 4;
+}
+
+// NetworkPolicyStatus describe the current state of the NetworkPolicy.
+message NetworkPolicyStatus {
+  // Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy.
+  // Current service state
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
+  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
 
 // PodSecurityPolicy governs the ability to make requests that affect the Security Context

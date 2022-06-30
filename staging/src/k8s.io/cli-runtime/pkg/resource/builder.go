@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -44,7 +45,8 @@ import (
 var FileExtensions = []string{".json", ".yaml", ".yml"}
 var InputExtensions = append(FileExtensions, "stdin")
 
-const defaultHttpGetAttempts int = 3
+const defaultHttpGetAttempts = 3
+const pathNotExistError = "the path %q does not exist"
 
 // Builder provides convenience functions for taking arguments and parameters
 // from the command line and converting them to a list of resources to iterate
@@ -83,7 +85,8 @@ type Builder struct {
 	limitChunks       int64
 	requestTransforms []RequestTransform
 
-	resources []string
+	resources   []string
+	subresource string
 
 	namespace    string
 	allNamespace bool
@@ -255,10 +258,15 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 			}
 			b.URL(defaultHttpGetAttempts, url)
 		default:
-			if !recursive {
+			matches, err := expandIfFilePattern(s)
+			if err != nil {
+				b.errs = append(b.errs, err)
+				continue
+			}
+			if !recursive && len(matches) == 1 {
 				b.singleItemImplied = true
 			}
-			b.Path(recursive, s)
+			b.Path(recursive, matches...)
 		}
 	}
 	if filenameOptions.Kustomize != "" {
@@ -409,7 +417,7 @@ func (b *Builder) Path(recursive bool, paths ...string) *Builder {
 	for _, p := range paths {
 		_, err := os.Stat(p)
 		if os.IsNotExist(err) {
-			b.errs = append(b.errs, fmt.Errorf("the path %q does not exist", p))
+			b.errs = append(b.errs, fmt.Errorf(pathNotExistError, p))
 			continue
 		}
 		if err != nil {
@@ -552,6 +560,13 @@ func (b *Builder) RequestChunksOf(chunkSize int64) *Builder {
 // an empty list to clear modifiers.
 func (b *Builder) TransformRequests(opts ...RequestTransform) *Builder {
 	b.requestTransforms = opts
+	return b
+}
+
+// Subresource instructs the builder to retrieve the object at the
+// subresource path instead of the main resource path.
+func (b *Builder) Subresource(subresource string) *Builder {
+	b.subresource = subresource
 	return b
 }
 
@@ -886,6 +901,10 @@ func (b *Builder) visitBySelector() *Result {
 	if len(b.resources) == 0 {
 		return result.withError(fmt.Errorf("at least one resource must be specified to use a selector"))
 	}
+	if len(b.subresource) != 0 {
+		return result.withError(fmt.Errorf("subresource cannot be used when bulk resources are specified"))
+	}
+
 	mappings, err := b.resourceMappings()
 	if err != nil {
 		result.err = err
@@ -1007,10 +1026,11 @@ func (b *Builder) visitByResource() *Result {
 		}
 
 		info := &Info{
-			Client:    client,
-			Mapping:   mapping,
-			Namespace: selectorNamespace,
-			Name:      tuple.Name,
+			Client:      client,
+			Mapping:     mapping,
+			Namespace:   selectorNamespace,
+			Name:        tuple.Name,
+			Subresource: b.subresource,
 		}
 		items = append(items, info)
 	}
@@ -1071,10 +1091,11 @@ func (b *Builder) visitByName() *Result {
 	visitors := []Visitor{}
 	for _, name := range b.names {
 		info := &Info{
-			Client:    client,
-			Mapping:   mapping,
-			Namespace: selectorNamespace,
-			Name:      name,
+			Client:      client,
+			Mapping:     mapping,
+			Namespace:   selectorNamespace,
+			Name:        name,
+			Subresource: b.subresource,
 		}
 		visitors = append(visitors, info)
 	}
@@ -1155,10 +1176,9 @@ func (b *Builder) Do() *Result {
 		helpers = append(helpers, RetrieveLazy)
 	}
 	if b.continueOnError {
-		r.visitor = NewDecoratedVisitor(ContinueOnErrorVisitor{r.visitor}, helpers...)
-	} else {
-		r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
+		r.visitor = ContinueOnErrorVisitor{Visitor: r.visitor}
 	}
+	r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
 	return r
 }
 
@@ -1185,6 +1205,23 @@ func HasNames(args []string) (bool, error) {
 		return false, err
 	}
 	return hasCombinedTypes || len(args) > 1, nil
+}
+
+// expandIfFilePattern returns all the filenames that match the input pattern
+// or the filename if it is a specific filename and not a pattern.
+// If the input is a pattern and it yields no result it will result in an error.
+func expandIfFilePattern(pattern string) ([]string, error) {
+	if _, err := os.Stat(pattern); os.IsNotExist(err) {
+		matches, err := filepath.Glob(pattern)
+		if err == nil && len(matches) == 0 {
+			return nil, fmt.Errorf(pathNotExistError, pattern)
+		}
+		if err == filepath.ErrBadPattern {
+			return nil, fmt.Errorf("pattern %q is not valid: %v", pattern, err)
+		}
+		return matches, err
+	}
+	return []string{pattern}, nil
 }
 
 type cachingCategoryExpanderFunc struct {

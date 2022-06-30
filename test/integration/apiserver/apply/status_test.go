@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
@@ -37,7 +36,6 @@ import (
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
-	"sigs.k8s.io/yaml"
 )
 
 // namespace used for all tests, do not change this
@@ -50,6 +48,8 @@ var statusData = map[schema.GroupVersionResource]string{
 	gvr("extensions", "v1beta1", "ingresses"):                       `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
 	gvr("networking.k8s.io", "v1beta1", "ingresses"):                `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
 	gvr("networking.k8s.io", "v1", "ingresses"):                     `{"status": {"loadBalancer": {"ingress": [{"ip": "127.0.0.1"}]}}}`,
+	gvr("extensions", "v1beta1", "networkpolicies"):                 `{"status": {"conditions":[{"type":"Accepted","status":"False","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
+	gvr("networking.k8s.io", "v1", "networkpolicies"):               `{"status": {"conditions":[{"type":"Accepted","status":"False","lastTransitionTime":"2020-01-01T00:00:00Z","reason":"RuleApplied","message":"Rule was applied"}]}}`,
 	gvr("autoscaling", "v1", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 5}}`,
 	gvr("autoscaling", "v2", "horizontalpodautoscalers"):            `{"status": {"currentReplicas": 5}}`,
 	gvr("batch", "v1", "cronjobs"):                                  `{"status": {"lastScheduleTime": null}}`,
@@ -159,14 +159,10 @@ func TestApplyStatus(t *testing.T) {
 
 				// etcd test stub data doesn't contain apiVersion/kind (!), but apply requires it
 				newObj.SetGroupVersionKind(mapping.GroupVersionKind)
-				createData, err := json.Marshal(newObj.Object)
-				if err != nil {
-					t.Fatal(err)
-				}
 
 				rsc := dynamicClient.Resource(mapping.Resource).Namespace(namespace)
 				// apply to create
-				_, err = rsc.Patch(context.TODO(), name, types.ApplyPatchType, []byte(createData), metav1.PatchOptions{FieldManager: "create_test"})
+				_, err = rsc.Apply(context.TODO(), name, &newObj, metav1.ApplyOptions{FieldManager: "create_test"})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -178,16 +174,11 @@ func TestApplyStatus(t *testing.T) {
 				statusObj.SetAPIVersion(mapping.GroupVersionKind.GroupVersion().String())
 				statusObj.SetKind(mapping.GroupVersionKind.Kind)
 				statusObj.SetName(name)
-				statusYAML, err := yaml.Marshal(statusObj.Object)
-				if err != nil {
-					t.Fatal(err)
-				}
 
-				True := true
 				obj, err := dynamicClient.
 					Resource(mapping.Resource).
 					Namespace(namespace).
-					Patch(context.TODO(), name, types.ApplyPatchType, statusYAML, metav1.PatchOptions{FieldManager: "apply_status_test", Force: &True}, "status")
+					ApplyStatus(context.TODO(), name, &statusObj, metav1.ApplyOptions{FieldManager: "apply_status_test", Force: true})
 				if err != nil {
 					t.Fatalf("Failed to apply: %v", err)
 				}

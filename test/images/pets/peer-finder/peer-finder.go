@@ -20,7 +20,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -77,7 +77,7 @@ func shellOut(sendStdin, script string) {
 	stdin.Write([]byte(sendStdin))
 	stdin.Close()
 
-	out, err := ioutil.ReadAll(stdout)
+	out, err := io.ReadAll(stdout)
 	if err != nil {
 		log.Fatalf("Failed to execute %v: %v, err: %v", script, string(out), err)
 	}
@@ -104,7 +104,7 @@ func main() {
 
 	// If domain is not provided, try to get it from resolv.conf
 	if *domain == "" {
-		resolvConfBytes, err := ioutil.ReadFile("/etc/resolv.conf")
+		resolvConfBytes, err := os.ReadFile("/etc/resolv.conf")
 		resolvConf := string(resolvConfBytes)
 		if err != nil {
 			log.Fatal("Unable to read /etc/resolv.conf")

@@ -146,7 +146,7 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 
 	var cluster []etcdutil.Member
 	if isDryRun {
-		fmt.Printf("[dryrun] Would add etcd member: %s\n", etcdPeerAddress)
+		fmt.Printf("[etcd] Would add etcd member: %s\n", etcdPeerAddress)
 	} else {
 		klog.V(1).Infof("[etcd] Adding etcd member: %s", etcdPeerAddress)
 		cluster, err = etcdClient.AddMember(nodeName, etcdPeerAddress)
@@ -164,7 +164,7 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 	}
 
 	if isDryRun {
-		fmt.Println("[dryrun] Would wait for the new etcd member to join the cluster")
+		fmt.Println("[etcd] Would wait for the new etcd member to join the cluster")
 		return nil
 	}
 
@@ -179,6 +179,7 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 // GetEtcdPodSpec returns the etcd static Pod actualized to the context of the current configuration
 // NB. GetEtcdPodSpec methods holds the information about how kubeadm creates etcd static pod manifests.
 func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member) v1.Pod {
+	const etcdHealthEndpoint = "/health?serializable=true"
 	pathType := v1.HostPathDirectoryOrCreate
 	etcdMounts := map[string]v1.Volume{
 		etcdVolumeName:  staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.Local.DataDir, &pathType),
@@ -203,8 +204,8 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			},
-			LivenessProbe: staticpodutil.LivenessProbe(probeHostname, "/health", probePort, probeScheme),
-			StartupProbe:  staticpodutil.StartupProbe(probeHostname, "/health", probePort, probeScheme, cfg.APIServer.TimeoutForControlPlane),
+			LivenessProbe: staticpodutil.LivenessProbe(probeHostname, etcdHealthEndpoint, probePort, probeScheme),
+			StartupProbe:  staticpodutil.StartupProbe(probeHostname, etcdHealthEndpoint, probePort, probeScheme, cfg.APIServer.TimeoutForControlPlane),
 		},
 		etcdMounts,
 		// etcd will listen on the advertise address of the API server, in a different port (2379)
@@ -220,22 +221,25 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 		etcdLocalhostAddress = "::1"
 	}
 	defaultArguments := map[string]string{
-		"name":                        nodeName,
-		"listen-client-urls":          fmt.Sprintf("%s,%s", etcdutil.GetClientURLByIP(etcdLocalhostAddress), etcdutil.GetClientURL(endpoint)),
-		"advertise-client-urls":       etcdutil.GetClientURL(endpoint),
-		"listen-peer-urls":            etcdutil.GetPeerURL(endpoint),
-		"initial-advertise-peer-urls": etcdutil.GetPeerURL(endpoint),
-		"data-dir":                    cfg.Etcd.Local.DataDir,
-		"cert-file":                   filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName),
-		"key-file":                    filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName),
-		"trusted-ca-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
-		"client-cert-auth":            "true",
-		"peer-cert-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerCertName),
-		"peer-key-file":               filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
-		"peer-trusted-ca-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
-		"peer-client-cert-auth":       "true",
-		"snapshot-count":              "10000",
-		"listen-metrics-urls":         fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdMetricsPort))),
+		"name": nodeName,
+		// TODO: start using --initial-corrupt-check once the graduated flag is available:
+		// https://github.com/kubernetes/kubeadm/issues/2676
+		"experimental-initial-corrupt-check": "true",
+		"listen-client-urls":                 fmt.Sprintf("%s,%s", etcdutil.GetClientURLByIP(etcdLocalhostAddress), etcdutil.GetClientURL(endpoint)),
+		"advertise-client-urls":              etcdutil.GetClientURL(endpoint),
+		"listen-peer-urls":                   etcdutil.GetPeerURL(endpoint),
+		"initial-advertise-peer-urls":        etcdutil.GetPeerURL(endpoint),
+		"data-dir":                           cfg.Etcd.Local.DataDir,
+		"cert-file":                          filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName),
+		"key-file":                           filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName),
+		"trusted-ca-file":                    filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
+		"client-cert-auth":                   "true",
+		"peer-cert-file":                     filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerCertName),
+		"peer-key-file":                      filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdPeerKeyName),
+		"peer-trusted-ca-file":               filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
+		"peer-client-cert-auth":              "true",
+		"snapshot-count":                     "10000",
+		"listen-metrics-urls":                fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdMetricsPort))),
 	}
 
 	if len(initialCluster) == 0 {
@@ -264,8 +268,8 @@ func prepareAndWriteEtcdStaticPod(manifestDir string, patchesDir string, cfg *ku
 	var err error
 	if features.Enabled(cfg.FeatureGates, features.RootlessControlPlane) {
 		if isDryRun {
-			fmt.Printf("[dryrun] Would create users and groups for %q to run as non-root\n", kubeadmconstants.Etcd)
-			fmt.Printf("[dryrun] Would update static pod manifest for %q to run run as non-root\n", kubeadmconstants.Etcd)
+			fmt.Printf("[etcd] Would create users and groups for %q to run as non-root\n", kubeadmconstants.Etcd)
+			fmt.Printf("[etcd] Would update static pod manifest for %q to run run as non-root\n", kubeadmconstants.Etcd)
 		} else {
 			usersAndGroups, err = staticpodutil.GetUsersAndGroups()
 			if err != nil {

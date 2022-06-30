@@ -30,7 +30,8 @@ endif
 #   clean: Clean up.
 
 # It's necessary to set this because some environments don't link sh -> bash.
-SHELL := /usr/bin/env bash
+SHELL := /usr/bin/env bash -o errexit -o pipefail -o nounset
+BASH_ENV := ./hack/lib/logging.sh
 
 # Define variables so `make --warn-undefined-variables` works.
 PRINT_HELP ?=
@@ -72,21 +73,22 @@ define ALL_HELP_INFO
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags passed to 'go' when building.
 #   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
+#   DBG: If set to "1", build with optimizations disabled for easier
+#     debugging.  Any other value is ignored.
 #
 # Example:
 #   make
 #   make all
 #   make all WHAT=cmd/kubelet GOFLAGS=-v
-#   make all GOLDFLAGS=""
-#     Note: Specify GOLDFLAGS as an empty string for building unstripped binaries, which allows
-#           you to use code debugging tools like delve. When GOLDFLAGS is unspecified, it defaults
-#           to "-s -w" which strips debug information. Other flags that can be used for GOLDFLAGS 
-#           are documented at https://golang.org/cmd/link/
+#   make all DBG=1
+#     Note: Specify DBG=1 for building unstripped binaries, which allows you to use code debugging
+#           tools like delve. When DBG is unspecified, it defaults to "-s -w" which strips debug
+#           information.
 endef
 .PHONY: all
 ifeq ($(PRINT_HELP),y)
 all:
-	@echo "$$ALL_HELP_INFO"
+	echo "$$ALL_HELP_INFO"
 else
 all: generated_files
 	hack/make-rules/build.sh $(WHAT)
@@ -101,10 +103,10 @@ endef
 .PHONY: ginkgo
 ifeq ($(PRINT_HELP),y)
 ginkgo:
-	@echo "$$GINKGO_HELP_INFO"
+	echo "$$GINKGO_HELP_INFO"
 else
 ginkgo:
-	hack/make-rules/build.sh vendor/github.com/onsi/ginkgo/ginkgo
+	hack/make-rules/build.sh github.com/onsi/ginkgo/ginkgo
 endif
 
 define VERIFY_HELP_INFO
@@ -122,7 +124,7 @@ endef
 .PHONY: verify
 ifeq ($(PRINT_HELP),y)
 verify:
-	@echo "$$VERIFY_HELP_INFO"
+	echo "$$VERIFY_HELP_INFO"
 else
 verify:
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh
@@ -137,7 +139,7 @@ endef
 .PHONY: quick-verify
 ifeq ($(PRINT_HELP),y)
 quick-verify:
-	@echo "$$QUICK_VERIFY_HELP_INFO"
+	echo "$$QUICK_VERIFY_HELP_INFO"
 else
 quick-verify:
 	QUICK=true SILENT=false hack/make-rules/verify.sh
@@ -152,7 +154,7 @@ endef
 .PHONY: update
 ifeq ($(PRINT_HELP),y)
 update:
-	@echo "$$UPDATE_HELP_INFO"
+	echo "$$UPDATE_HELP_INFO"
 else
 update: generated_files
 	CALLED_FROM_MAIN_MAKEFILE=1 hack/make-rules/update.sh
@@ -178,7 +180,7 @@ endef
 .PHONY: check test
 ifeq ($(PRINT_HELP),y)
 check test:
-	@echo "$$CHECK_TEST_HELP_INFO"
+	echo "$$CHECK_TEST_HELP_INFO"
 else
 check test: generated_files
 	hack/make-rules/test.sh $(WHAT) $(TESTS)
@@ -197,7 +199,7 @@ endef
 .PHONY: test-integration
 ifeq ($(PRINT_HELP),y)
 test-integration:
-	@echo "$$TEST_IT_HELP_INFO"
+	echo "$$TEST_IT_HELP_INFO"
 else
 test-integration: generated_files
 	hack/make-rules/test-integration.sh $(WHAT)
@@ -221,15 +223,11 @@ define TEST_E2E_NODE_HELP_INFO
 #  ARTIFACTS: Local directory to scp test artifacts into from the remote hosts
 #    for REMOTE=true. Local directory to write juntil xml results into for REMOTE=false.
 #    Defaults to "/tmp/_artifacts/$$(date +%y%m%dT%H%M%S)".
-#  LIST_IMAGES: For REMOTE=true only. If true, don't run tests. Just output the
-#    list of available images for testing.  Defaults to false.
 #  TIMEOUT: For REMOTE=true only. How long (in golang duration format) to wait
 #    for ginkgo tests to complete. Defaults to 45m.
 #  PARALLELISM: The number of ginkgo nodes to run.  Defaults to 8.
-#  RUNTIME: Container runtime to use (eg. docker, remote).
-#    Defaults to "docker".
 #  CONTAINER_RUNTIME_ENDPOINT: remote container endpoint to connect to.
-#    Used when RUNTIME is set to "remote".
+#    Defaults to "/run/containerd/containerd.sock".
 #  IMAGE_SERVICE_ENDPOINT: remote image endpoint to connect to, to prepull images.
 #    Used when RUNTIME is set to "remote".
 #  IMAGE_CONFIG_FILE: path to a file containing image configuration.
@@ -250,7 +248,7 @@ define TEST_E2E_NODE_HELP_INFO
 #  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
 #    test files on remote hosts.  Defaults to true.
 #  IMAGE_PROJECT: For REMOTE=true only.  Project containing images provided to
-#    $$IMAGES.  Defaults to "kubernetes-node-e2e-images".
+#    $$IMAGES.  Defaults to "cos-cloud".
 #  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
 #    have the name "$${INSTANCE_PREFIX}-$${IMAGE_NAME}".  Defaults to "test".
 #  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
@@ -270,7 +268,7 @@ endef
 .PHONY: test-e2e-node
 ifeq ($(PRINT_HELP),y)
 test-e2e-node:
-	@echo "$$TEST_E2E_NODE_HELP_INFO"
+	echo "$$TEST_E2E_NODE_HELP_INFO"
 else
 test-e2e-node: ginkgo generated_files
 	hack/make-rules/test-e2e-node.sh
@@ -289,7 +287,7 @@ endef
 .PHONY: test-cmd
 ifeq ($(PRINT_HELP),y)
 test-cmd:
-	@echo "$$TEST_CMD_HELP_INFO"
+	echo "$$TEST_CMD_HELP_INFO"
 else
 test-cmd: generated_files
 	hack/make-rules/test-cmd.sh
@@ -306,7 +304,7 @@ endef
 .PHONY: clean
 ifeq ($(PRINT_HELP),y)
 clean:
-	@echo "$$CLEAN_HELP_INFO"
+	echo "$$CLEAN_HELP_INFO"
 else
 clean: clean_meta
 	build/make-clean.sh
@@ -322,7 +320,7 @@ endef
 .PHONY: clean_meta
 ifeq ($(PRINT_HELP),y)
 clean_meta:
-	@echo "$$CLEAN_META_HELP_INFO"
+	echo "$$CLEAN_META_HELP_INFO"
 else
 clean_meta:
 	rm -rf $(META_DIR)
@@ -338,7 +336,7 @@ endef
 .PHONY: clean_generated
 ifeq ($(PRINT_HELP),y)
 clean_generated:
-	@echo "$$CLEAN_GENERATED_HELP_INFO"
+	echo "$$CLEAN_GENERATED_HELP_INFO"
 else
 clean_generated:
 	find . -type f -name '$(GENERATED_FILE_PREFIX)*'  | xargs rm -f
@@ -359,7 +357,7 @@ endef
 .PHONY: vet
 ifeq ($(PRINT_HELP),y)
 vet:
-	@echo "$$VET_HELP_INFO"
+	echo "$$VET_HELP_INFO"
 else
 vet: generated_files
 	CALLED_FROM_MAIN_MAKEFILE=1 hack/make-rules/vet.sh $(WHAT)
@@ -378,7 +376,7 @@ endef
 .PHONY: release release-in-a-container
 ifeq ($(PRINT_HELP),y)
 release release-in-a-container:
-	@echo "$$RELEASE_HELP_INFO"
+	echo "$$RELEASE_HELP_INFO"
 else
 release release-in-a-container: KUBE_BUILD_CONFORMANCE = y
 release:
@@ -400,7 +398,7 @@ endef
 ifeq ($(PRINT_HELP),y)
 release-images: KUBE_BUILD_CONFORMANCE = y
 release-images:
-	@echo "$$RELEASE_IMAGES_HELP_INFO"
+	echo "$$RELEASE_IMAGES_HELP_INFO"
 else
 release-images:
 	build/release-images.sh
@@ -412,8 +410,8 @@ define RELEASE_SKIP_TESTS_HELP_INFO
 # Args:
 #   KUBE_RELEASE_RUN_TESTS: Whether to run tests. Set to 'y' to run tests anyways.
 #   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
-#   KUBE_DOCKER_REGISTRY: Registry of released images, default to k8s.gcr.io
-#   KUBE_BASE_IMAGE_REGISTRY: Registry of base images for controlplane binaries, default to k8s.gcr.io/build-image
+#   KUBE_DOCKER_REGISTRY: Registry of released images, default to registry.k8s.io
+#   KUBE_BASE_IMAGE_REGISTRY: Registry of base images for controlplane binaries, default to registry.k8s.io/build-image
 #
 # Example:
 #   make release-skip-tests
@@ -422,7 +420,7 @@ endef
 .PHONY: release-skip-tests quick-release
 ifeq ($(PRINT_HELP),y)
 release-skip-tests quick-release:
-	@echo "$$RELEASE_SKIP_TESTS_HELP_INFO"
+	echo "$$RELEASE_SKIP_TESTS_HELP_INFO"
 else
 release-skip-tests quick-release: KUBE_RELEASE_RUN_TESTS = n
 release-skip-tests quick-release: KUBE_FASTBUILD = true
@@ -443,7 +441,7 @@ endef
 .PHONY: quick-release-images
 ifeq ($(PRINT_HELP),y)
 quick-release-images:
-	@echo "$$QUICK_RELEASE_IMAGES_HELP_INFO"
+	echo "$$QUICK_RELEASE_IMAGES_HELP_INFO"
 else
 quick-release-images: KUBE_FASTBUILD = true
 quick-release-images:
@@ -461,7 +459,7 @@ endef
 .PHONY: package package-tarballs
 ifeq ($(PRINT_HELP),y)
 package package-tarballs:
-	@echo "$$PACKAGE_HELP_INFO"
+	echo "$$PACKAGE_HELP_INFO"
 else
 package-tarballs: KUBE_BUILD_CONFORMANCE = y
 package package-tarballs:
@@ -481,7 +479,7 @@ endef
 .PHONY: cross cross-in-a-container
 ifeq ($(PRINT_HELP),y)
 cross cross-in-a-container:
-	@echo "$$CROSS_HELP_INFO"
+	echo "$$CROSS_HELP_INFO"
 else
 cross cross-in-a-container: KUBE_BUILD_CONFORMANCE = y
 cross:
@@ -489,7 +487,7 @@ cross:
 cross-in-a-container: KUBE_OUTPUT_SUBPATH = $(OUT_DIR)/dockerized
 cross-in-a-container:
 ifeq (,$(wildcard /.dockerenv))
-	@echo -e "\nThe 'cross-in-a-container' target can only be used from within a docker container.\n"
+	echo -e "\nThe 'cross-in-a-container' target can only be used from within a docker container.\n"
 else
 	hack/make-rules/cross.sh
 endif
@@ -502,12 +500,12 @@ define CMD_HELP_INFO
 #   make kubectl kube-proxy
 endef
 #TODO: make EXCLUDE_TARGET auto-generated when there are other files in cmd/
-EXCLUDE_TARGET=BUILD OWNERS
+EXCLUDE_TARGET=OWNERS
 CMD_TARGET = $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/))))
 .PHONY: $(CMD_TARGET)
 ifeq ($(PRINT_HELP),y)
 $(CMD_TARGET):
-	@echo "$$CMD_HELP_INFO"
+	echo "$$CMD_HELP_INFO"
 else
 $(CMD_TARGET): generated_files
 	hack/make-rules/build.sh cmd/$@
@@ -522,10 +520,10 @@ endef
 .PHONY: generated_files
 ifeq ($(PRINT_HELP),y)
 generated_files:
-	@echo "$$GENERATED_FILES_HELP_INFO"
+	echo "$$GENERATED_FILES_HELP_INFO"
 else
 generated_files gen_openapi:
-	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1
+	$(MAKE) -f Makefile.generated_files $@ CALLED_FROM_MAIN_MAKEFILE=1 SHELL="$(SHELL)"
 endif
 
 define HELP_INFO
@@ -537,7 +535,7 @@ endef
 .PHONY: help
 ifeq ($(PRINT_HELP),y)
 help:
-	@echo "$$HELP_INFO"
+	echo "$$HELP_INFO"
 else
 help:
 	hack/make-rules/make-help.sh

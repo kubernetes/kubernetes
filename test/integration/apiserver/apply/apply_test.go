@@ -22,7 +22,6 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -35,7 +34,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
@@ -45,27 +44,23 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/controlplane"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
-	opts := framework.ControlPlaneConfigOptions{EtcdOptions: framework.DefaultEtcdOptions()}
-	opts.EtcdOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
-	if len(groupVersions) > 0 {
-		resourceConfig := controlplane.DefaultAPIResourceConfigSource()
-		resourceConfig.EnableVersions(groupVersions...)
-		controlPlaneConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
-	}
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+func setup(t testing.TB) (clientset.Interface, kubeapiservertesting.TearDownFunc) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
-	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
+	config := restclient.CopyConfig(server.ClientConfig)
+	// There are some tests (in scale_test.go) that rely on the response to be returned in JSON.
+	// So we overwrite it here.
+	config.ContentType = runtime.ContentTypeJSON
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
-	return s, clientSet, closeFn
+	return clientSet, server.TearDownFn
 }
 
 // TestApplyAlsoCreates makes sure that PATCH requests with the apply content type
@@ -74,7 +69,7 @@ func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server
 func TestApplyAlsoCreates(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	testCases := []struct {
@@ -118,35 +113,37 @@ func TestApplyAlsoCreates(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
-			Namespace("default").
-			Resource(tc.resource).
-			Name(tc.name).
-			Param("fieldManager", "apply_test").
-			Body([]byte(tc.body)).
-			Do(context.TODO()).
-			Get()
-		if err != nil {
-			t.Fatalf("Failed to create object using Apply patch: %v", err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+				Namespace("default").
+				Resource(tc.resource).
+				Name(tc.name).
+				Param("fieldManager", "apply_test").
+				Body([]byte(tc.body)).
+				Do(context.TODO()).
+				Get()
+			if err != nil {
+				t.Fatalf("Failed to create object using Apply patch: %v", err)
+			}
 
-		_, err = client.CoreV1().RESTClient().Get().Namespace("default").Resource(tc.resource).Name(tc.name).Do(context.TODO()).Get()
-		if err != nil {
-			t.Fatalf("Failed to retrieve object: %v", err)
-		}
+			_, err = client.CoreV1().RESTClient().Get().Namespace("default").Resource(tc.resource).Name(tc.name).Do(context.TODO()).Get()
+			if err != nil {
+				t.Fatalf("Failed to retrieve object: %v", err)
+			}
 
-		// Test that we can re apply with a different field manager and don't get conflicts
-		_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
-			Namespace("default").
-			Resource(tc.resource).
-			Name(tc.name).
-			Param("fieldManager", "apply_test_2").
-			Body([]byte(tc.body)).
-			Do(context.TODO()).
-			Get()
-		if err != nil {
-			t.Fatalf("Failed to re-apply object using Apply patch: %v", err)
-		}
+			// Test that we can re apply with a different field manager and don't get conflicts
+			_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+				Namespace("default").
+				Resource(tc.resource).
+				Name(tc.name).
+				Param("fieldManager", "apply_test_2").
+				Body([]byte(tc.body)).
+				Do(context.TODO()).
+				Get()
+			if err != nil {
+				t.Fatalf("Failed to re-apply object using Apply patch: %v", err)
+			}
+		})
 	}
 }
 
@@ -155,7 +152,7 @@ func TestApplyAlsoCreates(t *testing.T) {
 func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	podName := "no-op"
@@ -257,7 +254,7 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 func TestCreateOnApplyFailsWithUID(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
@@ -289,7 +286,7 @@ func TestCreateOnApplyFailsWithUID(t *testing.T) {
 func TestApplyUpdateApplyConflictForced(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	obj := []byte(`{
@@ -379,7 +376,7 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 func TestApplyGroupsManySeparateUpdates(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	obj := []byte(`{
@@ -443,7 +440,7 @@ func TestApplyGroupsManySeparateUpdates(t *testing.T) {
 func TestCreateVeryLargeObject(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	cfg := &v1.ConfigMap{
@@ -489,7 +486,7 @@ func TestCreateVeryLargeObject(t *testing.T) {
 func TestUpdateVeryLargeObject(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	cfg := &v1.ConfigMap{
@@ -555,7 +552,7 @@ func TestUpdateVeryLargeObject(t *testing.T) {
 func TestPatchVeryLargeObject(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	cfg := &v1.ConfigMap{
@@ -614,7 +611,7 @@ func TestPatchVeryLargeObject(t *testing.T) {
 func TestApplyManagedFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
@@ -682,16 +679,10 @@ func TestApplyManagedFields(t *testing.T) {
 		t.Fatalf("Failed to marshal object: %v", err)
 	}
 
-	selfLink := ""
-	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.RemoveSelfLink) {
-		selfLink = `
-			"selfLink": "` + accessor.GetSelfLink() + `",`
-	}
-
 	expected := []byte(`{
 		"metadata": {
 			"name": "test-cm",
-			"namespace": "default",` + selfLink + `
+			"namespace": "default",
 			"uid": "` + string(accessor.GetUID()) + `",
 			"resourceVersion": "` + accessor.GetResourceVersion() + `",
 			"creationTimestamp": "` + accessor.GetCreationTimestamp().UTC().Format(time.RFC3339) + `",
@@ -747,7 +738,7 @@ func TestApplyManagedFields(t *testing.T) {
 func TestApplyRemovesEmptyManagedFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	obj := []byte(`{
@@ -799,7 +790,7 @@ func TestApplyRemovesEmptyManagedFields(t *testing.T) {
 func TestApplyRequiresFieldManager(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	obj := []byte(`{
@@ -839,7 +830,7 @@ func TestApplyRequiresFieldManager(t *testing.T) {
 func TestApplyRemoveContainerPort(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	obj := []byte(`{
@@ -943,7 +934,7 @@ func TestApplyRemoveContainerPort(t *testing.T) {
 func TestApplyFailsWithVersionMismatch(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	obj := []byte(`{
@@ -1040,7 +1031,7 @@ func TestApplyFailsWithVersionMismatch(t *testing.T) {
 func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	obj := []byte(`{
@@ -1183,7 +1174,7 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 func TestClearManagedFieldsWithMergePatch(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
@@ -1239,7 +1230,7 @@ func TestClearManagedFieldsWithMergePatch(t *testing.T) {
 func TestClearManagedFieldsWithStrategicMergePatch(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
@@ -1299,7 +1290,7 @@ func TestClearManagedFieldsWithStrategicMergePatch(t *testing.T) {
 func TestClearManagedFieldsWithJSONPatch(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
@@ -1355,7 +1346,7 @@ func TestClearManagedFieldsWithJSONPatch(t *testing.T) {
 func TestClearManagedFieldsWithUpdate(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
@@ -1429,7 +1420,7 @@ func TestClearManagedFieldsWithUpdate(t *testing.T) {
 func TestErrorsDontFail(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	// Tries to create with a managed fields that has an empty `fieldsType`.
@@ -1469,7 +1460,7 @@ func TestErrorsDontFail(t *testing.T) {
 func TestErrorsDontFailUpdate(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	_, err := client.CoreV1().RESTClient().Post().
@@ -1533,7 +1524,7 @@ func TestErrorsDontFailUpdate(t *testing.T) {
 func TestErrorsDontFailPatch(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	_, err := client.CoreV1().RESTClient().Post().
@@ -1583,7 +1574,7 @@ func TestErrorsDontFailPatch(t *testing.T) {
 func TestApplyDoesNotChangeManagedFieldsViaSubresources(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	podBytes := []byte(`{
@@ -1686,7 +1677,7 @@ func TestApplyDoesNotChangeManagedFieldsViaSubresources(t *testing.T) {
 func TestClearManagedFieldsWithUpdateEmptyList(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
@@ -1771,7 +1762,7 @@ func TestClearManagedFieldsWithUpdateEmptyList(t *testing.T) {
 func TestApplyUnsetExclusivelyOwnedFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	// spec.replicas is a optional, defaulted field
@@ -1880,7 +1871,7 @@ func TestApplyUnsetExclusivelyOwnedFields(t *testing.T) {
 func TestApplyUnsetSharedFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	// spec.replicas is a optional, defaulted field
@@ -1992,7 +1983,7 @@ func TestApplyUnsetSharedFields(t *testing.T) {
 func TestApplyCanTransferFieldOwnershipToController(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	// Applier creates a deployment with replicas set to 3
@@ -2111,7 +2102,7 @@ func TestApplyCanTransferFieldOwnershipToController(t *testing.T) {
 func TestApplyCanRemoveMapItemsContributedToByControllers(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	// Applier creates a deployment with a name=nginx container
@@ -2231,7 +2222,7 @@ func TestApplyCanRemoveMapItemsContributedToByControllers(t *testing.T) {
 func TestDefaultMissingKeys(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	// Applier creates a deployment with containerPort but no protocol
@@ -2480,7 +2471,7 @@ func encodePod(pod v1.Pod) []byte {
 func BenchmarkNoServerSideApply(b *testing.B) {
 	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, false)()
 
-	_, client, closeFn := setup(b)
+	client, closeFn := setup(b)
 	defer closeFn()
 	flag.Lookup("v").Value.Set("0")
 
@@ -2493,7 +2484,8 @@ func getPodSizeWhenEnabled(b *testing.B, pod v1.Pod) int {
 
 func getPodBytesWhenEnabled(b *testing.B, pod v1.Pod, format string) []byte {
 	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-	_, client, closeFn := setup(b)
+
+	client, closeFn := setup(b)
 	defer closeFn()
 	flag.Lookup("v").Value.Set("0")
 
@@ -2517,7 +2509,7 @@ func BenchmarkNoServerSideApplyButSameSize(b *testing.B) {
 	ssaPodSize := getPodSizeWhenEnabled(b, pod)
 
 	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, false)()
-	_, client, closeFn := setup(b)
+	client, closeFn := setup(b)
 	defer closeFn()
 	flag.Lookup("v").Value.Set("0")
 
@@ -2553,7 +2545,7 @@ func BenchmarkServerSideApply(b *testing.B) {
 
 	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(b)
+	client, closeFn := setup(b)
 	defer closeFn()
 	flag.Lookup("v").Value.Set("0")
 
@@ -2565,7 +2557,6 @@ func benchAll(b *testing.B, client kubernetes.Interface, pod v1.Pod) {
 	pod.ObjectMeta.CreationTimestamp = metav1.Time{}
 	pod.ObjectMeta.ResourceVersion = ""
 	pod.ObjectMeta.UID = ""
-	pod.ObjectMeta.SelfLink = ""
 
 	// Create pod for repeated-updates
 	pod.Name = "repeated-pod"
@@ -2690,7 +2681,7 @@ func benchRepeatedUpdate(client kubernetes.Interface, podName string) func(*test
 func TestUpgradeClientSideToServerSideApply(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	obj := []byte(`
@@ -2818,15 +2809,13 @@ spec:
 }
 
 func TestStopTrackingManagedFieldsOnFeatureDisabled(t *testing.T) {
-	sharedEtcd := framework.DefaultEtcdOptions()
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.ControlPlaneConfigOptions{
-		EtcdOptions: sharedEtcd,
-	})
-	controlPlaneConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
+	sharedEtcd := framework.SharedEtcd()
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-	_, instanceConfig, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	client, err := clientset.NewForConfig(&restclient.Config{Host: instanceConfig.URL, QPS: -1})
+
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, sharedEtcd)
+	client, err := clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
@@ -2876,14 +2865,15 @@ spec:
 	}
 
 	// Restart server with server-side apply disabled
-	closeFn()
+	server.TearDownFn()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, false)()
-	_, instanceConfig, closeFn = framework.RunAnAPIServer(controlPlaneConfig)
-	client, err = clientset.NewForConfig(&restclient.Config{Host: instanceConfig.URL, QPS: -1})
+
+	server = kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, sharedEtcd)
+	defer server.TearDownFn()
+	client, err = clientset.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
-	defer closeFn()
 
 	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
 		AbsPath("/apis/apps/v1").
@@ -2920,7 +2910,7 @@ spec:
 func TestRenamingAppliedFieldManagers(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	// Creating an object
@@ -3012,7 +3002,7 @@ func TestRenamingAppliedFieldManagers(t *testing.T) {
 func TestRenamingUpdatedFieldManagers(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	// Creating an object
@@ -3114,7 +3104,7 @@ func TestRenamingUpdatedFieldManagers(t *testing.T) {
 func TestDroppingSubresourceField(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	// Creating an object
@@ -3227,7 +3217,7 @@ func TestDroppingSubresourceField(t *testing.T) {
 func TestDroppingSubresourceFromSpecField(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	// Creating an object
@@ -3341,7 +3331,7 @@ func TestDroppingSubresourceFromSpecField(t *testing.T) {
 func TestSubresourceField(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
-	_, client, closeFn := setup(t)
+	client, closeFn := setup(t)
 	defer closeFn()
 
 	// Creating a deployment

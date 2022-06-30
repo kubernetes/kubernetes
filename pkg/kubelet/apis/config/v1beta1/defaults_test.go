@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -111,7 +111,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				ConfigMapAndSecretChangeDetectionStrategy: v1beta1.WatchChangeDetectionStrategy,
 				EnforceNodeAllocatable:                    DefaultNodeAllocatableEnforcement,
 				VolumePluginDir:                           DefaultVolumePluginDir,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
 					FlushFrequency: 5 * time.Second,
 				},
@@ -232,10 +232,9 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:             "",
 				ProviderID:                  "",
 				KernelMemcgNotification:     false,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: logsapi.LoggingConfiguration{
 					Format:         "",
 					FlushFrequency: 5 * time.Second,
-					Sanitization:   false,
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(false),
 				ShutdownGracePeriod:             zeroDuration,
@@ -330,10 +329,9 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnforceNodeAllocatable: []string{},
 				AllowedUnsafeSysctls:   []string{},
 				VolumePluginDir:        DefaultVolumePluginDir,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
 					FlushFrequency: 5 * time.Second,
-					Sanitization:   false,
 				},
 				EnableSystemLogHandler:  utilpointer.Bool(false),
 				ReservedMemory:          []v1beta1.MemoryReservation{},
@@ -444,19 +442,16 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EvictionMinimumReclaim: map[string]string{
 					"imagefs.available": "1Gi",
 				},
-				PodsPerCore:                  1,
-				EnableControllerAttachDetach: utilpointer.Bool(true),
-				ProtectKernelDefaults:        true,
-				MakeIPTablesUtilChains:       utilpointer.Bool(true),
-				IPTablesMasqueradeBit:        utilpointer.Int32(1),
-				IPTablesDropBit:              utilpointer.Int32(1),
-				FeatureGates: map[string]bool{
-					"DynamicKubeletConfig": true,
-				},
-				FailSwapOn:           utilpointer.Bool(true),
-				MemorySwap:           v1beta1.MemorySwapConfiguration{SwapBehavior: "UnlimitedSwap"},
-				ContainerLogMaxSize:  "1Mi",
-				ContainerLogMaxFiles: utilpointer.Int32(1),
+				PodsPerCore:                               1,
+				EnableControllerAttachDetach:              utilpointer.Bool(true),
+				ProtectKernelDefaults:                     true,
+				MakeIPTablesUtilChains:                    utilpointer.Bool(true),
+				IPTablesMasqueradeBit:                     utilpointer.Int32(1),
+				IPTablesDropBit:                           utilpointer.Int32(1),
+				FailSwapOn:                                utilpointer.Bool(true),
+				MemorySwap:                                v1beta1.MemorySwapConfiguration{SwapBehavior: "UnlimitedSwap"},
+				ContainerLogMaxSize:                       "1Mi",
+				ContainerLogMaxFiles:                      utilpointer.Int32(1),
 				ConfigMapAndSecretChangeDetectionStrategy: v1beta1.TTLCacheChangeDetectionStrategy,
 				SystemReserved: map[string]string{
 					"memory": "1Gi",
@@ -473,10 +468,9 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:             "volume-plugin-dir",
 				ProviderID:                  "provider-id",
 				KernelMemcgNotification:     true,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: logsapi.LoggingConfiguration{
 					Format:         "json",
 					FlushFrequency: 5 * time.Second,
-					Sanitization:   true,
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(true),
 				ShutdownGracePeriod:             metav1.Duration{Duration: 60 * time.Second},
@@ -591,19 +585,16 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EvictionMinimumReclaim: map[string]string{
 					"imagefs.available": "1Gi",
 				},
-				PodsPerCore:                  1,
-				EnableControllerAttachDetach: utilpointer.Bool(true),
-				ProtectKernelDefaults:        true,
-				MakeIPTablesUtilChains:       utilpointer.Bool(true),
-				IPTablesMasqueradeBit:        utilpointer.Int32(1),
-				IPTablesDropBit:              utilpointer.Int32(1),
-				FeatureGates: map[string]bool{
-					"DynamicKubeletConfig": true,
-				},
-				FailSwapOn:           utilpointer.Bool(true),
-				MemorySwap:           v1beta1.MemorySwapConfiguration{SwapBehavior: "UnlimitedSwap"},
-				ContainerLogMaxSize:  "1Mi",
-				ContainerLogMaxFiles: utilpointer.Int32(1),
+				PodsPerCore:                               1,
+				EnableControllerAttachDetach:              utilpointer.Bool(true),
+				ProtectKernelDefaults:                     true,
+				MakeIPTablesUtilChains:                    utilpointer.Bool(true),
+				IPTablesMasqueradeBit:                     utilpointer.Int32(1),
+				IPTablesDropBit:                           utilpointer.Int32(1),
+				FailSwapOn:                                utilpointer.Bool(true),
+				MemorySwap:                                v1beta1.MemorySwapConfiguration{SwapBehavior: "UnlimitedSwap"},
+				ContainerLogMaxSize:                       "1Mi",
+				ContainerLogMaxFiles:                      utilpointer.Int32(1),
 				ConfigMapAndSecretChangeDetectionStrategy: v1beta1.TTLCacheChangeDetectionStrategy,
 				SystemReserved: map[string]string{
 					"memory": "1Gi",
@@ -620,10 +611,9 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:             "volume-plugin-dir",
 				ProviderID:                  "provider-id",
 				KernelMemcgNotification:     true,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: logsapi.LoggingConfiguration{
 					Format:         "json",
 					FlushFrequency: 5 * time.Second,
-					Sanitization:   true,
 				},
 				EnableSystemLogHandler:          utilpointer.Bool(true),
 				ShutdownGracePeriod:             metav1.Duration{Duration: 60 * time.Second},
@@ -715,7 +705,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				ConfigMapAndSecretChangeDetectionStrategy: v1beta1.WatchChangeDetectionStrategy,
 				EnforceNodeAllocatable:                    DefaultNodeAllocatableEnforcement,
 				VolumePluginDir:                           DefaultVolumePluginDir,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: logsapi.LoggingConfiguration{
 					Format:         "text",
 					FlushFrequency: 5 * time.Second,
 				},

@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -72,7 +71,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	// start the wardle server to prove we can aggregate it
 	wardleToKASKubeConfigFile := writeKubeConfigForWardleServerToKASConnection(t, rest.CopyConfig(kubeClientConfig))
 	defer os.Remove(wardleToKASKubeConfigFile)
-	wardleCertDir, _ := ioutil.TempDir("", "test-integration-wardle-server")
+	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
 	defer os.RemoveAll(wardleCertDir)
 	listener, wardlePort, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
 	if err != nil {
@@ -108,7 +107,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	testAPIGroup(t, wardleClient.Discovery().RESTClient())
 	testAPIResourceList(t, wardleClient.Discovery().RESTClient())
 
-	wardleCA, err := ioutil.ReadFile(directWardleClientConfig.CAFile)
+	wardleCA, err := os.ReadFile(directWardleClientConfig.CAFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +130,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	}
 
 	// wait for the unavailable API service to be processed with updated status
-	err = wait.Poll(100*time.Millisecond, 5*time.Second, func() (done bool, err error) {
+	err = wait.Poll(1*time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
 		_, _, err = kubeClient.Discovery().ServerGroupsAndResources()
 		hasExpectedError := checkWardleUnavailableDiscoveryError(t, err)
 		return hasExpectedError, nil
@@ -141,27 +140,47 @@ func TestAggregatedAPIServer(t *testing.T) {
 	}
 	// TODO figure out how to turn on enough of services and dns to run more
 
+	// Since ClientCAs are provided by "client-ca::kube-system::extension-apiserver-authentication::client-ca-file" controller
+	// we need to wait until it picks up the configmap (via a lister) otherwise the response might contain an empty result.
+	// The following code waits up to ForeverTestTimeout seconds for ClientCA to show up otherwise it fails
+	// maybe in the future this could be wired into the /readyz EP
+
 	// Now we want to verify that the client CA bundles properly reflect the values for the cluster-authentication
-	firstKubeCANames, err := cert.GetClientCANamesForURL(kubeClientConfig.Host)
+	var firstKubeCANames []string
+	err = wait.Poll(1*time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+		firstKubeCANames, err = cert.GetClientCANamesForURL(kubeClientConfig.Host)
+		if err != nil {
+			return false, err
+		}
+		return len(firstKubeCANames) != 0, nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log(firstKubeCANames)
-	firstWardleCANames, err := cert.GetClientCANamesForURL(directWardleClientConfig.Host)
+	var firstWardleCANames []string
+	err = wait.Poll(1*time.Second, wait.ForeverTestTimeout, func() (done bool, err error) {
+		firstWardleCANames, err = cert.GetClientCANamesForURL(directWardleClientConfig.Host)
+		if err != nil {
+			return false, err
+		}
+		return len(firstWardleCANames) != 0, nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log(firstWardleCANames)
+	// Now we want to verify that the client CA bundles properly reflect the values for the cluster-authentication
 	if !reflect.DeepEqual(firstKubeCANames, firstWardleCANames) {
 		t.Fatal("names don't match")
 	}
 
 	// now we update the client-ca nd request-header-client-ca-file and the kas will consume it, update the configmap
 	// and then the wardle server will detect and update too.
-	if err := ioutil.WriteFile(path.Join(testServer.TmpDir, "client-ca.crt"), differentClientCA, 0644); err != nil {
+	if err := os.WriteFile(path.Join(testServer.TmpDir, "client-ca.crt"), differentClientCA, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(path.Join(testServer.TmpDir, "proxy-ca.crt"), differentFrontProxyCA, 0644); err != nil {
+	if err := os.WriteFile(path.Join(testServer.TmpDir, "proxy-ca.crt"), differentFrontProxyCA, 0644); err != nil {
 		t.Fatal(err)
 	}
 	// wait for it to be picked up.  there's a test in certreload_test.go that ensure this works
@@ -274,7 +293,7 @@ func writeKubeConfigForWardleServerToKASConnection(t *testing.T, kubeClientConfi
 	}
 
 	adminKubeConfig := createKubeConfig(wardleToKASKubeClientConfig)
-	wardleToKASKubeConfigFile, _ := ioutil.TempFile("", "")
+	wardleToKASKubeConfigFile, _ := os.CreateTemp("", "")
 	if err := clientcmd.WriteToFile(*adminKubeConfig, wardleToKASKubeConfigFile.Name()); err != nil {
 		t.Fatal(err)
 	}

@@ -103,6 +103,7 @@ func TestIsProxyableIP(t *testing.T) {
 		ip   string
 		want error
 	}{
+		{"0.0.0.0", ErrAddressNotAllowed},
 		{"127.0.0.1", ErrAddressNotAllowed},
 		{"127.0.0.2", ErrAddressNotAllowed},
 		{"169.254.169.254", ErrAddressNotAllowed},
@@ -112,6 +113,7 @@ func TestIsProxyableIP(t *testing.T) {
 		{"192.168.0.1", nil},
 		{"172.16.0.1", nil},
 		{"8.8.8.8", nil},
+		{"::", ErrAddressNotAllowed},
 		{"::1", ErrAddressNotAllowed},
 		{"fe80::", ErrAddressNotAllowed},
 		{"ff02::", ErrAddressNotAllowed},
@@ -1183,6 +1185,9 @@ func TestLineBufferWrite(t *testing.T) {
 			if want, got := testCase.expected, string(testBuffer.Bytes()); !strings.EqualFold(want, got) {
 				t.Fatalf("write word is %v\n expected: %q, got: %q", testCase.input, want, got)
 			}
+			if testBuffer.Lines() != 1 {
+				t.Fatalf("expected 1 line, got: %d", testBuffer.Lines())
+			}
 		})
 	}
 }
@@ -1265,7 +1270,7 @@ func TestWriteCountLines(t *testing.T) {
 			for i := 0; i < testCase.expected; i++ {
 				testBuffer.Write(randSeq())
 			}
-			n := CountBytesLines(testBuffer.Bytes())
+			n := testBuffer.Lines()
 			if n != testCase.expected {
 				t.Fatalf("lines expected: %d, got: %d", testCase.expected, n)
 			}
@@ -1397,5 +1402,111 @@ func TestAddressSet(t *testing.T) {
 		if !tc.expected.Equal(AddressSet(tc.validator, tc.input)) {
 			t.Errorf("%s", tc.name)
 		}
+	}
+}
+
+func TestContainsIPv4Loopback(t *testing.T) {
+	tests := []struct {
+		name        string
+		cidrStrings []string
+		want        bool
+	}{
+		{
+			name: "empty",
+			want: true,
+		},
+		{
+			name:        "all zeros ipv4",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "0.0.0.0/0"},
+			want:        true,
+		},
+		{
+			name:        "all zeros ipv4 and invalid cidr",
+			cidrStrings: []string{"invalid.cidr", "192.168.0.0/16", "fd00:1:d::/64", "0.0.0.0/0"},
+			want:        true,
+		},
+		{
+			name:        "all zeros ipv6", // interpret all zeros equal for IPv4 and IPv6 as Golang stdlib
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "::/0"},
+			want:        true,
+		},
+		{
+			name:        "ipv4 loopback",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "127.0.0.0/8"},
+			want:        true,
+		},
+		{
+			name:        "ipv6 loopback",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "::1/128"},
+			want:        false,
+		},
+		{
+			name:        "ipv4 loopback smaller range",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "127.0.2.0/28"},
+			want:        true,
+		},
+		{
+			name:        "ipv4 loopback within larger range",
+			cidrStrings: []string{"224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64", "64.0.0.0/2"},
+			want:        true,
+		},
+		{
+			name:        "non loop loopback",
+			cidrStrings: []string{"128.0.2.0/28", "224.0.0.0/24", "192.168.0.0/16", "fd00:1:d::/64"},
+			want:        false,
+		},
+		{
+			name:        "invalid cidr",
+			cidrStrings: []string{"invalid.ip/invalid.mask"},
+			want:        false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ContainsIPv4Loopback(tt.cidrStrings); got != tt.want {
+				t.Errorf("ContainLoopback() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsZeroCIDR(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "invalide cidr",
+			input:    "",
+			expected: false,
+		},
+		{
+			name:     "ipv4 cidr",
+			input:    "172.10.0.0/16",
+			expected: false,
+		},
+		{
+			name:     "ipv4 zero cidr",
+			input:    IPv4ZeroCIDR,
+			expected: true,
+		},
+		{
+			name:     "ipv6 cidr",
+			input:    "::/128",
+			expected: false,
+		},
+		{
+			name:     "ipv6 zero cidr",
+			input:    IPv6ZeroCIDR,
+			expected: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsZeroCIDR(tc.input); tc.expected != got {
+				t.Errorf("IsZeroCIDR() = %t, want %t", got, tc.expected)
+			}
+		})
 	}
 }

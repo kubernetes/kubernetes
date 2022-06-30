@@ -80,7 +80,17 @@ func (q *graceTerminateRSList) remove(rs *listItem) bool {
 	return false
 }
 
+// return the size of the list
+func (q *graceTerminateRSList) len() int {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	return len(q.list)
+}
+
 func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (bool, error)) bool {
+	q.lock.Lock()
+	defer q.lock.Unlock()
 	success := true
 	for name, rs := range q.list {
 		deleted, err := handler(rs)
@@ -90,7 +100,7 @@ func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (boo
 		}
 		if deleted {
 			klog.InfoS("Removed real server from graceful delete real server list", "realServer", name)
-			q.remove(rs)
+			delete(q.list, rs.String())
 		}
 	}
 	return success

@@ -87,14 +87,15 @@ func (t fakeApfFilter) MaintainObservations(stopCh <-chan struct{}) {
 
 func (t fakeApfFilter) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
-	workEstimator func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) fcrequest.WorkEstimate,
+	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
+	workEstimator func() fcrequest.WorkEstimate,
 	queueNoteFn fq.QueueNoteFn,
 	execFn func(),
 ) {
 	if t.mockDecision == decisionSkipFilter {
 		panic("Handle should not be invoked")
 	}
-	workEstimator(bootstrap.SuggestedFlowSchemaGlobalDefault, bootstrap.SuggestedPriorityLevelConfigurationGlobalDefault, requestDigest.User.GetName())
+	noteFn(bootstrap.SuggestedFlowSchemaGlobalDefault, bootstrap.SuggestedPriorityLevelConfigurationGlobalDefault, requestDigest.User.GetName())
 	switch t.mockDecision {
 	case decisionNoQueuingExecute:
 		execFn()
@@ -157,6 +158,8 @@ func newApfServerWithHooks(t *testing.T, decision mockDecision, onExecute, postE
 }
 
 func newApfServerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func()) *httptest.Server {
+	epmetrics.Register()
+	fcmetrics.Register()
 	apfServer := httptest.NewServer(newApfHandlerWithFilter(t, flowControlFilter, onExecute, postExecute))
 	return apfServer
 }
@@ -184,8 +187,6 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 }
 
 func TestApfSkipLongRunningRequest(t *testing.T) {
-	epmetrics.Register()
-
 	server := newApfServerWithSingleRequest(t, decisionSkipFilter)
 	defer server.Close()
 
@@ -201,8 +202,6 @@ func TestApfSkipLongRunningRequest(t *testing.T) {
 }
 
 func TestApfRejectRequest(t *testing.T) {
-	epmetrics.Register()
-
 	server := newApfServerWithSingleRequest(t, decisionReject)
 	defer server.Close()
 
@@ -216,7 +215,7 @@ func TestApfRejectRequest(t *testing.T) {
 
 	checkForExpectedMetrics(t, []string{
 		"apiserver_request_terminations_total",
-		"apiserver_dropped_requests_total",
+		"apiserver_request_total",
 	})
 }
 
@@ -354,8 +353,6 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 }
 
 func TestApfCancelWaitRequest(t *testing.T) {
-	epmetrics.Register()
-
 	server := newApfServerWithSingleRequest(t, decisionCancelWait)
 	defer server.Close()
 
@@ -366,7 +363,7 @@ func TestApfCancelWaitRequest(t *testing.T) {
 	checkForExpectedMetrics(t, []string{
 		"apiserver_current_inflight_requests",
 		"apiserver_request_terminations_total",
-		"apiserver_dropped_requests_total",
+		"apiserver_request_total",
 	})
 }
 
@@ -390,7 +387,8 @@ func newFakeWatchApfFilter(capacity int) *fakeWatchApfFilter {
 
 func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
-	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) fcrequest.WorkEstimate,
+	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
+	_ func() fcrequest.WorkEstimate,
 	_ fq.QueueNoteFn,
 	execFn func(),
 ) {
@@ -534,6 +532,9 @@ func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
 }
 
 func TestApfWatchPanic(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
+
 	fakeFilter := newFakeWatchApfFilter(1)
 
 	onExecuteFunc := func() {
@@ -559,6 +560,8 @@ func TestApfWatchPanic(t *testing.T) {
 }
 
 func TestApfWatchHandlePanic(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
 	preExecutePanicingFilter := newFakeWatchApfFilter(1)
 	preExecutePanicingFilter.preExecutePanic = true
 
@@ -612,6 +615,8 @@ func TestApfWatchHandlePanic(t *testing.T) {
 // Even though in production we are not using httptest.Server, this logic is shared
 // across these two.
 func TestContextClosesOnRequestProcessed(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -640,14 +645,18 @@ type fakeFilterRequestDigest struct {
 
 func (f *fakeFilterRequestDigest) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
-	workEstimator func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string) fcrequest.WorkEstimate,
+	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
+	workEstimator func() fcrequest.WorkEstimate,
 	_ fq.QueueNoteFn, _ func(),
 ) {
 	f.requestDigestGot = &requestDigest
-	f.workEstimateGot = workEstimator(bootstrap.MandatoryFlowSchemaCatchAll, bootstrap.MandatoryPriorityLevelConfigurationCatchAll, "")
+	noteFn(bootstrap.MandatoryFlowSchemaCatchAll, bootstrap.MandatoryPriorityLevelConfigurationCatchAll, "")
+	f.workEstimateGot = workEstimator()
 }
 
 func TestApfWithRequestDigest(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
 	longRunningFunc := func(_ *http.Request, _ *apirequest.RequestInfo) bool { return false }
 	fakeFilter := &fakeFilterRequestDigest{}
 
@@ -686,6 +695,7 @@ func TestApfWithRequestDigest(t *testing.T) {
 }
 
 func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
+	epmetrics.Register()
 	fcmetrics.Register()
 
 	t.Run("priority level concurrency is set to 1, request handler panics, next request should not be rejected", func(t *testing.T) {

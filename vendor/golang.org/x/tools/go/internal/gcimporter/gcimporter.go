@@ -29,8 +29,14 @@ import (
 	"text/scanner"
 )
 
-// debugging/development support
-const debug = false
+const (
+	// Enable debug during development: it adds some additional checks, and
+	// prevents errors from being recovered.
+	debug = false
+
+	// If trace is set, debugging output is printed to std out.
+	trace = false
+)
 
 var pkgExts = [...]string{".a", ".o"}
 
@@ -179,7 +185,7 @@ func Import(packages map[string]*types.Package, path, srcDir string, lookup func
 
 	var hdr string
 	buf := bufio.NewReader(rc)
-	if hdr, err = FindExportData(buf); err != nil {
+	if hdr, _, err = FindExportData(buf); err != nil {
 		return
 	}
 

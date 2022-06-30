@@ -94,6 +94,9 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 	result.CPU = cpu
 	result.Memory = memory
 
+	// NOTE: if they can be found, log stats will be overwritten
+	// by the caller, as it knows more information about the pod,
+	// which is needed to determine log size.
 	if rootFs != nil {
 		// The container logs live on the node rootfs device
 		result.Logs = buildLogsStats(cstat, rootFs)

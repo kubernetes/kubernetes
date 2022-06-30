@@ -48,6 +48,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -70,6 +71,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 		nodes      *v1.NodeList
 	)
 	f := framework.NewDefaultFramework("pod-disks")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeCountIsAtLeast(minNodes)
@@ -194,7 +196,7 @@ var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 					ginkgo.By("deleting host0Pod") // delete this pod before creating next pod
 					framework.ExpectNoError(podClient.Delete(context.TODO(), host0Pod.Name, podDelOpt), "Failed to delete host0Pod")
 					framework.Logf("deleted host0Pod %q", host0Pod.Name)
-					e2epod.WaitForPodToDisappear(cs, host0Pod.Namespace, host0Pod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+					e2epod.WaitForPodToDisappear(cs, host0Pod.Namespace, host0Pod.Name, labels.Everything(), framework.Poll, f.Timeouts.PodDelete)
 					framework.Logf("deleted host0Pod %q disappeared", host0Pod.Name)
 				}
 

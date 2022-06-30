@@ -32,10 +32,12 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alpha][Feature:CustomResourceValidationExpressions]", func() {
 	f := framework.NewDefaultFramework("crd-validation-expressions")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var apiExtensionClient *clientset.Clientset
 	ginkgo.BeforeEach(func() {
@@ -164,6 +166,61 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 		expectedErrMsg := "undefined field 'z'"
 		if !strings.Contains(err.Error(), expectedErrMsg) {
 			framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+		}
+	})
+
+	ginkgo.It("MUST fail create of a custom resource definition that contains an x-kubernetes-validations rule that contains a syntax error", func() {
+		ginkgo.By("Defining a custom resource definition that contains a validation rule with a syntax error")
+		var schemaWithSyntaxErrorRule = unmarshallSchema([]byte(`{
+		   "type":"object",
+		   "properties":{
+		      "spec":{
+			    "type":"object",
+				"x-kubernetes-validations":[
+				  { "rule":"self = 42" }
+				]
+			  }
+			}
+		}`))
+		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithSyntaxErrorRule, false)
+		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		framework.ExpectError(err, "creating a CustomResourceDefinition with a validation rule that contains a syntax error")
+		expectedErrMsg := "Syntax error"
+		if !strings.Contains(err.Error(), expectedErrMsg) {
+			framework.Failf("expected error message to contain %q, got %q", expectedErrMsg, err.Error())
+		}
+	})
+
+	ginkgo.It("MUST fail create of a custom resource definition that contains an x-kubernetes-validations rule that exceeds the estimated cost limit", func() {
+		ginkgo.By("Defining a custom resource definition that contains a validation rule that exceeds the cost limit")
+		var schemaWithExpensiveRule = unmarshallSchema([]byte(`{
+		   "type":"object",
+		   "properties":{
+			  "spec":{
+			    "type":"object",
+			    "properties":{
+				  "x":{
+				    "type":"array",
+				    "items":{
+				      "type":"array",
+					  "items":{
+					    "type":"string"
+					  },
+					  "x-kubernetes-validations":[
+					    { "rule":"self.all(s, s == 'string constant')" }
+					  ]
+				    }
+				  }
+			    }
+			  }
+		    }
+		}`))
+		crd := fixtures.NewRandomNameV1CustomResourceDefinitionWithSchema(v1.NamespaceScoped, schemaWithExpensiveRule, false)
+		_, err := fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		framework.ExpectError(err, "creating a CustomResourceDefinition with a validation rule that exceeds the cost limit")
+		expectedErrMsg := "exceeds budget"
+		if !strings.Contains(err.Error(), expectedErrMsg) {
+			framework.Failf("expected error message to contain %q, got %q", expectedErrMsg, err.Error())
 		}
 	})
 })

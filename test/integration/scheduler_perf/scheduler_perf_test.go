@@ -20,8 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -60,6 +60,7 @@ const (
 	createPodSetsOpcode      = "createPodSets"
 	churnOpcode              = "churn"
 	barrierOpcode            = "barrier"
+	sleepOpcode              = "sleep"
 	extensionPointsLabelName = "extension_point"
 
 	// Two modes supported in "churn" operator.
@@ -77,8 +78,8 @@ var (
 				label:  extensionPointsLabelName,
 				values: []string{"Filter", "Score"},
 			},
-			"scheduler_e2e_scheduling_duration_seconds": nil,
-			"scheduler_pod_scheduling_duration_seconds": nil,
+			"scheduler_scheduling_attempt_duration_seconds": nil,
+			"scheduler_pod_scheduling_duration_seconds":     nil,
 		},
 	}
 )
@@ -102,9 +103,9 @@ type testCase struct {
 	Workloads []*workload
 	// SchedulerConfigFile is the path of scheduler configuration
 	SchedulerConfigFile string
-	// TODO(#93792): reduce config toil by having a default pod and node spec per
-	// testCase? CreatePods and CreateNodes ops will inherit these unless
-	// manually overridden.
+	// Default path to spec file describing the pods to create. Optional.
+	// This path can be overridden in createPodsOp by setting PodTemplatePath .
+	DefaultPodTemplatePath *string
 }
 
 func (tc *testCase) collectsMetrics() bool {
@@ -134,7 +135,63 @@ type workload struct {
 	// Name of the workload.
 	Name string
 	// Values of parameters used in the workloadTemplate.
-	Params map[string]int
+	Params params
+}
+
+type params struct {
+	params map[string]int
+	// isUsed field records whether params is used or not.
+	isUsed map[string]bool
+}
+
+// UnmarshalJSON is a custom unmarshaler for params.
+//
+// from(json):
+// 	{
+// 		"initNodes": 500,
+// 		"initPods": 50
+// 	}
+//
+// to:
+//	params{
+//		params: map[string]int{
+//			"intNodes": 500,
+//			"initPods": 50,
+//		},
+//		isUsed: map[string]bool{}, // empty map
+//	}
+//
+func (p *params) UnmarshalJSON(b []byte) error {
+	aux := map[string]int{}
+
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+
+	p.params = aux
+	p.isUsed = map[string]bool{}
+	return nil
+}
+
+// get returns param.
+func (p params) get(key string) (int, error) {
+	p.isUsed[key] = true
+	param, ok := p.params[key]
+	if ok {
+		return param, nil
+	}
+	return 0, fmt.Errorf("parameter %s is undefined", key)
+}
+
+// unusedParams returns the names of unusedParams
+func (w workload) unusedParams() []string {
+	var ret []string
+	for name := range w.Params.params {
+		if !w.Params.isUsed[name] {
+			ret = append(ret, name)
+		}
+	}
+	return ret
 }
 
 // op is a dummy struct which stores the real op in itself.
@@ -152,7 +209,7 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		&createPodSetsOp{},
 		&churnOp{},
 		&barrierOp{},
-		// TODO(#93793): add a sleep timer op to simulate waiting?
+		&sleepOp{},
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
 	}
 	var firstError error
@@ -227,9 +284,10 @@ func (*createNodesOp) collectsMetrics() bool {
 
 func (cno createNodesOp) patchParams(w *workload) (realOp, error) {
 	if cno.CountParam != "" {
-		var ok bool
-		if cno.Count, ok = w.Params[cno.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cno.CountParam)
+		var err error
+		cno.Count, err = w.Params.get(cno.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cno, (&cno).isValid(false)
@@ -268,9 +326,10 @@ func (*createNamespacesOp) collectsMetrics() bool {
 
 func (cmo createNamespacesOp) patchParams(w *workload) (realOp, error) {
 	if cmo.CountParam != "" {
-		var ok bool
-		if cmo.Count, ok = w.Params[cmo.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cmo.CountParam)
+		var err error
+		cmo.Count, err = w.Params.get(cmo.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cmo, (&cmo).isValid(false)
@@ -294,6 +353,7 @@ type createPodsOp struct {
 	// namespace of the format "namespace-<number>".
 	Namespace *string
 	// Path to spec file describing the pods to schedule. Optional.
+	// If nil, DefaultPodTemplatePath will be used.
 	PodTemplatePath *string
 	// Whether or not to wait for all pods in this op to get scheduled. Optional,
 	// defaults to false.
@@ -327,9 +387,10 @@ func (cpo *createPodsOp) collectsMetrics() bool {
 
 func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
 	if cpo.CountParam != "" {
-		var ok bool
-		if cpo.Count, ok = w.Params[cpo.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cpo.CountParam)
+		var err error
+		cpo.Count, err = w.Params.get(cpo.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cpo, (&cpo).isValid(false)
@@ -368,9 +429,10 @@ func (cpso *createPodSetsOp) collectsMetrics() bool {
 
 func (cpso createPodSetsOp) patchParams(w *workload) (realOp, error) {
 	if cpso.CountParam != "" {
-		var ok bool
-		if cpso.Count, ok = w.Params[cpso.CountParam[1:]]; !ok {
-			return nil, fmt.Errorf("parameter %s is undefined", cpso.CountParam)
+		var err error
+		cpso.Count, err = w.Params.get(cpso.CountParam[1:])
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &cpso, (&cpso).isValid(true)
@@ -451,6 +513,44 @@ func (bo barrierOp) patchParams(w *workload) (realOp, error) {
 	return &bo, nil
 }
 
+// sleepOp defines an op that can be used to sleep for a specified amount of time.
+// This is useful in simulating workloads that require some sort of time-based synchronisation.
+type sleepOp struct {
+	// Must be "sleep".
+	Opcode string
+	// duration of sleep.
+	Duration time.Duration
+}
+
+func (so *sleepOp) UnmarshalJSON(data []byte) (err error) {
+	var tmp struct {
+		Opcode   string
+		Duration string
+	}
+	if err = json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+
+	so.Opcode = tmp.Opcode
+	so.Duration, err = time.ParseDuration(tmp.Duration)
+	return err
+}
+
+func (so *sleepOp) isValid(_ bool) error {
+	if so.Opcode != sleepOpcode {
+		return fmt.Errorf("invalid opcode %q; expected %q", so.Opcode, sleepOpcode)
+	}
+	return nil
+}
+
+func (so *sleepOp) collectsMetrics() bool {
+	return false
+}
+
+func (so sleepOp) patchParams(_ *workload) (realOp, error) {
+	return &so, nil
+}
+
 func BenchmarkPerfScheduling(b *testing.B) {
 	testCases, err := getTestCases(configFile)
 	if err != nil {
@@ -477,12 +577,12 @@ func BenchmarkPerfScheduling(b *testing.B) {
 		})
 	}
 	if err := dataItems2JSONFile(dataItems, b.Name()); err != nil {
-		klog.Fatalf("%v: unable to write measured data: %v", b.Name(), err)
+		klog.Fatalf("%v: unable to write measured data %+v: %v", b.Name(), dataItems, err)
 	}
 }
 
 func loadSchedulerConfig(file string) (*config.KubeSchedulerConfiguration, error) {
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -540,8 +640,17 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 
 	var mu sync.Mutex
 	var dataItems []DataItem
-	numPodsScheduledPerNamespace := make(map[string]int)
 	nextNodeIndex := 0
+	// numPodsScheduledPerNamespace has all namespaces created in workload and the number of pods they (will) have.
+	// All namespaces listed in numPodsScheduledPerNamespace will be cleaned up.
+	numPodsScheduledPerNamespace := make(map[string]int)
+	b.Cleanup(func() {
+		for namespace := range numPodsScheduledPerNamespace {
+			if err := client.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{}); err != nil {
+				b.Errorf("Deleting Namespace in numPodsScheduledPerNamespace: %v", err)
+			}
+		}
+	})
 
 	for opIndex, op := range unrollWorkloadTemplate(b, tc.WorkloadTemplate, w) {
 		realOp, err := op.realOp.patchParams(w)
@@ -576,16 +685,32 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 				nsPreparer.cleanup()
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
-			b.Cleanup(func() {
-				nsPreparer.cleanup()
-			})
+			for _, n := range nsPreparer.namespaces() {
+				if _, ok := numPodsScheduledPerNamespace[n]; ok {
+					// this namespace has been already created.
+					continue
+				}
+				numPodsScheduledPerNamespace[n] = 0
+			}
 
 		case *createPodsOp:
 			var namespace string
+			// define Pod's namespace automatically, and create that namespace.
+			namespace = fmt.Sprintf("namespace-%d", opIndex)
 			if concreteOp.Namespace != nil {
 				namespace = *concreteOp.Namespace
-			} else {
-				namespace = fmt.Sprintf("namespace-%d", opIndex)
+			}
+			if _, ok := numPodsScheduledPerNamespace[namespace]; !ok {
+				// The namespace has not created yet.
+				// So, creat that and register it to numPodsScheduledPerNamespace.
+				_, err := client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{})
+				if err != nil {
+					b.Fatalf("failed to create namespace for Pod: %v", namespace)
+				}
+				numPodsScheduledPerNamespace[namespace] = 0
+			}
+			if concreteOp.PodTemplatePath == nil {
+				concreteOp.PodTemplatePath = tc.DefaultPodTemplatePath
 			}
 			var collectors []testDataCollector
 			var collectorCtx context.Context
@@ -749,10 +874,22 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 				}
 			}
 
+		case *sleepOp:
+			select {
+			case <-ctx.Done():
+			case <-time.After(concreteOp.Duration):
+			}
 		default:
 			b.Fatalf("op %d: invalid op %v", opIndex, concreteOp)
 		}
 	}
+
+	// check unused params and inform users
+	unusedParams := w.unusedParams()
+	if len(unusedParams) != 0 {
+		b.Fatalf("the parameters %v are defined on workload %s, but unused.\nPlease make sure there are no typos.", unusedParams, w.Name)
+	}
+
 	// Some tests have unschedulable pods. Do not add an implicit barrier at the
 	// end as we do not want to wait for them.
 	return dataItems
@@ -862,7 +999,7 @@ func waitUntilPodsScheduled(ctx context.Context, podInformer coreinformers.PodIn
 }
 
 func getSpecFromFile(path *string, spec interface{}) error {
-	bytes, err := ioutil.ReadFile(*path)
+	bytes, err := os.ReadFile(*path)
 	if err != nil {
 		return err
 	}
@@ -870,7 +1007,7 @@ func getSpecFromFile(path *string, spec interface{}) error {
 }
 
 func getUnstructuredFromFile(path string) (*unstructured.Unstructured, *schema.GroupVersionKind, error) {
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1026,6 +1163,15 @@ func newNamespacePreparer(cno *createNamespacesOp, clientset clientset.Interface
 	}, nil
 }
 
+// namespaces returns namespace names have been (or will be) created by this namespacePreparer
+func (p *namespacePreparer) namespaces() []string {
+	namespaces := make([]string, p.count)
+	for i := 0; i < p.count; i++ {
+		namespaces[i] = fmt.Sprintf("%s-%d", p.prefix, i)
+	}
+	return namespaces
+}
+
 // prepare creates the namespaces.
 func (p *namespacePreparer) prepare() error {
 	base := &v1.Namespace{}
@@ -1037,7 +1183,7 @@ func (p *namespacePreparer) prepare() error {
 		n := base.DeepCopy()
 		n.Name = fmt.Sprintf("%s-%d", p.prefix, i)
 		if err := testutils.RetryWithExponentialBackOff(func() (bool, error) {
-			_, err := p.client.CoreV1().Namespaces().Create(context.TODO(), n, metav1.CreateOptions{})
+			_, err := p.client.CoreV1().Namespaces().Create(context.Background(), n, metav1.CreateOptions{})
 			return err == nil || apierrors.IsAlreadyExists(err), nil
 		}); err != nil {
 			return err
@@ -1051,7 +1197,7 @@ func (p *namespacePreparer) cleanup() error {
 	var errRet error
 	for i := 0; i < p.count; i++ {
 		n := fmt.Sprintf("%s-%d", p.prefix, i)
-		if err := p.client.CoreV1().Namespaces().Delete(context.TODO(), n, metav1.DeleteOptions{}); err != nil {
+		if err := p.client.CoreV1().Namespaces().Delete(context.Background(), n, metav1.DeleteOptions{}); err != nil {
 			klog.Errorf("Deleting Namespace: %v", err)
 			errRet = err
 		}

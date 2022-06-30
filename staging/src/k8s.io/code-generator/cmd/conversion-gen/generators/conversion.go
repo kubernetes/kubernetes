@@ -638,10 +638,11 @@ func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, boo
 }
 
 func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
-	if klog.V(5).Enabled() {
+	klogV := klog.V(5)
+	if klogV.Enabled() {
 		if m, ok := g.useUnsafe.(equalMemoryTypes); ok {
 			var result []string
-			klog.Info("All objects without identical memory layout:")
+			klogV.Info("All objects without identical memory layout:")
 			for k, v := range m {
 				if v {
 					continue
@@ -650,7 +651,7 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 			}
 			sort.Strings(result)
 			for _, s := range result {
-				klog.Infof(s)
+				klogV.Info(s)
 			}
 		}
 	}

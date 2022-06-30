@@ -236,7 +236,7 @@ func TestValidateWebhookDuration(ts *testing.T) {
 		ts.Run(test.Name, func(t *testing.T) {
 			ctx := context.TODO()
 			if test.InitContext {
-				ctx = request.WithWebhookDurationAndCustomClock(ctx, &clk)
+				ctx = request.WithLatencyTrackersAndCustomClock(ctx, &clk)
 			}
 			wh, err := NewValidatingAdmissionWebhook(nil)
 			if err != nil {
@@ -261,7 +261,7 @@ func TestValidateWebhookDuration(ts *testing.T) {
 			}
 
 			_ = wh.Validate(ctx, webhooktesting.NewAttribute(ns, nil, test.IsDryRun), objectInterfaces)
-			wd, ok := request.WebhookDurationFrom(ctx)
+			wd, ok := request.LatencyTrackersFrom(ctx)
 			if !ok {
 				if test.InitContext {
 					t.Errorf("expected webhook duration to be initialized")
@@ -272,12 +272,78 @@ func TestValidateWebhookDuration(ts *testing.T) {
 				t.Errorf("expected webhook duration to not be initialized")
 				return
 			}
-			if wd.AdmitTracker.GetLatency() != 0 {
-				t.Errorf("expected admit duration to be equal to 0 got %q", wd.AdmitTracker.GetLatency())
+			if wd.MutatingWebhookTracker.GetLatency() != 0 {
+				t.Errorf("expected admit duration to be equal to 0 got %q", wd.MutatingWebhookTracker.GetLatency())
 			}
-			if wd.ValidateTracker.GetLatency() < test.ExpectedDurationMax {
-				t.Errorf("expected validate duraion to be greater or equal to %q got %q", test.ExpectedDurationMax, wd.ValidateTracker.GetLatency())
+			if wd.ValidatingWebhookTracker.GetLatency() < test.ExpectedDurationMax {
+				t.Errorf("expected validate duraion to be greater or equal to %q got %q", test.ExpectedDurationMax, wd.ValidatingWebhookTracker.GetLatency())
 			}
 		})
+	}
+}
+
+// TestValidatePanicHandling tests that panics should not escape the dispatcher
+func TestValidatePanicHandling(t *testing.T) {
+	testServer := webhooktesting.NewTestServer(t)
+	testServer.StartTLS()
+	defer testServer.Close()
+
+	objectInterfaces := webhooktesting.NewObjectInterfacesForTest()
+
+	serverURL, err := url.ParseRequestURI(testServer.URL)
+	if err != nil {
+		t.Fatalf("this should never happen? %v", err)
+	}
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	for _, tt := range webhooktesting.NewNonMutatingPanicTestCases(serverURL) {
+		wh, err := NewValidatingAdmissionWebhook(nil)
+		if err != nil {
+			t.Errorf("%s: failed to create validating webhook: %v", tt.Name, err)
+			continue
+		}
+
+		ns := "webhook-test"
+		client, informer := webhooktesting.NewFakeValidatingDataSource(ns, tt.Webhooks, stopCh)
+
+		wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewPanickingAuthenticationInfoResolver("Start panicking!"))) // see Aladdin, it's awesome
+		wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
+		wh.SetExternalKubeClientSet(client)
+		wh.SetExternalKubeInformerFactory(informer)
+
+		informer.Start(stopCh)
+		informer.WaitForCacheSync(stopCh)
+
+		if err = wh.ValidateInitialization(); err != nil {
+			t.Errorf("%s: failed to validate initialization: %v", tt.Name, err)
+			continue
+		}
+
+		attr := webhooktesting.NewAttribute(ns, nil, tt.IsDryRun)
+		err = wh.Validate(context.TODO(), attr, objectInterfaces)
+		if tt.ExpectAllow != (err == nil) {
+			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
+		}
+		// ErrWebhookRejected is not an error for our purposes
+		if tt.ErrorContains != "" {
+			if err == nil || !strings.Contains(err.Error(), tt.ErrorContains) {
+				t.Errorf("%s: expected an error saying %q, but got %v", tt.Name, tt.ErrorContains, err)
+			}
+		}
+		if _, isStatusErr := err.(*errors.StatusError); err != nil && !isStatusErr {
+			t.Errorf("%s: expected a StatusError, got %T", tt.Name, err)
+		}
+		fakeAttr, ok := attr.(*webhooktesting.FakeAttributes)
+		if !ok {
+			t.Errorf("Unexpected error, failed to convert attr to webhooktesting.FakeAttributes")
+			continue
+		}
+		if len(tt.ExpectAnnotations) == 0 {
+			assert.Empty(t, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
+		} else {
+			assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
+		}
 	}
 }

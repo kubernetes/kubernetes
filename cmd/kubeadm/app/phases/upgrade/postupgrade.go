@@ -18,7 +18,10 @@ package upgrade
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -31,6 +34,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
@@ -45,7 +49,7 @@ import (
 
 // PerformPostUpgradeTasks runs nearly the same functions as 'kubeadm init' would do
 // Note that the mark-control-plane phase is left out, not needed, and no token is created as that doesn't belong to the upgrade
-func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
+func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
 	errs := []error{}
 
 	// Upload currently used configuration to the cluster
@@ -61,7 +65,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	// Write the new kubelet config down to disk and the env file if needed
-	if err := writeKubeletConfigFiles(client, cfg, dryRun); err != nil {
+	if err := writeKubeletConfigFiles(client, cfg, patchesDir, dryRun, out); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -124,7 +128,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 			metav1.NamespaceSystem)
 	} else {
 		// Upgrade CoreDNS
-		if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client); err != nil {
+		if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client, out, false); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -147,7 +151,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 			metav1.NamespaceSystem)
 	} else {
 		// Upgrade kube-proxy
-		if err := proxy.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client); err != nil {
+		if err := proxy.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, false); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -155,7 +159,7 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	return errorsutil.NewAggregate(errs)
 }
 
-func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
+func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, patchesDir string, dryRun bool, out io.Writer) error {
 	kubeletDir, err := GetKubeletDir(dryRun)
 	if err != nil {
 		// The error here should never occur in reality, would only be thrown if /tmp doesn't exist on the machine.
@@ -163,7 +167,7 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 	errs := []error{}
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
-	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir); err != nil {
+	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, out); err != nil {
 		errs = append(errs, errors.Wrap(err, "error writing kubelet configuration to file"))
 	}
 
@@ -204,30 +208,82 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
 }
 
-// LabelOldControlPlaneNodes finds all nodes with the legacy node-role label and also applies
-// the "control-plane" node-role label to them.
+// RemoveOldControlPlaneTaint finds all nodes with the new "control-plane" node-role label
+// and removes the old "control-plane" taint to them.
 // TODO: https://github.com/kubernetes/kubeadm/issues/2200
-func LabelOldControlPlaneNodes(client clientset.Interface) error {
-	selectorOldControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
-		kubeadmconstants.LabelNodeRoleOldControlPlane: "",
+func RemoveOldControlPlaneTaint(client clientset.Interface) error {
+	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
+		kubeadmconstants.LabelNodeRoleControlPlane: "",
 	}))
-	nodesWithOldLabel, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: selectorOldControlPlane.String(),
+	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selectorControlPlane.String(),
 	})
 	if err != nil {
-		return errors.Wrapf(err, "could not list nodes labeled with %q", kubeadmconstants.LabelNodeRoleOldControlPlane)
+		return errors.Wrapf(err, "could not list nodes labeled with %q", kubeadmconstants.LabelNodeRoleControlPlane)
 	}
 
-	for _, n := range nodesWithOldLabel.Items {
-		if _, hasNewLabel := n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleControlPlane]; hasNewLabel {
-			continue
+	for _, n := range nodes.Items {
+		// Check if the node has the old taint
+		hasOldTaint := false
+		taints := []v1.Taint{}
+		for _, t := range n.Spec.Taints {
+			if t.String() == kubeadmconstants.OldControlPlaneTaint.String() {
+				hasOldTaint = true
+				continue
+			}
+			// Collect all other taints
+			taints = append(taints, t)
 		}
-		err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
-			n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleControlPlane] = ""
-		})
-		if err != nil {
-			return err
+		// If the old taint is present remove it
+		if hasOldTaint {
+			err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
+				n.Spec.Taints = taints
+			})
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
+}
+
+func updateKubeletDynamicEnvFileWithURLScheme(str string) string {
+	const (
+		flag   = "container-runtime-endpoint"
+		scheme = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://"
+	)
+	// Trim the prefix
+	str = strings.TrimLeft(str, fmt.Sprintf("%s=\"", kubeadmconstants.KubeletEnvFileVariableName))
+
+	// Flags are managed by kubeadm as pairs of key=value separated by space.
+	// Split them, find the one containing the flag of interest and update
+	// its value to have the scheme prefix.
+	split := strings.Split(str, " ")
+	for i, s := range split {
+		if !strings.Contains(s, flag) {
+			continue
+		}
+		keyValue := strings.Split(s, "=")
+		if len(keyValue) < 2 {
+			// Post init/join, the user may have edited the file and has flags that are not
+			// followed by "=". If that is the case the next argument must be the value
+			// of the endpoint flag and if its not a flag itself. Update that argument with
+			// the scheme instead.
+			if i+1 < len(split) {
+				nextArg := split[i+1]
+				if !strings.HasPrefix(nextArg, "-") && !strings.HasPrefix(nextArg, scheme) {
+					split[i+1] = scheme + nextArg
+				}
+			}
+			continue
+		}
+		if len(keyValue[1]) == 0 || strings.HasPrefix(keyValue[1], scheme) {
+			continue // The flag value already has the URL scheme prefix or is empty
+		}
+		// Missing prefix. Add it and update the key=value pair
+		keyValue[1] = scheme + keyValue[1]
+		split[i] = strings.Join(keyValue, "=")
+	}
+	str = strings.Join(split, " ")
+	return fmt.Sprintf("%s=\"%s", kubeadmconstants.KubeletEnvFileVariableName, str)
 }

@@ -27,11 +27,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // persistentvolumeclaimStrategy implements behavior for PersistentVolumeClaim objects
@@ -111,6 +112,10 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx context.Context, obj, 
 	// in again here.
 	pvcutil.EnforceDataSourceBackwardsCompatibility(&newPvc.Spec, &oldPvc.Spec)
 	pvcutil.NormalizeDataSources(&newPvc.Spec)
+
+	// We also normalize the data source fields of the old PVC, so that objects saved
+	// from an earlier version will pass validation.
+	pvcutil.NormalizeDataSources(&oldPvc.Spec)
 }
 
 func (persistentvolumeclaimStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

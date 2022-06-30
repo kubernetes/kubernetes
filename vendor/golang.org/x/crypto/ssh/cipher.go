@@ -18,7 +18,7 @@ import (
 	"io/ioutil"
 
 	"golang.org/x/crypto/chacha20"
-	"golang.org/x/crypto/poly1305"
+	"golang.org/x/crypto/internal/poly1305"
 )
 
 const (
@@ -394,6 +394,10 @@ func (c *gcmCipher) readCipherPacket(seqNum uint32, r io.Reader) ([]byte, error)
 	}
 	c.incIV()
 
+	if len(plain) == 0 {
+		return nil, errors.New("ssh: empty packet")
+	}
+
 	padding := plain[0]
 	if padding < 4 {
 		// padding is a byte, so it automatically satisfies
@@ -709,6 +713,10 @@ func (c *chacha20Poly1305Cipher) readCipherPacket(seqNum uint32, r io.Reader) ([
 
 	plain := c.buf[4:contentEnd]
 	s.XORKeyStream(plain, plain)
+
+	if len(plain) == 0 {
+		return nil, errors.New("ssh: empty packet")
+	}
 
 	padding := plain[0]
 	if padding < 4 {

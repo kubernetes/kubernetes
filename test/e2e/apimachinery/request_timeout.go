@@ -17,13 +17,14 @@ limitations under the License.
 package apimachinery
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
 	"github.com/onsi/ginkgo"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -32,6 +33,7 @@ const (
 
 var _ = SIGDescribe("Server request timeout", func() {
 	f := framework.NewDefaultFramework("request-timeout")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should return HTTP status code 400 if the user specifies an invalid timeout in the request URL", func() {
 		rt := getRoundTripper(f)
@@ -100,7 +102,7 @@ func newRequest(f *framework.Framework, timeout string) *http.Request {
 }
 
 func readBody(response *http.Response) string {
-	raw, err := ioutil.ReadAll(response.Body)
+	raw, err := io.ReadAll(response.Body)
 	framework.ExpectNoError(err)
 
 	return string(raw)

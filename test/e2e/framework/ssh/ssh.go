@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -102,7 +101,7 @@ func GetSigner(provider string) (ssh.Signer, error) {
 }
 
 func makePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
-	buffer, err := ioutil.ReadFile(key)
+	buffer, err := os.ReadFile(key)
 	if err != nil {
 		return nil, fmt.Errorf("error reading SSH key %s: '%v'", key, err)
 	}
@@ -245,7 +244,7 @@ func runSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, i
 		err = wait.Poll(5*time.Second, 20*time.Second, func() (bool, error) {
 			fmt.Printf("error dialing %s@%s: '%v', retrying\n", user, host, err)
 			if client, err = ssh.Dial("tcp", host, config); err != nil {
-				return false, err
+				return false, nil // retrying, error will be logged above
 			}
 			return true, nil
 		})

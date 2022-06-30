@@ -21,11 +21,11 @@ import (
 )
 
 // leastResourceScorer favors nodes with fewer requested resources.
-// It calculates the percentage of memory and CPU requested by pods scheduled on the node, and
+// It calculates the percentage of memory, CPU and other resources requested by pods scheduled on the node, and
 // prioritizes based on the minimum of the average of the fraction of requested to capacity.
 //
 // Details:
-// (cpu((capacity-sum(requested))*MaxNodeScore/capacity) + memory((capacity-sum(requested))*MaxNodeScore/capacity))/weightSum
+// (cpu((capacity-requested)*MaxNodeScore*cpuWeight/capacity) + memory((capacity-requested)*MaxNodeScore*memoryWeight/capacity) + ...)/weightSum
 func leastResourceScorer(resToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap) int64 {
 	return func(requested, allocable resourceToValueMap) int64 {
 		var nodeScore, weightSum int64

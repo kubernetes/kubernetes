@@ -4,9 +4,8 @@
 # term seems to be for getting terminal size when printing help text.
 
 approvers:
-- sig-cli-maintainers
+  - sig-cli-maintainers
 reviewers:
-- sig-cli
-
+  - sig-cli-reviewers
 labels:
-- sig/cli
+  - sig/cli

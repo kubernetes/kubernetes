@@ -53,8 +53,6 @@ type RuntimeClass struct {
 	// Overhead represents the resource overhead associated with running a pod for a
 	// given RuntimeClass. For more details, see
 	//  https://kubernetes.io/docs/concepts/scheduling-eviction/pod-overhead/
-	// This field is in beta starting v1.18
-	// and is only honored by servers that enable the PodOverhead feature.
 	// +optional
 	Overhead *Overhead `json:"overhead,omitempty" protobuf:"bytes,3,opt,name=overhead"`
 

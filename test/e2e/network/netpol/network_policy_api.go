@@ -18,7 +18,6 @@ package netpol
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -36,6 +36,7 @@ import (
 
 var _ = common.SIGDescribe("Netpol API", func() {
 	f := framework.NewDefaultFramework("netpol")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	/*
 		Release: v1.20
 		Testname: NetworkPolicies API
@@ -85,7 +86,9 @@ var _ = common.SIGDescribe("Netpol API", func() {
 					}
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected networking API group/version, got %#v", discoveryGroups.Groups))
+			if !found {
+				framework.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
+			}
 		}
 		ginkgo.By("getting /apis/networking.k8s.io")
 		{
@@ -99,7 +102,9 @@ var _ = common.SIGDescribe("Netpol API", func() {
 					break
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected networking API version, got %#v", group.Versions))
+			if !found {
+				framework.Failf("expected networking API version, got %#v", group.Versions)
+			}
 		}
 		ginkgo.By("getting /apis/networking.k8s.io" + npVersion)
 		{
@@ -112,7 +117,9 @@ var _ = common.SIGDescribe("Netpol API", func() {
 					foundNetPol = true
 				}
 			}
-			framework.ExpectEqual(foundNetPol, true, fmt.Sprintf("expected networkpolicies, got %#v", resources.APIResources))
+			if !foundNetPol {
+				framework.Failf("expected networkpolicies, got %#v", resources.APIResources)
+			}
 		}
 		// NetPol resource create/read/update/watch verbs
 		ginkgo.By("creating")
@@ -165,10 +172,14 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-npWatch.ResultChan():
-				framework.ExpectEqual(ok, true, "watch channel should not close")
+				if !ok {
+					framework.Fail("watch channel should not close")
+				}
 				framework.ExpectEqual(evt.Type, watch.Modified)
 				watchedNetPol, isNetPol := evt.Object.(*networkingv1.NetworkPolicy)
-				framework.ExpectEqual(isNetPol, true, fmt.Sprintf("expected NetworkPolicy, got %T", evt.Object))
+				if !isNetPol {
+					framework.Failf("expected NetworkPolicy, got %T", evt.Object)
+				}
 				if watchedNetPol.Annotations["patched"] == "true" && watchedNetPol.Annotations["updated"] == "true" {
 					framework.Logf("saw patched and updated annotations")
 					sawAnnotations = true
@@ -185,7 +196,9 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		err = npClient.Delete(context.TODO(), createdNetPol.Name, metav1.DeleteOptions{})
 		framework.ExpectNoError(err)
 		_, err = npClient.Get(context.TODO(), createdNetPol.Name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %#v", err))
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("expected 404, got %#v", err)
+		}
 		nps, err = npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(len(nps.Items), 2, "filtered list should have 2 items")
@@ -248,6 +261,81 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		npTemplate.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{egressRule}
 		_, err = npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "request template:%v", npTemplate)
+
+		ginkgo.By("deleting all test collection")
+		err = npClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		nps, err := npClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(nps.Items), 0, "filtered list should be 0 items")
+	})
+
+	/*
+			Release: v1.24
+			Testname: NetworkPolicy support status subresource
+			Description:
+		    - Status condition without a Reason cannot exist
+		    - Status should support conditions
+			- Two conditions with the same type cannot exist.
+	*/
+	ginkgo.It("should support creating NetworkPolicy with Status subresource [Feature:NetworkPolicyStatus]", func() {
+		ns := f.Namespace.Name
+		npClient := f.ClientSet.NetworkingV1().NetworkPolicies(ns)
+
+		ginkgo.By("NetworkPolicy should deny invalid status condition without Reason field")
+
+		namespaceSelector := &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"ns-name": "pod-b",
+			},
+		}
+		podSelector := &metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"pod-name": "client-a",
+			},
+		}
+		ingressRule := networkingv1.NetworkPolicyIngressRule{}
+		ingressRule.From = append(ingressRule.From, networkingv1.NetworkPolicyPeer{PodSelector: podSelector, NamespaceSelector: namespaceSelector})
+
+		npTemplate := GenNetworkPolicy(SetGenerateName("e2e-example-netpol-status-validate"),
+			SetObjectMetaLabel(map[string]string{"special-label": f.UniqueName}),
+			SetSpecPodSelectorMatchLabels(map[string]string{"pod-name": "test-pod"}),
+			SetSpecIngressRules(ingressRule))
+		newNetPol, err := npClient.Create(context.TODO(), npTemplate, metav1.CreateOptions{})
+
+		framework.ExpectNoError(err, "request template:%v", npTemplate)
+
+		condition := metav1.Condition{
+			Type:               string(networkingv1.NetworkPolicyConditionStatusAccepted),
+			Status:             metav1.ConditionTrue,
+			Reason:             "RuleApplied",
+			LastTransitionTime: metav1.Time{Time: time.Now().Add(-5 * time.Minute)},
+			Message:            "rule was successfully applied",
+			ObservedGeneration: 2,
+		}
+
+		status := networkingv1.NetworkPolicyStatus{
+			Conditions: []metav1.Condition{
+				condition,
+			},
+		}
+
+		ginkgo.By("NetworkPolicy should support valid status condition")
+		newNetPol.Status = status
+
+		_, err = npClient.UpdateStatus(context.TODO(), newNetPol, metav1.UpdateOptions{})
+		framework.ExpectNoError(err, "request template:%v", newNetPol)
+
+		ginkgo.By("NetworkPolicy should not support status condition without reason field")
+		newNetPol.Status.Conditions[0].Reason = ""
+		_, err = npClient.UpdateStatus(context.TODO(), newNetPol, metav1.UpdateOptions{})
+		framework.ExpectError(err, "request template:%v", newNetPol)
+
+		ginkgo.By("NetworkPolicy should not support status condition with duplicated types")
+		newNetPol.Status.Conditions = []metav1.Condition{condition, condition}
+		newNetPol.Status.Conditions[1].Status = metav1.ConditionFalse
+		_, err = npClient.UpdateStatus(context.TODO(), newNetPol, metav1.UpdateOptions{})
+		framework.ExpectError(err, "request template:%v", newNetPol)
 
 		ginkgo.By("deleting all test collection")
 		err = npClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})

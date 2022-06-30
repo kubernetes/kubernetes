@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 
@@ -33,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -40,12 +40,17 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
-func FetchInitConfigurationFromCluster(client clientset.Interface, w io.Writer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
-	fmt.Fprintf(w, "[%s] Reading configuration from the cluster...\n", logPrefix)
-	fmt.Fprintf(w, "[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -o yaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
+func FetchInitConfigurationFromCluster(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+	if printer == nil {
+		printer = &output.TextPrinter{}
+	}
+	printer.Printf("[%s] Reading configuration from the cluster...\n", logPrefix)
+	printer.Printf("[%s] FYI: You can look at this config file with 'kubectl -n %s get cm %s -o yaml'\n", logPrefix, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 
 	// Fetch the actual config from cluster
 	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane, skipComponentConfigs)
@@ -82,6 +87,12 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	if !ok {
 		return nil, errors.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
 	}
+	// If ClusterConfiguration was patched by something other than kubeadm, it may have errors. Warn about them.
+	if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme},
+		kubeadmapiv1.SchemeGroupVersion.WithKind(constants.ClusterConfigurationKind),
+		[]byte(clusterConfigurationData)); err != nil {
+		klog.Warning(err.Error())
+	}
 	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterConfigurationData), &initcfg.ClusterConfiguration); err != nil {
 		return nil, errors.Wrap(err, "failed to decode cluster configuration data")
 	}
@@ -97,7 +108,8 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	// get nodes specific information as well
 	if !newControlPlane {
 		// gets the nodeRegistration for the current from the node object
-		if err := getNodeRegistration(kubeconfigDir, client, &initcfg.NodeRegistration); err != nil {
+		kubeconfigFile := filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName)
+		if err := GetNodeRegistration(kubeconfigFile, client, &initcfg.NodeRegistration); err != nil {
 			return nil, errors.Wrap(err, "failed to get node registration")
 		}
 		// gets the APIEndpoint for the current node
@@ -117,10 +129,10 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	return initcfg, nil
 }
 
-// getNodeRegistration returns the nodeRegistration for the current node
-func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions) error {
+// GetNodeRegistration returns the nodeRegistration for the current node
+func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions) error {
 	// gets the name of the current node
-	nodeName, err := getNodeNameFromKubeletConfig(kubeconfigDir)
+	nodeName, err := getNodeNameFromKubeletConfig(kubeconfigFile)
 	if err != nil {
 		return errors.Wrap(err, "failed to get node name from kubelet config")
 	}
@@ -149,9 +161,8 @@ func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeR
 // getNodeNameFromKubeletConfig gets the node name from a kubelet config file
 // TODO: in future we want to switch to a more canonical way for doing this e.g. by having this
 //       information in the local kubelet config.yaml
-func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
+func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 	// loads the kubelet.conf file
-	fileName := filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName)
 	config, err := clientcmd.LoadFromFile(fileName)
 	if err != nil {
 		return "", err
@@ -183,8 +194,8 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 		return "", errors.Errorf("invalid kubeconfig file %s. x509 certificate expected", fileName)
 	}
 
-	// We are only putting one certificate in the certificate pem file, so it's safe to just pick the first one
-	// TODO: Support multiple certs here in order to be able to rotate certs
+	// Safely pick the first one because the sender's certificate must come first in the list.
+	// For details, see: https://www.rfc-editor.org/rfc/rfc4346#section-7.4.2
 	cert := certs[0]
 
 	// gets the node name from the certificate common name

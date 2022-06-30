@@ -32,9 +32,8 @@ func TestBuildArgumentListFromMap(t *testing.T) {
 		{
 			name: "override an argument from the base",
 			base: map[string]string{
-				"admission-control":     "NamespaceLifecycle",
-				"insecure-bind-address": "127.0.0.1",
-				"allow-privileged":      "true",
+				"admission-control": "NamespaceLifecycle",
+				"allow-privileged":  "true",
 			},
 			overrides: map[string]string{
 				"admission-control": "NamespaceLifecycle,LimitRanger",
@@ -42,14 +41,12 @@ func TestBuildArgumentListFromMap(t *testing.T) {
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
 				"--allow-privileged=true",
-				"--insecure-bind-address=127.0.0.1",
 			},
 		},
 		{
 			name: "add an argument that is not in base",
 			base: map[string]string{
-				"insecure-bind-address": "127.0.0.1",
-				"allow-privileged":      "true",
+				"allow-privileged": "true",
 			},
 			overrides: map[string]string{
 				"admission-control": "NamespaceLifecycle,LimitRanger",
@@ -57,13 +54,11 @@ func TestBuildArgumentListFromMap(t *testing.T) {
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
 				"--allow-privileged=true",
-				"--insecure-bind-address=127.0.0.1",
 			},
 		},
 		{
 			name: "allow empty strings in base",
 			base: map[string]string{
-				"insecure-bind-address":              "127.0.0.1",
 				"allow-privileged":                   "true",
 				"something-that-allows-empty-string": "",
 			},
@@ -73,14 +68,12 @@ func TestBuildArgumentListFromMap(t *testing.T) {
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
 				"--allow-privileged=true",
-				"--insecure-bind-address=127.0.0.1",
 				"--something-that-allows-empty-string=",
 			},
 		},
 		{
 			name: "allow empty strings in overrides",
 			base: map[string]string{
-				"insecure-bind-address":              "127.0.0.1",
 				"allow-privileged":                   "true",
 				"something-that-allows-empty-string": "foo",
 			},
@@ -91,7 +84,6 @@ func TestBuildArgumentListFromMap(t *testing.T) {
 			expected: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
 				"--allow-privileged=true",
-				"--insecure-bind-address=127.0.0.1",
 				"--something-that-allows-empty-string=",
 			},
 		},
@@ -117,28 +109,24 @@ func TestParseArgumentListToMap(t *testing.T) {
 			name: "normal case",
 			args: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 			},
 			expectedMap: map[string]string{
-				"admission-control":     "NamespaceLifecycle,LimitRanger",
-				"insecure-bind-address": "127.0.0.1",
-				"allow-privileged":      "true",
+				"admission-control": "NamespaceLifecycle,LimitRanger",
+				"allow-privileged":  "true",
 			},
 		},
 		{
 			name: "test that feature-gates is working",
 			args: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 				"--feature-gates=EnableFoo=true,EnableBar=false",
 			},
 			expectedMap: map[string]string{
-				"admission-control":     "NamespaceLifecycle,LimitRanger",
-				"insecure-bind-address": "127.0.0.1",
-				"allow-privileged":      "true",
-				"feature-gates":         "EnableFoo=true,EnableBar=false",
+				"admission-control": "NamespaceLifecycle,LimitRanger",
+				"allow-privileged":  "true",
+				"feature-gates":     "EnableFoo=true,EnableBar=false",
 			},
 		},
 		{
@@ -146,15 +134,13 @@ func TestParseArgumentListToMap(t *testing.T) {
 			args: []string{
 				"kube-apiserver",
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 				"--feature-gates=EnableFoo=true,EnableBar=false",
 			},
 			expectedMap: map[string]string{
-				"admission-control":     "NamespaceLifecycle,LimitRanger",
-				"insecure-bind-address": "127.0.0.1",
-				"allow-privileged":      "true",
-				"feature-gates":         "EnableFoo=true,EnableBar=false",
+				"admission-control": "NamespaceLifecycle,LimitRanger",
+				"allow-privileged":  "true",
+				"feature-gates":     "EnableFoo=true,EnableBar=false",
 			},
 		},
 	}
@@ -181,7 +167,6 @@ func TestReplaceArgument(t *testing.T) {
 			args: []string{
 				"kube-apiserver",
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 			},
 			mutateFunc: func(argMap map[string]string) map[string]string {
@@ -191,7 +176,6 @@ func TestReplaceArgument(t *testing.T) {
 			expectedArgs: []string{
 				"kube-apiserver",
 				"--admission-control=NamespaceLifecycle,LimitRanger,ResourceQuota",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 			},
 		},
@@ -200,7 +184,6 @@ func TestReplaceArgument(t *testing.T) {
 			args: []string{
 				"kube-apiserver",
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 			},
 			mutateFunc: func(argMap map[string]string) map[string]string {
@@ -210,7 +193,6 @@ func TestReplaceArgument(t *testing.T) {
 			expectedArgs: []string{
 				"kube-apiserver",
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 				"--new-arg-here=foo",
 			},
@@ -238,7 +220,6 @@ func TestRoundtrip(t *testing.T) {
 			name: "normal case",
 			args: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 			},
 		},
@@ -246,7 +227,6 @@ func TestRoundtrip(t *testing.T) {
 			name: "test that feature-gates is working",
 			args: []string{
 				"--admission-control=NamespaceLifecycle,LimitRanger",
-				"--insecure-bind-address=127.0.0.1",
 				"--allow-privileged=true",
 				"--feature-gates=EnableFoo=true,EnableBar=false",
 			},

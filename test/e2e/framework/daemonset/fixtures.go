@@ -84,20 +84,14 @@ func SchedulableNodes(c clientset.Interface, ds *appsv1.DaemonSet) []string {
 	framework.ExpectNoError(err)
 	nodeNames := make([]string, 0)
 	for _, node := range nodeList.Items {
-		if !canScheduleOnNode(node, ds) {
+		shouldRun, _ := daemon.NodeShouldRunDaemonPod(&node, ds)
+		if !shouldRun {
 			framework.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node.Name, node.Spec.Taints)
 			continue
 		}
 		nodeNames = append(nodeNames, node.Name)
 	}
 	return nodeNames
-}
-
-// canScheduleOnNode checks if a given DaemonSet can schedule pods on the given node
-func canScheduleOnNode(node v1.Node, ds *appsv1.DaemonSet) bool {
-	newPod := daemon.NewPod(ds, node.Name)
-	fitsNodeName, fitsNodeAffinity, fitsTaints := daemon.Predicates(newPod, &node, node.Spec.Taints)
-	return fitsNodeName && fitsNodeAffinity && fitsTaints
 }
 
 func CheckDaemonPodOnNodes(f *framework.Framework, ds *appsv1.DaemonSet, nodeNames []string) func() (bool, error) {

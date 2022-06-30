@@ -107,14 +107,10 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEvent {
 		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
 		// We rely on CSI node to translate in-tree PV to CSI.
 		{Resource: framework.CSINode, ActionType: framework.Add | framework.Update},
-	}
-	if pl.fts.EnableCSIStorageCapacity {
 		// When CSIStorageCapacity is enabled, pods may become schedulable
 		// on CSI driver & storage capacity changes.
-		events = append(events, []framework.ClusterEvent{
-			{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update},
-			{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update},
-		}...)
+		{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update},
+		{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update},
 	}
 	return events
 }
@@ -169,17 +165,17 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 // PreFilter invoked at the prefilter extension point to check if pod has all
 // immediate PVCs bound. If not all immediate PVCs are bound, an
 // UnschedulableAndUnresolvable is returned.
-func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
 	// If pod does not reference any PVC, we don't need to do anything.
 	if hasPVC, err := pl.podHasPVCs(pod); err != nil {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
 	} else if !hasPVC {
 		state.Write(stateKey, &stateData{skip: true})
-		return nil
+		return nil, nil
 	}
 	boundClaims, claimsToBind, unboundClaimsImmediate, err := pl.Binder.GetPodVolumes(pod)
 	if err != nil {
-		return framework.AsStatus(err)
+		return nil, framework.AsStatus(err)
 	}
 	if len(unboundClaimsImmediate) > 0 {
 		// Return UnschedulableAndUnresolvable error if immediate claims are
@@ -187,10 +183,10 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 		// claims are bound by PV controller.
 		status := framework.NewStatus(framework.UnschedulableAndUnresolvable)
 		status.AppendReason("pod has unbound immediate PersistentVolumeClaims")
-		return status
+		return nil, status
 	}
 	state.Write(stateKey, &stateData{boundClaims: boundClaims, claimsToBind: claimsToBind, podVolumesByNode: make(map[string]*PodVolumes)})
-	return nil
+	return nil, nil
 }
 
 // PreFilterExtensions returns prefilter extensions, pod add and remove.
@@ -379,12 +375,9 @@ func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 	pvInformer := fh.SharedInformerFactory().Core().V1().PersistentVolumes()
 	storageClassInformer := fh.SharedInformerFactory().Storage().V1().StorageClasses()
 	csiNodeInformer := fh.SharedInformerFactory().Storage().V1().CSINodes()
-	var capacityCheck *CapacityCheck
-	if fts.EnableCSIStorageCapacity {
-		capacityCheck = &CapacityCheck{
-			CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
-			CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1beta1().CSIStorageCapacities(),
-		}
+	capacityCheck := CapacityCheck{
+		CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
+		CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1().CSIStorageCapacities(),
 	}
 	binder := NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
 

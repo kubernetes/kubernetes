@@ -43,6 +43,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // Resource is a collection of compute resource.
@@ -90,6 +91,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	var systemPodsNo int
 	var ns string
 	f := framework.NewDefaultFramework("sched-priority")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.AfterEach(func() {
 	})
@@ -413,11 +415,15 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 	ratio = math.Max(maxCPUFraction, maxMemFraction)
 	for _, node := range nodes {
 		memAllocatable, found := node.Status.Allocatable[v1.ResourceMemory]
-		framework.ExpectEqual(found, true)
+		if !found {
+			framework.Failf("Node %v: node.Status.Allocatable %v does not contain entry %v", node.Name, node.Status.Allocatable, v1.ResourceMemory)
+		}
 		memAllocatableVal := memAllocatable.Value()
 
 		cpuAllocatable, found := node.Status.Allocatable[v1.ResourceCPU]
-		framework.ExpectEqual(found, true)
+		if !found {
+			framework.Failf("Node %v: node.Status.Allocatable %v does not contain entry %v", node.Name, node.Status.Allocatable, v1.ResourceCPU)
+		}
 		cpuAllocatableMil := cpuAllocatable.MilliValue()
 
 		needCreateResource := v1.ResourceList{}
@@ -508,7 +514,9 @@ func computeCPUMemFraction(node v1.Node, resource *v1.ResourceRequirements, pods
 	}
 
 	cpuAllocatable, found := node.Status.Allocatable[v1.ResourceCPU]
-	framework.ExpectEqual(found, true)
+	if !found {
+		framework.Failf("Node %v: node.Status.Allocatable %v does not contain entry %v", node.Name, node.Status.Allocatable, v1.ResourceCPU)
+	}
 	cpuAllocatableMil := cpuAllocatable.MilliValue()
 
 	floatOne := float64(1)
@@ -517,7 +525,9 @@ func computeCPUMemFraction(node v1.Node, resource *v1.ResourceRequirements, pods
 		cpuFraction = floatOne
 	}
 	memAllocatable, found := node.Status.Allocatable[v1.ResourceMemory]
-	framework.ExpectEqual(found, true)
+	if !found {
+		framework.Failf("Node %v: node.Status.Allocatable %v does not contain entry %v", node.Name, node.Status.Allocatable, v1.ResourceMemory)
+	}
 	memAllocatableVal := memAllocatable.Value()
 	memFraction := float64(totalRequestedMemResource) / float64(memAllocatableVal)
 	if memFraction > floatOne {

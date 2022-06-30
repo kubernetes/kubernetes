@@ -115,10 +115,10 @@ type ConversionFuncs struct {
 // previously defined functions.
 func (c ConversionFuncs) AddUntyped(a, b interface{}, fn ConversionFunc) error {
 	tA, tB := reflect.TypeOf(a), reflect.TypeOf(b)
-	if tA.Kind() != reflect.Ptr {
+	if tA.Kind() != reflect.Pointer {
 		return fmt.Errorf("the type %T must be a pointer to register as an untyped conversion", a)
 	}
-	if tB.Kind() != reflect.Ptr {
+	if tB.Kind() != reflect.Pointer {
 		return fmt.Errorf("the type %T must be a pointer to register as an untyped conversion", b)
 	}
 	c.untyped[typePair{tA, tB}] = fn
@@ -179,10 +179,10 @@ func (c *Converter) RegisterGeneratedUntypedConversionFunc(a, b interface{}, fn 
 func (c *Converter) RegisterIgnoredConversion(from, to interface{}) error {
 	typeFrom := reflect.TypeOf(from)
 	typeTo := reflect.TypeOf(to)
-	if reflect.TypeOf(from).Kind() != reflect.Ptr {
+	if typeFrom.Kind() != reflect.Pointer {
 		return fmt.Errorf("expected pointer arg for 'from' param 0, got: %v", typeFrom)
 	}
-	if typeTo.Kind() != reflect.Ptr {
+	if typeTo.Kind() != reflect.Pointer {
 		return fmt.Errorf("expected pointer arg for 'to' param 1, got: %v", typeTo)
 	}
 	c.ignoredUntypedConversions[typePair{typeFrom, typeTo}] = struct{}{}

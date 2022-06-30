@@ -21,7 +21,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -30,7 +29,7 @@ import (
 )
 
 func TestTar(t *testing.T) {
-	tmp, err := ioutil.TempDir("", "testtar")
+	tmp, err := os.MkdirTemp("", "testtar")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,13 +38,13 @@ func TestTar(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(tmp, "subdir"), os.FileMode(0755)); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(tmp, "file1"), []byte(`file1 data`), os.FileMode(0644)); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, "file1"), []byte(`file1 data`), os.FileMode(0644)); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(tmp, "file2"), []byte(`file2 data`), os.FileMode(0644)); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, "file2"), []byte(`file2 data`), os.FileMode(0644)); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(filepath.Join(tmp, "subdir", "file4"), []byte(`file4 data`), os.FileMode(0644)); err != nil {
+	if err := os.WriteFile(filepath.Join(tmp, "subdir", "file4"), []byte(`file4 data`), os.FileMode(0644)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -138,7 +137,7 @@ func readAllTar(tarPath string) (map[string]string, error) {
 			return nil, err
 		}
 
-		b, err := ioutil.ReadAll(tr)
+		b, err := io.ReadAll(tr)
 		if err != nil {
 			return nil, err
 		}

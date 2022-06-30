@@ -40,6 +40,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/config/options"
 	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -79,7 +80,9 @@ func NewOptions() *Options {
 		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
-		Deprecated:     &DeprecatedOptions{},
+		Deprecated: &DeprecatedOptions{
+			PodMaxInUnschedulablePodsDuration: 5 * time.Minute,
+		},
 		LeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
 			LeaderElect:       true,
 			LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
@@ -192,7 +195,7 @@ func (o *Options) initFlags() {
 	options.BindLeaderElectionFlags(o.LeaderElection, nfs.FlagSet("leader election"))
 	utilfeature.DefaultMutableFeatureGate.AddFlag(nfs.FlagSet("feature gate"))
 	o.Metrics.AddFlags(nfs.FlagSet("metrics"))
-	o.Logs.AddFlags(nfs.FlagSet("logs"))
+	logsapi.AddFlags(o.Logs, nfs.FlagSet("logs"))
 
 	o.Flags = &nfs
 }
@@ -231,6 +234,12 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		}
 	}
 	o.Metrics.Apply()
+
+	// Apply value independently instead of using ApplyDeprecated() because it can't be configured via ComponentConfig.
+	if o.Deprecated != nil {
+		c.PodMaxInUnschedulablePodsDuration = o.Deprecated.PodMaxInUnschedulablePodsDuration
+	}
+
 	return nil
 }
 
@@ -244,7 +253,6 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.SecureServing.Validate()...)
 	errs = append(errs, o.Authentication.Validate()...)
 	errs = append(errs, o.Authorization.Validate()...)
-	errs = append(errs, o.Deprecated.Validate()...)
 	errs = append(errs, o.Metrics.Validate()...)
 
 	return errs

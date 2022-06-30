@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -36,18 +35,22 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // isKubeadmConfigPresent checks if a kubeadm config type is found in the provided document map
@@ -64,19 +67,28 @@ func isKubeadmConfigPresent(docmap kubeadmapi.DocumentMap) bool {
 // are loaded. This function allows the component configs to be loaded from a file that contains only them. If the file contains any kubeadm types
 // in it (API group "kubeadm.kubernetes.io" present), then the supplied file is treaded as a legacy reconfiguration style "--config" use and the
 // returned bool value is set to true (the only case to be done so).
-func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, bool, error) {
+func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs bool, printer output.Printer) (*kubeadmapi.InitConfiguration, bool, error) {
 	// Used for info logs here
 	const logPrefix = "upgrade/config"
 
 	// The usual case here is to not have a config file, but rather load the config from the cluster.
 	// This is probably 90% of the time. So we handle it first.
 	if cfgPath == "" {
-		cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, logPrefix, false, skipComponentConfigs)
+		cfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, false, skipComponentConfigs)
+		// In case we fetch a configuration from the cluster, mutate the ImageRepository field
+		// to be 'registry.k8s.io', if it was 'k8s.gcr.io'.
+		// TODO: Remove this in 1.26
+		// https://github.com/kubernetes/kubeadm/issues/2671
+		if err == nil {
+			if err := uploadconfig.MutateImageRepository(cfg, client); err != nil {
+				return nil, false, err
+			}
+		}
 		return cfg, false, err
 	}
 
 	// Otherwise, we have a config file. Let's load it.
-	configBytes, err := ioutil.ReadFile(cfgPath)
+	configBytes, err := os.ReadFile(cfgPath)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "unable to load config from file %q", cfgPath)
 	}
@@ -99,7 +111,7 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 
 	// If no kubeadm config types are present, we assume that there are manually upgraded component configs in the file.
 	// Hence, we load the kubeadm types from the cluster.
-	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, logPrefix, false, true)
+	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, false, true)
 	if err != nil {
 		return nil, false, err
 	}
@@ -122,27 +134,27 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 }
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
+func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool, printer output.Printer) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
-	fmt.Println("[upgrade/config] Making sure the configuration is correct:")
+	printer.Printf("[upgrade/config] Making sure the configuration is correct:\n")
 
 	var newK8sVersion string
-	cfg, legacyReconfigure, err := loadConfig(flags.cfgPath, client, !upgradeApply)
+	cfg, legacyReconfigure, err := loadConfig(flags.cfgPath, client, !upgradeApply, printer)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			fmt.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-			fmt.Println("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.")
-			fmt.Println("")
-			fmt.Println("[upgrade/config] Next steps:")
-			fmt.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.\n")
-			fmt.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
-			fmt.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
-			fmt.Println("")
+			printer.Printf("[upgrade/config] In order to upgrade, a ConfigMap called %q in the %s namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+			printer.Printf("[upgrade/config] Without this information, 'kubeadm upgrade' won't know how to configure your upgraded cluster.\n")
+			printer.Println()
+			printer.Printf("[upgrade/config] Next steps:\n")
+			printer.Printf("\t- OPTION 1: Run 'kubeadm config upload from-flags' and specify the same CLI arguments you passed to 'kubeadm init' when you created your control-plane.\n")
+			printer.Printf("\t- OPTION 2: Run 'kubeadm config upload from-file' and specify the same config file you passed to 'kubeadm init' when you created your control-plane.\n")
+			printer.Printf("\t- OPTION 3: Pass a config file to 'kubeadm upgrade' using the --config flag.\n")
+			printer.Println()
 			err = errors.Errorf("the ConfigMap %q in the %s namespace used for getting configuration information was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
 		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
@@ -151,24 +163,6 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		// to supply a new ClusterConfiguration don't have to specify the Kubernetes version twice,
 		// if they don't want to upgrade but just change a setting.
 		newK8sVersion = cfg.KubernetesVersion
-	}
-
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
-	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
-
-	// Ensure the user is root
-	klog.V(1).Info("running preflight checks")
-	if err := runPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration); err != nil {
-		return nil, nil, nil, err
-	}
-
-	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client, &cfg.ClusterConfiguration, ignorePreflightErrorsSet); err != nil {
-		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
 	// The version arg is mandatory, during upgrade apply, unless it's specified in the config file
@@ -192,6 +186,24 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		}
 	}
 
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
+	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
+
+	// Ensure the user is root
+	klog.V(1).Info("running preflight checks")
+	if err := runPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration, printer); err != nil {
+		return nil, nil, nil, err
+	}
+
+	// Run healthchecks against the cluster
+	if err := upgrade.CheckClusterHealth(client, &cfg.ClusterConfiguration, ignorePreflightErrorsSet); err != nil {
+		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
+	}
+
 	// If features gates are passed to the command line, use it (otherwise use featureGates from configuration)
 	if flags.featureGatesString != "" {
 		cfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, flags.featureGatesString)
@@ -203,14 +215,32 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm
 	if msg := features.CheckDeprecatedFlags(&features.InitFeatureGates, cfg.FeatureGates); len(msg) > 0 {
 		for _, m := range msg {
-			fmt.Printf("[upgrade/config] %s\n", m)
+			printer.Printf("[upgrade/config] %s\n", m)
 		}
 		return nil, nil, nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
 	}
 
 	// If the user told us to print this information out; do it!
 	if flags.printConfig {
-		printConfiguration(&cfg.ClusterConfiguration, os.Stdout)
+		printConfiguration(&cfg.ClusterConfiguration, os.Stdout, printer)
+	}
+
+	// Handle a dupliate prefix URL scheme in the Node CRI socket.
+	// Older versions of kubeadm(v1.24.0~2) upgrade may add one or two extra prefix `unix://`
+	// TODO: this fix can be removed in 1.26 once all user node sockets have a correct URL scheme:
+	// https://github.com/kubernetes/kubeadm/issues/2426
+	dupURLScheme := strings.HasPrefix(cfg.NodeRegistration.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://"+kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://")
+	if dupURLScheme {
+		socket := strings.ReplaceAll(cfg.NodeRegistration.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://", "")
+		cfg.NodeRegistration.CRISocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + socket
+		hostname, err := os.Hostname()
+		if err != nil {
+			return nil, nil, nil, errors.Wrapf(err, "failed to get hostname")
+		}
+		klog.V(2).Infof("ensuring that Node %q has a CRI socket annotation with correct URL scheme %q", hostname, cfg.NodeRegistration.CRISocket)
+		if err := patchnodephase.AnnotateCRISocket(client, hostname, cfg.NodeRegistration.CRISocket); err != nil {
+			return nil, nil, nil, errors.Wrapf(err, "error updating the CRI socket for Node %q", cfg.NodeRegistration.CRISocket)
+		}
 	}
 
 	// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
@@ -218,7 +248,7 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 }
 
 // printConfiguration prints the external version of the API to yaml
-func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer) {
+func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer, printer output.Printer) {
 	// Short-circuit if cfg is nil, so we can safely get the value of the pointer below
 	if clustercfg == nil {
 		return
@@ -226,18 +256,18 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 
 	cfgYaml, err := configutil.MarshalKubeadmConfigObject(clustercfg)
 	if err == nil {
-		fmt.Fprintln(w, "[upgrade/config] Configuration used:")
+		printer.Fprintln(w, "[upgrade/config] Configuration used:")
 
 		scanner := bufio.NewScanner(bytes.NewReader(cfgYaml))
 		for scanner.Scan() {
-			fmt.Fprintf(w, "\t%s\n", scanner.Text())
+			printer.Fprintf(w, "\t%s\n", scanner.Text())
 		}
 	}
 }
 
 // runPreflightChecks runs the root preflight check
-func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.String, cfg *kubeadmapi.ClusterConfiguration) error {
-	fmt.Println("[preflight] Running pre-flight checks.")
+func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.String, cfg *kubeadmapi.ClusterConfiguration, printer output.Printer) error {
+	printer.Printf("[preflight] Running pre-flight checks.\n")
 	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
 	if err != nil {
 		return err

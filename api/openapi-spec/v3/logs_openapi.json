@@ -1,5 +1,14 @@
 {
-  "components": {},
+  "components": {
+    "securitySchemes": {
+      "BearerToken": {
+        "description": "Bearer Token authentication",
+        "in": "header",
+        "name": "authorization",
+        "type": "apiKey"
+      }
+    }
+  },
   "info": {
     "title": "Kubernetes",
     "version": "unversioned"
@@ -9,7 +18,11 @@
     "/logs/": {
       "get": {
         "operationId": "logFileListHandler",
-        "responses": {},
+        "responses": {
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
         "tags": [
           "logs"
         ]
@@ -18,7 +31,11 @@
     "/logs/{logpath}": {
       "get": {
         "operationId": "logFileHandler",
-        "responses": {},
+        "responses": {
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
         "tags": [
           "logs"
         ]

@@ -219,7 +219,7 @@ func (p rbdCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume) (*v1.P
 		return nil, fmt.Errorf("pv is nil or CSI source not defined on pv")
 	}
 	var rbdImageName string
-	var monSlice []string
+	monSlice := []string{""}
 	csiSource := pv.Spec.CSI
 
 	rbdImageName = csiSource.VolumeAttributes[imgNameKey]

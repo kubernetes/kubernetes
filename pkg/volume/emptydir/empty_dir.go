@@ -219,17 +219,10 @@ type emptyDir struct {
 
 func (ed *emptyDir) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        false,
-		Managed:         true,
-		SupportsSELinux: true,
+		ReadOnly:       false,
+		Managed:        true,
+		SELinuxRelabel: true,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (ed *emptyDir) CanMount() error {
-	return nil
 }
 
 // SetUp creates new directory.
@@ -257,7 +250,9 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 		} else if ed.medium == v1.StorageMediumDefault {
 			// Further check dir exists
 			if _, err := os.Stat(dir); err == nil {
-				return nil
+				klog.V(6).InfoS("Dir exists, so check and assign quota if the underlying medium supports quotas", "dir", dir)
+				err = ed.assignQuota(dir, mounterArgs.DesiredSize)
+				return err
 			}
 			// This situation should not happen unless user manually delete volume dir.
 			// In this case, delete ready file and print a warning for it.
@@ -286,22 +281,29 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// enforcement.
 	if err == nil {
 		volumeutil.SetReady(ed.getMetaDir())
-		if mounterArgs.DesiredSize != nil {
-			// Deliberately shadow the outer use of err as noted
-			// above.
-			hasQuotas, err := fsquota.SupportsQuotas(ed.mounter, dir)
-			if err != nil {
-				klog.V(3).Infof("Unable to check for quota support on %s: %s", dir, err.Error())
-			} else if hasQuotas {
-				klog.V(4).Infof("emptydir trying to assign quota %v on %s", mounterArgs.DesiredSize, dir)
-				err := fsquota.AssignQuota(ed.mounter, dir, ed.pod.UID, mounterArgs.DesiredSize)
-				if err != nil {
-					klog.V(3).Infof("Set quota on %s failed %s", dir, err.Error())
-				}
-			}
-		}
+		err = ed.assignQuota(dir, mounterArgs.DesiredSize)
 	}
 	return err
+}
+
+// assignQuota checks if the underlying medium supports quotas and if so, sets
+func (ed *emptyDir) assignQuota(dir string, mounterSize *resource.Quantity) error {
+	if mounterSize != nil {
+		// Deliberately shadow the outer use of err as noted
+		// above.
+		hasQuotas, err := fsquota.SupportsQuotas(ed.mounter, dir)
+		if err != nil {
+			klog.V(3).Infof("Unable to check for quota support on %s: %s", dir, err.Error())
+		} else if hasQuotas {
+			klog.V(4).Infof("emptydir trying to assign quota %v on %s", mounterSize, dir)
+			err := fsquota.AssignQuota(ed.mounter, dir, ed.pod.UID, mounterSize)
+			if err != nil {
+				klog.V(3).Infof("Set quota on %s failed %s", dir, err.Error())
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 // setupTmpfs creates a tmpfs mount at the specified directory.

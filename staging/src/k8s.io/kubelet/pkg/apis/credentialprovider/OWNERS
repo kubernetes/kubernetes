@@ -4,7 +4,7 @@
 options:
   no_parent_owners: true
 approvers:
-- api-approvers
+  - api-approvers
 reviewers:
-- sig-node-api-reviewers
-- sig-auth-api-reviewers
+  - sig-node-api-reviewers
+  - sig-auth-api-reviewers

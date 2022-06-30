@@ -166,10 +166,18 @@ const (
 	CapRWX                 Capability = "RWX"                 // support ReadWriteMany access modes
 	CapControllerExpansion Capability = "controllerExpansion" // support volume expansion for controller
 	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
-	CapOnlineExpansion     Capability = "onlineExpansion"     // supports online volume expansion
-	CapVolumeLimits        Capability = "volumeLimits"        // support volume limits (can be *very* slow)
-	CapSingleNodeVolume    Capability = "singleNodeVolume"    // support volume that can run on single node (like hostpath)
-	CapTopology            Capability = "topology"            // support topology
+
+	// offlineExpansion and onlineExpansion both default to true when
+	// controllerExpansion is true. The only reason to set offlineExpansion
+	// to false is when a CSI driver can only expand a volume while it's
+	// attached to a pod. Conversely, onlineExpansion can be set to false
+	// if the driver can only expand a volume while it is detached.
+	CapOfflineExpansion Capability = "offlineExpansion" // supports offline volume expansion (default: true)
+	CapOnlineExpansion  Capability = "onlineExpansion"  // supports online volume expansion (default: true)
+
+	CapVolumeLimits     Capability = "volumeLimits"     // support volume limits (can be *very* slow)
+	CapSingleNodeVolume Capability = "singleNodeVolume" // support volume that can run on single node (like hostpath)
+	CapTopology         Capability = "topology"         // support topology
 
 	// The driver publishes storage capacity information: when the storage class
 	// for dynamic provisioning exists, the driver is expected to provide

@@ -22,12 +22,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	netutils "k8s.io/utils/net"
@@ -901,6 +899,13 @@ func (al *Allocators) releaseClusterIPs(service *api.Service) (released map[api.
 	return al.releaseIPs(toRelease)
 }
 
+func (al *Allocators) Destroy() {
+	al.serviceNodePorts.Destroy()
+	for _, a := range al.serviceIPAllocatorsByFamily {
+		a.Destroy()
+	}
+}
+
 // This is O(N), but we expect haystack to be small;
 // so small that we expect a linear search to be faster
 func containsNumber(haystack []int, needle int) bool {
@@ -940,10 +945,7 @@ func shouldAllocateNodePorts(service *api.Service) bool {
 		return true
 	}
 	if service.Spec.Type == api.ServiceTypeLoadBalancer {
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
-			return *service.Spec.AllocateLoadBalancerNodePorts
-		}
-		return true
+		return *service.Spec.AllocateLoadBalancerNodePorts
 	}
 	return false
 }

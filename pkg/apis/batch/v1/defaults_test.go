@@ -25,12 +25,9 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 
 	. "k8s.io/kubernetes/pkg/apis/batch/v1"
@@ -39,31 +36,11 @@ import (
 func TestSetDefaultJob(t *testing.T) {
 	defaultLabels := map[string]string{"default": "default"}
 	tests := map[string]struct {
-		indexedJobEnabled bool
-		suspendJobEnabled bool
-		original          *batchv1.Job
-		expected          *batchv1.Job
-		expectLabels      bool
+		original     *batchv1.Job
+		expected     *batchv1.Job
+		expectLabels bool
 	}{
 		"All unspecified -> sets all to default values": {
-			original: &batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Template: v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
-					},
-				},
-			},
-			expected: &batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Completions:  pointer.Int32Ptr(1),
-					Parallelism:  pointer.Int32Ptr(1),
-					BackoffLimit: pointer.Int32Ptr(6),
-				},
-			},
-			expectLabels: true,
-		},
-		"All unspecified, indexed job enabled -> sets all to default values": {
-			indexedJobEnabled: true,
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Template: v1.PodTemplateSpec{
@@ -77,12 +54,12 @@ func TestSetDefaultJob(t *testing.T) {
 					Parallelism:    pointer.Int32Ptr(1),
 					BackoffLimit:   pointer.Int32Ptr(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:        pointer.BoolPtr(false),
 				},
 			},
 			expectLabels: true,
 		},
 		"All unspecified, suspend job enabled -> sets all to default values": {
-			suspendJobEnabled: true,
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Template: v1.PodTemplateSpec{
@@ -92,16 +69,16 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  pointer.Int32Ptr(1),
-					Parallelism:  pointer.Int32Ptr(1),
-					BackoffLimit: pointer.Int32Ptr(6),
-					Suspend:      pointer.BoolPtr(false),
+					Completions:    pointer.Int32Ptr(1),
+					Parallelism:    pointer.Int32Ptr(1),
+					BackoffLimit:   pointer.Int32Ptr(6),
+					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:        pointer.BoolPtr(false),
 				},
 			},
 			expectLabels: true,
 		},
 		"suspend set, everything else is defaulted": {
-			suspendJobEnabled: true,
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Suspend: pointer.BoolPtr(true),
@@ -112,10 +89,11 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  pointer.Int32Ptr(1),
-					Parallelism:  pointer.Int32Ptr(1),
-					BackoffLimit: pointer.Int32Ptr(6),
-					Suspend:      pointer.BoolPtr(true),
+					Completions:    pointer.Int32Ptr(1),
+					Parallelism:    pointer.Int32Ptr(1),
+					BackoffLimit:   pointer.Int32Ptr(6),
+					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:        pointer.BoolPtr(true),
 				},
 			},
 			expectLabels: true,
@@ -133,9 +111,11 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  pointer.Int32Ptr(1),
-					Parallelism:  pointer.Int32Ptr(1),
-					BackoffLimit: pointer.Int32Ptr(6),
+					Completions:    pointer.Int32Ptr(1),
+					Parallelism:    pointer.Int32Ptr(1),
+					BackoffLimit:   pointer.Int32Ptr(6),
+					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:        pointer.BoolPtr(false),
 				},
 			},
 		},
@@ -150,8 +130,10 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism:  pointer.Int32Ptr(0),
-					BackoffLimit: pointer.Int32Ptr(6),
+					Parallelism:    pointer.Int32Ptr(0),
+					BackoffLimit:   pointer.Int32Ptr(6),
+					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:        pointer.BoolPtr(false),
 				},
 			},
 			expectLabels: true,
@@ -167,8 +149,10 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism:  pointer.Int32Ptr(2),
-					BackoffLimit: pointer.Int32Ptr(6),
+					Parallelism:    pointer.Int32Ptr(2),
+					BackoffLimit:   pointer.Int32Ptr(6),
+					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:        pointer.BoolPtr(false),
 				},
 			},
 			expectLabels: true,
@@ -184,9 +168,11 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  pointer.Int32Ptr(2),
-					Parallelism:  pointer.Int32Ptr(1),
-					BackoffLimit: pointer.Int32Ptr(6),
+					Completions:    pointer.Int32Ptr(2),
+					Parallelism:    pointer.Int32Ptr(1),
+					BackoffLimit:   pointer.Int32Ptr(6),
+					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:        pointer.BoolPtr(false),
 				},
 			},
 			expectLabels: true,
@@ -202,9 +188,11 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:  pointer.Int32Ptr(1),
-					Parallelism:  pointer.Int32Ptr(1),
-					BackoffLimit: pointer.Int32Ptr(5),
+					Completions:    pointer.Int32Ptr(1),
+					Parallelism:    pointer.Int32Ptr(1),
+					BackoffLimit:   pointer.Int32Ptr(5),
+					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:        pointer.BoolPtr(false),
 				},
 			},
 			expectLabels: true,
@@ -264,9 +252,6 @@ func TestSetDefaultJob(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, test.indexedJobEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, test.suspendJobEnabled)()
-
 			original := test.original
 			expected := test.expected
 			obj2 := roundTrip(t, runtime.Object(original))

@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -269,6 +269,7 @@ func (rq *Controller) worker(ctx context.Context, queue workqueue.RateLimitingIn
 func (rq *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer rq.queue.ShutDown()
+	defer rq.missingUsageQueue.ShutDown()
 
 	klog.Infof("Starting resource quota controller")
 	defer klog.Infof("Shutting down resource quota controller")
@@ -435,8 +436,8 @@ func (rq *Controller) Sync(discoveryFunc NamespacedResourcesFunc, period time.Du
 		defer rq.workerLock.Unlock()
 
 		// Something has changed, so track the new state and perform a sync.
-		if klog.V(2).Enabled() {
-			klog.Infof("syncing resource quota controller with updated resources from discovery: %s", printDiff(oldResources, newResources))
+		if klogV := klog.V(2); klogV.Enabled() {
+			klogV.Infof("syncing resource quota controller with updated resources from discovery: %s", printDiff(oldResources, newResources))
 		}
 
 		// Perform the monitor resync and wait for controllers to report cache sync.

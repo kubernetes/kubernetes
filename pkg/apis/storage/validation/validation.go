@@ -31,9 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/storage"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -179,11 +176,7 @@ func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldP
 	allErrs := field.ErrorList{}
 	switch {
 	case source.InlineVolumeSpec == nil && source.PersistentVolumeName == nil:
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
-			allErrs = append(allErrs, field.Required(fldPath, "must specify exactly one of inlineVolumeSpec and persistentVolumeName"))
-		} else {
-			allErrs = append(allErrs, field.Required(fldPath, "must specify persistentVolumeName when CSIMigration feature is disabled"))
-		}
+		allErrs = append(allErrs, field.Required(fldPath, "must specify exactly one of inlineVolumeSpec and persistentVolumeName"))
 	case source.InlineVolumeSpec != nil && source.PersistentVolumeName != nil:
 		allErrs = append(allErrs, field.Forbidden(fldPath, "must specify exactly one of inlineVolumeSpec and persistentVolumeName"))
 	case source.PersistentVolumeName != nil:
@@ -469,7 +462,7 @@ func validatePodInfoOnMount(podInfoOnMount *bool, fldPath *field.Path) field.Err
 // validateStorageCapacity tests if storageCapacity is set for CSIDriver.
 func validateStorageCapacity(storageCapacity *bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if storageCapacity == nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
+	if storageCapacity == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 

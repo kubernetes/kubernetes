@@ -19,6 +19,7 @@ package remote
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -81,8 +82,8 @@ func assertEqualTypes(t *testing.T, path []string, a, b reflect.Type) {
 			if aField.Name != bField.Name {
 				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field name %d: %s %s", i, aField.Name, bField.Name))
 			}
-			if aField.Tag != bField.Tag {
-				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field tag %d: %s %s", i, aField.Tag, bField.Tag))
+			if aTag, bTag := stripEnum(aField.Tag), stripEnum(bField.Tag); aTag != bTag {
+				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field tag %d:\n%s\n%s\n", i, aTag, bTag))
 			}
 			if aField.Offset != bField.Offset {
 				fatalTypeError(t, path, a, b, fmt.Sprintf("mismatched field offset %d: %v %v", i, aField.Offset, bField.Offset))
@@ -98,16 +99,24 @@ func assertEqualTypes(t *testing.T, path []string, a, b reflect.Type) {
 			path = path[:len(path)-1]
 		}
 
-	case reflect.Ptr, reflect.Slice:
-		aElem := a.Elem()
-		bElem := b.Elem()
-		aElemType := reflect.TypeOf(aElem)
-		bElemType := reflect.TypeOf(bElem)
+	case reflect.Pointer, reflect.Slice:
+		aElemType := a.Elem()
+		bElemType := b.Elem()
 		assertEqualTypes(t, path, aElemType, bElemType)
+
+	case reflect.Int32:
+		if a.Kind() != b.Kind() {
+			fatalTypeError(t, path, a, b, "incompatible types")
+		}
 
 	default:
 		fatalTypeError(t, path, a, b, "unhandled kind")
 	}
+}
+
+// strip the enum value from the protobuf tag, since that doesn't impact the wire serialization and differs by package
+func stripEnum(tagValue reflect.StructTag) reflect.StructTag {
+	return reflect.StructTag(regexp.MustCompile(",enum=[^,]+").ReplaceAllString(string(tagValue), ""))
 }
 
 func fatalTypeError(t *testing.T, path []string, a, b reflect.Type, message string) {
@@ -161,14 +170,14 @@ func fillField(field reflect.Value, v int) {
 		field.Set(slice)
 		first := slice.Index(0)
 
-		if first.Type().Kind() == reflect.Ptr {
+		if first.Type().Kind() == reflect.Pointer {
 			first.Set(reflect.New(first.Type().Elem()))
 			fillFieldsOffset(first.Interface(), v)
 		} else {
 			fillField(first, v)
 		}
 
-	case reflect.Ptr:
+	case reflect.Pointer:
 		val := reflect.New(field.Type().Elem())
 		field.Set(val)
 		fillFieldsOffset(field.Interface(), v)
@@ -196,10 +205,10 @@ func TestFromV1alpha2VersionResponse(t *testing.T) {
 	assertEqual(t, from, to)
 }
 
-func TestFromV1alpha2PodSandboxStatus(t *testing.T) {
-	from := &v1alpha2.PodSandboxStatus{}
+func TestFromV1alpha2PodSandboxStatusResponse(t *testing.T) {
+	from := &v1alpha2.PodSandboxStatusResponse{}
 	fillFields(from)
-	to := fromV1alpha2PodSandboxStatus(from)
+	to := fromV1alpha2PodSandboxStatusResponse(from)
 	assertEqual(t, from, to)
 }
 
@@ -217,10 +226,10 @@ func TestFromV1alpha2ListContainersResponse(t *testing.T) {
 	assertEqual(t, from, to)
 }
 
-func TestFromV1alpha2ContainerStatus(t *testing.T) {
-	from := &v1alpha2.ContainerStatus{}
+func TestFromV1alpha2ContainerStatusResponse(t *testing.T) {
+	from := &v1alpha2.ContainerStatusResponse{}
 	fillFields(from)
-	to := fromV1alpha2ContainerStatus(from)
+	to := fromV1alpha2ContainerStatusResponse(from)
 	assertEqual(t, from, to)
 }
 
@@ -245,10 +254,10 @@ func TestFromV1alpha2PortForwardResponse(t *testing.T) {
 	assertEqual(t, from, to)
 }
 
-func TestFromV1alpha2RuntimeStatus(t *testing.T) {
-	from := &v1alpha2.RuntimeStatus{}
+func TestFromV1alpha2StatusResponse(t *testing.T) {
+	from := &v1alpha2.StatusResponse{}
 	fillFields(from)
-	to := fromV1alpha2RuntimeStatus(from)
+	to := fromV1alpha2StatusResponse(from)
 	assertEqual(t, from, to)
 }
 
@@ -287,11 +296,10 @@ func TestFromV1alpha2ListPodSandboxStatsResponse(t *testing.T) {
 	assertEqual(t, from, to)
 }
 
-func TestFromV1alpha2Image(t *testing.T) {
-	from := &v1alpha2.Image{}
+func TestFromV1alpha2ImageStatusResponse(t *testing.T) {
+	from := &v1alpha2.ImageStatusResponse{}
 	fillFields(from)
-	to := fromV1alpha2Image(from)
-	fmt.Printf(":%+v\n", to)
+	to := fromV1alpha2ImageStatusResponse(from)
 	assertEqual(t, from, to)
 }
 

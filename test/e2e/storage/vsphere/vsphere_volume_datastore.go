@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -51,6 +52,7 @@ const (
 
 var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-datastore")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		client                     clientset.Interface
 		namespace                  string

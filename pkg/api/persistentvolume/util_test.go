@@ -80,7 +80,7 @@ func TestDropDisabledFields(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandCSIVolumes, tc.csiExpansionEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeExpandSecret, tc.csiExpansionEnabled)()
 
 			DropDisabledFields(tc.newSpec, tc.oldSpec)
 			if !reflect.DeepEqual(tc.newSpec, tc.expectNewSpec) {
@@ -104,7 +104,7 @@ func specWithCSISecrets(secret *api.SecretReference) *api.PersistentVolumeSpec {
 	}
 
 	if secret != nil {
-		pvSpec.CSI.ControllerExpandSecretRef = secret
+		pvSpec.CSI.NodeExpandSecretRef = secret
 	}
 	return pvSpec
 }

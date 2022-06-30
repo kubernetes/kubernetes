@@ -22,10 +22,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"net"
 	"net/http"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,16 +40,14 @@ import (
 	"k8s.io/component-base/featuregate"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
-	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
-	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
-	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
@@ -73,19 +73,19 @@ const (
 	defaultPodResourcesPath    = "/var/lib/kubelet/pod-resources"
 	defaultPodResourcesTimeout = 10 * time.Second
 	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
-	kubeletReadOnlyPort        = "10255"
-	kubeletHealthCheckURL      = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
 	// state files
 	cpuManagerStateFile    = "/var/lib/kubelet/cpu_manager_state"
 	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
 )
+
+var kubeletHealthCheckURL = fmt.Sprintf("http://127.0.0.1:%d/healthz", ports.KubeletHealthzPort)
 
 func getNodeSummary() (*stats.Summary, error) {
 	kubeletConfig, err := getCurrentKubeletConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current kubelet config")
 	}
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/stats/summary", kubeletConfig.Address, kubeletConfig.ReadOnlyPort), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s/stats/summary", net.JoinHostPort(kubeletConfig.Address, strconv.Itoa(int(kubeletConfig.ReadOnlyPort)))), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build http request: %v", err)
 	}
@@ -98,7 +98,7 @@ func getNodeSummary() (*stats.Summary, error) {
 	}
 
 	defer resp.Body.Close()
-	contentsBytes, err := ioutil.ReadAll(resp.Body)
+	contentsBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read /stats/summary: %+v", resp)
 	}
@@ -223,57 +223,6 @@ func deleteStateFile(stateFileName string) {
 	framework.ExpectNoError(err, "failed to delete the state file")
 }
 
-// Returns true if kubeletConfig is enabled, false otherwise or if we cannot determine if it is.
-func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
-	cfgz, err := getCurrentKubeletConfig()
-	if err != nil {
-		return false, fmt.Errorf("could not determine whether 'DynamicKubeletConfig' feature is enabled, err: %v", err)
-	}
-	v, ok := cfgz.FeatureGates[string(features.DynamicKubeletConfig)]
-	if !ok {
-		return false, nil
-	}
-	return v, nil
-}
-
-// sets the current node's configSource, this should only be called from Serial tests
-func setNodeConfigSource(f *framework.Framework, source *v1.NodeConfigSource) error {
-	// since this is a serial test, we just get the node, change the source, and then update it
-	// this prevents any issues with the patch API from affecting the test results
-	nodeclient := f.ClientSet.CoreV1().Nodes()
-
-	// get the node
-	node, err := nodeclient.Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	// set new source
-	node.Spec.ConfigSource = source
-
-	// update to the new source
-	_, err = nodeclient.Update(context.TODO(), node, metav1.UpdateOptions{})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// constructs a ConfigMap, populating one of its keys with the KubeletConfiguration. Always uses GenerateName to generate a suffix.
-func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfiguration) *v1.ConfigMap {
-	data, err := kubeletconfigcodec.EncodeKubeletConfig(internalKC, kubeletconfigv1beta1.SchemeGroupVersion)
-	framework.ExpectNoError(err)
-
-	cmap := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: name + "-"},
-		Data: map[string]string{
-			"kubelet": string(data),
-		},
-	}
-	return cmap
-}
-
 // listNamespaceEvents lists the events in the given namespace.
 func listNamespaceEvents(c clientset.Interface, ns string) error {
 	ls, err := c.CoreV1().Events(ns).List(context.TODO(), metav1.ListOptions{})
@@ -305,6 +254,19 @@ func getLocalNode(f *framework.Framework) *v1.Node {
 	return &nodeList.Items[0]
 }
 
+// getLocalTestNode fetches the node object describing the local worker node set up by the e2e_node infra, alongside with its ready state.
+// getLocalTestNode is a variant of `getLocalNode` which reports but does not set any requirement about the node readiness state, letting
+// the caller decide. The check is intentionally done like `getLocalNode` does.
+// Note `getLocalNode` aborts (as in ginkgo.Expect) the test implicitly if the worker node is not ready.
+func getLocalTestNode(f *framework.Framework) (*v1.Node, bool) {
+	node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+	ready := e2enode.IsNodeReady(node)
+	schedulable := e2enode.IsNodeSchedulable(node)
+	framework.Logf("node %q ready=%v schedulable=%v", node.Name, ready, schedulable)
+	return node, ready && schedulable
+}
+
 // logKubeletLatencyMetrics logs KubeletLatencyMetrics computed from the Prometheus
 // metrics exposed on the current node and identified by the metricNames.
 // The Kubelet subsystem prefix is automatically prepended to these metric names.
@@ -313,30 +275,12 @@ func logKubeletLatencyMetrics(metricNames ...string) {
 	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
-	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
+	metric, err := e2emetrics.GrabKubeletMetricsWithoutProxy(fmt.Sprintf("%s:%d", framework.TestContext.NodeName, ports.KubeletReadOnlyPort), "/metrics")
 	if err != nil {
 		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {
 		framework.Logf("Kubelet Metrics: %+v", e2emetrics.GetKubeletLatencyMetrics(metric, metricSet))
 	}
-}
-
-// returns config related metrics from the local kubelet, filtered to the filterMetricNames passed in
-func getKubeletMetrics(filterMetricNames sets.String) (e2emetrics.KubeletMetrics, error) {
-	// grab Kubelet metrics
-	ms, err := e2emetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
-	if err != nil {
-		return nil, err
-	}
-
-	filtered := e2emetrics.NewKubeletMetrics()
-	for name := range ms {
-		if !filterMetricNames.Has(name) {
-			continue
-		}
-		filtered[name] = ms[name]
-	}
-	return filtered, nil
 }
 
 // runCommand runs the cmd and returns the combined stdout and stderr, or an
@@ -468,13 +412,16 @@ func toCgroupFsName(cgroupName cm.CgroupName) string {
 	return cgroupName.ToCgroupfs()
 }
 
-// reduceAllocatableMemoryUsage uses memory.force_empty (https://lwn.net/Articles/432224/)
+// reduceAllocatableMemoryUsageIfCgroupv1 uses memory.force_empty (https://lwn.net/Articles/432224/)
 // to make the kernel reclaim memory in the allocatable cgroup
-// the time to reduce pressure may be unbounded, but usually finishes within a second
-func reduceAllocatableMemoryUsage() {
-	cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
-	_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
-	framework.ExpectNoError(err)
+// the time to reduce pressure may be unbounded, but usually finishes within a second.
+// memory.force_empty is no supported in cgroupv2.
+func reduceAllocatableMemoryUsageIfCgroupv1() {
+	if !IsCgroup2UnifiedMode() {
+		cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
+		_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
+		framework.ExpectNoError(err)
+	}
 }
 
 // Equivalent of featuregatetesting.SetFeatureGateDuringTest

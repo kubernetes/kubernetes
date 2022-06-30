@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
 	"k8s.io/legacy-cloud-providers/azure/metrics"
@@ -47,10 +46,6 @@ import (
 )
 
 const (
-	// IPv6DualStack is here to avoid having to import features pkg
-	// and violate import rules
-	IPv6DualStack featuregate.Feature = "IPv6DualStack"
-
 	loadBalancerMinimumPriority = 500
 	loadBalancerMaximumPriority = 4096
 

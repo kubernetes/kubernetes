@@ -209,7 +209,6 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      hpaName,
 				Namespace: namespace,
-				SelfLink:  "experimental/v1/namespaces/" + namespace + "/horizontalpodautoscalers/" + hpaName,
 			},
 			Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
 				ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
@@ -2876,7 +2875,6 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-hpa",
 						Namespace: "test-namespace",
-						SelfLink:  "experimental/v1/namespaces/test-namespace/horizontalpodautoscalers/test-hpa",
 					},
 					Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
 						ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{

@@ -29,7 +29,6 @@ import (
 
 	api "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/volume"
@@ -41,7 +40,7 @@ func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T
 	spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
 	mapper, err := plug.NewBlockVolumeMapper(
 		spec,
-		&api.Pod{ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns, Name: testPod}},
+		&api.Pod{ObjectMeta: metav1.ObjectMeta{UID: testPodUID, Namespace: testns, Name: testPod}},
 		volume.VolumeOptions{},
 	)
 	if err != nil {
@@ -333,7 +332,7 @@ func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 	fakeClient := fakeclient.NewSimpleClientset()
 	attachRequired := false
 	fakeDriver := &storagev1.CSIDriver{
-		ObjectMeta: meta.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: testDriver,
 		},
 		Spec: storagev1.CSIDriverSpec{
@@ -373,7 +372,7 @@ func TestBlockMapperMapPodDeviceWithPodInfo(t *testing.T) {
 	attachRequired := false
 	podInfo := true
 	fakeDriver := &storagev1.CSIDriver{
-		ObjectMeta: meta.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: testDriver,
 		},
 		Spec: storagev1.CSIDriverSpec{

@@ -118,3 +118,11 @@ func (c *selfCollector) Describe(ch chan<- *Desc) {
 func (c *selfCollector) Collect(ch chan<- Metric) {
 	ch <- c.self
 }
+
+// collectorMetric is a metric that is also a collector.
+// Because of selfCollector, most (if not all) Metrics in
+// this package are also collectors.
+type collectorMetric interface {
+	Metric
+	Collector
+}

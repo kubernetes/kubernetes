@@ -33,7 +33,6 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/proxy"
 	netshtest "k8s.io/kubernetes/pkg/util/netsh/testing"
 	netutils "k8s.io/utils/net"
@@ -115,9 +114,6 @@ var tcpServerPort int32
 var udpServerPort int32
 
 func TestMain(m *testing.M) {
-	// Don't handle panics
-	runtime.ReallyCrash = true
-
 	// TCP setup.
 	tcp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

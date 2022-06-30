@@ -37,6 +37,7 @@ import (
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -699,15 +700,26 @@ func checkFsStats(t *testing.T, label string, seed int, stats *statsapi.FsStats)
 	assert.EqualValues(t, seed+offsetFsInodesFree, *stats.InodesFree, label+".InodesFree")
 }
 
-func checkEphemeralStats(t *testing.T, label string, containerSeeds []int, volumeSeeds []int, stats *statsapi.FsStats) {
+func checkEphemeralStats(t *testing.T, label string, containerSeeds []int, volumeSeeds []int, containerLogStats []*volume.Metrics, stats *statsapi.FsStats) {
 	var usedBytes, inodeUsage int
 	for _, cseed := range containerSeeds {
-		usedBytes = usedBytes + cseed + offsetFsTotalUsageBytes
+		usedBytes += cseed + offsetFsBaseUsageBytes
 		inodeUsage += cseed + offsetFsInodeUsage
+		// If containerLogStats is nil, then the log stats calculated from cAdvisor
+		// information is used. Since it's Total - Base, and these values are
+		// set to the offset, we can use the calculated difference in the offset
+		// to account for this.
+		if containerLogStats == nil {
+			usedBytes += offsetFsTotalUsageBytes - offsetFsBaseUsageBytes
+		}
 	}
 	for _, vseed := range volumeSeeds {
-		usedBytes = usedBytes + vseed + offsetFsUsage
+		usedBytes += vseed + offsetFsUsage
 		inodeUsage += vseed + offsetFsInodeUsage
+	}
+	for _, logStats := range containerLogStats {
+		usedBytes += int(logStats.Used.Value())
+		inodeUsage += int(logStats.InodesUsed.Value())
 	}
 	assert.EqualValues(t, usedBytes, int(*stats.UsedBytes), label+".UsedBytes")
 	assert.EqualValues(t, inodeUsage, int(*stats.InodesUsed), label+".InodesUsed")

@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -94,6 +93,8 @@ const (
 
 var metadataAccessor = meta.NewAccessor()
 
+var attachFunc = attach.DefaultAttachFunc
+
 type RunObject struct {
 	Object  runtime.Object
 	Mapping *meta.RESTMapping
@@ -105,11 +106,10 @@ type RunOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
-	DeleteFlags   *cmddelete.DeleteFlags
 	DeleteOptions *cmddelete.DeleteOptions
 
 	DryRunStrategy cmdutil.DryRunStrategy
-	DryRunVerifier *resource.DryRunVerifier
+	DryRunVerifier *resource.QueryParamVerifier
 
 	PrintObj func(runtime.Object) error
 	Recorder genericclioptions.Recorder
@@ -135,7 +135,6 @@ type RunOptions struct {
 func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 	return &RunOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-		DeleteFlags: cmddelete.NewDeleteFlags("to use to replace the resource."),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -159,7 +158,6 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 		},
 	}
 
-	o.DeleteFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
 
@@ -177,11 +175,7 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container.  If left empty, this value will not be specified by the client and defaulted by the server."))
 	cmd.Flags().Bool("rm", false, "If true, delete the pod after it exits.  Only valid when attaching to the container, e.g. with '--attach' or with '-i/--stdin'.")
 	cmd.Flags().StringArray("env", []string{}, "Environment variables to set in the container.")
-	cmd.Flags().String("serviceaccount", "", "Service account to set in the pod spec.")
-	cmd.Flags().MarkDeprecated("serviceaccount", "has no effect and will be removed in 1.24.")
 	cmd.Flags().StringVar(&opt.Port, "port", opt.Port, i18n.T("The port that this container exposes."))
-	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
-	cmd.Flags().MarkDeprecated("hostport", "has no effect and will be removed in 1.24.")
 	cmd.Flags().StringP("labels", "l", "", "Comma separated labels to apply to the pod. Will override previous values.")
 	cmd.Flags().BoolVarP(&opt.Interactive, "stdin", "i", opt.Interactive, "Keep stdin open on the container in the pod, even if nothing is attached.")
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, "Allocate a TTY for the container in the pod.")
@@ -189,10 +183,6 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().BoolVar(&opt.LeaveStdinOpen, "leave-stdin-open", opt.LeaveStdinOpen, "If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.")
 	cmd.Flags().String("restart", "Always", i18n.T("The restart policy for this Pod.  Legal values [Always, OnFailure, Never]."))
 	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
-	cmd.Flags().String("requests", "", i18n.T("The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."))
-	cmd.Flags().MarkDeprecated("requests", "has no effect and will be removed in 1.24.")
-	cmd.Flags().String("limits", "", i18n.T("The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."))
-	cmd.Flags().MarkDeprecated("limits", "has no effect and will be removed in 1.24.")
 	cmd.Flags().BoolVar(&opt.Expose, "expose", opt.Expose, "If true, create a ClusterIP service associated with the pod.  Requires `--port`.")
 	cmd.Flags().BoolVarP(&opt.Quiet, "quiet", "q", opt.Quiet, "If true, suppress prompt messages.")
 	cmd.Flags().BoolVar(&opt.Privileged, "privileged", opt.Privileged, i18n.T("If true, run the container in privileged mode."))
@@ -218,7 +208,7 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	attachFlag := cmd.Flags().Lookup("attach")
 	if !attachFlag.Changed && o.Interactive {
@@ -234,17 +224,16 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	deleteOpts, err := o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
-	if err != nil {
-		return err
+	o.DeleteOptions = &cmddelete.DeleteOptions{
+		CascadingStrategy: metav1.DeletePropagationBackground,
+		DynamicClient:     dynamicClient,
+		GracePeriod:       -1,
+		IgnoreNotFound:    true,
+		IOStreams:         o.IOStreams,
+		Quiet:             o.Quiet,
+		Timeout:           time.Duration(0),
+		WaitForDeletion:   false,
 	}
-
-	deleteOpts.IgnoreNotFound = true
-	deleteOpts.WaitForDeletion = false
-	deleteOpts.GracePeriod = -1
-	deleteOpts.Quiet = o.Quiet
-
-	o.DeleteOptions = deleteOpts
 
 	return nil
 }
@@ -314,13 +303,6 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	params["annotations"] = cmdutil.GetFlagStringArray(cmd, "annotations")
 	params["env"] = cmdutil.GetFlagStringArray(cmd, "env")
 
-	// TODO(eddiezane): These flags will be removed for 1.24
-	// https://github.com/kubernetes/kubectl/issues/1101#issuecomment-916149516
-	delete(params, "serviceaccount")
-	delete(params, "hostport")
-	delete(params, "requests")
-	delete(params, "limits")
-
 	var createdObjects = []*RunObject{}
 	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, o.NewOverrider(&corev1.Pod{}))
 	if err != nil {
@@ -340,7 +322,11 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	if o.Attach {
 		if remove {
-			defer o.removeCreatedObjects(f, createdObjects)
+			defer func() {
+				if err := o.removeCreatedObjects(f, createdObjects); err != nil {
+					fmt.Fprintf(o.ErrOut, "Delete failed: %v\n", err)
+				}
+			}()
 		}
 
 		opts := &attach.AttachOptions{
@@ -360,9 +346,9 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			return err
 		}
 		opts.Config = config
-		opts.AttachFunc = attach.DefaultAttachFunc
+		opts.AttachFunc = attachFunc
 
-		clientset, err := kubernetes.NewForConfig(config)
+		clientset, err := f.KubernetesClientSet()
 		if err != nil {
 			return err
 		}
@@ -501,7 +487,7 @@ func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, n
 	}
 
 	if err := opts.Run(); err != nil {
-		fmt.Fprintf(opts.ErrOut, "Error attaching, falling back to logs: %v\n", err)
+		fmt.Fprintf(opts.ErrOut, "warning: couldn't attach to pod/%s, falling back to streaming logs: %v\n", name, err)
 		return logOpts(f, pod, opts)
 	}
 	return nil

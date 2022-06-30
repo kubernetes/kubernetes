@@ -95,10 +95,12 @@ func DefaultStacktracePred(status int) bool {
 	return (status < http.StatusOK || status >= http.StatusInternalServerError) && status != http.StatusSwitchingProtocols
 }
 
+const withLoggingLevel = 3
+
 // WithLogging wraps the handler with logging.
 func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
 	return withLogging(handler, pred, func() bool {
-		return klog.V(3).Enabled()
+		return klog.V(withLoggingLevel).Enabled()
 	})
 }
 
@@ -226,6 +228,14 @@ func AddKeyValue(ctx context.Context, key string, value interface{}) {
 	}
 }
 
+// SetStacktracePredicate sets a custom stacktrace predicate for the
+// logger associated with the given request context.
+func SetStacktracePredicate(ctx context.Context, pred StacktracePred) {
+	if rl := respLoggerFromContext(ctx); rl != nil {
+		rl.StacktraceWhen(pred)
+	}
+}
+
 // Log is intended to be called once at the end of your request handler, via defer
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
@@ -272,7 +282,7 @@ func (rl *respLogger) Log() {
 		}
 	}
 
-	klog.InfoSDepth(1, "HTTP", keysAndValues...)
+	klog.V(withLoggingLevel).InfoSDepth(1, "HTTP", keysAndValues...)
 }
 
 // Header implements http.ResponseWriter.

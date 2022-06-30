@@ -431,7 +431,6 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, time.Second*1)
 	var plugins []volume.VolumePlugin
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, tc.csiMigration)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, tc.csiMigration)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InTreePluginGCEUnregister, tc.csiMigration)()
 

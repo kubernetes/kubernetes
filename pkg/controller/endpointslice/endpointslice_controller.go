@@ -86,8 +86,6 @@ func NewController(podInformer coreinformers.PodInformer,
 	endpointUpdatesBatchPeriod time.Duration,
 ) *Controller {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartStructuredLogging(0)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-controller"})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
@@ -252,6 +250,12 @@ type Controller struct {
 // Run will not return until stopCh is closed.
 func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+
+	// Start events processing pipeline.
+	c.eventBroadcaster.StartLogging(klog.Infof)
+	c.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.client.CoreV1().Events("")})
+	defer c.eventBroadcaster.Shutdown()
+
 	defer c.queue.ShutDown()
 
 	klog.Infof("Starting endpoint slice controller")
@@ -264,10 +268,6 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	for i := 0; i < workers; i++ {
 		go wait.Until(c.worker, c.workerLoopPeriod, stopCh)
 	}
-
-	go func() {
-		defer utilruntime.HandleCrash()
-	}()
 
 	<-stopCh
 }
@@ -367,6 +367,9 @@ func (c *Controller) syncService(key string) error {
 			"Error listing Endpoint Slices for Service %s/%s: %v", service.Namespace, service.Name, err)
 		return err
 	}
+
+	// Drop EndpointSlices that have been marked for deletion to prevent the controller from getting stuck.
+	endpointSlices = dropEndpointSlicesPendingDeletion(endpointSlices)
 
 	if c.endpointSliceTracker.StaleSlices(service, endpointSlices) {
 		return endpointsliceutil.NewStaleInformerCache("EndpointSlice informer cache is out of date")
@@ -539,6 +542,7 @@ func (c *Controller) checkNodeTopologyDistribution() {
 	nodes, err := c.nodeLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("Error listing Nodes: %v", err)
+		return
 	}
 	c.topologyCache.SetNodes(nodes)
 	serviceKeys := c.topologyCache.GetOverloadedServices()
@@ -559,4 +563,15 @@ func trackSync(err error) {
 		}
 	}
 	endpointslicemetrics.EndpointSliceSyncs.WithLabelValues(metricLabel).Inc()
+}
+
+func dropEndpointSlicesPendingDeletion(endpointSlices []*discovery.EndpointSlice) []*discovery.EndpointSlice {
+	n := 0
+	for _, endpointSlice := range endpointSlices {
+		if endpointSlice.DeletionTimestamp == nil {
+			endpointSlices[n] = endpointSlice
+			n++
+		}
+	}
+	return endpointSlices[:n]
 }

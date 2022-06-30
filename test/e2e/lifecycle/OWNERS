@@ -1,24 +1,17 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- luxas
-- timothysc
-- fabriziopandini
-- neolit123
-- rosti
-- ereslibre
+  - luxas
+  - fabriziopandini
+  - neolit123
 reviewers:
-- luxas
-- timothysc
-- fabriziopandini
-- neolit123
-- kad
-- detiber
-- dixudx
-- rosti
-- yagonobre
-- ereslibre
-- SataQiu
-- yastij
+  - luxas
+  - fabriziopandini
+  - neolit123
+  - SataQiu
 labels:
-- sig/cluster-lifecycle
+  - sig/cluster-lifecycle
+emeritus_approvers:
+  - rosti
+  - ereslibre
+  - timothysc

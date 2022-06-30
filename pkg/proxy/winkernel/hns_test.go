@@ -26,6 +26,8 @@ import (
 
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 const (
@@ -56,12 +58,12 @@ func TestGetEndpointByID(t *testing.T) {
 	testGetEndpointByID(t, hnsV1)
 	testGetEndpointByID(t, hnsV2)
 }
-func TestGetEndpointByIpAddress(t *testing.T) {
+func TestGetEndpointByIpAddressAndName(t *testing.T) {
 	hnsV1 := hnsV1{}
 	hnsV2 := hnsV2{}
 
-	testGetEndpointByIpAddress(t, hnsV1)
-	testGetEndpointByIpAddress(t, hnsV2)
+	testGetEndpointByIpAddressAndName(t, hnsV1)
+	testGetEndpointByIpAddressAndName(t, hnsV2)
 }
 func TestCreateEndpointLocal(t *testing.T) {
 	hnsV1 := hnsV1{}
@@ -165,7 +167,7 @@ func testGetEndpointByID(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testGetEndpointByIpAddress(t *testing.T, hns HostNetworkService) {
+func testGetEndpointByIpAddressAndName(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -193,6 +195,15 @@ func testGetEndpointByIpAddress(t *testing.T, hns HostNetworkService) {
 	}
 	if endpoint.ip != Endpoint.IpConfigurations[0].IpAddress {
 		t.Errorf("%v does not match %v", endpoint.ip, Endpoint.IpConfigurations[0].IpAddress)
+	}
+
+	endpoint, err = hns.getEndpointByName(Endpoint.Name)
+	if err != nil {
+		t.Error(err)
+	}
+	diff := cmp.Diff(endpoint, Endpoint)
+	if diff != "" {
+		t.Errorf("getEndpointByName(%s) returned a different endpoint. Diff: %s ", Endpoint.Name, diff)
 	}
 
 	err = Endpoint.Delete()
@@ -316,6 +327,7 @@ func testDeleteEndpoint(t *testing.T, hns HostNetworkService) {
 
 func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
+	lbs := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 
 	ipConfig := &hcn.IpConfig{
 		IpAddress: epIpAddress,
@@ -347,13 +359,16 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 	if err != nil {
 		t.Error(err)
 	}
+	// We populate this to ensure we test for getting existing load balancer
+	id := loadBalancerIdentifier{protocol: protocol, internalPort: internalPort, externalPort: externalPort, vip: serviceVip, endpointsCount: len(Endpoints)}
+	lbs[id] = &loadBalancerInfo{hnsID: LoadBalancer.Id}
 
 	endpoint := &endpointsInfo{
 		ip:    Endpoint.IpConfigurations[0].IpAddress,
 		hnsID: Endpoint.Id,
 	}
 	endpoints := []endpointsInfo{*endpoint}
-	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort)
+	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
 	if err != nil {
 		t.Error(err)
 	}
@@ -377,6 +392,8 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 }
 func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
+	// We keep this empty to ensure we test for new load balancer creation.
+	lbs := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 
 	ipConfig := &hcn.IpConfig{
 		IpAddress: epIpAddress,
@@ -398,7 +415,7 @@ func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
 		hnsID: Endpoint.Id,
 	}
 	endpoints := []endpointsInfo{*endpoint}
-	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort)
+	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
 	if err != nil {
 		t.Error(err)
 	}

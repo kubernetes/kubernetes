@@ -26,7 +26,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1";
+option go_package = "k8s.io/api/authentication/v1";
 
 // BoundObjectReference is a reference to an object that a token is bound to.
 message BoundObjectReference {
@@ -74,7 +74,7 @@ message TokenRequest {
 // TokenRequestSpec contains client provided parameters of a token request.
 message TokenRequestSpec {
   // Audiences are the intendend audiences of the token. A recipient of a
-  // token must identitfy themself with an identifier in the list of
+  // token must identify themself with an identifier in the list of
   // audiences of the token, and otherwise should reject the token. A
   // token issued for multiple audiences may be used to authenticate
   // against any of the audiences listed but implies a high degree of

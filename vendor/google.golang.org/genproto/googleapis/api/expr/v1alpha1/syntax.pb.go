@@ -1,4 +1,4 @@
-// Copyright 2020 Google LLC
+// Copyright 2021 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -507,14 +507,15 @@ type SourceInfo struct {
 	// The location could be a file, UI element, or similar. For example,
 	// `acme/app/AnvilPolicy.cel`.
 	Location string `protobuf:"bytes,2,opt,name=location,proto3" json:"location,omitempty"`
-	// Monotonically increasing list of character offsets where newlines appear.
+	// Monotonically increasing list of code point offsets where newlines
+	// `\n` appear.
 	//
 	// The line number of a given position is the index `i` where for a given
 	// `id` the `line_offsets[i] < id_positions[id] < line_offsets[i+1]`. The
 	// column may be derivd from `id_positions[id] - line_offsets[i]`.
 	LineOffsets []int32 `protobuf:"varint,3,rep,packed,name=line_offsets,json=lineOffsets,proto3" json:"line_offsets,omitempty"`
-	// A map from the parse node id (e.g. `Expr.id`) to the character offset
-	// within source.
+	// A map from the parse node id (e.g. `Expr.id`) to the code point offset
+	// within the source.
 	Positions map[int64]int32 `protobuf:"bytes,4,rep,name=positions,proto3" json:"positions,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
 	// A map from the parse node id where a macro replacement was made to the
 	// call `Expr` that resulted in a macro expansion.
@@ -602,7 +603,7 @@ type SourcePosition struct {
 
 	// The soucre location name (e.g. file name).
 	Location string `protobuf:"bytes,1,opt,name=location,proto3" json:"location,omitempty"`
-	// The character offset.
+	// The UTF-8 code unit offset.
 	Offset int32 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
 	// The 1-based index of the starting line in the source text
 	// where the issue occurs, or 0 if unknown.
@@ -871,7 +872,7 @@ func (x *Expr_Call) GetArgs() []*Expr {
 
 // A list creation expression.
 //
-// Lists may either be homogenous, e.g. `[1, 2, 3]`, or heterogenous, e.g.
+// Lists may either be homogenous, e.g. `[1, 2, 3]`, or heterogeneous, e.g.
 // `dyn([1, 'hello', 2.0])`
 type Expr_CreateList struct {
 	state         protoimpl.MessageState

@@ -5,5 +5,6 @@ reviewers:
   - SergeyKanzhelev
 approvers:
   - dchen1107
-  - yguo0905
   - cheftako
+emeritus_approvers:
+  - yguo0905

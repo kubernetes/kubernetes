@@ -31,6 +31,7 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -57,7 +58,7 @@ const (
 	Test to verify if an invalid fstype specified in storage class fails pod creation.
 
 	Steps
-	1. Create StorageClass with inavlid.
+	1. Create StorageClass with invalid.
 	2. Create PVC which uses the StorageClass created in step 1.
 	3. Wait for PV to be provisioned.
 	4. Wait for PVC's status to become Bound.
@@ -68,6 +69,7 @@ const (
 
 var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-fstype")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		client    clientset.Interface
 		namespace string

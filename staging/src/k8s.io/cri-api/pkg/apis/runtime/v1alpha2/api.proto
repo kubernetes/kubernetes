@@ -18,7 +18,7 @@ limitations under the License.
 syntax = "proto3";
 
 package runtime.v1alpha2;
-option go_package = "v1alpha2";
+option go_package = "k8s.io/cri-api/pkg/apis/runtime/v1alpha2";
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 
@@ -66,7 +66,8 @@ service RuntimeService {
     // StopContainer stops a running container with a grace period (i.e., timeout).
     // This call is idempotent, and must not return an error if the container has
     // already been stopped.
-    // TODO: what must the runtime do after the grace period is reached?
+    // The runtime must forcibly kill the container after the grace period is
+    // reached.
     rpc StopContainer(StopContainerRequest) returns (StopContainerResponse) {}
     // RemoveContainer removes the container. If the container is running, the
     // container must be forcibly removed.
@@ -206,6 +207,16 @@ message Mount {
     MountPropagation propagation = 5;
 }
 
+// IDMapping describes host to container ID mappings for a pod sandbox.
+message IDMapping {
+    // HostId is the id on the host.
+    uint32 host_id = 1;
+    // ContainerId is the id in the container.
+    uint32 container_id = 2;
+    // Length is the size of the range to map.
+    uint32 length = 3;
+}
+
 // A NamespaceMode describes the intended namespace configuration for each
 // of the namespaces (Network, PID, IPC) in NamespaceOption. Runtimes should
 // map these modes as appropriate for the technology underlying the runtime.
@@ -231,6 +242,19 @@ enum NamespaceMode {
     TARGET    = 3;
 }
 
+// UserNamespace describes the intended user namespace configuration for a pod sandbox.
+message UserNamespace {
+    // Mode is the NamespaceMode for this UserNamespace.
+    // Note: NamespaceMode for UserNamespace currently supports only POD and NODE, not CONTAINER OR TARGET.
+    NamespaceMode mode = 1;
+
+    // Uids specifies the UID mappings for the user namespace.
+    repeated IDMapping uids = 2;
+
+    // Gids specifies the GID mappings for the user namespace.
+    repeated IDMapping gids = 3;
+}
+
 // NamespaceOption provides options for Linux namespaces.
 message NamespaceOption {
     // Network namespace for this container/sandbox.
@@ -250,6 +274,12 @@ message NamespaceOption {
     // previously created in the same pod. It is not possible to specify different targets
     // for each namespace.
     string target_id = 4;
+    // UsernsOptions for this pod sandbox.
+    // The Kubelet picks the user namespace configuration to use for the pod sandbox.  The mappings
+    // are specified as part of the UserNamespace struct.  If the struct is nil, then the POD mode
+    // must be assumed.  This is done for backward compatibility with older Kubelet versions that
+    // do not set a user namespace.
+    UserNamespace userns_options = 5;
 }
 
 // Int64Value is the wrapper of int64.
@@ -371,11 +401,6 @@ message PodSandboxConfig {
     // E.g.,
     //     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
     //     ContainerConfig.LogPath = `containerName/Instance#.log`
-    //
-    // WARNING: Log management and how kubelet should interface with the
-    // container logs are under active discussion in
-    // https://issues.k8s.io/24677. There *may* be future change of direction
-    // for logging as the discussion carries on.
     string log_directory = 3;
     // DNS config for the sandbox.
     DNSConfig dns_config = 4;
@@ -449,6 +474,7 @@ message PodIP{
     string ip = 1;
 }
 // PodSandboxNetworkStatus is the status of the network for a PodSandbox.
+// Currently ignored for pods sharing the host networking namespace.
 message PodSandboxNetworkStatus {
     // IP address of the PodSandbox.
     string ip = 1;
@@ -568,7 +594,7 @@ message PodSandboxStatsResponse {
     PodSandboxStats stats = 1;
 }
 
-// PodSandboxStatsFilter is used to filter pod sandboxes.
+// PodSandboxStatsFilter is used to filter the list of pod sandboxes to retrieve stats for.
 // All those fields are combined with 'AND'.
 message PodSandboxStatsFilter {
     // ID of the pod sandbox.
@@ -662,7 +688,7 @@ message NetworkInterfaceUsage {
 message ProcessUsage {
     // The time at which these stats were updated.
     int64 timestamp = 1;
-	// Number of processes.
+    // Number of processes.
     UInt64Value process_count = 2;
 }
 
@@ -683,8 +709,6 @@ message KeyValue {
 
 // LinuxContainerResources specifies Linux specific configuration for
 // resources.
-// TODO: Consider using Resources from opencontainers/runtime-spec/specs-go
-// directly.
 message LinuxContainerResources {
     // CPU CFS (Completely Fair Scheduler) period. Default: 0 (not specified).
     int64 cpu_period = 1;
@@ -730,11 +754,20 @@ message SELinuxOption {
 }
 
 // Capability contains the container capabilities to add or drop
+// Dropping a capability will drop it from all sets.
+// If a capability is added to only the add_capabilities list then it gets added to permitted, 
+// inheritable, effective and bounding sets, i.e. all sets except the ambient set.
+// If a capability is added to only the add_ambient_capabilities list then it gets added to all sets, i.e permitted
+// inheritable, effective, bounding and ambient sets.
+// If a capability is added to add_capabilities and add_ambient_capabilities lists then it gets added to all sets, i.e.
+// permitted, inheritable, effective, bounding and ambient sets.
 message Capability {
     // List of capabilities to add.
     repeated string add_capabilities = 1;
     // List of capabilities to drop.
     repeated string drop_capabilities = 2;
+    // List of ambient capabilities to add.
+    repeated string add_ambient_capabilities = 3;
 }
 
 // LinuxContainerSecurityContext holds linux security configuration that will be applied to a container.
@@ -818,7 +851,7 @@ message LinuxContainerConfig {
     LinuxContainerSecurityContext security_context = 2;
 }
 
-// WindowsSandboxSecurityContext holds platform-specific configurations that will be 
+// WindowsSandboxSecurityContext holds platform-specific configurations that will be
 // applied to a sandbox.
 // These settings will only apply to the sandbox container.
 message WindowsSandboxSecurityContext {
@@ -830,7 +863,7 @@ message WindowsSandboxSecurityContext {
     // The contents of the GMSA credential spec to use to run this container.
     string credential_spec = 2;
 
-    // Indicates whether the container be asked to run as a HostProcess container.
+    // Indicates whether the container requested to run as a HostProcess container.
     bool host_process = 3;
 }
 
@@ -875,6 +908,8 @@ message WindowsContainerResources {
     int64 cpu_maximum = 3;
     // Memory limit in bytes. Default: 0 (not specified).
     int64 memory_limit_in_bytes = 4;
+    // Specifies the size of the rootfs / scratch space in bytes to be configured for this container. Default: 0 (not specified).
+    int64 rootfs_size_in_bytes = 5;
 }
 
 // ContainerMetadata holds all necessary information for building the container
@@ -956,8 +991,6 @@ message ContainerConfig {
 
     // Variables for interactive containers, these have very specialized
     // use-cases (e.g. debugging).
-    // TODO: Determine if we need to continue supporting these fields that are
-    // part of Kubernetes's Container Spec.
     bool stdin = 12;
     bool stdin_once = 13;
     bool tty = 14;
@@ -1135,10 +1168,10 @@ message UpdateContainerResourcesRequest {
     string container_id = 1;
     // Resource configuration specific to Linux containers.
     LinuxContainerResources linux = 2;
-    // Resource configuration specific to Windows containers. 
+    // Resource configuration specific to Windows containers.
     WindowsContainerResources windows = 3;
-    // Unstructured key-value map holding arbitrary additional information for 
-    // container resources updating. This can be used for specifying experimental 
+    // Unstructured key-value map holding arbitrary additional information for
+    // container resources updating. This can be used for specifying experimental
     // resources to update or other options to use when updating the container.
     map<string, string> annotations = 4;
 }
@@ -1491,7 +1524,7 @@ message MemoryUsage {
     int64 timestamp = 1;
     // The amount of working set memory in bytes.
     UInt64Value working_set_bytes = 2;
-    // Available memory for use.  This is defined as the memory limit = workingSetBytes.
+    // Available memory for use. This is defined as the memory limit - workingSetBytes.
     UInt64Value available_bytes = 3;
     // Total memory in use. This includes all memory regardless of when it was accessed.
     UInt64Value usage_bytes = 4;

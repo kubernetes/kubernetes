@@ -23,14 +23,12 @@ package app
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -43,6 +41,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
@@ -56,6 +55,7 @@ import (
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -66,6 +66,7 @@ import (
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -73,6 +74,10 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
+
+func init() {
+	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+}
 
 const (
 	// ControllerStartJitter is the Jitter used when starting controller managers
@@ -90,18 +95,6 @@ const (
 	// ExternalLoops means the kube-controller-manager exclude the controller loops that are cloud provider dependent
 	ExternalLoops
 )
-
-// TODO: delete this check after insecure flags removed in v1.24
-func checkNonZeroInsecurePort(fs *pflag.FlagSet) error {
-	val, err := fs.GetInt("port")
-	if err != nil {
-		return err
-	}
-	if val != 0 {
-		return fmt.Errorf("invalid port value %d: only zero is allowed", val)
-	}
-	return nil
-}
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
 func NewControllerManagerCommand() *cobra.Command {
@@ -127,33 +120,22 @@ controller, and serviceaccounts controller.`,
 			restclient.SetDefaultWarningHandler(restclient.NoWarnings{})
 			return nil
 		},
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 
 			// Activate logging as soon as possible, after that
 			// show flags with the final logging configuration.
-			if err := s.Logs.ValidateAndApply(); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+			if err := logsapi.ValidateAndApply(s.Logs, utilfeature.DefaultFeatureGate); err != nil {
+				return err
 			}
 			cliflag.PrintFlags(cmd.Flags())
 
-			err := checkNonZeroInsecurePort(cmd.Flags())
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
-			}
-
 			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List())
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+				return err
 			}
 
-			if err := Run(c.Complete(), wait.NeverStop); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
-			}
+			return Run(c.Complete(), wait.NeverStop)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -190,10 +172,17 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 	}
 }
 
-// Run runs the KubeControllerManagerOptions.  This should never exit.
+// Run runs the KubeControllerManagerOptions.
 func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
+
+	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
+
+	// Start events processing pipeline.
+	c.EventBroadcaster.StartStructuredLogging(0)
+	c.EventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.Client.CoreV1().Events("")})
+	defer c.EventBroadcaster.Shutdown()
 
 	if cfgz, err := configz.New(ConfigzName); err == nil {
 		cfgz.Set(c.ComponentConfig)
@@ -216,8 +205,8 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	if c.SecureServing != nil {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
-		// TODO: handle stoppedCh returned by c.SecureServing.Serve
-		if _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		// TODO: handle stoppedCh and listenerStoppedCh returned by c.SecureServing.Serve
+		if _, _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
 			return err
 		}
 	}
@@ -227,7 +216,6 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
 	run := func(ctx context.Context, startSATokenController InitFunc, initializersFunc ControllerInitializersFunc) {
-
 		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx.Done())
 		if err != nil {
 			klog.Fatalf("error building controller context: %v", err)
@@ -241,13 +229,14 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		controllerContext.ObjectOrMetadataInformerFactory.Start(stopCh)
 		close(controllerContext.InformersStarted)
 
-		select {}
+		<-ctx.Done()
 	}
 
 	// No leader election, run directly
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		run(context.TODO(), saTokenControllerInitFunc, NewControllerInitializers)
-		panic("unreachable")
+		ctx, _ := wait.ContextForChannel(stopCh)
+		run(ctx, saTokenControllerInitFunc, NewControllerInitializers)
+		return nil
 	}
 
 	id, err := os.Hostname()
@@ -295,7 +284,8 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 				run(ctx, startSATokenController, initializersFunc)
 			},
 			OnStoppedLeading: func() {
-				klog.Fatalf("leaderelection lost")
+				klog.ErrorS(nil, "leaderelection lost")
+				klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 			},
 		})
 
@@ -318,12 +308,14 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 					run(ctx, nil, createInitializersFunc(leaderMigrator.FilterFunc, leadermigration.ControllerMigrated))
 				},
 				OnStoppedLeading: func() {
-					klog.Fatalf("migration leaderelection lost")
+					klog.ErrorS(nil, "migration leaderelection lost")
+					klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 				},
 			})
 	}
 
-	select {}
+	<-stopCh
+	return nil
 }
 
 // ControllerContext defines the context object for controller
@@ -652,6 +644,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 		serviceaccountcontroller.TokensControllerOptions{
 			TokenGenerator: tokenGenerator,
 			RootCA:         rootCA,
+			AutoGenerate:   !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyServiceAccountTokenNoAutoGeneration),
 		},
 	)
 	if err != nil {
@@ -666,7 +659,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 }
 
 func readCA(file string) ([]byte, error) {
-	rootCA, err := ioutil.ReadFile(file)
+	rootCA, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}

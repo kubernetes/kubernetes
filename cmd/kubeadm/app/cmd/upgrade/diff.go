@@ -18,7 +18,6 @@ package upgrade
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/pkg/errors"
@@ -35,6 +34,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -119,7 +119,15 @@ func runDiff(flags *diffFlags, args []string) error {
 		if err != nil {
 			return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 		}
-		cfg, err = configutil.FetchInitConfigurationFromCluster(client, flags.out, "upgrade/diff", false, false)
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade/diff", false, false)
+		// In case we fetch a configuration from the cluster, mutate the ImageRepository field
+		// to be 'registry.k8s.io', if it was 'k8s.gcr.io'. Don't mutate the in-cluster value by passing
+		// nil as the client field; this is done only on "apply".
+		// TODO: Remove this in 1.26
+		// https://github.com/kubernetes/kubeadm/issues/2671
+		if err == nil {
+			_ = uploadconfig.MutateImageRepository(cfg, nil)
+		}
 	}
 	if err != nil {
 		return err
@@ -171,7 +179,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		if path == "" {
 			return errors.New("empty manifest path")
 		}
-		existingManifest, err := ioutil.ReadFile(path)
+		existingManifest, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}

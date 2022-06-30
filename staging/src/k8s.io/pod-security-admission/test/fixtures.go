@@ -99,7 +99,7 @@ var fixtureGenerators = map[fixtureKey]fixtureGenerator{}
 type fixtureKey struct {
 	version api.Version
 	level   api.Level
-	check   string
+	check   policy.CheckID
 }
 
 // fixtureGenerator holds generators for valid and invalid fixtures.
@@ -184,7 +184,7 @@ func getFixtures(key fixtureKey) (fixtureData, error) {
 				fail: generator.generateFail(validPodForLevel.DeepCopy()),
 			}
 			if len(data.expectErrorSubstring) == 0 {
-				data.expectErrorSubstring = key.check
+				data.expectErrorSubstring = string(key.check)
 			}
 			if len(data.fail) == 0 {
 				return fixtureData{}, fmt.Errorf("generateFail for %#v must return at least one pod", key)

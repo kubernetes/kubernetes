@@ -9,7 +9,6 @@ filters:
       - api-approvers
     reviewers:
       - api-reviewers
-
   # examples:
   #   pkg/api/types.go
   #   pkg/api/*/register.go

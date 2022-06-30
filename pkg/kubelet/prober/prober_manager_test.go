@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -34,7 +33,6 @@ import (
 )
 
 func init() {
-	runtime.ReallyCrash = true
 }
 
 var defaultProbe = &v1.Probe{

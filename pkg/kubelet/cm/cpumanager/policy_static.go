@@ -292,11 +292,26 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	return nil
 }
 
+// getAssignedCPUsOfSiblings returns assigned cpus of given container's siblings(all containers other than the given container) in the given pod `podUID`.
+func getAssignedCPUsOfSiblings(s state.State, podUID string, containerName string) cpuset.CPUSet {
+	assignments := s.GetCPUAssignments()
+	cset := cpuset.NewCPUSet()
+	for name, cpus := range assignments[podUID] {
+		if containerName == name {
+			continue
+		}
+		cset = cset.Union(cpus)
+	}
+	return cset
+}
+
 func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
 	klog.InfoS("Static policy: RemoveContainer", "podUID", podUID, "containerName", containerName)
+	cpusInUse := getAssignedCPUsOfSiblings(s, podUID, containerName)
 	if toRelease, ok := s.GetCPUSet(podUID, containerName); ok {
 		s.Delete(podUID, containerName)
 		// Mutate the shared pool, adding released cpus.
+		toRelease = toRelease.Difference(cpusInUse)
 		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
 	}
 	return nil

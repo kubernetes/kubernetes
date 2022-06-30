@@ -17,14 +17,14 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -127,10 +127,7 @@ func (m *podContainerManagerImpl) killOnePid(pid int) error {
 	p, _ := os.FindProcess(pid)
 	if err := p.Kill(); err != nil {
 		// If the process already exited, that's fine.
-		if strings.Contains(err.Error(), "process already finished") {
-			// Hate parsing strings, but
-			// vendor/github.com/opencontainers/runc/libcontainer/
-			// also does this.
+		if errors.Is(err, os.ErrProcessDone) {
 			klog.V(3).InfoS("Process no longer exists", "pid", pid)
 			return nil
 		}
@@ -242,7 +239,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 			// get the subsystems QoS cgroup absolute name
 			qcConversion := m.cgroupManager.Name(qosContainerName)
 			qc := path.Join(val, qcConversion)
-			dirInfo, err := ioutil.ReadDir(qc)
+			dirInfo, err := os.ReadDir(qc)
 			if err != nil {
 				if os.IsNotExist(err) {
 					continue

@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -356,4 +356,37 @@ func TestSharedInformerErrorHandling(t *testing.T) {
 		t.Errorf("Timeout waiting for error handler call")
 	}
 	close(stop)
+}
+
+func TestSharedInformerTransformer(t *testing.T) {
+	// source simulates an apiserver object endpoint.
+	source := fcache.NewFakeControllerSource()
+
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: "pod1", ResourceVersion: "1"}})
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: "pod2", ResourceVersion: "2"}})
+
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+	informer.SetTransform(func(obj interface{}) (interface{}, error) {
+		if pod, ok := obj.(*v1.Pod); ok {
+			name := pod.GetName()
+
+			if upper := strings.ToUpper(name); upper != name {
+				copied := pod.DeepCopyObject().(*v1.Pod)
+				copied.SetName(upper)
+				return copied, nil
+			}
+		}
+		return obj, nil
+	})
+
+	listenerTransformer := newTestListener("listenerTransformer", 0, "POD1", "POD2")
+	informer.AddEventHandler(listenerTransformer)
+
+	stop := make(chan struct{})
+	go informer.Run(stop)
+	defer close(stop)
+
+	if !listenerTransformer.ok() {
+		t.Errorf("%s: expected %v, got %v", listenerTransformer.name, listenerTransformer.expectedItemNames, listenerTransformer.receivedItemNames)
+	}
 }

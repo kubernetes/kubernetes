@@ -42,6 +42,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo"
 )
@@ -58,6 +59,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		conformanceTests []e2eingress.ConformanceTests
 	)
 	f := framework.NewDefaultFramework("ingress")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.BeforeEach(func() {
 		jig = e2eingress.NewIngressTestJig(f.ClientSet)
@@ -473,63 +475,6 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			detectNegAnnotation(f, jig, gceController, ns, name, 0)
 		})
 	})
-
-	// Time: borderline 5m, slow by design
-	ginkgo.Describe("[Slow] Nginx", func() {
-		var nginxController *e2eingress.NginxIngressController
-
-		ginkgo.BeforeEach(func() {
-			// Skip until nginx-ingress controller works against kubernetes 1.22+
-			// Those versions no longer server ingress v1beta1
-			// xref: https://github.com/kubernetes/ingress-nginx/issues/7145
-			e2eskipper.Skipf("Skipping because nginx-controller requires ingress/v1beta1 API")
-
-			e2eskipper.SkipUnlessProviderIs("gce", "gke")
-			ginkgo.By("Initializing nginx controller")
-			jig.Class = "nginx"
-			nginxController = &e2eingress.NginxIngressController{Ns: ns, Client: jig.Client}
-
-			// TODO: This test may fail on other platforms. We can simply skip it
-			// but we want to allow easy testing where a user might've hand
-			// configured firewalls.
-			if framework.ProviderIs("gce", "gke") {
-				framework.ExpectNoError(gce.GcloudComputeResourceCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
-			} else {
-				framework.Logf("WARNING: Not running on GCE/GKE, cannot create firewall rules for :80, :443. Assuming traffic can reach the external ips of all nodes in cluster on those ports.")
-			}
-
-			nginxController.Init()
-		})
-
-		ginkgo.AfterEach(func() {
-			if framework.ProviderIs("gce", "gke") {
-				framework.ExpectNoError(gce.GcloudComputeResourceDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
-			}
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				e2eingress.DescribeIng(ns)
-			}
-			defer nginxController.TearDown()
-			if jig.Ingress == nil {
-				ginkgo.By("No ingress created, no cleanup necessary")
-				return
-			}
-			ginkgo.By("Deleting ingress")
-			jig.TryDeleteIngress()
-		})
-
-		ginkgo.It("should conform to Ingress spec", func() {
-			// Poll more frequently to reduce e2e completion time.
-			// This test runs in presubmit.
-			jig.PollInterval = 5 * time.Second
-			conformanceTests = e2eingress.CreateIngressComformanceTests(jig, ns, map[string]string{})
-			for _, t := range conformanceTests {
-				ginkgo.By(t.EntryLog)
-				t.Execute()
-				ginkgo.By(t.ExitLog)
-				jig.WaitForIngress(false)
-			}
-		})
-	})
 })
 
 func detectNegAnnotation(f *framework.Framework, jig *e2eingress.TestJig, gceController *gce.IngressController, ns, name string, negs int) {
@@ -592,6 +537,7 @@ func detectNegAnnotation(f *framework.Framework, jig *e2eingress.TestJig, gceCon
 
 var _ = common.SIGDescribe("Ingress API", func() {
 	f := framework.NewDefaultFramework("ingress")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	/*
 		Release: v1.19
 		Testname: Ingress API
@@ -652,6 +598,14 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			},
 			Status: networkingv1.IngressStatus{LoadBalancer: v1.LoadBalancerStatus{}},
 		}
+
+		ingress1 := ingTemplate.DeepCopy()
+		ingress1.Spec.Rules[0].Host = "host1.bar.com"
+		ingress2 := ingTemplate.DeepCopy()
+		ingress2.Spec.Rules[0].Host = "host2.bar.com"
+		ingress3 := ingTemplate.DeepCopy()
+		ingress3.Spec.Rules[0].Host = "host3.bar.com"
+
 		// Discovery
 		ginkgo.By("getting /apis")
 		{
@@ -668,7 +622,9 @@ var _ = common.SIGDescribe("Ingress API", func() {
 					}
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected networking API group/version, got %#v", discoveryGroups.Groups))
+			if !found {
+				framework.Failf("expected networking API group/version, got %#v", discoveryGroups.Groups)
+			}
 		}
 
 		ginkgo.By("getting /apis/networking.k8s.io")
@@ -683,7 +639,9 @@ var _ = common.SIGDescribe("Ingress API", func() {
 					break
 				}
 			}
-			framework.ExpectEqual(found, true, fmt.Sprintf("expected networking API version, got %#v", group.Versions))
+			if !found {
+				framework.Failf("expected networking API version, got %#v", group.Versions)
+			}
 		}
 
 		ginkgo.By("getting /apis/networking.k8s.io" + ingVersion)
@@ -697,16 +655,18 @@ var _ = common.SIGDescribe("Ingress API", func() {
 					foundIngress = true
 				}
 			}
-			framework.ExpectEqual(foundIngress, true, fmt.Sprintf("expected ingresses, got %#v", resources.APIResources))
+			if !foundIngress {
+				framework.Failf("expected ingresses, got %#v", resources.APIResources)
+			}
 		}
 
 		// Ingress resource create/read/update/watch verbs
 		ginkgo.By("creating")
-		_, err := ingClient.Create(context.TODO(), ingTemplate, metav1.CreateOptions{})
+		_, err := ingClient.Create(context.TODO(), ingress1, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		_, err = ingClient.Create(context.TODO(), ingTemplate, metav1.CreateOptions{})
+		_, err = ingClient.Create(context.TODO(), ingress2, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		createdIngress, err := ingClient.Create(context.TODO(), ingTemplate, metav1.CreateOptions{})
+		createdIngress, err := ingClient.Create(context.TODO(), ingress3, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("getting")
@@ -759,10 +719,14 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		for sawAnnotations := false; !sawAnnotations; {
 			select {
 			case evt, ok := <-ingWatch.ResultChan():
-				framework.ExpectEqual(ok, true, "watch channel should not close")
+				if !ok {
+					framework.Fail("watch channel should not close")
+				}
 				framework.ExpectEqual(evt.Type, watch.Modified)
 				watchedIngress, isIngress := evt.Object.(*networkingv1.Ingress)
-				framework.ExpectEqual(isIngress, true, fmt.Sprintf("expected Ingress, got %T", evt.Object))
+				if !isIngress {
+					framework.Failf("expected Ingress, got %T", evt.Object)
+				}
 				if watchedIngress.Annotations["patched"] == "true" {
 					framework.Logf("saw patched and updated annotations")
 					sawAnnotations = true
@@ -818,7 +782,9 @@ var _ = common.SIGDescribe("Ingress API", func() {
 
 		expectFinalizer := func(ing *networkingv1.Ingress, msg string) {
 			framework.ExpectNotEqual(ing.DeletionTimestamp, nil, fmt.Sprintf("expected deletionTimestamp, got nil on step: %q, ingress: %+v", msg, ing))
-			framework.ExpectEqual(len(ing.Finalizers) > 0, true, fmt.Sprintf("expected finalizers on ingress, got none on step: %q, ingress: %+v", msg, ing))
+			if len(ing.Finalizers) == 0 {
+				framework.Failf("expected finalizers on ingress, got none on step: %q, ingress: %+v", msg, ing)
+			}
 		}
 
 		err = ingClient.Delete(context.TODO(), createdIngress.Name, metav1.DeleteOptions{})
@@ -828,12 +794,16 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		if err == nil {
 			expectFinalizer(ing, "deleting createdIngress")
 		} else {
-			framework.ExpectEqual(apierrors.IsNotFound(err), true, fmt.Sprintf("expected 404, got %v", err))
+			if !apierrors.IsNotFound(err) {
+				framework.Failf("expected 404, got %v", err)
+			}
 		}
 		ings, err = ingClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		// Should have <= 3 items since some ingresses might not have been deleted yet due to finalizers
-		framework.ExpectEqual(len(ings.Items) <= 3, true, "filtered list should have <= 3 items")
+		if len(ings.Items) > 3 {
+			framework.Fail("filtered list should have <= 3 items")
+		}
 		// Validate finalizer on the deleted ingress
 		for _, ing := range ings.Items {
 			if ing.Namespace == createdIngress.Namespace && ing.Name == createdIngress.Name {
@@ -847,7 +817,9 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ings, err = ingClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "special-label=" + f.UniqueName})
 		framework.ExpectNoError(err)
 		// Should have <= 3 items since some ingresses might not have been deleted yet due to finalizers
-		framework.ExpectEqual(len(ings.Items) <= 3, true, "filtered list should have <= 3 items")
+		if len(ings.Items) > 3 {
+			framework.Fail("filtered list should have <= 3 items")
+		}
 		// Validate finalizers
 		for _, ing := range ings.Items {
 			expectFinalizer(&ing, "deleting ingress collection")

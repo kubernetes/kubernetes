@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
@@ -31,16 +30,13 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/gengo/examples/set-gen/sets"
 	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -124,9 +120,7 @@ var missingHanlders = sets.NewString(
 )
 
 func TestServerSidePrint(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, true)()
-
-	s, _, closeFn := setupWithResources(t,
+	clientSet, kubeConfig, tearDownFn := setupWithResources(t,
 		// additional groupversions needed for the test to run
 		[]schema.GroupVersion{
 			{Group: "discovery.k8s.io", Version: "v1"},
@@ -146,23 +140,23 @@ func TestServerSidePrint(t *testing.T) {
 		},
 		[]schema.GroupVersionResource{},
 	)
-	defer closeFn()
+	defer tearDownFn()
 
-	ns := framework.CreateTestingNamespace("server-print", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(clientSet, "server-print", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 	tableParam := fmt.Sprintf("application/json;as=Table;g=%s;v=%s, application/json", metav1beta1.GroupName, metav1beta1.SchemeGroupVersion.Version)
 	printer := newFakePrinter(printersinternal.AddHandlers)
 
 	configFlags := genericclioptions.NewTestConfigFlags().
-		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfig(s.URL), &clientcmd.ConfigOverrides{}))
+		WithClientConfig(clientcmd.NewDefaultClientConfig(*createKubeConfig(kubeConfig.Host), &clientcmd.ConfigOverrides{}))
 
 	restConfig, err := configFlags.ToRESTConfig()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	cacheDir, err := ioutil.TempDir(os.TempDir(), "test-integration-apiserver-print")
+	cacheDir, err := os.MkdirTemp(os.TempDir(), "test-integration-apiserver-print")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
