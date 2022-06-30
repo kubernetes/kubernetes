@@ -25,6 +25,9 @@ import (
 	"testing"
 	"time"
 
+	csitrans "k8s.io/csi-translation-lib"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
+
 	"github.com/stretchr/testify/assert"
 	"k8s.io/mount-utils"
 
@@ -2195,6 +2198,11 @@ func TestSyncStates(t *testing.T) {
 				mountedPods := rcInstance.actualStateOfWorld.GetAllMountedVolumes()
 				if len(mountedPods) != 1 {
 					return fmt.Errorf("expected 1 pods to in mounted volume list got %d", len(mountedPods))
+				}
+				mountedPodVolume := mountedPods[0]
+				addedViaReconstruction := rcInstance.actualStateOfWorld.IsVolumeReconstructed(mountedPodVolume.VolumeName, mountedPodVolume.PodName)
+				if !addedViaReconstruction {
+					return fmt.Errorf("expected volume %s to be marked as added via reconstruction", mountedPodVolume.VolumeName)
 				}
 				return nil
 			},
