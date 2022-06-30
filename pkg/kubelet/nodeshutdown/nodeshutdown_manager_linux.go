@@ -78,8 +78,9 @@ type managerImpl struct {
 	killPodFunc    eviction.KillPodFunc
 	syncNodeStatus func()
 
-	dbusCon     dbusInhibiter
-	inhibitLock systemd.InhibitLock
+	dbusCon          dbusInhibiter
+	inhibitLockMutex sync.Mutex
+	inhibitLock      systemd.InhibitLock
 
 	nodeShuttingDownMutex sync.Mutex
 	nodeShuttingDownNow   bool
@@ -299,10 +300,25 @@ func (m *managerImpl) aquireInhibitLock() error {
 	if err != nil {
 		return err
 	}
+	m.inhibitLockMutex.Lock()
+	defer m.inhibitLockMutex.Unlock()
 	if m.inhibitLock != 0 {
 		m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
 	}
 	m.inhibitLock = lock
+	return nil
+}
+
+func (m *managerImpl) releaseInhibitLock() error {
+	m.inhibitLockMutex.Lock()
+	defer m.inhibitLockMutex.Unlock()
+	if m.inhibitLock != 0 {
+		err := m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
+		if err != nil {
+			return err
+		}
+	}
+	m.inhibitLock = 0
 	return nil
 }
 
@@ -322,7 +338,10 @@ func (m *managerImpl) processShutdownEvent() error {
 	activePods := m.getPods()
 
 	defer func() {
-		m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
+		err := m.releaseInhibitLock()
+		if err != nil {
+			m.logger.Error(err, "failed releasing inhibitLock when shutdown")
+		}
 		m.logger.V(1).Info("Shutdown manager completed processing shutdown event, node will shutdown shortly")
 	}()
 
