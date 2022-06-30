@@ -54,7 +54,7 @@ var (
 		kubectl config unset contexts.foo.namespace
 
 		# Unset cluster server using jsonpath
-		kubectl config unset '{.clusters[?(@.name=="cluster-0")].cluster.server}' --jsonpath`)
+		kubectl config unset '{.clusters[?(@.name=="cluster-0")].cluster.server}'`)
 )
 
 // NewCmdConfigUnset returns a Command instance for 'config unset' sub command
