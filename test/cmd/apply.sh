@@ -224,7 +224,7 @@ __EOF__
   kubectl delete pod/b -n nsb
   kubectl delete ns nsb
 
-  ## kubectl apply --prune should fallback to delete for non reapable types
+  ## kubectl apply --prune should fallback to delete for non readable types
   kubectl apply --all --prune -f hack/testdata/prune-reap/a.yml 2>&1 "${kube_flags[@]:?}"
   kube::test::get_object_assert 'pvc a-pvc' "{{${id_field:?}}}" 'a-pvc'
   kubectl apply --all --prune -f hack/testdata/prune-reap/b.yml 2>&1 "${kube_flags[@]:?}"
@@ -289,7 +289,7 @@ __EOF__
   # cleanup
   kubectl delete -f hack/testdata/service-revision2.yaml "${kube_flags[@]:?}"
 
-  ## kubectl apply -k somedir
+  ## kubectl apply -k some-dir
   kubectl apply -k hack/testdata/kustomize
   kube::test::get_object_assert 'configmap test-the-map' "{{${id_field}}}" 'test-the-map'
   kube::test::get_object_assert 'deployment test-the-deployment' "{{${id_field}}}" 'test-the-deployment'
@@ -297,7 +297,7 @@ __EOF__
   # cleanup
   kubectl delete -k hack/testdata/kustomize
 
-  ## kubectl apply --kustomize somedir
+  ## kubectl apply --kustomize some-dir
   kubectl apply --kustomize hack/testdata/kustomize
   kube::test::get_object_assert 'configmap test-the-map' "{{${id_field}}}" 'test-the-map'
   kube::test::get_object_assert 'deployment test-the-deployment' "{{${id_field}}}" 'test-the-deployment'
@@ -306,7 +306,7 @@ __EOF__
   kubectl delete --kustomize hack/testdata/kustomize
 
   ## kubectl apply multiple resources with one failure during apply phase.
-  # Pre-Condition: namepace does not exist and no POD exists
+  # Pre-Condition: namespace does not exist and no POD exists
   output_message=$(! kubectl get namespace multi-resource-ns 2>&1 "${kube_flags[@]:?}")
   kube::test::if_has_string "${output_message}" 'namespaces "multi-resource-ns" not found'
   kube::test::wait_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
