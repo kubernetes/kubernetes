@@ -346,6 +346,7 @@ func autoConvert_kubeadm_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in
 		return err
 	}
 	out.KubernetesVersion = in.KubernetesVersion
+	// INFO: in.CIKubernetesVersion opted out of conversion generation
 	out.ControlPlaneEndpoint = in.ControlPlaneEndpoint
 	if err := Convert_kubeadm_APIServer_To_v1beta2_APIServer(&in.APIServer, &out.APIServer, s); err != nil {
 		return err
