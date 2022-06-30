@@ -53,7 +53,8 @@ func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, exte
 	}
 
 	if corruptedMnt || mounter.canSafelySkipMountPointCheck() {
-		klog.V(4).Infof("unmounting %q", mountPath)
+		klog.V(4).Infof("unmounting %q (corruptedMount: %t, mounterCanSkipMountPointChecks: %t)",
+			mountPath, corruptedMnt, mounter.canSafelySkipMountPointCheck())
 		if err := mounter.UnmountWithForce(mountPath, umountTimeout); err != nil {
 			return err
 		}
@@ -89,7 +90,8 @@ func CleanupMountWithForce(mountPath string, mounter MounterForceUnmounter, exte
 // will be skipped. The mount point check will also be skipped if the mounter supports it.
 func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
 	if corruptedMnt || mounter.canSafelySkipMountPointCheck() {
-		klog.V(4).Infof("unmounting %q", mountPath)
+		klog.V(4).Infof("unmounting %q (corruptedMount: %t, mounterCanSkipMountPointChecks: %t)",
+			mountPath, corruptedMnt, mounter.canSafelySkipMountPointCheck())
 		if err := mounter.Unmount(mountPath); err != nil {
 			return err
 		}
