@@ -733,6 +733,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 				},
 				UnschedulablePlugins: sets.NewString(nodeports.Name),
 			},
+			CachedMsg: "0/1 nodes are available: 1 node(s) didn't have free ports for the requested pod ports.",
 		}
 		if !reflect.DeepEqual(expectErr, err) {
 			t.Errorf("err want=%v, get=%v", expectErr, err)

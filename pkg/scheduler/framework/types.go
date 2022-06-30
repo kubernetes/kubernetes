@@ -224,6 +224,9 @@ type FitError struct {
 	Pod         *v1.Pod
 	NumAllNodes int
 	Diagnosis   Diagnosis
+	// CachedMsg is calculated only once.
+	// Protect using sync.Once is unnecessary as FitError is read in serial.
+	CachedMsg string
 }
 
 // NoNodeAvailableMsg is used to format message when no nodes available.
@@ -231,6 +234,10 @@ const NoNodeAvailableMsg = "0/%v nodes are available"
 
 // Error returns detailed information of why the pod failed to fit on each node
 func (f *FitError) Error() string {
+	if f.CachedMsg != "" {
+		return f.CachedMsg
+	}
+
 	reasons := make(map[string]int)
 	for _, status := range f.Diagnosis.NodeToStatusMap {
 		for _, reason := range status.Reasons() {
@@ -251,6 +258,7 @@ func (f *FitError) Error() string {
 	if postFilterMsg != "" {
 		reasonMsg += " " + postFilterMsg
 	}
+	f.CachedMsg = reasonMsg
 	return reasonMsg
 }
 
