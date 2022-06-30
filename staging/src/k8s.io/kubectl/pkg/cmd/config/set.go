@@ -329,6 +329,10 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 
 			// We must now work on the results gotten by the current node in the user provided jsonpath
 			for _, outerResult := range results {
+				// no reason to keep going setting things to unset something eventually so just short circuit
+				if len(outerResult) == 0 && unset {
+					return nil
+				}
 				// This should really only apply to the slices of named structs e.g. NamedClusters. It is a result of
 				// filter returning an empty list in the results.
 				if len(outerResult) == 0 && node.Type() == jsonpath.NodeFilter {
