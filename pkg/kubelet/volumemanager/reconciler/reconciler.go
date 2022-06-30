@@ -178,6 +178,10 @@ func (rc *reconciler) reconcile() {
 	// Ensure devices that should be detached/unmounted are detached/unmounted.
 	rc.unmountDetachDevices()
 
+	// After running the above operations if skippedDuringReconstruction is not empty
+	// then ensure that all volumes which were discovered and skipped during reconstruction
+	// are added to actualStateOfWorld in uncertain state.
+	// This should be called only ONCE after reconstruction.
 	if len(rc.skippedDuringReconstruction) > 0 {
 		rc.processReconstructedVolumes()
 	}
@@ -279,7 +283,18 @@ func (rc *reconciler) processReconstructedVolumes() {
 			volumeNotMounted := rc.actualStateOfWorld.PodRemovedFromVolume(podName, volume.volumeName)
 			// if volume is not mounted then lets mark volume mounted in uncertain state in ASOW
 			if volumeNotMounted {
-				err := rc.markVolumeState(volume, operationexecutor.VolumeMountUncertain)
+				markVolumeOpts := operationexecutor.MarkVolumeOpts{
+					PodName:             volume.podName,
+					PodUID:              types.UID(volume.podName),
+					VolumeName:          volume.volumeName,
+					Mounter:             volume.mounter,
+					BlockVolumeMapper:   volume.blockVolumeMapper,
+					OuterVolumeSpecName: volume.outerVolumeSpecName,
+					VolumeGidVolume:     volume.volumeGidValue,
+					VolumeSpec:          volume.volumeSpec,
+					VolumeMountState:    operationexecutor.VolumeMountUncertain,
+				}
+				err := rc.actualStateOfWorld.AddVolumeViaReconstruction(markVolumeOpts)
 				uncertainVolumeCount += 1
 				if err != nil {
 					klog.ErrorS(err, "Could not add pod to volume information to actual state of world", "pod", klog.KObj(volume.pod))
@@ -429,6 +444,8 @@ type reconstructedVolume struct {
 	blockVolumeMapper   volumepkg.BlockVolumeMapper
 }
 
+// globalVolumeInfo stores reconstructed volume information
+// for each pod that was using that volume.
 type globalVolumeInfo struct {
 	volumeName        v1.UniqueVolumeName
 	volumeSpec        *volumepkg.Spec

@@ -17,7 +17,9 @@ limitations under the License.
 package cache
 
 import (
+	"fmt"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -458,6 +460,149 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 	verifyVolumeMountedElsewhere(t, podName2, generatedVolumeName2, true /*expectedMountedElsewhere */, asw)
 }
 
+func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
+	tests := []struct {
+		name           string
+		opCallback     func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error
+		verifyCallback func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error
+	}{
+		{
+			name: "marking volume mounted should remove volume from found during reconstruction",
+			opCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				volumeOpts.VolumeMountState = operationexecutor.VolumeMounted
+				return asw.MarkVolumeAsMounted(volumeOpts)
+			},
+			verifyCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				ok := asw.IsVolumeReconstructed(volumeOpts.VolumeName, volumeOpts.PodName)
+				if ok {
+					return fmt.Errorf("found unexpected volume in reconstructed volume list")
+				}
+				return nil
+			},
+		},
+		{
+			name: "removing volume from pod should remove volume from found during reconstruction",
+			opCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				return asw.MarkVolumeAsUnmounted(volumeOpts.PodName, volumeOpts.VolumeName)
+			},
+			verifyCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				ok := asw.IsVolumeReconstructed(volumeOpts.VolumeName, volumeOpts.PodName)
+				if ok {
+					return fmt.Errorf("found unexpected volume in reconstructed volume list")
+				}
+				return nil
+			},
+		},
+		{
+			name: "removing volume entirely from ASOW should remove volume from found during reconstruction",
+			opCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				err := asw.MarkVolumeAsUnmounted(volumeOpts.PodName, volumeOpts.VolumeName)
+				if err != nil {
+					return err
+				}
+				asw.MarkVolumeAsDetached(volumeOpts.VolumeName, "")
+				return nil
+			},
+			verifyCallback: func(asw ActualStateOfWorld, volumeOpts operationexecutor.MarkVolumeOpts) error {
+				ok := asw.IsVolumeReconstructed(volumeOpts.VolumeName, volumeOpts.PodName)
+				if ok {
+					return fmt.Errorf("found unexpected volume in reconstructed volume list")
+				}
+				aswInstance, _ := asw.(*actualStateOfWorld)
+				_, found := aswInstance.foundDuringReconstruction[volumeOpts.VolumeName]
+				if found {
+					return fmt.Errorf("found unexpected volume in reconstructed map")
+				}
+				return nil
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+			asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+			devicePath := "fake/device/path"
+
+			pod1 := getTestPod("pod1", "pod1uid", "volume-name-1", "fake-device1")
+			volumeSpec1 := &volume.Spec{Volume: &pod1.Spec.Volumes[0]}
+			generatedVolumeName1, err := util.GetUniqueVolumeNameFromSpec(
+				plugin, volumeSpec1)
+			require.NoError(t, err)
+
+			err = asw.MarkVolumeAsAttached(generatedVolumeName1, volumeSpec1, "" /* nodeName */, devicePath)
+			if err != nil {
+				t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+			}
+			podName1 := util.GetUniquePodName(pod1)
+
+			mounter1, err := plugin.NewMounter(volumeSpec1, pod1, volume.VolumeOptions{})
+			if err != nil {
+				t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
+			}
+
+			mapper1, err := plugin.NewBlockVolumeMapper(volumeSpec1, pod1, volume.VolumeOptions{})
+			if err != nil {
+				t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
+			}
+
+			markVolumeOpts1 := operationexecutor.MarkVolumeOpts{
+				PodName:             podName1,
+				PodUID:              pod1.UID,
+				VolumeName:          generatedVolumeName1,
+				Mounter:             mounter1,
+				BlockVolumeMapper:   mapper1,
+				OuterVolumeSpecName: volumeSpec1.Name(),
+				VolumeSpec:          volumeSpec1,
+				VolumeMountState:    operationexecutor.VolumeMountUncertain,
+			}
+			err = asw.AddVolumeViaReconstruction(markVolumeOpts1)
+			if err != nil {
+				t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+			}
+			// make sure state is as we expect it to be
+			verifyVolumeExistsAsw(t, generatedVolumeName1, true /* shouldExist */, asw)
+			verifyVolumeDoesntExistInUnmountedVolumes(t, generatedVolumeName1, asw)
+			verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName1, asw)
+			verifyVolumeExistsWithSpecNameInVolumeAsw(t, podName1, volumeSpec1.Name(), asw)
+			verifyVolumeSpecNameInVolumeAsw(t, podName1, []*volume.Spec{volumeSpec1}, asw)
+			verifyVolumeFoundInReconstruction(t, podName1, generatedVolumeName1, asw)
+
+			if tc.opCallback != nil {
+				err = tc.opCallback(asw, markVolumeOpts1)
+				if err != nil {
+					t.Fatalf("for test %s: %v", tc.name, err)
+				}
+			}
+			err = tc.verifyCallback(asw, markVolumeOpts1)
+			if err != nil {
+				t.Fatalf("for test %s verification failed: %v", tc.name, err)
+			}
+		})
+	}
+}
+
+func getTestPod(podName, podUID, outerVolumeName, pdName string) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+			UID:  types.UID(podUID),
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: outerVolumeName,
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: pdName,
+						},
+					},
+				},
+			},
+		},
+	}
+	return pod
+}
+
 // Calls AddPodToVolume() to add pod to empty data struct
 // Verifies call fails with "volume does not exist" error.
 func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
@@ -871,5 +1016,12 @@ func verifyVolumeSpecNameInVolumeAsw(
 		if volume.InnerVolumeSpecName != volumeSpecs[i].Name() {
 			t.Fatalf("Volume spec name does not match Expected: <%q> Actual: <%q>", volumeSpecs[i].Name(), volume.InnerVolumeSpecName)
 		}
+	}
+}
+
+func verifyVolumeFoundInReconstruction(t *testing.T, podToCheck volumetypes.UniquePodName, volumeToCheck v1.UniqueVolumeName, asw ActualStateOfWorld) {
+	isRecontructed := asw.IsVolumeReconstructed(volumeToCheck, podToCheck)
+	if !isRecontructed {
+		t.Fatalf("ASW IsVolumeReconstructed result invalid. expected <true> Actual <false>")
 	}
 }
