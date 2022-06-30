@@ -2050,37 +2050,25 @@ func TestStatefulSetControlRollback(t *testing.T) {
 
 func TestStatefulSetAvailability(t *testing.T) {
 	tests := []struct {
-		name                              string
-		inputSTS                          *apps.StatefulSet
-		expectedActiveReplicas            int32
-		readyDuration                     time.Duration
-		minReadySecondsFeaturegateEnabled bool
+		name                   string
+		inputSTS               *apps.StatefulSet
+		expectedActiveReplicas int32
+		readyDuration          time.Duration
 	}{
 		{
-			name: "replicas not running for required time, still will be available," +
-				" when minReadySeconds is disabled",
-			inputSTS:                          setMinReadySeconds(newStatefulSet(1), int32(3600)),
-			readyDuration:                     0 * time.Minute,
-			expectedActiveReplicas:            int32(1),
-			minReadySecondsFeaturegateEnabled: false,
+			name:                   "replicas running for required time, when minReadySeconds is enabled",
+			inputSTS:               setMinReadySeconds(newStatefulSet(1), int32(3600)),
+			readyDuration:          -120 * time.Minute,
+			expectedActiveReplicas: int32(1),
 		},
 		{
-			name:                              "replicas running for required time, when minReadySeconds is enabled",
-			inputSTS:                          setMinReadySeconds(newStatefulSet(1), int32(3600)),
-			readyDuration:                     -120 * time.Minute,
-			expectedActiveReplicas:            int32(1),
-			minReadySecondsFeaturegateEnabled: true,
-		},
-		{
-			name:                              "replicas not running for required time, when minReadySeconds is enabled",
-			inputSTS:                          setMinReadySeconds(newStatefulSet(1), int32(3600)),
-			readyDuration:                     -30 * time.Minute,
-			expectedActiveReplicas:            int32(0),
-			minReadySecondsFeaturegateEnabled: true,
+			name:                   "replicas not running for required time, when minReadySeconds is enabled",
+			inputSTS:               setMinReadySeconds(newStatefulSet(1), int32(3600)),
+			readyDuration:          -30 * time.Minute,
+			expectedActiveReplicas: int32(0),
 		},
 	}
 	for _, test := range tests {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, test.minReadySecondsFeaturegateEnabled)()
 		set := test.inputSTS
 		client := fake.NewSimpleClientset(set)
 		spc, _, ssc := setupController(client)

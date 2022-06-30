@@ -245,26 +245,16 @@ func TestStatefulSetAvailable(t *testing.T) {
 		totalReplicas  int32
 		readyReplicas  int32
 		activeReplicas int32
-		enabled        bool
 	}{
 		{
-			name:           "When feature gate is enabled, only certain replicas would become active",
+			name:           "only certain replicas would become active",
 			totalReplicas:  4,
 			readyReplicas:  3,
 			activeReplicas: 2,
-			enabled:        true,
-		},
-		{
-			name:           "When feature gate is disabled, all the ready replicas would become active",
-			totalReplicas:  4,
-			readyReplicas:  3,
-			activeReplicas: 3,
-			enabled:        false,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, test.enabled)()
 			closeFn, rm, informers, c := scSetup(t)
 			defer closeFn()
 			ns := framework.CreateNamespaceOrDie(c, "test-available-pods", t)

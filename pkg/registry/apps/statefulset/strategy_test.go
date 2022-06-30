@@ -85,8 +85,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 		Status: apps.StatefulSetStatus{Replicas: 4},
 	}
 	Strategy.PrepareForUpdate(ctx, validPs, ps)
-	t.Run("when minReadySeconds feature gate is enabled", func(t *testing.T) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, true)()
+	t.Run("StatefulSet minReadySeconds field validations on creation and updation", func(t *testing.T) {
 		// Test creation
 		ps := &apps.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -137,53 +136,6 @@ func TestStatefulSetStrategy(t *testing.T) {
 			t.Errorf("expected minReadySeconds to not be changed %v", errs)
 		}
 	})
-	t.Run("when minReadySeconds feature gate is disabled, the minReadySeconds should not be updated",
-		func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, false)()
-			// Test creation
-			ps := &apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            &metav1.LabelSelector{MatchLabels: validSelector},
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					MinReadySeconds:     int32(-1),
-				},
-			}
-			Strategy.PrepareForCreate(ctx, ps)
-			errs := Strategy.Validate(ctx, ps)
-			if len(errs) != 0 {
-				t.Errorf("StatefulSet creation should not have any issues but found %v", errs)
-			}
-			if ps.Spec.MinReadySeconds != 0 {
-				t.Errorf("if the StatefulSet is created with invalid value we expect it to be defaulted to 0 "+
-					"but got %v", ps.Spec.MinReadySeconds)
-			}
-
-			// Test Updation
-			validPs := &apps.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace, ResourceVersion: "1", Generation: 1},
-				Spec: apps.StatefulSetSpec{
-					PodManagementPolicy: apps.OrderedReadyPodManagement,
-					Selector:            ps.Spec.Selector,
-					Template:            validPodTemplate.Template,
-					UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
-					MinReadySeconds:     newMinReadySeconds,
-				},
-				Status: apps.StatefulSetStatus{Replicas: 4},
-			}
-			Strategy.PrepareForUpdate(ctx, validPs, ps)
-			errs = Strategy.ValidateUpdate(ctx, validPs, ps)
-			if len(errs) == 0 {
-				t.Errorf("updating only spec.Replicas is allowed on a statefulset: %v", errs)
-			}
-			expectedUpdateErrorString := "spec: Forbidden: updates to statefulset spec for fields other than" +
-				" 'replicas', 'template', 'updateStrategy' and 'persistentVolumeClaimRetentionPolicy' are forbidden"
-			if errs[0].Error() != expectedUpdateErrorString {
-				t.Errorf("expected error string %v", errs[0].Error())
-			}
-		})
 
 	validPs = &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace, ResourceVersion: "1", Generation: 1},
@@ -379,75 +331,35 @@ func getMaxUnavailable(maxUnavailable int) *int {
 // TestDropStatefulSetDisabledFields tests if the drop functionality is working fine or not
 func TestDropStatefulSetDisabledFields(t *testing.T) {
 	testCases := []struct {
-		name                  string
-		enableMinReadySeconds bool
-		enableMaxUnavailable  bool
-		ss                    *apps.StatefulSet
-		oldSS                 *apps.StatefulSet
-		expectedSS            *apps.StatefulSet
+		name                 string
+		enableMaxUnavailable bool
+		ss                   *apps.StatefulSet
+		oldSS                *apps.StatefulSet
+		expectedSS           *apps.StatefulSet
 	}{
 		{
-			name:                  "no minReadySeconds, no update",
-			enableMinReadySeconds: false,
-			ss:                    &apps.StatefulSet{},
-			oldSS:                 nil,
-			expectedSS:            &apps.StatefulSet{},
+			name:       "set minReadySeconds, no update",
+			ss:         generateStatefulSetWithMinReadySeconds(10),
+			oldSS:      generateStatefulSetWithMinReadySeconds(20),
+			expectedSS: generateStatefulSetWithMinReadySeconds(10),
 		},
 		{
-			name:                  "no minReadySeconds, irrespective of the current value, set to default value of 0",
-			enableMinReadySeconds: false,
-			ss:                    generateStatefulSetWithMinReadySeconds(2000),
-			oldSS:                 nil,
-			expectedSS:            &apps.StatefulSet{Spec: apps.StatefulSetSpec{MinReadySeconds: int32(0)}},
+			name:       "set minReadySeconds, oldSS field set to nil",
+			ss:         generateStatefulSetWithMinReadySeconds(10),
+			oldSS:      nil,
+			expectedSS: generateStatefulSetWithMinReadySeconds(10),
 		},
 		{
-			name:                  "no minReadySeconds, oldSS field set to 100, no update",
-			enableMinReadySeconds: false,
-			ss:                    generateStatefulSetWithMinReadySeconds(2000),
-			oldSS:                 generateStatefulSetWithMinReadySeconds(100),
-			expectedSS:            generateStatefulSetWithMinReadySeconds(2000),
+			name:       "set minReadySeconds, oldSS field is set to 0",
+			ss:         generateStatefulSetWithMinReadySeconds(10),
+			oldSS:      generateStatefulSetWithMinReadySeconds(0),
+			expectedSS: generateStatefulSetWithMinReadySeconds(10),
 		},
 		{
-			name:                  "no minReadySeconds, oldSS field set to -1(invalid value), update to zero",
-			enableMinReadySeconds: false,
-			ss:                    generateStatefulSetWithMinReadySeconds(2000),
-			oldSS:                 generateStatefulSetWithMinReadySeconds(-1),
-			expectedSS:            generateStatefulSetWithMinReadySeconds(0),
-		},
-		{
-			name:                  "no minReadySeconds, oldSS field set to 0, no update",
-			enableMinReadySeconds: false,
-			ss:                    generateStatefulSetWithMinReadySeconds(2000),
-			oldSS:                 generateStatefulSetWithMinReadySeconds(0),
-			expectedSS:            generateStatefulSetWithMinReadySeconds(2000),
-		},
-		{
-			name:                  "set minReadySeconds, no update",
-			enableMinReadySeconds: true,
-			ss:                    generateStatefulSetWithMinReadySeconds(10),
-			oldSS:                 generateStatefulSetWithMinReadySeconds(20),
-			expectedSS:            generateStatefulSetWithMinReadySeconds(10),
-		},
-		{
-			name:                  "set minReadySeconds, oldSS field set to nil",
-			enableMinReadySeconds: true,
-			ss:                    generateStatefulSetWithMinReadySeconds(10),
-			oldSS:                 nil,
-			expectedSS:            generateStatefulSetWithMinReadySeconds(10),
-		},
-		{
-			name:                  "set minReadySeconds, oldSS field is set to 0",
-			enableMinReadySeconds: true,
-			ss:                    generateStatefulSetWithMinReadySeconds(10),
-			oldSS:                 generateStatefulSetWithMinReadySeconds(0),
-			expectedSS:            generateStatefulSetWithMinReadySeconds(10),
-		},
-		{
-			name:                 "MaxUnavailable not enabled, field not used",
-			enableMaxUnavailable: false,
-			ss:                   makeStatefulSetWithMaxUnavailable(nil),
-			oldSS:                nil,
-			expectedSS:           makeStatefulSetWithMaxUnavailable(nil),
+			name:       "MaxUnavailable not enabled, field not used",
+			ss:         makeStatefulSetWithMaxUnavailable(nil),
+			oldSS:      nil,
+			expectedSS: makeStatefulSetWithMaxUnavailable(nil),
 		},
 		{
 			name:                 "MaxUnavailable not enabled, field used in new, not in old",
@@ -481,7 +393,6 @@ func TestDropStatefulSetDisabledFields(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, tc.enableMaxUnavailable)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, tc.enableMinReadySeconds)()
 			old := tc.oldSS.DeepCopy()
 
 			dropStatefulSetDisabledFields(tc.ss, tc.oldSS)
