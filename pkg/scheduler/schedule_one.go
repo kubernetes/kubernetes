@@ -367,12 +367,12 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 		UnschedulablePlugins: sets.NewString(),
 	}
 
-	// Run "prefilter" plugins.
-	preRes, s := fwk.RunPreFilterPlugins(ctx, state, pod)
 	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
 	if err != nil {
 		return nil, diagnosis, err
 	}
+	// Run "prefilter" plugins.
+	preRes, s := fwk.RunPreFilterPlugins(ctx, state, pod)
 	if !s.IsSuccess() {
 		if !s.IsUnschedulable() {
 			return nil, diagnosis, s.AsError()
