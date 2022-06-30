@@ -6266,67 +6266,6 @@ type ConfigMapList struct {
 	Items []ConfigMap `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// Type and constants for component health validation.
-type ComponentConditionType string
-
-// These are the valid conditions for the component.
-const (
-	ComponentHealthy ComponentConditionType = "Healthy"
-)
-
-// Information about the condition of a component.
-type ComponentCondition struct {
-	// Type of condition for a component.
-	// Valid value: "Healthy"
-	Type ComponentConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=ComponentConditionType"`
-	// Status of the condition for a component.
-	// Valid values for "Healthy": "True", "False", or "Unknown".
-	Status ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
-	// Message about the condition for a component.
-	// For example, information about a health check.
-	// +optional
-	Message string `json:"message,omitempty" protobuf:"bytes,3,opt,name=message"`
-	// Condition error code for a component.
-	// For example, a health check error code.
-	// +optional
-	Error string `json:"error,omitempty" protobuf:"bytes,4,opt,name=error"`
-}
-
-// +genclient
-// +genclient:nonNamespaced
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
-// Deprecated: This API is deprecated in v1.19+
-type ComponentStatus struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// List of component conditions observed
-	// +optional
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	Conditions []ComponentCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// Status of all the conditions for the component as a list of ComponentStatus objects.
-// Deprecated: This API is deprecated in v1.19+
-type ComponentStatusList struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-	// +optional
-	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// List of ComponentStatus objects.
-	Items []ComponentStatus `json:"items" protobuf:"bytes,2,rep,name=items"`
-}
-
 // DownwardAPIVolumeSource represents a volume containing downward API info.
 // Downward API volumes support ownership management and SELinux relabeling.
 type DownwardAPIVolumeSource struct {

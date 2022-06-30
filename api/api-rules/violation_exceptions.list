@@ -70,7 +70,6 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,Capabilities,Add
 API rule violation: list_type_missing,k8s.io/api/core/v1,Capabilities,Drop
 API rule violation: list_type_missing,k8s.io/api/core/v1,CephFSPersistentVolumeSource,Monitors
 API rule violation: list_type_missing,k8s.io/api/core/v1,CephFSVolumeSource,Monitors
-API rule violation: list_type_missing,k8s.io/api/core/v1,ComponentStatus,Conditions
 API rule violation: list_type_missing,k8s.io/api/core/v1,ConfigMapProjection,Items
 API rule violation: list_type_missing,k8s.io/api/core/v1,ConfigMapVolumeSource,Items
 API rule violation: list_type_missing,k8s.io/api/core/v1,Container,Args

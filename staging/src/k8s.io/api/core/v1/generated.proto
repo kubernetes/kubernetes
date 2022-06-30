@@ -409,54 +409,6 @@ message ClientIPConfig {
   optional int32 timeoutSeconds = 1;
 }
 
-// Information about the condition of a component.
-message ComponentCondition {
-  // Type of condition for a component.
-  // Valid value: "Healthy"
-  optional string type = 1;
-
-  // Status of the condition for a component.
-  // Valid values for "Healthy": "True", "False", or "Unknown".
-  optional string status = 2;
-
-  // Message about the condition for a component.
-  // For example, information about a health check.
-  // +optional
-  optional string message = 3;
-
-  // Condition error code for a component.
-  // For example, a health check error code.
-  // +optional
-  optional string error = 4;
-}
-
-// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
-// Deprecated: This API is deprecated in v1.19+
-message ComponentStatus {
-  // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // List of component conditions observed
-  // +optional
-  // +patchMergeKey=type
-  // +patchStrategy=merge
-  repeated ComponentCondition conditions = 2;
-}
-
-// Status of all the conditions for the component as a list of ComponentStatus objects.
-// Deprecated: This API is deprecated in v1.19+
-message ComponentStatusList {
-  // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // List of ComponentStatus objects.
-  repeated ComponentStatus items = 2;
-}
-
 // ConfigMap holds configuration data for pods to consume.
 message ConfigMap {
   // Standard object's metadata.

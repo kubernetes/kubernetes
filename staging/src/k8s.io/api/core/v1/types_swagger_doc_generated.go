@@ -218,38 +218,6 @@ func (ClientIPConfig) SwaggerDoc() map[string]string {
 	return map_ClientIPConfig
 }
 
-var map_ComponentCondition = map[string]string{
-	"":        "Information about the condition of a component.",
-	"type":    "Type of condition for a component. Valid value: \"Healthy\"",
-	"status":  "Status of the condition for a component. Valid values for \"Healthy\": \"True\", \"False\", or \"Unknown\".",
-	"message": "Message about the condition for a component. For example, information about a health check.",
-	"error":   "Condition error code for a component. For example, a health check error code.",
-}
-
-func (ComponentCondition) SwaggerDoc() map[string]string {
-	return map_ComponentCondition
-}
-
-var map_ComponentStatus = map[string]string{
-	"":           "ComponentStatus (and ComponentStatusList) holds the cluster validation info. Deprecated: This API is deprecated in v1.19+",
-	"metadata":   "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"conditions": "List of component conditions observed",
-}
-
-func (ComponentStatus) SwaggerDoc() map[string]string {
-	return map_ComponentStatus
-}
-
-var map_ComponentStatusList = map[string]string{
-	"":         "Status of all the conditions for the component as a list of ComponentStatus objects. Deprecated: This API is deprecated in v1.19+",
-	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-	"items":    "List of ComponentStatus objects.",
-}
-
-func (ComponentStatusList) SwaggerDoc() map[string]string {
-	return map_ComponentStatusList
-}
-
 var map_ConfigMap = map[string]string{
 	"":           "ConfigMap holds configuration data for pods to consume.",
 	"metadata":   "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",

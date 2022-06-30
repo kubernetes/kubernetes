@@ -4761,74 +4761,6 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 	}
 }
 
-func TestPrintComponentStatus(t *testing.T) {
-	tests := []struct {
-		componentStatus api.ComponentStatus
-		expected        []metav1.TableRow
-	}{
-		// Basic component status without conditions
-		{
-			componentStatus: api.ComponentStatus{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cs1",
-				},
-				Conditions: []api.ComponentCondition{},
-			},
-			// Columns: Name, Status, Message, Error
-			expected: []metav1.TableRow{{Cells: []interface{}{"cs1", "Unknown", "", ""}}},
-		},
-		// Basic component status with healthy condition.
-		{
-			componentStatus: api.ComponentStatus{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cs2",
-				},
-				Conditions: []api.ComponentCondition{
-					{
-						Type:    "Healthy",
-						Status:  api.ConditionTrue,
-						Message: "test message",
-						Error:   "test error",
-					},
-				},
-			},
-			// Columns: Name, Status, Message, Error
-			expected: []metav1.TableRow{{Cells: []interface{}{"cs2", "Healthy", "test message", "test error"}}},
-		},
-		// Basic component status with healthy condition.
-		{
-			componentStatus: api.ComponentStatus{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cs3",
-				},
-				Conditions: []api.ComponentCondition{
-					{
-						Type:    "Healthy",
-						Status:  api.ConditionFalse,
-						Message: "test message",
-						Error:   "test error",
-					},
-				},
-			},
-			// Columns: Name, Status, Message, Error
-			expected: []metav1.TableRow{{Cells: []interface{}{"cs3", "Unhealthy", "test message", "test error"}}},
-		},
-	}
-
-	for i, test := range tests {
-		rows, err := printComponentStatus(&test.componentStatus, printers.GenerateOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i := range rows {
-			rows[i].Object.Object = nil
-		}
-		if !reflect.DeepEqual(test.expected, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
-		}
-	}
-}
-
 func TestPrintCronJob(t *testing.T) {
 	completions := int32(2)
 	suspend := false
@@ -6041,12 +5973,6 @@ func TestTableRowDeepCopyShouldNotPanic(t *testing.T) {
 			name: "CertificateSigningRequest",
 			printer: func() ([]metav1.TableRow, error) {
 				return printCertificateSigningRequest(&certificates.CertificateSigningRequest{}, printers.GenerateOptions{})
-			},
-		},
-		{
-			name: "ComponentStatus",
-			printer: func() ([]metav1.TableRow, error) {
-				return printComponentStatus(&api.ComponentStatus{}, printers.GenerateOptions{})
 			},
 		},
 		{

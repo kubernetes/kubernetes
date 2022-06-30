@@ -673,7 +673,6 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 					{Name: "pods", Namespaced: true, Kind: "Pod"},
 					{Name: "services", Namespaced: true, Kind: "Service"},
 					{Name: "replicationcontrollers", Namespaced: true, Kind: "ReplicationController"},
-					{Name: "componentstatuses", Namespaced: false, Kind: "ComponentStatus"},
 					{Name: "nodes", Namespaced: false, Kind: "Node"},
 					{Name: "secrets", Namespaced: true, Kind: "Secret"},
 					{Name: "configmaps", Namespaced: true, Kind: "ConfigMap"},

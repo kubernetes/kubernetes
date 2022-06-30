@@ -18,10 +18,6 @@ limitations under the License.
 
 package v1
 
-// ComponentStatusListerExpansion allows custom methods to be added to
-// ComponentStatusLister.
-type ComponentStatusListerExpansion interface{}
-
 // ConfigMapListerExpansion allows custom methods to be added to
 // ConfigMapLister.
 type ConfigMapListerExpansion interface{}

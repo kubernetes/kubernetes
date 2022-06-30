@@ -321,15 +321,6 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(persistentVolumeClaimColumnDefinitions, printPersistentVolumeClaim)
 	h.TableHandler(persistentVolumeClaimColumnDefinitions, printPersistentVolumeClaimList)
 
-	componentStatusColumnDefinitions := []metav1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Status", Type: "string", Description: "Status of the component conditions"},
-		{Name: "Message", Type: "string", Description: "Message of the component conditions"},
-		{Name: "Error", Type: "string", Description: "Error of the component conditions"},
-	}
-	h.TableHandler(componentStatusColumnDefinitions, printComponentStatus)
-	h.TableHandler(componentStatusColumnDefinitions, printComponentStatusList)
-
 	deploymentColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Ready", Type: "string", Description: "Number of the pod with ready state"},
@@ -1942,41 +1933,6 @@ func printCertificateSigningRequestList(list *certificates.CertificateSigningReq
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printCertificateSigningRequest(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
-
-func printComponentStatus(obj *api.ComponentStatus, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	row := metav1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-	status := "Unknown"
-	message := ""
-	error := ""
-	for _, condition := range obj.Conditions {
-		if condition.Type == api.ComponentHealthy {
-			if condition.Status == api.ConditionTrue {
-				status = "Healthy"
-			} else {
-				status = "Unhealthy"
-			}
-			message = condition.Message
-			error = condition.Error
-			break
-		}
-	}
-	row.Cells = append(row.Cells, obj.Name, status, message, error)
-	return []metav1.TableRow{row}, nil
-}
-
-func printComponentStatusList(list *api.ComponentStatusList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
-	rows := make([]metav1.TableRow, 0, len(list.Items))
-	for i := range list.Items {
-		r, err := printComponentStatus(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

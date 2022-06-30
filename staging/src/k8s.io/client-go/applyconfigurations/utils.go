@@ -517,10 +517,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.CinderVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ClientIPConfig"):
 		return &applyconfigurationscorev1.ClientIPConfigApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("ComponentCondition"):
-		return &applyconfigurationscorev1.ComponentConditionApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("ComponentStatus"):
-		return &applyconfigurationscorev1.ComponentStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ConfigMap"):
 		return &applyconfigurationscorev1.ConfigMapApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ConfigMapEnvSource"):

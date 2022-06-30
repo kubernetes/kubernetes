@@ -5390,49 +5390,6 @@ const (
 	PortForwardRequestIDHeader = "requestID"
 )
 
-// ComponentConditionType defines type and constants for component health validation.
-type ComponentConditionType string
-
-// These are the valid conditions for the component.
-const (
-	ComponentHealthy ComponentConditionType = "Healthy"
-)
-
-// ComponentCondition represents the condition of a component
-type ComponentCondition struct {
-	Type   ComponentConditionType
-	Status ConditionStatus
-	// +optional
-	Message string
-	// +optional
-	Error string
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
-// Deprecated: This API is deprecated in v1.19+
-type ComponentStatus struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ObjectMeta
-
-	// +optional
-	Conditions []ComponentCondition
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ComponentStatusList represents the list of component statuses
-// Deprecated: This API is deprecated in v1.19+
-type ComponentStatusList struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ListMeta
-
-	Items []ComponentStatus
-}
-
 // SecurityContext holds security configuration that will be applied to a container.
 // Some fields are present in both SecurityContext and PodSecurityContext.  When both
 // are set, the values in SecurityContext take precedence.

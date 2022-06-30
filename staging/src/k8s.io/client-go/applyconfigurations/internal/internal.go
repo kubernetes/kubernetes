@@ -3708,44 +3708,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: timeoutSeconds
       type:
         scalar: numeric
-- name: io.k8s.api.core.v1.ComponentCondition
-  map:
-    fields:
-    - name: error
-      type:
-        scalar: string
-    - name: message
-      type:
-        scalar: string
-    - name: status
-      type:
-        scalar: string
-      default: ""
-    - name: type
-      type:
-        scalar: string
-      default: ""
-- name: io.k8s.api.core.v1.ComponentStatus
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.api.core.v1.ComponentCondition
-          elementRelationship: associative
-          keys:
-          - type
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-      default: {}
 - name: io.k8s.api.core.v1.ConfigMap
   map:
     fields:

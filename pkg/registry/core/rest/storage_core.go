@@ -17,15 +17,10 @@ limitations under the License.
 package rest
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
-
-	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,16 +30,13 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
 	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
 	endpointsstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	eventstore "k8s.io/kubernetes/pkg/registry/core/event/storage"
@@ -65,9 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	servicestore "k8s.io/kubernetes/pkg/registry/core/service/storage"
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
-	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	utilsnet "k8s.io/utils/net"
 )
 
 // LegacyRESTStorageProvider provides information needed to build RESTStorage for core, but
@@ -372,10 +362,6 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 		storage[resource] = configMapStorage
 	}
 
-	if resource := "componentstatuses"; apiResourceConfigSource.ResourceEnabled(corev1.SchemeGroupVersion.WithResource(resource)) {
-		storage[resource] = componentstatus.NewStorage(componentStatusStorage{c.StorageFactory}.serversToValidate)
-	}
-
 	if len(storage) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap["v1"] = storage
 	}
@@ -385,49 +371,4 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(apiResourceConfigSource 
 
 func (p LegacyRESTStorageProvider) GroupName() string {
 	return api.GroupName
-}
-
-type componentStatusStorage struct {
-	storageFactory serverstorage.StorageFactory
-}
-
-func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
-	// this is fragile, which assumes that the default port is being used
-	// TODO: switch to secure port until these components remove the ability to serve insecurely.
-	serversToValidate := map[string]*componentstatus.Server{
-		"controller-manager": {EnableHTTPS: true, TLSConfig: &tls.Config{InsecureSkipVerify: true}, Addr: "127.0.0.1", Port: ports.KubeControllerManagerPort, Path: "/healthz"},
-		"scheduler":          {EnableHTTPS: true, TLSConfig: &tls.Config{InsecureSkipVerify: true}, Addr: "127.0.0.1", Port: kubeschedulerconfig.DefaultKubeSchedulerPort, Path: "/healthz"},
-	}
-
-	for ix, machine := range s.storageFactory.Backends() {
-		etcdUrl, err := url.Parse(machine.Server)
-		if err != nil {
-			klog.Errorf("Failed to parse etcd url for validation: %v", err)
-			continue
-		}
-		var port int
-		var addr string
-		if strings.Contains(etcdUrl.Host, ":") {
-			var portString string
-			addr, portString, err = net.SplitHostPort(etcdUrl.Host)
-			if err != nil {
-				klog.Errorf("Failed to split host/port: %s (%v)", etcdUrl.Host, err)
-				continue
-			}
-			port, _ = utilsnet.ParsePort(portString, true)
-		} else {
-			addr = etcdUrl.Host
-			port = 2379
-		}
-		// TODO: etcd health checking should be abstracted in the storage tier
-		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = &componentstatus.Server{
-			Addr:        addr,
-			EnableHTTPS: etcdUrl.Scheme == "https",
-			TLSConfig:   machine.TLSConfig,
-			Port:        port,
-			Path:        "/health",
-			Validate:    etcd3.EtcdHealthCheck,
-		}
-	}
-	return serversToValidate
 }

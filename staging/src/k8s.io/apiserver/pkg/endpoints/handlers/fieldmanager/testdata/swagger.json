@@ -872,32 +872,6 @@
       },
       "type": "object"
     },
-    "io.k8s.api.core.v1.ComponentCondition": {
-      "description": "Information about the condition of a component.",
-      "properties": {
-        "error": {
-          "description": "Condition error code for a component. For example, a health check error code.",
-          "type": "string"
-        },
-        "message": {
-          "description": "Message about the condition for a component. For example, information about a health check.",
-          "type": "string"
-        },
-        "status": {
-          "description": "Status of the condition for a component. Valid values for \"Healthy\": \"True\", \"False\", or \"Unknown\".",
-          "type": "string"
-        },
-        "type": {
-          "description": "Type of condition for a component. Valid value: \"Healthy\"",
-          "type": "string"
-        }
-      },
-      "required": [
-        "type",
-        "status"
-      ],
-      "type": "object"
-    },
     "io.k8s.api.core.v1.ConfigMapEnvSource": {
       "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
       "properties": {

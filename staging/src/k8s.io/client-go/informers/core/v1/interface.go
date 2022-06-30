@@ -24,8 +24,6 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// ComponentStatuses returns a ComponentStatusInformer.
-	ComponentStatuses() ComponentStatusInformer
 	// ConfigMaps returns a ConfigMapInformer.
 	ConfigMaps() ConfigMapInformer
 	// Endpoints returns a EndpointsInformer.
@@ -67,11 +65,6 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
-}
-
-// ComponentStatuses returns a ComponentStatusInformer.
-func (v *version) ComponentStatuses() ComponentStatusInformer {
-	return &componentStatusInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ConfigMaps returns a ConfigMapInformer.

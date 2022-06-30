@@ -28,7 +28,6 @@ import (
 
 type CoreV1Interface interface {
 	RESTClient() rest.Interface
-	ComponentStatusesGetter
 	ConfigMapsGetter
 	EndpointsGetter
 	EventsGetter
@@ -49,10 +48,6 @@ type CoreV1Interface interface {
 // CoreV1Client is used to interact with features provided by the  group.
 type CoreV1Client struct {
 	restClient rest.Interface
-}
-
-func (c *CoreV1Client) ComponentStatuses() ComponentStatusInterface {
-	return newComponentStatuses(c)
 }
 
 func (c *CoreV1Client) ConfigMaps(namespace string) ConfigMapInterface {

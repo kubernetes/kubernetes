@@ -115,9 +115,6 @@
 - endpoint: getStorageV1APIResources
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: listCoreV1ComponentStatus
-  reason: pending deprecation
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L69
 - endpoint: listCoreV1NamespacedPersistentVolumeClaim
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
@@ -169,9 +166,6 @@
 - endpoint: patchStorageV1VolumeAttachmentStatus
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
-- endpoint: readCoreV1ComponentStatus
-  reason: pending deprecation
-  link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L69
 - endpoint: readCoreV1NamespacedPersistentVolumeClaim
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64

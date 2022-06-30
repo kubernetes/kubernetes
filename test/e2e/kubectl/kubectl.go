@@ -828,19 +828,6 @@ metadata:
 		})
 	})
 
-	ginkgo.Describe("Kubectl get componentstatuses", func() {
-		ginkgo.It("should get componentstatuses", func() {
-			ginkgo.By("getting list of componentstatuses")
-			output := framework.RunKubectlOrDie(ns, "get", "componentstatuses", "-o", "jsonpath={.items[*].metadata.name}")
-			components := strings.Split(output, " ")
-			ginkgo.By("getting details of componentstatuses")
-			for _, component := range components {
-				ginkgo.By("getting status of " + component)
-				framework.RunKubectlOrDie(ns, "get", "componentstatuses", component)
-			}
-		})
-	})
-
 	ginkgo.Describe("Kubectl apply", func() {
 		ginkgo.It("should apply a new configuration to an existing RC", func() {
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))

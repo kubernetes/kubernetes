@@ -125,7 +125,6 @@ var rootScopedKinds = map[schema.GroupKind]bool{
 	{Group: "", Kind: "Node"}:             true,
 	{Group: "", Kind: "Namespace"}:        true,
 	{Group: "", Kind: "PersistentVolume"}: true,
-	{Group: "", Kind: "ComponentStatus"}:  true,
 
 	{Group: "extensions", Kind: "PodSecurityPolicy"}: true,
 

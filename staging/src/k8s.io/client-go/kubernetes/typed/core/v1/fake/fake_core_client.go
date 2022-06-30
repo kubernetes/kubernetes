@@ -28,10 +28,6 @@ type FakeCoreV1 struct {
 	*testing.Fake
 }
 
-func (c *FakeCoreV1) ComponentStatuses() v1.ComponentStatusInterface {
-	return &FakeComponentStatuses{c}
-}
-
 func (c *FakeCoreV1) ConfigMaps(namespace string) v1.ConfigMapInterface {
 	return &FakeConfigMaps{c, namespace}
 }
