@@ -50,17 +50,11 @@ run_kubectl_config_set_jsonpath_tests() {
   create_and_use_new_namespace
   kube::log::status "Testing kubectl(v1:config set)"
 
-  # Get the api cert and add a comment to avoid flag parsing problems
-  cert_data=$(echo "#Comment" && cat "${TMPDIR:-/tmp}/apiserver.crt")
+  kubectl config set '{.clusters[?(@.name == "test-cluster")].cluster.server}' "https://1.2.3.4"
 
-  kubectl config set '{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}' "$cert_data" --set-raw-bytes
-  r_written=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}')
+  e_written=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test-cluster")].cluster.server}')
 
-  encoded=$(echo -n "$cert_data" | base64)
-  kubectl config set '{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}' "$encoded"
-  e_written=$(kubectl config view --raw -o jsonpath='{.clusters[?(@.name == "test-cluster")].cluster.certificate-authority-data}')
-
-  test "$e_written" == "$r_written"
+  test "$e_written" == "https://1.2.3.4"
 
   set +o nounset
   set +o errexit
