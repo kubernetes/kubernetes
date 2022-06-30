@@ -166,8 +166,6 @@ const (
 	CudaVectorAdd2
 	// DebianIptables Image
 	DebianIptables
-	// EchoServer image
-	EchoServer
 	// Etcd image
 	Etcd
 	// GlusterDynamicProvisioner image
@@ -243,7 +241,6 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[CudaVectorAdd] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
 	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "bullseye-v1.4.0"}
-	configs[EchoServer] = Config{list.PromoterE2eRegistry, "echoserver", "2.4"}
 	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.4-0"}
 	configs[GlusterDynamicProvisioner] = Config{list.PromoterE2eRegistry, "glusterdynamic-provisioner", "v1.3"}
 	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-2"}
