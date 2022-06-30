@@ -202,11 +202,73 @@ func (o setOptions) validate() error {
 	return nil
 }
 
-// modifyConfigJson: modifyConfig, but for JSON path
-func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue string, unset bool, setRawBytes bool, deduplicate bool) error {
-	// Create jsonpath parser to use throughout the function
+// modifyConfigJson: This functions enables setting and unsetting values in a given
+// k8s.io/client-go/tools/clientcmd/api/v1 config object.
+//
+// config: the v1 Config object to work on
+// propertyName: the jsonpath to use to find and set values
+// propertyValue: the value you wish to set in the value found by propertyName
+// unset: whether we are attempting to set or unset the value
+// setRawBytes: whether we are setting []byte properties with or without base64 conversion
+// deduplicate: whether we and to sort and deduplicate the values or not
+//
+// The intention of this function is to allow uesrs to add new or existing known properties to a kubeconfig file. It is
+// expected that a user will pass a jsonpath string that will be to set properties that may not exist yet, and we need
+// to support their ability to set these properties, and build the properties along the path that need to exist for the
+// desired property to be set. Additionally, users will expect that they will be able to pass multiple top level
+// jsonpath nodes, which will look like '{.key1}{.key2}...{.keyn}'. This is why jsonpath results are returned using
+// [][]reflect.Value. The first slice divides the string into individual path's, e.g. position 0 of the example is
+// {.key1} and so on. The inner slice will contain a list of the results of that the path within the {}, which can be
+// one or more, e.g. if we were to use a wildcard like {.key1[*]}, this will return all values in a list, all of which
+// the user will expect to be acted on. To support both of these features we must use several nested loops
+//
+// for:
+//   The first level of the for loop supports traversing all individual path's provided, e.g. each of
+//   {.key1}{.key2}...{.keyn}
+//
+//   for:
+//     The second level of the for loop supports traversing the actual paths within the {}, e.g. '.path.to.key.to.set'
+//     that will get broken up into path, to, key, to, and set.
+//
+//     for:
+//       The third level of the for loop supports traversing the results of the current step in the jsonpath we are at.
+//       This is only required because we need to support setting properties in the event a filter node returns nothing
+//       which results in the outer results slice having a length of zero.
+//
+//       for:
+//         The fourth and final level of the for loops supports traversing the actual results which will have the values
+//         that can actually be set. This is where the meat of the logic is.
+//
+// Inside the final for loop is a large switch block to handle different types of potential values. These are as
+// follows:
+//   String - This should always be the value gotten by the last node in the jsonpath
+//   Bool - Convert the string input from the user into a bool if we can, then set. this should always be the value
+//          gotten by the last node in the jsonpath
+//   Pointer - This should always be followed by a field node, and unless we are unsetting should never be the last node
+//             in a path. We only need to set anything here if the pointer is zero, so that we get results on the next
+//             step in the jsonpath node list
+//   Struct - Similar to the Pointer case, this node can not be the final node in the jsonpath unless we are unsetting
+//            the value. We do not work on this result and instead only validate that the next node in the path is valid
+//   Map - We have two cases to support for this type.
+//     * [string]string - This needs to make sure the node that returned the map is the second to last node, with the
+//                        last node being the key to set the value to.
+//     * [string][]string - This case supports unsetting the entire map if it is the last node in the list, unsetting a
+//                          specific key in the map if it is the second to last node in the list, or setting a value to
+//                          the map's key
+//   Slice - Similar to Map this type has several subtypes.
+//     * String - Similar to the top level string type, this must be the final node in the list. This case supports
+//                users providing values in a CSV format and will split them and set the strings as desired. This also
+//                supports adding and removing values from existing slices by appending + or - to the end of the list
+//     * Uint8 - Similar to the string type, this must be the final node in the list. This case is specifically for
+//               supporting users setting []byte data and supports setting the data either directly using --set-raw-bytes
+//               or will convert the data for the user if the flag is not provided.
+//     * Struct - This can not be the final node in the list unless we are unsetting the node. We simply pass on this
+//                unless we are unsetting it.
+func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue string, unset, setRawBytes, deduplicate bool) error {
+	// Create a jsonpath parser to use throughout the function. This one will be used for getting values.
 	jsonPath := jsonpath.New("Value Getter").AllowMissingKeys(true)
 
+	// Create a jsonpath parser to use throughout the function. This one will be used for parsing nodes from a jsonpath string.
 	jsonPathParser, err := jsonpath.Parse("Node Parser", propertyName)
 	if err != nil {
 		return err
@@ -224,7 +286,9 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 		// e.g. {.node1.node2.node3}
 		for nodeIterator, node := range innerNodeList {
 			// For set, it only makes sense to use field, array, and filter node types, so we will be ignoring
-			// any other types of nodes and returning an error specifying what type of node was unsupported
+			// any other types of nodes and returning an error specifying what type of node was unsupported.
+			// If it is required in the future we can add support for other node types after propertly defining
+			// use case and scope.
 			var filterKey string
 			var filterValue string
 
@@ -235,7 +299,6 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 				jsonPathTraverser = append(jsonPathTraverser, "."+node.(*jsonpath.FieldNode).Value)
 
 			case jsonpath.NodeArray:
-				// Array nodes can just use their naked value
 				jsonPathTraverser = append(jsonPathTraverser, node.(*jsonpath.ArrayNode).Value)
 
 			case jsonpath.NodeFilter:
@@ -255,6 +318,7 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 				return fmt.Errorf("unsupported jsonpath node type detected: %v", jsonpath.NodeTypeName[node.Type()])
 			}
 
+			// Get a list of result values to work on from the current position in the jsonpath
 			if err := jsonPath.Parse("{" + strings.Join(jsonPathTraverser, "") + "}"); err != nil {
 				return err
 			}
@@ -263,13 +327,14 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 				return err
 			}
 
-			// We must now work on the results gotten by our user provided jsonpath
+			// We must now work on the results gotten by the current node in the user provided jsonpath
 			for _, outerResult := range results {
 				// This should really only apply to the slices of named structs e.g. NamedClusters. It is a result of
 				// filter returning an empty list in the results.
 				if len(outerResult) == 0 && node.Type() == jsonpath.NodeFilter {
 					// Need to back up so that we can create the new named struct type inside the outer list
-					// This requires a new jsonpath object
+					// This requires a new jsonpath object so that we can get the new list of results without losing the
+					// list of results for the jsonpath node we're currently working on
 					innerJsonPath := jsonpath.New("Inner Value Getter")
 					if err := innerJsonPath.Parse("{" + strings.Join(jsonPathTraverser[0:nodeIterator], "") + "}"); err != nil {
 						return err
@@ -286,7 +351,7 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 					newType := reflect.New(newInnerResult[0][0].Type().Elem())
 
 					// Set the new type's given field's value appropriately so that we can continue on down the node list
-					// This will most likely be setting the "name" field
+					// This will most likely be setting the "name" field but want to support any filter field.
 					fieldIndex := getStructFieldIndexByName(newType.Elem(), filterKey)
 					newType.Elem().Field(fieldIndex).Set(reflect.ValueOf(filterValue))
 					newInnerResult[0][0].Set(reflect.Append(newInnerResult[0][0], newType.Elem()))
@@ -351,8 +416,8 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 							}
 
 						case reflect.Slice:
-							// This isn't necessary now as there are no instances of any other map of slices that isn't
-							// a map[string][]string, but just "for the future"
+							// This check isn't necessary now as there are no instances of any other map of slices that
+							// isn't a map[string][]string, but just "for the future"
 							if innerResult.Type().Elem().Elem().Kind() != reflect.String {
 								return fmt.Errorf("can not set map value type that is not a string slice: {%s}", strings.Join(jsonPathTraverser[0:nodeIterator+1], ""))
 							}
