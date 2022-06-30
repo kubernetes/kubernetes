@@ -38,7 +38,7 @@ import (
 // GetCurrentKubeletConfig fetches the current Kubelet Config for the given node
 func GetCurrentKubeletConfig(nodeName, namespace string, useProxy bool) (*kubeletconfig.KubeletConfiguration, error) {
 	resp := pollConfigz(5*time.Minute, 5*time.Second, nodeName, namespace, useProxy)
-	if resp == nil {
+	if len(resp) == 0 {
 		return nil, fmt.Errorf("failed to fetch /configz from %q", nodeName)
 	}
 	kubeCfg, err := decodeConfigz(resp)
@@ -49,7 +49,7 @@ func GetCurrentKubeletConfig(nodeName, namespace string, useProxy bool) (*kubele
 }
 
 // returns a status 200 response from the /configz endpoint or nil if fails
-func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, namespace string, useProxy bool) *http.Response {
+func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, namespace string, useProxy bool) []byte {
 	endpoint := ""
 	if useProxy {
 		// start local proxy, so we can send graceful deletion over query string, rather than body parameter
@@ -88,26 +88,35 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName, na
 	}
 	req.Header.Add("Accept", "application/json")
 
-	var resp *http.Response
+	var respBody []byte
 	err = wait.PollImmediate(pollInterval, timeout, func() (bool, error) {
-		resp, err = client.Do(req)
+		resp, err := client.Do(req)
 		if err != nil {
 			framework.Logf("Failed to get /configz, retrying. Error: %v", err)
 			return false, nil
 		}
+		defer resp.Body.Close()
+
 		if resp.StatusCode != 200 {
 			framework.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
+			return false, nil
+		}
+
+		respBody, err = io.ReadAll(resp.Body)
+		if err != nil {
+			framework.Logf("failed to read body from /configz response, retrying. Error: %v", err)
 			return false, nil
 		}
 
 		return true, nil
 	})
 	framework.ExpectNoError(err, "Failed to get successful response from /configz")
-	return resp
+
+	return respBody
 }
 
 // Decodes the http response from /configz and returns a kubeletconfig.KubeletConfiguration (internal type).
-func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, error) {
+func decodeConfigz(respBody []byte) (*kubeletconfig.KubeletConfiguration, error) {
 	// This hack because /configz reports the following structure:
 	// {"kubeletconfig": {the JSON representation of kubeletconfigv1beta1.KubeletConfiguration}}
 	type configzWrapper struct {
@@ -117,12 +126,7 @@ func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, er
 	configz := configzWrapper{}
 	kubeCfg := kubeletconfig.KubeletConfiguration{}
 
-	contentsBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(contentsBytes, &configz)
+	err := json.Unmarshal(respBody, &configz)
 	if err != nil {
 		return nil, err
 	}
