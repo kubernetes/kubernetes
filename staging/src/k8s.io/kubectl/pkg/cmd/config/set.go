@@ -287,7 +287,7 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 		for nodeIterator, node := range innerNodeList {
 			// For set, it only makes sense to use field, array, and filter node types, so we will be ignoring
 			// any other types of nodes and returning an error specifying what type of node was unsupported.
-			// If it is required in the future we can add support for other node types after propertly defining
+			// If it is required in the future we can add support for other node types after property defining
 			// use case and scope.
 			var filterKey string
 			var filterValue string
