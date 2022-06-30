@@ -227,7 +227,9 @@ type actualStateOfWorld struct {
 	// state by default.
 	// The key in this map is the name of the volume and the value is an object
 	// containing more information about the attached volume.
-	attachedVolumes           map[v1.UniqueVolumeName]attachedVolume
+	attachedVolumes map[v1.UniqueVolumeName]attachedVolume
+	// foundDuringReconstruction is a map of volumes which were discovered
+	// from kubelet root directory when kubelet was restarted.
 	foundDuringReconstruction map[v1.UniqueVolumeName]map[volumetypes.UniquePodName]types.UID
 
 	// volumePluginMgr is the volume plugin manager used to create volume
@@ -366,14 +368,15 @@ func (asw *actualStateOfWorld) AddVolumeViaReconstruction(opts operationexecutor
 }
 
 func (asw *actualStateOfWorld) IsVolumeReconstructed(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool {
-	asw.RLock()
-	defer asw.RUnlock()
-
 	volumeState := asw.GetVolumeMountState(volumeName, podName)
+
 	// only uncertain volumes are reconstructed
 	if volumeState != operationexecutor.VolumeMountUncertain {
 		return false
 	}
+
+	asw.RLock()
+	defer asw.RUnlock()
 	podMap, ok := asw.foundDuringReconstruction[volumeName]
 	if !ok {
 		return false
@@ -571,6 +574,11 @@ func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.M
 	// If pod exists, reset remountRequired value
 	podObj.remountRequired = false
 	podObj.volumeMountStateForPod = markVolumeOpts.VolumeMountState
+
+	// if volume is mounted successfully, then it should be removed from foundDuringReconstruction map
+	if markVolumeOpts.VolumeMountState == operationexecutor.VolumeMounted {
+		delete(asw.foundDuringReconstruction[volumeName], podName)
+	}
 	if mounter != nil {
 		// The mounter stored in the object may have old information,
 		// use the newest one.
