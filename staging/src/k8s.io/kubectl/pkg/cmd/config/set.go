@@ -365,6 +365,9 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 						// Need to check if we're working on a string slice or a slice of structs
 						switch innerResult.Type().Elem().Kind() {
 						case reflect.String:
+							if nodeIterator < len(innerNodeList)-1 {
+								return fmt.Errorf("can't have more nodes after a string slice, %q", strings.Join(jsonPathTraverser[0:nodeIterator], ""))
+							}
 							if unset {
 								innerResult.Set(reflect.Zero(innerResult.Type()))
 							} else if nodeIterator == len(innerNodeList)-1 && innerResult.CanAddr() {
@@ -458,7 +461,18 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 						}
 
 					case reflect.Pointer:
+						// If this is the last node in the jsonpath, and we're trying to unset then unset
+						if nodeIterator == len(innerNodeList)-1 && unset {
+							innerResult.Set(reflect.Zero(innerResult.Type()))
+						}
+						if nodeIterator == len(innerNodeList)-1 && !unset {
+							return fmt.Errorf("%q cannot be the last node in the path", jsonPathTraverser[nodeIterator])
+						}
 						// Check to see if next filter value actually exists as a field for the given struct pointer
+						if innerNodeList[nodeIterator+1].Type() != jsonpath.NodeField {
+							return fmt.Errorf("invalid node type after %q, must be field node", strings.Join(jsonPathTraverser[0:nodeIterator], ""))
+						}
+						// Check to see if the next node is a valid field in the type pointed to
 						nextNodeValue := innerNodeList[nodeIterator+1].(*jsonpath.FieldNode).Value
 						innerPointerType := reflect.Zero(innerResult.Type().Elem())
 						if fieldIndex := getStructFieldIndexByName(innerPointerType, nextNodeValue); fieldIndex == -1 {
@@ -469,8 +483,6 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 							if err := pointerHandler(config, jsonPathTraverser, innerResultIndex, nodeIterator, propertyName); err != nil {
 								return err
 							}
-						} else if nodeIterator == len(innerNodeList)-1 && unset {
-							innerResult.Set(reflect.Zero(innerResult.Type()))
 						}
 
 					case reflect.Bool:
@@ -489,7 +501,7 @@ func modifyConfigJson(config *clientcmdapiv1.Config, propertyName, propertyValue
 					case reflect.Struct:
 						if unset && nodeIterator == len(innerNodeList)-1 {
 							innerResult.Set(reflect.Zero(innerResult.Type()))
-						} else if innerNodeList[nodeIterator+1].Type() != jsonpath.NodeField {
+						} else if nodeIterator < len(innerNodeList)-1 && innerNodeList[nodeIterator+1].Type() != jsonpath.NodeField {
 							return fmt.Errorf("next node after finding a struct must be a Field Node, error at %q", "{"+strings.Join(jsonPathTraverser[:nodeIterator], "")+"}")
 						} else {
 							// Checking that next field node value actually exists so that we can provide helpful error messages.
