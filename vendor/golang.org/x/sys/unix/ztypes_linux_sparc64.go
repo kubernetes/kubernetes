@@ -249,6 +249,14 @@ type Sigset_t struct {
 
 const _C__NSIG = 0x41
 
+type Siginfo struct {
+	Signo int32
+	Errno int32
+	Code  int32
+	_     int32
+	_     [112]byte
+}
+
 type Termios struct {
 	Iflag  uint32
 	Oflag  uint32
