@@ -44,7 +44,7 @@ var (
 	unsetLong = templates.LongDesc(i18n.T(`
 	Unset an individual value in a kubeconfig file.
 
-	PROPERTY_NAME is either a jsonpath query for where the property name will be, or a dot delimited name.`))
+	PROPERTY_NAME is either a jsonpath query for where the properties will be, or a dot delimited name.`))
 
 	unsetExample = templates.Examples(`
 		# Unset the current-context

@@ -52,7 +52,7 @@ var (
 	setLong = templates.LongDesc(i18n.T(`
 	Set an individual value in a kubeconfig file.
 
-	PROPERTY_NAME is either a jsonpath query for where the property name will be, or a dot delimited name.
+	PROPERTY_NAME is either a jsonpath query for where the properties will be, or a dot delimited name.
 
 	PROPERTY_VALUE is the new value you want to set. Binary fields such as 'certificate-authority-data' expect a base64 encoded string unless the --set-raw-bytes flag is used.
 
