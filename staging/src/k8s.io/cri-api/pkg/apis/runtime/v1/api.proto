@@ -36,8 +36,8 @@ service RuntimeService {
     rpc Version(VersionRequest) returns (VersionResponse) {}
 
 
-    // GetContainerEvents gets container events from the CRI runtime
-    rpc  GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
+    // GetCRIEvents gets container events from the CRI runtime
+    rpc  GetCRIEvents(GetCRIEventsRequest) returns (stream CRIEventsResponse) {}
     // RunPodSandbox creates and starts a pod-level sandbox. Runtimes must ensure
     // the sandbox is in the ready state on success.
     rpc RunPodSandbox(RunPodSandboxRequest) returns (RunPodSandboxResponse) {}
@@ -119,35 +119,42 @@ service RuntimeService {
     rpc Status(StatusRequest) returns (StatusResponse) {}
 }
 
-// GetEventsFilter is used to filter a list of events.
-// All those fields are combined with 'AND'
-message GetEventsFilter {
-    // ID of the container or sandbox.
-    string id = 1;
-    // LabelSelector to select matches.
-    // Only api.MatchLabels is supported for now and the requirements
-    // are ANDed. MatchExpressions is not supported yet.
-    map<string, string> label_selector = 3;
+message GetCRIEventsRequest {
 }
 
-message GetEventsRequest {
-    // Optional to filter a list of events.
-    GetEventsFilter filter = 1;
+message CRIEventsResponse {
+    CRISandoxEvent sandox_event = 1;
+    CRIContainerEvent container_event = 2;
 }
 
-message ContainerEventResponse {
+message CRISandoxEvent {
+    // ID of the sandbox container
+    string container_id = 1;
+
+    // Type of the sandbox event
+    SandboxEventType sandbox_event_type = 2;
+
+    // Creation timestamp of this event
+    int64 created_at = 3;
+
+    // Sandbox metadata
+    PodSandboxMetadata pod_sandbox_metadata = 4;
+}
+
+message CRIContainerEvent {
     // ID of the container
-	string container_id = 1;
+    string container_id = 1;
 
-	// Type of the container event
+    // Type of the container event
     ContainerEventType container_event_type = 2;
 
     // Creation timestamp of this event
     int64 created_at = 3;
 
-    // ID of the sandbox container
-	string sandbox_id = 4;
+    // Sandbox metadata
+    PodSandboxMetadata pod_sandbox_metadata = 4;
 }
+
 
 enum ContainerEventType {
     // Container created
@@ -159,8 +166,22 @@ enum ContainerEventType {
     // Container stopped
     CONTAINER_STOPPED_EVENT = 2;
 
-    // Container deleted
-    CONTAINER_DELETED_EVENT = 3;
+    // Container removed
+    CONTAINER_REMOVED_EVENT = 3;
+}
+
+enum SandboxEventType {
+    // Sandbox created
+    SANDBOX_CREATED_EVENT = 0;
+
+    // Sandbox started
+    SANDBOX_STARTED_EVENT = 1;
+
+    // Sandbox stopped
+    SANDBOX_STOPPED_EVENT = 2;
+
+    // Sandbox removed
+    SANDBOX_REMOVED_EVENT = 3;
 }
 
 // ImageService defines the public APIs for managing images.
