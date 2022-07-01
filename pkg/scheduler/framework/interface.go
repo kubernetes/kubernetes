@@ -158,7 +158,14 @@ func (s *Status) Message() string {
 	if s == nil {
 		return ""
 	}
-	return strings.Join(s.reasons, ", ")
+	return strings.Join(s.Reasons(), ", ")
+}
+
+// WithError sets the given `err` to s.error,
+// and returns the given status object.
+func (s *Status) WithError(err error) *Status {
+	s.err = err
+	return s
 }
 
 // SetFailedPlugin sets the given plugin name to s.failedPlugin.
@@ -180,6 +187,9 @@ func (s *Status) FailedPlugin() string {
 
 // Reasons returns reasons of the Status.
 func (s *Status) Reasons() []string {
+	if len(s.reasons) == 0 && s.err != nil {
+		return []string{s.err.Error()}
+	}
 	return s.reasons
 }
 
@@ -233,10 +243,11 @@ func (s *Status) Equal(x *Status) bool {
 	if s.code == Error {
 		return cmp.Equal(s.err, x.err, cmpopts.EquateErrors())
 	}
-	return cmp.Equal(s.reasons, x.reasons)
+	return cmp.Equal(s.Reasons(), x.Reasons())
 }
 
 // NewStatus makes a Status out of the given arguments and returns its pointer.
+// Note: it's not recommended to pass in a
 func NewStatus(code Code, reasons ...string) *Status {
 	s := &Status{
 		code:    code,
@@ -251,9 +262,10 @@ func NewStatus(code Code, reasons ...string) *Status {
 // AsStatus wraps an error in a Status.
 func AsStatus(err error) *Status {
 	return &Status{
-		code:    Error,
-		reasons: []string{err.Error()},
-		err:     err,
+		code: Error,
+		// Delay err's evaluation to Reason() instead of composing here.
+		// reasons: []string{err.Error()},
+		err: err,
 	}
 }
 

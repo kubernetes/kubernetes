@@ -170,7 +170,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeT
 			},
 		}
 		// Specify nominatedNodeName to clear the pod's nominatedNodeName status, if applicable.
-		return framework.NewPostFilterResultWithNominatedNode(""), framework.NewStatus(framework.Unschedulable, fitError.Error())
+		return framework.NewPostFilterResultWithNominatedNode(""), framework.NewStatus(framework.Unschedulable).WithError(fitError)
 	}
 
 	// 3) Interact with registered Extenders to filter out some candidates if needed.
