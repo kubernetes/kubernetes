@@ -191,6 +191,19 @@ __EOF__
   # cleanup
   kubectl delete pods b -n nsb
 
+  ## kubectl apply --prune
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # apply a into namespace nsb
+  kubectl apply --server-side --namespace nsb -l prune-group=true -f hack/testdata/prune/a.yaml "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'pods a -n nsb' "{{${id_field:?}}}" 'a'
+  # apply b with namespace
+  kubectl apply --server-side --namespace nsb --prune -l prune-group=true -f hack/testdata/prune/b.yaml "${kube_flags[@]:?}"
+  # check right pod exists and wrong pod doesn't exist
+  kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" 'b:'
+
+  # cleanup
+  kubectl delete pods b -n nsb
+
   # same thing without prune for a sanity check
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
@@ -250,6 +263,24 @@ __EOF__
   # cleanup
   kubectl delete svc prune-svc 2>&1 "${kube_flags[@]:?}"
 
+  ## kubectl apply --server-side --prune --prune-whitelist
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # apply pod a
+  kubectl apply --server-side --prune -l prune-group=true -f hack/testdata/prune/a.yaml "${kube_flags[@]:?}"
+  # check right pod exists
+  kube::test::get_object_assert 'pods a' "{{${id_field:?}}}" 'a'
+  # apply svc and don't prune pod a by overwriting whitelist
+  kubectl apply --server-side --prune -l prune-group=true -f hack/testdata/prune/svc.yaml --prune-whitelist core/v1/Service 2>&1 "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'service prune-svc' "{{${id_field:?}}}" 'prune-svc'
+  kube::test::get_object_assert 'pods a' "{{${id_field:?}}}" 'a'
+  # apply svc and prune pod a with default whitelist
+  kubectl apply --server-side --prune -l prune-group=true -f hack/testdata/prune/svc.yaml 2>&1 "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'service prune-svc' "{{${id_field:?}}}" 'prune-svc'
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # cleanup
+  kubectl delete svc prune-svc 2>&1 "${kube_flags[@]:?}"
+
   ## kubectl apply --prune can prune resources not in the defaulted namespace
   # Pre-Condition: namespace nsb exists; no POD exists
   kubectl create ns nsb
@@ -262,6 +293,24 @@ __EOF__
   kube::test::get_object_assert 'pods b -n nsb' "{{${id_field:?}}}" 'b'
   # apply --prune must prune a
   kubectl apply --prune --all -f hack/testdata/prune/b.yaml
+  # check wrong pod doesn't exist and right pod exists
+  kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" 'b:'
+
+  # cleanup
+  kubectl delete ns nsb
+
+  ## kubectl apply --server-side --prune can prune resources not in the defaulted namespace
+  # Pre-Condition: namespace nsb exists; no POD exists
+  kubectl create ns nsb
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # apply a into namespace nsb
+  kubectl apply --server-side --namespace nsb -f hack/testdata/prune/a.yaml "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'pods a -n nsb' "{{${id_field:?}}}" 'a'
+  # apply b with namespace
+  kubectl apply --server-side --namespace nsb -f hack/testdata/prune/b.yaml "${kube_flags[@]:?}"
+  kube::test::get_object_assert 'pods b -n nsb' "{{${id_field:?}}}" 'b'
+  # apply --prune must prune a
+  kubectl apply --server-side --prune --all -f hack/testdata/prune/b.yaml
   # check wrong pod doesn't exist and right pod exists
   kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" 'b:'
 

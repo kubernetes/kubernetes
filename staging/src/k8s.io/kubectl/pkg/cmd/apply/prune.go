@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,6 +43,9 @@ type pruner struct {
 	dryRunStrategy    cmdutil.DryRunStrategy
 	gracePeriod       int
 
+	serverSideApply bool
+	fieldManager    string
+
 	toPrinter func(string) (printers.ResourcePrinter, error)
 
 	out io.Writer
@@ -61,6 +63,9 @@ func newPruner(o *ApplyOptions) pruner {
 		cascadingStrategy: o.DeleteOptions.CascadingStrategy,
 		dryRunStrategy:    o.DryRunStrategy,
 		gracePeriod:       o.DeleteOptions.GracePeriod,
+
+		serverSideApply: o.ServerSideApply,
+		fieldManager:    o.FieldManager,
 
 		toPrinter: o.ToPrinter,
 
@@ -112,10 +117,29 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 		if err != nil {
 			return err
 		}
-		annots := metadata.GetAnnotations()
-		if _, ok := annots[corev1.LastAppliedConfigAnnotation]; !ok {
-			// don't prune resources not created with apply
-			continue
+		if p.serverSideApply {
+			managedFields := metadata.GetManagedFields()
+			if managedFields == nil {
+				// don't prune resources not created serversideapply
+				continue
+			}
+			fieldManagerFound := false
+			for _, f := range managedFields {
+				if f.Manager == p.fieldManager {
+					fieldManagerFound = true
+					break
+				}
+			}
+			if !fieldManagerFound {
+				// don't prune resources field manager is different
+				continue
+			}
+		} else {
+			annots := metadata.GetAnnotations()
+			if _, ok := annots[corev1.LastAppliedConfigAnnotation]; !ok {
+				// don't prune resources not created with apply
+				continue
+			}
 		}
 		uid := metadata.GetUID()
 		if p.visitedUids.Has(string(uid)) {

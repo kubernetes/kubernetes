@@ -38,15 +38,21 @@ type pruner struct {
 	visitedNamespaces sets.String
 	labelSelector     string
 	resources         []prune.Resource
+
+	serverSideApply bool
+	fieldManager    string
 }
 
-func newPruner(dc dynamic.Interface, m meta.RESTMapper, r []prune.Resource) *pruner {
+func newPruner(dc dynamic.Interface, m meta.RESTMapper, ssa bool, fm string, r []prune.Resource) *pruner {
 	return &pruner{
 		visitedUids:       sets.NewString(),
 		visitedNamespaces: sets.NewString(),
 		dynamicClient:     dc,
 		mapper:            m,
 		resources:         r,
+
+		serverSideApply: ssa,
+		fieldManager:    fm,
 	}
 }
 
@@ -98,9 +104,29 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) ([]runtime.O
 		if err != nil {
 			return pobjs, err
 		}
-		annots := metadata.GetAnnotations()
-		if _, ok := annots[corev1.LastAppliedConfigAnnotation]; !ok {
-			continue
+		if p.serverSideApply {
+			managedFields := metadata.GetManagedFields()
+			if managedFields == nil {
+				// don't prune resources not created serversideapply
+				continue
+			}
+			fieldManagerFound := false
+			for _, f := range managedFields {
+				if f.Manager == p.fieldManager {
+					fieldManagerFound = true
+					break
+				}
+			}
+			if !fieldManagerFound {
+				// don't prune resources field manager is different
+				continue
+			}
+		} else {
+			annots := metadata.GetAnnotations()
+			if _, ok := annots[corev1.LastAppliedConfigAnnotation]; !ok {
+				// don't prune resources not created with apply
+				continue
+			}
 		}
 		uid := metadata.GetUID()
 		if p.visitedUids.Has(string(uid)) {

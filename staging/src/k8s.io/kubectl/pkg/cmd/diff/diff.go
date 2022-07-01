@@ -646,7 +646,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 		if err != nil {
 			return err
 		}
-		o.pruner = newPruner(o.DynamicClient, mapper, resources)
+		o.pruner = newPruner(o.DynamicClient, mapper, o.ServerSideApply, o.FieldManager, resources)
 	}
 
 	o.Builder = f.NewBuilder()
