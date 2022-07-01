@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -62,7 +63,7 @@ func rs(name string, replicas int, selector map[string]string, timestamp metav1.
 			Namespace:         metav1.NamespaceDefault,
 		},
 		Spec: apps.ReplicaSetSpec{
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Replicas: pointer.Int32(int32(replicas)),
 			Selector: &metav1.LabelSelector{MatchLabels: selector},
 			Template: v1.PodTemplateSpec{},
 		},
@@ -94,7 +95,7 @@ func newDeployment(name string, replicas int, revisionHistoryLimit *int32, maxSu
 					MaxSurge:       func() *intstr.IntOrString { i := intstr.FromInt(0); return &i }(),
 				},
 			},
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Replicas: pointer.Int32(int32(replicas)),
 			Selector: &metav1.LabelSelector{MatchLabels: selector},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -132,7 +133,7 @@ func newReplicaSet(d *apps.Deployment, name string, replicas int) *apps.ReplicaS
 		},
 		Spec: apps.ReplicaSetSpec{
 			Selector: d.Spec.Selector,
-			Replicas: func() *int32 { i := int32(replicas); return &i }(),
+			Replicas: pointer.Int32(int32(replicas)),
 			Template: d.Spec.Template,
 		},
 	}
