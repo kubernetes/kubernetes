@@ -278,8 +278,7 @@ func (b *glusterfsMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	}
 
 	// Cleanup upon failure.
-	mount.CleanupMountPoint(dir, b.mounter, false)
-	return err
+	return mount.CleanupMountPoint(dir, b.mounter, false)
 }
 
 func (glusterfsVolume *glusterfs) GetPath() string {
