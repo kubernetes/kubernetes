@@ -225,7 +225,6 @@ type StatefulSetSpec struct {
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
-	// This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
 	// +optional
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,9,opt,name=minReadySeconds"`
 
@@ -281,7 +280,6 @@ type StatefulSetStatus struct {
 	Conditions []StatefulSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,10,rep,name=conditions"`
 
 	// Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.
-	// This is a beta field and enabled/disabled by StatefulSetMinReadySeconds feature gate.
 	// +optional
 	AvailableReplicas int32 `json:"availableReplicas" protobuf:"varint,11,opt,name=availableReplicas"`
 }
