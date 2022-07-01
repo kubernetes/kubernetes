@@ -154,35 +154,19 @@ done
 echo "Found ${found} node(s)."
 kubectl_retry get nodes
 
-attempt=0
-while true; do
-  # The "kubectl componentstatuses -o template" exports components health information.
-  #
-  # Echo the output and gather 2 counts:
-  #  - Total number of componentstatuses.
-  #  - Number of "healthy" components.
-  cs_status=$(kubectl_retry get componentstatuses -o template --template='{{range .items}}{{with index .conditions 0}}{{.type}}:{{.status}}{{end}}{{"\n"}}{{end}}') || true
-  componentstatuses=$(echo "${cs_status}" | grep -c 'Healthy:') || true
-  healthy=$(echo "${cs_status}" | grep -c 'Healthy:True') || true
+# the first node is the master node. No master or control-plane label is set on the master node.
+# the master node may have no internal ip address. 
+externalip=$(kubectl get node --no-headers -o=jsonpath='{$.items[*].status.addresses[?(@.type=="ExternalIP")].address}'| awk '{print $1}')
+internalip=$(kubectl get node --no-headers -o=jsonpath='{$.items[*].status.addresses[?(@.type=="InternalIP")].address}'| awk '{print $1}')
 
-  if ((componentstatuses > healthy)) || ((componentstatuses == 0)); then
-    if ((attempt < 5)); then
-      echo -e "${color_yellow}Cluster not working yet.${color_norm}"
-      attempt=$((attempt+1))
-      sleep 30
-    else
-      echo -e " ${color_yellow}Validate output:${color_norm}"
-      kubectl_retry get cs
-      echo -e "${color_red}Validation returned one or more failed components. Cluster is probably broken.${color_norm}"
-      exit 1
-    fi
-  else
-    break
-  fi
+until curl --insecure --max-time 5 --fail --output /dev/null --silent "https://${externalip}/healthz" || \
+  curl --insecure --max-time 5 --fail --output /dev/null --silent "https://${internalip}/healthz"; do
+  echo -e "${color_yellow:-}Waiting for the Kubernetes API at ${internalip} or ${externalip} on 443 to be healthy.${color_norm:-}"
+  sleep 30
 done
 
 echo "Validate output:"
-kubectl_retry get cs || true
+kubectl_retry get node || true
 if [ "${return_value}" == "0" ]; then
   echo -e "${color_green}Cluster validation succeeded${color_norm}"
 else
