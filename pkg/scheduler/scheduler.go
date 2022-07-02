@@ -59,7 +59,7 @@ const (
 	pluginMetricsSamplePercent = 10
 	// Duration the scheduler will wait before expiring an assumed pod.
 	// See issue #106361 for more details about this parameter and its value.
-	durationToExpireAssumedPod = 15 * time.Minute
+	durationToExpireAssumedPod = 0 * time.Minute
 )
 
 // Scheduler watches for new unscheduled pods. It attempts to find
