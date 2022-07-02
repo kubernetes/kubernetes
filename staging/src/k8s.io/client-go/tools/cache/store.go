@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/util/covariation"
 )
 
 // Store is a generic object storage and processing interface.  A
@@ -137,8 +138,8 @@ func SplitMetaNamespaceKey(key string) (namespace, name string, err error) {
 // `*cache` implements Indexer in terms of a ThreadSafeStore and an
 // associated KeyFunc.
 type cache struct {
-	// cacheStorage bears the burden of thread safety for the cache
-	cacheStorage ThreadSafeStore
+	// ThreadSafeStoreWithJointIndexer bears the burden of thread safety for the cache
+	cacheStorage ThreadSafeStoreWithJointIndexer
 	// keyFunc is used to make the key for objects stored in and retrieved from items, and
 	// should be deterministic.
 	keyFunc KeyFunc
@@ -266,15 +267,32 @@ func (c *cache) Resync() error {
 // NewStore returns a Store implemented simply with a map and a lock.
 func NewStore(keyFunc KeyFunc) Store {
 	return &cache{
-		cacheStorage: NewThreadSafeStore(Indexers{}, Indices{}),
-		keyFunc:      keyFunc,
+		cacheStorage: &threadSafeMap{
+			items:    map[string]interface{}{},
+			indexers: Indexers{},
+			indices:  Indices{},
+		},
+		keyFunc: keyFunc,
 	}
 }
 
 // NewIndexer returns an Indexer implemented simply with a map and a lock.
 func NewIndexer(keyFunc KeyFunc, indexers Indexers) Indexer {
 	return &cache{
-		cacheStorage: NewThreadSafeStore(indexers, Indices{}),
-		keyFunc:      keyFunc,
+		cacheStorage: &threadSafeMap{
+			items:    map[string]interface{}{},
+			indexers: indexers,
+			indices:  Indices{},
+		},
+		keyFunc: keyFunc,
 	}
+}
+
+// IndexerWithJointIndexer covariant Indexer to JointIndexer
+func IndexerWithJointIndexer(indexer Indexer) (JointIndexer, error) {
+	i, err := covariation.Covariant(indexer, (*JointIndexer)(nil))
+	if err != nil {
+		return nil, err
+	}
+	return i.(JointIndexer), nil
 }

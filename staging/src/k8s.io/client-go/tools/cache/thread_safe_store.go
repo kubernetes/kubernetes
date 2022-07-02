@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/covariation"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -51,7 +52,6 @@ type ThreadSafeStore interface {
 	IndexKeys(indexName, indexedValue string) ([]string, error)
 	ListIndexFuncValues(name string) []string
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
-	ByIndexes(conds IndexConditions) ([]interface{}, error)
 	GetIndexers() Indexers
 
 	// AddIndexers adds more indexers to this store.  If you call this after you already have data
@@ -59,6 +59,12 @@ type ThreadSafeStore interface {
 	AddIndexers(newIndexers Indexers) error
 	// Resync is a no-op and is deprecated
 	Resync() error
+}
+
+// ThreadSafeStoreWithJointIndexer makes a convenient union query based on ThreadSafeStore
+type ThreadSafeStoreWithJointIndexer interface {
+	ThreadSafeStore
+	ByIndexes(conds IndexConditions) ([]interface{}, error)
 }
 
 // IndexConditions is AND of all IndexCondition
@@ -435,4 +441,13 @@ func NewThreadSafeStore(indexers Indexers, indices Indices) ThreadSafeStore {
 			indices:  indices,
 		},
 	}
+}
+
+// StorageWithJointIndexer covariant ThreadSafeStore to ThreadSafeStoreWithJointIndexer
+func StorageWithJointIndexer(threadSafeStore ThreadSafeStore) (ThreadSafeStoreWithJointIndexer, error) {
+	storage, err := covariation.Covariant(threadSafeStore, (*ThreadSafeStoreWithJointIndexer)(nil))
+	if err != nil {
+		return nil, err
+	}
+	return storage.(ThreadSafeStoreWithJointIndexer), nil
 }
