@@ -545,7 +545,8 @@ func TestFindAndRemoveNonattachableVolumes(t *testing.T) {
 
 func TestEphemeralVolumeOwnerCheck(t *testing.T) {
 	// create dswp
-	pod, pv, pvc := createEphemeralVolumeObjects("dswp-test-pod", "dswp-test-volume-name", false /* not owned */)
+	mode := v1.PersistentVolumeFilesystem
+	pod, pv, pvc := createEphemeralVolumeObjects("dswp-test-pod", "dswp-test-volume-name", false /* not owned */, &mode)
 	dswp, fakePodManager, _, _, _ := createDswpWithVolume(t, pv, pvc)
 	fakePodManager.AddPod(pod)
 
@@ -913,6 +914,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 		verify      func(*testing.T, []v1.UniqueVolumeName, v1.UniqueVolumeName)
 		readOnlyVol bool
 		volumeMode  v1.PersistentVolumeMode
+		volumeType  string
 	}{
 		{
 			// No resize request for volume, volumes in ASW shouldn't be marked as fsResizeRequired
@@ -988,60 +990,65 @@ func TestCheckVolumeFSResize(t *testing.T) {
 			},
 			volumeMode: v1.PersistentVolumeBlock,
 		},
+		{
+			// volume in ASW should be marked as fsResizeRequired
+			resize: func(_ *testing.T, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, _ *desiredStateOfWorldPopulator) {
+				setCapacity(pv, pvc, 2)
+			},
+			verify: func(t *testing.T, vols []v1.UniqueVolumeName, volName v1.UniqueVolumeName) {
+				if len(vols) == 0 {
+					t.Fatalf("Requested resize for volume, but volume in ASW hasn't been marked as fsResizeRequired")
+				}
+				if len(vols) != 1 {
+					t.Errorf("Some unexpected volumes are marked as fsResizeRequired: %v", vols)
+				}
+				if vols[0] != volName {
+					t.Fatalf("Mark wrong volume as fsResizeRequired: %s", vols[0])
+				}
+			},
+			volumeMode: v1.PersistentVolumeFilesystem,
+			volumeType: "ephemeral",
+		},
 	}
 
 	for _, tc := range testcases {
-		pv := &v1.PersistentVolume{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "dswp-test-volume-name",
-			},
-			Spec: v1.PersistentVolumeSpec{
-				PersistentVolumeSource: v1.PersistentVolumeSource{RBD: &v1.RBDPersistentVolumeSource{}},
-				Capacity:               volumeCapacity(1),
-				ClaimRef:               &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
-				VolumeMode:             &tc.volumeMode,
-			},
-		}
-		pvc := &v1.PersistentVolumeClaim{
-			Spec: v1.PersistentVolumeClaimSpec{
-				VolumeName: pv.Name,
-				Resources: v1.ResourceRequirements{
-					Requests: pv.Spec.Capacity,
-				},
-			},
-			Status: v1.PersistentVolumeClaimStatus{
-				Phase:    v1.ClaimBound,
-				Capacity: pv.Spec.Capacity,
-			},
+		var pod *v1.Pod
+		var pvc *v1.PersistentVolumeClaim
+		var pv *v1.PersistentVolume
+
+		if tc.volumeType == "ephemeral" {
+			pod, pv, pvc = createEphemeralVolumeObjects("dswp-test-pod", "dswp-test-volume-name", true, &tc.volumeMode)
+		} else {
+			pv, pvc = createResizeRelatedVolumes(&tc.volumeMode)
+			containers := []v1.Container{}
+
+			if tc.volumeMode == v1.PersistentVolumeFilesystem {
+				containers = append(containers, v1.Container{
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      pv.Name,
+							MountPath: "/mnt",
+							ReadOnly:  tc.readOnlyVol,
+						},
+					},
+				})
+			} else {
+				containers = append(containers, v1.Container{
+					VolumeDevices: []v1.VolumeDevice{
+						{
+							Name:       pv.Name,
+							DevicePath: "/mnt/foobar",
+						},
+					},
+				})
+			}
+
+			pod = createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+			pod.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ReadOnly = tc.readOnlyVol
 		}
 
 		dswp, fakePodManager, fakeDSW, _, _ := createDswpWithVolume(t, pv, pvc)
 		fakeASW := dswp.actualStateOfWorld
-		containers := []v1.Container{}
-
-		if tc.volumeMode == v1.PersistentVolumeFilesystem {
-			containers = append(containers, v1.Container{
-				VolumeMounts: []v1.VolumeMount{
-					{
-						Name:      pv.Name,
-						MountPath: "/mnt",
-						ReadOnly:  tc.readOnlyVol,
-					},
-				},
-			})
-		} else {
-			containers = append(containers, v1.Container{
-				VolumeDevices: []v1.VolumeDevice{
-					{
-						Name:       pv.Name,
-						DevicePath: "/mnt/foobar",
-					},
-				},
-			})
-		}
-
-		pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
-		pod.Spec.Volumes[0].VolumeSource.PersistentVolumeClaim.ReadOnly = tc.readOnlyVol
 		uniquePodName := types.UniquePodName(pod.UID)
 		uniqueVolumeName := v1.UniqueVolumeName("fake-plugin/" + pod.Spec.Volumes[0].Name)
 
@@ -1058,6 +1065,33 @@ func TestCheckVolumeFSResize(t *testing.T) {
 			tc.verify(t, resizeRequiredVolumes, uniqueVolumeName)
 		}()
 	}
+}
+
+func createResizeRelatedVolumes(volumeMode *v1.PersistentVolumeMode) (pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
+	pv = &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dswp-test-volume-name",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{RBD: &v1.RBDPersistentVolumeSource{}},
+			Capacity:               volumeCapacity(1),
+			ClaimRef:               &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			VolumeMode:             volumeMode,
+		},
+	}
+	pvc = &v1.PersistentVolumeClaim{
+		Spec: v1.PersistentVolumeClaimSpec{
+			VolumeName: pv.Name,
+			Resources: v1.ResourceRequirements{
+				Requests: pv.Spec.Capacity,
+			},
+		},
+		Status: v1.PersistentVolumeClaimStatus{
+			Phase:    v1.ClaimBound,
+			Capacity: pv.Spec.Capacity,
+		},
+	}
+	return
 }
 
 func volumeCapacity(size int) v1.ResourceList {
@@ -1166,7 +1200,7 @@ func createPodWithVolume(pod, pv, pvc string, containers []v1.Container) *v1.Pod
 	}
 }
 
-func createEphemeralVolumeObjects(podName, volumeName string, owned bool) (pod *v1.Pod, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
+func createEphemeralVolumeObjects(podName, volumeName string, owned bool, volumeMode *v1.PersistentVolumeMode) (pod *v1.Pod, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
 	pod = &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -1199,14 +1233,14 @@ func createEphemeralVolumeObjects(podName, volumeName string, owned bool) (pod *
 			Phase: v1.PodPhase("Running"),
 		},
 	}
-	mode := v1.PersistentVolumeFilesystem
 	pv = &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: volumeName,
 		},
 		Spec: v1.PersistentVolumeSpec{
 			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
-			VolumeMode: &mode,
+			Capacity:   volumeCapacity(1),
+			VolumeMode: volumeMode,
 		},
 	}
 	pvc = &v1.PersistentVolumeClaim{
@@ -1215,10 +1249,14 @@ func createEphemeralVolumeObjects(podName, volumeName string, owned bool) (pod *
 			Namespace: pod.Namespace,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			VolumeName: "dswp-test-volume-name",
+			VolumeName: volumeName,
+			Resources: v1.ResourceRequirements{
+				Requests: pv.Spec.Capacity,
+			},
 		},
 		Status: v1.PersistentVolumeClaimStatus{
-			Phase: v1.ClaimBound,
+			Phase:    v1.ClaimBound,
+			Capacity: pv.Spec.Capacity,
 		},
 	}
 	if owned {
