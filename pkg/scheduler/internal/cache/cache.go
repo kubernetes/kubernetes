@@ -734,7 +734,7 @@ func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 				"pod", klog.KObj(ps.pod))
 			continue
 		}
-		if now.After(*ps.deadline) {
+		if cache.ttl != 0 && now.After(*ps.deadline) {
 			klog.InfoS("Pod expired", "pod", klog.KObj(ps.pod))
 			if err := cache.expirePod(key, ps); err != nil {
 				klog.ErrorS(err, "ExpirePod failed", "pod", klog.KObj(ps.pod))
