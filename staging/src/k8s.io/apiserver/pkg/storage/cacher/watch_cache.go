@@ -477,12 +477,25 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues [
 	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
 	// requirement here is to NOT miss anything that should be returned. We can return as many non-matching items as we
 	// want - they will be filtered out later. The fact that we return less things is only further performance improvement.
-	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
-	for _, matchValue := range matchValues {
-		if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
-			return result, w.resourceVersion, matchValue.IndexName, nil
+	// If multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
+	minIndex := -1
+	minIndexKeysNum := math.MaxUint32
+	for i, matchValue := range matchValues {
+		result, err := w.store.IndexKeys(matchValue.IndexName, matchValue.Value)
+		if err != nil {
+			continue
+		}
+		if len(result) < minIndexKeysNum {
+			minIndex = i
+			minIndexKeysNum = len(result)
 		}
 	}
+	if minIndex != -1 {
+		if result, err := w.store.ByIndex(matchValues[minIndex].IndexName, matchValues[minIndex].Value); err == nil {
+			return result, w.resourceVersion, matchValues[minIndex].IndexName, nil
+		}
+	}
+
 	return w.store.List(), w.resourceVersion, "", nil
 }
 

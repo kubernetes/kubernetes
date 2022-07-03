@@ -404,7 +404,6 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	// list by label index.
 	matchValues := []storage.MatchValue{
 		{IndexName: "l:label", Value: "value1"},
-		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
 	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, matchValues, nil)
 	if err != nil {
@@ -423,6 +422,26 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	// list with spec.nodeName index.
 	matchValues = []storage.MatchValue{
 		{IndexName: "l:not-exist-label", Value: "whatever"},
+		{IndexName: "f:spec.nodeName", Value: "node2"},
+	}
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, matchValues, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resourceVersion != 5 {
+		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
+	}
+	if len(list) != 1 {
+		t.Errorf("unexpected list returned: %#v", list)
+	}
+	if indexUsed != "f:spec.nodeName" {
+		t.Errorf("Used index %q but expected %q", indexUsed, "f:spec.nodeName")
+	}
+
+	// list with both label and spec.nodeName index, return fewest items.
+	matchValues = []storage.MatchValue{
+		{IndexName: "l:not-exist-label", Value: "whatever"},
+		{IndexName: "l:label", Value: "value1"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
 	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, matchValues, nil)
