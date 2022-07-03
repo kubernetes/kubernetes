@@ -43,7 +43,7 @@ import (
 )
 
 var (
-	supportedFeatures = sets.NewString("layering")
+	supportedFeatures = sets.NewString("layering", "object-map", "exclusive-lock")
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.

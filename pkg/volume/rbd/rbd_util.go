@@ -44,6 +44,7 @@ import (
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/apimachinery/pkg/util/version"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -439,6 +440,13 @@ func (util *rbdUtil) AttachDisk(b rbdMounter) (string, error) {
 		if err != nil {
 			klog.Warningf("rbd: failed to load rbd kernel module:%v", err)
 		}
+		disabled, err := disableFeatures(b, "rbd", mon)
+		if err != nil {
+			klog.Errorf("%v", err)
+		}
+		if disabled {
+			defer enableFeatures(b, "rbd", mon)
+		}
 		output, err = execRbdMap(b, "rbd", mon)
 		if err != nil {
 			if !nbdToolsFound {
@@ -463,6 +471,55 @@ func (util *rbdUtil) AttachDisk(b rbdMounter) (string, error) {
 		}
 	}
 	return devicePath, nil
+}
+
+// https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=d9b9c893048e9d308a833619f0866f1f52778cf5
+func disableFeatures(b rbdMounter, rbdCmd, mon string) (bool, error) {
+	out, err := b.exec.Command("uname", "-r").Output()
+	if err != nil {
+		return false, fmt.Errorf("unsupported uname command: %s, %v", string(out), err)
+	}
+	osversion, err := version.ParseGeneric(strings.Split(string(out), "-")[0])
+	if err != nil {
+		return false, fmt.Errorf("Failed to parse os version: %s, %v", string(out), err)
+	}
+	if res, err :=  osversion.Compare("5.3.0"); err != nil {
+		return false, err
+	} else if res >= 0 {
+		return false, nil
+	}
+	imgPath := fmt.Sprintf("%s/%s", b.Pool, b.Image)
+	if b.Secret != "" {
+		out, err = b.exec.Command(rbdCmd,
+			"feature", "disable", imgPath, "--id", b.ID, "-m", mon, "--key="+b.Secret, "exclusive-lock", "object-map").CombinedOutput()
+	} else {
+		out, err = b.exec.Command(rbdCmd,
+			"feature", "disable", imgPath, "--id", b.ID, "-m", mon, "-k", b.Keyring, "exclusive-lock", "object-map").CombinedOutput()
+	}
+	if err != nil && !strings.Contains(strings.ToLower(string(out)+err.Error()), "already disabled") {
+		return false, err
+	}
+	klog.V(3).Infof("Success disable feature %s for volume %s", "exclusive-lock object-map", b.volName)
+	return true, nil
+}
+
+// This operation can not use for immutable features
+func enableFeatures(b rbdMounter, rbdCmd, mon string) error {
+	var out []byte
+	var err error
+	imgPath := fmt.Sprintf("%s/%s", b.Pool, b.Image)
+	if b.Secret != "" {
+		out, err = b.exec.Command(rbdCmd,
+			"feature", "enable", imgPath, "--id", b.ID, "-m", mon, "--key="+b.Secret, "exclusive-lock", "object-map").CombinedOutput()
+	} else {
+		out, err = b.exec.Command(rbdCmd,
+			"feature", "enable", imgPath, "--id", b.ID, "-m", mon, "-k", b.Keyring, "exclusive-lock", "object-map").CombinedOutput()
+	}
+	if err != nil && !strings.Contains(strings.ToLower(string(out)+err.Error()), "already enabled") {
+		return err
+	}
+	klog.V(3).Infof("Success enable feature %s for volume %s", "exclusive-lock object-map", b.volName)
+	return nil
 }
 
 // DetachDisk detaches the disk from the node.
