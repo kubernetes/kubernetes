@@ -372,12 +372,6 @@ func (s *Server) InstallDefaultHandlers() {
 		cadvisormetrics.OOMMetrics:          struct{}{},
 	}
 
-	// Only add the Accelerator metrics if the feature is inactive
-	// Note: Accelerator metrics will be removed in the future, hence the feature gate.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAcceleratorUsageMetrics) {
-		includedMetrics[cadvisormetrics.AcceleratorUsageMetrics] = struct{}{}
-	}
-
 	cadvisorOpts := cadvisorv2.RequestOptions{
 		IdType:    cadvisorv2.TypeName,
 		Count:     1,
