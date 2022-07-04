@@ -916,7 +916,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	// containers cannot be specified on pod creation.
 	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
 		for _, idx := range podContainerChanges.EphemeralContainersToStart {
-			start("ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
+			if err := start("ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx])); err != nil {
+				return
+			}
 		}
 	}
 
@@ -933,7 +935,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 
 	// Step 7: start containers in podContainerChanges.ContainersToStart.
 	for _, idx := range podContainerChanges.ContainersToStart {
-		start("container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
+		if err := start("container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx])); err != nil {
+			return
+		}
 	}
 
 	return
