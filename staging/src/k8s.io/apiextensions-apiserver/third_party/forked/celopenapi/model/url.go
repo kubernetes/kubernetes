@@ -16,6 +16,7 @@ package model
 
 import (
 	"fmt"
+	"github.com/google/cel-go/cel"
 	"net/url"
 	"reflect"
 
@@ -32,6 +33,7 @@ type URL struct {
 var (
 	URLObject = decls.NewObjectType("kubernetes.URL")
 	typeValue = types.NewTypeValue("kubernetes.URL")
+	URLType   = cel.ObjectType("kubernetes.URL")
 )
 
 // ConvertToNative implements ref.Val.ConvertToNative.
