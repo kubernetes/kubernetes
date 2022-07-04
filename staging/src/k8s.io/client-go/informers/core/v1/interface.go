@@ -44,10 +44,16 @@ type Interface interface {
 	PersistentVolumeClaims() PersistentVolumeClaimInformer
 	// Pods returns a PodInformer.
 	Pods() PodInformer
+	// PodSchedulings returns a PodSchedulingInformer.
+	PodSchedulings() PodSchedulingInformer
 	// PodTemplates returns a PodTemplateInformer.
 	PodTemplates() PodTemplateInformer
 	// ReplicationControllers returns a ReplicationControllerInformer.
 	ReplicationControllers() ReplicationControllerInformer
+	// ResourceClaims returns a ResourceClaimInformer.
+	ResourceClaims() ResourceClaimInformer
+	// ResourceClasses returns a ResourceClassInformer.
+	ResourceClasses() ResourceClassInformer
 	// ResourceQuotas returns a ResourceQuotaInformer.
 	ResourceQuotas() ResourceQuotaInformer
 	// Secrets returns a SecretInformer.
@@ -119,6 +125,11 @@ func (v *version) Pods() PodInformer {
 	return &podInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
+// PodSchedulings returns a PodSchedulingInformer.
+func (v *version) PodSchedulings() PodSchedulingInformer {
+	return &podSchedulingInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
 // PodTemplates returns a PodTemplateInformer.
 func (v *version) PodTemplates() PodTemplateInformer {
 	return &podTemplateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
@@ -127,6 +138,16 @@ func (v *version) PodTemplates() PodTemplateInformer {
 // ReplicationControllers returns a ReplicationControllerInformer.
 func (v *version) ReplicationControllers() ReplicationControllerInformer {
 	return &replicationControllerInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ResourceClaims returns a ResourceClaimInformer.
+func (v *version) ResourceClaims() ResourceClaimInformer {
+	return &resourceClaimInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ResourceClasses returns a ResourceClassInformer.
+func (v *version) ResourceClasses() ResourceClassInformer {
+	return &resourceClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ResourceQuotas returns a ResourceQuotaInformer.

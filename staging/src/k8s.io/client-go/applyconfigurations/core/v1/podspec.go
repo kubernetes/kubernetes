@@ -61,6 +61,7 @@ type PodSpecApplyConfiguration struct {
 	TopologySpreadConstraints     []TopologySpreadConstraintApplyConfiguration `json:"topologySpreadConstraints,omitempty"`
 	SetHostnameAsFQDN             *bool                                        `json:"setHostnameAsFQDN,omitempty"`
 	OS                            *PodOSApplyConfiguration                     `json:"os,omitempty"`
+	ResourceClaims                []PodResourceClaimApplyConfiguration         `json:"resourceClaims,omitempty"`
 }
 
 // PodSpecApplyConfiguration constructs an declarative configuration of the PodSpec type for use with
@@ -405,5 +406,18 @@ func (b *PodSpecApplyConfiguration) WithSetHostnameAsFQDN(value bool) *PodSpecAp
 // If called multiple times, the OS field is set to the value of the last call.
 func (b *PodSpecApplyConfiguration) WithOS(value *PodOSApplyConfiguration) *PodSpecApplyConfiguration {
 	b.OS = value
+	return b
+}
+
+// WithResourceClaims adds the given value to the ResourceClaims field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ResourceClaims field.
+func (b *PodSpecApplyConfiguration) WithResourceClaims(values ...*PodResourceClaimApplyConfiguration) *PodSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithResourceClaims")
+		}
+		b.ResourceClaims = append(b.ResourceClaims, *values[i])
+	}
 	return b
 }

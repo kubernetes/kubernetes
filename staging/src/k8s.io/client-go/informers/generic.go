@@ -199,10 +199,16 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().PersistentVolumeClaims().Informer()}, nil
 	case corev1.SchemeGroupVersion.WithResource("pods"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().Pods().Informer()}, nil
+	case corev1.SchemeGroupVersion.WithResource("podschedulings"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().PodSchedulings().Informer()}, nil
 	case corev1.SchemeGroupVersion.WithResource("podtemplates"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().PodTemplates().Informer()}, nil
 	case corev1.SchemeGroupVersion.WithResource("replicationcontrollers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().ReplicationControllers().Informer()}, nil
+	case corev1.SchemeGroupVersion.WithResource("resourceclaims"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().ResourceClaims().Informer()}, nil
+	case corev1.SchemeGroupVersion.WithResource("resourceclasses"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().ResourceClasses().Informer()}, nil
 	case corev1.SchemeGroupVersion.WithResource("resourcequotas"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Core().V1().ResourceQuotas().Informer()}, nil
 	case corev1.SchemeGroupVersion.WithResource("secrets"):

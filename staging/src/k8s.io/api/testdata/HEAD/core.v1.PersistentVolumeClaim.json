@@ -67,7 +67,10 @@
       },
       "requests": {
         "requestsKey": "0"
-      }
+      },
+      "claims": [
+        "claimsValue"
+      ]
     },
     "volumeName": "volumeNameValue",
     "storageClassName": "storageClassNameValue",

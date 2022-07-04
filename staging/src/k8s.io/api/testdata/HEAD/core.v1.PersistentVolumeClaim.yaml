@@ -44,6 +44,8 @@ spec:
     kind: kindValue
     name: nameValue
   resources:
+    claims:
+    - claimsValue
     limits:
       limitsKey: "0"
     requests:

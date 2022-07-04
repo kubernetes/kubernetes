@@ -54,6 +54,8 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1.ReplicationControllerList{}, func(obj interface{}) {
 		SetObjectDefaults_ReplicationControllerList(obj.(*v1.ReplicationControllerList))
 	})
+	scheme.AddTypeDefaultingFunc(&v1.ResourceClaim{}, func(obj interface{}) { SetObjectDefaults_ResourceClaim(obj.(*v1.ResourceClaim)) })
+	scheme.AddTypeDefaultingFunc(&v1.ResourceClaimList{}, func(obj interface{}) { SetObjectDefaults_ResourceClaimList(obj.(*v1.ResourceClaimList)) })
 	scheme.AddTypeDefaultingFunc(&v1.ResourceQuota{}, func(obj interface{}) { SetObjectDefaults_ResourceQuota(obj.(*v1.ResourceQuota)) })
 	scheme.AddTypeDefaultingFunc(&v1.ResourceQuotaList{}, func(obj interface{}) { SetObjectDefaults_ResourceQuotaList(obj.(*v1.ResourceQuotaList)) })
 	scheme.AddTypeDefaultingFunc(&v1.Secret{}, func(obj interface{}) { SetObjectDefaults_Secret(obj.(*v1.Secret)) })
@@ -438,6 +440,12 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		}
 	}
 	SetDefaults_ResourceList(&in.Spec.Overhead)
+	for i := range in.Spec.ResourceClaims {
+		a := &in.Spec.ResourceClaims[i]
+		if a.Claim.Template != nil {
+			SetDefaults_ResourceClaimSpec(&a.Claim.Template.Spec)
+		}
+	}
 }
 
 func SetObjectDefaults_PodList(in *v1.PodList) {
@@ -712,6 +720,12 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		}
 	}
 	SetDefaults_ResourceList(&in.Template.Spec.Overhead)
+	for i := range in.Template.Spec.ResourceClaims {
+		a := &in.Template.Spec.ResourceClaims[i]
+		if a.Claim.Template != nil {
+			SetDefaults_ResourceClaimSpec(&a.Claim.Template.Spec)
+		}
+	}
 }
 
 func SetObjectDefaults_PodTemplateList(in *v1.PodTemplateList) {
@@ -988,6 +1002,12 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			}
 		}
 		SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+		for i := range in.Spec.Template.Spec.ResourceClaims {
+			a := &in.Spec.Template.Spec.ResourceClaims[i]
+			if a.Claim.Template != nil {
+				SetDefaults_ResourceClaimSpec(&a.Claim.Template.Spec)
+			}
+		}
 	}
 }
 
@@ -995,6 +1015,17 @@ func SetObjectDefaults_ReplicationControllerList(in *v1.ReplicationControllerLis
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ReplicationController(a)
+	}
+}
+
+func SetObjectDefaults_ResourceClaim(in *v1.ResourceClaim) {
+	SetDefaults_ResourceClaimSpec(&in.Spec)
+}
+
+func SetObjectDefaults_ResourceClaimList(in *v1.ResourceClaimList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_ResourceClaim(a)
 	}
 }
 

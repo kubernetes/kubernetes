@@ -318,6 +318,8 @@ spec:
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
         resources:
+          claims:
+          - claimsValue
           limits:
             limitsKey: "0"
           requests:
@@ -519,6 +521,8 @@ spec:
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
         resources:
+          claims:
+          - claimsValue
           limits:
             limitsKey: "0"
           requests:
@@ -721,6 +725,8 @@ spec:
           terminationGracePeriodSeconds: 7
           timeoutSeconds: 3
         resources:
+          claims:
+          - claimsValue
           limits:
             limitsKey: "0"
           requests:
@@ -803,6 +809,50 @@ spec:
       priorityClassName: priorityClassNameValue
       readinessGates:
       - conditionType: conditionTypeValue
+      resourceClaims:
+      - claim:
+          resourceClaimName: resourceClaimNameValue
+          template:
+            metadata:
+              annotations:
+                annotationsKey: annotationsValue
+              creationTimestamp: "2008-01-01T01:01:01Z"
+              deletionGracePeriodSeconds: 10
+              deletionTimestamp: "2009-01-01T01:01:01Z"
+              finalizers:
+              - finalizersValue
+              generateName: generateNameValue
+              generation: 7
+              labels:
+                labelsKey: labelsValue
+              managedFields:
+              - apiVersion: apiVersionValue
+                fieldsType: fieldsTypeValue
+                fieldsV1: {}
+                manager: managerValue
+                operation: operationValue
+                subresource: subresourceValue
+                time: "2004-01-01T01:01:01Z"
+              name: nameValue
+              namespace: namespaceValue
+              ownerReferences:
+              - apiVersion: apiVersionValue
+                blockOwnerDeletion: true
+                controller: true
+                kind: kindValue
+                name: nameValue
+                uid: uidValue
+              resourceVersion: resourceVersionValue
+              selfLink: selfLinkValue
+              uid: uidValue
+            spec:
+              allocationMode: allocationModeValue
+              parameters:
+                apiVersion: apiVersionValue
+                kind: kindValue
+                name: nameValue
+              resourceClassName: resourceClassNameValue
+        name: nameValue
       restartPolicy: restartPolicyValue
       runtimeClassName: runtimeClassNameValue
       schedulerName: schedulerNameValue
@@ -966,6 +1016,8 @@ spec:
                 kind: kindValue
                 name: nameValue
               resources:
+                claims:
+                - claimsValue
                 limits:
                   limitsKey: "0"
                 requests:

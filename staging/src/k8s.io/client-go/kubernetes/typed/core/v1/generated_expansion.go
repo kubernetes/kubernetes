@@ -30,9 +30,15 @@ type PersistentVolumeExpansion interface{}
 
 type PersistentVolumeClaimExpansion interface{}
 
+type PodSchedulingExpansion interface{}
+
 type PodTemplateExpansion interface{}
 
 type ReplicationControllerExpansion interface{}
+
+type ResourceClaimExpansion interface{}
+
+type ResourceClassExpansion interface{}
 
 type ResourceQuotaExpansion interface{}
 

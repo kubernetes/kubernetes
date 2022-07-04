@@ -3484,6 +3484,18 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: podAntiAffinity
       type:
         namedType: io.k8s.api.core.v1.PodAntiAffinity
+- name: io.k8s.api.core.v1.AllocationResult
+  map:
+    fields:
+    - name: availableOnNodes
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+    - name: resourceHandle
+      type:
+        scalar: string
+    - name: sharedResource
+      type:
+        scalar: boolean
 - name: io.k8s.api.core.v1.AttachedVolume
   map:
     fields:
@@ -3702,6 +3714,15 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.core.v1.ClaimSource
+  map:
+    fields:
+    - name: resourceClaimName
+      type:
+        scalar: string
+    - name: template
+      type:
+        namedType: io.k8s.api.core.v1.ResourceClaimTemplate
 - name: io.k8s.api.core.v1.ClientIPConfig
   map:
     fields:
@@ -5669,6 +5690,60 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.core.v1.PodResourceClaim
+  map:
+    fields:
+    - name: claim
+      type:
+        namedType: io.k8s.api.core.v1.ClaimSource
+      default: {}
+    - name: name
+      type:
+        scalar: string
+- name: io.k8s.api.core.v1.PodScheduling
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.core.v1.PodSchedulingSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.core.v1.PodSchedulingStatus
+      default: {}
+- name: io.k8s.api.core.v1.PodSchedulingSpec
+  map:
+    fields:
+    - name: potentialNodes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+    - name: selectedNode
+      type:
+        scalar: string
+- name: io.k8s.api.core.v1.PodSchedulingStatus
+  map:
+    fields:
+    - name: claims
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.ResourceClaimSchedulingStatus
+          elementRelationship: associative
+          keys:
+          - podResourceClaimName
 - name: io.k8s.api.core.v1.PodSecurityContext
   map:
     fields:
@@ -5813,6 +5888,14 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.PodReadinessGate
           elementRelationship: atomic
+    - name: resourceClaims
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.PodResourceClaim
+          elementRelationship: associative
+          keys:
+          - name
     - name: restartPolicy
       type:
         scalar: string
@@ -6210,6 +6293,155 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: io.k8s.api.core.v1.ResourceClaim
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.core.v1.ResourceClaimSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.core.v1.ResourceClaimStatus
+      default: {}
+- name: io.k8s.api.core.v1.ResourceClaimParametersReference
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+      default: ""
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.core.v1.ResourceClaimSchedulingStatus
+  map:
+    fields:
+    - name: podResourceClaimName
+      type:
+        scalar: string
+    - name: unsuitableNodes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
+- name: io.k8s.api.core.v1.ResourceClaimSpec
+  map:
+    fields:
+    - name: allocationMode
+      type:
+        scalar: string
+    - name: parameters
+      type:
+        namedType: io.k8s.api.core.v1.ResourceClaimParametersReference
+    - name: resourceClassName
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.core.v1.ResourceClaimStatus
+  map:
+    fields:
+    - name: allocation
+      type:
+        namedType: io.k8s.api.core.v1.AllocationResult
+    - name: deallocationRequested
+      type:
+        scalar: boolean
+    - name: driverName
+      type:
+        scalar: string
+    - name: reservedFor
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.ResourceClaimUserReference
+          elementRelationship: associative
+- name: io.k8s.api.core.v1.ResourceClaimTemplate
+  map:
+    fields:
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.core.v1.ResourceClaimSpec
+      default: {}
+- name: io.k8s.api.core.v1.ResourceClaimUserReference
+  map:
+    fields:
+    - name: group
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: resource
+      type:
+        scalar: string
+      default: ""
+    - name: uid
+      type:
+        scalar: string
+      default: ""
+    - name: version
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.core.v1.ResourceClass
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: driverName
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: parameters
+      type:
+        namedType: io.k8s.api.core.v1.ResourceClassParametersReference
+    - name: suitableNodes
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+- name: io.k8s.api.core.v1.ResourceClassParametersReference
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+      default: ""
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.ResourceFieldSelector
   map:
     fields:
@@ -6279,6 +6511,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.core.v1.ResourceRequirements
   map:
     fields:
+    - name: claims
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
     - name: limits
       type:
         map:

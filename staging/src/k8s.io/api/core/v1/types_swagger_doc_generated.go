@@ -50,6 +50,17 @@ func (Affinity) SwaggerDoc() map[string]string {
 	return map_Affinity
 }
 
+var map_AllocationResult = map[string]string{
+	"":                 "AllocationResult contains attributed of an allocated resource.",
+	"resourceHandle":   "ResourceHandle contains arbitrary data returned by the driver after a successful allocation. This is opaque for Kubernetes. Driver documentation may explain to users how to interpret this data if needed.\n\nResource drivers can use this to store some data directly or cross-reference some other place where information is stored. This data is guaranteed to be available when a Pod is about to run on a node, in contrast to the ResourceClass which may have been deleted in the meantime.\n\nThe maximum size of this field is 16KiB.",
+	"availableOnNodes": "This field will get set by the resource driver after it has allocated the resource driver to inform the scheduler where it can schedule Pods using the ResourceClaim.\n\nNode-local resources can use the `kubernetes.io/hostname` label to select a specific node.\n\nSetting this field is optional. If nil, the resource is available everywhere.",
+	"sharedResource":   "SharedResource determines whether the resource supports more than one user at a time.",
+}
+
+func (AllocationResult) SwaggerDoc() map[string]string {
+	return map_AllocationResult
+}
+
 var map_AttachedVolume = map[string]string{
 	"":           "AttachedVolume describes a volume attached to a node",
 	"name":       "Name of the attached volume",
@@ -207,6 +218,16 @@ var map_CinderVolumeSource = map[string]string{
 
 func (CinderVolumeSource) SwaggerDoc() map[string]string {
 	return map_CinderVolumeSource
+}
+
+var map_ClaimSource = map[string]string{
+	"":                  "ClaimSource either references one separate ResourceClaim by name or embeds a template for a ResourceClaim, but never both.\n\nAdditional options might get added in the future, so code using this struct must error out when none of the options that it supports are set.",
+	"resourceClaimName": "The resource is independent of the Pod and defined by a separate ResourceClaim in the same namespace as the Pod. Either this or Template must be set, but not both.",
+	"template":          "Will be used to create a stand-alone ResourceClaim to allocate the resource. The pod in which this PodResource is embedded will be the owner of the ResourceClaim, i.e. the ResourceClaim will be deleted together with the pod.  The name of the ResourceClaim will be `<pod name>-<resource name>` where `<resource name>` is the name PodResource.Name Pod validation will reject the pod if the concatenated name is not valid for a ResourceClaim (for example, too long).\n\nAn existing ResourceClaim with that name that is not owned by the pod will *not* be used for the pod to avoid using an unrelated resource by mistake. Scheduling is then blocked until the unrelated ResourceClaim is removed. If such a pre-created ResourceClaim is meant to be used by the pod, the ResourceClaim has to be updated with an owner reference to the pod once the pod exists. Normally this should not be necessary, but it may be useful when manually reconstructing a broken cluster.\n\nRunning the pod also gets blocked by a wrong ownership. This should be even less likely because of the prior scheduling check, but could happen if a user force-deletes or modifies the ResourceClaim.\n\nThis field is read-only and no changes will be made by Kubernetes to the ResourceClaim after it has been created. Either this or ResourceClaimName must be set, but not both.",
+}
+
+func (ClaimSource) SwaggerDoc() map[string]string {
+	return map_ClaimSource
 }
 
 var map_ClientIPConfig = map[string]string{
@@ -1606,6 +1627,56 @@ func (PodReadinessGate) SwaggerDoc() map[string]string {
 	return map_PodReadinessGate
 }
 
+var map_PodResourceClaim = map[string]string{
+	"":      "PodResourceClaim references exactly one ResourceClaim, either by name or by embedding a template for a ResourceClaim that will get created by the resource claim controller in kube-controller-manager.",
+	"name":  "A name under which this resource can be referenced by the containers.",
+	"claim": "Claim determines where to find the claim.",
+}
+
+func (PodResourceClaim) SwaggerDoc() map[string]string {
+	return map_PodResourceClaim
+}
+
+var map_PodScheduling = map[string]string{
+	"":         "PodScheduling objects get created by a scheduler when it handles a pod which uses one or more unallocated ResourceClaims with delayed allocation.",
+	"metadata": "The name must be the same as the corresponding Pod.  That Pod must be listed as owner in OwnerReferences to ensure that the PodScheduling object gets deleted when no longer needed. Normally the scheduler will delete it.\n\nDrivers must ignore PodScheduling objects where the owning pod already got deleted because such objects are orphaned and will be removed soon.\n\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "Spec is set and updated by the scheduler.",
+	"status":   "Status is updated by resource drivers.",
+}
+
+func (PodScheduling) SwaggerDoc() map[string]string {
+	return map_PodScheduling
+}
+
+var map_PodSchedulingList = map[string]string{
+	"":         "PodSchedulingList is a collection of pod scheduling objects.",
+	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items is the list of resource claims.",
+}
+
+func (PodSchedulingList) SwaggerDoc() map[string]string {
+	return map_PodSchedulingList
+}
+
+var map_PodSchedulingSpec = map[string]string{
+	"":               "PodSchedulingSpec contains the request for information about resources required by a pod and eventually communicates the decision of the scheduler to move ahead with pod scheduling for a specific node.",
+	"selectedNode":   "When allocation is delayed, the scheduler must set the node for which it wants the resource(s) to be allocated before the driver(s) start with allocation.\n\nThe driver must ensure that the allocated resource is available on this node or update ResourceSchedulingStatus.UnsuitableNodes to indicate where allocation might succeed.\n\nWhen allocation succeeds, drivers should immediately add the pod to the ResourceClaimStatus.ReservedFor field together with setting ResourceClaimStatus.Allocated. This optimization may save scheduling attempts and roundtrips through the API server because the scheduler does not need to reserve the claim for the pod itself.\n\nThe selected node may change over time, for example when the initial choice turns out to be unsuitable after all. Drivers must not reallocate for a different node when they see such a change because it would lead to race conditions. Instead, the scheduler will trigger deallocation of specific claims as needed through the ResourceClaimStatus.DeallocationRequested field.",
+	"potentialNodes": "When allocation is delayed, and the scheduler needs to decide on which node a Pod should run, it will ask the driver(s) on which nodes the resource might be made available. To trigger that check, the scheduler provides the names of nodes which might be suitable for the Pod. Will be updated periodically until all resources are allocated.\n\nThe ResourceClass.SuiteableNodes node selector can be used to filter out nodes based on labels. This prevents adding nodes here that the driver then would need to reject through UnsuitableNodes.\n\nThe size of this field is limited to 256. This is large enough for many clusters. Larger clusters may need more attempts to find a node that suits all pending resources.",
+}
+
+func (PodSchedulingSpec) SwaggerDoc() map[string]string {
+	return map_PodSchedulingSpec
+}
+
+var map_PodSchedulingStatus = map[string]string{
+	"":       "PodSchedulingStatus is where resource drivers provide information about where the could allocate a resource and whether allocation failed.",
+	"claims": "Each resource driver is responsible for providing information about those resources in the Pod that the driver manages. It can skip adding that information when it already allocated the resource.\n\nA driver must add entries here for all its pending claims, even if the ResourceSchedulingStatus.UnsuitabeNodes field is empty, because the scheduler may decide to wait with selecting a node until it has information from all drivers.",
+}
+
+func (PodSchedulingStatus) SwaggerDoc() map[string]string {
+	return map_PodSchedulingStatus
+}
+
 var map_PodSecurityContext = map[string]string{
 	"":                    "PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
 	"seLinuxOptions":      "The SELinux context to be applied to all containers. If unspecified, the container runtime will allocate a random SELinux context for each container.  May also be set in SecurityContext.  If set in both SecurityContext and PodSecurityContext, the value specified in SecurityContext takes precedence for that container. Note that this field cannot be set when spec.os.name is windows.",
@@ -1670,7 +1741,8 @@ var map_PodSpec = map[string]string{
 	"overhead":                      "Overhead represents the resource overhead associated with running a pod for a given RuntimeClass. This field will be autopopulated at admission time by the RuntimeClass admission controller. If the RuntimeClass admission controller is enabled, overhead must not be set in Pod create requests. The RuntimeClass admission controller will reject Pod create requests which have the overhead already set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero. More info: https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead/README.md",
 	"topologySpreadConstraints":     "TopologySpreadConstraints describes how a group of pods ought to spread across topology domains. Scheduler will schedule pods in a way which abides by the constraints. All topologySpreadConstraints are ANDed.",
 	"setHostnameAsFQDN":             "If true the pod's hostname will be configured as the pod's FQDN, rather than the leaf name (the default). In Linux containers, this means setting the FQDN in the hostname field of the kernel (the nodename field of struct utsname). In Windows containers, this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN. If a pod does not have FQDN, this has no effect. Default to false.",
-	"os":                            "Specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup",
+	"os":                            "Specifies the OS of the containers in the pod. Some pod and container fields are restricted if this is set.\n\nIf the OS field is set to linux, the following fields must be unset: -securityContext.windowsOptions\n\nIf the OS field is set to windows, following fields must be unset: - spec.hostPID - spec.hostIPC - spec.securityContext.seLinuxOptions - spec.securityContext.seccompProfile - spec.securityContext.fsGroup - spec.securityContext.fsGroupChangePolicy - spec.securityContext.sysctls - spec.shareProcessNamespace - spec.securityContext.runAsUser - spec.securityContext.runAsGroup - spec.securityContext.supplementalGroups - spec.containers[*].securityContext.seLinuxOptions - spec.containers[*].securityContext.seccompProfile - spec.containers[*].securityContext.capabilities - spec.containers[*].securityContext.readOnlyRootFilesystem - spec.containers[*].securityContext.privileged - spec.containers[*].securityContext.allowPrivilegeEscalation - spec.containers[*].securityContext.procMount - spec.containers[*].securityContext.runAsUser - spec.containers[*].securityContext.runAsGroup This is a beta field and requires the IdentifyPodOS feature",
+	"resourceClaims":                "ResourceClaims defines which ResourceClaims must be allocated and reserved before the Pod is allowed to start. The resources will be made available to those containers which reference them by name.",
 }
 
 func (PodSpec) SwaggerDoc() map[string]string {
@@ -1943,6 +2015,127 @@ func (ReplicationControllerStatus) SwaggerDoc() map[string]string {
 	return map_ReplicationControllerStatus
 }
 
+var map_ResourceClaim = map[string]string{
+	"":         "ResourceClaim is created by users to describe which resources they need. Its status tracks whether the resource has been allocated and what the resulting attributes are.",
+	"metadata": "The driver must set a finalizer here before it attempts to allocate the resource. It removes the finalizer again when a) the allocation attempt has definitely failed or b) when the allocated resource was freed. This ensures that resources are not leaked.\n\nMore info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "Spec describes the desired attributes of a resource that then needs to be allocated. It can only be set once when creating the ResourceClaim.",
+	"status":   "Status describes whether the resource is available and with which attributes.",
+}
+
+func (ResourceClaim) SwaggerDoc() map[string]string {
+	return map_ResourceClaim
+}
+
+var map_ResourceClaimList = map[string]string{
+	"":         "ResourceClaimList is a collection of resource classes.",
+	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items is the list of resource claims.",
+}
+
+func (ResourceClaimList) SwaggerDoc() map[string]string {
+	return map_ResourceClaimList
+}
+
+var map_ResourceClaimParametersReference = map[string]string{
+	"":           "ResourceClaimParametersReference contains enough information to let you locate the parameters for a ResourceClaim. The object must be in the same namespace as the ResourceClaim.",
+	"apiVersion": "APIVersion is the group and version for the resource being referenced or just the version for the core API.",
+	"kind":       "Kind is the type of resource being referenced. This is the same value as in the parameter object's metadata, for example \"ConfigMap\".",
+	"name":       "Name is the name of resource being referenced.",
+}
+
+func (ResourceClaimParametersReference) SwaggerDoc() map[string]string {
+	return map_ResourceClaimParametersReference
+}
+
+var map_ResourceClaimSchedulingStatus = map[string]string{
+	"":                     "ResourceClaimSchedulingStatus contains information about one particular claim while scheduling a pod.",
+	"podResourceClaimName": "PodResourceClaimName matches the PodResourceClaim.Name field.",
+	"unsuitableNodes":      "A change of the PodSchedulingSpec.PotentialNodes field and/or a failed allocation attempt trigger a check in the driver on which of those nodes the resource might be made available. It then excludes nodes by listing those where that is not the case in UnsuitableNodes.\n\nNodes listed here will be ignored by the scheduler when selecting a node for a Pod. All other nodes are potential candidates, either because no information is available yet or because allocation might succeed.\n\nThis can change, so the driver must refresh this information periodically and/or after changing resource allocation for some other ResourceClaim until a node gets selected by the scheduler.",
+}
+
+func (ResourceClaimSchedulingStatus) SwaggerDoc() map[string]string {
+	return map_ResourceClaimSchedulingStatus
+}
+
+var map_ResourceClaimSpec = map[string]string{
+	"":                  "ResourceClaimSpec defines how a resource is to be allocated.",
+	"resourceClassName": "ResourceClassName references the driver and additional parameters via the name of a ResourceClass that was created as part of the driver deployment.\n\nThe apiserver does not check that the referenced class exists, but a driver-specific admission webhook may require that and is allowed to reject claims where the class is missing.",
+	"parameters":        "Parameters references a separate object with arbitrary parameters that will be used by the driver when allocating a resource for the claim.\n\nThe object must be in the same namespace as the ResourceClaim.",
+	"allocationMode":    "Allocation can start immediately or when a Pod wants to use the resource. Waiting for a Pod is the default.",
+}
+
+func (ResourceClaimSpec) SwaggerDoc() map[string]string {
+	return map_ResourceClaimSpec
+}
+
+var map_ResourceClaimStatus = map[string]string{
+	"":                      "ResourceClaimStatus tracks whether the resource has been allocated and what the resulting attributes are.",
+	"driverName":            "DriverName is a copy of the driver name from the ResourceClass at the time when allocation started. It's necessary to enable usage of the claim by kubelet in case that the ResourceClass got removed in the meantime. It also helps the resource driver to determine whether it needs to handle a claim that got marked for deletion.",
+	"allocation":            "Allocation is set by the resource driver once a resource has been allocated successfully. Nil indicates that the resource is not allocated.",
+	"reservedFor":           "ReservedFor indicates which entities are currently allowed to use the claim. Usually those are Pods, but other objects are also possible as long as they exist as resources in the apiserver. The ResourceClaim controller in the kube-controller-manager checks for stale entries that reference non-existent objects and removes them.\n\nA scheduler must add a Pod that it is scheduling. This must be done in an atomic ResourceClaim update because there might be multiple schedulers working on different Pods that compete for access to the same ResourceClaim, the ResourceClaim might have been marked for deletion, or even been deallocated already.\n\nkubelet will check this before allowing a Pod to run because a a user might have selected a node manually without reserving resources or a scheduler might have missed that step, for example because it doesn't support dynamic resource allocation or the feature was disabled.\n\nThe maximum size is 32. This is an artificial limit to prevent a completely unbounded field in the API.",
+	"deallocationRequested": "DeallocationRequested gets set by the scheduler when it detects the situation where pod scheduling cannot proceed because some claim was allocated for a node that cannot provide some other required resource.\n\nThe driver then needs to deallocate this claim and the scheduler will try again.\n\nWhile DeallocationRequested is set, no new users may be added to ReservedFor.",
+}
+
+func (ResourceClaimStatus) SwaggerDoc() map[string]string {
+	return map_ResourceClaimStatus
+}
+
+var map_ResourceClaimTemplate = map[string]string{
+	"":         "ResourceClaimTemplate is used to produce ResourceClaim objects by embedding such a template in the ResourceRequirements of a Pod.",
+	"metadata": "May contain labels and annotations that will be copied into the PVC when creating it. No other fields are allowed and will be rejected during validation.",
+	"spec":     "The specification for the ResourceClaim. The entire content is copied unchanged into the PVC that gets created from this template. The same fields as in a ResourceClaim are also valid here.",
+}
+
+func (ResourceClaimTemplate) SwaggerDoc() map[string]string {
+	return map_ResourceClaimTemplate
+}
+
+var map_ResourceClaimUserReference = map[string]string{
+	"":         "ResourceClaimParametersReference contains enough information to let you locate the user of a ResourceClaim. The user must be a resource in the same namespace as the ResourceClaim.",
+	"group":    "Group is the API group for the resource being referenced. If Group is empty, the specified Kind must be in the core API group. For any other third-party types, APIGroup is required.",
+	"version":  "Version is the version of the API for accessing the resource.",
+	"resource": "Resource is the type of resource being referenced, for example \"pods\".",
+	"name":     "Name is the name of resource being referenced.",
+	"uid":      "UID identifies exactly one incarnation of the resource.",
+}
+
+func (ResourceClaimUserReference) SwaggerDoc() map[string]string {
+	return map_ResourceClaimUserReference
+}
+
+var map_ResourceClass = map[string]string{
+	"":              "ResourceClass is used by administrators to influence how resources are allocated.",
+	"metadata":      "More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"driverName":    "DriverName determines which resource driver is to be used for allocation of a ResourceClaim that uses this class.\n\nResource drivers have a unique name in reverse domain order (acme.example.com).",
+	"parameters":    "Parameters holds arbitrary values that will be available to the driver when allocating a resource that uses this class. The driver will be able to distinguish between parameters stored here and and those stored in ResourceClaimSpec. These parameters here can only be set by cluster administrators.",
+	"suitableNodes": "Only nodes matching the selector will be considered by the scheduler when trying to find a Node that fits a Pod when that Pod uses a ResourceClaim that has not been allocated yet.\n\nSetting this field is optional. If nil, all nodes are candidates.",
+}
+
+func (ResourceClass) SwaggerDoc() map[string]string {
+	return map_ResourceClass
+}
+
+var map_ResourceClassList = map[string]string{
+	"":         "ResourceClassList is a collection of resource classes.",
+	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "Items is the list of resource classes.",
+}
+
+func (ResourceClassList) SwaggerDoc() map[string]string {
+	return map_ResourceClassList
+}
+
+var map_ResourceClassParametersReference = map[string]string{
+	"":           "ResourceClassParametersReference contains enough information to let you locate the parameters for a ResourceClass. The object must be cluster-scoped.",
+	"apiVersion": "APIVersion is the group and version for the resource being referenced or just the version for the core API.",
+	"kind":       "Kind is the type of resource being referenced. This is the same value as in the parameter object's metadata.",
+	"name":       "Name is the name of resource being referenced.",
+}
+
+func (ResourceClassParametersReference) SwaggerDoc() map[string]string {
+	return map_ResourceClassParametersReference
+}
+
 var map_ResourceFieldSelector = map[string]string{
 	"":              "ResourceFieldSelector represents container resources (cpu, memory) and their output format",
 	"containerName": "Container name: required for volumes, optional for env vars",
@@ -2000,6 +2193,7 @@ var map_ResourceRequirements = map[string]string{
 	"":         "ResourceRequirements describes the compute resource requirements.",
 	"limits":   "Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
 	"requests": "Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/",
+	"claims":   "The entries are the names of resources in PodSpec.ResourceClaims that are used by the container.",
 }
 
 func (ResourceRequirements) SwaggerDoc() map[string]string {

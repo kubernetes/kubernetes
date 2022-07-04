@@ -308,6 +308,12 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	for i := range in.Spec.Template.Spec.ResourceClaims {
+		a := &in.Spec.Template.Spec.ResourceClaims[i]
+		if a.Claim.Template != nil {
+			corev1.SetDefaults_ResourceClaimSpec(&a.Claim.Template.Spec)
+		}
+	}
 }
 
 func SetObjectDefaults_DaemonSetList(in *v1.DaemonSetList) {
@@ -583,6 +589,12 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	for i := range in.Spec.Template.Spec.ResourceClaims {
+		a := &in.Spec.Template.Spec.ResourceClaims[i]
+		if a.Claim.Template != nil {
+			corev1.SetDefaults_ResourceClaimSpec(&a.Claim.Template.Spec)
+		}
+	}
 }
 
 func SetObjectDefaults_DeploymentList(in *v1.DeploymentList) {
@@ -858,6 +870,12 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	for i := range in.Spec.Template.Spec.ResourceClaims {
+		a := &in.Spec.Template.Spec.ResourceClaims[i]
+		if a.Claim.Template != nil {
+			corev1.SetDefaults_ResourceClaimSpec(&a.Claim.Template.Spec)
+		}
+	}
 }
 
 func SetObjectDefaults_ReplicaSetList(in *v1.ReplicaSetList) {
@@ -1133,6 +1151,12 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 		}
 	}
 	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
+	for i := range in.Spec.Template.Spec.ResourceClaims {
+		a := &in.Spec.Template.Spec.ResourceClaims[i]
+		if a.Claim.Template != nil {
+			corev1.SetDefaults_ResourceClaimSpec(&a.Claim.Template.Spec)
+		}
+	}
 	for i := range in.Spec.VolumeClaimTemplates {
 		a := &in.Spec.VolumeClaimTemplates[i]
 		corev1.SetDefaults_PersistentVolumeClaim(a)

@@ -303,6 +303,12 @@ func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
 		}
 	}
 	v1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Overhead)
+	for i := range in.Spec.JobTemplate.Spec.Template.Spec.ResourceClaims {
+		a := &in.Spec.JobTemplate.Spec.Template.Spec.ResourceClaims[i]
+		if a.Claim.Template != nil {
+			v1.SetDefaults_ResourceClaimSpec(&a.Claim.Template.Spec)
+		}
+	}
 }
 
 func SetObjectDefaults_CronJobList(in *v1beta1.CronJobList) {
@@ -577,4 +583,10 @@ func SetObjectDefaults_JobTemplate(in *v1beta1.JobTemplate) {
 		}
 	}
 	v1.SetDefaults_ResourceList(&in.Template.Spec.Template.Spec.Overhead)
+	for i := range in.Template.Spec.Template.Spec.ResourceClaims {
+		a := &in.Template.Spec.Template.Spec.ResourceClaims[i]
+		if a.Claim.Template != nil {
+			v1.SetDefaults_ResourceClaimSpec(&a.Claim.Template.Spec)
+		}
+	}
 }

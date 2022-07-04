@@ -68,12 +68,24 @@ func (c *FakeCoreV1) Pods(namespace string) v1.PodInterface {
 	return &FakePods{c, namespace}
 }
 
+func (c *FakeCoreV1) PodSchedulings(namespace string) v1.PodSchedulingInterface {
+	return &FakePodSchedulings{c, namespace}
+}
+
 func (c *FakeCoreV1) PodTemplates(namespace string) v1.PodTemplateInterface {
 	return &FakePodTemplates{c, namespace}
 }
 
 func (c *FakeCoreV1) ReplicationControllers(namespace string) v1.ReplicationControllerInterface {
 	return &FakeReplicationControllers{c, namespace}
+}
+
+func (c *FakeCoreV1) ResourceClaims(namespace string) v1.ResourceClaimInterface {
+	return &FakeResourceClaims{c, namespace}
+}
+
+func (c *FakeCoreV1) ResourceClasses() v1.ResourceClassInterface {
+	return &FakeResourceClasses{c}
 }
 
 func (c *FakeCoreV1) ResourceQuotas(namespace string) v1.ResourceQuotaInterface {

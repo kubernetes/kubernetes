@@ -495,6 +495,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=core, Version=v1
 	case corev1.SchemeGroupVersion.WithKind("Affinity"):
 		return &applyconfigurationscorev1.AffinityApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("AllocationResult"):
+		return &applyconfigurationscorev1.AllocationResultApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("AttachedVolume"):
 		return &applyconfigurationscorev1.AttachedVolumeApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("AWSElasticBlockStoreVolumeSource"):
@@ -515,6 +517,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.CinderPersistentVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("CinderVolumeSource"):
 		return &applyconfigurationscorev1.CinderVolumeSourceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ClaimSource"):
+		return &applyconfigurationscorev1.ClaimSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ClientIPConfig"):
 		return &applyconfigurationscorev1.ClientIPConfigApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ComponentCondition"):
@@ -723,6 +727,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PodOSApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodReadinessGate"):
 		return &applyconfigurationscorev1.PodReadinessGateApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodResourceClaim"):
+		return &applyconfigurationscorev1.PodResourceClaimApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodScheduling"):
+		return &applyconfigurationscorev1.PodSchedulingApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodSchedulingSpec"):
+		return &applyconfigurationscorev1.PodSchedulingSpecApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("PodSchedulingStatus"):
+		return &applyconfigurationscorev1.PodSchedulingStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodSecurityContext"):
 		return &applyconfigurationscorev1.PodSecurityContextApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PodSpec"):
@@ -759,6 +771,24 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.ReplicationControllerSpecApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ReplicationControllerStatus"):
 		return &applyconfigurationscorev1.ReplicationControllerStatusApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceClaim"):
+		return &applyconfigurationscorev1.ResourceClaimApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceClaimParametersReference"):
+		return &applyconfigurationscorev1.ResourceClaimParametersReferenceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceClaimSchedulingStatus"):
+		return &applyconfigurationscorev1.ResourceClaimSchedulingStatusApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceClaimSpec"):
+		return &applyconfigurationscorev1.ResourceClaimSpecApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceClaimStatus"):
+		return &applyconfigurationscorev1.ResourceClaimStatusApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceClaimTemplate"):
+		return &applyconfigurationscorev1.ResourceClaimTemplateApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceClaimUserReference"):
+		return &applyconfigurationscorev1.ResourceClaimUserReferenceApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceClass"):
+		return &applyconfigurationscorev1.ResourceClassApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ResourceClassParametersReference"):
+		return &applyconfigurationscorev1.ResourceClassParametersReferenceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ResourceFieldSelector"):
 		return &applyconfigurationscorev1.ResourceFieldSelectorApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ResourceQuota"):

@@ -38,8 +38,11 @@ type CoreV1Interface interface {
 	PersistentVolumesGetter
 	PersistentVolumeClaimsGetter
 	PodsGetter
+	PodSchedulingsGetter
 	PodTemplatesGetter
 	ReplicationControllersGetter
+	ResourceClaimsGetter
+	ResourceClassesGetter
 	ResourceQuotasGetter
 	SecretsGetter
 	ServicesGetter
@@ -91,12 +94,24 @@ func (c *CoreV1Client) Pods(namespace string) PodInterface {
 	return newPods(c, namespace)
 }
 
+func (c *CoreV1Client) PodSchedulings(namespace string) PodSchedulingInterface {
+	return newPodSchedulings(c, namespace)
+}
+
 func (c *CoreV1Client) PodTemplates(namespace string) PodTemplateInterface {
 	return newPodTemplates(c, namespace)
 }
 
 func (c *CoreV1Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
 	return newReplicationControllers(c, namespace)
+}
+
+func (c *CoreV1Client) ResourceClaims(namespace string) ResourceClaimInterface {
+	return newResourceClaims(c, namespace)
+}
+
+func (c *CoreV1Client) ResourceClasses() ResourceClassInterface {
+	return newResourceClasses(c)
 }
 
 func (c *CoreV1Client) ResourceQuotas(namespace string) ResourceQuotaInterface {

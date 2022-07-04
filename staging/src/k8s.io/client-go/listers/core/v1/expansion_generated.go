@@ -82,6 +82,14 @@ type PodListerExpansion interface{}
 // PodNamespaceLister.
 type PodNamespaceListerExpansion interface{}
 
+// PodSchedulingListerExpansion allows custom methods to be added to
+// PodSchedulingLister.
+type PodSchedulingListerExpansion interface{}
+
+// PodSchedulingNamespaceListerExpansion allows custom methods to be added to
+// PodSchedulingNamespaceLister.
+type PodSchedulingNamespaceListerExpansion interface{}
+
 // PodTemplateListerExpansion allows custom methods to be added to
 // PodTemplateLister.
 type PodTemplateListerExpansion interface{}
@@ -89,6 +97,18 @@ type PodTemplateListerExpansion interface{}
 // PodTemplateNamespaceListerExpansion allows custom methods to be added to
 // PodTemplateNamespaceLister.
 type PodTemplateNamespaceListerExpansion interface{}
+
+// ResourceClaimListerExpansion allows custom methods to be added to
+// ResourceClaimLister.
+type ResourceClaimListerExpansion interface{}
+
+// ResourceClaimNamespaceListerExpansion allows custom methods to be added to
+// ResourceClaimNamespaceLister.
+type ResourceClaimNamespaceListerExpansion interface{}
+
+// ResourceClassListerExpansion allows custom methods to be added to
+// ResourceClassLister.
+type ResourceClassListerExpansion interface{}
 
 // ResourceQuotaListerExpansion allows custom methods to be added to
 // ResourceQuotaLister.

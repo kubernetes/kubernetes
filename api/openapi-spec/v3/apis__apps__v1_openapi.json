@@ -1551,6 +1551,24 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.core.v1.ClaimSource": {
+        "description": "ClaimSource either references one separate ResourceClaim by name or embeds a template for a ResourceClaim, but never both.\n\nAdditional options might get added in the future, so code using this struct must error out when none of the options that it supports are set.",
+        "properties": {
+          "resourceClaimName": {
+            "description": "The resource is independent of the Pod and defined by a separate ResourceClaim in the same namespace as the Pod. Either this or Template must be set, but not both.",
+            "type": "string"
+          },
+          "template": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceClaimTemplate"
+              }
+            ],
+            "description": "Will be used to create a stand-alone ResourceClaim to allocate the resource. The pod in which this PodResource is embedded will be the owner of the ResourceClaim, i.e. the ResourceClaim will be deleted together with the pod.  The name of the ResourceClaim will be `<pod name>-<resource name>` where `<resource name>` is the name PodResource.Name Pod validation will reject the pod if the concatenated name is not valid for a ResourceClaim (for example, too long).\n\nAn existing ResourceClaim with that name that is not owned by the pod will *not* be used for the pod to avoid using an unrelated resource by mistake. Scheduling is then blocked until the unrelated ResourceClaim is removed. If such a pre-created ResourceClaim is meant to be used by the pod, the ResourceClaim has to be updated with an owner reference to the pod once the pod exists. Normally this should not be necessary, but it may be useful when manually reconstructing a broken cluster.\n\nRunning the pod also gets blocked by a wrong ownership. This should be even less likely because of the prior scheduling check, but could happen if a user force-deletes or modifies the ResourceClaim.\n\nThis field is read-only and no changes will be made by Kubernetes to the ResourceClaim after it has been created. Either this or ResourceClaimName must be set, but not both."
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.core.v1.ConfigMapEnvSource": {
         "description": "ConfigMapEnvSource selects a ConfigMap to populate the environment variables with.\n\nThe contents of the target ConfigMap's Data field will represent the key-value pairs as environment variables.",
         "properties": {
@@ -3291,6 +3309,25 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.core.v1.PodResourceClaim": {
+        "description": "PodResourceClaim references exactly one ResourceClaim, either by name or by embedding a template for a ResourceClaim that will get created by the resource claim controller in kube-controller-manager.",
+        "properties": {
+          "claim": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ClaimSource"
+              }
+            ],
+            "default": {},
+            "description": "Claim determines where to find the claim."
+          },
+          "name": {
+            "description": "A name under which this resource can be referenced by the containers.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "io.k8s.api.core.v1.PodSecurityContext": {
         "description": "PodSecurityContext holds pod-level security attributes and common container settings. Some fields are also present in container.securityContext.  Field values of container.securityContext take precedence over field values of PodSecurityContext.",
         "properties": {
@@ -3544,6 +3581,24 @@
               "default": {}
             },
             "type": "array"
+          },
+          "resourceClaims": {
+            "description": "ResourceClaims defines which ResourceClaims must be allocated and reserved before the Pod is allowed to start. The resources will be made available to those containers which reference them by name.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.PodResourceClaim"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-patch-merge-key": "name",
+            "x-kubernetes-patch-strategy": "merge,retainKeys"
           },
           "restartPolicy": {
             "description": "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy\n\n",
@@ -3890,6 +3945,85 @@
         ],
         "type": "object"
       },
+      "io.k8s.api.core.v1.ResourceClaimParametersReference": {
+        "description": "ResourceClaimParametersReference contains enough information to let you locate the parameters for a ResourceClaim. The object must be in the same namespace as the ResourceClaim.",
+        "properties": {
+          "apiVersion": {
+            "default": "",
+            "description": "APIVersion is the group and version for the resource being referenced or just the version for the core API.",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "description": "Kind is the type of resource being referenced. This is the same value as in the parameter object's metadata, for example \"ConfigMap\".",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "description": "Name is the name of resource being referenced.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind",
+          "name"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.ResourceClaimSpec": {
+        "description": "ResourceClaimSpec defines how a resource is to be allocated.",
+        "properties": {
+          "allocationMode": {
+            "description": "Allocation can start immediately or when a Pod wants to use the resource. Waiting for a Pod is the default.",
+            "type": "string"
+          },
+          "parameters": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceClaimParametersReference"
+              }
+            ],
+            "description": "Parameters references a separate object with arbitrary parameters that will be used by the driver when allocating a resource for the claim.\n\nThe object must be in the same namespace as the ResourceClaim."
+          },
+          "resourceClassName": {
+            "default": "",
+            "description": "ResourceClassName references the driver and additional parameters via the name of a ResourceClass that was created as part of the driver deployment.\n\nThe apiserver does not check that the referenced class exists, but a driver-specific admission webhook may require that and is allowed to reject claims where the class is missing.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resourceClassName"
+        ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.ResourceClaimTemplate": {
+        "description": "ResourceClaimTemplate is used to produce ResourceClaim objects by embedding such a template in the ResourceRequirements of a Pod.",
+        "properties": {
+          "metadata": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+              }
+            ],
+            "default": {},
+            "description": "May contain labels and annotations that will be copied into the PVC when creating it. No other fields are allowed and will be rejected during validation."
+          },
+          "spec": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceClaimSpec"
+              }
+            ],
+            "default": {},
+            "description": "The specification for the ResourceClaim. The entire content is copied unchanged into the PVC that gets created from this template. The same fields as in a ResourceClaim are also valid here."
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "type": "object"
+      },
       "io.k8s.api.core.v1.ResourceFieldSelector": {
         "description": "ResourceFieldSelector represents container resources (cpu, memory) and their output format",
         "properties": {
@@ -3921,6 +4055,15 @@
       "io.k8s.api.core.v1.ResourceRequirements": {
         "description": "ResourceRequirements describes the compute resource requirements.",
         "properties": {
+          "claims": {
+            "description": "The entries are the names of resources in PodSpec.ResourceClaims that are used by the container.",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "set"
+          },
           "limits": {
             "additionalProperties": {
               "allOf": [
