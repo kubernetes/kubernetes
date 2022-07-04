@@ -20,12 +20,8 @@ import (
 	"net/url"
 
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/interpreter/functions"
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
-
 	"k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
 )
 
@@ -111,124 +107,44 @@ var urlsLib = &urls{}
 
 type urls struct{}
 
-var urlLibraryDecls = []*exprpb.Decl{
-	decls.NewFunction("url",
-		decls.NewOverload("string_to_url",
-			[]*exprpb.Type{decls.String},
-			model.URLObject),
-	),
-	decls.NewFunction("getScheme",
-		decls.NewInstanceOverload("url_get_scheme",
-			[]*exprpb.Type{model.URLObject},
-			decls.String),
-	),
-	decls.NewFunction("getHost",
-		decls.NewInstanceOverload("url_get_host",
-			[]*exprpb.Type{model.URLObject},
-			decls.String),
-	),
-	decls.NewFunction("getHostname",
-		decls.NewInstanceOverload("url_get_hostname",
-			[]*exprpb.Type{model.URLObject},
-			decls.String),
-	),
-	decls.NewFunction("getPort",
-		decls.NewInstanceOverload("url_get_port",
-			[]*exprpb.Type{model.URLObject},
-			decls.String),
-	),
-	decls.NewFunction("getEscapedPath",
-		decls.NewInstanceOverload("url_get_escaped_path",
-			[]*exprpb.Type{model.URLObject},
-			decls.String),
-	),
-	decls.NewFunction("getQuery",
-		decls.NewInstanceOverload("url_get_query",
-			[]*exprpb.Type{model.URLObject},
-			decls.NewMapType(decls.String, decls.NewListType(decls.String))),
-	),
-	decls.NewFunction("isURL",
-		decls.NewOverload("is_url_string",
-			[]*exprpb.Type{decls.String},
-			decls.Bool),
-	),
+var urlLibraryDecls = map[string][]cel.FunctionOpt{
+	"url": {
+		cel.Overload("string_to_url", []*cel.Type{cel.StringType}, model.URLType,
+			cel.UnaryBinding(stringToUrl))},
+	"getScheme": {
+		cel.MemberOverload("url_get_scheme", []*cel.Type{model.URLType}, cel.StringType,
+			cel.UnaryBinding(getScheme))},
+	"getHost": {
+		cel.MemberOverload("url_get_host", []*cel.Type{model.URLType}, cel.StringType,
+			cel.UnaryBinding(getHost))},
+	"getHostname": {
+		cel.MemberOverload("url_get_hostname", []*cel.Type{model.URLType}, cel.StringType,
+			cel.UnaryBinding(getHostname))},
+	"getPort": {
+		cel.MemberOverload("url_get_port", []*cel.Type{model.URLType}, cel.StringType,
+			cel.UnaryBinding(getPort))},
+	"getEscapedPath": {
+		cel.MemberOverload("url_get_escaped_path", []*cel.Type{model.URLType}, cel.StringType,
+			cel.UnaryBinding(getEscapedPath))},
+	"getQuery": {
+		cel.MemberOverload("url_get_query", []*cel.Type{model.URLType},
+			cel.MapType(cel.StringType, cel.ListType(cel.StringType)),
+			cel.UnaryBinding(getQuery))},
+	"isURL": {
+		cel.Overload("is_url_string", []*cel.Type{cel.StringType}, cel.BoolType,
+			cel.UnaryBinding(isURL))},
 }
 
 func (*urls) CompileOptions() []cel.EnvOption {
-	return []cel.EnvOption{
-		cel.Declarations(urlLibraryDecls...),
+	options := []cel.EnvOption{}
+	for name, overloads := range urlLibraryDecls {
+		options = append(options, cel.Function(name, overloads...))
 	}
+	return options
 }
 
 func (*urls) ProgramOptions() []cel.ProgramOption {
-	return []cel.ProgramOption{
-		cel.Functions(
-			&functions.Overload{
-				Operator: "url",
-				Unary:    stringToUrl,
-			},
-			&functions.Overload{
-				Operator: "string_to_url",
-				Unary:    stringToUrl,
-			},
-			&functions.Overload{
-				Operator: "getScheme",
-				Unary:    getScheme,
-			},
-			&functions.Overload{
-				Operator: "url_get_scheme",
-				Unary:    getScheme,
-			},
-			&functions.Overload{
-				Operator: "getHost",
-				Unary:    getHost,
-			},
-			&functions.Overload{
-				Operator: "url_get_host",
-				Unary:    getHost,
-			},
-			&functions.Overload{
-				Operator: "getHostname",
-				Unary:    getHostname,
-			},
-			&functions.Overload{
-				Operator: "url_get_hostname",
-				Unary:    getHostname,
-			},
-			&functions.Overload{
-				Operator: "getPort",
-				Unary:    getPort,
-			},
-			&functions.Overload{
-				Operator: "url_get_port",
-				Unary:    getPort,
-			},
-			&functions.Overload{
-				Operator: "getEscapedPath",
-				Unary:    getEscapedPath,
-			},
-			&functions.Overload{
-				Operator: "url_get_escaped_path",
-				Unary:    getEscapedPath,
-			},
-			&functions.Overload{
-				Operator: "getQuery",
-				Unary:    getQuery,
-			},
-			&functions.Overload{
-				Operator: "url_get_query",
-				Unary:    getQuery,
-			},
-			&functions.Overload{
-				Operator: "isURL",
-				Unary:    isURL,
-			},
-			&functions.Overload{
-				Operator: "is_url_string",
-				Unary:    isURL,
-			},
-		),
-	}
+	return []cel.ProgramOption{}
 }
 
 func stringToUrl(arg ref.Val) ref.Val {

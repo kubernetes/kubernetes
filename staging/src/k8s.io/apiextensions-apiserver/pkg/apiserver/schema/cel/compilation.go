@@ -24,10 +24,6 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
-	"github.com/google/cel-go/checker/decls"
-	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
-	"google.golang.org/protobuf/proto"
-
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/library"
@@ -108,7 +104,7 @@ func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]
 	}
 	celRules := s.Extensions.XValidations
 
-	var propDecls []*expr.Decl
+	var propDecls []cel.EnvOption
 	var root *celmodel.DeclType
 	var ok bool
 	baseEnv, err := getBaseEnv()
@@ -136,9 +132,9 @@ func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]
 		}
 		root = rootDecl.MaybeAssignTypeName(scopedTypeName)
 	}
-	propDecls = append(propDecls, decls.NewVar(ScopedVarName, root.ExprType()))
-	propDecls = append(propDecls, decls.NewVar(OldScopedVarName, root.ExprType()))
-	opts = append(opts, cel.Declarations(propDecls...))
+	propDecls = append(propDecls, cel.Variable(ScopedVarName, root.CelType()))
+	propDecls = append(propDecls, cel.Variable(OldScopedVarName, root.CelType()))
+	opts = append(opts, propDecls...)
 	env, err := baseEnv.Extend(opts...)
 	if err != nil {
 		return nil, err
@@ -165,7 +161,7 @@ func compileRule(rule apiextensions.ValidationRule, env *cel.Env, perCallLimit u
 		compilationResult.Error = &Error{ErrorTypeInvalid, "compilation failed: " + issues.String()}
 		return
 	}
-	if !proto.Equal(ast.ResultType(), decls.Bool) {
+	if ast.OutputType() != cel.BoolType {
 		compilationResult.Error = &Error{ErrorTypeInvalid, "cel expression must evaluate to a bool"}
 		return
 	}
