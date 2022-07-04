@@ -917,7 +917,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	JobReadyPods: {Default: true, PreRelease: featuregate.Beta},
 
-	JobTrackingWithFinalizers: {Default: false, PreRelease: featuregate.Beta}, // Disabled due to #109485
+	JobTrackingWithFinalizers: {Default: true, PreRelease: featuregate.Beta},
 
 	KubeletCredentialProviders: {Default: true, PreRelease: featuregate.Beta},
 
