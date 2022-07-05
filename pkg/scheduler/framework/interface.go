@@ -247,7 +247,8 @@ func (s *Status) Equal(x *Status) bool {
 }
 
 // NewStatus makes a Status out of the given arguments and returns its pointer.
-// Note: it's not recommended to pass in a
+// Note: it's not recommended to pass in an Error code along with a reason that stringifies FitError.
+// In that case, use `AsStatus(FitError)` instead.
 func NewStatus(code Code, reasons ...string) *Status {
 	s := &Status{
 		code:    code,
@@ -263,9 +264,7 @@ func NewStatus(code Code, reasons ...string) *Status {
 func AsStatus(err error) *Status {
 	return &Status{
 		code: Error,
-		// Delay err's evaluation to Reason() instead of composing here.
-		// reasons: []string{err.Error()},
-		err: err,
+		err:  err,
 	}
 }
 
