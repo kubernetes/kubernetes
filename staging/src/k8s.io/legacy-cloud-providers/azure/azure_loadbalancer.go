@@ -587,7 +587,7 @@ func (az *Cloud) findMatchedPIPByLoadBalancerIP(service *v1.Service, loadBalance
 
 	for _, pip := range pips {
 		if pip.PublicIPAddressPropertiesFormat.IPAddress != nil &&
-				*pip.PublicIPAddressPropertiesFormat.IPAddress == loadBalancerIP {
+			*pip.PublicIPAddressPropertiesFormat.IPAddress == loadBalancerIP {
 			return &pip, nil
 		}
 	}
@@ -670,9 +670,9 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		// return if pip exist and dns label is the same
 		if strings.EqualFold(getDomainNameLabel(&pip), domainNameLabel) {
 			if existingServiceName, ok := pip.Tags[serviceUsingDNSKey]; ok &&
-					strings.EqualFold(*existingServiceName, serviceName) {
+				strings.EqualFold(*existingServiceName, serviceName) {
 				klog.V(6).Infof("ensurePublicIPExists for service(%s): pip(%s) - "+
-						"the service is using the DNS label on the public IP", serviceName, pipName)
+					"the service is using the DNS label on the public IP", serviceName, pipName)
 
 				var rerr *retry.Error
 				if changed {
@@ -723,6 +723,14 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 				Name: network.PublicIPAddressSkuNameStandard,
 			}
 		}
+		// only add zone information for the new standard pips
+		zones, err := az.getRegionZonesBackoff(to.String(pip.Location))
+		if err != nil {
+			return nil, err
+		}
+		if len(zones) > 0 {
+			pip.Zones = &zones
+		}
 		klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - creating", serviceName, *pip.Name)
 	}
 	if foundDNSLabelAnnotation {
@@ -736,7 +744,7 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 			pip.PublicIPAddressPropertiesFormat.DNSSettings = nil
 		} else {
 			if pip.PublicIPAddressPropertiesFormat.DNSSettings == nil ||
-					pip.PublicIPAddressPropertiesFormat.DNSSettings.DomainNameLabel == nil {
+				pip.PublicIPAddressPropertiesFormat.DNSSettings.DomainNameLabel == nil {
 				klog.V(6).Infof("ensurePublicIPExists for service(%s): pip(%s) - no existing DNS label on the public IP, create one", serviceName, pipName)
 				pip.PublicIPAddressPropertiesFormat.DNSSettings = &network.PublicIPAddressDNSSettings{
 					DomainNameLabel: &domainNameLabel,
@@ -831,7 +839,7 @@ func sortIPTags(ipTags *[]network.IPTag) {
 		sort.Slice(*ipTags, func(i, j int) bool {
 			ipTag := *ipTags
 			return to.String(ipTag[i].IPTagType) < to.String(ipTag[j].IPTagType) ||
-					to.String(ipTag[i].Tag) < to.String(ipTag[j].Tag)
+				to.String(ipTag[i].Tag) < to.String(ipTag[j].Tag)
 		})
 	}
 }
@@ -957,9 +965,9 @@ func (az *Cloud) isFrontendIPChanged(clusterName string, config network.Frontend
 // loadBalancing resources, including loadBalancing rules, outbound rules, inbound NAT rules
 // and inbound NAT pools.
 func (az *Cloud) isFrontendIPConfigUnsafeToDelete(
-		lb *network.LoadBalancer,
-		service *v1.Service,
-		fipConfigID *string,
+	lb *network.LoadBalancer,
+	service *v1.Service,
+	fipConfigID *string,
 ) (bool, error) {
 	if lb == nil || fipConfigID == nil || *fipConfigID == "" {
 		return false, fmt.Errorf("isFrontendIPConfigUnsafeToDelete: incorrect parameters")
@@ -992,9 +1000,9 @@ func (az *Cloud) isFrontendIPConfigUnsafeToDelete(
 	// referencing this frontend IP configuration
 	for _, lbRule := range lbRules {
 		if lbRule.LoadBalancingRulePropertiesFormat != nil &&
-				lbRule.FrontendIPConfiguration != nil &&
-				lbRule.FrontendIPConfiguration.ID != nil &&
-				strings.EqualFold(*lbRule.FrontendIPConfiguration.ID, *fipConfigID) {
+			lbRule.FrontendIPConfiguration != nil &&
+			lbRule.FrontendIPConfiguration.ID != nil &&
+			strings.EqualFold(*lbRule.FrontendIPConfiguration.ID, *fipConfigID) {
 			if !az.serviceOwnsRule(service, *lbRule.Name) {
 				warningMsg := fmt.Sprintf("isFrontendIPConfigUnsafeToDelete: frontend IP configuration with ID %s on LB %s cannot be deleted because it is being referenced by load balancing rules of other services", *fipConfigID, *lb.Name)
 				klog.Warning(warningMsg)
@@ -1024,9 +1032,9 @@ func (az *Cloud) isFrontendIPConfigUnsafeToDelete(
 	// referencing this frontend IP configuration
 	for _, inboundNatRule := range inboundNatRules {
 		if inboundNatRule.InboundNatRulePropertiesFormat != nil &&
-				inboundNatRule.FrontendIPConfiguration != nil &&
-				inboundNatRule.FrontendIPConfiguration.ID != nil &&
-				strings.EqualFold(*inboundNatRule.FrontendIPConfiguration.ID, *fipConfigID) {
+			inboundNatRule.FrontendIPConfiguration != nil &&
+			inboundNatRule.FrontendIPConfiguration.ID != nil &&
+			strings.EqualFold(*inboundNatRule.FrontendIPConfiguration.ID, *fipConfigID) {
 			warningMsg := fmt.Sprintf("isFrontendIPConfigUnsafeToDelete: frontend IP configuration with ID %s on LB %s cannot be deleted because it is being referenced by the inbound NAT rule %s", *fipConfigID, *lb.Name, *inboundNatRule.Name)
 			klog.Warning(warningMsg)
 			az.Event(service, v1.EventTypeWarning, "DeletingFrontendIPConfiguration", warningMsg)
@@ -1039,9 +1047,9 @@ func (az *Cloud) isFrontendIPConfigUnsafeToDelete(
 	// referencing this frontend IP configuration
 	for _, inboundNatPool := range inboundNatPools {
 		if inboundNatPool.InboundNatPoolPropertiesFormat != nil &&
-				inboundNatPool.FrontendIPConfiguration != nil &&
-				inboundNatPool.FrontendIPConfiguration.ID != nil &&
-				strings.EqualFold(*inboundNatPool.FrontendIPConfiguration.ID, *fipConfigID) {
+			inboundNatPool.FrontendIPConfiguration != nil &&
+			inboundNatPool.FrontendIPConfiguration.ID != nil &&
+			strings.EqualFold(*inboundNatPool.FrontendIPConfiguration.ID, *fipConfigID) {
 			warningMsg := fmt.Sprintf("isFrontendIPConfigUnsafeToDelete: frontend IP configuration with ID %s on LB %s cannot be deleted because it is being referenced by the inbound NAT pool %s", *fipConfigID, *lb.Name, *inboundNatPool.Name)
 			klog.Warning(warningMsg)
 			az.Event(service, v1.EventTypeWarning, "DeletingFrontendIPConfiguration", warningMsg)
@@ -1064,8 +1072,8 @@ func findMatchedOutboundRuleFIPConfig(fipConfigID *string, outboundRuleFIPConfig
 }
 
 func (az *Cloud) findFrontendIPConfigOfService(
-		fipConfigs *[]network.FrontendIPConfiguration,
-		service *v1.Service,
+	fipConfigs *[]network.FrontendIPConfiguration,
+	service *v1.Service,
 ) (*network.FrontendIPConfiguration, bool, error) {
 	for _, config := range *fipConfigs {
 		owns, isPrimaryService, err := az.serviceOwnsFrontendIP(config, service)
@@ -1229,6 +1237,10 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 			}
 		}
 	} else {
+		var (
+			previousZone *[]string
+			isFipChanged bool
+		)
 		for i := len(newConfigs) - 1; i >= 0; i-- {
 			config := newConfigs[i]
 			isFipChanged, err := az.isFrontendIPChanged(clusterName, config, service, defaultLBFrontendIPConfigName)
@@ -1239,6 +1251,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				klog.V(2).Infof("reconcileLoadBalancer for service (%s)(%t): lb frontendconfig(%s) - dropping", serviceName, wantLb, *config.Name)
 				newConfigs = append(newConfigs[:i], newConfigs[i+1:]...)
 				dirtyConfigs = true
+				previousZone = config.Zones
 			}
 		}
 
@@ -1299,12 +1312,21 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				}
 			}
 
-			newConfigs = append(newConfigs,
-				network.FrontendIPConfiguration{
-					Name:                                    to.StringPtr(defaultLBFrontendIPConfigName),
-					ID:                                      to.StringPtr(fmt.Sprintf(frontendIPConfigIDTemplate, az.SubscriptionID, az.ResourceGroup, *lb.Name, defaultLBFrontendIPConfigName)),
-					FrontendIPConfigurationPropertiesFormat: fipConfigurationProperties,
-				})
+			newConfig := network.FrontendIPConfiguration{
+				Name:                                    to.StringPtr(defaultLBFrontendIPConfigName),
+				ID:                                      to.StringPtr(fmt.Sprintf(frontendIPConfigIDTemplate, az.SubscriptionID, az.ResourceGroup, *lb.Name, defaultLBFrontendIPConfigName)),
+				FrontendIPConfigurationPropertiesFormat: fipConfigurationProperties,
+			}
+
+			// only add zone information for new internal frontend IP configurations
+			if isInternal {
+				if err := az.getFrontendZones(&newConfig, previousZone, isFipChanged, serviceName, defaultLBFrontendIPConfigName); err != nil {
+					klog.Errorf("reconcileLoadBalancer for service (%s)(%t): failed to getFrontendZones: %s", serviceName, wantLb, err.Error())
+					return nil, err
+				}
+			}
+
+			newConfigs = append(newConfigs, newConfig)
 			klog.V(2).Infof("reconcileLoadBalancer for service (%s)(%t): lb frontendconfig(%s) - adding", serviceName, wantLb, defaultLBFrontendIPConfigName)
 			dirtyConfigs = true
 		}
@@ -1510,13 +1532,40 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	return lb, nil
 }
 
+func (az *Cloud) getFrontendZones(
+	fipConfig *network.FrontendIPConfiguration,
+	previousZone *[]string,
+	isFipChanged bool,
+	serviceName, defaultLBFrontendIPConfigName string) error {
+	if !isFipChanged { // fetch zone information from API for new frontends
+		// only add zone information for new internal frontend IP configurations for standard load balancer not deployed to an edge zone.
+		location := az.Location
+		zones, err := az.getRegionZonesBackoff(location)
+		if err != nil {
+			return err
+		}
+		if az.useStandardLoadBalancer() && len(zones) > 0 {
+			fipConfig.Zones = &zones
+		}
+	} else {
+		if previousZone == nil { // keep the existing zone information for existing frontends
+			klog.V(2).Infof("getFrontendZones for service (%s): lb frontendconfig(%s): setting zone to nil", serviceName, defaultLBFrontendIPConfigName)
+		} else {
+			zoneStr := strings.Join(*previousZone, ",")
+			klog.V(2).Infof("getFrontendZones for service (%s): lb frontendconfig(%s): setting zone to %s", serviceName, defaultLBFrontendIPConfigName, zoneStr)
+		}
+		fipConfig.Zones = previousZone
+	}
+	return nil
+}
+
 // checkLoadBalancerResourcesConflicted checks if the service is consuming
 // ports which are conflicted with the existing loadBalancer resources,
 // including inbound NAT rule, inbound NAT pools and loadBalancing rules
 func (az *Cloud) checkLoadBalancerResourcesConflicted(
-		lb *network.LoadBalancer,
-		frontendIPConfigID string,
-		service *v1.Service,
+	lb *network.LoadBalancer,
+	frontendIPConfigID string,
+	service *v1.Service,
 ) error {
 	if service.Spec.Ports == nil {
 		return nil
@@ -1527,19 +1576,19 @@ func (az *Cloud) checkLoadBalancerResourcesConflicted(
 		if lb.LoadBalancingRules != nil {
 			for _, rule := range *lb.LoadBalancingRules {
 				if rule.LoadBalancingRulePropertiesFormat != nil &&
-						rule.FrontendIPConfiguration != nil &&
-						rule.FrontendIPConfiguration.ID != nil &&
-						strings.EqualFold(*rule.FrontendIPConfiguration.ID, frontendIPConfigID) &&
-						strings.EqualFold(string(rule.Protocol), string(port.Protocol)) &&
-						rule.FrontendPort != nil &&
-						*rule.FrontendPort == port.Port {
+					rule.FrontendIPConfiguration != nil &&
+					rule.FrontendIPConfiguration.ID != nil &&
+					strings.EqualFold(*rule.FrontendIPConfiguration.ID, frontendIPConfigID) &&
+					strings.EqualFold(string(rule.Protocol), string(port.Protocol)) &&
+					rule.FrontendPort != nil &&
+					*rule.FrontendPort == port.Port {
 					// ignore self-owned rules for unit test
 					if rule.Name != nil && az.serviceOwnsRule(service, *rule.Name) {
 						continue
 					}
 					return fmt.Errorf("checkLoadBalancerResourcesConflicted: service port %s is trying to "+
-							"consume the port %d which is being referenced by an existing loadBalancing rule %s with "+
-							"the same protocol %s and frontend IP config with ID %s",
+						"consume the port %d which is being referenced by an existing loadBalancing rule %s with "+
+						"the same protocol %s and frontend IP config with ID %s",
 						port.Name,
 						*rule.FrontendPort,
 						*rule.Name,
@@ -1552,15 +1601,15 @@ func (az *Cloud) checkLoadBalancerResourcesConflicted(
 		if lb.InboundNatRules != nil {
 			for _, inboundNatRule := range *lb.InboundNatRules {
 				if inboundNatRule.InboundNatRulePropertiesFormat != nil &&
-						inboundNatRule.FrontendIPConfiguration != nil &&
-						inboundNatRule.FrontendIPConfiguration.ID != nil &&
-						strings.EqualFold(*inboundNatRule.FrontendIPConfiguration.ID, frontendIPConfigID) &&
-						strings.EqualFold(string(inboundNatRule.Protocol), string(port.Protocol)) &&
-						inboundNatRule.FrontendPort != nil &&
-						*inboundNatRule.FrontendPort == port.Port {
+					inboundNatRule.FrontendIPConfiguration != nil &&
+					inboundNatRule.FrontendIPConfiguration.ID != nil &&
+					strings.EqualFold(*inboundNatRule.FrontendIPConfiguration.ID, frontendIPConfigID) &&
+					strings.EqualFold(string(inboundNatRule.Protocol), string(port.Protocol)) &&
+					inboundNatRule.FrontendPort != nil &&
+					*inboundNatRule.FrontendPort == port.Port {
 					return fmt.Errorf("checkLoadBalancerResourcesConflicted: service port %s is trying to "+
-							"consume the port %d which is being referenced by an existing inbound NAT rule %s with "+
-							"the same protocol %s and frontend IP config with ID %s",
+						"consume the port %d which is being referenced by an existing inbound NAT rule %s with "+
+						"the same protocol %s and frontend IP config with ID %s",
 						port.Name,
 						*inboundNatRule.FrontendPort,
 						*inboundNatRule.Name,
@@ -1573,17 +1622,17 @@ func (az *Cloud) checkLoadBalancerResourcesConflicted(
 		if lb.InboundNatPools != nil {
 			for _, pool := range *lb.InboundNatPools {
 				if pool.InboundNatPoolPropertiesFormat != nil &&
-						pool.FrontendIPConfiguration != nil &&
-						pool.FrontendIPConfiguration.ID != nil &&
-						strings.EqualFold(*pool.FrontendIPConfiguration.ID, frontendIPConfigID) &&
-						strings.EqualFold(string(pool.Protocol), string(port.Protocol)) &&
-						pool.FrontendPortRangeStart != nil &&
-						pool.FrontendPortRangeEnd != nil &&
-						*pool.FrontendPortRangeStart <= port.Port &&
-						*pool.FrontendPortRangeEnd >= port.Port {
+					pool.FrontendIPConfiguration != nil &&
+					pool.FrontendIPConfiguration.ID != nil &&
+					strings.EqualFold(*pool.FrontendIPConfiguration.ID, frontendIPConfigID) &&
+					strings.EqualFold(string(pool.Protocol), string(port.Protocol)) &&
+					pool.FrontendPortRangeStart != nil &&
+					pool.FrontendPortRangeEnd != nil &&
+					*pool.FrontendPortRangeStart <= port.Port &&
+					*pool.FrontendPortRangeEnd >= port.Port {
 					return fmt.Errorf("checkLoadBalancerResourcesConflicted: service port %s is trying to "+
-							"consume the port %d which is being in the range (%d-%d) of an existing "+
-							"inbound NAT pool %s with the same protocol %s and frontend IP config with ID %s",
+						"consume the port %d which is being in the range (%d-%d) of an existing "+
+						"inbound NAT pool %s with the same protocol %s and frontend IP config with ID %s",
 						port.Name,
 						port.Port,
 						*pool.FrontendPortRangeStart,
@@ -1608,7 +1657,7 @@ func parseHealthProbeProtocolAndPath(service *v1.Service) (string, string) {
 	}
 	// ignore the request path if using TCP
 	if strings.EqualFold(protocol, string(network.ProbeProtocolHTTP)) ||
-			strings.EqualFold(protocol, string(network.ProbeProtocolHTTPS)) {
+		strings.EqualFold(protocol, string(network.ProbeProtocolHTTPS)) {
 		if v, ok := service.Annotations[ServiceAnnotationLoadBalancerHealthProbeRequestPath]; ok {
 			path = v
 		}
@@ -1617,12 +1666,12 @@ func parseHealthProbeProtocolAndPath(service *v1.Service) (string, string) {
 }
 
 func (az *Cloud) reconcileLoadBalancerRule(
-		service *v1.Service,
-		wantLb bool,
-		lbFrontendIPConfigID string,
-		lbBackendPoolID string,
-		lbName string,
-		lbIdleTimeout *int32) ([]network.Probe, []network.LoadBalancingRule, error) {
+	service *v1.Service,
+	wantLb bool,
+	lbFrontendIPConfigID string,
+	lbBackendPoolID string,
+	lbName string,
+	lbIdleTimeout *int32) ([]network.Probe, []network.LoadBalancingRule, error) {
 
 	var ports []v1.ServicePort
 	if wantLb {
@@ -1732,8 +1781,8 @@ func (az *Cloud) reconcileLoadBalancerRule(
 		}
 
 		if requiresInternalLoadBalancer(service) &&
-				strings.EqualFold(az.LoadBalancerSku, loadBalancerSkuStandard) &&
-				strings.EqualFold(service.Annotations[ServiceAnnotationLoadBalancerEnableHighAvailabilityPorts], "true") {
+			strings.EqualFold(az.LoadBalancerSku, loadBalancerSkuStandard) &&
+			strings.EqualFold(service.Annotations[ServiceAnnotationLoadBalancerEnableHighAvailabilityPorts], "true") {
 			expectedRule.FrontendPort = to.Int32Ptr(0)
 			expectedRule.BackendPort = to.Int32Ptr(0)
 			expectedRule.Protocol = network.TransportProtocolAll
@@ -2141,12 +2190,12 @@ func shouldReleaseExistingOwnedPublicIP(existingPip *network.PublicIPAddress, lb
 	// Release the ip under the following criteria -
 	// #1 - If we don't actually want a load balancer,
 	return !lbShouldExist ||
-			// #2 - If the load balancer is internal, and thus doesn't require public exposure
-			lbIsInternal ||
-			// #3 - If the name of this public ip does not match the desired name,
-			(pipName != desiredPipName) ||
-			// #4 If the service annotations have specified the ip tags that the public ip must have, but they do not match the ip tags of the existing instance
-			(ipTagRequest.IPTagsRequestedByAnnotation && !areIPTagsEquivalent(currentIPTags, ipTagRequest.IPTags))
+		// #2 - If the load balancer is internal, and thus doesn't require public exposure
+		lbIsInternal ||
+		// #3 - If the name of this public ip does not match the desired name,
+		(pipName != desiredPipName) ||
+		// #4 If the service annotations have specified the ip tags that the public ip must have, but they do not match the ip tags of the existing instance
+		(ipTagRequest.IPTagsRequestedByAnnotation && !areIPTagsEquivalent(currentIPTags, ipTagRequest.IPTags))
 }
 
 //  ensurePIPTagged ensures the public IP of the service is tagged as configured
@@ -2317,9 +2366,9 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 func (az *Cloud) safeDeletePublicIP(service *v1.Service, pipResourceGroup string, pip *network.PublicIPAddress, lb *network.LoadBalancer) error {
 	// Remove references if pip.IPConfiguration is not nil.
 	if pip.PublicIPAddressPropertiesFormat != nil &&
-			pip.PublicIPAddressPropertiesFormat.IPConfiguration != nil &&
-			lb != nil && lb.LoadBalancerPropertiesFormat != nil &&
-			lb.LoadBalancerPropertiesFormat.FrontendIPConfigurations != nil {
+		pip.PublicIPAddressPropertiesFormat.IPConfiguration != nil &&
+		lb != nil && lb.LoadBalancerPropertiesFormat != nil &&
+		lb.LoadBalancerPropertiesFormat.FrontendIPConfigurations != nil {
 		referencedLBRules := []network.SubResource{}
 		frontendIPConfigUpdated := false
 		loadBalancerRuleUpdated := false
@@ -2332,7 +2381,7 @@ func (az *Cloud) safeDeletePublicIP(service *v1.Service, pipResourceGroup string
 				config := lbFrontendIPConfigs[i]
 				if strings.EqualFold(ipConfigurationID, to.String(config.ID)) {
 					if config.FrontendIPConfigurationPropertiesFormat != nil &&
-							config.FrontendIPConfigurationPropertiesFormat.LoadBalancingRules != nil {
+						config.FrontendIPConfigurationPropertiesFormat.LoadBalancingRules != nil {
 						referencedLBRules = *config.FrontendIPConfigurationPropertiesFormat.LoadBalancingRules
 					}
 
@@ -2403,7 +2452,7 @@ func findProbe(probes []network.Probe, probe network.Probe) bool {
 func findRule(rules []network.LoadBalancingRule, rule network.LoadBalancingRule, wantLB bool) bool {
 	for _, existingRule := range rules {
 		if strings.EqualFold(to.String(existingRule.Name), to.String(rule.Name)) &&
-				equalLoadBalancingRulePropertiesFormat(existingRule.LoadBalancingRulePropertiesFormat, rule.LoadBalancingRulePropertiesFormat, wantLB) {
+			equalLoadBalancingRulePropertiesFormat(existingRule.LoadBalancingRulePropertiesFormat, rule.LoadBalancingRulePropertiesFormat, wantLB) {
 			return true
 		}
 	}
@@ -2418,14 +2467,14 @@ func equalLoadBalancingRulePropertiesFormat(s *network.LoadBalancingRuleProperti
 	}
 
 	properties := reflect.DeepEqual(s.Protocol, t.Protocol) &&
-			reflect.DeepEqual(s.FrontendIPConfiguration, t.FrontendIPConfiguration) &&
-			reflect.DeepEqual(s.BackendAddressPool, t.BackendAddressPool) &&
-			reflect.DeepEqual(s.LoadDistribution, t.LoadDistribution) &&
-			reflect.DeepEqual(s.FrontendPort, t.FrontendPort) &&
-			reflect.DeepEqual(s.BackendPort, t.BackendPort) &&
-			reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP) &&
-			reflect.DeepEqual(to.Bool(s.EnableTCPReset), to.Bool(t.EnableTCPReset)) &&
-			reflect.DeepEqual(to.Bool(s.DisableOutboundSnat), to.Bool(t.DisableOutboundSnat))
+		reflect.DeepEqual(s.FrontendIPConfiguration, t.FrontendIPConfiguration) &&
+		reflect.DeepEqual(s.BackendAddressPool, t.BackendAddressPool) &&
+		reflect.DeepEqual(s.LoadDistribution, t.LoadDistribution) &&
+		reflect.DeepEqual(s.FrontendPort, t.FrontendPort) &&
+		reflect.DeepEqual(s.BackendPort, t.BackendPort) &&
+		reflect.DeepEqual(s.EnableFloatingIP, t.EnableFloatingIP) &&
+		reflect.DeepEqual(to.Bool(s.EnableTCPReset), to.Bool(t.EnableTCPReset)) &&
+		reflect.DeepEqual(to.Bool(s.DisableOutboundSnat), to.Bool(t.DisableOutboundSnat))
 
 	if wantLB && s.IdleTimeoutInMinutes != nil && t.IdleTimeoutInMinutes != nil {
 		return properties && reflect.DeepEqual(s.IdleTimeoutInMinutes, t.IdleTimeoutInMinutes)

@@ -93,6 +93,7 @@ func GetTestCloud(ctrl *gomock.Controller) (az *Cloud) {
 	common := &controllerCommon{cloud: az, resourceGroup: "rg", location: "westus"}
 	az.controllerCommon = common
 	az.ManagedDiskController = &ManagedDiskController{common: common}
+	az.regionZonesMap = map[string][]string{az.Location: {"1", "2", "3"}}
 
 	return az
 }

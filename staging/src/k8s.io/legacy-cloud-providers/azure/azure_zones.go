@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -21,14 +22,21 @@ package azure
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 	azcache "k8s.io/legacy-cloud-providers/azure/cache"
+)
+
+const (
+	// ZoneFetchingInterval defines the interval of performing zoneClient.GetZones
+	ZoneFetchingInterval = 30 * time.Minute
 )
 
 // makeZone returns the zone value in format of <region>-<zone-id>.
@@ -127,4 +135,66 @@ func (az *Cloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName)
 	}
 
 	return az.VMSet.GetZoneByNodeName(string(nodeName))
+}
+
+func (az *Cloud) refreshZones(refreshFunc func()) {
+	ticker := time.NewTicker(ZoneFetchingInterval)
+	defer ticker.Stop()
+
+	az.regionZonesMap = make(map[string][]string)
+	refreshFunc()
+	for ; true; <-ticker.C {
+		refreshFunc()
+	}
+}
+
+func (az *Cloud) syncRegionZonesMap() {
+	klog.V(4).Infof("refreshZones: starting to fetch all available zones for the subscription %s", az.SubscriptionID)
+	zones, rerr := az.ZoneClient.GetZones(context.Background(), az.SubscriptionID)
+	if len(zones) == 0 || rerr != nil {
+		klog.Warningf("refreshZones: error when get zones, will retry after %s", ZoneFetchingInterval.String())
+		return
+	}
+
+	az.updateRegionZonesMap(zones)
+}
+
+func (az *Cloud) updateRegionZonesMap(zones map[string][]string) {
+	az.refreshZonesLock.Lock()
+	defer az.refreshZonesLock.Unlock()
+
+	for region, z := range zones {
+		az.regionZonesMap[region] = z
+	}
+}
+
+func (az *Cloud) getRegionZonesBackoff(region string) ([]string, error) {
+	if len(az.regionZonesMap) != 0 {
+		az.refreshZonesLock.RLock()
+		defer az.refreshZonesLock.RUnlock()
+
+		return az.regionZonesMap[region], nil
+	}
+
+	klog.V(2).Infof("getRegionZonesMapWrapper: the region-zones map is not initialized successfully, retrying immediately")
+
+	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (done bool, err error) {
+		zones, rerr := az.ZoneClient.GetZones(context.Background(), az.SubscriptionID)
+		if len(zones) == 0 || rerr != nil {
+			klog.Warningf("getRegionZonesMapWrapper: failed to fetch zones information: %v", rerr.Error())
+			return false, nil
+		}
+
+		az.updateRegionZonesMap(zones)
+		return true, nil
+	})
+
+	if err != nil {
+		return []string{}, fmt.Errorf("cannot get zones information of %s after %d time retry", region, az.RequestBackoff().Steps)
+	}
+
+	az.refreshZonesLock.RLock()
+	defer az.refreshZonesLock.RUnlock()
+
+	return az.regionZonesMap[region], nil
 }

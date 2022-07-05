@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -60,6 +61,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/vmsizeclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/zoneclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 
 	// ensure the newly added package from azure-sdk-for-go is in vendor/
@@ -265,6 +267,7 @@ type Cloud struct {
 	VirtualMachineScaleSetsClient   vmssclient.Interface
 	VirtualMachineScaleSetVMsClient vmssvmclient.Interface
 	VirtualMachineSizesClient       vmsizeclient.Interface
+	ZoneClient                      zoneclient.Interface
 
 	ResourceRequestBackoff wait.Backoff
 	metadata               *InstanceMetadataService
@@ -292,6 +295,9 @@ type Cloud struct {
 	routeCIDRsLock sync.Mutex
 	// routeCIDRs holds cache for route CIDRs.
 	routeCIDRs map[string]string
+
+	regionZonesMap   map[string][]string
+	refreshZonesLock sync.RWMutex
 
 	KubeClient       clientset.Interface
 	eventBroadcaster record.EventBroadcaster
@@ -553,6 +559,8 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 	az.routeUpdater = newDelayedRouteUpdater(az, routeUpdateInterval)
 	go az.routeUpdater.run()
 
+	go az.refreshZones(az.syncRegionZonesMap)
+
 	return nil
 }
 
@@ -582,6 +590,7 @@ func (az *Cloud) configAzureClients(
 	publicIPClientConfig := azClientConfig.WithRateLimiter(az.Config.PublicIPAddressRateLimit)
 	// TODO(ZeroMagic): add azurefileRateLimit
 	fileClientConfig := azClientConfig.WithRateLimiter(nil)
+	zoneClientConfig := azClientConfig.WithRateLimiter(nil)
 
 	// If uses network resources in different AAD Tenant, update Authorizer for VM/VMSS client config
 	if multiTenantServicePrincipalToken != nil {
@@ -625,6 +634,7 @@ func (az *Cloud) configAzureClients(
 	az.SecurityGroupsClient = securitygroupclient.New(securityGroupClientConfig)
 	az.PublicIPAddressesClient = publicipclient.New(publicIPClientConfig)
 	az.FileClient = fileclient.New(fileClientConfig)
+	az.ZoneClient = zoneclient.New(zoneClientConfig)
 }
 
 func (az *Cloud) getAzureClientConfig(servicePrincipalToken *adal.ServicePrincipalToken) *azclients.ClientConfig {
