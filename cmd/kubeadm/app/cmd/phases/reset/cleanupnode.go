@@ -18,6 +18,7 @@ package phases
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -201,4 +202,17 @@ func CleanDir(filePath string) error {
 		}
 	}
 	return nil
+}
+
+func IsDirEmpty(dir string) (bool, error) {
+	d, err := os.Open(dir)
+	if err != nil {
+		return false, err
+	}
+	defer d.Close()
+	_, err = d.Readdirnames(1)
+	if err == io.EOF {
+		return true, nil
+	}
+	return false, nil
 }
