@@ -333,7 +333,7 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs *framework.CycleState, 
 		return framework.AsStatus(fmt.Errorf("no pod volumes found for node %q", nodeName))
 	}
 	klog.V(5).InfoS("Trying to bind volumes for pod", "pod", klog.KObj(pod))
-	err = pl.Binder.BindPodVolumes(pod, podVolumes)
+	err = pl.Binder.BindPodVolumes(ctx, pod, podVolumes)
 	if err != nil {
 		klog.V(1).InfoS("Failed to bind volumes for pod", "pod", klog.KObj(pod), "err", err)
 		return framework.AsStatus(err)

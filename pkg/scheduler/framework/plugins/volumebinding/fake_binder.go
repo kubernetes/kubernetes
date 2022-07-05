@@ -16,7 +16,11 @@ limitations under the License.
 
 package volumebinding
 
-import v1 "k8s.io/api/core/v1"
+import (
+	"context"
+
+	v1 "k8s.io/api/core/v1"
+)
 
 // FakeVolumeBinderConfig holds configurations for fake volume binder.
 type FakeVolumeBinderConfig struct {
@@ -62,7 +66,7 @@ func (b *FakeVolumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string,
 func (b *FakeVolumeBinder) RevertAssumedPodVolumes(_ *PodVolumes) {}
 
 // BindPodVolumes implements SchedulerVolumeBinder.BindPodVolumes.
-func (b *FakeVolumeBinder) BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes) error {
+func (b *FakeVolumeBinder) BindPodVolumes(ctx context.Context, assumedPod *v1.Pod, podVolumes *PodVolumes) error {
 	b.BindCalled = true
 	return b.config.BindErr
 }
