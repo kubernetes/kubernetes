@@ -56,14 +56,19 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, cfg)
 	if err == nil {
-		r.AddDirsToClean(etcdDataDir)
 		if cfg != nil {
 			if !r.DryRun() {
-				if err := etcdphase.RemoveStackedEtcdMemberFromCluster(r.Client(), cfg); err != nil {
+				err := etcdphase.RemoveStackedEtcdMemberFromCluster(r.Client(), cfg)
+				if err != nil {
 					klog.Warningf("[reset] Failed to remove etcd member: %v, please manually remove this etcd member using etcdctl", err)
+				} else {
+					if err := CleanDir(etcdDataDir); err != nil {
+						klog.Warningf("[reset] Failed to delete contents of %q directory: %v", etcdDataDir, err)
+					}
 				}
 			} else {
 				fmt.Println("[reset] Would remove the etcd member on this node from the etcd cluster")
+				fmt.Printf("[reset] Would delete contents of the etcd data directory: %v\n", etcdDataDir)
 			}
 		}
 	} else {

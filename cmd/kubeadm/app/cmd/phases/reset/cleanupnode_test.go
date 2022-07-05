@@ -173,7 +173,11 @@ func TestConfigDirCleaner(t *testing.T) {
 			if test.resetDir == "" {
 				test.resetDir = "pki"
 			}
-			resetConfigDir(tmpDir, filepath.Join(tmpDir, test.resetDir), false)
+			dirsToClean := []string{
+				filepath.Join(tmpDir, test.resetDir),
+				filepath.Join(tmpDir, kubeadmconstants.ManifestsSubDirName),
+			}
+			resetConfigDir(tmpDir, dirsToClean, false)
 
 			// Verify the files we cleanup implicitly in every test:
 			assertExists(t, tmpDir)
