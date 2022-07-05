@@ -24,10 +24,7 @@ package main
 import (
 	"os"
 
-	"github.com/spf13/cobra"
-
 	"k8s.io/component-base/cli"
-	cliflag "k8s.io/component-base/cli/flag"
 	_ "k8s.io/component-base/logs/json/register" // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/restclient"
 	_ "k8s.io/component-base/metrics/prometheus/version" // for version metric registration
@@ -36,16 +33,6 @@ import (
 
 func main() {
 	command := app.NewKubeletCommand()
-
-	// kubelet uses a config file and does its own special
-	// parsing of flags and that config file. It initializes
-	// logging after it is done with that. Therefore it does
-	// not use cli.Run like other, simpler commands.
-	code := run(command)
+	code := cli.Run(command)
 	os.Exit(code)
-}
-
-func run(command *cobra.Command) int {
-	command.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
-	return cli.Run(command)
 }
