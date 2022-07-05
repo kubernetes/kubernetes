@@ -77,6 +77,7 @@ type cacheImpl struct {
 type podState struct {
 	pod *v1.Pod
 	// Used by assumedPod to determinate expiration.
+	// If deadline is nil, assumedPod will never expire.
 	deadline *time.Time
 	// Used to block cache from expiring assumedPod if binding still runs
 	bindingFinished bool
@@ -401,9 +402,13 @@ func (cache *cacheImpl) finishBinding(pod *v1.Pod, now time.Time) error {
 	klog.V(5).InfoS("Finished binding for pod, can be expired", "pod", klog.KObj(pod))
 	currState, ok := cache.podStates[key]
 	if ok && cache.assumedPods.Has(key) {
-		dl := now.Add(cache.ttl)
+		if cache.ttl == time.Duration(0) {
+			currState.deadline = nil
+		} else {
+			dl := now.Add(cache.ttl)
+			currState.deadline = &dl
+		}
 		currState.bindingFinished = true
-		currState.deadline = &dl
 	}
 	return nil
 }

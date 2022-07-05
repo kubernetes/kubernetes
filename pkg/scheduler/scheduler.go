@@ -53,7 +53,7 @@ import (
 const (
 	// Duration the scheduler will wait before expiring an assumed pod.
 	// See issue #106361 for more details about this parameter and its value.
-	durationToExpireAssumedPod = 0 * time.Minute
+	durationToExpireAssumedPod time.Duration = 0
 )
 
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
