@@ -752,6 +752,12 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 		}
 		ctrl.classLister = storagelisters.NewStorageClassLister(indexer)
 
+		pvIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+		for _, pv := range test.initialVolumes {
+			pvIndexer.Add(pv)
+		}
+		ctrl.volumeLister = corelisters.NewPersistentVolumeLister(pvIndexer)
+
 		podIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 		for _, pod := range pods {
 			podIndexer.Add(pod)
@@ -813,6 +819,12 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 			indexer.Add(class)
 		}
 		ctrl.classLister = storagelisters.NewStorageClassLister(indexer)
+
+		pvIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+		for _, pv := range test.initialVolumes {
+			pvIndexer.Add(pv)
+		}
+		ctrl.volumeLister = corelisters.NewPersistentVolumeLister(pvIndexer)
 
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
