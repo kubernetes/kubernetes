@@ -19,7 +19,6 @@ package upgrade
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -320,22 +319,4 @@ func getWaiter(dryRun bool, client clientset.Interface, timeout time.Duration) a
 		return dryrunutil.NewWaiter()
 	}
 	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
-}
-
-// InteractivelyConfirmUpgrade asks the user whether they _really_ want to upgrade.
-func InteractivelyConfirmUpgrade(question string) error {
-
-	fmt.Printf("[upgrade/confirm] %s [y/N]: ", question)
-
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Scan()
-	if err := scanner.Err(); err != nil {
-		return errors.Wrap(err, "couldn't read from standard input")
-	}
-	answer := scanner.Text()
-	if strings.ToLower(answer) == "y" || strings.ToLower(answer) == "yes" {
-		return nil
-	}
-
-	return errors.New("won't proceed; the user didn't answer (Y|y) in order to continue")
 }
