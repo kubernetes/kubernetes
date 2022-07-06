@@ -79,12 +79,6 @@ func buildKubeletArgMapCommon(opts kubeletFlagsOpts) map[string]string {
 	// container runtime is by default docker in kubelet v1.23, so it can be removed in v1.26
 	kubeletFlags["container-runtime"] = "remote"
 
-	// This flag passes the pod infra container image (e.g. "pause" image) to the kubelet
-	// and prevents its garbage collection
-	if opts.pauseImage != "" {
-		kubeletFlags["pod-infra-container-image"] = opts.pauseImage
-	}
-
 	if opts.registerTaintsUsingFlags && opts.nodeRegOpts.Taints != nil && len(opts.nodeRegOpts.Taints) > 0 {
 		taintStrs := []string{}
 		for _, taint := range opts.nodeRegOpts.Taints {
