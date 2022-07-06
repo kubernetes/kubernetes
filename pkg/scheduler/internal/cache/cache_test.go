@@ -253,46 +253,75 @@ func TestExpirePod(t *testing.T) {
 		makeBasePod(t, nodeName, "test-3", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 	}
 	now := time.Now()
-	ttl := 10 * time.Second
+	defaultTTL := 10 * time.Second
 	tests := []struct {
+		name        string
 		pods        []*testExpirePodStruct
 		cleanupTime time.Time
-
-		wNodeInfo *framework.NodeInfo
-	}{{ // assumed pod would expires
-		pods: []*testExpirePodStruct{
-			{pod: testPods[0], finishBind: true, assumedTime: now},
-		},
-		cleanupTime: now.Add(2 * ttl),
-		wNodeInfo:   nil,
-	}, { // first one would expire, second and third would not.
-		pods: []*testExpirePodStruct{
-			{pod: testPods[0], finishBind: true, assumedTime: now},
-			{pod: testPods[1], finishBind: true, assumedTime: now.Add(3 * ttl / 2)},
-			{pod: testPods[2]},
-		},
-		cleanupTime: now.Add(2 * ttl),
-		wNodeInfo: newNodeInfo(
-			&framework.Resource{
-				MilliCPU: 400,
-				Memory:   2048,
+		ttl         time.Duration
+		wNodeInfo   *framework.NodeInfo
+	}{
+		{
+			name: "assumed pod would expire",
+			pods: []*testExpirePodStruct{
+				{pod: testPods[0], finishBind: true, assumedTime: now},
 			},
-			&framework.Resource{
-				MilliCPU: 400,
-				Memory:   2048,
+			cleanupTime: now.Add(2 * defaultTTL),
+			wNodeInfo:   nil,
+			ttl:         defaultTTL,
+		},
+		{
+			name: "first one would expire, second and third would not",
+			pods: []*testExpirePodStruct{
+				{pod: testPods[0], finishBind: true, assumedTime: now},
+				{pod: testPods[1], finishBind: true, assumedTime: now.Add(3 * defaultTTL / 2)},
+				{pod: testPods[2]},
 			},
-			// Order gets altered when removing pods.
-			[]*v1.Pod{testPods[2], testPods[1]},
-			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*framework.ImageStateSummary),
-		),
-	}}
+			cleanupTime: now.Add(2 * defaultTTL),
+			wNodeInfo: newNodeInfo(
+				&framework.Resource{
+					MilliCPU: 400,
+					Memory:   2048,
+				},
+				&framework.Resource{
+					MilliCPU: 400,
+					Memory:   2048,
+				},
+				// Order gets altered when removing pods.
+				[]*v1.Pod{testPods[2], testPods[1]},
+				newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
+				make(map[string]*framework.ImageStateSummary),
+			),
+			ttl: defaultTTL,
+		},
+		{
+			name: "assumed pod would never expire",
+			pods: []*testExpirePodStruct{
+				{pod: testPods[0], finishBind: true, assumedTime: now},
+			},
+			cleanupTime: now.Add(3 * defaultTTL),
+			wNodeInfo: newNodeInfo(
+				&framework.Resource{
+					MilliCPU: 100,
+					Memory:   500,
+				},
+				&framework.Resource{
+					MilliCPU: 100,
+					Memory:   500,
+				},
+				[]*v1.Pod{testPods[0]},
+				newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
+				make(map[string]*framework.ImageStateSummary),
+			),
+			ttl: time.Duration(0),
+		},
+	}
 
-	for i, tt := range tests {
-		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newCache(ttl, time.Second, nil)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cache := newCache(tc.ttl, time.Second, nil)
 
-			for _, pod := range tt.pods {
+			for _, pod := range tc.pods {
 				if err := cache.AssumePod(pod.pod); err != nil {
 					t.Fatal(err)
 				}
@@ -305,9 +334,9 @@ func TestExpirePod(t *testing.T) {
 			}
 			// pods that got bound and have assumedTime + ttl < cleanupTime will get
 			// expired and removed
-			cache.cleanupAssumedPods(tt.cleanupTime)
+			cache.cleanupAssumedPods(tc.cleanupTime)
 			n := cache.nodes[nodeName]
-			if err := deepEqualWithoutGeneration(n, tt.wNodeInfo); err != nil {
+			if err := deepEqualWithoutGeneration(n, tc.wNodeInfo); err != nil {
 				t.Error(err)
 			}
 		})
