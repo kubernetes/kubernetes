@@ -764,10 +764,10 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 			w.Write(LEVEL_0, "Priority:\t%d\n", *pod.Spec.Priority)
 		}
 		if len(pod.Spec.PriorityClassName) > 0 {
-			w.Write(LEVEL_0, "Priority Class Name:\t%s\n", stringOrNone(pod.Spec.PriorityClassName))
+			w.Write(LEVEL_0, "Priority Class Name:\t%s\n", pod.Spec.PriorityClassName)
 		}
 		if pod.Spec.RuntimeClassName != nil && len(*pod.Spec.RuntimeClassName) > 0 {
-			w.Write(LEVEL_0, "Runtime Class Name:\t%s\n", stringOrNone(*pod.Spec.RuntimeClassName))
+			w.Write(LEVEL_0, "Runtime Class Name:\t%s\n", *pod.Spec.RuntimeClassName)
 		}
 		if pod.Spec.NodeName == "" {
 			w.Write(LEVEL_0, "Node:\t<none>\n")
