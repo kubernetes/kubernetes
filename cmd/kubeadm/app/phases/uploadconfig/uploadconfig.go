@@ -47,6 +47,11 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	clusterConfigurationToUpload := cfg.ClusterConfiguration.DeepCopy()
 	clusterConfigurationToUpload.ComponentConfigs = kubeadmapi.ComponentConfigMap{}
 
+	// restore the resolved Kubernetes version as CI Kubernetes version if needed
+	if len(clusterConfigurationToUpload.CIKubernetesVersion) > 0 {
+		clusterConfigurationToUpload.KubernetesVersion = clusterConfigurationToUpload.CIKubernetesVersion
+	}
+
 	// Marshal the ClusterConfiguration into YAML
 	clusterConfigurationYaml, err := configutil.MarshalKubeadmConfigObject(clusterConfigurationToUpload)
 	if err != nil {
