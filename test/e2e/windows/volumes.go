@@ -17,9 +17,13 @@ limitations under the License.
 package windows
 
 import (
+	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -27,6 +31,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	semver "github.com/blang/semver/v4"
 	"github.com/onsi/ginkgo"
 )
 
@@ -38,7 +43,8 @@ const (
 )
 
 var (
-	image = imageutils.GetE2EImage(imageutils.Pause)
+	image           = imageutils.GetE2EImage(imageutils.Pause)
+	powershellImage = imageutils.GetE2EImage(imageutils.BusyBox)
 )
 
 var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
@@ -81,9 +87,11 @@ var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
 			ginkgo.By("creating two containers, one with readOnly permissions the other with read-write permissions on hostMap volume")
 			doReadWriteReadOnlyTest(f, hostMapSource, hostMapPath)
 		})
-
 	})
 
+	ginkgo.It("validate rootfs size can be set larger than 20Gb", func() {
+		doSetRootFSSizeTest(f)
+	})
 })
 
 func doReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath string) {
@@ -187,4 +195,95 @@ func testPodWithROVolume(podName string, source v1.VolumeSource, path string) *v
 			},
 		},
 	}
+}
+
+func getNodeContainerRuntimeAndVersion(n v1.Node) (string, semver.Version, error) {
+	containerRuntimeVersionString := n.Status.NodeInfo.DeepCopy().ContainerRuntimeVersion
+	parts := strings.Split(containerRuntimeVersionString, "://")
+
+	if len(parts) != 2 {
+		return "", semver.Version{}, fmt.Errorf("Could not get container runtime and version from '%s'", containerRuntimeVersionString)
+	}
+
+	v, err := semver.ParseTolerant(parts[1])
+	if err != nil {
+		return "", semver.Version{}, err
+	}
+
+	return parts[0], v, nil
+}
+
+func newRootFSSizeTestPod(nodeName, podName string) *v1.Pod {
+	return &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "rootfs-size-test",
+					Image: powershellImage,
+					Command: []string{
+						"powershell.exe",
+						"-Command",
+						"if (-not ((Get-PsDrive -Name C).Free -gt 21474836480)) { exit 1 } else { exit 0 }",
+					},
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceEphemeralStorage: resource.MustParse("30Gi"),
+						},
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			NodeName:      nodeName,
+		},
+	}
+}
+
+// The default size of the volume rootfs volume for Windows containers is 20Gb.
+// In containerd v1.7+ this value can be specified via tha CRI fields added with
+// https://github.com/kubernetes/kubernetes/pull/108894.
+// this test validates this behavior.
+func doSetRootFSSizeTest(f *framework.Framework) {
+	ginkgo.Describe("verify container rootfs volume size can be specified", func() {
+		ginkgo.By("Selecting a Windows node")
+		targetNode, err := findWindowsNode(f)
+		framework.ExpectNoError(err, "Error finding Windows node")
+		framework.Logf("Using node: %v", targetNode.Name)
+
+		ginkgo.By("Ensuring node is running containerd v1.7+")
+		r, v, err := getNodeContainerRuntimeAndVersion(targetNode)
+		framework.ExpectNoError(err, "Error getting node container runtime and version")
+		framework.Logf("Got runtime: %s, version %v", r, v)
+
+		if !strings.EqualFold(r, "containerd") {
+			e2eskipper.Skipf("container runtime is not containerd")
+		}
+
+		v1dot7 := semver.MustParse("1.7.0")
+		if v.LT(v1dot7) {
+			e2eskipper.Skipf("container runtime version less than v1.7")
+		}
+
+		ginkgo.By("Scheudling a pod with a 30Gi empheral-storage limit")
+		podName := "rootfs-test-pod"
+		f.PodClient().Create(newRootFSSizeTestPod(targetNode.Name, podName))
+
+		ginkgo.By("Waiting for pod to run")
+		f.PodClient().WaitForFinish(podName, 3*time.Minute)
+
+		ginkgo.By("Then ensuring pod finished running successfully")
+		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
+			context.TODO(),
+			podName,
+			metav1.GetOptions{})
+
+		framework.ExpectNoError(err, "Error retrieving pod")
+		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+	})
 }
