@@ -325,10 +325,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 	// If there are aligned CPUs in numaAffinity, attempt to take those first.
 	result := cpuset.NewCPUSet()
 	if numaAffinity != nil {
-		alignedCPUs := cpuset.NewCPUSet()
-		for _, numaNodeID := range numaAffinity.GetBits() {
-			alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)))
-		}
+		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
 
 		numAlignedToAlloc := alignedCPUs.Size()
 		if numCPUs < numAlignedToAlloc {
@@ -571,10 +568,44 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 	// to the minAffinitySize. Only those with an equal number of bits set (and
 	// with a minimal set of numa nodes) will be considered preferred.
 	for i := range hints {
+		if p.options.AlignBySocket && p.isHintSocketAligned(hints[i].NUMANodeAffinity) {
+			hints[i].Preferred = true
+			continue
+		}
 		if hints[i].NUMANodeAffinity.Count() == minAffinitySize {
 			hints[i].Preferred = true
 		}
 	}
 
 	return hints
+}
+
+func (p *staticPolicy) isHintSocketAligned(hint bitmask.BitMask) bool {
+	numaNodes := hint.GetBits()
+	if p.topology.CPUDetails.SocketsInNUMANodes(numaNodes[:]...).Size() == 1 {
+		return true
+	}
+	return false
+}
+
+// getAlignedCPUs return set of aligned CPUs based on numa affinity mask and configured policy options.
+func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableCPUs cpuset.CPUSet) cpuset.CPUSet {
+	alignedCPUs := cpuset.NewCPUSet()
+	numaBits := numaAffinity.GetBits()
+	// If align-by-socket policy option is enabled, NUMA based hint is expanded to
+	// socket aligned hint. It will ensure that first socket aligned available CPUs are
+	// allocated before we try to find CPUs across socket to satisfy allocation request.
+	if p.options.AlignBySocket {
+		socketBits := p.topology.CPUDetails.SocketsInNUMANodes(numaBits...).ToSliceNoSort()
+		for _, socketID := range socketBits {
+			alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInSockets(socketID)))
+		}
+		return alignedCPUs
+	}
+
+	for _, numaNodeID := range numaBits {
+		alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)))
+	}
+
+	return alignedCPUs
 }

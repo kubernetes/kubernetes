@@ -28,11 +28,13 @@ import (
 const (
 	FullPCPUsOnlyOption            string = "full-pcpus-only"
 	DistributeCPUsAcrossNUMAOption string = "distribute-cpus-across-numa"
+	AlignBySocketOption            string = "align-by-socket"
 )
 
 var (
 	alphaOptions = sets.NewString(
 		DistributeCPUsAcrossNUMAOption,
+		AlignBySocketOption,
 	)
 	betaOptions = sets.NewString(
 		FullPCPUsOnlyOption,
@@ -69,6 +71,9 @@ type StaticPolicyOptions struct {
 	// Flag to evenly distribute CPUs across NUMA nodes in cases where more
 	// than one NUMA node is required to satisfy the allocation.
 	DistributeCPUsAcrossNUMA bool
+	// Flag to ensure CPU's are considered aligned at socket boundary rather than
+	// NUMA boundary
+	AlignBySocket bool
 }
 
 func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOptions, error) {
@@ -91,6 +96,12 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
 			}
 			opts.DistributeCPUsAcrossNUMA = optValue
+		case AlignBySocketOption:
+			optValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.AlignBySocket = optValue
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.
