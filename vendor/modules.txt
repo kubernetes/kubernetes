@@ -2538,6 +2538,7 @@ k8s.io/legacy-cloud-providers/azure/clients/vmssclient
 k8s.io/legacy-cloud-providers/azure/clients/vmssclient/mockvmssclient
 k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient
 k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/mockvmssvmclient
+k8s.io/legacy-cloud-providers/azure/clients/zoneclient
 k8s.io/legacy-cloud-providers/azure/metrics
 k8s.io/legacy-cloud-providers/azure/retry
 k8s.io/legacy-cloud-providers/gce
