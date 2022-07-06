@@ -398,6 +398,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindPort:    10001,
+			BindNetwork: "tcp",
 			BindAddress: netutils.ParseIPSloppy("192.168.4.21"),
 			ServerCert: apiserveroptions.GeneratableKeyCert{
 				CertDirectory: "/a/b/c",

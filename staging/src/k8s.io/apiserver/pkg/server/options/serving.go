@@ -111,6 +111,7 @@ func NewSecureServingOptions() *SecureServingOptions {
 	return &SecureServingOptions{
 		BindAddress: netutils.ParseIPSloppy("0.0.0.0"),
 		BindPort:    443,
+		BindNetwork: "tcp",
 		ServerCert: GeneratableKeyCert{
 			PairName:      "apiserver",
 			CertDirectory: "apiserver.local.config/certificates",
@@ -154,6 +155,10 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"The IP address on which to listen for the --secure-port port. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
 		"clients. If blank or an unspecified address (0.0.0.0 or ::), all interfaces will be used.")
+
+	fs.StringVar(&s.BindNetwork, "bind-network", s.BindNetwork, ""+
+		"The IP address bind to which type of network, defaults to \"tcp\", accepts \"tcp\","+
+		" \"tcp4\", and \"tcp6\".")
 
 	desc := "The port on which to serve HTTPS with authentication and authorization."
 	if s.Required {
