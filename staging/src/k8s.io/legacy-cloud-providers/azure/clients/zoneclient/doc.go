@@ -12,4 +12,4 @@ limitations under the License.
 */
 
 // Package zoneclient implements the client for ARM.
-package zoneclient // import "sigs.k8s.io/cloud-provider-azure/pkg/azureclients/zoneclient"
+package zoneclient // import "k8s.io/legacy-cloud-providers/azure/clients/zoneclient"
