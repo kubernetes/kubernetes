@@ -71,9 +71,6 @@ func (networkPolicyStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 
 	networkPolicy.Generation = 1
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyEndPort) {
-		dropNetworkPolicyEndPort(networkPolicy)
-	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -86,10 +83,6 @@ func (networkPolicyStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	if utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyStatus) || len(oldNetworkPolicy.Status.Conditions) > 0 {
 		// Update is not allowed to set status when the operation is not directed to status subresource
 		newNetworkPolicy.Status = oldNetworkPolicy.Status
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.NetworkPolicyEndPort) && !endPortInUse(oldNetworkPolicy) {
-		dropNetworkPolicyEndPort(newNetworkPolicy)
 	}
 
 	// Any changes to the spec increment the generation number, any changes to the
@@ -186,43 +179,4 @@ func (networkPolicyStatusStrategy) ValidateUpdate(ctx context.Context, obj, old 
 // WarningsOnUpdate returns warnings for the given update.
 func (networkPolicyStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
-}
-
-// Drops Network Policy EndPort fields if Feature Gate is also disabled.
-// This should be used in future Network Policy evolutions
-func dropNetworkPolicyEndPort(netPol *networking.NetworkPolicy) {
-	for idx, ingressSpec := range netPol.Spec.Ingress {
-		for idxPort, port := range ingressSpec.Ports {
-			if port.EndPort != nil {
-				netPol.Spec.Ingress[idx].Ports[idxPort].EndPort = nil
-			}
-		}
-	}
-
-	for idx, egressSpec := range netPol.Spec.Egress {
-		for idxPort, port := range egressSpec.Ports {
-			if port.EndPort != nil {
-				netPol.Spec.Egress[idx].Ports[idxPort].EndPort = nil
-			}
-		}
-	}
-}
-
-func endPortInUse(netPol *networking.NetworkPolicy) bool {
-	for _, ingressSpec := range netPol.Spec.Ingress {
-		for _, port := range ingressSpec.Ports {
-			if port.EndPort != nil {
-				return true
-			}
-		}
-	}
-
-	for _, egressSpec := range netPol.Spec.Egress {
-		for _, port := range egressSpec.Ports {
-			if port.EndPort != nil {
-				return true
-			}
-		}
-	}
-	return false
 }
