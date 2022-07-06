@@ -66,6 +66,8 @@ type patchSet struct {
 }
 
 // String() is used for unit-testing.
+func (ps *patchSet) String() string {
+	return fmt.Sprintf(
 		"{%q, %q, %#v}",
 		ps.targetName,
 		ps.patchType,
