@@ -94,7 +94,11 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.Cy
 		Interface:  pl,
 	}
 
-	return pe.Preempt(ctx, pod, m)
+	result, status := pe.Preempt(ctx, pod, m)
+	if msg := status.Message(); msg != "" {
+		return result, framework.NewStatus(status.Code(), "preemption: "+msg)
+	}
+	return result, status
 }
 
 // calculateNumCandidates returns the number of candidates the FindCandidates

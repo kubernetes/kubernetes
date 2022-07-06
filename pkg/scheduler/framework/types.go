@@ -249,7 +249,7 @@ func (f *FitError) Error() string {
 	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
 	postFilterMsg := f.Diagnosis.PostFilterMsg
 	if postFilterMsg != "" {
-		reasonMsg += " [PostFilter] " + postFilterMsg
+		reasonMsg += " " + postFilterMsg
 	}
 	return reasonMsg
 }
