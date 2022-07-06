@@ -161,7 +161,7 @@ func (s *Status) Message() string {
 	return strings.Join(s.Reasons(), ", ")
 }
 
-// WithError sets the given `err` to s.error,
+// WithError sets the given `err` to s.err,
 // and returns the given status object.
 func (s *Status) WithError(err error) *Status {
 	s.err = err
@@ -278,6 +278,11 @@ func (p PluginToStatus) Merge() *Status {
 	if len(p) == 0 {
 		return nil
 	}
+	if len(p) == 1 {
+		for _, s := range p {
+			return s
+		}
+	}
 
 	finalStatus := NewStatus(Success)
 	for _, s := range p {
@@ -290,7 +295,7 @@ func (p PluginToStatus) Merge() *Status {
 			finalStatus.failedPlugin = s.FailedPlugin()
 		}
 
-		for _, r := range s.reasons {
+		for _, r := range s.Reasons() {
 			finalStatus.AppendReason(r)
 		}
 	}

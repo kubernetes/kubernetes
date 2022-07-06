@@ -249,7 +249,7 @@ func (f *FitError) Error() string {
 	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
 	postFilterMsg := f.Diagnosis.PostFilterMsg
 	if postFilterMsg != "" {
-		reasonMsg += " " + postFilterMsg
+		reasonMsg += " [PostFilter] " + postFilterMsg
 	}
 	return reasonMsg
 }
@@ -319,9 +319,9 @@ func getPodAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm) {
 			terms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//if len(affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		// if len(affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
 		//	terms = append(terms, affinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-		//}
+		// }
 	}
 	return terms
 }
@@ -332,9 +332,9 @@ func getPodAntiAffinityTerms(affinity *v1.Affinity) (terms []v1.PodAffinityTerm)
 			terms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 		}
 		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
+		// if len(affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
 		//	terms = append(terms, affinity.PodAntiAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
-		//}
+		// }
 	}
 	return terms
 }
