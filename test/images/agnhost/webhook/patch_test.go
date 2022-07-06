@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatchv5 "github.com/evanphx/json-patch/v5"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -119,7 +119,7 @@ func TestPatches(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		patchObj, err := jsonpatch.DecodePatch([]byte(testcase.patch))
+		patchObj, err := jsonpatchv5.DecodePatch([]byte(testcase.patch))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +156,7 @@ func TestJSONPatchForUnstructured(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	patchObj, err := jsonpatch.DecodePatch([]byte(configMapPatch1))
+	patchObj, err := jsonpatchv5.DecodePatch([]byte(configMapPatch1))
 	if err != nil {
 		t.Fatal(err)
 	}

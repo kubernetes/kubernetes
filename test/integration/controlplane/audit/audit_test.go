@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatchv5 "github.com/evanphx/json-patch/v5"
 )
 
 const (
@@ -104,7 +104,7 @@ rules:
 	nonAdmissionWebhookNamespace       = "no-webhook-namespace"
 	watchTestTimeout             int64 = 1
 	watchOptions                       = metav1.ListOptions{TimeoutSeconds: &watchTestTimeout}
-	patch, _                           = json.Marshal(jsonpatch.Patch{})
+	patch, _                           = json.Marshal(jsonpatchv5.Patch{})
 	auditTestUser                      = "system:apiserver"
 	versions                           = map[string]schema.GroupVersion{
 		"audit.k8s.io/v1": auditv1.SchemeGroupVersion,

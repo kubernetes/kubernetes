@@ -26,7 +26,7 @@ import (
 	"net/http"
 	"testing"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatchv5 "github.com/evanphx/json-patch/v5"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -214,12 +214,12 @@ func fakeScaleClient(t *testing.T) (ScalesGetter, []schema.GroupResource) {
 			pt := types.PatchType(contentType)
 			switch pt {
 			case types.MergePatchType:
-				res, err = jsonpatch.MergePatch(originScale, body)
+				res, err = jsonpatchv5.MergePatch(originScale, body)
 				if err != nil {
 					return nil, err
 				}
 			case types.JSONPatchType:
-				patch, err := jsonpatch.DecodePatch(body)
+				patch, err := jsonpatchv5.DecodePatch(body)
 				if err != nil {
 					return nil, err
 				}

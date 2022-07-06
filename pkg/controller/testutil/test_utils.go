@@ -47,7 +47,7 @@ import (
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatchv5 "github.com/evanphx/json-patch/v5"
 )
 
 var (
@@ -312,7 +312,7 @@ func (m *FakeNodeHandler) Patch(_ context.Context, name string, pt types.PatchTy
 	var patchedObjJS []byte
 	switch pt {
 	case types.JSONPatchType:
-		patchObj, err := jsonpatch.DecodePatch(data)
+		patchObj, err := jsonpatchv5.DecodePatch(data)
 		if err != nil {
 			klog.Error(err.Error())
 			return nil, nil
@@ -322,7 +322,7 @@ func (m *FakeNodeHandler) Patch(_ context.Context, name string, pt types.PatchTy
 			return nil, nil
 		}
 	case types.MergePatchType:
-		if patchedObjJS, err = jsonpatch.MergePatch(originalObjJS, data); err != nil {
+		if patchedObjJS, err = jsonpatchv5.MergePatch(originalObjJS, data); err != nil {
 			klog.Error(err.Error())
 			return nil, nil
 		}

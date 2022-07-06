@@ -27,7 +27,7 @@ import (
 	"strings"
 	"sync"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatchv5 "github.com/evanphx/json-patch/v5"
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -66,8 +66,6 @@ type patchSet struct {
 }
 
 // String() is used for unit-testing.
-func (ps *patchSet) String() string {
-	return fmt.Sprintf(
 		"{%q, %q, %#v}",
 		ps.targetName,
 		ps.patchType,
@@ -186,15 +184,15 @@ func (pm *PatchManager) ApplyPatchesToTarget(patchTarget *PatchTarget) error {
 
 			// JSON patch.
 			case types.JSONPatchType:
-				var patchObj jsonpatch.Patch
-				patchObj, err = jsonpatch.DecodePatch(patchBytes)
+				var patchObj jsonpatchv5.Patch
+				patchObj, err = jsonpatchv5.DecodePatch(patchBytes)
 				if err == nil {
 					patchedData, err = patchObj.Apply(patchedData)
 				}
 
 			// Merge patch.
 			case types.MergePatchType:
-				patchedData, err = jsonpatch.MergePatch(patchedData, patchBytes)
+				patchedData, err = jsonpatchv5.MergePatch(patchedData, patchBytes)
 
 			// Strategic merge patch.
 			case types.StrategicMergePatchType:

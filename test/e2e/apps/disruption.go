@@ -19,11 +19,12 @@ package apps
 import (
 	"context"
 	"fmt"
-	"github.com/onsi/gomega"
 	"strings"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/onsi/gomega"
+
+	jsonpatchv5 "github.com/evanphx/json-patch/v5"
 	"github.com/onsi/ginkgo"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -185,7 +186,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			old.Status.DisruptedPods = make(map[string]metav1.Time)
 			newBytes, err := json.Marshal(old)
 			framework.ExpectNoError(err, "failed to marshal JSON for new data")
-			return jsonpatch.CreateMergePatch(oldBytes, newBytes)
+			return jsonpatchv5.CreateMergePatch(oldBytes, newBytes)
 		}, "status")
 		framework.ExpectEmpty(patched.Status.DisruptedPods, "Expecting the PodDisruptionBudget's be empty")
 	})
@@ -385,7 +386,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			old.Spec.MaxUnavailable = &maxUnavailable
 			newData, err := json.Marshal(old)
 			framework.ExpectNoError(err, "failed to marshal JSON for new data")
-			return jsonpatch.CreateMergePatch(oldData, newData)
+			return jsonpatchv5.CreateMergePatch(oldData, newData)
 		})
 
 		waitForPodsOrDie(cs, ns, 3)

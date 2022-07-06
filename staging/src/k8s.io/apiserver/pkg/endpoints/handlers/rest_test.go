@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatchv5 "github.com/evanphx/json-patch/v5"
 	fuzz "github.com/google/gofuzz"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -405,7 +405,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 					t.Errorf("%s: unexpected error: %v", tc.name, err)
 					continue
 				}
-				patch, err = jsonpatch.CreateMergePatch(originalObjJS, changedJS)
+				patch, err = jsonpatchv5.CreateMergePatch(originalObjJS, changedJS)
 				if err != nil {
 					t.Errorf("%s: unexpected error: %v", tc.name, err)
 					continue

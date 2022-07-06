@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatchv5 "github.com/evanphx/json-patch/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -102,7 +102,7 @@ func TestJSONPatchAnnotationValue(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			jsonPatch, err := jsonpatch.DecodePatch(tc.patch)
+			jsonPatch, err := jsonpatchv5.DecodePatch(tc.patch)
 			assert.NoError(t, err, "unexpected error decode patch")
 			actual, err := jsonPatchAnnotationValue(tc.config, tc.webhook, jsonPatch)
 			assert.NoError(t, err, "unexpected error getting json patch annotation")

@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/evanphx/json-patch"
+	jsonpatchv5 "github.com/evanphx/json-patch/v5"
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/yaml"
 )
@@ -687,7 +687,7 @@ func testPatchCreation(t *testing.T, expected, actual []byte, description string
 }
 
 func testPatchApplication(t *testing.T, original, patch, expected []byte, description string) {
-	result, err := jsonpatch.MergePatch(original, patch)
+	result, err := jsonpatchv5.MergePatch(original, patch)
 	if err != nil {
 		t.Errorf("error: %s\nin test case: %s\ncannot apply patch:\n%s\nto original:\n%s\n",
 			err, description, jsonToYAMLOrError(patch), jsonToYAMLOrError(original))

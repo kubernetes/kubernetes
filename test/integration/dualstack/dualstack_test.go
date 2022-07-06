@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	jsonpatchv5 "github.com/evanphx/json-patch/v5"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1255,7 +1255,7 @@ func TestServiceUpdate(t *testing.T) {
 		t.Fatalf("unexpected error marshal toupdate service. %v", err)
 	}
 
-	patchBytes, err = jsonpatch.CreateMergePatch(currentJSON, toUpdateJSON)
+	patchBytes, err = jsonpatchv5.CreateMergePatch(currentJSON, toUpdateJSON)
 	if err != nil {
 		t.Fatalf("unexpected error creating json patch. %v", err)
 	}
