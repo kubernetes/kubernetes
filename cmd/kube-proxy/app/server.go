@@ -621,6 +621,46 @@ func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh cha
 		return
 	}
 
+	if _, ipNet, err := net.ParseCIDR(bindAddress); err == nil {
+		// bindAddress is a subnet, it will get the IP that meets the subnet
+		if ifaces, err := net.Interfaces(); err == nil {
+			for _, i := range ifaces {
+				if addrs, err := i.Addrs(); err == nil {
+					for _, addr := range addrs {
+						var ip net.IP
+						switch v := addr.(type) {
+						case *net.IPNet:
+							ip = v.IP
+						case *net.IPAddr:
+							ip = v.IP
+						}
+						if ipNet.Contains(ip) {
+							// update bindAddress
+							bindAddress = ip.String()
+							break
+						}
+					}
+				} else {
+					err = fmt.Errorf("error getting list of ip address: %v", err)
+					utilruntime.HandleError(err)
+					if errCh != nil {
+						errCh <- err
+					}
+				}
+				if net.ParseIP(bindAddress) != nil {
+					// if bindAddress has been updated, and it is IP address, then no need to check further
+					break
+				}
+			}
+		} else {
+			err = fmt.Errorf("error getting list of interfaces: %v", err)
+			utilruntime.HandleError(err)
+			if errCh != nil {
+				errCh <- err
+			}
+		}
+	}
+
 	proxyMux := mux.NewPathRecorderMux("kube-proxy")
 	healthz.InstallHandler(proxyMux)
 	proxyMux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
