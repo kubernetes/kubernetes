@@ -1029,33 +1029,79 @@ func (proxier *Proxier) syncProxyRules() {
 		clusterPolicyChain := svcInfo.clusterPolicyChainName
 		localPolicyChain := svcInfo.localPolicyChainName
 
-		// These chains designate which policy chain to use for internal- and
-		// external-destination traffic.
+		// internalPolicyChain is the chain containing the endpoints for
+		// "internal" (ClusterIP) traffic. internalTrafficChain is the chain that
+		// internal traffic is routed to (which is always the same as
+		// internalPolicyChain). hasInternalEndpoints is true if we should
+		// generate rules pointing to internalTrafficChain, or false if there are
+		// no available internal endpoints.
 		internalPolicyChain := clusterPolicyChain
-		externalPolicyChain := clusterPolicyChain
+		hasInternalEndpoints := hasEndpoints
 		if svcInfo.InternalPolicyLocal() {
 			internalPolicyChain = localPolicyChain
+			if len(localEndpoints) == 0 {
+				hasInternalEndpoints = false
+			}
 		}
+		internalTrafficChain := internalPolicyChain
+
+		// Similarly, externalPolicyChain is the chain containing the endpoints
+		// for "external" (NodePort, LoadBalancer, and ExternalIP) traffic.
+		// externalTrafficChain is the chain that external traffic is routed to
+		// (which is always the service's "EXT" chain). hasExternalEndpoints is
+		// true if there are endpoints that will be reached by external traffic.
+		// (But we may still have to generate externalTrafficChain even if there
+		// are no external endpoints, to ensure that the short-circuit rules for
+		// local traffic are set up.)
+		externalPolicyChain := clusterPolicyChain
+		hasExternalEndpoints := hasEndpoints
 		if svcInfo.ExternalPolicyLocal() {
 			externalPolicyChain = localPolicyChain
+			if len(localEndpoints) == 0 {
+				hasExternalEndpoints = false
+			}
 		}
-
-		// These chains are where *ALL* rules which match traffic that is
-		// service-destined should jump.  ClusterIP traffic is considered
-		// "internal" while NodePort, LoadBalancer, and ExternalIPs traffic is
-		// considered "external".
-		internalTrafficChain := internalPolicyChain
 		externalTrafficChain := svcInfo.externalChainName // eventually jumps to externalPolicyChain
 
+		var internalTrafficFilterTarget, internalTrafficFilterComment string
+		var externalTrafficFilterTarget, externalTrafficFilterComment string
+		if !hasEndpoints {
+			// The service has no endpoints at all; hasInternalEndpoints and
+			// hasExternalEndpoints will also be false, and we will not
+			// generate any chains in the "nat" table for the service; only
+			// rules in the "filter" table rejecting incoming packets for
+			// the service's IPs.
+			internalTrafficFilterTarget = "REJECT"
+			internalTrafficFilterComment = fmt.Sprintf(`"%s has no endpoints"`, svcPortNameString)
+			externalTrafficFilterTarget = "REJECT"
+			externalTrafficFilterComment = internalTrafficFilterComment
+		} else {
+			if !hasInternalEndpoints {
+				// The internalTrafficPolicy is "Local" but there are no local
+				// endpoints. Traffic to the clusterIP will be dropped, but
+				// external traffic may still be accepted.
+				internalTrafficFilterTarget = "DROP"
+				internalTrafficFilterComment = fmt.Sprintf(`"%s has no local endpoints"`, svcPortNameString)
+			}
+			if !hasExternalEndpoints {
+				// The externalTrafficPolicy is "Local" but there are no
+				// local endpoints. Traffic to "external" IPs from outside
+				// the cluster will be dropped, but traffic from inside
+				// the cluster may still be accepted.
+				externalTrafficFilterTarget = "DROP"
+				externalTrafficFilterComment = fmt.Sprintf(`"%s has no local endpoints"`, svcPortNameString)
+			}
+		}
+
 		// Declare the clusterPolicyChain if needed.
-		if hasEndpoints && svcInfo.UsesClusterEndpoints() {
+		if len(clusterEndpoints) > 0 && svcInfo.UsesClusterEndpoints() {
 			// Create the Cluster traffic policy chain
 			proxier.natChains.Write(utiliptables.MakeChainLine(clusterPolicyChain))
 			activeNATChains[clusterPolicyChain] = true
 		}
 
 		// Declare the localPolicyChain if needed.
-		if hasEndpoints && svcInfo.UsesLocalEndpoints() {
+		if len(localEndpoints) > 0 && svcInfo.UsesLocalEndpoints() {
 			proxier.natChains.Write(utiliptables.MakeChainLine(localPolicyChain))
 			activeNATChains[localPolicyChain] = true
 		}
@@ -1063,7 +1109,9 @@ func (proxier *Proxier) syncProxyRules() {
 		// If any "external" destinations are enabled, set up external traffic
 		// handling.  All captured traffic for all external destinations should
 		// jump to externalTrafficChain, which will handle some special-cases
-		// and then jump to externalPolicyChain.
+		// and then jump to externalPolicyChain. (We check hasEndpoints here not
+		// hasExternalEndpoints because we need the short-circuit rules in the
+		// EXT chain even when there are no external endpoints.)
 		if hasEndpoints && svcInfo.ExternallyAccessible() {
 			proxier.natChains.Write(utiliptables.MakeChainLine(externalTrafficChain))
 			activeNATChains[externalTrafficChain] = true
@@ -1111,13 +1159,15 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Anything else falls thru to the appropriate policy chain.
-			proxier.natRules.Write(
-				"-A", string(externalTrafficChain),
-				"-j", string(externalPolicyChain))
+			if hasExternalEndpoints {
+				proxier.natRules.Write(
+					"-A", string(externalTrafficChain),
+					"-j", string(externalPolicyChain))
+			}
 		}
 
 		// Capture the clusterIP.
-		if hasEndpoints {
+		if hasInternalEndpoints {
 			args = append(args[:0],
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcPortNameString),
 				"-m", protocol, "-p", protocol,
@@ -1148,11 +1198,11 @@ func (proxier *Proxier) syncProxyRules() {
 			// No endpoints.
 			proxier.filterRules.Write(
 				"-A", string(kubeServicesChain),
-				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcPortNameString),
+				"-m", "comment", "--comment", internalTrafficFilterComment,
 				"-m", protocol, "-p", protocol,
 				"-d", svcInfo.ClusterIP().String(),
 				"--dport", strconv.Itoa(svcInfo.Port()),
-				"-j", "REJECT",
+				"-j", internalTrafficFilterTarget,
 			)
 		}
 
@@ -1168,16 +1218,18 @@ func (proxier *Proxier) syncProxyRules() {
 					"-d", externalIP,
 					"--dport", strconv.Itoa(svcInfo.Port()),
 					"-j", string(externalTrafficChain))
-
-			} else {
-				// No endpoints.
+			}
+			if !hasExternalEndpoints {
+				// Either no endpoints at all (REJECT) or no endpoints for
+				// external traffic (DROP anything that didn't get
+				// short-circuited by the EXT chain.)
 				proxier.filterRules.Write(
 					"-A", string(kubeExternalServicesChain),
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcPortNameString),
+					"-m", "comment", "--comment", externalTrafficFilterComment,
 					"-m", protocol, "-p", protocol,
 					"-d", externalIP,
 					"--dport", strconv.Itoa(svcInfo.Port()),
-					"-j", "REJECT",
+					"-j", externalTrafficFilterTarget,
 				)
 			}
 		}
@@ -1251,16 +1303,19 @@ func (proxier *Proxier) syncProxyRules() {
 					"-j", string(nextChain))
 
 			}
-		} else {
-			// No endpoints.
+		}
+		if !hasExternalEndpoints {
+			// Either no endpoints at all (REJECT) or no endpoints for
+			// external traffic (DROP anything that didn't get short-circuited
+			// by the EXT chain.)
 			for _, lbip := range svcInfo.LoadBalancerIPStrings() {
 				proxier.filterRules.Write(
 					"-A", string(kubeExternalServicesChain),
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcPortNameString),
+					"-m", "comment", "--comment", externalTrafficFilterComment,
 					"-m", protocol, "-p", protocol,
 					"-d", lbip,
 					"--dport", strconv.Itoa(svcInfo.Port()),
-					"-j", "REJECT",
+					"-j", externalTrafficFilterTarget,
 				)
 			}
 		}
@@ -1277,15 +1332,18 @@ func (proxier *Proxier) syncProxyRules() {
 					"-m", protocol, "-p", protocol,
 					"--dport", strconv.Itoa(svcInfo.NodePort()),
 					"-j", string(externalTrafficChain))
-			} else {
-				// No endpoints.
+			}
+			if !hasExternalEndpoints {
+				// Either no endpoints at all (REJECT) or no endpoints for
+				// external traffic (DROP anything that didn't get
+				// short-circuited by the EXT chain.)
 				proxier.filterRules.Write(
 					"-A", string(kubeExternalServicesChain),
-					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcPortNameString),
+					"-m", "comment", "--comment", externalTrafficFilterComment,
 					"-m", "addrtype", "--dst-type", "LOCAL",
 					"-m", protocol, "-p", protocol,
 					"--dport", strconv.Itoa(svcInfo.NodePort()),
-					"-j", "REJECT",
+					"-j", externalTrafficFilterTarget,
 				)
 			}
 		}
@@ -1319,12 +1377,6 @@ func (proxier *Proxier) syncProxyRules() {
 				if svcInfo.ExternalPolicyLocal() {
 					serviceNoLocalEndpointsTotalExternal++
 				}
-				// Blackhole all traffic since there are no local endpoints
-				proxier.natRules.Write(
-					"-A", string(localPolicyChain),
-					"-m", "comment", "--comment",
-					fmt.Sprintf(`"%s has no local endpoints"`, svcPortNameString),
-					"-j", string(kubeMarkDropChain))
 			}
 		}
 	}
