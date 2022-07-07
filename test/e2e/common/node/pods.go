@@ -1071,7 +1071,15 @@ var _ = SIGDescribe("Pods", func() {
 		}
 	})
 
-	ginkgo.It("should patch a pod status", func() {
+	/*
+		Release: v1.25
+		Testname: Pods, patching status
+		Description: A pod is created which MUST succeed
+		and be found running. The pod status when patched
+		MUST succeed. Given the patching of the pod status,
+		the fields MUST equal the new values.
+	*/
+	framework.ConformanceIt("should patch a pod status", func() {
 		ns := f.Namespace.Name
 		podClient := f.ClientSet.CoreV1().Pods(ns)
 		podName := "pod-" + utilrand.String(5)
