@@ -5405,7 +5405,7 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 	}
 	if in.IPFamilyPolicy != nil {
 		in, out := &in.IPFamilyPolicy, &out.IPFamilyPolicy
-		*out = new(IPFamilyPolicyType)
+		*out = new(IPFamilyPolicy)
 		**out = **in
 	}
 	if in.AllocateLoadBalancerNodePorts != nil {

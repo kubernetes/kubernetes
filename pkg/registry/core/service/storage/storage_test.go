@@ -1239,7 +1239,7 @@ func proveHealthCheckNodePortDeallocated(t *testing.T, storage *wrapperRESTForTe
 // functional tests of the registry
 //
 
-func fmtIPFamilyPolicy(pol *api.IPFamilyPolicyType) string {
+func fmtIPFamilyPolicy(pol *api.IPFamilyPolicy) string {
 	if pol == nil {
 		return "<nil>"
 	}
@@ -1453,7 +1453,7 @@ func TestCreateInitIPFields(t *testing.T) {
 		line           string
 		svc            *api.Service
 		expectError    bool
-		expectPolicy   api.IPFamilyPolicyType
+		expectPolicy   api.IPFamilyPolicy
 		expectFamilies []api.IPFamily
 		expectHeadless bool
 	}
@@ -5922,7 +5922,7 @@ func TestCreateInvalidClusterIPInputs(t *testing.T) {
 		name:     "bad_ipFamilyPolicy",
 		families: []api.IPFamily{api.IPv4Protocol},
 		svc: svctest.MakeService("foo",
-			svctest.SetIPFamilyPolicy(api.IPFamilyPolicyType("garbage"))),
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicy("garbage"))),
 		expect: []string{"Unsupported value"},
 	}, {
 		name:     "requiredual_ipFamilyPolicy_on_singlestack",
