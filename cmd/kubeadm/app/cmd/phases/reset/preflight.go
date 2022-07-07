@@ -51,7 +51,7 @@ func runPreflight(c workflow.RunData) error {
 		return errors.New("preflight phase invoked with an invalid data struct")
 	}
 
-	if !r.ForceReset() {
+	if !r.ForceReset() && !r.DryRun() {
 		klog.Warning("[reset] WARNING: Changes made to this host by 'kubeadm init' or 'kubeadm join' will be reverted.")
 		fmt.Print("[reset] Are you sure you want to proceed? [y/N]: ")
 		s := bufio.NewScanner(r.InputReader())
