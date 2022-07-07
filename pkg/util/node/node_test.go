@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"context"
 	"net"
 	"reflect"
 	"testing"
@@ -26,7 +25,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeclientfake "k8s.io/client-go/kubernetes/fake"
 	netutils "k8s.io/utils/net"
 )
 
@@ -228,147 +226,6 @@ func TestGetHostname(t *testing.T) {
 		if test.expectedHostName != hostName {
 			t.Errorf("[%d]: expected output %q, got %q", idx, test.expectedHostName, hostName)
 		}
-
-	}
-}
-
-func TestGetNodeIP(t *testing.T) {
-
-	testCases := []struct {
-		name     string
-		nodeName string
-		node     *v1.Node
-		expect   net.IP
-	}{
-		{
-			name:     "failed to get nodeIP,can't find the node",
-			nodeName: "",
-			expect:   nil,
-		},
-		{
-			name:     "failed to get nodeIP",
-			nodeName: "node1",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-				Spec:   v1.NodeSpec{},
-				Status: v1.NodeStatus{},
-			},
-			expect: nil,
-		},
-		{
-			name:     "IPv4-only, simple",
-			nodeName: "node1",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-				Spec: v1.NodeSpec{},
-				Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
-					{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
-					{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-					{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-				}},
-			},
-			expect: netutils.ParseIPSloppy("1.2.3.4"),
-		},
-		{
-			name:     "IPv4-only, external-first",
-			nodeName: "node1",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-				Spec: v1.NodeSpec{},
-				Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
-					{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-					{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-					{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
-				}},
-			},
-			expect: netutils.ParseIPSloppy("1.2.3.4"),
-		},
-		{
-			name:     "IPv4-only, no internal",
-			nodeName: "node1",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-				Spec: v1.NodeSpec{},
-				Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
-					{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-					{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-				}},
-			},
-			expect: netutils.ParseIPSloppy("4.3.2.1"),
-		},
-		{
-			name:     "dual-stack node",
-			nodeName: "node1",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-				Spec: v1.NodeSpec{},
-				Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
-					{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
-					{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-					{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-					{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
-					{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
-				}},
-			},
-			expect: netutils.ParseIPSloppy("1.2.3.4"),
-		},
-		{
-			name:     "dual-stack node, different order",
-			nodeName: "node1",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-				Spec: v1.NodeSpec{},
-				Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
-					{Type: v1.NodeInternalIP, Address: "1.2.3.4"},
-					{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
-					{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-					{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-					{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
-				}},
-			},
-			expect: netutils.ParseIPSloppy("1.2.3.4"),
-		},
-		{
-			name:     "dual-stack node, IPv6-first, no internal IPv4",
-			nodeName: "node1",
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "node1",
-				},
-				Spec: v1.NodeSpec{},
-				Status: v1.NodeStatus{Addresses: []v1.NodeAddress{
-					{Type: v1.NodeInternalIP, Address: "a:b::c:d"},
-					{Type: v1.NodeExternalIP, Address: "d:c::b:a"},
-					{Type: v1.NodeExternalIP, Address: "4.3.2.1"},
-					{Type: v1.NodeExternalIP, Address: "4.3.2.2"},
-				}},
-			},
-			expect: netutils.ParseIPSloppy("a:b::c:d"),
-		},
-	}
-	for _, test := range testCases {
-		t.Run(test.name, func(t *testing.T) {
-			kubeClientSet := kubeclientfake.NewSimpleClientset()
-			if test.node != nil {
-				if _, err := kubeClientSet.CoreV1().Nodes().Create(context.Background(), test.node, metav1.CreateOptions{}); err != nil {
-					t.Error("create node error")
-				}
-			}
-			result := GetNodeIP(kubeClientSet, test.nodeName)
-			assert.Equal(t, test.expect, result)
-		})
 
 	}
 }
