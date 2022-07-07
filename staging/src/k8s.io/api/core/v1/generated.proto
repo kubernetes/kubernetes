@@ -741,14 +741,14 @@ message Container {
   // Cannot be updated.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
   // +optional
-  optional Probe livenessProbe = 10;
+  optional TerminatingProbe livenessProbe = 10;
 
   // Periodic probe of container service readiness.
   // Container will be removed from service endpoints if the probe fails.
   // Cannot be updated.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
   // +optional
-  optional Probe readinessProbe = 11;
+  optional NonTerminatingProbe readinessProbe = 11;
 
   // StartupProbe indicates that the Pod has successfully initialized.
   // If specified, no other probes are executed until this completes successfully.
@@ -758,7 +758,7 @@ message Container {
   // This cannot be updated.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
   // +optional
-  optional Probe startupProbe = 22;
+  optional TerminatingProbe startupProbe = 22;
 
   // Actions that the management system should take in response to container lifecycle events.
   // Cannot be updated.
@@ -1339,15 +1339,15 @@ message EphemeralContainerCommon {
 
   // Probes are not allowed for ephemeral containers.
   // +optional
-  optional Probe livenessProbe = 10;
+  optional TerminatingProbe livenessProbe = 10;
 
   // Probes are not allowed for ephemeral containers.
   // +optional
-  optional Probe readinessProbe = 11;
+  optional NonTerminatingProbe readinessProbe = 11;
 
   // Probes are not allowed for ephemeral containers.
   // +optional
-  optional Probe startupProbe = 22;
+  optional TerminatingProbe startupProbe = 22;
 
   // Lifecycle is not allowed for ephemeral containers.
   // +optional
@@ -2554,6 +2554,12 @@ message NodeSystemInfo {
 
   // The Architecture reported by the node
   optional string architecture = 10;
+}
+
+// NonTerminatingProbe describes a health check to be performed against a
+// container for a condition which does not terminate the container.
+message NonTerminatingProbe {
+  optional ProbeCommon probeCommon = 1;
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
@@ -4064,9 +4070,8 @@ message PreferredSchedulingTerm {
   optional NodeSelectorTerm preference = 2;
 }
 
-// Probe describes a health check to be performed against a container to determine whether it is
-// alive or ready to receive traffic.
-message Probe {
+// ProbeCommon describes the common fields for all varieties of probes.
+message ProbeCommon {
   // The action taken to determine the health of a container
   optional ProbeHandler handler = 1;
 
@@ -4095,19 +4100,6 @@ message Probe {
   // Defaults to 3. Minimum value is 1.
   // +optional
   optional int32 failureThreshold = 6;
-
-  // Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
-  // The grace period is the duration in seconds after the processes running in the pod are sent
-  // a termination signal and the time when the processes are forcibly halted with a kill signal.
-  // Set this value longer than the expected cleanup time for your process.
-  // If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
-  // value overrides the value provided by the pod spec.
-  // Value must be non-negative integer. The value zero indicates stop immediately via
-  // the kill signal (no opportunity to shut down).
-  // This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
-  // Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
-  // +optional
-  optional int64 terminationGracePeriodSeconds = 7;
 }
 
 // ProbeHandler defines a specific action that should be taken in a probe.
@@ -5456,6 +5448,25 @@ message Taint {
   // It is only written for NoExecute taints.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;
+}
+
+// TerminatingProbe describes a health check to be performed against a
+// container to determine whether it needs to be terminated.
+message TerminatingProbe {
+  optional ProbeCommon probeCommon = 1;
+
+  // Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
+  // The grace period is the duration in seconds after the processes running in the pod are sent
+  // a termination signal and the time when the processes are forcibly halted with a kill signal.
+  // Set this value longer than the expected cleanup time for your process.
+  // If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this
+  // value overrides the value provided by the pod spec.
+  // Value must be non-negative integer. The value zero indicates stop immediately via
+  // the kill signal (no opportunity to shut down).
+  // This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+  // Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
+  // +optional
+  optional int64 terminationGracePeriodSeconds = 7;
 }
 
 // The pod this Toleration is attached to tolerates any taint that matches

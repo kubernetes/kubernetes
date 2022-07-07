@@ -526,7 +526,6 @@ func dropDisabledFields(
 			if c.StartupProbe != nil {
 				c.StartupProbe.TerminationGracePeriodSeconds = nil
 			}
-			// cannot be set for readiness probes
 			return true
 		})
 	}

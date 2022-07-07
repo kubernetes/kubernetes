@@ -2093,9 +2093,8 @@ type ExecAction struct {
 	Command []string
 }
 
-// Probe describes a health check to be performed against a container to determine whether it is
-// alive or ready to receive traffic.
-type Probe struct {
+// ProbeCommon describes the common fields for all varieties of probes.
+type ProbeCommon struct {
 	// The action taken to determine the health of a container
 	ProbeHandler
 	// Length of time before health checking is activated.  In seconds.
@@ -2113,6 +2112,13 @@ type Probe struct {
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
 	// +optional
 	FailureThreshold int32
+}
+
+// TerminatingProbe describes a health check to be performed against a
+// container to determine whether it needs to be terminated.
+type TerminatingProbe struct {
+	ProbeCommon
+
 	// Optional duration in seconds the pod needs to terminate gracefully upon probe failure.
 	// The grace period is the duration in seconds after the processes running in the pod are sent
 	// a termination signal and the time when the processes are forcibly halted with a kill signal.
@@ -2124,6 +2130,12 @@ type Probe struct {
 	// This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
 	// +optional
 	TerminationGracePeriodSeconds *int64
+}
+
+// NonTerminatingProbe describes a health check to be performed against a
+// container for a condition which does not terminate the container.
+type NonTerminatingProbe struct {
+	ProbeCommon
 }
 
 // PullPolicy describes a policy for if/when to pull a container image
@@ -2252,11 +2264,11 @@ type Container struct {
 	// +optional
 	VolumeDevices []VolumeDevice
 	// +optional
-	LivenessProbe *Probe
+	LivenessProbe *TerminatingProbe
 	// +optional
-	ReadinessProbe *Probe
+	ReadinessProbe *NonTerminatingProbe
 	// +optional
-	StartupProbe *Probe
+	StartupProbe *TerminatingProbe
 	// +optional
 	Lifecycle *Lifecycle
 	// Required.
@@ -3415,13 +3427,13 @@ type EphemeralContainerCommon struct {
 	VolumeDevices []VolumeDevice
 	// Probes are not allowed for ephemeral containers.
 	// +optional
-	LivenessProbe *Probe
+	LivenessProbe *TerminatingProbe
 	// Probes are not allowed for ephemeral containers.
 	// +optional
-	ReadinessProbe *Probe
+	ReadinessProbe *NonTerminatingProbe
 	// Probes are not allowed for ephemeral containers.
 	// +optional
-	StartupProbe *Probe
+	StartupProbe *TerminatingProbe
 	// Lifecycle is not allowed for ephemeral containers.
 	// +optional
 	Lifecycle *Lifecycle

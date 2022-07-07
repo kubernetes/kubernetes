@@ -117,7 +117,7 @@ func hasPauseProbe(pod *v1.Pod) bool {
 	return probe != nil && reflect.DeepEqual(probe.Exec.Command, pauseProbe.Exec.Command)
 }
 
-var pauseProbe = &v1.Probe{
+var pauseProbe = v1.ProbeCommon{
 	ProbeHandler: v1.ProbeHandler{
 		Exec: &v1.ExecAction{Command: []string{"test", "-f", "/data/statefulset-continue"}},
 	},
@@ -145,7 +145,7 @@ func (sp statefulPodsByOrdinal) Less(i, j int) bool {
 // with ResumeNextPod().
 // Note that this cannot be used together with SetHTTPProbe().
 func PauseNewPods(ss *appsv1.StatefulSet) {
-	ss.Spec.Template.Spec.Containers[0].ReadinessProbe = pauseProbe
+	ss.Spec.Template.Spec.Containers[0].ReadinessProbe = &NonTerminatingProbe{ProbeCommon: pauseProbe}
 }
 
 // ResumeNextPod allows the next Pod in the StatefulSet to continue by removing the ReadinessProbe

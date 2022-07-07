@@ -1072,6 +1072,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1.NonTerminatingProbe)(nil), (*core.NonTerminatingProbe)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NonTerminatingProbe_To_core_NonTerminatingProbe(a.(*v1.NonTerminatingProbe), b.(*core.NonTerminatingProbe), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.NonTerminatingProbe)(nil), (*v1.NonTerminatingProbe)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_NonTerminatingProbe_To_v1_NonTerminatingProbe(a.(*core.NonTerminatingProbe), b.(*v1.NonTerminatingProbe), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1.ObjectFieldSelector)(nil), (*core.ObjectFieldSelector)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_ObjectFieldSelector_To_core_ObjectFieldSelector(a.(*v1.ObjectFieldSelector), b.(*core.ObjectFieldSelector), scope)
 	}); err != nil {
@@ -1482,13 +1492,13 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.Probe)(nil), (*core.Probe)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Probe_To_core_Probe(a.(*v1.Probe), b.(*core.Probe), scope)
+	if err := s.AddGeneratedConversionFunc((*v1.ProbeCommon)(nil), (*core.ProbeCommon)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ProbeCommon_To_core_ProbeCommon(a.(*v1.ProbeCommon), b.(*core.ProbeCommon), scope)
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*core.Probe)(nil), (*v1.Probe)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_Probe_To_v1_Probe(a.(*core.Probe), b.(*v1.Probe), scope)
+	if err := s.AddGeneratedConversionFunc((*core.ProbeCommon)(nil), (*v1.ProbeCommon)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_ProbeCommon_To_v1_ProbeCommon(a.(*core.ProbeCommon), b.(*v1.ProbeCommon), scope)
 	}); err != nil {
 		return err
 	}
@@ -1954,6 +1964,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*core.Taint)(nil), (*v1.Taint)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_Taint_To_v1_Taint(a.(*core.Taint), b.(*v1.Taint), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.TerminatingProbe)(nil), (*core.TerminatingProbe)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_TerminatingProbe_To_core_TerminatingProbe(a.(*v1.TerminatingProbe), b.(*core.TerminatingProbe), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.TerminatingProbe)(nil), (*v1.TerminatingProbe)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_TerminatingProbe_To_v1_TerminatingProbe(a.(*core.TerminatingProbe), b.(*v1.TerminatingProbe), scope)
 	}); err != nil {
 		return err
 	}
@@ -2977,9 +2997,9 @@ func autoConvert_v1_Container_To_core_Container(in *v1.Container, out *core.Cont
 	}
 	out.VolumeMounts = *(*[]core.VolumeMount)(unsafe.Pointer(&in.VolumeMounts))
 	out.VolumeDevices = *(*[]core.VolumeDevice)(unsafe.Pointer(&in.VolumeDevices))
-	out.LivenessProbe = (*core.Probe)(unsafe.Pointer(in.LivenessProbe))
-	out.ReadinessProbe = (*core.Probe)(unsafe.Pointer(in.ReadinessProbe))
-	out.StartupProbe = (*core.Probe)(unsafe.Pointer(in.StartupProbe))
+	out.LivenessProbe = (*core.TerminatingProbe)(unsafe.Pointer(in.LivenessProbe))
+	out.ReadinessProbe = (*core.NonTerminatingProbe)(unsafe.Pointer(in.ReadinessProbe))
+	out.StartupProbe = (*core.TerminatingProbe)(unsafe.Pointer(in.StartupProbe))
 	out.Lifecycle = (*core.Lifecycle)(unsafe.Pointer(in.Lifecycle))
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.TerminationMessagePolicy = core.TerminationMessagePolicy(in.TerminationMessagePolicy)
@@ -3010,9 +3030,9 @@ func autoConvert_core_Container_To_v1_Container(in *core.Container, out *v1.Cont
 	}
 	out.VolumeMounts = *(*[]v1.VolumeMount)(unsafe.Pointer(&in.VolumeMounts))
 	out.VolumeDevices = *(*[]v1.VolumeDevice)(unsafe.Pointer(&in.VolumeDevices))
-	out.LivenessProbe = (*v1.Probe)(unsafe.Pointer(in.LivenessProbe))
-	out.ReadinessProbe = (*v1.Probe)(unsafe.Pointer(in.ReadinessProbe))
-	out.StartupProbe = (*v1.Probe)(unsafe.Pointer(in.StartupProbe))
+	out.LivenessProbe = (*v1.TerminatingProbe)(unsafe.Pointer(in.LivenessProbe))
+	out.ReadinessProbe = (*v1.NonTerminatingProbe)(unsafe.Pointer(in.ReadinessProbe))
+	out.StartupProbe = (*v1.TerminatingProbe)(unsafe.Pointer(in.StartupProbe))
 	out.Lifecycle = (*v1.Lifecycle)(unsafe.Pointer(in.Lifecycle))
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.TerminationMessagePolicy = v1.TerminationMessagePolicy(in.TerminationMessagePolicy)
@@ -3565,9 +3585,9 @@ func autoConvert_v1_EphemeralContainerCommon_To_core_EphemeralContainerCommon(in
 	}
 	out.VolumeMounts = *(*[]core.VolumeMount)(unsafe.Pointer(&in.VolumeMounts))
 	out.VolumeDevices = *(*[]core.VolumeDevice)(unsafe.Pointer(&in.VolumeDevices))
-	out.LivenessProbe = (*core.Probe)(unsafe.Pointer(in.LivenessProbe))
-	out.ReadinessProbe = (*core.Probe)(unsafe.Pointer(in.ReadinessProbe))
-	out.StartupProbe = (*core.Probe)(unsafe.Pointer(in.StartupProbe))
+	out.LivenessProbe = (*core.TerminatingProbe)(unsafe.Pointer(in.LivenessProbe))
+	out.ReadinessProbe = (*core.NonTerminatingProbe)(unsafe.Pointer(in.ReadinessProbe))
+	out.StartupProbe = (*core.TerminatingProbe)(unsafe.Pointer(in.StartupProbe))
 	out.Lifecycle = (*core.Lifecycle)(unsafe.Pointer(in.Lifecycle))
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.TerminationMessagePolicy = core.TerminationMessagePolicy(in.TerminationMessagePolicy)
@@ -3598,9 +3618,9 @@ func autoConvert_core_EphemeralContainerCommon_To_v1_EphemeralContainerCommon(in
 	}
 	out.VolumeMounts = *(*[]v1.VolumeMount)(unsafe.Pointer(&in.VolumeMounts))
 	out.VolumeDevices = *(*[]v1.VolumeDevice)(unsafe.Pointer(&in.VolumeDevices))
-	out.LivenessProbe = (*v1.Probe)(unsafe.Pointer(in.LivenessProbe))
-	out.ReadinessProbe = (*v1.Probe)(unsafe.Pointer(in.ReadinessProbe))
-	out.StartupProbe = (*v1.Probe)(unsafe.Pointer(in.StartupProbe))
+	out.LivenessProbe = (*v1.TerminatingProbe)(unsafe.Pointer(in.LivenessProbe))
+	out.ReadinessProbe = (*v1.NonTerminatingProbe)(unsafe.Pointer(in.ReadinessProbe))
+	out.StartupProbe = (*v1.TerminatingProbe)(unsafe.Pointer(in.StartupProbe))
 	out.Lifecycle = (*v1.Lifecycle)(unsafe.Pointer(in.Lifecycle))
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.TerminationMessagePolicy = v1.TerminationMessagePolicy(in.TerminationMessagePolicy)
@@ -5062,6 +5082,30 @@ func autoConvert_core_NodeSystemInfo_To_v1_NodeSystemInfo(in *core.NodeSystemInf
 // Convert_core_NodeSystemInfo_To_v1_NodeSystemInfo is an autogenerated conversion function.
 func Convert_core_NodeSystemInfo_To_v1_NodeSystemInfo(in *core.NodeSystemInfo, out *v1.NodeSystemInfo, s conversion.Scope) error {
 	return autoConvert_core_NodeSystemInfo_To_v1_NodeSystemInfo(in, out, s)
+}
+
+func autoConvert_v1_NonTerminatingProbe_To_core_NonTerminatingProbe(in *v1.NonTerminatingProbe, out *core.NonTerminatingProbe, s conversion.Scope) error {
+	if err := Convert_v1_ProbeCommon_To_core_ProbeCommon(&in.ProbeCommon, &out.ProbeCommon, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1_NonTerminatingProbe_To_core_NonTerminatingProbe is an autogenerated conversion function.
+func Convert_v1_NonTerminatingProbe_To_core_NonTerminatingProbe(in *v1.NonTerminatingProbe, out *core.NonTerminatingProbe, s conversion.Scope) error {
+	return autoConvert_v1_NonTerminatingProbe_To_core_NonTerminatingProbe(in, out, s)
+}
+
+func autoConvert_core_NonTerminatingProbe_To_v1_NonTerminatingProbe(in *core.NonTerminatingProbe, out *v1.NonTerminatingProbe, s conversion.Scope) error {
+	if err := Convert_core_ProbeCommon_To_v1_ProbeCommon(&in.ProbeCommon, &out.ProbeCommon, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_core_NonTerminatingProbe_To_v1_NonTerminatingProbe is an autogenerated conversion function.
+func Convert_core_NonTerminatingProbe_To_v1_NonTerminatingProbe(in *core.NonTerminatingProbe, out *v1.NonTerminatingProbe, s conversion.Scope) error {
+	return autoConvert_core_NonTerminatingProbe_To_v1_NonTerminatingProbe(in, out, s)
 }
 
 func autoConvert_v1_ObjectFieldSelector_To_core_ObjectFieldSelector(in *v1.ObjectFieldSelector, out *core.ObjectFieldSelector, s conversion.Scope) error {
@@ -6633,7 +6677,7 @@ func Convert_core_PreferredSchedulingTerm_To_v1_PreferredSchedulingTerm(in *core
 	return autoConvert_core_PreferredSchedulingTerm_To_v1_PreferredSchedulingTerm(in, out, s)
 }
 
-func autoConvert_v1_Probe_To_core_Probe(in *v1.Probe, out *core.Probe, s conversion.Scope) error {
+func autoConvert_v1_ProbeCommon_To_core_ProbeCommon(in *v1.ProbeCommon, out *core.ProbeCommon, s conversion.Scope) error {
 	if err := Convert_v1_ProbeHandler_To_core_ProbeHandler(&in.ProbeHandler, &out.ProbeHandler, s); err != nil {
 		return err
 	}
@@ -6642,16 +6686,15 @@ func autoConvert_v1_Probe_To_core_Probe(in *v1.Probe, out *core.Probe, s convers
 	out.PeriodSeconds = in.PeriodSeconds
 	out.SuccessThreshold = in.SuccessThreshold
 	out.FailureThreshold = in.FailureThreshold
-	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	return nil
 }
 
-// Convert_v1_Probe_To_core_Probe is an autogenerated conversion function.
-func Convert_v1_Probe_To_core_Probe(in *v1.Probe, out *core.Probe, s conversion.Scope) error {
-	return autoConvert_v1_Probe_To_core_Probe(in, out, s)
+// Convert_v1_ProbeCommon_To_core_ProbeCommon is an autogenerated conversion function.
+func Convert_v1_ProbeCommon_To_core_ProbeCommon(in *v1.ProbeCommon, out *core.ProbeCommon, s conversion.Scope) error {
+	return autoConvert_v1_ProbeCommon_To_core_ProbeCommon(in, out, s)
 }
 
-func autoConvert_core_Probe_To_v1_Probe(in *core.Probe, out *v1.Probe, s conversion.Scope) error {
+func autoConvert_core_ProbeCommon_To_v1_ProbeCommon(in *core.ProbeCommon, out *v1.ProbeCommon, s conversion.Scope) error {
 	if err := Convert_core_ProbeHandler_To_v1_ProbeHandler(&in.ProbeHandler, &out.ProbeHandler, s); err != nil {
 		return err
 	}
@@ -6660,13 +6703,12 @@ func autoConvert_core_Probe_To_v1_Probe(in *core.Probe, out *v1.Probe, s convers
 	out.PeriodSeconds = in.PeriodSeconds
 	out.SuccessThreshold = in.SuccessThreshold
 	out.FailureThreshold = in.FailureThreshold
-	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	return nil
 }
 
-// Convert_core_Probe_To_v1_Probe is an autogenerated conversion function.
-func Convert_core_Probe_To_v1_Probe(in *core.Probe, out *v1.Probe, s conversion.Scope) error {
-	return autoConvert_core_Probe_To_v1_Probe(in, out, s)
+// Convert_core_ProbeCommon_To_v1_ProbeCommon is an autogenerated conversion function.
+func Convert_core_ProbeCommon_To_v1_ProbeCommon(in *core.ProbeCommon, out *v1.ProbeCommon, s conversion.Scope) error {
+	return autoConvert_core_ProbeCommon_To_v1_ProbeCommon(in, out, s)
 }
 
 func autoConvert_v1_ProbeHandler_To_core_ProbeHandler(in *v1.ProbeHandler, out *core.ProbeHandler, s conversion.Scope) error {
@@ -8065,6 +8107,32 @@ func autoConvert_core_Taint_To_v1_Taint(in *core.Taint, out *v1.Taint, s convers
 // Convert_core_Taint_To_v1_Taint is an autogenerated conversion function.
 func Convert_core_Taint_To_v1_Taint(in *core.Taint, out *v1.Taint, s conversion.Scope) error {
 	return autoConvert_core_Taint_To_v1_Taint(in, out, s)
+}
+
+func autoConvert_v1_TerminatingProbe_To_core_TerminatingProbe(in *v1.TerminatingProbe, out *core.TerminatingProbe, s conversion.Scope) error {
+	if err := Convert_v1_ProbeCommon_To_core_ProbeCommon(&in.ProbeCommon, &out.ProbeCommon, s); err != nil {
+		return err
+	}
+	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
+	return nil
+}
+
+// Convert_v1_TerminatingProbe_To_core_TerminatingProbe is an autogenerated conversion function.
+func Convert_v1_TerminatingProbe_To_core_TerminatingProbe(in *v1.TerminatingProbe, out *core.TerminatingProbe, s conversion.Scope) error {
+	return autoConvert_v1_TerminatingProbe_To_core_TerminatingProbe(in, out, s)
+}
+
+func autoConvert_core_TerminatingProbe_To_v1_TerminatingProbe(in *core.TerminatingProbe, out *v1.TerminatingProbe, s conversion.Scope) error {
+	if err := Convert_core_ProbeCommon_To_v1_ProbeCommon(&in.ProbeCommon, &out.ProbeCommon, s); err != nil {
+		return err
+	}
+	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
+	return nil
+}
+
+// Convert_core_TerminatingProbe_To_v1_TerminatingProbe is an autogenerated conversion function.
+func Convert_core_TerminatingProbe_To_v1_TerminatingProbe(in *core.TerminatingProbe, out *v1.TerminatingProbe, s conversion.Scope) error {
+	return autoConvert_core_TerminatingProbe_To_v1_TerminatingProbe(in, out, s)
 }
 
 func autoConvert_v1_Toleration_To_core_Toleration(in *v1.Toleration, out *core.Toleration, s conversion.Scope) error {

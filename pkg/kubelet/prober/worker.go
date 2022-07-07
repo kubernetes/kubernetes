@@ -51,7 +51,7 @@ type worker struct {
 	container v1.Container
 
 	// Describes the probe configuration (read-only)
-	spec *v1.Probe
+	spec *v1.ProbeCommon
 
 	// The type of the worker.
 	probeType probeType
@@ -102,15 +102,21 @@ func newWorker(
 
 	switch probeType {
 	case readiness:
-		w.spec = container.ReadinessProbe
+		if container.ReadinessProbe != nil {
+			w.spec = &container.ReadinessProbe.ProbeCommon
+		}
 		w.resultsManager = m.readinessManager
 		w.initialValue = results.Failure
 	case liveness:
-		w.spec = container.LivenessProbe
+		if container.LivenessProbe != nil {
+			w.spec = &container.LivenessProbe.ProbeCommon
+		}
 		w.resultsManager = m.livenessManager
 		w.initialValue = results.Success
 	case startup:
-		w.spec = container.StartupProbe
+		if container.StartupProbe != nil {
+			w.spec = &container.StartupProbe.ProbeCommon
+		}
 		w.resultsManager = m.startupManager
 		w.initialValue = results.Unknown
 	}

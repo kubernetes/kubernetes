@@ -1034,7 +1034,7 @@
           "livenessProbe": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.TerminatingProbe"
               }
             ],
             "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
@@ -1066,7 +1066,7 @@
           "readinessProbe": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.NonTerminatingProbe"
               }
             ],
             "description": "Periodic probe of container service readiness. Container will be removed from service endpoints if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
@@ -1091,7 +1091,7 @@
           "startupProbe": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.TerminatingProbe"
               }
             ],
             "description": "StartupProbe indicates that the Pod has successfully initialized. If specified, no other probes are executed until this completes successfully. If this probe fails, the Pod will be restarted, just as if the livenessProbe failed. This can be used to provide different probe parameters at the beginning of a Pod's lifecycle, when it might take a long time to load data or warm a cache, than during steady-state operation. This cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
@@ -1435,7 +1435,7 @@
           "livenessProbe": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.TerminatingProbe"
               }
             ],
             "description": "Probes are not allowed for ephemeral containers."
@@ -1467,7 +1467,7 @@
           "readinessProbe": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.NonTerminatingProbe"
               }
             ],
             "description": "Probes are not allowed for ephemeral containers."
@@ -1492,7 +1492,7 @@
           "startupProbe": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.Probe"
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.TerminatingProbe"
               }
             ],
             "description": "Probes are not allowed for ephemeral containers."
@@ -2149,6 +2149,69 @@
         },
         "type": "object",
         "x-kubernetes-map-type": "atomic"
+      },
+      "io.k8s.api.core.v1.NonTerminatingProbe": {
+        "description": "NonTerminatingProbe describes a health check to be performed against a container for a condition which does not terminate the container.",
+        "properties": {
+          "exec": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ExecAction"
+              }
+            ],
+            "description": "Exec specifies the action to take."
+          },
+          "failureThreshold": {
+            "description": "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "grpc": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.GRPCAction"
+              }
+            ],
+            "description": "GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate."
+          },
+          "httpGet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.HTTPGetAction"
+              }
+            ],
+            "description": "HTTPGet specifies the http request to perform."
+          },
+          "initialDelaySeconds": {
+            "description": "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+            "format": "int32",
+            "type": "integer"
+          },
+          "periodSeconds": {
+            "description": "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "successThreshold": {
+            "description": "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Minimum value is 1.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "tcpSocket": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.TCPSocketAction"
+              }
+            ],
+            "description": "TCPSocket specifies an action involving a TCP port."
+          },
+          "timeoutSeconds": {
+            "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
       },
       "io.k8s.api.core.v1.ObjectFieldSelector": {
         "description": "ObjectFieldSelector selects an APIVersioned field of an object.",
@@ -2997,74 +3060,6 @@
         ],
         "type": "object"
       },
-      "io.k8s.api.core.v1.Probe": {
-        "description": "Probe describes a health check to be performed against a container to determine whether it is alive or ready to receive traffic.",
-        "properties": {
-          "exec": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.ExecAction"
-              }
-            ],
-            "description": "Exec specifies the action to take."
-          },
-          "failureThreshold": {
-            "description": "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "grpc": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.GRPCAction"
-              }
-            ],
-            "description": "GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate."
-          },
-          "httpGet": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.HTTPGetAction"
-              }
-            ],
-            "description": "HTTPGet specifies the http request to perform."
-          },
-          "initialDelaySeconds": {
-            "description": "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
-            "format": "int32",
-            "type": "integer"
-          },
-          "periodSeconds": {
-            "description": "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "successThreshold": {
-            "description": "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Minimum value is 1.",
-            "format": "int32",
-            "type": "integer"
-          },
-          "tcpSocket": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.api.core.v1.TCPSocketAction"
-              }
-            ],
-            "description": "TCPSocket specifies an action involving a TCP port."
-          },
-          "terminationGracePeriodSeconds": {
-            "description": "Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.",
-            "format": "int64",
-            "type": "integer"
-          },
-          "timeoutSeconds": {
-            "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
-            "format": "int32",
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
       "io.k8s.api.core.v1.ProjectedVolumeSource": {
         "description": "Represents a projected volume source",
         "properties": {
@@ -3620,6 +3615,74 @@
         "required": [
           "port"
         ],
+        "type": "object"
+      },
+      "io.k8s.api.core.v1.TerminatingProbe": {
+        "description": "TerminatingProbe describes a health check to be performed against a container to determine whether it needs to be terminated.",
+        "properties": {
+          "exec": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.ExecAction"
+              }
+            ],
+            "description": "Exec specifies the action to take."
+          },
+          "failureThreshold": {
+            "description": "Minimum consecutive failures for the probe to be considered failed after having succeeded. Defaults to 3. Minimum value is 1.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "grpc": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.GRPCAction"
+              }
+            ],
+            "description": "GRPC specifies an action involving a GRPC port. This is a beta field and requires enabling GRPCContainerProbe feature gate."
+          },
+          "httpGet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.HTTPGetAction"
+              }
+            ],
+            "description": "HTTPGet specifies the http request to perform."
+          },
+          "initialDelaySeconds": {
+            "description": "Number of seconds after the container has started before liveness probes are initiated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+            "format": "int32",
+            "type": "integer"
+          },
+          "periodSeconds": {
+            "description": "How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "successThreshold": {
+            "description": "Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Minimum value is 1.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "tcpSocket": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.core.v1.TCPSocketAction"
+              }
+            ],
+            "description": "TCPSocket specifies an action involving a TCP port."
+          },
+          "terminationGracePeriodSeconds": {
+            "description": "Optional duration in seconds the pod needs to terminate gracefully upon probe failure. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. If this value is nil, the pod's terminationGracePeriodSeconds will be used. Otherwise, this value overrides the value provided by the pod spec. Value must be non-negative integer. The value zero indicates stop immediately via the kill signal (no opportunity to shut down). This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate. Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "timeoutSeconds": {
+            "description": "Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
         "type": "object"
       },
       "io.k8s.api.core.v1.Toleration": {

@@ -717,6 +717,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeSystemInfo"):
 		return &applyconfigurationscorev1.NodeSystemInfoApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NonTerminatingProbe"):
+		return &applyconfigurationscorev1.NonTerminatingProbeApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ObjectFieldSelector"):
 		return &applyconfigurationscorev1.ObjectFieldSelectorApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ObjectReference"):
@@ -783,8 +785,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.PortworxVolumeSourceApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("PreferredSchedulingTerm"):
 		return &applyconfigurationscorev1.PreferredSchedulingTermApplyConfiguration{}
-	case corev1.SchemeGroupVersion.WithKind("Probe"):
-		return &applyconfigurationscorev1.ProbeApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("ProbeCommon"):
+		return &applyconfigurationscorev1.ProbeCommonApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ProbeHandler"):
 		return &applyconfigurationscorev1.ProbeHandlerApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ProjectedVolumeSource"):
@@ -865,6 +867,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.TaintApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("TCPSocketAction"):
 		return &applyconfigurationscorev1.TCPSocketActionApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("TerminatingProbe"):
+		return &applyconfigurationscorev1.TerminatingProbeApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("Toleration"):
 		return &applyconfigurationscorev1.TolerationApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("TopologySelectorLabelRequirement"):

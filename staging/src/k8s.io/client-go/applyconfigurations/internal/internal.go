@@ -4112,7 +4112,7 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: io.k8s.api.core.v1.Lifecycle
     - name: livenessProbe
       type:
-        namedType: io.k8s.api.core.v1.Probe
+        namedType: io.k8s.api.core.v1.TerminatingProbe
     - name: name
       type:
         scalar: string
@@ -4128,7 +4128,7 @@ var schemaYAML = typed.YAMLObject(`types:
           - protocol
     - name: readinessProbe
       type:
-        namedType: io.k8s.api.core.v1.Probe
+        namedType: io.k8s.api.core.v1.NonTerminatingProbe
     - name: resources
       type:
         namedType: io.k8s.api.core.v1.ResourceRequirements
@@ -4138,7 +4138,7 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: io.k8s.api.core.v1.SecurityContext
     - name: startupProbe
       type:
-        namedType: io.k8s.api.core.v1.Probe
+        namedType: io.k8s.api.core.v1.TerminatingProbe
     - name: stdin
       type:
         scalar: boolean
@@ -4504,7 +4504,7 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: io.k8s.api.core.v1.Lifecycle
     - name: livenessProbe
       type:
-        namedType: io.k8s.api.core.v1.Probe
+        namedType: io.k8s.api.core.v1.TerminatingProbe
     - name: name
       type:
         scalar: string
@@ -4520,7 +4520,7 @@ var schemaYAML = typed.YAMLObject(`types:
           - protocol
     - name: readinessProbe
       type:
-        namedType: io.k8s.api.core.v1.Probe
+        namedType: io.k8s.api.core.v1.NonTerminatingProbe
     - name: resources
       type:
         namedType: io.k8s.api.core.v1.ResourceRequirements
@@ -4530,7 +4530,7 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: io.k8s.api.core.v1.SecurityContext
     - name: startupProbe
       type:
-        namedType: io.k8s.api.core.v1.Probe
+        namedType: io.k8s.api.core.v1.TerminatingProbe
     - name: stdin
       type:
         scalar: boolean
@@ -5436,6 +5436,36 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.core.v1.NonTerminatingProbe
+  map:
+    fields:
+    - name: exec
+      type:
+        namedType: io.k8s.api.core.v1.ExecAction
+    - name: failureThreshold
+      type:
+        scalar: numeric
+    - name: grpc
+      type:
+        namedType: io.k8s.api.core.v1.GRPCAction
+    - name: httpGet
+      type:
+        namedType: io.k8s.api.core.v1.HTTPGetAction
+    - name: initialDelaySeconds
+      type:
+        scalar: numeric
+    - name: periodSeconds
+      type:
+        scalar: numeric
+    - name: successThreshold
+      type:
+        scalar: numeric
+    - name: tcpSocket
+      type:
+        namedType: io.k8s.api.core.v1.TCPSocketAction
+    - name: timeoutSeconds
+      type:
+        scalar: numeric
 - name: io.k8s.api.core.v1.ObjectFieldSelector
   map:
     fields:
@@ -6254,39 +6284,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
-- name: io.k8s.api.core.v1.Probe
-  map:
-    fields:
-    - name: exec
-      type:
-        namedType: io.k8s.api.core.v1.ExecAction
-    - name: failureThreshold
-      type:
-        scalar: numeric
-    - name: grpc
-      type:
-        namedType: io.k8s.api.core.v1.GRPCAction
-    - name: httpGet
-      type:
-        namedType: io.k8s.api.core.v1.HTTPGetAction
-    - name: initialDelaySeconds
-      type:
-        scalar: numeric
-    - name: periodSeconds
-      type:
-        scalar: numeric
-    - name: successThreshold
-      type:
-        scalar: numeric
-    - name: tcpSocket
-      type:
-        namedType: io.k8s.api.core.v1.TCPSocketAction
-    - name: terminationGracePeriodSeconds
-      type:
-        scalar: numeric
-    - name: timeoutSeconds
-      type:
-        scalar: numeric
 - name: io.k8s.api.core.v1.ProjectedVolumeSource
   map:
     fields:
@@ -7085,6 +7082,39 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: value
       type:
         scalar: string
+- name: io.k8s.api.core.v1.TerminatingProbe
+  map:
+    fields:
+    - name: exec
+      type:
+        namedType: io.k8s.api.core.v1.ExecAction
+    - name: failureThreshold
+      type:
+        scalar: numeric
+    - name: grpc
+      type:
+        namedType: io.k8s.api.core.v1.GRPCAction
+    - name: httpGet
+      type:
+        namedType: io.k8s.api.core.v1.HTTPGetAction
+    - name: initialDelaySeconds
+      type:
+        scalar: numeric
+    - name: periodSeconds
+      type:
+        scalar: numeric
+    - name: successThreshold
+      type:
+        scalar: numeric
+    - name: tcpSocket
+      type:
+        namedType: io.k8s.api.core.v1.TCPSocketAction
+    - name: terminationGracePeriodSeconds
+      type:
+        scalar: numeric
+    - name: timeoutSeconds
+      type:
+        scalar: numeric
 - name: io.k8s.api.core.v1.Toleration
   map:
     fields:

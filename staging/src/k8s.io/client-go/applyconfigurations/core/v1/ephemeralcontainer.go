@@ -155,7 +155,7 @@ func (b *EphemeralContainerApplyConfiguration) WithVolumeDevices(values ...*Volu
 // WithLivenessProbe sets the LivenessProbe field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the LivenessProbe field is set to the value of the last call.
-func (b *EphemeralContainerApplyConfiguration) WithLivenessProbe(value *ProbeApplyConfiguration) *EphemeralContainerApplyConfiguration {
+func (b *EphemeralContainerApplyConfiguration) WithLivenessProbe(value *TerminatingProbeApplyConfiguration) *EphemeralContainerApplyConfiguration {
 	b.LivenessProbe = value
 	return b
 }
@@ -163,7 +163,7 @@ func (b *EphemeralContainerApplyConfiguration) WithLivenessProbe(value *ProbeApp
 // WithReadinessProbe sets the ReadinessProbe field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ReadinessProbe field is set to the value of the last call.
-func (b *EphemeralContainerApplyConfiguration) WithReadinessProbe(value *ProbeApplyConfiguration) *EphemeralContainerApplyConfiguration {
+func (b *EphemeralContainerApplyConfiguration) WithReadinessProbe(value *NonTerminatingProbeApplyConfiguration) *EphemeralContainerApplyConfiguration {
 	b.ReadinessProbe = value
 	return b
 }
@@ -171,7 +171,7 @@ func (b *EphemeralContainerApplyConfiguration) WithReadinessProbe(value *ProbeAp
 // WithStartupProbe sets the StartupProbe field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the StartupProbe field is set to the value of the last call.
-func (b *EphemeralContainerApplyConfiguration) WithStartupProbe(value *ProbeApplyConfiguration) *EphemeralContainerApplyConfiguration {
+func (b *EphemeralContainerApplyConfiguration) WithStartupProbe(value *TerminatingProbeApplyConfiguration) *EphemeralContainerApplyConfiguration {
 	b.StartupProbe = value
 	return b
 }

@@ -201,7 +201,7 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 		obj.SchedulerName = v1.DefaultSchedulerName
 	}
 }
-func SetDefaults_Probe(obj *v1.Probe) {
+func SetDefaults_ProbeCommon(obj *v1.ProbeCommon) {
 	if obj.TimeoutSeconds == 0 {
 		obj.TimeoutSeconds = 1
 	}

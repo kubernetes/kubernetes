@@ -82,14 +82,20 @@ func (pb *prober) recordContainerEvent(pod *v1.Pod, container *v1.Container, eve
 
 // probe probes the container.
 func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (results.Result, error) {
-	var probeSpec *v1.Probe
+	var probeSpec *v1.ProbeCommon
 	switch probeType {
 	case readiness:
-		probeSpec = container.ReadinessProbe
+		if container.ReadinessProbe != nil {
+			probeSpec = &container.ReadinessProbe.ProbeCommon
+		}
 	case liveness:
-		probeSpec = container.LivenessProbe
+		if container.LivenessProbe != nil {
+			probeSpec = &container.LivenessProbe.ProbeCommon
+		}
 	case startup:
-		probeSpec = container.StartupProbe
+		if container.StartupProbe != nil {
+			probeSpec = &container.StartupProbe.ProbeCommon
+		}
 	default:
 		return results.Failure, fmt.Errorf("unknown probe type: %q", probeType)
 	}
@@ -122,7 +128,7 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
 // if it never succeeds.
-func (pb *prober) runProbeWithRetries(ctx context.Context, probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID, retries int) (probe.Result, string, error) {
+func (pb *prober) runProbeWithRetries(ctx context.Context, probeType probeType, p *v1.ProbeCommon, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID, retries int) (probe.Result, string, error) {
 	var err error
 	var result probe.Result
 	var output string
@@ -135,7 +141,7 @@ func (pb *prober) runProbeWithRetries(ctx context.Context, probeType probeType, 
 	return result, output, err
 }
 
-func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
+func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.ProbeCommon, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
 		klog.V(4).InfoS("Exec-Probe runProbe", "pod", klog.KObj(pod), "containerName", container.Name, "execCommand", p.Exec.Command)

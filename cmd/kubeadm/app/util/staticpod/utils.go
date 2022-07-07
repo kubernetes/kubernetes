@@ -239,20 +239,24 @@ func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 }
 
 // LivenessProbe creates a Probe object with a HTTPGet handler
-func LivenessProbe(host, path string, port int, scheme v1.URIScheme) *v1.Probe {
+func LivenessProbe(host, path string, port int, scheme v1.URIScheme) *v1.TerminatingProbe {
 	// sets initialDelaySeconds same as periodSeconds to skip one period before running a check
-	return createHTTPProbe(host, path, port, scheme, 10, 15, 8, 10)
+	return &v1.TerminatingProbe{
+		ProbeCommon: createHTTPProbe(host, path, port, scheme, 10, 15, 8, 10),
+	}
 }
 
 // ReadinessProbe creates a Probe object with a HTTPGet handler
-func ReadinessProbe(host, path string, port int, scheme v1.URIScheme) *v1.Probe {
+func ReadinessProbe(host, path string, port int, scheme v1.URIScheme) *v1.NonTerminatingProbe {
 	// sets initialDelaySeconds as '0' because we don't want to delay user infrastructure checks
 	// looking for "ready" status on kubeadm static Pods
-	return createHTTPProbe(host, path, port, scheme, 0, 15, 3, 1)
+	return &v1.NonTerminatingProbe{
+		ProbeCommon: createHTTPProbe(host, path, port, scheme, 0, 15, 3, 1),
+	}
 }
 
 // StartupProbe creates a Probe object with a HTTPGet handler
-func StartupProbe(host, path string, port int, scheme v1.URIScheme, timeoutForControlPlane *metav1.Duration) *v1.Probe {
+func StartupProbe(host, path string, port int, scheme v1.URIScheme, timeoutForControlPlane *metav1.Duration) *v1.TerminatingProbe {
 	periodSeconds, timeoutForControlPlaneSeconds := int32(10), kubeadmconstants.DefaultControlPlaneTimeout.Seconds()
 	if timeoutForControlPlane != nil {
 		timeoutForControlPlaneSeconds = timeoutForControlPlane.Seconds()
@@ -261,11 +265,13 @@ func StartupProbe(host, path string, port int, scheme v1.URIScheme, timeoutForCo
 	// we ignore initialDelaySeconds in the calculation here for simplicity
 	failureThreshold := int32(math.Ceil(timeoutForControlPlaneSeconds / float64(periodSeconds)))
 	// sets initialDelaySeconds same as periodSeconds to skip one period before running a check
-	return createHTTPProbe(host, path, port, scheme, periodSeconds, 15, failureThreshold, periodSeconds)
+	return &v1.TerminatingProbe{
+		ProbeCommon: createHTTPProbe(host, path, port, scheme, periodSeconds, 15, failureThreshold, periodSeconds),
+	}
 }
 
-func createHTTPProbe(host, path string, port int, scheme v1.URIScheme, initialDelaySeconds, timeoutSeconds, failureThreshold, periodSeconds int32) *v1.Probe {
-	return &v1.Probe{
+func createHTTPProbe(host, path string, port int, scheme v1.URIScheme, initialDelaySeconds, timeoutSeconds, failureThreshold, periodSeconds int32) v1.ProbeCommon {
+	return v1.ProbeCommon{
 		ProbeHandler: v1.ProbeHandler{
 			HTTPGet: &v1.HTTPGetAction{
 				Host:   host,

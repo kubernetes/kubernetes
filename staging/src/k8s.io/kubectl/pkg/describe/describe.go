@@ -1856,15 +1856,15 @@ func describeContainerState(status corev1.ContainerStatus, w PrefixWriter) {
 
 func describeContainerProbe(container corev1.Container, w PrefixWriter) {
 	if container.LivenessProbe != nil {
-		probe := DescribeProbe(container.LivenessProbe)
+		probe := DescribeProbe(&container.LivenessProbe.ProbeCommon)
 		w.Write(LEVEL_2, "Liveness:\t%s\n", probe)
 	}
 	if container.ReadinessProbe != nil {
-		probe := DescribeProbe(container.ReadinessProbe)
+		probe := DescribeProbe(&container.ReadinessProbe.ProbeCommon)
 		w.Write(LEVEL_2, "Readiness:\t%s\n", probe)
 	}
 	if container.StartupProbe != nil {
-		probe := DescribeProbe(container.StartupProbe)
+		probe := DescribeProbe(&container.StartupProbe.ProbeCommon)
 		w.Write(LEVEL_2, "Startup:\t%s\n", probe)
 	}
 }
@@ -1974,7 +1974,7 @@ func describeContainerEnvFrom(container corev1.Container, resolverFn EnvVarResol
 }
 
 // DescribeProbe is exported for consumers in other API groups that have probes
-func DescribeProbe(probe *corev1.Probe) string {
+func DescribeProbe(probe *corev1.ProbeCommon) string {
 	attrs := fmt.Sprintf("delay=%ds timeout=%ds period=%ds #success=%d #failure=%d", probe.InitialDelaySeconds, probe.TimeoutSeconds, probe.PeriodSeconds, probe.SuccessThreshold, probe.FailureThreshold)
 	switch {
 	case probe.Exec != nil:

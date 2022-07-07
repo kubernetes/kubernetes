@@ -118,38 +118,38 @@ func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
-			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.LivenessProbe.ProbeCommon)
+			if a.LivenessProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.LivenessProbe.ProbeHandler.GRPC != nil {
-				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
+			if a.LivenessProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.LivenessProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.LivenessProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
-			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.ReadinessProbe.ProbeCommon)
+			if a.ReadinessProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
-				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
+			if a.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
-			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.StartupProbe.ProbeCommon)
+			if a.StartupProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.StartupProbe.ProbeHandler.GRPC != nil {
-				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
+			if a.StartupProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.StartupProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.StartupProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
@@ -186,38 +186,38 @@ func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
-			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.LivenessProbe.ProbeCommon)
+			if a.LivenessProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.LivenessProbe.ProbeHandler.GRPC != nil {
-				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
+			if a.LivenessProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.LivenessProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.LivenessProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
-			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.ReadinessProbe.ProbeCommon)
+			if a.ReadinessProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
-				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
+			if a.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
-			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.StartupProbe.ProbeCommon)
+			if a.StartupProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.StartupProbe.ProbeHandler.GRPC != nil {
-				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
+			if a.StartupProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.StartupProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.StartupProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
@@ -254,38 +254,38 @@ func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
 		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
 		if a.EphemeralContainerCommon.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
-			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.EphemeralContainerCommon.LivenessProbe.ProbeCommon)
+			if a.EphemeralContainerCommon.LivenessProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC != nil {
-				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service == nil {
+			if a.EphemeralContainerCommon.LivenessProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.EphemeralContainerCommon.LivenessProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.EphemeralContainerCommon.LivenessProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
 		if a.EphemeralContainerCommon.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
-			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.EphemeralContainerCommon.ReadinessProbe.ProbeCommon)
+			if a.EphemeralContainerCommon.ReadinessProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC != nil {
-				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
+			if a.EphemeralContainerCommon.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.EphemeralContainerCommon.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.EphemeralContainerCommon.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
 		if a.EphemeralContainerCommon.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
-			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.EphemeralContainerCommon.StartupProbe.ProbeCommon)
+			if a.EphemeralContainerCommon.StartupProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC != nil {
-				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service == nil {
+			if a.EphemeralContainerCommon.StartupProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.EphemeralContainerCommon.StartupProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.EphemeralContainerCommon.StartupProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
@@ -392,38 +392,38 @@ func SetObjectDefaults_JobTemplate(in *v1beta1.JobTemplate) {
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
-			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.LivenessProbe.ProbeCommon)
+			if a.LivenessProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.LivenessProbe.ProbeHandler.GRPC != nil {
-				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
+			if a.LivenessProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.LivenessProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.LivenessProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
-			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.ReadinessProbe.ProbeCommon)
+			if a.ReadinessProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
-				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
+			if a.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
-			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.StartupProbe.ProbeCommon)
+			if a.StartupProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.StartupProbe.ProbeHandler.GRPC != nil {
-				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
+			if a.StartupProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.StartupProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.StartupProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
@@ -460,38 +460,38 @@ func SetObjectDefaults_JobTemplate(in *v1beta1.JobTemplate) {
 		v1.SetDefaults_ResourceList(&a.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.Resources.Requests)
 		if a.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.LivenessProbe)
-			if a.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.LivenessProbe.ProbeCommon)
+			if a.LivenessProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.LivenessProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.LivenessProbe.ProbeHandler.GRPC != nil {
-				if a.LivenessProbe.ProbeHandler.GRPC.Service == nil {
+			if a.LivenessProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.LivenessProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.LivenessProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
 		if a.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.ReadinessProbe)
-			if a.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.ReadinessProbe.ProbeCommon)
+			if a.ReadinessProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.ReadinessProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.ReadinessProbe.ProbeHandler.GRPC != nil {
-				if a.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
+			if a.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
 		if a.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.StartupProbe)
-			if a.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.StartupProbe.ProbeCommon)
+			if a.StartupProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.StartupProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.StartupProbe.ProbeHandler.GRPC != nil {
-				if a.StartupProbe.ProbeHandler.GRPC.Service == nil {
+			if a.StartupProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.StartupProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.StartupProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
@@ -528,38 +528,38 @@ func SetObjectDefaults_JobTemplate(in *v1beta1.JobTemplate) {
 		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Limits)
 		v1.SetDefaults_ResourceList(&a.EphemeralContainerCommon.Resources.Requests)
 		if a.EphemeralContainerCommon.LivenessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.LivenessProbe)
-			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.EphemeralContainerCommon.LivenessProbe.ProbeCommon)
+			if a.EphemeralContainerCommon.LivenessProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.LivenessProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC != nil {
-				if a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service == nil {
+			if a.EphemeralContainerCommon.LivenessProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.EphemeralContainerCommon.LivenessProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.EphemeralContainerCommon.LivenessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.EphemeralContainerCommon.LivenessProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
 		if a.EphemeralContainerCommon.ReadinessProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.ReadinessProbe)
-			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.EphemeralContainerCommon.ReadinessProbe.ProbeCommon)
+			if a.EphemeralContainerCommon.ReadinessProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.ReadinessProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC != nil {
-				if a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service == nil {
+			if a.EphemeralContainerCommon.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.EphemeralContainerCommon.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.EphemeralContainerCommon.ReadinessProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.EphemeralContainerCommon.ReadinessProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}
 		if a.EphemeralContainerCommon.StartupProbe != nil {
-			v1.SetDefaults_Probe(a.EphemeralContainerCommon.StartupProbe)
-			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet != nil {
-				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeHandler.HTTPGet)
+			v1.SetDefaults_ProbeCommon(&a.EphemeralContainerCommon.StartupProbe.ProbeCommon)
+			if a.EphemeralContainerCommon.StartupProbe.ProbeCommon.ProbeHandler.HTTPGet != nil {
+				v1.SetDefaults_HTTPGetAction(a.EphemeralContainerCommon.StartupProbe.ProbeCommon.ProbeHandler.HTTPGet)
 			}
-			if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC != nil {
-				if a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service == nil {
+			if a.EphemeralContainerCommon.StartupProbe.ProbeCommon.ProbeHandler.GRPC != nil {
+				if a.EphemeralContainerCommon.StartupProbe.ProbeCommon.ProbeHandler.GRPC.Service == nil {
 					var ptrVar1 string = ""
-					a.EphemeralContainerCommon.StartupProbe.ProbeHandler.GRPC.Service = &ptrVar1
+					a.EphemeralContainerCommon.StartupProbe.ProbeCommon.ProbeHandler.GRPC.Service = &ptrVar1
 				}
 			}
 		}

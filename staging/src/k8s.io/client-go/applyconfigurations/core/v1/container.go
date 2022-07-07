@@ -36,9 +36,9 @@ type ContainerApplyConfiguration struct {
 	Resources                *ResourceRequirementsApplyConfiguration `json:"resources,omitempty"`
 	VolumeMounts             []VolumeMountApplyConfiguration         `json:"volumeMounts,omitempty"`
 	VolumeDevices            []VolumeDeviceApplyConfiguration        `json:"volumeDevices,omitempty"`
-	LivenessProbe            *ProbeApplyConfiguration                `json:"livenessProbe,omitempty"`
-	ReadinessProbe           *ProbeApplyConfiguration                `json:"readinessProbe,omitempty"`
-	StartupProbe             *ProbeApplyConfiguration                `json:"startupProbe,omitempty"`
+	LivenessProbe            *TerminatingProbeApplyConfiguration     `json:"livenessProbe,omitempty"`
+	ReadinessProbe           *NonTerminatingProbeApplyConfiguration  `json:"readinessProbe,omitempty"`
+	StartupProbe             *TerminatingProbeApplyConfiguration     `json:"startupProbe,omitempty"`
 	Lifecycle                *LifecycleApplyConfiguration            `json:"lifecycle,omitempty"`
 	TerminationMessagePath   *string                                 `json:"terminationMessagePath,omitempty"`
 	TerminationMessagePolicy *corev1.TerminationMessagePolicy        `json:"terminationMessagePolicy,omitempty"`
@@ -175,7 +175,7 @@ func (b *ContainerApplyConfiguration) WithVolumeDevices(values ...*VolumeDeviceA
 // WithLivenessProbe sets the LivenessProbe field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the LivenessProbe field is set to the value of the last call.
-func (b *ContainerApplyConfiguration) WithLivenessProbe(value *ProbeApplyConfiguration) *ContainerApplyConfiguration {
+func (b *ContainerApplyConfiguration) WithLivenessProbe(value *TerminatingProbeApplyConfiguration) *ContainerApplyConfiguration {
 	b.LivenessProbe = value
 	return b
 }
@@ -183,7 +183,7 @@ func (b *ContainerApplyConfiguration) WithLivenessProbe(value *ProbeApplyConfigu
 // WithReadinessProbe sets the ReadinessProbe field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the ReadinessProbe field is set to the value of the last call.
-func (b *ContainerApplyConfiguration) WithReadinessProbe(value *ProbeApplyConfiguration) *ContainerApplyConfiguration {
+func (b *ContainerApplyConfiguration) WithReadinessProbe(value *NonTerminatingProbeApplyConfiguration) *ContainerApplyConfiguration {
 	b.ReadinessProbe = value
 	return b
 }
@@ -191,7 +191,7 @@ func (b *ContainerApplyConfiguration) WithReadinessProbe(value *ProbeApplyConfig
 // WithStartupProbe sets the StartupProbe field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the StartupProbe field is set to the value of the last call.
-func (b *ContainerApplyConfiguration) WithStartupProbe(value *ProbeApplyConfiguration) *ContainerApplyConfiguration {
+func (b *ContainerApplyConfiguration) WithStartupProbe(value *TerminatingProbeApplyConfiguration) *ContainerApplyConfiguration {
 	b.StartupProbe = value
 	return b
 }

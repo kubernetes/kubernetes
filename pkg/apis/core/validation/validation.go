@@ -2816,7 +2816,7 @@ func validatePodResourceClaimSource(claimSource core.ClaimSource, fldPath *field
 	return allErrs
 }
 
-func validateProbe(probe *core.Probe, fldPath *field.Path) field.ErrorList {
+func validateProbeCommon(probe *core.ProbeCommon, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if probe == nil {
@@ -2829,9 +2829,29 @@ func validateProbe(probe *core.Probe, fldPath *field.Path) field.ErrorList {
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.PeriodSeconds), fldPath.Child("periodSeconds"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.SuccessThreshold), fldPath.Child("successThreshold"))...)
 	allErrs = append(allErrs, ValidateNonnegativeField(int64(probe.FailureThreshold), fldPath.Child("failureThreshold"))...)
+	return allErrs
+}
+
+func validateTerminatingProbe(probe *core.TerminatingProbe, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if probe == nil {
+		return allErrs
+	}
+	allErrs = append(allErrs, validateProbeCommon(&probe.ProbeCommon, fldPath)...)
 	if probe.TerminationGracePeriodSeconds != nil && *probe.TerminationGracePeriodSeconds <= 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("terminationGracePeriodSeconds"), *probe.TerminationGracePeriodSeconds, "must be greater than 0"))
 	}
+	return allErrs
+}
+
+func validateNonTerminatingProbe(probe *core.NonTerminatingProbe, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if probe == nil {
+		return allErrs
+	}
+	allErrs = append(allErrs, validateProbeCommon(&probe.ProbeCommon, fldPath)...)
 	return allErrs
 }
 
@@ -3284,12 +3304,9 @@ func validateContainers(containers []core.Container, volumes map[string]core.Vol
 			allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, path.Child("lifecycle"))...)
 		}
 
-		allErrs = append(allErrs, validateProbe(ctr.StartupProbe, path.Child("startupProbe"))...)
-		allErrs = append(allErrs, validateProbe(ctr.LivenessProbe, path.Child("livenessProbe"))...)
-		allErrs = append(allErrs, validateProbe(ctr.ReadinessProbe, path.Child("readinessProbe"))...)
-		if ctr.ReadinessProbe != nil && ctr.ReadinessProbe.TerminationGracePeriodSeconds != nil {
-			allErrs = append(allErrs, field.Invalid(path.Child("readinessProbe", "terminationGracePeriodSeconds"), ctr.ReadinessProbe.TerminationGracePeriodSeconds, "must not be set for readinessProbes"))
-		}
+		allErrs = append(allErrs, validateTerminatingProbe(ctr.StartupProbe, path.Child("startupProbe"))...)
+		allErrs = append(allErrs, validateTerminatingProbe(ctr.LivenessProbe, path.Child("livenessProbe"))...)
+		allErrs = append(allErrs, validateNonTerminatingProbe(ctr.ReadinessProbe, path.Child("readinessProbe"))...)
 	}
 
 	// Port conflicts are checked across all containers

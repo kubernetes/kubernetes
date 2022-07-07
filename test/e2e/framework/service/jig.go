@@ -660,12 +660,14 @@ func (j *TestJig) newRCTemplate() *v1.ReplicationController {
 							Name:  "netexec",
 							Image: imageutils.GetE2EImage(imageutils.Agnhost),
 							Args:  []string{"netexec", "--http-port=80", "--udp-port=80"},
-							ReadinessProbe: &v1.Probe{
-								PeriodSeconds: 3,
-								ProbeHandler: v1.ProbeHandler{
-									HTTPGet: &v1.HTTPGetAction{
-										Port: intstr.FromInt(80),
-										Path: "/hostName",
+							ReadinessProbe: &v1.NonTerminatingProbe{
+								ProbeCommon: v1.ProbeCommon{
+									PeriodSeconds: 3,
+									ProbeHandler: v1.ProbeHandler{
+										HTTPGet: &v1.HTTPGetAction{
+											Port: intstr.FromInt(80),
+											Path: "/hostName",
+										},
 									},
 								},
 							},
