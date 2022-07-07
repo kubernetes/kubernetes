@@ -819,6 +819,10 @@ func (adc *attachDetachController) GetPodVolumeDir(podUID types.UID, pluginName,
 	return ""
 }
 
+func (adc *attachDetachController) GetHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int64) (hostUID, hostGID *int64, err error) {
+	return nil, nil, nil
+}
+
 func (adc *attachDetachController) GetPodPluginDir(podUID types.UID, pluginName string) string {
 	return ""
 }

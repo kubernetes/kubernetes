@@ -528,3 +528,68 @@ func (m *usernsManager) CleanupOrphanedPodUsernsAllocations(pods []*v1.Pod, runn
 
 	return nil
 }
+
+// getHostIDsForPod if the pod uses user namespaces, takes the uid and gid
+// inside the container and returns the host UID and GID those are mapped to on
+// the host. If containerUID/containerGID is nil, then it returns the host
+// UID/GID for ID 0 inside the container.
+// If the pod is not using user namespaces, as there is no mapping needed, the
+// same containerUID and containerGID params are returned.
+func (m *usernsManager) getHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int64) (hostUID, hostGID *int64, err error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) {
+		return containerUID, containerGID, nil
+	}
+
+	if pod == nil || pod.Spec.HostUsers == nil || *pod.Spec.HostUsers == true {
+		return containerUID, containerGID, nil
+	}
+
+	mapping, err := m.GetOrCreateUserNamespaceMappings(pod)
+	if err != nil {
+		err = fmt.Errorf("Error getting pod user namespace mapping: %w", err)
+		return
+	}
+
+	uid, err := hostIDFromMapping(mapping.Uids, containerUID)
+	if err != nil {
+		err = fmt.Errorf("Error getting host UID: %w", err)
+		return
+	}
+
+	gid, err := hostIDFromMapping(mapping.Gids, containerGID)
+	if err != nil {
+		err = fmt.Errorf("Error getting host GID: %w", err)
+		return
+	}
+
+	return &uid, &gid, nil
+}
+
+func hostIDFromMapping(mapping []*runtimeapi.IDMapping, containerId *int64) (int64, error) {
+	if len(mapping) == 0 {
+		return 0, fmt.Errorf("can't use empty user namespace mapping")
+	}
+
+	// If none is requested, root inside the container is used
+	id := int64(0)
+	if containerId != nil {
+		id = *containerId
+	}
+
+	for _, m := range mapping {
+		if m == nil {
+			continue
+		}
+
+		firstId := int64(m.ContainerId)
+		lastId := firstId + int64(m.Length) - 1
+
+		// The id we are looking for is in the range
+		if id >= firstId && id <= lastId {
+			// Return the host id for this container id
+			return int64(m.HostId) + id - firstId, nil
+		}
+	}
+
+	return 0, fmt.Errorf("ID: %v not present in pod user namespace", id)
+}

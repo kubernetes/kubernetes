@@ -425,6 +425,10 @@ func (kl *Kubelet) GetOrCreateUserNamespaceMappings(pod *v1.Pod) (*runtimeapi.Us
 	return kl.usernsManager.GetOrCreateUserNamespaceMappings(pod)
 }
 
+func (kl *Kubelet) getHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int64) (hostUID, hostGID *int64, err error) {
+	return kl.usernsManager.getHostIDsForPod(pod, containerUID, containerGID)
+}
+
 // GeneratePodHostNameAndDomain creates a hostname and domain name for a pod,
 // given that pod's spec and annotations or returns an error.
 func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
