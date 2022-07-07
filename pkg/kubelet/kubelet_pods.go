@@ -1154,6 +1154,12 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		return err
 	}
 
+	// Remove orphaned pod user namespace allocations (if any).
+	klog.V(3).InfoS("Clean up orphaned pod user namespace allocations")
+	if err = kl.usernsManager.CleanupOrphanedPodUsernsAllocations(allPods, runningRuntimePods); err != nil {
+		klog.ErrorS(err, "Failed cleaning up orphaned pod user namespaces allocations")
+	}
+
 	// Remove orphaned volumes from pods that are known not to have any
 	// containers. Note that we pass all pods (including terminated pods) to
 	// the function, so that we don't remove volumes associated with terminated
