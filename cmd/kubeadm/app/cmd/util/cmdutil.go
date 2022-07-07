@@ -17,6 +17,11 @@ limitations under the License.
 package util
 
 import (
+	"bufio"
+	"fmt"
+	"io"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -99,4 +104,20 @@ func DefaultInitConfiguration() *kubeadmapiv1.InitConfiguration {
 		},
 	}
 	return initCfg
+}
+
+// InteractivelyConfirmAction asks the user whether they _really_ want to take the action.
+func InteractivelyConfirmAction(action, question string, r io.Reader) error {
+	fmt.Printf("[%s] %s [y/N]: ", action, question)
+	scanner := bufio.NewScanner(r)
+	scanner.Scan()
+	if err := scanner.Err(); err != nil {
+		return errors.Wrap(err, "couldn't read from standard input")
+	}
+	answer := scanner.Text()
+	if strings.ToLower(answer) == "y" || strings.ToLower(answer) == "yes" {
+		return nil
+	}
+
+	return errors.New("won't proceed; the user didn't answer (Y|y) in order to continue")
 }
