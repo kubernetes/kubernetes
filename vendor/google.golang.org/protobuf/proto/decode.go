@@ -42,18 +42,25 @@ type UnmarshalOptions struct {
 		FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error)
 		FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error)
 	}
+
+	// RecursionLimit limits how deeply messages may be nested.
+	// If zero, a default limit is applied.
+	RecursionLimit int
 }
 
 // Unmarshal parses the wire-format message in b and places the result in m.
 // The provided message must be mutable (e.g., a non-nil pointer to a message).
 func Unmarshal(b []byte, m Message) error {
-	_, err := UnmarshalOptions{}.unmarshal(b, m.ProtoReflect())
+	_, err := UnmarshalOptions{RecursionLimit: protowire.DefaultRecursionLimit}.unmarshal(b, m.ProtoReflect())
 	return err
 }
 
 // Unmarshal parses the wire-format message in b and places the result in m.
 // The provided message must be mutable (e.g., a non-nil pointer to a message).
 func (o UnmarshalOptions) Unmarshal(b []byte, m Message) error {
+	if o.RecursionLimit == 0 {
+		o.RecursionLimit = protowire.DefaultRecursionLimit
+	}
 	_, err := o.unmarshal(b, m.ProtoReflect())
 	return err
 }
@@ -63,6 +70,9 @@ func (o UnmarshalOptions) Unmarshal(b []byte, m Message) error {
 // This method permits fine-grained control over the unmarshaler.
 // Most users should use Unmarshal instead.
 func (o UnmarshalOptions) UnmarshalState(in protoiface.UnmarshalInput) (protoiface.UnmarshalOutput, error) {
+	if o.RecursionLimit == 0 {
+		o.RecursionLimit = protowire.DefaultRecursionLimit
+	}
 	return o.unmarshal(in.Buf, in.Message)
 }
 
@@ -86,12 +96,17 @@ func (o UnmarshalOptions) unmarshal(b []byte, m protoreflect.Message) (out proto
 			Message:  m,
 			Buf:      b,
 			Resolver: o.Resolver,
+			Depth:    o.RecursionLimit,
 		}
 		if o.DiscardUnknown {
 			in.Flags |= protoiface.UnmarshalDiscardUnknown
 		}
 		out, err = methods.Unmarshal(in)
 	} else {
+		o.RecursionLimit--
+		if o.RecursionLimit < 0 {
+			return out, errors.New("exceeded max recursion depth")
+		}
 		err = o.unmarshalMessageSlow(b, m)
 	}
 	if err != nil {

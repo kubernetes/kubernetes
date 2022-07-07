@@ -243,6 +243,8 @@ func NewBasicBlockStartState() *BasicBlockStartState {
 	return &BasicBlockStartState{BaseBlockStartState: b}
 }
 
+var _ BlockStartState = &BasicBlockStartState{}
+
 // BlockEndState is a terminal node of a simple (a|b|c) block.
 type BlockEndState struct {
 	*BaseATNState
@@ -318,6 +320,8 @@ func NewPlusBlockStartState() *PlusBlockStartState {
 	return &PlusBlockStartState{BaseBlockStartState: b}
 }
 
+var _ BlockStartState = &PlusBlockStartState{}
+
 // StarBlockStartState is the block that begins a closure loop.
 type StarBlockStartState struct {
 	*BaseBlockStartState
@@ -330,6 +334,8 @@ func NewStarBlockStartState() *StarBlockStartState {
 
 	return &StarBlockStartState{BaseBlockStartState: b}
 }
+
+var _ BlockStartState = &StarBlockStartState{}
 
 type StarLoopbackState struct {
 	*BaseATNState

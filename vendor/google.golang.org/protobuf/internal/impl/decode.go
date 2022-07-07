@@ -18,6 +18,7 @@ import (
 )
 
 var errDecode = errors.New("cannot parse invalid wire-format data")
+var errRecursionDepth = errors.New("exceeded maximum recursion depth")
 
 type unmarshalOptions struct {
 	flags    protoiface.UnmarshalInputFlags
@@ -25,6 +26,7 @@ type unmarshalOptions struct {
 		FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error)
 		FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error)
 	}
+	depth int
 }
 
 func (o unmarshalOptions) Options() proto.UnmarshalOptions {
@@ -44,6 +46,7 @@ func (o unmarshalOptions) IsDefault() bool {
 
 var lazyUnmarshalOptions = unmarshalOptions{
 	resolver: preg.GlobalTypes,
+	depth:    protowire.DefaultRecursionLimit,
 }
 
 type unmarshalOutput struct {
@@ -62,6 +65,7 @@ func (mi *MessageInfo) unmarshal(in piface.UnmarshalInput) (piface.UnmarshalOutp
 	out, err := mi.unmarshalPointer(in.Buf, p, 0, unmarshalOptions{
 		flags:    in.Flags,
 		resolver: in.Resolver,
+		depth:    in.Depth,
 	})
 	var flags piface.UnmarshalOutputFlags
 	if out.initialized {
@@ -82,6 +86,10 @@ var errUnknown = errors.New("unknown")
 
 func (mi *MessageInfo) unmarshalPointer(b []byte, p pointer, groupTag protowire.Number, opts unmarshalOptions) (out unmarshalOutput, err error) {
 	mi.init()
+	opts.depth--
+	if opts.depth < 0 {
+		return out, errRecursionDepth
+	}
 	if flags.ProtoLegacy && mi.isMessageSet {
 		return unmarshalMessageSet(mi, b, p, opts)
 	}

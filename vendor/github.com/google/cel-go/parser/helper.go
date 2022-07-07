@@ -435,6 +435,11 @@ func (e *exprHelper) Ident(name string) *exprpb.Expr {
 	return e.parserHelper.newIdent(e.nextMacroID(), name)
 }
 
+// AccuIdent implements the ExprHelper interface method.
+func (e *exprHelper) AccuIdent() *exprpb.Expr {
+	return e.parserHelper.newIdent(e.nextMacroID(), AccumulatorName)
+}
+
 // GlobalCall implements the ExprHelper interface method.
 func (e *exprHelper) GlobalCall(function string, args ...*exprpb.Expr) *exprpb.Expr {
 	return e.parserHelper.newGlobalCall(e.nextMacroID(), function, args...)

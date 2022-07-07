@@ -181,8 +181,7 @@ func (e *Env) addOverload(f *exprpb.Decl, overload *exprpb.Decl_FunctionDecl_Ove
 		overload.GetParams()...)
 	overloadErased := substitute(emptyMappings, overloadFunction, true)
 	for _, existing := range function.GetOverloads() {
-		existingFunction := decls.NewFunctionType(existing.GetResultType(),
-			existing.GetParams()...)
+		existingFunction := decls.NewFunctionType(existing.GetResultType(), existing.GetParams()...)
 		existingErased := substitute(emptyMappings, existingFunction, true)
 		overlap := isAssignable(emptyMappings, overloadErased, existingErased) != nil ||
 			isAssignable(emptyMappings, existingErased, overloadErased) != nil
@@ -213,18 +212,33 @@ func (e *Env) addOverload(f *exprpb.Decl, overload *exprpb.Decl_FunctionDecl_Ove
 // Adds a function decl if one doesn't already exist, then adds all overloads from the Decl.
 // If overload overlaps with an existing overload, adds to the errors  in the Env instead.
 func (e *Env) setFunction(decl *exprpb.Decl) []errorMsg {
+	errorMsgs := make([]errorMsg, 0)
+	overloads := decl.GetFunction().GetOverloads()
 	current := e.declarations.FindFunction(decl.Name)
 	if current == nil {
 		//Add the function declaration without overloads and check the overloads below.
 		current = decls.NewFunction(decl.Name)
 	} else {
+		existingOverloads := map[string]*exprpb.Decl_FunctionDecl_Overload{}
+		for _, overload := range current.GetFunction().GetOverloads() {
+			existingOverloads[overload.GetOverloadId()] = overload
+		}
+		newOverloads := []*exprpb.Decl_FunctionDecl_Overload{}
+		for _, overload := range overloads {
+			existing, found := existingOverloads[overload.GetOverloadId()]
+			if !found || !proto.Equal(existing, overload) {
+				newOverloads = append(newOverloads, overload)
+			}
+		}
+		overloads = newOverloads
+		if len(newOverloads) == 0 {
+			return errorMsgs
+		}
 		// Copy on write since we don't know where this original definition came from.
 		current = proto.Clone(current).(*exprpb.Decl)
 	}
 	e.declarations.SetFunction(current)
-
-	errorMsgs := make([]errorMsg, 0)
-	for _, overload := range decl.GetFunction().GetOverloads() {
+	for _, overload := range overloads {
 		errorMsgs = append(errorMsgs, e.addOverload(current, overload)...)
 	}
 	return errorMsgs
@@ -235,6 +249,9 @@ func (e *Env) setFunction(decl *exprpb.Decl) []errorMsg {
 func (e *Env) addIdent(decl *exprpb.Decl) errorMsg {
 	current := e.declarations.FindIdentInScope(decl.Name)
 	if current != nil {
+		if proto.Equal(current, decl) {
+			return ""
+		}
 		return overlappingIdentifierError(decl.Name)
 	}
 	e.declarations.AddIdent(decl)
