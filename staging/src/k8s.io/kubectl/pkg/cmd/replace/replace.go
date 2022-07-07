@@ -228,11 +228,11 @@ func (o *ReplaceOptions) Validate() error {
 	}
 
 	if o.DeleteOptions.ForceDeletion && o.DryRunStrategy != cmdutil.DryRunNone {
-		return fmt.Errorf("dry-run can not be used when --force is set")
+		return fmt.Errorf("--dry-run can not be used when --force is set")
 	}
 
 	if cmdutil.IsFilenameSliceEmpty(o.DeleteOptions.FilenameOptions.Filenames, o.DeleteOptions.FilenameOptions.Kustomize) {
-		return fmt.Errorf("Must specify --filename to replace")
+		return fmt.Errorf("must specify --filename to replace")
 	}
 
 	if len(o.Raw) > 0 {
