@@ -19,6 +19,7 @@ package podtopologyspread
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"testing"
 
@@ -815,6 +816,31 @@ func TestPreFilterStateAddPod(t *testing.T) {
 					{key: "node", value: "node-a"}: pointer.Int32Ptr(1),
 					{key: "node", value: "node-b"}: pointer.Int32Ptr(1),
 					{key: "node", value: "node-x"}: pointer.Int32Ptr(2),
+				},
+			},
+		},
+		{
+			name: "add a pod that doesn't match the node affinity",
+			preemptor: st.MakePod().Name("p").Label("foo", "").NodeAffinityNotIn("foo", []string{"bar"}).
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
+			nodeIdx:  0,
+			addedPod: st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Label("foo", "bar").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone2").Label("node", "node-b").Label("foo", "").Obj(),
+			},
+			want: &preFilterState{
+				Constraints: []topologySpreadConstraint{zoneConstraint},
+				TpKeyToCriticalPaths: map[string]*criticalPaths{
+					"zone": {{"zone2", 1}, {MatchNum: math.MaxInt32}},
+				},
+				TpPairToMatchNum: map[topologyPair]*int32{
+					{key: "zone", value: "zone2"}: pointer.Int32Ptr(1),
 				},
 			},
 		},
