@@ -3,6 +3,7 @@ package dns
 import (
 	"fmt"
 	"io"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/validation"
@@ -102,19 +103,21 @@ func (dnsV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj runtime
 
 // validateDNSSpecCreate validates the spec of a DNS that is being created.
 func validateDNSSpecCreate(spec operatorv1.DNSSpec) field.ErrorList {
-	return validateDNSSpec(spec)
+	var errs field.ErrorList
+	specField := field.NewPath("spec")
+	errs = append(errs, validateDNSNodePlacement(spec.NodePlacement, specField.Child("nodePlacement"))...)
+	errs = append(errs, validateUpstreamResolversCreate(spec.UpstreamResolvers, specField.Child("upstreamResolvers"))...)
+	errs = append(errs, validateServersCreate(spec.Servers, specField.Child("servers"))...)
+	return errs
 }
 
 // validateDNSSpecUpdate validates the spec of a DNS that is being updated.
 func validateDNSSpecUpdate(newspec, oldspec operatorv1.DNSSpec) field.ErrorList {
-	return validateDNSSpec(newspec)
-}
-
-// validateDNSSpec validates the spec of a DNS.
-func validateDNSSpec(spec operatorv1.DNSSpec) field.ErrorList {
 	var errs field.ErrorList
 	specField := field.NewPath("spec")
-	errs = append(errs, validateDNSNodePlacement(spec.NodePlacement, specField.Child("nodePlacement"))...)
+	errs = append(errs, validateDNSNodePlacement(newspec.NodePlacement, specField.Child("nodePlacement"))...)
+	errs = append(errs, validateUpstreamResolversUpdate(newspec.UpstreamResolvers, oldspec.UpstreamResolvers, specField.Child("upstreamResolvers"))...)
+	errs = append(errs, validateServersUpdate(newspec.Servers, oldspec.Servers, specField.Child("servers"))...)
 	return errs
 }
 
@@ -141,4 +144,98 @@ func validateTolerations(versionedTolerations []corev1.Toleration, fldPath *fiel
 	}
 	allErrors = append(allErrors, apivalidation.ValidateTolerations(unversionedTolerations, fldPath)...)
 	return allErrors
+}
+
+// validateUpstreamResolversCreate validates configuration of the Upstream objects when TLS is configured.
+func validateUpstreamResolversCreate(upstreamResolvers operatorv1.UpstreamResolvers, fieldPath *field.Path) field.ErrorList {
+	var errs field.ErrorList
+
+	errs = append(errs, validateDNSTransportConfig(upstreamResolvers.TransportConfig, fieldPath.Child("transportConfig"))...)
+
+	if upstreamResolvers.TransportConfig.Transport == operatorv1.TLSTransport {
+		// Transport is TLS so we must check if there are mixed Upstream types. SystemResolveConf is not allowed with TLS.
+		for i, upstream := range upstreamResolvers.Upstreams {
+			if upstream.Type == operatorv1.SystemResolveConfType {
+				errMessage := "SystemResolvConf is not allowed when TLS is configured as the transport"
+				errs = append(errs, field.Invalid(fieldPath.Child("upstreams").Index(i).Child("type"), upstream.Type, errMessage))
+			}
+		}
+	}
+
+	return errs
+}
+
+// validateUpstreamResolversUpdate validates configuration of the Upstream objects when TLS is configured.
+func validateUpstreamResolversUpdate(newUpstreamResolvers operatorv1.UpstreamResolvers, oldUpstreamResolvers operatorv1.UpstreamResolvers, fieldPath *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	newTransport := newUpstreamResolvers.TransportConfig.Transport
+
+	if !reflect.DeepEqual(newUpstreamResolvers.TransportConfig, oldUpstreamResolvers.TransportConfig) || isKnownTransport(newTransport) {
+		errs = append(errs, validateUpstreamResolversCreate(newUpstreamResolvers, fieldPath)...)
+	}
+
+	return errs
+}
+
+func isKnownTransport(transport operatorv1.DNSTransport) bool {
+	switch transport {
+	case "", operatorv1.CleartextTransport, operatorv1.TLSTransport:
+		return true
+	default:
+		return false
+	}
+
+}
+
+func validateServersCreate(servers []operatorv1.Server, fieldPath *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	for i, server := range servers {
+		errs = append(errs, validateDNSTransportConfig(server.ForwardPlugin.TransportConfig, fieldPath.Index(i).Child("forwardPlugin").Child("transportConfig"))...)
+	}
+	return errs
+}
+
+func validateServersUpdate(newServers []operatorv1.Server, oldServers []operatorv1.Server, fieldPath *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	for i, newServer := range newServers {
+		for _, oldServer := range oldServers {
+			// Use server.Name as the pivot for comparison since a cluster admin could conceivably change the transport
+			// and/or upstreams, making those insufficient for comparison.
+			if newServer.Name == oldServer.Name {
+				// TransportConfig has changed
+				if !reflect.DeepEqual(newServer.ForwardPlugin.TransportConfig, oldServer.ForwardPlugin.TransportConfig) {
+					errs = append(validateDNSTransportConfig(newServer.ForwardPlugin.TransportConfig, fieldPath.Index(i).Child("forwardPlugin").Child("transportConfig")))
+				}
+			}
+		}
+	}
+	return errs
+}
+
+func validateDNSTransportConfig(transportConfig operatorv1.DNSTransportConfig, fieldPath *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	var emptyTransportConfig operatorv1.DNSTransportConfig
+	tlsConfig := transportConfig.TLS
+
+	// No validation is needed on an empty TransportConfig.
+	if transportConfig == emptyTransportConfig {
+		return errs
+	}
+
+	switch transportConfig.Transport {
+	case "", operatorv1.CleartextTransport:
+		// Don't allow TLS configuration when using empty or Cleartext
+		if tlsConfig != nil {
+			errs = append(errs, field.Invalid(fieldPath.Child("tls"), transportConfig.TLS, "TLS must not be configured when using an empty or cleartext transport"))
+		}
+	case operatorv1.TLSTransport:
+		// When Transport is TLS, there MUST be a ServerName configured.
+		if tlsConfig == nil || tlsConfig.ServerName == "" {
+			errs = append(errs, field.Required(fieldPath.Child("tls").Child("serverName"), "transportConfig requires a serverName when transport is TLS"))
+		}
+	default:
+		errs = append(errs, field.Invalid(fieldPath.Child("transport"), transportConfig.Transport, "unknown transport"))
+	}
+
+	return errs
 }
