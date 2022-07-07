@@ -41,6 +41,7 @@ type PodSpecApplyConfiguration struct {
 	HostNetwork                   *bool                                        `json:"hostNetwork,omitempty"`
 	HostPID                       *bool                                        `json:"hostPID,omitempty"`
 	HostIPC                       *bool                                        `json:"hostIPC,omitempty"`
+	HostUsers                     *bool                                        `json:"hostUsers,omitempty"`
 	ShareProcessNamespace         *bool                                        `json:"shareProcessNamespace,omitempty"`
 	SecurityContext               *PodSecurityContextApplyConfiguration        `json:"securityContext,omitempty"`
 	ImagePullSecrets              []LocalObjectReferenceApplyConfiguration     `json:"imagePullSecrets,omitempty"`
@@ -204,6 +205,14 @@ func (b *PodSpecApplyConfiguration) WithNodeName(value string) *PodSpecApplyConf
 // If called multiple times, the HostNetwork field is set to the value of the last call.
 func (b *PodSpecApplyConfiguration) WithHostNetwork(value bool) *PodSpecApplyConfiguration {
 	b.HostNetwork = &value
+	return b
+}
+
+// WithHostUsers sets the HostUsers field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the HostUsers field is set to the value of the last call.
+func (b *PodSpecApplyConfiguration) WithHostUsers(value *bool) *PodSpecApplyConfiguration {
+	b.HostUsers = value
 	return b
 }
 

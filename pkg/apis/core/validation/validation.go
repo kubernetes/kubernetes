@@ -3637,6 +3637,9 @@ func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 		if securityContext.SELinuxOptions != nil {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("seLinuxOptions"), "cannot be set for a windows pod"))
 		}
+		if securityContext.HostUsers != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostUsers"), "cannot be set for a windows pod"))
+		}
 		if securityContext.HostPID {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostPID"), "cannot be set for a windows pod"))
 		}
