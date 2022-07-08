@@ -22,6 +22,7 @@ import (
 	"math"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
@@ -29,6 +30,7 @@ import (
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/metrics"
 	"k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -113,6 +115,8 @@ func validator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *
 // Most callers can ignore the returned remainingBudget value unless another validate call is going to be made
 // context is passed for supporting context cancellation during cel validation
 func (s *Validator) Validate(ctx context.Context, fldPath *field.Path, sts *schema.Structural, obj, oldObj interface{}, costBudget int64) (errs field.ErrorList, remainingBudget int64) {
+	t := time.Now()
+	defer metrics.Metrics.ObserveEvaluation(time.Since(t))
 	remainingBudget = costBudget
 	if s == nil || obj == nil {
 		return nil, remainingBudget

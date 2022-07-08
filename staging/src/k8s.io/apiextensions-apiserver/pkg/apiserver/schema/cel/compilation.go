@@ -31,6 +31,7 @@ import (
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/library"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/metrics"
 	celmodel "k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
 )
 
@@ -99,6 +100,9 @@ func getBaseEnv() (*cel.Env, error) {
 //  - nil Program, nil Error: The provided rule was empty so compilation was not attempted
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit as input.
 func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]CompilationResult, error) {
+	t := time.Now()
+	defer metrics.Metrics.ObserveCompilation(time.Since(t))
+
 	if len(s.Extensions.XValidations) == 0 {
 		return nil, nil
 	}
