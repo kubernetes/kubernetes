@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
 func TestPodSandboxChanged(t *testing.T) {
@@ -222,7 +223,8 @@ func TestNamespacesForPod(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			actual := NamespacesForPod(test.input)
+			actual, err := NamespacesForPod(test.input, &kubecontainertest.FakeRuntimeHelper{})
+			require.NoError(t, err)
 			require.Equal(t, test.expected, actual)
 		})
 	}
