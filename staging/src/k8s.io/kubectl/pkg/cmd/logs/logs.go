@@ -43,7 +43,7 @@ import (
 )
 
 const (
-	logsUsageStr = "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]"
+	logsUsageStr = "logs [-f [-w]] [-p] (POD | TYPE/NAME) [-c CONTAINER]"
 )
 
 var (
@@ -66,6 +66,9 @@ var (
 
 		# Begin streaming the logs of the ruby container in pod web-1
 		kubectl logs -f -c ruby web-1
+
+		# Wait for container ruby in pod web1 to start and then begin streaming its logs
+		kubectl logs -f -w -c ruby web-1
 
 		# Begin streaming the logs from all containers in pods defined by label app=nginx
 		kubectl logs -f -l app=nginx --all-containers=true
@@ -127,7 +130,8 @@ type LogsOptions struct {
 
 	genericclioptions.IOStreams
 
-	TailSpecified bool
+	TailSpecified         bool
+	WaitForContainerStart bool
 
 	containerNameFromRefSpecRegexp *regexp.Regexp
 }
@@ -167,6 +171,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 func (o *LogsOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.AllContainers, "all-containers", o.AllContainers, "Get all containers' logs in the pod(s).")
 	cmd.Flags().BoolVarP(&o.Follow, "follow", "f", o.Follow, "Specify if the logs should be streamed.")
+	cmd.Flags().BoolVarP(&o.WaitForContainerStart, "wait", "w", o.WaitForContainerStart, "Wait for containers to start before streaming logs. Can only be set together with --follow.")
 	cmd.Flags().BoolVar(&o.Timestamps, "timestamps", o.Timestamps, "Include timestamps on each line in the log output")
 	cmd.Flags().Int64Var(&o.LimitBytes, "limit-bytes", o.LimitBytes, "Maximum bytes of logs to return. Defaults to no limit.")
 	cmd.Flags().BoolVarP(&o.Previous, "previous", "p", o.Previous, "If true, print the logs for the previous instance of the container in a pod if it exists.")
@@ -260,7 +265,11 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	}
 
 	o.RESTClientGetter = f
-	o.LogsForObject = polymorphichelpers.LogsForObjectFn
+	if o.WaitForContainerStart && !o.Previous {
+		o.LogsForObject = polymorphichelpers.LogsForObjectWithWaitFn
+	} else {
+		o.LogsForObject = polymorphichelpers.LogsForObjectFn
+	}
 
 	if o.Object == nil {
 		builder := f.NewBuilder().
@@ -316,6 +325,10 @@ func (o LogsOptions) Validate() error {
 
 	if logsOptions.TailLines != nil && *logsOptions.TailLines < -1 {
 		return fmt.Errorf("--tail must be greater than or equal to -1")
+	}
+
+	if o.WaitForContainerStart && !o.Follow {
+		return fmt.Errorf("--wait can only be set together with --follow")
 	}
 
 	return nil

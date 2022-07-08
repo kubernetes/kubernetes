@@ -31,7 +31,10 @@ import (
 type LogsForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[v1.ObjectReference]rest.ResponseWrapper, error)
 
 // LogsForObjectFn gives a way to easily override the function for unit testing if needed.
-var LogsForObjectFn LogsForObjectFunc = logsForObject
+var LogsForObjectFn LogsForObjectFunc = logsForObjectImmediate
+
+// LogsForObjectWithWaitFn gives a way to easily override the function for unit testing if needed.
+var LogsForObjectWithWaitFn LogsForObjectFunc = logsForObjectWithWait
 
 // AttachablePodForObjectFunc is a function type that can tell you how to get the pod for which to attach a given object
 type AttachablePodForObjectFunc func(restClientGetter genericclioptions.RESTClientGetter, object runtime.Object, timeout time.Duration) (*v1.Pod, error)

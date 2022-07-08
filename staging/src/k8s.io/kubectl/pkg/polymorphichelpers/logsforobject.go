@@ -17,11 +17,19 @@ limitations under the License.
 package polymorphichelpers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"sort"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/kubectl/pkg/util/interrupt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,7 +42,15 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 )
 
-func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
+func logsForObjectImmediate(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
+	return logsForObject(restClientGetter, object, options, timeout, allContainers, false)
+}
+
+func logsForObjectWithWait(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
+	return logsForObject(restClientGetter, object, options, timeout, allContainers, true)
+}
+
+func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers, waitUntilStarted bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -44,11 +60,11 @@ func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, 
 	if err != nil {
 		return nil, err
 	}
-	return logsForObjectWithClient(clientset, object, options, timeout, allContainers)
+	return logsForObjectWithClient(clientset, object, options, timeout, allContainers, waitUntilStarted)
 }
 
 // this is split for easy test-ability
-func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, options runtime.Object, timeout time.Duration, allContainers bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
+func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object runtime.Object, options runtime.Object, timeout time.Duration, allContainers bool, waitUntilStarted bool) (map[corev1.ObjectReference]rest.ResponseWrapper, error) {
 	opts, ok := options.(*corev1.PodLogOptions)
 	if !ok {
 		return nil, errors.New("provided options object is not a PodLogOptions")
@@ -58,7 +74,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 	case *corev1.PodList:
 		ret := make(map[corev1.ObjectReference]rest.ResponseWrapper)
 		for i := range t.Items {
-			currRet, err := logsForObjectWithClient(clientset, &t.Items[i], options, timeout, allContainers)
+			currRet, err := logsForObjectWithClient(clientset, &t.Items[i], options, timeout, allContainers, waitUntilStarted)
 			if err != nil {
 				return nil, err
 			}
@@ -108,6 +124,13 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 				return nil, fmt.Errorf("Unable to construct reference to '%#v': %v", t, err)
 			}
 
+			if waitUntilStarted {
+				_, err = waitForPod(clientset, t.Namespace, t.Name, containerStarted(currOpts.Container))
+				if err != nil {
+					return nil, fmt.Errorf("failure while waiting for container %s in pod %s to be running: %w", currOpts.Container, t.Name, err)
+				}
+			}
+
 			ret := make(map[corev1.ObjectReference]rest.ResponseWrapper, 1)
 			ret[*ref] = clientset.Pods(t.Namespace).GetLogs(t.Name, currOpts)
 			return ret, nil
@@ -117,7 +140,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.InitContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false, waitUntilStarted)
 			if err != nil {
 				return nil, err
 			}
@@ -128,7 +151,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.Containers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false, waitUntilStarted)
 			if err != nil {
 				return nil, err
 			}
@@ -139,7 +162,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		for _, c := range t.Spec.EphemeralContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
-			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false)
+			currRet, err := logsForObjectWithClient(clientset, t, currOpts, timeout, false, waitUntilStarted)
 			if err != nil {
 				return nil, err
 			}
@@ -165,5 +188,66 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		fmt.Fprintf(os.Stderr, "Found %v pods, using pod/%v\n", numPods, pod.Name)
 	}
 
-	return logsForObjectWithClient(clientset, pod, options, timeout, allContainers)
+	return logsForObjectWithClient(clientset, pod, options, timeout, allContainers, waitUntilStarted)
+}
+
+// waitForPod watches the given pod until the exitCondition is true
+func waitForPod(podClient corev1client.PodsGetter, ns, name string, exitCondition watchtools.ConditionFunc) (*corev1.Pod, error) {
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), 0)
+	defer cancel()
+
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return podClient.Pods(ns).List(context.TODO(), options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return podClient.Pods(ns).Watch(context.TODO(), options)
+		},
+	}
+
+	intr := interrupt.New(nil, cancel)
+	var result *corev1.Pod
+	err := intr.Run(func() error {
+		ev, err := watchtools.UntilWithSync(ctx, lw, &corev1.Pod{}, nil, exitCondition)
+		if ev != nil {
+			result = ev.Object.(*corev1.Pod)
+		}
+		return err
+	})
+
+	return result, err
+}
+
+// containerStarted returns true if the container has started, false if the container has not
+// yet reached this state, or an error in any other case.
+func containerStarted(container string) func(event watch.Event) (bool, error) {
+	return func(event watch.Event) (bool, error) {
+		switch event.Type {
+		case watch.Deleted:
+			return false, fmt.Errorf("pod deleted")
+		}
+		switch t := event.Object.(type) {
+		case *corev1.Pod:
+			for _, status := range t.Status.InitContainerStatuses {
+				if status.Name == container {
+					return status.Started != nil && *status.Started, nil
+				}
+			}
+			for _, status := range t.Status.ContainerStatuses {
+				if status.Name == container {
+					return status.Started != nil && *status.Started, nil
+				}
+			}
+			for _, status := range t.Status.EphemeralContainerStatuses {
+				if status.Name == container {
+					return status.Started != nil && *status.Started, nil
+				}
+			}
+			return false, fmt.Errorf("container %s not found in pod", container)
+		}
+		return false, nil
+	}
 }

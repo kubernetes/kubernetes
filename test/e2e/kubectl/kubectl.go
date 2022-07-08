@@ -1632,6 +1632,107 @@ metadata:
 		})
 	})
 
+	ginkgo.Describe("Kubectl logs (wait)", func() {
+		podName := "logs-generator-with-cm"
+		containerName := "logs-generator"
+		configMapName := "log-container-blocker"
+		configMapKey := "key"
+
+		ginkgo.AfterEach(func() {
+			framework.RunKubectlOrDie(ns, "delete", "pod", podName)
+			framework.RunKubectlOrDie(ns, "delete", "configmap", configMapName)
+		})
+
+		ginkgo.It("should be able to wait for containers to start", func() {
+			// Split("something\n", "\n") returns ["something", ""], so
+			// strip trailing newline first
+			lines := func(out string) []string {
+				return strings.Split(strings.TrimRight(out, "\n"), "\n")
+			}
+
+			ginkgo.By("creating pod with multiple container waiting to start")
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  containerName,
+							Image: agnhostImage,
+							Args:  []string{"logs-generator", "--log-lines-total", "10", "--run-duration", "5s"},
+							Env: []v1.EnvVar{
+								{
+									Name: "BLOCK_POD_STARTUP",
+									ValueFrom: &v1.EnvVarSource{
+										ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+											LocalObjectReference: v1.LocalObjectReference{
+												Name: configMapName,
+											},
+											Key: configMapKey,
+										},
+									},
+								},
+							},
+						},
+						{
+							Name:  "never-start",
+							Image: agnhostImage,
+							Env: []v1.EnvVar{
+								{
+									Name: "NEVER_UNBLOCK",
+									ValueFrom: &v1.EnvVarSource{
+										ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+											LocalObjectReference: v1.LocalObjectReference{
+												Name: "never-created",
+											},
+											Key: "any",
+										},
+									},
+								},
+							},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+			_, err := c.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			outChan := make(chan string)
+			go func() {
+				defer ginkgo.GinkgoRecover()
+				ginkgo.By("streaming logs in wait mode")
+				outChan <- framework.RunKubectlOrDie(ns, "logs", podName, containerName, "--follow", "--wait")
+				close(outChan)
+			}()
+
+			time.Sleep(1 * time.Second) // give kubectl logs better chance of starting before the pod is Ready
+			ginkgo.By("creating configmap to unblock one container and allow it to start")
+			configMap := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: configMapName,
+				},
+				Data: map[string]string{
+					configMapKey: "data",
+				},
+			}
+			_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configMap, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("waiting for kubectl logs to terminate")
+			var out string
+			select {
+			case out = <-outChan:
+				break
+			case <-time.After(framework.PodStartTimeout):
+				framework.Failf("container never started or kubectl logs failed to terminate")
+			}
+
+			framework.ExpectEqual(len(lines(out)), 10)
+		})
+	})
+
 	ginkgo.Describe("Kubectl patch", func() {
 		/*
 			Release: v1.9

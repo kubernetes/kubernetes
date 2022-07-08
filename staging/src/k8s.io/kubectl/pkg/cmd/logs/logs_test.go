@@ -663,6 +663,24 @@ func TestValidateLogOptions(t *testing.T) {
 			args:     []string{"my-pod", "my-container"},
 			expected: "only one of -c or an inline",
 		},
+		{
+			name: "waiting for container to start is only allowed in streaming mode",
+			opts: func(streams genericclioptions.IOStreams) *LogsOptions {
+				o := NewLogsOptions(streams, false)
+				o.Follow = false
+				o.WaitForContainerStart = true
+
+				var err error
+				o.Options, err = o.ToLogOptions()
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+
+				return o
+			},
+			args:     []string{"my-pod"},
+			expected: "--wait can only be set together with --follow",
+		},
 	}
 	for _, test := range tests {
 		streams := genericclioptions.NewTestIOStreamsDiscard()
