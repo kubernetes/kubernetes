@@ -57,12 +57,10 @@ import (
 	restclient "k8s.io/client-go/rest"
 	kubeversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/batch"
 	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
-	"k8s.io/kubernetes/pkg/apis/networking"
-	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/controlplane/storageversionhashdata"
+	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
@@ -87,17 +85,9 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 		},
 	}
 
-	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme)
-	// This configures the testing apiserver the same way the real apiserver is
-	// configured. The storage versions of these resources are different
-	// from the storage versions of other resources in their group.
-	resourceEncodingOverrides := []schema.GroupVersionResource{
-		batch.Resource("cronjobs").WithVersion("v1beta1"),
-		apisstorage.Resource("volumeattachments").WithVersion("v1beta1"),
-		networking.Resource("ingresses").WithVersion("v1beta1"),
-	}
-	resourceEncoding = resourceconfig.MergeResourceEncodingConfigs(resourceEncoding, resourceEncodingOverrides)
-	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, "application/vnd.kubernetes.protobuf", legacyscheme.Codecs, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
+	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
+	resourceEncoding := resourceconfig.MergeResourceEncodingConfigs(storageFactoryConfig.DefaultResourceEncoding, storageFactoryConfig.ResourceEncodingOverrides)
+	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, "application/vnd.kubernetes.protobuf", storageFactoryConfig.Serializer, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
 
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	// unit tests don't need watch cache and it leaks lots of goroutines with etcd testing functions during unit tests
