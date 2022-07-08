@@ -104,7 +104,7 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 
 	// Requested version is automatic CI build, thus mark CIKubernetesVersion as `ci/<resolved-version>`
 	if isCIVersion {
-		cfg.CIKubernetesVersion = fmt.Sprintf("ci/%s", ver)
+		cfg.CIKubernetesVersion = fmt.Sprintf("%s%s", constants.CIKubernetesVersionPrefix, ver)
 	}
 
 	cfg.KubernetesVersion = ver
