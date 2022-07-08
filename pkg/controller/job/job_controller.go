@@ -537,12 +537,7 @@ func (jm *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 
 	utilruntime.HandleError(fmt.Errorf("syncing job: %w", err))
-	if !apierrors.IsConflict(err) {
-		// If this was a conflict error, we expect a Job or Pod update event, which
-		// will add the job back to the queue. Avoiding the rate limited requeue
-		// saves an unnecessary sync.
-		jm.queue.AddRateLimited(key)
-	}
+	jm.queue.AddRateLimited(key)
 
 	return true
 }
