@@ -49,6 +49,8 @@ import (
 
 	"github.com/go-logr/logr"
 
+	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/internal/dbg"
 	"k8s.io/klog/v2/internal/serialize"
 	"k8s.io/klog/v2/internal/verbosity"
 )
@@ -76,22 +78,40 @@ type NopTL struct{}
 func (n NopTL) Helper()                 {}
 func (n NopTL) Log(args ...interface{}) {}
 
-var _TL = NopTL{}
+var _ TL = NopTL{}
 
 // NewLogger constructs a new logger for the given test interface.
+//
+// Beware that testing.T does not support logging after the test that
+// it was created for has completed. If a test leaks goroutines
+// and those goroutines log something after test completion,
+// that output will be printed via the global klog logger with
+// `<test name> leaked goroutine` as prefix.
 //
 // Experimental
 //
 // Notice: This type is EXPERIMENTAL and may be changed or removed in a
 // later release.
 func NewLogger(t TL, c *Config) logr.Logger {
-	return logr.New(&tlogger{
-		t:      t,
-		prefix: "",
-		values: nil,
-		config: c,
-		buffer: new(buffer),
-	})
+	l := tlogger{
+		shared: &tloggerShared{
+			t:      t,
+			config: c,
+		},
+	}
+
+	type testCleanup interface {
+		Cleanup(func())
+		Name() string
+	}
+
+	// Stopping the logging is optional and only done (and required)
+	// for testing.T/B/F.
+	if tb, ok := t.(testCleanup); ok {
+		tb.Cleanup(l.shared.stop)
+		l.shared.testName = tb.Name()
+	}
+	return logr.New(l)
 }
 
 // Buffer stores log entries as formatted text and structured data.
@@ -203,6 +223,7 @@ const (
 // later release.
 type Underlier interface {
 	// GetUnderlying returns the testing instance that logging goes to.
+	// It returns nil when the test has completed already.
 	GetUnderlying() TL
 
 	// GetBuffer grants access to the in-memory copy of the log entries.
@@ -227,35 +248,95 @@ func (b *buffer) Data() Log {
 	return b.log.DeepCopy()
 }
 
+// tloggerShared holds values that are the same for all LogSink instances. It
+// gets referenced by pointer in the tlogger struct.
+type tloggerShared struct {
+	// mutex protects access to t.
+	mutex sync.Mutex
+
+	// t gets cleared when the test is completed.
+	t TL
+
+	// We warn once when a leaked goroutine is detected because
+	// it logs after test completion.
+	goroutineWarningDone bool
+
+	testName  string
+	config    *Config
+	buffer    buffer
+	callDepth int
+}
+
+func (ls *tloggerShared) stop() {
+	ls.mutex.Lock()
+	defer ls.mutex.Unlock()
+	ls.t = nil
+}
+
+// tlogger is the actual LogSink implementation.
 type tlogger struct {
-	t      TL
+	shared *tloggerShared
 	prefix string
 	values []interface{}
-	config *Config
-	buffer *buffer
 }
 
-func (l *tlogger) Init(info logr.RuntimeInfo) {
+func (l tlogger) fallbackLogger() logr.Logger {
+	logger := klog.Background().WithValues(l.values...).WithName(l.shared.testName + " leaked goroutine")
+	if l.prefix != "" {
+		logger = logger.WithName(l.prefix)
+	}
+	// Skip direct caller (= Error or Info) plus the logr wrapper.
+	logger = logger.WithCallDepth(l.shared.callDepth + 1)
+
+	if !l.shared.goroutineWarningDone {
+		logger.WithCallDepth(1).Error(nil, "WARNING: test kept at least one goroutine running after test completion", "callstack", string(dbg.Stacks(false)))
+		l.shared.goroutineWarningDone = true
+	}
+	return logger
 }
 
-func (l *tlogger) GetCallStackHelper() func() {
-	return l.t.Helper
+func (l tlogger) Init(info logr.RuntimeInfo) {
+	l.shared.callDepth = info.CallDepth
 }
 
-func (l *tlogger) Info(level int, msg string, kvList ...interface{}) {
-	l.t.Helper()
+func (l tlogger) GetCallStackHelper() func() {
+	l.shared.mutex.Lock()
+	defer l.shared.mutex.Unlock()
+	if l.shared.t == nil {
+		return func() {}
+	}
+
+	return l.shared.t.Helper
+}
+
+func (l tlogger) Info(level int, msg string, kvList ...interface{}) {
+	l.shared.mutex.Lock()
+	defer l.shared.mutex.Unlock()
+	if l.shared.t == nil {
+		l.fallbackLogger().V(level).Info(msg, kvList...)
+		return
+	}
+
+	l.shared.t.Helper()
 	buffer := &bytes.Buffer{}
 	merged := serialize.MergeKVs(l.values, kvList)
 	serialize.KVListFormat(buffer, merged...)
 	l.log(LogInfo, msg, level, buffer, nil, kvList)
 }
 
-func (l *tlogger) Enabled(level int) bool {
-	return l.config.vstate.Enabled(verbosity.Level(level), 1)
+func (l tlogger) Enabled(level int) bool {
+	return l.shared.config.vstate.Enabled(verbosity.Level(level), 1)
 }
 
-func (l *tlogger) Error(err error, msg string, kvList ...interface{}) {
-	l.t.Helper()
+func (l tlogger) Error(err error, msg string, kvList ...interface{}) {
+	l.shared.mutex.Lock()
+	defer l.shared.mutex.Unlock()
+	if l.shared.t == nil {
+		l.fallbackLogger().Error(err, msg, kvList...)
+		return
+	}
+
+	l.shared.t.Helper()
 	buffer := &bytes.Buffer{}
 	if err != nil {
 		serialize.KVListFormat(buffer, "err", err)
@@ -265,8 +346,8 @@ func (l *tlogger) Error(err error, msg string, kvList ...interface{}) {
 	l.log(LogError, msg, 0, buffer, err, kvList)
 }
 
-func (l *tlogger) log(what LogType, msg string, level int, buffer *bytes.Buffer, err error, kvList []interface{}) {
-	l.t.Helper()
+func (l tlogger) log(what LogType, msg string, level int, buffer *bytes.Buffer, err error, kvList []interface{}) {
+	l.shared.t.Helper()
 	args := []interface{}{what}
 	if l.prefix != "" {
 		args = append(args, l.prefix+":")
@@ -276,24 +357,24 @@ func (l *tlogger) log(what LogType, msg string, level int, buffer *bytes.Buffer,
 		// Skip leading space inserted by serialize.KVListFormat.
 		args = append(args, string(buffer.Bytes()[1:]))
 	}
-	l.t.Log(args...)
+	l.shared.t.Log(args...)
 
-	l.buffer.mutex.Lock()
-	defer l.buffer.mutex.Unlock()
+	l.shared.buffer.mutex.Lock()
+	defer l.shared.buffer.mutex.Unlock()
 
 	// Store as text.
-	l.buffer.text.WriteString(string(what))
+	l.shared.buffer.text.WriteString(string(what))
 	for i := 1; i < len(args); i++ {
-		l.buffer.text.WriteByte(' ')
-		l.buffer.text.WriteString(args[i].(string))
+		l.shared.buffer.text.WriteByte(' ')
+		l.shared.buffer.text.WriteString(args[i].(string))
 	}
 	lastArg := args[len(args)-1].(string)
 	if lastArg[len(lastArg)-1] != '\n' {
-		l.buffer.text.WriteByte('\n')
+		l.shared.buffer.text.WriteByte('\n')
 	}
 
 	// Store as raw data.
-	l.buffer.log = append(l.buffer.log,
+	l.shared.buffer.log = append(l.shared.buffer.log,
 		LogEntry{
 			Timestamp:       time.Now(),
 			Type:            what,
@@ -310,27 +391,25 @@ func (l *tlogger) log(what LogType, msg string, level int, buffer *bytes.Buffer,
 // WithName returns a new logr.Logger with the specified name appended.  klogr
 // uses '/' characters to separate name elements.  Callers should not pass '/'
 // in the provided name string, but this library does not actually enforce that.
-func (l *tlogger) WithName(name string) logr.LogSink {
-	new := *l
+func (l tlogger) WithName(name string) logr.LogSink {
 	if len(l.prefix) > 0 {
-		new.prefix = l.prefix + "/"
+		l.prefix = l.prefix + "/"
 	}
-	new.prefix += name
-	return &new
+	l.prefix += name
+	return l
 }
 
-func (l *tlogger) WithValues(kvList ...interface{}) logr.LogSink {
-	new := *l
-	new.values = serialize.WithValues(l.values, kvList)
-	return &new
+func (l tlogger) WithValues(kvList ...interface{}) logr.LogSink {
+	l.values = serialize.WithValues(l.values, kvList)
+	return l
 }
 
-func (l *tlogger) GetUnderlying() TL {
-	return l.t
+func (l tlogger) GetUnderlying() TL {
+	return l.shared.t
 }
 
-func (l *tlogger) GetBuffer() Buffer {
-	return l.buffer
+func (l tlogger) GetBuffer() Buffer {
+	return &l.shared.buffer
 }
 
 var _ logr.LogSink = &tlogger{}
