@@ -1537,6 +1537,7 @@ var _ storageframework.PreprovisionedVolumeTestDriver = &azureDiskDriver{}
 var _ storageframework.InlineVolumeTestDriver = &azureDiskDriver{}
 var _ storageframework.PreprovisionedPVTestDriver = &azureDiskDriver{}
 var _ storageframework.DynamicPVTestDriver = &azureDiskDriver{}
+var _ storageframework.CustomTimeoutsTestDriver = &azureDiskDriver{}
 
 // InitAzureDiskDriver returns azureDiskDriver that implements TestDriver interface
 func InitAzureDiskDriver() storageframework.TestDriver {
@@ -2154,4 +2155,12 @@ func (a *azureFileDriver) CreateVolume(config *storageframework.PerTestConfig, v
 func (v *azureFileVolume) DeleteVolume() {
 	err := e2epv.DeleteShare(v.accountName, v.shareName)
 	framework.ExpectNoError(err)
+}
+
+func (a *azureDiskDriver) GetTimeouts() *framework.TimeoutContext {
+	return &framework.TimeoutContext{
+		PodStart:  time.Minute * 15,
+		PodDelete: time.Minute * 15,
+		PVDelete:  time.Minute * 20,
+	}
 }
