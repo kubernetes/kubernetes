@@ -36,6 +36,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 )
@@ -104,8 +105,10 @@ func NewCloudNodeLifecycleController(
 
 // Run starts the main loop for this controller. Run is blocking so should
 // be called via a goroutine
-func (c *CloudNodeLifecycleController) Run(ctx context.Context) {
+func (c *CloudNodeLifecycleController) Run(ctx context.Context, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
 	defer utilruntime.HandleCrash()
+	controllerManagerMetrics.ControllerStarted("cloud-node-lifecycle")
+	defer controllerManagerMetrics.ControllerStopped("cloud-node-lifecycle")
 
 	// The following loops run communicate with the APIServer with a worst case complexity
 	// of O(num_nodes) per cycle. These functions are justified here because these events fire

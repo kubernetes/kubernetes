@@ -212,7 +212,7 @@ func startCloudNodeLifecycleController(ctx context.Context, controllerContext Co
 		return nil, false, nil
 	}
 
-	go cloudNodeLifecycleController.Run(ctx)
+	go cloudNodeLifecycleController.Run(ctx, controllerContext.ControllerManagerMetrics)
 	return nil, true, nil
 }
 
