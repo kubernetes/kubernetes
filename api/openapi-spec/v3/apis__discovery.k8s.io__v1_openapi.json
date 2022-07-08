@@ -78,7 +78,7 @@
             "type": "string"
           },
           "nodeName": {
-            "description": "nodeName represents the name of the Node hosting this endpoint. This can be used to determine endpoints local to a Node. This field can be enabled with the EndpointSliceNodeName feature gate.",
+            "description": "nodeName represents the name of the Node hosting this endpoint. This can be used to determine endpoints local to a Node.",
             "type": "string"
           },
           "targetRef": {

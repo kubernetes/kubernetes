@@ -109,8 +109,7 @@ type Endpoint struct {
 	// +optional
 	Topology map[string]string `json:"topology,omitempty" protobuf:"bytes,5,opt,name=topology"`
 	// nodeName represents the name of the Node hosting this endpoint. This can
-	// be used to determine endpoints local to a Node. This field can be enabled
-	// with the EndpointSliceNodeName feature gate.
+	// be used to determine endpoints local to a Node.
 	// +optional
 	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,6,opt,name=nodeName"`
 	// hints contains information associated with how an endpoint should be
