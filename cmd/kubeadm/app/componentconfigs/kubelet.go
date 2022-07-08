@@ -18,6 +18,7 @@ package componentconfigs
 
 import (
 	"path/filepath"
+	"strings"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -71,8 +72,11 @@ var kubeletHandler = handler{
 }
 
 func kubeletConfigFromCluster(h *handler, clientset clientset.Interface, clusterCfg *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
+	// Resolve possible CI version labels
+	ver := strings.TrimPrefix(clusterCfg.KubernetesVersion, constants.CIKubernetesVersionPrefix)
+
 	// Read the ConfigMap from the cluster based on what version the kubelet is
-	k8sVersion, err := version.ParseGeneric(clusterCfg.KubernetesVersion)
+	k8sVersion, err := version.ParseGeneric(ver)
 	if err != nil {
 		return nil, err
 	}
