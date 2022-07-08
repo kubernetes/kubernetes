@@ -196,6 +196,7 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 		return fmt.Errorf("mount failed: %v\nMounting command: %s\nMounting arguments: %s\nOutput: %s",
 			err, mountCmd, mountArgsLogStr, string(output))
 	}
+	klog.V(4).Infof("Volume successfully mounted, output: (%s)", string(output))
 	return err
 }
 
