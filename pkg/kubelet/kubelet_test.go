@@ -665,6 +665,10 @@ func TestHandlePodCleanups(t *testing.T) {
 }
 
 func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	ready := false
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
