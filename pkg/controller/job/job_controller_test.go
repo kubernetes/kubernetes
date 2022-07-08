@@ -1997,11 +1997,13 @@ func TestSyncJobUpdateRequeue(t *testing.T) {
 			wantRequeue: true,
 		},
 		"conflict error": {
-			updateErr: apierrors.NewConflict(schema.GroupResource{}, "", nil),
+			updateErr:   apierrors.NewConflict(schema.GroupResource{}, "", nil),
+			wantRequeue: true,
 		},
 		"conflict error, with finalizers": {
 			withFinalizers: true,
 			updateErr:      apierrors.NewConflict(schema.GroupResource{}, "", nil),
+			wantRequeue:    true,
 		},
 	}
 	for name, tc := range cases {
