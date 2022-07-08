@@ -46,7 +46,7 @@ import (
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	// ensure libs have a chance to initialize
@@ -469,7 +469,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 
 		ginkgo.AfterEach(func() {
 			// print out additional info if tests failed
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				// List existing PriorityClasses.
 				priorityList, err := cs.SchedulingV1().PriorityClasses().List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
@@ -705,7 +705,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 
 		ginkgo.AfterEach(func() {
 			// Print out additional info if tests failed.
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				// List existing PriorityClasses.
 				priorityList, err := cs.SchedulingV1().PriorityClasses().List(context.TODO(), metav1.ListOptions{})
 				if err != nil {

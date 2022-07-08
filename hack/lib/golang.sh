@@ -111,7 +111,7 @@ readonly KUBE_SERVER_IMAGE_BINARIES=("${KUBE_SERVER_IMAGE_TARGETS[@]##*/}")
 kube::golang::conformance_image_targets() {
   # NOTE: this contains cmd targets for kube::release::build_conformance_image
   local targets=(
-    github.com/onsi/ginkgo/ginkgo
+    ginkgo
     test/e2e/e2e.test
     test/conformance/image/go-runner
     cmd/kubectl
@@ -274,7 +274,7 @@ kube::golang::test_targets() {
     cmd/genyaml
     cmd/genswaggertypedocs
     cmd/linkcheck
-    github.com/onsi/ginkgo/ginkgo
+    ginkgo
     test/e2e/e2e.test
     test/conformance/image/go-runner
   )
@@ -301,7 +301,7 @@ readonly KUBE_TEST_PORTABLE=(
 kube::golang::server_test_targets() {
   local targets=(
     cmd/kubemark
-    github.com/onsi/ginkgo/ginkgo
+    ginkgo
   )
 
   if [[ "${OSTYPE:-}" == "linux"* ]]; then
@@ -382,7 +382,14 @@ kube::golang::is_statically_linked_library() {
 kube::golang::binaries_from_targets() {
   local target
   for target; do
-    if [[ "${target}" =~ ^([[:alnum:]]+".")+[[:alnum:]]+"/" ]]; then
+    if [ "${target}" = "ginkgo" ] ||
+       [ "${target}" = "github.com/onsi/ginkgo/ginkgo" ] ||
+       [ "${target}" = "vendor/github.com/onsi/ginkgo/ginkgo" ]; then
+      # Aliases that build the ginkgo CLI for hack/ginkgo-e2e.sh.
+      # "ginkgo" is the one that is documented in the Makefile. The others
+      # are for backwards compatibility.
+      echo "github.com/onsi/ginkgo/v2/ginkgo"
+    elif [[ "${target}" =~ ^([[:alnum:]]+".")+[[:alnum:]]+"/" ]]; then
       # If the target starts with what looks like a domain name, assume it has a
       # fully-qualified package name rather than one that needs the Kubernetes
       # package prepended.

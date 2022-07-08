@@ -28,13 +28,12 @@ import (
 	"os"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"text/template"
 
 	"gopkg.in/yaml.v2"
 
-	"github.com/onsi/ginkgo/types"
+	"github.com/onsi/ginkgo/v2/types"
 )
 
 // ConformanceData describes the structure of the conformance.yaml file
@@ -70,8 +69,6 @@ var (
 )
 
 type frame struct {
-	Function string
-
 	// File and Line are the file name and line number of the
 	// location in this frame. For non-leaf frames, this will be
 	// the location of a call. These may be the empty string and
@@ -97,7 +94,7 @@ func main() {
 	dec := json.NewDecoder(f)
 	testInfos := []*ConformanceData{}
 	for {
-		var spec *types.SpecSummary
+		var spec *types.SpecReport
 		if err := dec.Decode(&spec); err == io.EOF {
 			break
 		} else if err != nil {
@@ -119,39 +116,35 @@ func main() {
 	saveAllTestInfo(testInfos)
 }
 
-func isConformance(spec *types.SpecSummary) bool {
+func isConformance(spec *types.SpecReport) bool {
 	return strings.Contains(getTestName(spec), "[Conformance]")
 }
 
-func getTestInfo(spec *types.SpecSummary) *ConformanceData {
+func getTestInfo(spec *types.SpecReport) *ConformanceData {
 	var c *ConformanceData
 	var err error
 	// The key to this working is that we don't need to parse every file or walk
-	// every componentCodeLocation. The last componentCodeLocation is going to typically start
-	// with the ConformanceIt(...) call and the next call in that callstack will be the
-	// ast.Node which is attached to the comment that we want.
-	for i := len(spec.ComponentCodeLocations) - 1; i > 0; i-- {
-		fullstacktrace := spec.ComponentCodeLocations[i].FullStackTrace
-		c, err = getConformanceDataFromStackTrace(fullstacktrace)
-		if err != nil {
-			log.Printf("Error looking for conformance data: %v", err)
-		}
-		if c != nil {
-			break
-		}
+	// every types.CodeLocation. The LeafNodeLocation is going to be file:line which
+	// attached to the comment that we want.
+	leafNodeLocation := spec.LeafNodeLocation
+	frame := frame{
+		File: leafNodeLocation.FileName,
+		Line: leafNodeLocation.LineNumber,
 	}
-
+	c, err = getConformanceData(frame)
+	if err != nil {
+		log.Printf("Error looking for conformance data: %v", err)
+	}
 	if c == nil {
 		log.Printf("Did not find test info for spec: %#v\n", getTestName(spec))
 		return nil
 	}
-
 	c.CodeName = getTestName(spec)
 	return c
 }
 
-func getTestName(spec *types.SpecSummary) string {
-	return strings.Join(spec.ComponentTexts[1:], " ")
+func getTestName(spec *types.SpecReport) string {
+	return strings.Join(spec.ContainerHierarchyTexts[0:], " ") + " " + spec.LeafNodeText
 }
 
 func saveAllTestInfo(dataSet []*ConformanceData) {
@@ -185,56 +178,27 @@ func saveAllTestInfo(dataSet []*ConformanceData) {
 	fmt.Println(string(b))
 }
 
-func getConformanceDataFromStackTrace(fullstackstrace string) (*ConformanceData, error) {
-	// The full stacktrace to parse from ginkgo is of the form:
-	// k8s.io/kubernetes/test/e2e/storage/utils.SIGDescribe(0x51f4c4f, 0xf, 0x53a0dd8, 0xc000ab6e01)\n\ttest/e2e/storage/utils/framework.go:23 +0x75\n ... ...
-	// So we need to split it into lines, remove whitespace, and then grab the files/lines.
-	stack := strings.Replace(fullstackstrace, "\t", "", -1)
-	calls := strings.Split(stack, "\n")
-	frames := []frame{}
-	i := 0
-	for i < len(calls) {
-		fileLine := strings.Split(calls[i+1], " ")
-		lineinfo := strings.Split(fileLine[0], ":")
-		line, err := strconv.Atoi(lineinfo[1])
-		if err != nil {
-			panic(err)
-		}
-		frames = append(frames, frame{
-			Function: calls[i],
-			File:     lineinfo[0],
-			Line:     line,
-		})
-		i += 2
-	}
-
+func getConformanceData(targetFrame frame) (*ConformanceData, error) {
 	// filenames are in one of two special GOPATHs depending on if they were
 	// built dockerized or with the host go
 	// we want to trim this prefix to produce portable relative paths
 	k8sSRC := *k8sPath + "/_output/local/go/src/k8s.io/kubernetes/"
-	for i := range frames {
-		trimmedFile := strings.TrimPrefix(frames[i].File, k8sSRC)
-		trimmedFile = strings.TrimPrefix(trimmedFile, "/go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes/")
-		frames[i].File = trimmedFile
+	trimmedFile := strings.TrimPrefix(targetFrame.File, k8sSRC)
+	trimmedFile = strings.TrimPrefix(trimmedFile, "/go/src/k8s.io/kubernetes/_output/dockerized/go/src/k8s.io/kubernetes/")
+	targetFrame.File = trimmedFile
+
+	freader, err := os.Open(targetFrame.File)
+	if err != nil {
+		return nil, err
 	}
+	defer freader.Close()
 
-	for _, curFrame := range frames {
-		if _, seen := seenLines[fmt.Sprintf("%v:%v", curFrame.File, curFrame.Line)]; seen {
-			continue
-		}
-
-		freader, err := os.Open(curFrame.File)
-		if err != nil {
-			return nil, err
-		}
-		defer freader.Close()
-		cd, err := scanFileForFrame(curFrame.File, freader, curFrame)
-		if err != nil {
-			return nil, err
-		}
-		if cd != nil {
-			return cd, nil
-		}
+	cd, err := scanFileForFrame(targetFrame.File, freader, targetFrame)
+	if err != nil {
+		return nil, err
+	}
+	if cd != nil {
+		return cd, nil
 	}
 
 	return nil, nil

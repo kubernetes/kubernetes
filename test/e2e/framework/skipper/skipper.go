@@ -26,7 +26,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,8 +56,18 @@ type SkipPanic struct {
 	FullStackTrace string // A full stack trace starting at the source of the failure
 }
 
+const ginkgoSkipPanic = `
+Your test was skipped.
+Ginkgo panics to prevent subsequent assertions from running.
+Normally Ginkgo rescues this panic so you shouldn't see it.
+But, if you make an assertion in a goroutine, Ginkgo can't capture the panic.
+To circumvent this, you should call
+	defer GinkgoRecover()
+at the top of the goroutine that caused this panic.
+`
+
 // String makes SkipPanic look like the old Ginkgo panic when printed.
-func (SkipPanic) String() string { return ginkgo.GINKGO_PANIC }
+func (SkipPanic) String() string { return ginkgoSkipPanic }
 
 // Skip wraps ginkgo.Skip so that it panics with more useful
 // information about why the test is being skipped. This function will
@@ -88,7 +98,7 @@ func skip(message string, callerSkip ...int) {
 
 // ginkgo adds a lot of test running infrastructure to the stack, so
 // we filter those out
-var stackSkipPattern = regexp.MustCompile(`onsi/ginkgo`)
+var stackSkipPattern = regexp.MustCompile(`onsi/ginkgo/v2`)
 
 func pruneStack(skip int) string {
 	skip += 2 // one for pruneStack and one for debug.Stack

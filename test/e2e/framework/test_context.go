@@ -24,11 +24,14 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/config"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
+
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -276,15 +279,6 @@ func (tc TestContextType) ClusterIsIPv6() bool {
 // options themselves, copy flags from test/e2e/framework/config
 // as shown in HandleFlags.
 func RegisterCommonFlags(flags *flag.FlagSet) {
-	// Turn on verbose by default to get spec names
-	config.DefaultReporterConfig.Verbose = true
-
-	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
-	config.GinkgoConfig.EmitSpecProgress = true
-
-	// Randomize specs as well as suites
-	config.GinkgoConfig.RandomizeAllSpecs = true
-
 	flags.StringVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", "false", "If set to 'true' or 'all' framework will be monitoring resource usage of system all add-ons in (some) e2e tests, if set to 'master' framework will be monitoring master node only, if set to 'none' of 'false' monitoring will be turned off.")
 	flags.BoolVar(&TestContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")
 	flags.IntVar(&TestContext.MaxNodesToGather, "max-nodes-to-gather-from", 20, "The maximum number of nodes to gather extended info from on test failure.")
@@ -301,7 +295,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.Host, "host", "", fmt.Sprintf("The host, or apiserver, to connect to. Will default to %s if this argument and --kubeconfig are not set.", defaultHost))
 	flags.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
-	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
+	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports and other tests results should be saved. Default is empty, which doesn't generate these reports. If ginkgo's -junit-report parameter is used, that parameter instead of -report-dir determines the location of a single JUnit report.")
 	flags.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/containerd/containerd.sock", "The container runtime endpoint of cluster VM instances.")
 	flags.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
 	flags.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
@@ -325,6 +319,30 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.SnapshotControllerPodName, "snapshot-controller-pod-name", "", "The pod name to use for identifying the snapshot controller in the kube-system namespace.")
 	flags.IntVar(&TestContext.SnapshotControllerHTTPPort, "snapshot-controller-http-port", 0, "The port to use for snapshot controller HTTP communication.")
+}
+
+func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
+	// fetch the current config
+	suiteConfig, reporterConfig := ginkgo.GinkgoConfiguration()
+	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
+	suiteConfig.EmitSpecProgress = true
+	// Randomize specs as well as suites
+	suiteConfig.RandomizeAllSpecs = true
+	// Turn on verbose by default to get spec names
+	reporterConfig.Verbose = true
+	// Enable JUnit output to the result directory, but only if not already specified
+	// via -junit-report.
+	if reporterConfig.JUnitReport == "" && TestContext.ReportDir != "" {
+		// With Ginkgo v1, we used to write one file per parallel node. Now Ginkgo v2 automatically
+		// merges all results into a single file for us. The 01 suffix is kept in case that users
+		// expect files to be called "junit_<prefix><number>.xml".
+		reporterConfig.JUnitReport = path.Join(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
+	}
+	// Disable skipped tests unless they are explicitly requested.
+	if len(suiteConfig.FocusStrings) == 0 && len(suiteConfig.SkipStrings) == 0 {
+		suiteConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
+	}
+	return suiteConfig, reporterConfig
 }
 
 // RegisterClusterFlags registers flags specific to the cluster e2e test suite.
@@ -441,8 +459,21 @@ func GenerateSecureToken(tokenLen int) (string, error) {
 }
 
 // AfterReadingAllFlags makes changes to the context after all flags
-// have been read.
+// have been read and prepares the process for a test run.
 func AfterReadingAllFlags(t *TestContextType) {
+	// Reconfigure klog so that output goes to the GinkgoWriter instead
+	// of stderr. The advantage is that it then gets interleaved properly
+	// with output that goes to GinkgoWriter (By, Logf).
+
+	// These flags are not exposed via the normal command line flag set,
+	// therefore we have to use our own private one here.
+	var fs flag.FlagSet
+	klog.InitFlags(&fs)
+	fs.Set("logtostderr", "false")
+	fs.Set("alsologtostderr", "false")
+	fs.Set("one_output", "true")
+	klog.SetOutput(ginkgo.GinkgoWriter)
+
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
 		// Check if we can use the in-cluster config

@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,12 +44,12 @@ import (
 //
 //
 //
-// This must be line #47.
-
-func runTests(t *testing.T, reporter ginkgo.Reporter) {
-	// This source code line will be part of the stack dump comparison.
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Pod Suite", []ginkgo.Reporter{reporter})
-}
+//
+//
+//
+//
+//
+// This must be line #52.
 
 var _ = ginkgo.Describe("pod", func() {
 	ginkgo.It("not found", func() {
@@ -75,7 +75,7 @@ func TestFailureOutput(t *testing.T) {
 	// Sorted by name!
 	expected := output.SuiteResults{
 		output.TestResult{
-			Name: "[Top Level] pod not found",
+			Name: "pod not found",
 			// "Ignoring NotFound..." will normally occur every two seconds,
 			// but we reduce it to one line because it might occur less often
 			// on a loaded system.
@@ -106,22 +106,16 @@ FAIL: error while waiting for pod default/no-such-pod to be running: pods "no-su
 Full Stack Trace
 k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.1()
 	wait_test.go:56
-k8s.io/kubernetes/test/e2e/framework/pod_test.runTests()
-	wait_test.go:51
-
 `,
 			NormalizeOutput: func(output string) string {
 				return trimDuplicateLines(output, "INFO: Ignoring NotFound error while getting pod default/no-such-pod")
 			},
 			Failure: `error while waiting for pod default/no-such-pod to be running: pods "no-such-pod" not found`,
 			Stack: `k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.1()
-	wait_test.go:56
-k8s.io/kubernetes/test/e2e/framework/pod_test.runTests()
-	wait_test.go:51
-`,
+	wait_test.go:56`,
 		},
 		output.TestResult{
-			Name: "[Top Level] pod not running",
+			Name: "pod not running",
 			// "INFO: Pod ..." will normally occur every two seconds,
 			// but we reduce it to one line because it might occur less often
 			// on a loaded system.
@@ -213,23 +207,17 @@ FAIL: wait for pod pending-pod running: timed out while waiting for pod default/
 Full Stack Trace
 k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.2()
 	wait_test.go:60
-k8s.io/kubernetes/test/e2e/framework/pod_test.runTests()
-	wait_test.go:51
-
 `,
 			NormalizeOutput: func(output string) string {
 				return trimDuplicateLines(output, `INFO: Pod "pending-pod": Phase="", Reason="", readiness=false. Elapsed: <elapsed>`)
 			},
 			Failure: `wait for pod pending-pod running: timed out while waiting for pod default/pending-pod to be running`,
 			Stack: `k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.2()
-	wait_test.go:60
-k8s.io/kubernetes/test/e2e/framework/pod_test.runTests()
-	wait_test.go:51
-`,
+	wait_test.go:60`,
 		},
 	}
 
-	output.TestGinkgoOutput(t, runTests, expected)
+	output.TestGinkgoOutput(t, expected)
 }
 
 func trimDuplicateLines(output, prefix string) string {
