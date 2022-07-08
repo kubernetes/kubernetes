@@ -94,7 +94,7 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	isCIVersion := kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion)
 
 	// Requested version is automatic CI build, thus use KubernetesCI Image Repository for core images
-	if isCIVersion {
+	if isCIVersion && cfg.ImageRepository == kubeadmapiv1.DefaultImageRepository {
 		cfg.CIImageRepository = constants.DefaultCIImageRepository
 	}
 
@@ -106,7 +106,7 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 
 	// Requested version is automatic CI build, thus mark CIKubernetesVersion as `ci/<resolved-version>`
 	if isCIVersion {
-		cfg.CIKubernetesVersion = fmt.Sprintf("ci/%s", ver)
+		cfg.CIKubernetesVersion = fmt.Sprintf("%s%s", constants.CIKubernetesVersionPrefix, ver)
 	}
 
 	cfg.KubernetesVersion = ver
