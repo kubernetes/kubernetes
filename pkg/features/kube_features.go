@@ -982,7 +982,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	RotateKubeletServerCertificate: {Default: true, PreRelease: featuregate.Beta},
 
-	SeccompDefault: {Default: false, PreRelease: featuregate.Alpha},
+	SeccompDefault: {Default: true, PreRelease: featuregate.Beta},
 
 	ServiceIPStaticSubrange: {Default: true, PreRelease: featuregate.Beta},
 
