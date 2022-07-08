@@ -53,6 +53,20 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+var (
+	// Functional Pointers for hcsshim package functions
+	hcsshimHNSListPolicyListRequest = hcsshim.HNSListPolicyListRequest
+	hcsshimGetHNSNetworkByName      = hcsshim.GetHNSNetworkByName
+
+	// Functional Pointers for hcn package functions
+	hcnGetSupportedFeatures   = hcn.GetSupportedFeatures
+	hcnIPv6DualStackSupported = hcn.IPv6DualStackSupported
+	hcnDSRSupported           = hcn.DSRSupported
+	hcnRemoteSubnetSupported  = hcn.RemoteSubnetSupported
+
+	hns, supportedFeatures = newHostNetworkService()
+)
+
 // KernelCompatTester tests whether the required kernel capabilities are
 // present to run the windows kernel proxier.
 type KernelCompatTester interface {
@@ -74,7 +88,7 @@ type WindowsKernelCompatTester struct{}
 
 // IsCompatible returns true if winkernel can support this mode of proxy
 func (lkct WindowsKernelCompatTester) IsCompatible() error {
-	_, err := hcsshim.HNSListPolicyListRequest()
+	_, err := hcsshimHNSListPolicyListRequest()
 	if err != nil {
 		return fmt.Errorf("Windows kernel is not compatible for Kernel mode")
 	}
@@ -148,7 +162,7 @@ const NETWORK_TYPE_OVERLAY = "overlay"
 func newHostNetworkService() (HostNetworkService, hcn.SupportedFeatures) {
 	var hns HostNetworkService
 	hns = hnsV1{}
-	supportedFeatures := hcn.GetSupportedFeatures()
+	supportedFeatures := hcnGetSupportedFeatures()
 	if supportedFeatures.Api.V2 {
 		hns = hnsV2{}
 	}
@@ -190,7 +204,7 @@ type DualStackCompatTester struct{}
 
 func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 	// First tag of hcsshim that has a proper check for dual stack support is v0.8.22 due to a bug.
-	if err := hcn.IPv6DualStackSupported(); err != nil {
+	if err := hcnIPv6DualStackSupported(); err != nil {
 		// Hcn *can* fail the query to grab the version of hcn itself (which this call will do internally before parsing
 		// to see if dual stack is supported), but the only time this can happen, at least that can be discerned, is if the host
 		// is pre-1803 and hcn didn't exist. hcsshim should truthfully return a known error if this happened that we can
@@ -203,7 +217,6 @@ func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 	}
 
 	// check if network is using overlay
-	hns, _ := newHostNetworkService()
 	networkName, err := getNetworkName(networkName)
 	if err != nil {
 		klog.ErrorS(err, "Unable to determine dual-stack status, falling back to single-stack")
@@ -462,7 +475,7 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	info := &serviceInfo{BaseServiceInfo: baseInfo}
 	preserveDIP := service.Annotations["preserve-destination"] == "true"
 	localTrafficDSR := service.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal
-	err := hcn.DSRSupported()
+	err := hcnDSRSupported()
 	if err != nil {
 		preserveDIP = false
 		localTrafficDSR = false
@@ -651,7 +664,7 @@ func NewProxier(
 	if isDSR && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinDSR) {
 		return nil, fmt.Errorf("WinDSR feature gate not enabled")
 	}
-	err = hcn.DSRSupported()
+	err = hcnDSRSupported()
 	if isDSR && err != nil {
 		return nil, err
 	}
@@ -662,7 +675,7 @@ func NewProxier(
 		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) {
 			return nil, fmt.Errorf("WinOverlay feature gate not enabled")
 		}
-		err = hcn.RemoteSubnetSupported()
+		err = hcnRemoteSubnetSupported()
 		if err != nil {
 			return nil, err
 		}
@@ -822,7 +835,7 @@ func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
 }
 
 func deleteAllHnsLoadBalancerPolicy() {
-	plists, err := hcsshim.HNSListPolicyListRequest()
+	plists, err := hcsshimHNSListPolicyListRequest()
 	if err != nil {
 		return
 	}
@@ -837,7 +850,7 @@ func deleteAllHnsLoadBalancerPolicy() {
 }
 
 func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
-	hnsnetwork, err := hcsshim.GetHNSNetworkByName(hnsNetworkName)
+	hnsnetwork, err := hcsshimGetHNSNetworkByName(hnsNetworkName)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get HNS Network by name")
 		return nil, err
@@ -980,9 +993,6 @@ func isNetworkNotFoundError(err error) bool {
 		return false
 	}
 	if _, ok := err.(hcn.NetworkNotFoundError); ok {
-		return true
-	}
-	if _, ok := err.(hcsshim.NetworkNotFoundError); ok {
 		return true
 	}
 	return false

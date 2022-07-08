@@ -20,12 +20,16 @@ limitations under the License.
 package winkernel
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/winkernel/mocks"
+	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -150,6 +156,7 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clust
 		isDSR:               false,
 		hns:                 newFakeHNS(),
 		endPointsRefCount:   make(endPointsReferenceCountMap),
+		rootHnsEndpointName: mocks.HnsEndPointName,
 	}
 
 	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, v1.IPv4Protocol, nil, proxier.serviceMapChange)
@@ -954,4 +961,334 @@ func makeTestEndpointSlice(namespace, name string, sliceNum int, epsFunc func(*d
 	}
 	epsFunc(eps)
 	return eps
+}
+
+func TestGetHnsNetworkInfo(t *testing.T) {
+	mockhscshim := mocks.HcsshimMock{}
+	hcsshimGetHNSNetworkByName = mockhscshim.GetHNSNetworkByName
+	mockHNSNetwork := mocks.MockNewHNSNetwork("nw-id-123", "nw-name-123")
+	mockNilHNSNetwork := mocks.MockNewHNSNetwork("", "")
+	expected := &hnsNetworkInfo{
+		id:          mockHNSNetwork.Id,
+		name:        mockHNSNetwork.Name,
+		networkType: mockHNSNetwork.Type,
+	}
+	mockhscshim.On("GetHNSNetworkByName", "nw-name-123").Return(mockHNSNetwork, nil)
+	mockhscshim.On("GetHNSNetworkByName", "nw-name-234").Return(mockNilHNSNetwork, errors.New("{NetworkNotFoundError:nw-name-234}"))
+	actual1, _ := getHnsNetworkInfo("nw-name-123")
+	assert.Equal(t, expected, actual1, "Positive test for getHnsNetworkInfo : Expected and actual matches.")
+	actual2, err := getHnsNetworkInfo("nw-name-234")
+	assert.Nil(t, actual2, "Negative test for getHnsNetworkInfo : Returns nil object.")
+	assert.Equal(t, err, errors.New("{NetworkNotFoundError:nw-name-234}"), "Negative test for getHnsNetworkInfo : Returns error.")
+}
+
+func TestNewHostNetworkServiceV1(t *testing.T) {
+	mockhcn := mocks.HcnMock{}
+	hcnGetSupportedFeatures = mockhcn.GetSupportedFeatures
+	mockSupFeatures := mocks.MockNewSupportedFeatures()
+	mockhcn.On("GetSupportedFeatures").Return(mockSupFeatures)
+	actualHns, _ := newHostNetworkService()
+	expectedHns := hnsV1{}
+	assert.Equal(t, expectedHns, actualHns)
+}
+
+func TestNewHostNetworkServiceV2(t *testing.T) {
+	mockhcn := mocks.HcnMock{}
+	hcnGetSupportedFeatures = mockhcn.GetSupportedFeatures
+	mockSupFeatures := mocks.MockNewSupportedFeatures()
+	mockSupFeatures.Api.V2 = true
+	mockhcn.On("GetSupportedFeatures").Return(mockSupFeatures)
+	actualHns2, _ := newHostNetworkService()
+	expectedHns2 := hnsV2{}
+	assert.Equal(t, expectedHns2, actualHns2)
+}
+
+func TestGetNetworkInfo(t *testing.T) {
+	mockHns := HnsMock{}
+	mockHnsNwInfo := mockNewHNSNetworkInfo("nw-id-123", "nw-name-123")
+	mockHns.On("getNetworkByName", "hns-nw-name-123").Return(mockHnsNwInfo, nil)
+	actualNwInfo, _ := getNetworkInfo(mockHns, "hns-nw-name-123")
+	assert.Equal(t, mockHnsNwInfo, actualNwInfo)
+}
+
+func TestDualStackCompatible(t *testing.T) {
+	mockHns := HnsMock{}
+	mockHnsNwInfo := mockNewHNSNetworkInfo("nw-id-123", "nw-name-123")
+	mockHns.On("getNetworkByName", "nw-name-123").Return(mockHnsNwInfo, nil)
+	hns = mockHns
+
+	mockhcn := mocks.HcnMock{}
+	hcnIPv6DualStackSupported = mockhcn.IPv6DualStackSupported
+	mockhcn.On("IPv6DualStackSupported").Return(nil)
+
+	dualStackCompTester := DualStackCompatTester{}
+	comp := dualStackCompTester.DualStackCompatible("nw-name-123")
+	assert.True(t, comp)
+}
+
+func setupMockHns(proxier *Proxier) HnsMock {
+
+	mockHns := HnsMock{}
+	mockHnsNwInfo := mockNewHNSNetworkInfo(strings.ToUpper(guid), mocks.TestNwName)
+	mockHns.On("getNetworkByName", mocks.TestNwName).Return(mockHnsNwInfo, nil)
+
+	mockEndpointInfo := mockNewEndpointInfo(mockHns, epIpAddress, epMacAddress, mocks.HnsID, true)
+	mockHns.On("getEndpointByName", proxier.rootHnsEndpointName).Return(mockEndpointInfo, nil)
+
+	endPointsInfoMap := mockNewHNSNetworkInfoMap(mockHns)
+	mockHns.On("getAllEndpointsByNetwork", mocks.TestNwName).Return(endPointsInfoMap, nil)
+
+	allLBs := mockNewAllLoadBalancers()
+	mockHns.On("getAllLoadBalancers").Return(allLBs, nil)
+
+	mockEndpointInfo2 := mockNewEndpointInfo(nil, mocks.SvcIP, epMacAddress, mocks.EmptyID, false)
+
+	mockEndpointInfo3 := mockNewEndpointInfo(nil, sourceVip, epMacAddress, mocks.EmptyID, true)
+	mockEndpointInfo3.terminating = false
+	mockHns.On("createEndpoint", mockEndpointInfo2, mocks.TestNwName).Return(mockEndpointInfo2, nil)
+	mockHns.On("createEndpoint", mockEndpointInfo3, mocks.TestNwName).Return(mockEndpointInfo3, nil)
+
+	mockHns.On("deleteLoadBalancer", mocks.EmptyID).Return(nil)
+
+	endPointsInfoList := mockNewHNSNetworkInfoList(nil, []string{epIpAddressRemote}, []string{epMacAddress}, mocks.ProviderAddress, 2)
+	lbInfo := &loadBalancerInfo{
+		hnsID: mocks.HnsID,
+	}
+	mockHns.On("getLoadBalancer", endPointsInfoList, mock.Anything, mocks.ProviderAddress, mock.Anything, uint16(protocol), uint16(internalPort), mock.Anything, allLBs).Return(lbInfo, nil)
+
+	proxier.hns = mockHns
+
+	return mockHns
+}
+
+// testSvcInfo is unit testcase to test the service map
+func TestSvcInfo(t *testing.T) {
+
+	syncPeriod := 30 * time.Second
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	if proxier == nil {
+		t.Error()
+		return
+	}
+
+	setupMockHns(proxier)
+
+	// test to check if forwardHealthCheckVip is set to true.
+	proxier.forwardHealthCheckVip = true
+
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = mocks.SvcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(mocks.SvcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(mocks.SvcNodePort),
+			}}
+		}),
+	)
+
+	tcpProtocol := v1.ProtocolTCP
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIpAddressRemote},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Port:     utilpointer.Int32(int32(mocks.SvcPort)),
+				Protocol: &tcpProtocol,
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	// Assert service map
+	svc := proxier.serviceMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	assert.True(t, ok, "Cast serviceInfo successful")
+	assert.Equal(t, svcInfo.hnsID, mocks.HnsID, "HNS ID match")
+	assert.Equal(t, svcInfo.nodePorthnsID, mocks.HnsID, "Node port HNS ID match")
+}
+
+// TestHealthCheckNodePort tests that health check node ports are enabled when expected
+func TestHealthCheckNodePort(t *testing.T) {
+	// Arrange
+	syncPeriod := 30 * time.Second
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	if proxier == nil {
+		t.Error()
+		return
+	}
+
+	setupMockHns(proxier)
+
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	// Act
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ClusterIP = mocks.SvcIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(mocks.SvcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(mocks.SvcNodePort),
+			}}
+			svc.Spec.HealthCheckNodePort = int32(mocks.SvcHealthCheckNodePort)
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	// Assert service map
+	svc := proxier.serviceMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	assert.True(t, ok, "Cast serviceInfo successful")
+	assert.Equal(t, svcInfo.BaseServiceInfo.HealthCheckNodePort(), mocks.SvcHealthCheckNodePort, "Health Check node port is not matching.")
+}
+
+// TestEndpointSliceE2E ensures that the winkernel proxier supports working with
+// EndpointSlices
+func TestEndpointSliceE2E(t *testing.T) {
+	// Arrange
+	syncPeriod := 30 * time.Second
+	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	if proxier == nil {
+		t.Error()
+		return
+	}
+
+	mockHns := setupMockHns(proxier)
+
+	mockCreateEndpoint(&mockHns, "192.168.2.4", "02-11-c0-a8-02-04", mocks.ProviderAddress, mocks.EmptyID, false)
+	mockCreateEndpoint(&mockHns, "192.168.2.5", "02-11-c0-a8-02-05", "", mocks.EmptyID, false)
+	// mockCreateEndpoint(&mockHns, "192.168.2.6", "02-11-c0-a8-02-06", "", mocks.EmptyID, false)
+
+	lbInfo := &loadBalancerInfo{
+		hnsID: mocks.HnsID,
+	}
+	allLBs := mockNewAllLoadBalancers()
+	mockHns.On("getLoadBalancer", mock.Anything, mock.Anything, mocks.ProviderAddress, mock.Anything, uint16(protocol), uint16(internalPort), mock.Anything, allLBs).Return(lbInfo, nil)
+
+	proxier.hns = mockHns
+
+	proxier.servicesSynced = true
+	proxier.endpointSlicesSynced = true
+
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	proxier.OnServiceAdd(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: svcPortName.Name, Namespace: svcPortName.Namespace},
+		Spec: v1.ServiceSpec{
+			ClusterIP: mocks.SvcIP,
+			Selector:  map[string]string{"foo": "bar"},
+			Ports:     []v1.ServicePort{{Name: svcPortName.Port, TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+		},
+	})
+
+	tcpProtocol := v1.ProtocolTCP
+	endpointSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-1", svcPortName.Name),
+			Namespace: svcPortName.Namespace,
+			Labels:    map[string]string{discovery.LabelServiceName: svcPortName.Name},
+		},
+		Ports: []discovery.EndpointPort{{
+			Name:     &svcPortName.Port,
+			Port:     utilpointer.Int32Ptr(80),
+			Protocol: &tcpProtocol,
+		}},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints: []discovery.Endpoint{{
+			Addresses:  []string{epIpAddressRemote},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			NodeName:   utilpointer.StringPtr(testHostName),
+		}, {
+			Addresses:  []string{"192.168.2.4"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			NodeName:   utilpointer.StringPtr("node2"),
+		}, {
+			Addresses:  []string{"192.168.2.5"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			NodeName:   utilpointer.StringPtr("node3"),
+		}, {
+			Addresses:  []string{"192.168.2.6"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
+			NodeName:   utilpointer.StringPtr("node4"),
+		}},
+	}
+
+	// Act
+	proxier.syncRunner = new(async.BoundedFrequencyRunner)
+	proxier.setInitialized(true)
+	proxier.OnEndpointSliceAdd(endpointSlice)
+
+	assert.Equal(t, proxier.endpointsChanges.PendingCount(), 4, "Endpoint pending count does not match.")
+	assert.Equal(t, proxier.endpointsChanges.AppliedCount(), 0, "Endpoint applied count does not match.")
+
+	proxier.syncProxyRules()
+
+	assert.Equal(t, proxier.endpointsChanges.PendingCount(), 0, "Endpoint pending count does not match.")
+	assert.Equal(t, proxier.endpointsChanges.AppliedCount(), 4, "Endpoint applied count does not match.")
+
+	// Assert
+	svc := proxier.serviceMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	if !ok {
+		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+
+	} else {
+		if svcInfo.hnsID != guid {
+			t.Errorf("The Hns Loadbalancer Id %v does not match %v. ServicePortName %q", svcInfo.hnsID, guid, svcPortName.String())
+		}
+	}
+
+	// ep := proxier.endpointsMap[svcPortName][0]
+	// epInfo, ok := ep.(*endpointsInfo)
+	// if !ok {
+	// 	t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
+
+	// } else {
+	// 	if epInfo.hnsID != guid {
+	// 		t.Errorf("Hns EndpointId %v does not match %v. ServicePortName %q", epInfo.hnsID, guid, svcPortName.String())
+	// 	}
+	// }
+
+	// proxier.setInitialized(false)
+	// proxier.OnEndpointSliceDelete(endpointSlice)
+	// proxier.setInitialized(true)
+	// proxier.syncProxyRules()
+
+	// svc = proxier.serviceMap[svcPortName]
+	// svcInfo, ok = svc.(*serviceInfo)
+	// if !ok {
+	// 	t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+
+	// } else { //policy should not be applied here
+	// 	if svcInfo.policyApplied {
+	// 		t.Error("Service ns1/svc1:p80 has no endpoint information available, but policies are applied. Unexpected behaviour!")
+	// 	}
+	// }
 }

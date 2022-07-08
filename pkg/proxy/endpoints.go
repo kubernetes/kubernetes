@@ -401,6 +401,30 @@ func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndp
 	return result
 }
 
+func (ect *EndpointChangeTracker) PendingCount() int {
+	trackerSvcMap := ect.endpointSliceCache.trackerByServiceMap
+	count := 0
+	for _, trackerSvc := range trackerSvcMap {
+		svcMap := trackerSvc.pending
+		for _, svc := range svcMap {
+			count += len(svc.Endpoints)
+		}
+	}
+	return count
+}
+
+func (ect *EndpointChangeTracker) AppliedCount() int {
+	trackerSvcMap := ect.endpointSliceCache.trackerByServiceMap
+	count := 0
+	for _, trackerSvc := range trackerSvcMap {
+		svcMap := trackerSvc.applied
+		for _, svc := range svcMap {
+			count += len(svc.Endpoints)
+		}
+	}
+	return count
+}
+
 // EndpointsMap maps a service name to a list of all its Endpoints.
 type EndpointsMap map[ServicePortName][]Endpoint
 

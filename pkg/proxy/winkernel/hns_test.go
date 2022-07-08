@@ -390,6 +390,7 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
+
 func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
 	Network := mustTestNetwork(t)
 	// We keep this empty to ensure we test for new load balancer creation.
