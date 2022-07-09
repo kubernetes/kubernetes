@@ -493,3 +493,81 @@ func TestDifference(t *testing.T) {
 		}
 	}
 }
+
+func TestSubtractWithNonNegativeResult(t *testing.T) {
+	type args struct {
+		a corev1.ResourceList
+		b corev1.ResourceList
+	}
+	tests := []struct {
+		name string
+		args args
+		want corev1.ResourceList
+	}{
+		{
+			name: "all resource a > b ",
+			args: args{
+				a: corev1.ResourceList{
+					corev1.ResourceCPU:     resource.MustParse("200m"),
+					corev1.ResourceMemory:  resource.MustParse("10Gi"),
+					corev1.ResourceStorage: resource.MustParse("100Gi"),
+				},
+				b: corev1.ResourceList{
+					corev1.ResourceCPU:     resource.MustParse("100m"),
+					corev1.ResourceMemory:  resource.MustParse("5Gi"),
+					corev1.ResourceStorage: resource.MustParse("50Gi"),
+				},
+			},
+			want: corev1.ResourceList{
+				corev1.ResourceCPU:     resource.MustParse("100m"),
+				corev1.ResourceMemory:  resource.MustParse("5Gi"),
+				corev1.ResourceStorage: resource.MustParse("50Gi"),
+			},
+		}, {
+			name: "all resource a < b ",
+			args: args{
+				a: corev1.ResourceList{
+					corev1.ResourceCPU:     resource.MustParse("20m"),
+					corev1.ResourceMemory:  resource.MustParse("1Gi"),
+					corev1.ResourceStorage: resource.MustParse("10Gi"),
+				},
+				b: corev1.ResourceList{
+					corev1.ResourceCPU:     resource.MustParse("100m"),
+					corev1.ResourceMemory:  resource.MustParse("5Gi"),
+					corev1.ResourceStorage: resource.MustParse("50Gi"),
+				},
+			},
+			want: corev1.ResourceList{
+				corev1.ResourceCPU:     resource.MustParse("0m"),
+				corev1.ResourceMemory:  resource.MustParse("0Gi"),
+				corev1.ResourceStorage: resource.MustParse("0Gi"),
+			},
+		},
+		{
+			name: "some resource a < b ",
+			args: args{
+				a: corev1.ResourceList{
+					corev1.ResourceCPU:     resource.MustParse("200m"),
+					corev1.ResourceMemory:  resource.MustParse("1Gi"),
+					corev1.ResourceStorage: resource.MustParse("10Gi"),
+				},
+				b: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("100m"),
+					corev1.ResourceMemory: resource.MustParse("5Gi"),
+				},
+			},
+			want: corev1.ResourceList{
+				corev1.ResourceCPU:     resource.MustParse("100m"),
+				corev1.ResourceMemory:  resource.MustParse("0Gi"),
+				corev1.ResourceStorage: resource.MustParse("10Gi"),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SubtractWithNonNegativeResult(tt.args.a, tt.args.b); !Equals(got, tt.want) {
+				t.Errorf("SubtractWithNonNegativeResult() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
