@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
 )
@@ -85,20 +86,72 @@ func Test_parsePercentage(t *testing.T) {
 }
 
 func TestParseQOSReserved(t *testing.T) {
-	type args struct {
-		m map[string]string
-	}
+	// Part 1 Tests all valid combinations of memory type and percentage.
+	t.Run("validTestswithPercent", func(t *testing.T) {
+		for i := 0; i < 100; i++ {
+			value := map[string]string{
+				"memory": fmt.Sprintf("%d", i) + "%",
+			}
+			want := map[v1.ResourceName]int64{
+				v1.ResourceName("memory"): int64(i),
+			}
+			if got, e := ParseQOSReserved(value); got != &want && e != nil {
+				t.Errorf("ParseQOSReserved() failed, got %v, wanted %v, error was: %v", got, want, e)
+			}
+		}
+	})
+
+	// Part 2 tests a few error values
 	tests := []struct {
 		name    string
-		args    args
+		m       map[string]string
 		want    *map[v1.ResourceName]int64
 		wantErr bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "invalid1",
+			m: map[string]string{
+				"cpu": "86%",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "invalid2",
+			m: map[string]string{
+				"cpu": "-85%",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "invalid3",
+			m: map[string]string{
+				"memory": "105%",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "invalid4",
+			m: map[string]string{
+				"memory": "-35",
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "invalid5",
+			m: map[string]string{
+				"cpu": "105%",
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseQOSReserved(tt.args.m)
+			got, err := ParseQOSReserved(tt.m)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseQOSReserved() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -111,19 +164,207 @@ func TestParseQOSReserved(t *testing.T) {
 }
 
 func Test_containerDevicesFromResourceDeviceInstances(t *testing.T) {
-	type args struct {
-		devs devicemanager.ResourceDeviceInstances
-	}
+	var nilDevs []*podresourcesapi.ContainerDevices
+
 	tests := []struct {
 		name string
-		args args
+		devs devicemanager.ResourceDeviceInstances
 		want []*podresourcesapi.ContainerDevices
 	}{
-		// TODO: Add test cases.
+		{
+			name: "nil1",
+			devs: devicemanager.NewResourceDeviceInstances(),
+			want: nilDevs,
+		},
+		{
+			name: "noNodesTest1",
+			devs: devicemanager.ResourceDeviceInstances{
+				"dev1": devicemanager.DeviceInstances{
+					"node1": pluginapi.Device{
+						Topology: nil,
+					},
+				},
+			},
+			want: []*podresourcesapi.ContainerDevices{
+				{
+					ResourceName: "dev1",
+					DeviceIds:    []string{"node1"},
+					Topology:     nil,
+				},
+			},
+		},
+		{
+			name: "noNodesTest2",
+			devs: devicemanager.ResourceDeviceInstances{
+				"somedevice": devicemanager.DeviceInstances{
+					"node1": pluginapi.Device{
+						Topology: nil,
+					},
+					"node2": pluginapi.Device{
+						Topology: nil,
+					},
+					"node3": pluginapi.Device{
+						Topology: nil,
+					},
+				},
+			},
+			want: []*podresourcesapi.ContainerDevices{
+				{
+					ResourceName: "somedevice",
+					DeviceIds:    []string{"node1"},
+					Topology:     nil,
+				},
+				{
+					ResourceName: "somedevice",
+					DeviceIds:    []string{"node2"},
+					Topology:     nil,
+				},
+				{
+					ResourceName: "somedevice",
+					DeviceIds:    []string{"node3"},
+					Topology:     nil,
+				},
+			},
+		},
+		{
+			name: "nodesTest1",
+			devs: devicemanager.ResourceDeviceInstances{
+				"somedevice": devicemanager.DeviceInstances{
+					"instance1": pluginapi.Device{
+						Topology: &pluginapi.TopologyInfo{
+							Nodes: []*pluginapi.NUMANode{
+								{
+									ID: 1,
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []*podresourcesapi.ContainerDevices{
+				{
+					ResourceName: "somedevice",
+					DeviceIds:    []string{"instance1"},
+					Topology: &podresourcesapi.TopologyInfo{
+						Nodes: []*podresourcesapi.NUMANode{
+							{
+								ID: 1,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "nodesTest2",
+			devs: devicemanager.ResourceDeviceInstances{
+				"somedevice": devicemanager.DeviceInstances{
+					"instance1": pluginapi.Device{
+						Topology: &pluginapi.TopologyInfo{
+							Nodes: []*pluginapi.NUMANode{
+								{
+									ID: 1,
+								},
+								{
+									ID: 2,
+								},
+								{
+									ID: 3,
+								},
+							},
+						},
+					},
+					"instance2": pluginapi.Device{
+						Topology: &pluginapi.TopologyInfo{
+							Nodes: []*pluginapi.NUMANode{
+								{
+									ID: 1,
+								},
+								{
+									ID: 2,
+								},
+								{
+									ID: 3,
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []*podresourcesapi.ContainerDevices{
+				{
+					ResourceName: "somedevice",
+					DeviceIds:    []string{"instance1"},
+					Topology: &podresourcesapi.TopologyInfo{
+						Nodes: []*podresourcesapi.NUMANode{
+							{
+								ID: 1,
+							},
+						},
+					},
+				},
+				{
+					ResourceName: "somedevice",
+					DeviceIds:    []string{"instance1"},
+					Topology: &podresourcesapi.TopologyInfo{
+						Nodes: []*podresourcesapi.NUMANode{
+							{
+								ID: 2,
+							},
+						},
+					},
+				},
+				{
+					ResourceName: "somedevice",
+					DeviceIds:    []string{"instance1"},
+					Topology: &podresourcesapi.TopologyInfo{
+						Nodes: []*podresourcesapi.NUMANode{
+							{
+								ID: 3,
+							},
+						},
+					},
+				},
+				{
+					ResourceName: "somedevice",
+					DeviceIds:    []string{"instance2"},
+					Topology: &podresourcesapi.TopologyInfo{
+						Nodes: []*podresourcesapi.NUMANode{
+							{
+								ID: 1,
+							},
+						},
+					},
+				},
+				{
+					ResourceName: "somedevice",
+					DeviceIds:    []string{"instance2"},
+					Topology: &podresourcesapi.TopologyInfo{
+						Nodes: []*podresourcesapi.NUMANode{
+							{
+								ID: 2,
+							},
+						},
+					},
+				},
+				{
+					ResourceName: "somedevice",
+					DeviceIds:    []string{"instance2"},
+					Topology: &podresourcesapi.TopologyInfo{
+						Nodes: []*podresourcesapi.NUMANode{
+							{
+								ID: 3,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := containerDevicesFromResourceDeviceInstances(tt.args.devs); !reflect.DeepEqual(got, tt.want) {
+			if got := containerDevicesFromResourceDeviceInstances(tt.devs); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("containerDevicesFromResourceDeviceInstances() = %v, want %v", got, tt.want)
 			}
 		})
