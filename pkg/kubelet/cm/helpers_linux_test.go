@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -567,6 +567,73 @@ func TestMilliCPUToQuota(t *testing.T) {
 		if quota != testCase.quota {
 			t.Errorf("Input %v and %v, expected quota %v, but got quota %v", testCase.input, testCase.period, testCase.quota, quota)
 		}
+	}
+}
+
+func TestMilliCPUToShares(t *testing.T) {
+
+	tests := []struct {
+		name     string
+		milliCPU int64
+		want     uint64
+	}{
+		{
+			name:     "1",
+			milliCPU: 0,
+			want:     2,
+		},
+		{
+			name:     "2",
+			milliCPU: 500,
+			want:     512,
+		},
+		{
+			name:     "3",
+			milliCPU: 32000,
+			want:     32768,
+		},
+		{
+			name:     "4",
+			milliCPU: 256,
+			want:     262,
+		},
+		{
+			name:     "5",
+			milliCPU: 1,
+			want:     MinShares,
+		},
+		{
+			name:     "6",
+			milliCPU: 2,
+			want:     MinShares,
+		},
+		{
+			name:     "7",
+			milliCPU: 512000,
+			want:     MaxShares,
+		},
+		{
+			name:     "8",
+			milliCPU: 1024,
+			want:     1049,
+		},
+		{
+			name:     "9",
+			milliCPU: 2048,
+			want:     2097,
+		},
+		{
+			name:     "10",
+			milliCPU: 4096,
+			want:     4194,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := MilliCPUToShares(tt.milliCPU); got != tt.want {
+				t.Errorf("MilliCPUToShares() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
