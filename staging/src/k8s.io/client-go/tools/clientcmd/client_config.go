@@ -577,7 +577,7 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 }
 
 func (config *inClusterClientConfig) Namespace() (string, bool, error) {
-	//get the namespace of current pod, if available
+	// Get InCluster namespace of current pod if available, or it will be `default` namespace
 	namespace, _ := restclient.InClusterNamespace()
 	return namespace, false, nil
 }

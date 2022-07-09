@@ -553,7 +553,7 @@ func InClusterNamespace() (string, error) {
 	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
 		return ns, nil
 	}
-	//return the namespace associated with the service account of the pod, if available
+	// Return the namespace associated with the service account of the pod, if available
 	nsFile := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 	if _, err := os.Stat(nsFile); os.IsNotExist(err) {
 		return DefaultNamespace, ErrNotInCluster
@@ -563,7 +563,7 @@ func InClusterNamespace() (string, error) {
 		return DefaultNamespace, err
 	}
 	ns := strings.TrimSpace(string(data))
-	// for compatibility, return default if the namespace is empty
+	// For compatibility, return default namespace if it is empty
 	if len(ns) == 0 {
 		ns = DefaultNamespace
 	}
