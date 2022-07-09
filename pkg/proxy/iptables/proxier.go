@@ -38,11 +38,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
@@ -1082,6 +1080,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// external traffic may still be accepted.
 				internalTrafficFilterTarget = "DROP"
 				internalTrafficFilterComment = fmt.Sprintf(`"%s has no local endpoints"`, svcPortNameString)
+				serviceNoLocalEndpointsTotalInternal++
 			}
 			if !hasExternalEndpoints {
 				// The externalTrafficPolicy is "Local" but there are no
@@ -1090,6 +1089,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// the cluster may still be accepted.
 				externalTrafficFilterTarget = "DROP"
 				externalTrafficFilterComment = fmt.Sprintf(`"%s has no local endpoints"`, svcPortNameString)
+				serviceNoLocalEndpointsTotalExternal++
 			}
 		}
 
@@ -1367,17 +1367,8 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if svcInfo.UsesLocalEndpoints() {
-			if len(localEndpoints) != 0 {
-				// Write rules jumping from localPolicyChain to localEndpointChains
-				proxier.writeServiceToEndpointRules(svcPortNameString, svcInfo, localPolicyChain, localEndpoints, args)
-			} else if hasEndpoints {
-				if svcInfo.InternalPolicyLocal() && utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
-					serviceNoLocalEndpointsTotalInternal++
-				}
-				if svcInfo.ExternalPolicyLocal() {
-					serviceNoLocalEndpointsTotalExternal++
-				}
-			}
+			// Write rules jumping from localPolicyChain to localEndpointChains
+			proxier.writeServiceToEndpointRules(svcPortNameString, svcInfo, localPolicyChain, localEndpoints, args)
 		}
 	}
 
