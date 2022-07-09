@@ -736,7 +736,6 @@ func checkIPTablesRuleJumps(ruleData string) error {
 		// Ignore jumps to chains that we expect to exist even if kube-proxy
 		// didn't create them itself.
 		jumpedChains.Delete("ACCEPT", "REJECT", "DROP", "MARK", "RETURN", "DNAT", "SNAT", "MASQUERADE")
-		jumpedChains.Delete(string(kubeMarkDropChain))
 
 		// Find cases where we have "-A FOO ... -j BAR" but no ":BAR", meaning
 		// that we are jumping to a chain that was not created.
@@ -1436,10 +1435,8 @@ type iptablesTracer struct {
 	// the return value of tracePacket.
 	outputs []string
 
-	// markMasq and markDrop track whether the packet has been marked for masquerading
-	// or dropping.
+	// markMasq tracks whether the packet has been marked for masquerading
 	markMasq bool
-	markDrop bool
 }
 
 // newIPTablesTracer creates an iptablesTracer. nodeIP is the IP to treat as the local
@@ -1525,10 +1522,6 @@ func (tracer *iptablesTracer) runChain(table utiliptables.Table, chain utiliptab
 			tracer.markMasq = true
 			continue
 
-		case "KUBE-MARK-DROP":
-			tracer.markDrop = true
-			continue
-
 		case "ACCEPT", "REJECT", "DROP":
 			// (only valid in filter)
 			tracer.outputs = append(tracer.outputs, rule.Jump.Value)
@@ -1580,11 +1573,6 @@ func tracePacket(t *testing.T, ipt *iptablestest.FakeIPTables, sourceIP, destIP,
 	// inbound, outbound, or intra-host packet, which we don't know. So we just run
 	// the interesting tables manually. (Theoretically this could cause conflicts in
 	// the future in which case we'd have to do something more complicated.)
-
-	// The DROP rule is created by kubelet, not us, so we have to simulate that manually.
-	if tracer.markDrop {
-		return tracer.matches, "DROP", false
-	}
 	tracer.runChain(utiliptables.TableFilter, kubeServicesChain, sourceIP, destIP, destPort)
 	tracer.runChain(utiliptables.TableFilter, kubeExternalServicesChain, sourceIP, destIP, destPort)
 	tracer.runChain(utiliptables.TableFilter, kubeNodePortsChain, sourceIP, destIP, destPort)
