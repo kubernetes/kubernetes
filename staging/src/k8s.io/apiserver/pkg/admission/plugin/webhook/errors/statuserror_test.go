@@ -18,8 +18,11 @@ package errors
 
 import (
 	"fmt"
+	"net/http"
+	"reflect"
 	"testing"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -150,5 +153,36 @@ func TestToStatusErr(t *testing.T) {
 		if err.ErrStatus.Status != test.expectedStatus {
 			t.Errorf("%s: expected code %q, got %q", test.name, test.expectedStatus, err.ErrStatus.Status)
 		}
+	}
+}
+
+func TestNewDryRunUnsupportedErr(t *testing.T) {
+	type args struct {
+		webhookName string
+	}
+	tests := []struct {
+		name string
+		args args
+		want *apierrors.StatusError
+	}{
+		{
+			name: "NewDryRunUnsupportedErr",
+			args: args{webhookName: "foo"},
+			want: &apierrors.StatusError{
+				ErrStatus: metav1.Status{
+					Status:  metav1.StatusFailure,
+					Code:    http.StatusBadRequest,
+					Reason:  metav1.StatusReasonBadRequest,
+					Message: fmt.Sprintf("admission webhook %q does not support dry run", "foo"),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NewDryRunUnsupportedErr(tt.args.webhookName); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewDryRunUnsupportedErr() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
