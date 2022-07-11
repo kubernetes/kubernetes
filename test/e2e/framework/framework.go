@@ -550,7 +550,7 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 // RecordFlakeIfError records flakeness info if error happens.
 // NOTE: This function is not used at any places yet, but we are in progress for https://github.com/kubernetes/kubernetes/issues/66239 which requires this. Please don't remove this.
 func (f *Framework) RecordFlakeIfError(err error, optionalDescription ...interface{}) {
-	f.flakeReport.RecordFlakeIfError(err, optionalDescription)
+	f.flakeReport.RecordFlakeIfError(err, optionalDescription...)
 }
 
 // AddNamespacesToDelete adds one or more namespaces to be deleted when the test
