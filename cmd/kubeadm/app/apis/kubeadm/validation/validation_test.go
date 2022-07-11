@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -110,8 +111,9 @@ func TestValidateNodeRegistrationOptions(t *testing.T) {
 		{"valid-nodename", false},   // supported
 		// test cases for criSocket are covered in TestValidateSocketPath
 	}
+	criPath := fmt.Sprintf("%s:///some/path", kubeadmapiv1.DefaultContainerRuntimeURLScheme)
 	for _, rt := range tests {
-		nro := kubeadmapi.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: "unix:///some/path"}
+		nro := kubeadmapi.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: criPath}
 		actual := ValidateNodeRegistrationOptions(&nro, field.NewPath("nodeRegistration"))
 		actualErrors := len(actual) > 0
 		if actualErrors != rt.expectedErrors {
@@ -456,6 +458,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 // TODO: Create a separated test for ValidateClusterConfiguration
 func TestValidateInitConfiguration(t *testing.T) {
 	nodename := "valid-nodename"
+	criPath := fmt.Sprintf("%s:///some/path", kubeadmapiv1.DefaultContainerRuntimeURLScheme)
 	var tests = []struct {
 		name     string
 		s        *kubeadmapi.InitConfiguration
@@ -476,7 +479,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadmapi.InitConfiguration{
@@ -491,7 +494,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, false},
 		{"invalid missing node name",
 			&kubeadmapi.InitConfiguration{
@@ -521,7 +524,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, false},
 		{"valid InitConfiguration with IPv4 service subnet",
 			&kubeadmapi.InitConfiguration{
@@ -542,7 +545,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, true},
 		{"valid InitConfiguration using IPv6 service subnet",
 			&kubeadmapi.InitConfiguration{
@@ -562,7 +565,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "unix:///some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, true},
 	}
 	for _, rt := range tests {
@@ -579,6 +582,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 }
 
 func TestValidateJoinConfiguration(t *testing.T) {
+	criPath := fmt.Sprintf("%s:///var/run/containerd/containerd.sock", kubeadmapiv1.DefaultContainerRuntimeURLScheme)
 	var tests = []struct {
 		s        *kubeadmapi.JoinConfiguration
 		expected bool
@@ -607,7 +611,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "unix:///var/run/containerd/containerd.sock",
+				CRISocket: criPath,
 			},
 		}, true},
 		{&kubeadmapi.JoinConfiguration{ // Pass with JoinControlPlane
@@ -622,7 +626,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "unix:///var/run/containerd/containerd.sock",
+				CRISocket: criPath,
 			},
 			ControlPlane: &kubeadmapi.JoinControlPlane{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
@@ -643,7 +647,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "unix:///var/run/containerd/containerd.sock",
+				CRISocket: criPath,
 			},
 			ControlPlane: &kubeadmapi.JoinControlPlane{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
@@ -664,7 +668,7 @@ func TestValidateJoinConfiguration(t *testing.T) {
 			},
 			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
-				CRISocket: "unix:///var/run/containerd/containerd.sock",
+				CRISocket: criPath,
 			},
 			ControlPlane: &kubeadmapi.JoinControlPlane{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
@@ -1124,9 +1128,10 @@ func TestValidateEtcd(t *testing.T) {
 		actual := ValidateEtcd(tc.etcd, field.NewPath("etcd"))
 		actualErrors := len(actual) > 0
 		if actualErrors != tc.expectedErrors {
-			t.Errorf("Error: \n\texpected: %t\n\t  actual: %t",
+			t.Errorf("Error: \n\texpected: %t\n\t  actual: %t\n\t  encountered errors: %v",
 				tc.expectedErrors,
 				actualErrors,
+				actual,
 			)
 		}
 	}

@@ -82,7 +82,7 @@ func TestSchedulerOptions(t *testing.T) {
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -114,7 +114,7 @@ users:
 apiVersion: componentconfig/v1alpha1
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -125,7 +125,7 @@ leaderElection:
 apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -136,7 +136,7 @@ leaderElection:
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -147,7 +147,7 @@ leaderElection:
 apiVersion: kubescheduler.config.k8s.io/unknown
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ leaderElection:
 	if err := os.WriteFile(noVersionConfig, []byte(fmt.Sprintf(`
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -168,7 +168,7 @@ leaderElection:
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true
 foo: bar`, configKubeconfig)), os.FileMode(0600)); err != nil {
@@ -180,7 +180,7 @@ foo: bar`, configKubeconfig)), os.FileMode(0600)); err != nil {
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 leaderElection:
   leaderElect: true
   leaderElect: false`, configKubeconfig)), os.FileMode(0600)); err != nil {
@@ -217,7 +217,7 @@ users:
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 profiles:
 - plugins:
     reserve:
@@ -248,7 +248,7 @@ profiles:
 apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 profiles:
 - plugins:
     reserve:
@@ -279,7 +279,7 @@ profiles:
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 profiles:
 - plugins:
     reserve:
@@ -310,7 +310,7 @@ profiles:
 apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 profiles:
 - schedulerName: "foo-profile"
   plugins:
@@ -337,7 +337,7 @@ profiles:
 apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 profiles:
 - schedulerName: "foo-profile"
   plugins:
@@ -364,7 +364,7 @@ profiles:
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
-  kubeconfig: "%s"
+  kubeconfig: '%s'
 profiles:
 - schedulerName: "foo-profile"
   plugins:
