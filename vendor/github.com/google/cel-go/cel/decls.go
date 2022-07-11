@@ -165,7 +165,7 @@ type Type struct {
 	isAssignableRuntimeType func(other ref.Type) bool
 }
 
-// IsAssignableFrom determines whether the current type is type-check assignable from the input fromType.
+// IsAssignableType determines whether the current type is type-check assignable from the input fromType.
 func (t *Type) IsAssignableType(fromType *Type) bool {
 	if t.isAssignableType != nil {
 		return t.isAssignableType(fromType)
@@ -650,7 +650,7 @@ func (f *functionDecl) merge(other *functionDecl) (*functionDecl, error) {
 	for _, o := range other.overloads {
 		err := merged.addOverload(o)
 		if err != nil {
-			return nil, fmt.Errorf("function declration merge failed: %v", err)
+			return nil, fmt.Errorf("function declaration merge failed: %v", err)
 		}
 	}
 	if other.singleton != nil {
@@ -821,8 +821,8 @@ func (o *overloadDecl) signatureOverlaps(other *overloadDecl) bool {
 	for i, argType := range o.argTypes {
 		otherArgType := other.argTypes[i]
 		argsOverlap = argsOverlap &&
-			(argType.IsAssignableRuntimeType(otherArgType.runtimeType) ||
-				otherArgType.IsAssignableRuntimeType(argType.runtimeType))
+			(argType.IsAssignableType(otherArgType) ||
+				otherArgType.IsAssignableType(argType))
 	}
 	return argsOverlap
 }

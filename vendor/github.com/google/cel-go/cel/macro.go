@@ -20,6 +20,10 @@ import (
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
+// Macro describes a function signature to match and the MacroExpander to apply.
+//
+// Note: when a Macro should apply to multiple overloads (based on arg count) of a given function,
+// a Macro should be created per arg-count or as a var arg macro.
 type Macro = parser.Macro
 
 // MacroExpander converts a call and its associated arguments into a new CEL abstract syntax tree, or an error
@@ -85,7 +89,7 @@ func MapMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.E
 	return parser.MakeMap(meh, target, args)
 }
 
-// MakeFilter expands the input call arguments into a comprehension which produces a list which contains
+// FilterMacroExpander expands the input call arguments into a comprehension which produces a list which contains
 // only elements which match the provided predicate expression:
 // <iterRange>.filter(<iterVar>, <predicate>)
 func FilterMacroExpander(meh MacroExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {

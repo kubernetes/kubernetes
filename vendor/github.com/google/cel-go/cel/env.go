@@ -61,6 +61,8 @@ func (ast *Ast) SourceInfo() *exprpb.SourceInfo {
 
 // ResultType returns the output type of the expression if the Ast has been type-checked, else
 // returns decls.Dyn as the parse step cannot infer the type.
+//
+// Deprecated: use OutputType
 func (ast *Ast) ResultType() *exprpb.Type {
 	if !ast.IsChecked() {
 		return decls.Dyn
@@ -68,6 +70,8 @@ func (ast *Ast) ResultType() *exprpb.Type {
 	return ast.typeMap[ast.expr.GetId()]
 }
 
+// OutputType returns the output type of the expression if the Ast has been type-checked, else
+// returns cel.DynType as the parse step cannot infer types.
 func (ast *Ast) OutputType() *Type {
 	t, err := ExprTypeToType(ast.ResultType())
 	if err != nil {

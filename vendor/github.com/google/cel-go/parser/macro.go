@@ -284,7 +284,7 @@ const (
 	quantifierExistsOne
 )
 
-// MakeExists expands the input call arguments into a comprehension that returns true if all of the
+// MakeAll expands the input call arguments into a comprehension that returns true if all of the
 // elements in the range match the predicate expressions:
 // <iterRange>.all(<iterVar>, <predicate>)
 func MakeAll(eh ExprHelper, target *exprpb.Expr, args []*exprpb.Expr) (*exprpb.Expr, *common.Error) {
