@@ -806,7 +806,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			//
 			// SyncPod can still be running when we get here, which
 			// means the PodWorker has not acked the deletion.
-			if m.podStateProvider.IsPodTerminationRequested(pod.UID) {
+			if m.podStateProvider.IsPodTerminationRequested(pod.UID) || m.podStateProvider.ShouldPodContentBeRemoved(pod.UID) {
 				klog.V(4).InfoS("Pod was deleted and sandbox failed to be created", "pod", klog.KObj(pod), "podUID", pod.UID)
 				return
 			}
