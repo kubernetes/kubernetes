@@ -50,6 +50,10 @@ func (m *fakeManager) GetAffinity(podUID string, containerName string) TopologyH
 	return *m.hint
 }
 
+func (m *fakeManager) GetPolicy() Policy {
+	return NewNonePolicy()
+}
+
 func (m *fakeManager) AddHintProvider(h HintProvider) {
 	klog.InfoS("AddHintProvider", "hintProvider", h)
 }

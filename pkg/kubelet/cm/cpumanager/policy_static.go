@@ -115,6 +115,10 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 	if err != nil {
 		return nil, err
 	}
+	err = ValidateStaticPolicyOptions(opts, topology, affinity)
+	if err != nil {
+		return nil, err
+	}
 
 	klog.InfoS("Static policy created with configuration", "options", opts)
 

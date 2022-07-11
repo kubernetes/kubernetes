@@ -23,6 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
 const (
@@ -109,4 +111,18 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 		}
 	}
 	return opts, nil
+}
+
+func ValidateStaticPolicyOptions(opts StaticPolicyOptions, topology *topology.CPUTopology, topologyManager topologymanager.Store) error {
+	if opts.AlignBySocket == true {
+		//1. not compatible with topology manager single numa policy option
+		if topologyManager.GetPolicy().Name() == topologymanager.PolicySingleNumaNode {
+			return fmt.Errorf("Topolgy manager Single numa policy is incompatible with CPUManager Align  by socket policy option")
+		}
+		//2. not comptuble with topology when num_socets > num_numa
+		if topology.NumSockets > topology.NumNUMANodes {
+			return fmt.Errorf("Align by socket is not compatible with hardware where number of sockets are more than number of NUMA")
+		}
+	}
+	return nil
 }
