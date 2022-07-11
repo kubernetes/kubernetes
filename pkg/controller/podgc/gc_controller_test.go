@@ -433,7 +433,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 				t.Errorf("Error while listing all Pods: %v", err)
 				return
 			}
-			gcc.gcUnscheduledTerminating(pods)
+			gcc.gcUnscheduledTerminating(context.TODO(), pods)
 			deletedPodNames := getDeletedPodNames(client)
 
 			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
