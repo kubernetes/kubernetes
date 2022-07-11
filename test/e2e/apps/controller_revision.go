@@ -39,6 +39,7 @@ import (
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -153,6 +154,7 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 		framework.Logf("%s has been patched", patchedControllerRevision.Name)
 
 		ginkgo.By("Create a new ControllerRevision")
+		ds.Spec.Template.Spec.TerminationGracePeriodSeconds = pointer.Int64(1)
 		newHash, newName := hashAndNameForDaemonSet(ds)
 		newRevision := &appsv1.ControllerRevision{
 			ObjectMeta: metav1.ObjectMeta{
