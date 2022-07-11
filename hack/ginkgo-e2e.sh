@@ -170,7 +170,7 @@ fi
 # for backward compatibility purpose.
 "${program[@]}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
-  --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" \
+  --ginkgo.flake-attempts="${FLAKE_ATTEMPTS}" \
   --ginkgo.timeout="24h" \
   --host="${KUBE_MASTER_URL}" \
   --provider="${KUBERNETES_PROVIDER}" \
@@ -191,7 +191,7 @@ fi
   --docker-config-file="${DOCKER_CONFIG_FILE:-}" \
   --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
   --prepull-images="${PREPULL_IMAGES:-false}" \
-  --ginkgo.slowSpecThreshold="${GINKGO_SLOW_SPEC_THRESHOLD:-300}" \
+  --ginkgo.slow-spec-threshold="${GINKGO_SLOW_SPEC_THRESHOLD:-300s}" \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \
   ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \
