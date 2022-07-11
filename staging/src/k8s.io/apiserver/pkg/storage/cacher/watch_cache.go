@@ -228,7 +228,8 @@ func newWatchCache(
 		startIndex:         0,
 		endIndex:           0,
 		// store:               cache.NewIndexer(storeElementKey, storeElementIndexers(indexers)),
-		store:               newBtreeStore(2), // TODO: figure out what the degree should be.
+		// TODO: figure out what the degree should be.
+		store:               newBtreeStore(storeElementKey, storeElementIndexers(indexers), 2),
 		resourceVersion:     0,
 		listResourceVersion: 0,
 		eventHandler:        eventHandler,
@@ -485,59 +486,53 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
-func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, key string, listOpts storage.ListOptions, trace *utiltrace.Trace) ([]interface{}, uint64, string, error) {
+func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, key string, listOpts storage.ListOptions, matchValues []storage.MatchValue, trace *utiltrace.Trace) ([]interface{}, uint64, string, error) {
 	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
+	defer w.RUnlock()
+
 	if err != nil {
 		return nil, 0, "", err
 	}
 
 	pred := listOpts.Predicate
 	hasContinuation := len(pred.Continue) > 0
-	hasLimit := pred.Limit > 0
-
-	if !hasLimit {
-		return w.store.List(), w.resourceVersion, "", nil
-	}
+	// hasLimit := pred.Limit > 0
 
 	// Perform a clone under the lock, this should be a relatively
 	// inexpensive operation since the implementation of clone uses
 	// copy on write semantics. Once cloned, serve the list from the
 	// cloned copy to avoid building the response under a lock.
 	var storeClone btreeIndexer
-	if err := func() error {
-		defer w.RUnlock()
-		if hasContinuation {
-			if _, ok := w.continueCache.cache[resourceVersion]; !ok {
-				// We return a 410 Gone here for the following reason:
-				//
-				// Before the LIST request reaches the watchCache, we
-				// check if it should be delegated to etcd directly. In
-				// this check, we see if the request has a continuation,
-				// if it does, we check if the RV of the continuation
-				// token is still present in the watchCache or not, if
-				// it isn't then we let etcd serve the request.
-				//
-				// As and when events are removed from the watchCache
-				// (when it becomes full), we also check and evict the
-				// cached copy of the tree for the resource version whose
-				// event is going to be removed.
-				//
-				// Due to this, in case the cached clone is evicted, we
-				// return a 410 Gone similar to when a continue token
-				// expires. On receiving this error, the client can retry
-				// and on this retry, the check for delegation will route
-				// the request to etcd and things proceed accordingly.
-				return errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
+	if hasContinuation {
+		if _, ok := w.continueCache.cache[resourceVersion]; !ok {
+			// We return a 410 Gone here for the following reason:
+			//
+			// Before the LIST request reaches the watchCache, we
+			// check if it should be delegated to etcd directly. In
+			// this check, we see if the request has a continuation,
+			// if it does, we check if the RV of the continuation
+			// token is still present in the watchCache or not, if
+			// it isn't then we let etcd serve the request.
+			//
+			// As and when events are removed from the watchCache
+			// (when it becomes full), we also check and evict the
+			// cached copy of the tree for the resource version whose
+			// event is going to be removed.
+			//
+			// Due to this, in case the cached clone is evicted, we
+			// return a 410 Gone similar to when a continue token
+			// expires. On receiving this error, the client can retry
+			// and on this retry, the check for delegation will route
+			// the request to etcd and things proceed accordingly.
+			err = errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
+			if err != nil {
+				return nil, 0, "", err
 			}
-			storeClone = w.continueCache.cache[resourceVersion]
-			return nil
 		}
+		storeClone = w.continueCache.cache[resourceVersion]
+	} else {
 		storeClone = w.store.Clone()
 		w.continueCache.cache[resourceVersion] = storeClone
-
-		return nil
-	}(); err != nil {
-		return nil, 0, "", err
 	}
 
 	if !strings.HasSuffix(key, "/") {
@@ -550,6 +545,12 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, key string, l
 			return nil, 0, "", apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 		}
 		key = continueKey
+	}
+
+	for _, matchValue := range matchValues {
+		if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
+			return result, w.resourceVersion, matchValue.IndexName, nil
+		}
 	}
 
 	return storeClone.LimitPrefixRead(listOpts.Predicate.Limit, key), w.resourceVersion, "", nil

@@ -647,7 +647,7 @@ func (c *Cacher) shouldDelegateList(opts storage.ListOptions) (bool, error) {
 	return true, nil
 }
 
-func (c *Cacher) listItems(listRV uint64, key string, listOpts storage.ListOptions, trace *utiltrace.Trace, recursive bool) ([]interface{}, uint64, string, error) {
+func (c *Cacher) listItems(listRV uint64, key string, pred storage.SelectionPredicate, listOpts storage.ListOptions, trace *utiltrace.Trace, recursive bool) ([]interface{}, uint64, string, error) {
 	if !recursive {
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(listRV, key, trace)
 		if err != nil {
@@ -658,7 +658,7 @@ func (c *Cacher) listItems(listRV uint64, key string, listOpts storage.ListOptio
 		}
 		return nil, readResourceVersion, "", nil
 	}
-	return c.watchCache.WaitUntilFreshAndList(listRV, key, listOpts, trace)
+	return c.watchCache.WaitUntilFreshAndList(listRV, key, listOpts, pred.MatcherIndex(), trace)
 }
 
 // GetList implements storage.Interface
@@ -713,7 +713,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 	filter := filterWithAttrsFunction(key, pred)
 
-	objs, readResourceVersion, indexUsed, err := c.listItems(listRV, key, opts, trace, recursive)
+	objs, readResourceVersion, indexUsed, err := c.listItems(listRV, key, pred, opts, trace, recursive)
 	if err != nil {
 		return err
 	}

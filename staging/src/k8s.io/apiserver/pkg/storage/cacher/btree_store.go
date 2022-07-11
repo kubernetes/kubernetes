@@ -22,23 +22,31 @@ import (
 	"sync"
 
 	"github.com/google/btree"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 )
 
 type btreeIndexer interface {
 	cache.Store
+	ByIndex(indexName, indexValue string) ([]interface{}, error)
 	Clone() btreeIndexer
 	LimitPrefixRead(limit int64, key string) []interface{}
 }
 
 type btreeStore struct {
-	lock sync.RWMutex
-	tree *btree.BTree
+	lock     sync.RWMutex
+	tree     *btree.BTree
+	indices  cache.Indices
+	indexers cache.Indexers
+	keyFunc  cache.KeyFunc
 }
 
-func newBtreeStore(degree int) *btreeStore {
+func newBtreeStore(keyFunc cache.KeyFunc, indexers cache.Indexers, degree int) *btreeStore {
 	return &btreeStore{
-		tree: btree.New(degree),
+		tree:     btree.New(degree),
+		indices:  cache.Indices{},
+		indexers: indexers,
+		keyFunc:  keyFunc,
 	}
 }
 
@@ -64,6 +72,16 @@ func (t *btreeStore) Delete(obj interface{}) error {
 	if !ok {
 		return fmt.Errorf("obj not a storeElement: %#v", obj)
 	}
+
+	key, err := t.keyFunc(obj)
+	if err != nil {
+		return cache.KeyError{Obj: obj, Err: err}
+	}
+	err = t.updateIndicesLocked(obj, nil, key)
+	if err != nil {
+		return err
+	}
+
 	item := t.tree.Delete(storeElem)
 	if item == nil {
 		return fmt.Errorf("obj does not exist")
@@ -111,23 +129,14 @@ func (t *btreeStore) Get(obj interface{}) (item interface{}, exists bool, err er
 		return nil, false, nil
 	}
 
-	return item, false, nil
+	return item, true, nil
 }
 
 func (t *btreeStore) GetByKey(key string) (item interface{}, exists bool, err error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	t.tree.Ascend(func(i btree.Item) bool {
-		if key == i.(*storeElement).Key {
-			item = i
-			exists = true
-			return false
-		}
-		return true
-	})
-
-	return item, exists, nil
+	return t.getByKeyLocked(key)
 }
 
 func (t *btreeStore) Replace(objs []interface{}, _ string) error {
@@ -169,20 +178,109 @@ func (t *btreeStore) addOrUpdateLocked(obj interface{}) error {
 	if !ok {
 		return fmt.Errorf("obj not a storeElement: %#v", obj)
 	}
-	t.tree.ReplaceOrInsert(storeElem)
+
+	returned := t.tree.ReplaceOrInsert(storeElem)
+	key, err := t.keyFunc(obj)
+	if err != nil {
+		return cache.KeyError{Obj: obj, Err: err}
+	}
+	if returned == nil {
+		return t.updateIndicesLocked(nil, obj, key)
+	}
+
+	old := returned.(interface{})
+	return t.updateIndicesLocked(old, storeElem, key)
+}
+
+func (t *btreeStore) getByKeyLocked(key string) (item interface{}, exists bool, err error) {
+	t.tree.Ascend(func(i btree.Item) bool {
+		if key == i.(*storeElement).Key {
+			item = i
+			exists = true
+			return false
+		}
+		return true
+	})
+
+	return item, exists, nil
+}
+
+func (t *btreeStore) updateIndicesLocked(oldObj, newObj interface{}, key string) error {
+	var oldIndexValues, indexValues []string
+	var err error
+	for name, indexFunc := range t.indexers {
+		if oldObj != nil {
+			oldIndexValues, err = indexFunc(oldObj)
+		} else {
+			oldIndexValues = oldIndexValues[:0]
+		}
+		if err != nil {
+			return fmt.Errorf("unable to calculate an index entry for key %q on index %q: %v", key, name, err)
+		}
+
+		if newObj != nil {
+			indexValues, err = indexFunc(newObj)
+		} else {
+			indexValues = indexValues[:0]
+		}
+		if err != nil {
+			return fmt.Errorf("unable to calculate an index entry for key %q on index %q: %v", key, name, err)
+		}
+
+		index := t.indices[name]
+		if index == nil {
+			index = cache.Index{}
+			t.indices[name] = index
+		}
+
+		if len(indexValues) == 1 && len(oldIndexValues) == 1 && indexValues[0] == oldIndexValues[0] {
+			// We optimize for the most common case where indexFunc returns a single value which has not been changed
+			continue
+		}
+
+		for _, value := range oldIndexValues {
+			t.deleteKeyFromIndexLocked(key, value, index)
+		}
+		for _, value := range indexValues {
+			t.addKeyToIndexLocked(key, value, index)
+		}
+	}
 
 	return nil
 }
 
+func (c *btreeStore) addKeyToIndexLocked(key, value string, index cache.Index) {
+	set := index[value]
+	if set == nil {
+		set = sets.String{}
+		index[value] = set
+	}
+	set.Insert(key)
+}
+
+func (t *btreeStore) deleteKeyFromIndexLocked(key, value string, index cache.Index) {
+	set := index[value]
+	if set == nil {
+		return
+	}
+	set.Delete(key)
+	// If we don't delete the set when zero, indices with high cardinality
+	// short lived resources can cause memory to increase over time from
+	// unused empty sets. See `kubernetes/kubernetes/issues/84959`.
+	if len(set) == 0 {
+		delete(index, value)
+	}
+}
+
 func (t *btreeStore) LimitPrefixRead(limit int64, key string) []interface{} {
 	t.lock.RLock()
-	defer t.lock.Unlock()
+	defer t.lock.RUnlock()
 
 	var result []interface{}
 	var elementsRetrieved int64
 	t.tree.AscendGreaterOrEqual(&storeElement{Key: key}, func(i btree.Item) bool {
 		elementKey := i.(*storeElement).Key
-		if elementsRetrieved == limit {
+		if limit > 0 && elementsRetrieved == limit {
 			return false
 		}
 		if !strings.HasPrefix(elementKey, key) {
@@ -194,6 +292,33 @@ func (t *btreeStore) LimitPrefixRead(limit int64, key string) []interface{} {
 	})
 
 	return result
+}
+
+func (t *btreeStore) ByIndex(indexName, indexValue string) ([]interface{}, error) {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	indexFunc := t.indexers[indexName]
+	if indexFunc == nil {
+		return nil, fmt.Errorf("Index with name %s does not exist", indexName)
+	}
+
+	index := t.indices[indexName]
+
+	set := index[indexValue]
+	list := make([]interface{}, 0, set.Len())
+	for key := range set {
+		obj, exists, err := t.getByKeyLocked(key)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, fmt.Errorf("key %s does not exist in store", key)
+		}
+		list = append(list, obj)
+	}
+
+	return list, nil
 }
 
 var _ btreeIndexer = (*btreeStore)(nil)
