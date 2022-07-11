@@ -1,6 +1,6 @@
 # kube-aggregator
 
-Implements https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/aggregated-api-servers.md.
+Implements the [Aggregated API Servers](https://github.com/kubernetes/design-proposals-archive/blob/main/api-machinery/aggregated-api-servers.md) design proposal.
 
 It provides:
 
