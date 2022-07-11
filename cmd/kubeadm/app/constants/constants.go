@@ -364,6 +364,9 @@ const (
 	// TODO: Find a better place for this constant
 	YAMLDocumentSeparator = "---\n"
 
+	// CIKubernetesVersionPrefix is the prefix for CI Kubernetes version
+	CIKubernetesVersionPrefix = "ci/"
+
 	// DefaultAPIServerBindAddress is the default bind address for the API Server
 	DefaultAPIServerBindAddress = "0.0.0.0"
 

@@ -18,6 +18,7 @@ package config
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/lithammer/dedent"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -448,6 +450,100 @@ func TestIsKubeadmPrereleaseVersion(t *testing.T) {
 			result := isKubeadmPrereleaseVersion(tc.versionInfo, tc.k8sVersion, tc.mcpVersion)
 			if result != tc.expectedResult {
 				t.Errorf("expected result: %v, got %v", tc.expectedResult, result)
+			}
+		})
+	}
+}
+
+func TestNormalizeKubernetesVersion(t *testing.T) {
+	validVersion := fmt.Sprintf("v%v", constants.MinimumControlPlaneVersion)
+	validCIVersion := fmt.Sprintf("%s%s", constants.CIKubernetesVersionPrefix, validVersion)
+	tests := []struct {
+		name        string
+		cfg         *kubeadmapi.ClusterConfiguration
+		expectedCfg *kubeadmapi.ClusterConfiguration
+		expectErr   bool
+	}{
+		{
+			name: "normal version, default image repository",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: validVersion,
+				ImageRepository:   kubeadmapiv1.DefaultImageRepository,
+			},
+			expectedCfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion:   validVersion,
+				CIKubernetesVersion: "",
+				ImageRepository:     kubeadmapiv1.DefaultImageRepository,
+				CIImageRepository:   "",
+			},
+			expectErr: false,
+		},
+		{
+			name: "normal version, custom image repository",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: validVersion,
+				ImageRepository:   "custom.repository",
+			},
+			expectedCfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion:   validVersion,
+				CIKubernetesVersion: "",
+				ImageRepository:     "custom.repository",
+				CIImageRepository:   "",
+			},
+			expectErr: false,
+		},
+		{
+			name: "ci version, default image repository",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: validCIVersion,
+				ImageRepository:   kubeadmapiv1.DefaultImageRepository,
+			},
+			expectedCfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion:   validVersion,
+				CIKubernetesVersion: validCIVersion,
+				ImageRepository:     kubeadmapiv1.DefaultImageRepository,
+				CIImageRepository:   constants.DefaultCIImageRepository,
+			},
+			expectErr: false,
+		},
+		{
+			name: "ci version, custom image repository",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: validCIVersion,
+				ImageRepository:   "custom.repository",
+			},
+			expectedCfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion:   validVersion,
+				CIKubernetesVersion: validCIVersion,
+				ImageRepository:     "custom.repository",
+				CIImageRepository:   "",
+			},
+			expectErr: false,
+		},
+		{
+			name: "unsupported old version",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: "v0.0.0",
+				ImageRepository:   kubeadmapiv1.DefaultImageRepository,
+			},
+			expectedCfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion:   "v0.0.0",
+				CIKubernetesVersion: "",
+				ImageRepository:     kubeadmapiv1.DefaultImageRepository,
+				CIImageRepository:   "",
+			},
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := NormalizeKubernetesVersion(tc.cfg)
+			if !reflect.DeepEqual(tc.cfg, tc.expectedCfg) {
+				t.Errorf("expected ClusterConfiguration: %#v, got %#v", tc.expectedCfg, tc.cfg)
+			}
+			if !tc.expectErr && err != nil {
+				t.Errorf("unexpected failure: %v", err)
 			}
 		})
 	}
