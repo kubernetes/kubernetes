@@ -52,6 +52,7 @@ const (
 
 type PodGCController struct {
 	kubeClient clientset.Interface
+	ctx        context.Context
 
 	podLister        corelisters.PodLister
 	podListerSynced  cache.InformerSynced
@@ -60,7 +61,6 @@ type PodGCController struct {
 
 	nodeQueue workqueue.DelayingInterface
 
-	deletePod              func(namespace, name string) error
 	terminatedPodThreshold int
 }
 
@@ -71,19 +71,21 @@ func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer c
 	}
 	gcc := &PodGCController{
 		kubeClient:             kubeClient,
+		ctx:                    ctx,
 		terminatedPodThreshold: terminatedPodThreshold,
 		podLister:              podInformer.Lister(),
 		podListerSynced:        podInformer.Informer().HasSynced,
 		nodeLister:             nodeInformer.Lister(),
 		nodeListerSynced:       nodeInformer.Informer().HasSynced,
 		nodeQueue:              workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
-		deletePod: func(namespace, name string) error {
-			klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(namespace, name))
-			return kubeClient.CoreV1().Pods(namespace).Delete(ctx, name, *metav1.NewDeleteOptions(0))
-		},
 	}
 
 	return gcc
+}
+
+func (gcc *PodGCController) deletePod(namespace, name string) error {
+	klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(namespace, name))
+	return gcc.kubeClient.CoreV1().Pods(namespace).Delete(gcc.ctx, name, *metav1.NewDeleteOptions(0))
 }
 
 func (gcc *PodGCController) Run(ctx context.Context) {
