@@ -120,7 +120,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 	actual := unk.GroupVersionKind()
 	copyKindDefaults(&actual, gvk)
 
-	if intoUnknown, ok := into.(*runtime.Unknown); ok && intoUnknown != nil {
+	if intoUnknown, ok := into.(*runtime.Unknown); ok {
 		*intoUnknown = unk
 		if ok, _, _ := s.RecognizesData(unk.Raw); ok {
 			intoUnknown.ContentType = runtime.ContentTypeProtobuf
@@ -347,7 +347,7 @@ func (s *RawSerializer) Decode(originalData []byte, gvk *schema.GroupVersionKind
 	actual := &schema.GroupVersionKind{}
 	copyKindDefaults(actual, gvk)
 
-	if intoUnknown, ok := into.(*runtime.Unknown); ok && intoUnknown != nil {
+	if intoUnknown, ok := into.(*runtime.Unknown); ok {
 		intoUnknown.Raw = data
 		intoUnknown.ContentEncoding = ""
 		intoUnknown.ContentType = runtime.ContentTypeProtobuf

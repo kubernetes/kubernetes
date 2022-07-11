@@ -151,7 +151,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		*actual = gvkWithDefaults(*actual, *gvk)
 	}
 
-	if unk, ok := into.(*runtime.Unknown); ok && unk != nil {
+	if unk, ok := into.(*runtime.Unknown); ok {
 		unk.Raw = originalData
 		unk.ContentType = runtime.ContentTypeJSON
 		unk.GetObjectKind().SetGroupVersionKind(*actual)
