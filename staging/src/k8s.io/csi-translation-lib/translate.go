@@ -34,6 +34,7 @@ var (
 		plugins.VSphereDriverName:   plugins.NewvSphereCSITranslator(),
 		plugins.PortworxDriverName:  plugins.NewPortworxCSITranslator(),
 		plugins.RBDDriverName:       plugins.NewRBDCSITranslator(),
+		plugins.CephFSDriverName:    plugins.NewCephFSCSITranslator(),
 	}
 )
 

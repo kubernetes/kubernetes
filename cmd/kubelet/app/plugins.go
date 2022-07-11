@@ -19,11 +19,11 @@ package app
 // This file exists to force the desired plugin implementations to be linked.
 import (
 	"k8s.io/component-base/featuregate"
+	"k8s.io/kubernetes/pkg/volume/cephfs"
 	"k8s.io/utils/exec"
 
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/cephfs"
 	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"

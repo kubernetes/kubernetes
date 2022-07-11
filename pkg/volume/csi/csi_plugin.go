@@ -237,6 +237,9 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 		csitranslationplugins.RBDVolumePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
 		},
+		csitranslationplugins.CephFSVolumePluginName: func() bool {
+			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationCephFS)
+		},
 	}
 
 	// Initializing the label management channels

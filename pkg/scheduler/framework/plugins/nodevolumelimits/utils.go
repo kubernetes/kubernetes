@@ -59,6 +59,10 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD) {
 			return false
 		}
+	case csilibplugins.CephFSVolumePluginName:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationCephFS) {
+			return false
+		}
 	default:
 		return false
 	}

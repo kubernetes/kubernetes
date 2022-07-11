@@ -28,10 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/azure_file"
 	"k8s.io/kubernetes/pkg/volume/azuredd"
+
+	"k8s.io/kubernetes/pkg/volume/cephfs"
+	"k8s.io/kubernetes/pkg/volume/cinder"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	"k8s.io/kubernetes/pkg/volume/portworx"
 	"k8s.io/kubernetes/pkg/volume/rbd"
+
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 )
 
@@ -69,6 +73,7 @@ func appendAttachableLegacyProviderVolumes(allPlugins []volume.VolumePlugin, fea
 	pluginMigrationStatus[plugins.VSphereInTreePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationvSphere, pluginUnregisterFeature: features.InTreePluginvSphereUnregister, pluginProbeFunction: vsphere_volume.ProbeVolumePlugins}
 	pluginMigrationStatus[plugins.PortworxVolumePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationPortworx, pluginUnregisterFeature: features.InTreePluginPortworxUnregister, pluginProbeFunction: portworx.ProbeVolumePlugins}
 	pluginMigrationStatus[plugins.RBDVolumePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationRBD, pluginUnregisterFeature: features.InTreePluginRBDUnregister, pluginProbeFunction: rbd.ProbeVolumePlugins}
+	pluginMigrationStatus[plugins.CephFSVolumePluginName] = pluginInfo{pluginMigrationFeature: features.CSIMigrationCephFS, pluginUnregisterFeature: features.InTreePluginCephFSUnregister, pluginProbeFunction: cephfs.ProbeVolumePlugins}
 	var err error
 	for pluginName, pluginInfo := range pluginMigrationStatus {
 		allPlugins, err = appendPluginBasedOnFeatureFlags(allPlugins, pluginName, featureGate, pluginInfo)

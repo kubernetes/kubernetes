@@ -158,6 +158,12 @@ const (
 	// Enables the RBD in-tree driver to RBD CSI Driver  migration feature.
 	CSIMigrationRBD featuregate.Feature = "CSIMigrationRBD"
 
+	// owner: @humblec
+	// alpha: v1.25
+	//
+	// Enables the RBD in-tree driver to CephFS CSI Driver  migration feature.
+	CSIMigrationCephFS featuregate.Feature = "CSIMigrationCephFS"
+
 	// owner: @divyenpatel
 	// beta: v1.19 (requires: vSphere vCenter/ESXi Version: 7.0u2, HW Version: VM version 15)
 	//
@@ -404,6 +410,12 @@ const (
 	//
 	// Disables the RBD in-tree driver.
 	InTreePluginRBDUnregister featuregate.Feature = "InTreePluginRBDUnregister"
+
+	// owner: @humblec
+	// alpha: v1.25
+	//
+	// Disables the RBD in-tree driver.
+	InTreePluginCephFSUnregister featuregate.Feature = "InTreePluginCephFSUnregister"
 
 	// owner: @divyenpatel
 	// alpha: v1.21
@@ -837,6 +849,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.Beta},
 
+	CSIMigrationCephFS: {Default: false, PreRelease: featuregate.Alpha}, // Off by default (requires CephFS CSI driver)
+
 	CSINodeExpandSecret: {Default: false, PreRelease: featuregate.Alpha},
 
 	CSIStorageCapacity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
@@ -904,6 +918,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginPortworxUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
 	InTreePluginRBDUnregister: {Default: false, PreRelease: featuregate.Alpha},
+
+	InTreePluginCephFSUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
 	InTreePluginvSphereUnregister: {Default: false, PreRelease: featuregate.Alpha},
 

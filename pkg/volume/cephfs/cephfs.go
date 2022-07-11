@@ -32,6 +32,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -50,6 +52,11 @@ var _ volume.VolumePlugin = &cephfsPlugin{}
 const (
 	cephfsPluginName = "kubernetes.io/cephfs"
 )
+
+func (plugin *cephfsPlugin) IsMigratedToCSI() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationCephFS)
+}
 
 func (plugin *cephfsPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host

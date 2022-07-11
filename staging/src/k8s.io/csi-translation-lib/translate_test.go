@@ -422,6 +422,13 @@ func generateUniqueVolumeSource(driverName string) (v1.VolumeSource, error) {
 				RBDImage: string(uuid.NewUUID()),
 			},
 		}, nil
+
+	case plugins.CephFSDriverName:
+		return v1.VolumeSource{
+			CephFS: &v1.CephFSVolumeSource{
+				Path: string(uuid.NewUUID()),
+			},
+		}, nil
 	default:
 		return v1.VolumeSource{}, fmt.Errorf("couldn't find logic for driver: %v", driverName)
 	}
@@ -447,6 +454,11 @@ func TestPluginNameMappings(t *testing.T) {
 			name:             "RBD plugin name",
 			inTreePluginName: "kubernetes.io/rbd",
 			csiPluginName:    "rbd.csi.ceph.com",
+		},
+		{
+			name:             "CephFS plugin name",
+			inTreePluginName: "kubernetes.io/cephfs",
+			csiPluginName:    "cephfs.csi.ceph.com",
 		},
 	}
 	for _, test := range testCases {
