@@ -63,8 +63,8 @@ import (
 	"k8s.io/component-base/logs"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	tracing "k8s.io/component-base/tracing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	podresourcesapiv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -135,7 +135,9 @@ type filteringContainer struct {
 }
 
 func (a *filteringContainer) Handle(path string, handler http.Handler) {
-	handler = tracing.WithTracing(handler, a.TracerProvider, "kubelet")
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+		handler = tracing.WithTracing(handler, a.TracerProvider, "kubelet")
+	}
 	a.HandleWithFilter(path, handler)
 	a.registeredHandlePaths = append(a.registeredHandlePaths, path)
 }
