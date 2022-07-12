@@ -52,7 +52,6 @@ const (
 
 type PodGCController struct {
 	kubeClient clientset.Interface
-	ctx        context.Context
 
 	podLister        corelisters.PodLister
 	podListerSynced  cache.InformerSynced
@@ -80,11 +79,6 @@ func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer c
 	}
 
 	return gcc
-}
-
-func (gcc *PodGCController) deletePod(ctx context.Context, namespace, name string) error {
-	klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(namespace, name))
-	return gcc.kubeClient.CoreV1().Pods(namespace).Delete(ctx, name, *metav1.NewDeleteOptions(0))
 }
 
 func (gcc *PodGCController) Run(ctx context.Context) {
@@ -302,4 +296,9 @@ func (o byCreationTimestamp) Less(i, j int) bool {
 		return o[i].Name < o[j].Name
 	}
 	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
+}
+
+func (gcc *PodGCController) deletePod(ctx context.Context, namespace, name string) error {
+	klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(namespace, name))
+	return gcc.kubeClient.CoreV1().Pods(namespace).Delete(ctx, name, *metav1.NewDeleteOptions(0))
 }
