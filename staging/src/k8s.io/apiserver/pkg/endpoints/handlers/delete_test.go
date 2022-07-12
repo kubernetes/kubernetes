@@ -57,11 +57,11 @@ func (s *mockCodecs) EncoderForVersion(encoder runtime.Encoder, gv runtime.Group
 
 func TestDeleteResourceAuditLogRequestObject(t *testing.T) {
 
-	ctx := audit.WithAuditContext(context.TODO(), &audit.AuditContext{
-		Event: &auditapis.Event{
-			Level: auditapis.LevelRequestResponse,
-		},
-	})
+	ctx := audit.WithAuditContext(context.TODO())
+	ac := audit.AuditContextFrom(ctx)
+	ac.Event = &auditapis.Event{
+		Level: auditapis.LevelRequestResponse,
+	}
 
 	policy := metav1.DeletePropagationBackground
 	deleteOption := &metav1.DeleteOptions{

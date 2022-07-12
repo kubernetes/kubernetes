@@ -88,7 +88,7 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 // a client and the feature gate for APIResponseCompression is enabled.
 func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
 	trace := utiltrace.New("SerializeObject",
-		utiltrace.Field{"audit-id", request.GetAuditIDTruncated(req.Context())},
+		utiltrace.Field{"audit-id", audit.GetAuditIDTruncated(req.Context())},
 		utiltrace.Field{"method", req.Method},
 		utiltrace.Field{"url", req.URL.Path},
 		utiltrace.Field{"protocol", req.Proto},

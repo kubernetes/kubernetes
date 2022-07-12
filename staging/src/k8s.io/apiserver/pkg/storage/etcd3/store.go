@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
@@ -153,7 +153,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 // Create implements storage.Interface.Create.
 func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
 	trace := utiltrace.New("Create etcd3",
-		utiltrace.Field{Key: "audit-id", Value: endpointsrequest.GetAuditIDTruncated(ctx)},
+		utiltrace.Field{Key: "audit-id", Value: audit.GetAuditIDTruncated(ctx)},
 		utiltrace.Field{Key: "key", Value: key},
 		utiltrace.Field{Key: "type", Value: getTypeName(obj)},
 		utiltrace.Field{Key: "resource", Value: s.groupResourceString},
@@ -332,7 +332,7 @@ func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
 	trace := utiltrace.New("GuaranteedUpdate etcd3",
-		utiltrace.Field{Key: "audit-id", Value: endpointsrequest.GetAuditIDTruncated(ctx)},
+		utiltrace.Field{Key: "audit-id", Value: audit.GetAuditIDTruncated(ctx)},
 		utiltrace.Field{Key: "key", Value: key},
 		utiltrace.Field{Key: "type", Value: getTypeName(destination)},
 		utiltrace.Field{Key: "resource", Value: s.groupResourceString})
@@ -529,7 +529,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	match := opts.ResourceVersionMatch
 	pred := opts.Predicate
 	trace := utiltrace.New(fmt.Sprintf("List(recursive=%v) etcd3", recursive),
-		utiltrace.Field{Key: "audit-id", Value: endpointsrequest.GetAuditIDTruncated(ctx)},
+		utiltrace.Field{Key: "audit-id", Value: audit.GetAuditIDTruncated(ctx)},
 		utiltrace.Field{Key: "key", Value: key},
 		utiltrace.Field{Key: "resourceVersion", Value: resourceVersion},
 		utiltrace.Field{Key: "resourceVersionMatch", Value: match},

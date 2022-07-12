@@ -843,14 +843,13 @@ func TestAuditIDHttpHeader(t *testing.T) {
 }
 
 func withTestContext(req *http.Request, user user.Info, ae *auditinternal.Event) *http.Request {
-	ctx := req.Context()
+	ctx := audit.WithAuditContext(req.Context())
 	if user != nil {
 		ctx = request.WithUser(ctx, user)
 	}
 	if ae != nil {
-		ctx = audit.WithAuditContext(ctx, &audit.AuditContext{
-			Event: ae,
-		})
+		ac := audit.AuditContextFrom(ctx)
+		ac.Event = ae
 	}
 	if info, err := newTestRequestInfoResolver().NewRequestInfo(req); err == nil {
 		ctx = request.WithRequestInfo(ctx, info)

@@ -188,7 +188,9 @@ func (a *cachedTokenAuthenticator) doAuthenticateToken(ctx context.Context, toke
 		// since this is shared work between multiple requests, we have no way of knowing if any
 		// particular request supports audit annotations.  thus we always attempt to record them.
 		ev := &auditinternal.Event{Level: auditinternal.LevelMetadata}
-		ctx = audit.WithAuditContext(ctx, &audit.AuditContext{Event: ev})
+		ctx = audit.WithAuditContext(ctx)
+		ac := audit.AuditContextFrom(ctx)
+		ac.Event = ev
 
 		record.resp, record.ok, record.err = a.authenticator.AuthenticateToken(ctx, token)
 		record.annotations = ev.Annotations
