@@ -328,7 +328,7 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 
 	informerFactory.Core().V1().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
 
-	// old service was a load balancer, but updated version is a node port.
+	// old service was a loadbalancer, but updated version is a node port.
 	existingService := &api.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "service", Namespace: "test", ResourceVersion: "1"},
 		Spec:       api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
@@ -662,7 +662,7 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	}
 }
 
-// TestAdmitEnforceQuotaConstraints verifies that if a quota tracks a particular resource that that resource is
+// TestAdmitEnforceQuotaConstraints verifies that if a quota tracks a particular resource that resource is
 // specified on the pod.  In this case, we create a quota that tracks cpu request, memory request, and memory limit.
 // We ensure that a pod that does not specify a memory limit that it fails in admission.
 func TestAdmitEnforceQuotaConstraints(t *testing.T) {
