@@ -182,38 +182,6 @@ func isSorted(val ref.Val) ref.Val {
 	return types.True
 }
 
-func dynSum() functions.UnaryOp {
-	return func(val ref.Val) ref.Val {
-		iterable, ok := val.(traits.Iterable)
-		if !ok {
-			return types.MaybeNoSuchOverloadErr(val)
-		}
-		it := iterable.Iterator()
-		var initval ref.Val
-		if it.HasNext() == types.True {
-			first := it.Next()
-			switch first.Type() {
-			case types.IntType:
-				initval = types.Int(0)
-			case types.UintType:
-				initval = types.Uint(0)
-			case types.DoubleType:
-				initval = types.Double(0.0)
-			case types.DurationType:
-				initval = types.Duration{Duration: 0}
-			default:
-				return types.MaybeNoSuchOverloadErr(first)
-			}
-		} else {
-			initval = types.Int(0)
-		}
-		initFn := func() ref.Val {
-			return initval
-		}
-		return sum(initFn)(val)
-	}
-}
-
 func sum(init func() ref.Val) functions.UnaryOp {
 	return func(val ref.Val) ref.Val {
 		i := init()
