@@ -378,6 +378,86 @@ func TestDescribePodPriority(t *testing.T) {
 	}
 }
 
+func TestDescribePodRuntimeClass(t *testing.T) {
+	runtimeClassNames := []string{"test1", ""}
+	testCases := []struct {
+		name     string
+		pod      *corev1.Pod
+		expect   []string
+		unexpect []string
+	}{
+		{
+			name: "test1",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					RuntimeClassName: &runtimeClassNames[0],
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+				"Runtime Class Name", "test1",
+			},
+			unexpect: []string{},
+		},
+		{
+			name: "test2",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					RuntimeClassName: &runtimeClassNames[1],
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+			},
+			unexpect: []string{
+				"Runtime Class Name", "test2",
+			},
+		},
+		{
+			name: "test3",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{},
+			},
+			expect: []string{
+				"Name", "bar",
+			},
+			unexpect: []string{
+				"Runtime Class Name", "test3",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.pod)
+			c := &describeClient{T: t, Interface: fake}
+			d := PodDescriber{c}
+			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+			for _, unexpected := range testCase.unexpect {
+				if strings.Contains(out, unexpected) {
+					t.Errorf("unexpected to find %q in output: %q", unexpected, out)
+				}
+			}
+		})
+	}
+}
+
 func TestDescribePriorityClass(t *testing.T) {
 	preemptLowerPriority := corev1.PreemptLowerPriority
 	preemptNever := corev1.PreemptNever
