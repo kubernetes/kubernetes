@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/openapi"
-	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	testutil "k8s.io/client-go/util/testing"
@@ -151,7 +150,7 @@ func TestOpenAPIDiskCache(t *testing.T) {
 	require.Greater(t, len(fakeServer.ServedDocuments), 0)
 
 	client, err := NewCachedDiscoveryClientForConfig(
-		&rest.Config{Host: fakeServer.HttpServer.URL},
+		&restclient.Config{Host: fakeServer.HttpServer.URL},
 		discoCache,
 		httpCache,
 		1*time.Nanosecond,
