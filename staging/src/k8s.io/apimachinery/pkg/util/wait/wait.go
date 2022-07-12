@@ -566,7 +566,7 @@ func PollImmediateInfiniteWithContext(ctx context.Context, interval time.Duratio
 	return poll(ctx, true, poller(interval, 0), condition)
 }
 
-// Internally used, each of the the public 'Poll*' function defined in this
+// Internally used, each of the public 'Poll*' function defined in this
 // package should invoke this internal function with appropriate parameters.
 // ctx: the context specified by the caller, for infinite polling pass
 // a context that never gets cancelled or expired.
