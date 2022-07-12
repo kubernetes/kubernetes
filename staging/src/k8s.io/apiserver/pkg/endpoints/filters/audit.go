@@ -125,7 +125,7 @@ func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRul
 	ac := audit.AuditContextFrom(ctx)
 	if ac == nil {
 		// Auditing not enabled.
-		return ac, nil
+		return nil, nil
 	}
 
 	attribs, err := GetAuthorizerAttributes(ctx)

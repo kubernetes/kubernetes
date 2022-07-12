@@ -290,7 +290,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	handler := genericapifilters.WithAudit(mux, auditSink, fakeRuleEvaluator, longRunningCheck)
 	handler = genericapifilters.WithRequestDeadline(handler, auditSink, fakeRuleEvaluator, longRunningCheck, codecs, 60*time.Second)
 	handler = genericapifilters.WithRequestInfo(handler, testRequestInfoResolver())
-	handler = genericapifilters.WithAuditID(handler)
+	handler = genericapifilters.WithAuditInit(handler)
 
 	return &defaultAPIServer{handler, container}
 }

@@ -78,9 +78,9 @@ func TestWithAuditID(t *testing.T) {
 				auditIDGot = string(v)
 			})
 
-			wrapped := WithAuditID(handler)
+			wrapped := WithAuditInit(handler)
 			if test.newAuditIDFunc != nil {
-				wrapped = withAuditID(handler, test.newAuditIDFunc)
+				wrapped = withAuditInit(handler, test.newAuditIDFunc)
 			}
 
 			testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
