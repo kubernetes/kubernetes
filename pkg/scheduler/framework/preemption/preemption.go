@@ -138,7 +138,7 @@ type Evaluator struct {
 func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
 	// 0) Fetch the latest version of <pod>.
 	// It's safe to directly fetch pod here. Because the informer cache has already been
-	// initialized when creating the Scheduler obj, i.e., factory.go#MakeDefaultErrorFunc().
+	// initialized when creating the Scheduler obj.
 	// However, tests may need to manually initialize the shared pod informer.
 	podNamespace, podName := pod.Namespace, pod.Name
 	pod, err := ev.PodLister.Pods(pod.Namespace).Get(pod.Name)
