@@ -191,7 +191,7 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 		if err := ioutil.WriteFile(certFixturePath, certBuffer.Bytes(), 0644); err != nil {
 			return nil, nil, fmt.Errorf("failed to write cert fixture to %s: %v", certFixturePath, err)
 		}
-		if err := ioutil.WriteFile(keyFixturePath, keyBuffer.Bytes(), 0644); err != nil {
+		if err := ioutil.WriteFile(keyFixturePath, keyBuffer.Bytes(), 0600); err != nil {
 			return nil, nil, fmt.Errorf("failed to write key fixture to %s: %v", certFixturePath, err)
 		}
 	}
