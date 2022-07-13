@@ -103,15 +103,35 @@ var paramA = cel.TypeParamType("A")
 
 // CEL typeParams can be used to constraint to a specific trait (e.g. traits.ComparableType) if the 1st operand is the type to constrain.
 // But the functions we need to constrain are <list<paramType>>, not just <paramType>.
-var summableTypes = map[string]*cel.Type{"int": cel.IntType, "uint": cel.UintType, "double": cel.DoubleType, "duration": cel.DurationType}
+// Make sure the order of overload set is deterministic
+type namedCELType struct {
+	typeName string
+	celType  *cel.Type
+}
+
+var summableTypes = []namedCELType{
+	{typeName: "int", celType: cel.IntType},
+	{typeName: "uint", celType: cel.UintType},
+	{typeName: "double", celType: cel.DoubleType},
+	{typeName: "duration", celType: cel.DurationType},
+}
+
 var zeroValuesOfSummableTypes = map[string]ref.Val{
 	"int":      types.Int(0),
 	"uint":     types.Uint(0),
 	"double":   types.Double(0.0),
 	"duration": types.Duration{Duration: 0},
 }
-var comparableTypes = map[string]*cel.Type{"bool": cel.BoolType, "int": cel.IntType, "uint": cel.UintType, "double": cel.DoubleType,
-	"duration": cel.DurationType, "timestamp": cel.TimestampType, "string": cel.StringType, "bytes": cel.BytesType}
+var comparableTypes = []namedCELType{
+	{typeName: "int", celType: cel.IntType},
+	{typeName: "uint", celType: cel.UintType},
+	{typeName: "double", celType: cel.DoubleType},
+	{typeName: "bool", celType: cel.BoolType},
+	{typeName: "duration", celType: cel.DurationType},
+	{typeName: "timestamp", celType: cel.TimestampType},
+	{typeName: "string", celType: cel.StringType},
+	{typeName: "bytes", celType: cel.BytesType},
+}
 
 // WARNING: All library additions or modifications must follow
 // https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/2876-crd-validation-expression-language#function-library-updates
@@ -285,11 +305,11 @@ func lastIndexOf(list ref.Val, item ref.Val) ref.Val {
 
 // templatedOverloads returns overloads for each of the provided types. The template function is called with each type
 // name (map key) and type to construct the overloads.
-func templatedOverloads(types map[string]*cel.Type, template func(name string, t *cel.Type) cel.FunctionOpt) []cel.FunctionOpt {
+func templatedOverloads(types []namedCELType, template func(name string, t *cel.Type) cel.FunctionOpt) []cel.FunctionOpt {
 	overloads := make([]cel.FunctionOpt, len(types))
 	i := 0
-	for name, t := range types {
-		overloads[i] = template(name, t)
+	for _, t := range types {
+		overloads[i] = template(t.typeName, t.celType)
 		i++
 	}
 	return overloads

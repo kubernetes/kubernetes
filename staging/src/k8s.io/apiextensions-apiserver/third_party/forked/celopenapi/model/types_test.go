@@ -37,8 +37,12 @@ func TestTypes_ListType(t *testing.T) {
 	if list.ElemType.TypeName() != "string" {
 		t.Errorf("got %s, wanted elem type of string", list.ElemType.TypeName())
 	}
-	if list.ExprType().GetListType() == nil {
-		t.Errorf("got %v, wanted CEL list type", list.ExprType())
+	expT, err := list.ExprType()
+	if err != nil {
+		t.Errorf("fail to get cel type: %s", err)
+	}
+	if expT.GetListType() == nil {
+		t.Errorf("got %v, wanted CEL list type", expT)
 	}
 }
 
@@ -59,8 +63,12 @@ func TestTypes_MapType(t *testing.T) {
 	if mp.ElemType.TypeName() != "int" {
 		t.Errorf("got %s, wanted elem type of int", mp.ElemType.TypeName())
 	}
-	if mp.ExprType().GetMapType() == nil {
-		t.Errorf("got %v, wanted CEL map type", mp.ExprType())
+	expT, err := mp.ExprType()
+	if err != nil {
+		t.Errorf("fail to get cel type: %s", err)
+	}
+	if expT.GetMapType() == nil {
+		t.Errorf("got %v, wanted CEL map type", expT)
 	}
 }
 
