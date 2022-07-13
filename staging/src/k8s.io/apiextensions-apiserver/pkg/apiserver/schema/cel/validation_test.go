@@ -1929,6 +1929,10 @@ func TestCELValidationContextCancellation(t *testing.T) {
 	}
 }
 
+// This is the most recursive operations we expect to be able to include in an expression.
+// This number could get larger with more improvements in the grammar or ANTLR stack, but should *never* decrease or previously valid expressions could be treated as invalid.
+const maxValidDepth = 243
+
 // TestCELMaxRecursionDepth tests CEL setting for maxRecursionDepth.
 func TestCELMaxRecursionDepth(t *testing.T) {
 	tests := []struct {
@@ -1946,10 +1950,10 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 			obj:    objs(true),
 			schema: schemas(booleanType),
 			valid: []string{
-				strings.Repeat("self.val1"+" == ", 242) + "self.val1",
+				strings.Repeat("self.val1"+" == ", maxValidDepth-1) + "self.val1",
 			},
 			errors: map[string]string{
-				strings.Repeat("self.val1"+" == ", 243) + "self.val1": "max recursion depth exceeded",
+				strings.Repeat("self.val1"+" == ", maxValidDepth) + "self.val1": "max recursion depth exceeded",
 			},
 		},
 	}
