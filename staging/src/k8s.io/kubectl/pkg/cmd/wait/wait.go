@@ -187,11 +187,11 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 }
 
 func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error) {
-	if strings.ToLower(condition) == "delete" {
+	if strings.EqualFold(condition, "delete") {
 		return IsDeleted, nil
 	}
 	if strings.HasPrefix(condition, "condition=") {
-		conditionName := condition[len("condition="):]
+		conditionName := strings.TrimPrefix(condition, "condition=")
 		conditionValue := "true"
 		if equalsIndex := strings.Index(conditionName, "="); equalsIndex != -1 {
 			conditionValue = conditionName[equalsIndex+1:]
@@ -302,7 +302,7 @@ func (o *WaitOptions) RunWait() error {
 		return err
 	}
 	visitor := o.ResourceFinder.Do()
-	isForDelete := strings.ToLower(o.ForCondition) == "delete"
+	isForDelete := strings.EqualFold(o.ForCondition, "delete")
 	if visitor, ok := visitor.(*resource.Result); ok && isForDelete {
 		visitor.IgnoreErrors(apierrors.IsNotFound)
 	}

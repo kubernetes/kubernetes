@@ -70,7 +70,7 @@ func SplitAndParseResourceRequestWithMatchingPrefix(inResource string, mapper me
 		// Find first gvr whose gr prefixes requested resource
 		groupResource := gvrItem.GroupResource().String()
 		if strings.HasPrefix(inResource, groupResource) {
-			resourceSuffix := inResource[len(groupResource):]
+			resourceSuffix := strings.TrimPrefix(inResource, groupResource)
 			if len(resourceSuffix) > 0 {
 				dotParts := strings.Split(resourceSuffix, ".")
 				if len(dotParts) > 0 {

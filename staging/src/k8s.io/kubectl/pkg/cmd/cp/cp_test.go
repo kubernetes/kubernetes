@@ -46,9 +46,9 @@ import (
 type FileType int
 
 const (
-	RegularFile FileType = 0
-	SymLink     FileType = 1
-	RegexFile   FileType = 2
+	RegularFile FileType = iota
+	SymLink
+	RegexFile
 )
 
 func TestExtractFileSpec(t *testing.T) {
