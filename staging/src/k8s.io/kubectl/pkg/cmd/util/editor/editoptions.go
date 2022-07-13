@@ -66,6 +66,7 @@ type EditOptions struct {
 
 	OutputPatch        bool
 	WindowsLineEndings bool
+	LabelSelector      string
 
 	cmdutil.ValidateOptions
 	ValidationDirective     string
@@ -192,6 +193,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 	r := b.NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		Subresource(o.Subresource).
+		LabelSelectorParam(o.LabelSelector).
 		ContinueOnError().
 		Flatten().
 		Do()
@@ -207,6 +209,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Comm
 			Unstructured().
 			Stream(bytes.NewReader(data), "edited-file").
 			Subresource(o.Subresource).
+			LabelSelectorParam(o.LabelSelector).
 			ContinueOnError().
 			Flatten().
 			Do()
