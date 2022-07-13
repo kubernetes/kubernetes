@@ -68,7 +68,7 @@ func newFakePodStateProvider() *fakePodStateProvider {
 }
 
 func (f *fakePodStateProvider) IsPodTerminationRequested(uid types.UID) bool {
-	_, found := f.removed[uid]
+	_, found := f.terminated[uid]
 	return found
 }
 
