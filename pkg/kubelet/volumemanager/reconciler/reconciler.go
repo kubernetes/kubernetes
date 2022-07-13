@@ -75,30 +75,28 @@ type Reconciler interface {
 // NewReconciler returns a new instance of Reconciler.
 //
 // controllerAttachDetachEnabled - if true, indicates that the attach/detach
-//
-//	controller is responsible for managing the attach/detach operations for
-//	this node, and therefore the volume manager should not
+// controller is responsible for managing the attach/detach operations for
+// his node, and therefore the volume manager should not
 //
 // loopSleepDuration - the amount of time the reconciler loop sleeps between
-//
-//	successive executions
+// successive executions
 //
 // waitForAttachTimeout - the amount of time the Mount function will wait for
-//
-//	the volume to be attached
+// the volume to be attached
 //
 // nodeName - the Name for this node, used by Attach and Detach methods
-// desiredStateOfWorld - cache containing the desired state of the world
-// actualStateOfWorld - cache containing the actual state of the world
-// populatorHasAddedPods - checker for whether the populator has finished
 //
-//	adding pods to the desiredStateOfWorld cache at least once after sources
-//	are all ready (before sources are ready, pods are probably missing)
+// desiredStateOfWorld - cache containing the desired state of the world
+//
+// actualStateOfWorld - cache containing the actual state of the world
+//
+// populatorHasAddedPods - checker for whether the populator has finished
+// adding pods to the desiredStateOfWorld cache at least once after sources
+// are all ready (before sources are ready, pods are probably missing)
 //
 // operationExecutor - used to trigger attach/detach/mount/unmount operations
-//
-//	safely (prevents more than one operation from being triggered on the same
-//	volume)
+// safely (prevents more than one operation from being triggered on the same
+// volume)
 //
 // mounter - mounter passed in from kubelet, passed down unmount path
 // hostutil - hostutil passed in from kubelet
@@ -191,7 +189,6 @@ func (rc *reconciler) reconcile() {
 	// After running the above operations if skippedDuringReconstruction is not empty
 	// then ensure that all volumes which were discovered and skipped during reconstruction
 	// are added to actualStateOfWorld in uncertain state.
-	// This should be called only ONCE after reconstruction.
 	if len(rc.skippedDuringReconstruction) > 0 {
 		rc.processReconstructedVolumes()
 	}
@@ -306,42 +303,43 @@ func (rc *reconciler) mountAttachedVolumes(volumeToMount cache.VolumeToMount, po
 // But if mount operation fails for some reason then we still need to mark the volume as uncertain
 // and wait for the next reconciliation loop to deal with it.
 func (rc *reconciler) processReconstructedVolumes() {
-	if rc.kubeClient != nil {
-		rc.updateDevicePath(rc.skippedDuringReconstruction)
-	}
 	for volumeName, glblVolumeInfo := range rc.skippedDuringReconstruction {
 		// check if volume is marked as attached to the node
 		// for now lets only process volumes which are at least known as attached to the node
 		// this should help with most volume types (including secret, configmap etc)
 		if !rc.actualStateOfWorld.VolumeExists(volumeName) {
 			klog.V(4).InfoS("Volume is not marked as attached to the node. Skipping processing of the volume", "volumeName", volumeName)
-			delete(rc.skippedDuringReconstruction, volumeName)
 			continue
 		}
 		uncertainVolumeCount := 0
+		// only delete volumes which were marked as attached here.
+		// This should ensure that  - we will wait for volumes which were not marked as attached
+		// before adding them in uncertain state during reconstruction.
+		delete(rc.skippedDuringReconstruction, volumeName)
 
 		for podName, volume := range glblVolumeInfo.podVolumes {
-			volumeNotMounted := rc.actualStateOfWorld.PodRemovedFromVolume(podName, volume.volumeName)
+			markVolumeOpts := operationexecutor.MarkVolumeOpts{
+				PodName:             volume.podName,
+				PodUID:              types.UID(podName),
+				VolumeName:          volume.volumeName,
+				Mounter:             volume.mounter,
+				BlockVolumeMapper:   volume.blockVolumeMapper,
+				OuterVolumeSpecName: volume.outerVolumeSpecName,
+				VolumeGidVolume:     volume.volumeGidValue,
+				VolumeSpec:          volume.volumeSpec,
+				VolumeMountState:    operationexecutor.VolumeMountUncertain,
+			}
+
+			volumeAdded, err := rc.actualStateOfWorld.CheckAndMarkVolumeAsUncertainViaReconstruction(markVolumeOpts)
+
 			// if volume is not mounted then lets mark volume mounted in uncertain state in ASOW
-			if volumeNotMounted {
-				markVolumeOpts := operationexecutor.MarkVolumeOpts{
-					PodName:             volume.podName,
-					PodUID:              types.UID(volume.podName),
-					VolumeName:          volume.volumeName,
-					Mounter:             volume.mounter,
-					BlockVolumeMapper:   volume.blockVolumeMapper,
-					OuterVolumeSpecName: volume.outerVolumeSpecName,
-					VolumeGidVolume:     volume.volumeGidValue,
-					VolumeSpec:          volume.volumeSpec,
-					VolumeMountState:    operationexecutor.VolumeMountUncertain,
-				}
-				err := rc.actualStateOfWorld.AddVolumeViaReconstruction(markVolumeOpts)
+			if volumeAdded {
 				uncertainVolumeCount += 1
 				if err != nil {
 					klog.ErrorS(err, "Could not add pod to volume information to actual state of world", "pod", klog.KObj(volume.pod))
 					continue
 				}
-				klog.V(4).InfoS("Volume is marked as mounted and added into the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName)
+				klog.V(4).InfoS("Volume is marked as mounted in uncertain state and added to the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName)
 			}
 		}
 
@@ -353,56 +351,11 @@ func (rc *reconciler) processReconstructedVolumes() {
 					klog.ErrorS(err, "Could not find device mount path for volume", "volumeName", glblVolumeInfo.volumeName)
 					continue
 				}
-				currentMountState := rc.actualStateOfWorld.GetDeviceMountState(glblVolumeInfo.volumeName)
-				if currentMountState == operationexecutor.DeviceNotMounted {
-					err = rc.actualStateOfWorld.MarkDeviceAsUncertain(glblVolumeInfo.volumeName, glblVolumeInfo.devicePath, deviceMountPath)
-					if err != nil {
-						klog.ErrorS(err, "Could not mark device is mounted to actual state of world", "volume", glblVolumeInfo.volumeName)
-						continue
-					}
-					klog.V(4).InfoS("Volume is marked device as mounted and added into the actual state", "volumeName", glblVolumeInfo.volumeName)
+				deviceMounted := rc.actualStateOfWorld.CheckAndMarkDeviceUncertainViaReconstruction(glblVolumeInfo.volumeName, deviceMountPath)
+				if !deviceMounted {
+					klog.V(3).InfoS("Could not mark device as mounted in uncertain state", "volumeName", glblVolumeInfo.volumeName)
 				}
 			}
-		}
-	}
-	rc.skippedDuringReconstruction = make(map[v1.UniqueVolumeName]*globalVolumeInfo)
-}
-
-func (rc *reconciler) waitForVolumeAttach(volumeToMount cache.VolumeToMount) {
-	if rc.controllerAttachDetachEnabled || !volumeToMount.PluginIsAttachable {
-		//// lets not spin a goroutine and unnecessarily trigger exponential backoff if this happens
-		if volumeToMount.PluginIsAttachable && !volumeToMount.ReportedInUse {
-			klog.V(5).InfoS(volumeToMount.GenerateMsgDetailed("operationExecutor.VerifyControllerAttachedVolume failed", " volume not marked in-use"), "pod", klog.KObj(volumeToMount.Pod))
-			return
-		}
-		// Volume is not attached (or doesn't implement attacher), kubelet attach is disabled, wait
-		// for controller to finish attaching volume.
-		klog.V(5).InfoS(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.VerifyControllerAttachedVolume", ""), "pod", klog.KObj(volumeToMount.Pod))
-		err := rc.operationExecutor.VerifyControllerAttachedVolume(
-			volumeToMount.VolumeToMount,
-			rc.nodeName,
-			rc.actualStateOfWorld)
-		if err != nil && !isExpectedError(err) {
-			klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.VerifyControllerAttachedVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error(), "pod", klog.KObj(volumeToMount.Pod))
-		}
-		if err == nil {
-			klog.InfoS(volumeToMount.GenerateMsgDetailed("operationExecutor.VerifyControllerAttachedVolume started", ""), "pod", klog.KObj(volumeToMount.Pod))
-		}
-	} else {
-		// Volume is not attached to node, kubelet attach is enabled, volume implements an attacher,
-		// so attach it
-		volumeToAttach := operationexecutor.VolumeToAttach{
-			VolumeName: volumeToMount.VolumeName,
-			VolumeSpec: volumeToMount.VolumeSpec,
-			NodeName:   rc.nodeName,
-		}
-		klog.V(5).InfoS(volumeToAttach.GenerateMsgDetailed("Starting operationExecutor.AttachVolume", ""), "pod", klog.KObj(volumeToMount.Pod))
-		err := rc.operationExecutor.AttachVolume(volumeToAttach, rc.actualStateOfWorld)
-		if err != nil && !isExpectedError(err) {
-			klog.ErrorS(err, volumeToMount.GenerateErrorDetailed(fmt.Sprintf("operationExecutor.AttachVolume failed (controllerAttachDetachEnabled %v)", rc.controllerAttachDetachEnabled), err).Error(), "pod", klog.KObj(volumeToMount.Pod))
-		}
-		if err == nil {
-			klog.InfoS(volumeToMount.GenerateMsgDetailed("operationExecutor.AttachVolume started", ""), "pod", klog.KObj(volumeToMount.Pod))
 		}
 	}
 }
