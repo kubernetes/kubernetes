@@ -3499,6 +3499,24 @@ type BackoffPolicyOnExitCodesRequirement struct {
 	Values []int32
 }
 
+type BackoffPolicyOnPodConditionsOperator string
+
+const (
+	BackoffPolicyOnPodConditionsOpIn BackoffPolicyOnPodConditionsOperator = "In"
+)
+
+type BackoffPolicyOnPodConditionsRequirement struct {
+
+	// Represents the relationship between the actual Pod condition types
+	// and the set of specified Pod condition types
+	Operator BackoffPolicyOnPodConditionsOperator
+
+	// Specifies the set of values. Each actual pod condition type, with status=True,
+	// is checked against this set of values with respect to the operator
+	// +listType=set
+	Values []PodConditionType
+}
+
 type BackoffPolicyRule struct {
 	// Specifies the action taken on a pod failure when the requirements are satisfied.
 	Action BackoffPolicyAction
@@ -3506,6 +3524,10 @@ type BackoffPolicyRule struct {
 	// Represents the requirement on the container exit code
 	// +optional
 	OnExitCodes *BackoffPolicyOnExitCodesRequirement
+
+	// Represents the requirement on the pod failure conditions
+	// +optional
+	OnPodConditions *BackoffPolicyOnPodConditionsRequirement
 }
 
 // BackoffPolicy describes how failed pods influence the backoffLimit.

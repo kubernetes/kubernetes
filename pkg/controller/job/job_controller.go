@@ -1715,8 +1715,37 @@ func findMatchingBackoffPolicyRule(job *batch.Job, failedPod *v1.Pod) *v1.Backof
 				return &backoffPolicyRule
 			}
 		}
+		if backoffPolicyRule.OnPodConditions != nil {
+			if isOnPodConditionsMatching(failedPod, backoffPolicyRule.OnPodConditions) {
+				return &backoffPolicyRule
+			}
+		}
 	}
 	return nil
+}
+
+func isOnPodConditionsMatching(failedPod *v1.Pod, requirement *v1.BackoffPolicyOnPodConditionsRequirement) bool {
+	klog.InfoS("_______ podConditions", failedPod.Status.Conditions)
+	for _, podCondition := range failedPod.Status.Conditions {
+		if isOnPodConditionsOperatorMatching(podCondition.Type, requirement.Operator, requirement.Values) {
+			klog.InfoS("_______ found matching", "type", podCondition.Type)
+			return true
+		}
+	}
+	klog.InfoS("_______ not found matching")
+	return false
+}
+
+func isOnPodConditionsOperatorMatching(conditionType v1.PodConditionType, operator v1.BackoffPolicyOnPodConditionsOperator, values []v1.PodConditionType) bool {
+	if operator == v1.BackoffPolicyOnPodConditionsOpIn {
+		for _, value := range values {
+			if value == conditionType {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
 
 func isOnExitCodesMatching(failedPod *v1.Pod, requirement *v1.BackoffPolicyOnExitCodesRequirement) bool {

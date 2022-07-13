@@ -311,6 +311,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/core/v1.AzureFileVolumeSource":                                                        schema_k8sio_api_core_v1_AzureFileVolumeSource(ref),
 		"k8s.io/api/core/v1.BackoffPolicy":                                                                schema_k8sio_api_core_v1_BackoffPolicy(ref),
 		"k8s.io/api/core/v1.BackoffPolicyOnExitCodesRequirement":                                          schema_k8sio_api_core_v1_BackoffPolicyOnExitCodesRequirement(ref),
+		"k8s.io/api/core/v1.BackoffPolicyOnPodConditionsRequirement":                                      schema_k8sio_api_core_v1_BackoffPolicyOnPodConditionsRequirement(ref),
 		"k8s.io/api/core/v1.BackoffPolicyRule":                                                            schema_k8sio_api_core_v1_BackoffPolicyRule(ref),
 		"k8s.io/api/core/v1.Binding":                                                                      schema_k8sio_api_core_v1_Binding(ref),
 		"k8s.io/api/core/v1.CSIPersistentVolumeSource":                                                    schema_k8sio_api_core_v1_CSIPersistentVolumeSource(ref),
@@ -14793,6 +14794,47 @@ func schema_k8sio_api_core_v1_BackoffPolicyOnExitCodesRequirement(ref common.Ref
 	}
 }
 
+func schema_k8sio_api_core_v1_BackoffPolicyOnPodConditionsRequirement(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"operator": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the relationship between the actual Pod condition types and the set of specified Pod condition types",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"values": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the set of values. Each actual pod condition type, with status=True, is checked against this set of values with respect to the operator",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"operator", "values"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_core_v1_BackoffPolicyRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -14813,12 +14855,17 @@ func schema_k8sio_api_core_v1_BackoffPolicyRule(ref common.ReferenceCallback) co
 							Ref:         ref("k8s.io/api/core/v1.BackoffPolicyOnExitCodesRequirement"),
 						},
 					},
+					"onPodConditions": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref("k8s.io/api/core/v1.BackoffPolicyOnPodConditionsRequirement"),
+						},
+					},
 				},
 				Required: []string{"action"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.BackoffPolicyOnExitCodesRequirement"},
+			"k8s.io/api/core/v1.BackoffPolicyOnExitCodesRequirement", "k8s.io/api/core/v1.BackoffPolicyOnPodConditionsRequirement"},
 	}
 }
 

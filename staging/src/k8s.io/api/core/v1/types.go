@@ -4054,6 +4054,24 @@ type BackoffPolicyOnExitCodesRequirement struct {
 	Values []int32 `json:"values" protobuf:"varint,3,rep,name=values"`
 }
 
+type BackoffPolicyOnPodConditionsOperator string
+
+const (
+	BackoffPolicyOnPodConditionsOpIn BackoffPolicyOnPodConditionsOperator = "In"
+)
+
+type BackoffPolicyOnPodConditionsRequirement struct {
+
+	// Represents the relationship between the actual Pod condition types
+	// and the set of specified Pod condition types
+	Operator BackoffPolicyOnPodConditionsOperator `json:"operator" protobuf:"bytes,1,req,name=operator"`
+
+	// Specifies the set of values. Each actual pod condition type, with status=True,
+	// is checked against this set of values with respect to the operator
+	// +listType=set
+	Values []PodConditionType `json:"values" protobuf:"bytes,2,rep,name=values"`
+}
+
 type BackoffPolicyRule struct {
 	// Specifies the action taken on a pod failure when the requirements are satisfied.
 	Action BackoffPolicyAction `json:"action" protobuf:"bytes,1,req,name=action"`
@@ -4061,6 +4079,9 @@ type BackoffPolicyRule struct {
 	// Represents the requirement on the container exit code
 	// +optional
 	OnExitCodes *BackoffPolicyOnExitCodesRequirement `json:"onExitCodes" protobuf:"bytes,2,opt,name=onExitCodes"`
+
+	// +optional
+	OnPodConditions *BackoffPolicyOnPodConditionsRequirement `json:"onPodConditions" protobuf:"bytes,3,opt,name=onPodConditions"`
 }
 
 // BackoffPolicy describes how failed pods influence the backoffLimit.

@@ -184,6 +184,17 @@ message BackoffPolicyOnExitCodesRequirement {
   repeated int32 values = 3;
 }
 
+message BackoffPolicyOnPodConditionsRequirement {
+  // Represents the relationship between the actual Pod condition types
+  // and the set of specified Pod condition types
+  optional string operator = 1;
+
+  // Specifies the set of values. Each actual pod condition type, with status=True,
+  // is checked against this set of values with respect to the operator
+  // +listType=set
+  repeated string values = 2;
+}
+
 message BackoffPolicyRule {
   // Specifies the action taken on a pod failure when the requirements are satisfied.
   optional string action = 1;
@@ -191,6 +202,9 @@ message BackoffPolicyRule {
   // Represents the requirement on the container exit code
   // +optional
   optional BackoffPolicyOnExitCodesRequirement onExitCodes = 2;
+
+  // +optional
+  optional BackoffPolicyOnPodConditionsRequirement onPodConditions = 3;
 }
 
 // Binding ties one object to another; for example, a pod is bound to a node by a scheduler.
