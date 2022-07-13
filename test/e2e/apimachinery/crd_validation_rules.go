@@ -62,7 +62,7 @@ var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Alp
 	}
 
 	// for all new CRD validation features that should be E2E-tested, add them
-	// into this schema and then add CR requests to the end of the the test
+	// into this schema and then add CR requests to the end of the test
 	// below ("MUST NOT fail validation...") instead of writing a new and
 	// separate test
 	var schemaWithValidationExpression = unmarshallSchema([]byte(`{

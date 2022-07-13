@@ -664,7 +664,7 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	ProviderID string `json:"providerID,omitempty"`
-	// kernelMemcgNotification, if set, instructs the the kubelet to integrate with the
+	// kernelMemcgNotification, if set, instructs the kubelet to integrate with the
 	// kernel memcg notification for determining if memory eviction thresholds are
 	// exceeded rather than polling.
 	// Default: false
