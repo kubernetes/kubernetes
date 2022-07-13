@@ -662,8 +662,9 @@ func (f *functionDecl) merge(other *functionDecl) (*functionDecl, error) {
 	return merged, nil
 }
 
-// addOverload ensures that the new overload does not collide with an existing overload signature,
-// nor does it redefine an existing overload binding.
+// addOverload ensures that the new overload does not collide with an existing overload signature;
+// however, if the function signatures are identical, the implementation may be rewritten as its
+// difficult to compare functions by object identity.
 func (f *functionDecl) addOverload(overload *overloadDecl) error {
 	for id, o := range f.overloads {
 		if id != overload.id && o.signatureOverlaps(overload) {
@@ -671,11 +672,8 @@ func (f *functionDecl) addOverload(overload *overloadDecl) error {
 		}
 		if id == overload.id {
 			if o.signatureEquals(overload) && o.nonStrict == overload.nonStrict {
-				if !o.hasBinding() && overload.hasBinding() {
-					f.overloads[id] = overload
-				} else if o.hasBinding() && overload.hasBinding() && o != overload {
-					return fmt.Errorf("overload binding collision in function %s: %s has multiple bindings", f.name, o.id)
-				}
+				// Allow redefinition of an overload implementation so long as the signatures match.
+				f.overloads[id] = overload
 			} else {
 				return fmt.Errorf("overload redefinition in function. %s: %s has multiple definitions", f.name, o.id)
 			}

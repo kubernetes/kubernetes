@@ -85,7 +85,7 @@ func (stdLibrary) ProgramOptions() []ProgramOption {
 type timeUTCLibrary struct{}
 
 func (timeUTCLibrary) CompileOptions() []EnvOption {
-	return timestampOverloadDeclarations
+	return timeOverloadDeclarations
 }
 
 func (timeUTCLibrary) ProgramOptions() []ProgramOption {
@@ -97,7 +97,31 @@ func (timeUTCLibrary) ProgramOptions() []ProgramOption {
 var (
 	utcTZ = types.String("UTC")
 
-	timestampOverloadDeclarations = []EnvOption{
+	timeOverloadDeclarations = []EnvOption{
+		Function(overloads.TimeGetHours,
+			MemberOverload(overloads.DurationToHours, []*Type{DurationType}, IntType,
+				UnaryBinding(func(dur ref.Val) ref.Val {
+					d := dur.(types.Duration)
+					return types.Int(d.Hours())
+				}))),
+		Function(overloads.TimeGetMinutes,
+			MemberOverload(overloads.DurationToMinutes, []*Type{DurationType}, IntType,
+				UnaryBinding(func(dur ref.Val) ref.Val {
+					d := dur.(types.Duration)
+					return types.Int(d.Minutes())
+				}))),
+		Function(overloads.TimeGetSeconds,
+			MemberOverload(overloads.DurationToSeconds, []*Type{DurationType}, IntType,
+				UnaryBinding(func(dur ref.Val) ref.Val {
+					d := dur.(types.Duration)
+					return types.Int(d.Seconds())
+				}))),
+		Function(overloads.TimeGetMilliseconds,
+			MemberOverload(overloads.DurationToMilliseconds, []*Type{DurationType}, IntType,
+				UnaryBinding(func(dur ref.Val) ref.Val {
+					d := dur.(types.Duration)
+					return types.Int(d.Milliseconds())
+				}))),
 		Function(overloads.TimeGetFullYear,
 			MemberOverload(overloads.TimestampToYear, []*Type{TimestampType}, IntType,
 				UnaryBinding(func(ts ref.Val) ref.Val {

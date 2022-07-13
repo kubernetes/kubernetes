@@ -94,13 +94,14 @@ func FormatType(t *exprpb.Type) string {
 // Env encapsulates the context necessary to perform parsing, type checking, or generation of
 // evaluable programs for different expressions.
 type Env struct {
-	Container    *containers.Container
-	functions    map[string]*functionDecl
-	declarations []*exprpb.Decl
-	macros       []parser.Macro
-	adapter      ref.TypeAdapter
-	provider     ref.TypeProvider
-	features     map[int]bool
+	Container       *containers.Container
+	functions       map[string]*functionDecl
+	declarations    []*exprpb.Decl
+	macros          []parser.Macro
+	adapter         ref.TypeAdapter
+	provider        ref.TypeProvider
+	features        map[int]bool
+	appliedFeatures map[int]bool
 
 	// Internal parser representation
 	prsr *parser.Parser
@@ -150,14 +151,15 @@ func NewCustomEnv(opts ...EnvOption) (*Env, error) {
 		return nil, err
 	}
 	return (&Env{
-		declarations: []*exprpb.Decl{},
-		functions:    map[string]*functionDecl{},
-		macros:       []parser.Macro{},
-		Container:    containers.DefaultContainer,
-		adapter:      registry,
-		provider:     registry,
-		features:     map[int]bool{},
-		progOpts:     []ProgramOption{},
+		declarations:    []*exprpb.Decl{},
+		functions:       map[string]*functionDecl{},
+		macros:          []parser.Macro{},
+		Container:       containers.DefaultContainer,
+		adapter:         registry,
+		provider:        registry,
+		features:        map[int]bool{},
+		appliedFeatures: map[int]bool{},
+		progOpts:        []ProgramOption{},
 	}).configure(opts)
 }
 
@@ -294,6 +296,10 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 	for k, v := range e.features {
 		featuresCopy[k] = v
 	}
+	appliedFeaturesCopy := make(map[int]bool, len(e.appliedFeatures))
+	for k, v := range e.appliedFeatures {
+		appliedFeaturesCopy[k] = v
+	}
 	funcsCopy := make(map[string]*functionDecl, len(e.functions))
 	for k, v := range e.functions {
 		funcsCopy[k] = v
@@ -301,15 +307,16 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 
 	// TODO: functions copy needs to happen here.
 	ext := &Env{
-		Container:    e.Container,
-		declarations: decsCopy,
-		functions:    funcsCopy,
-		macros:       macsCopy,
-		progOpts:     progOptsCopy,
-		adapter:      adapter,
-		features:     featuresCopy,
-		provider:     provider,
-		chkOpts:      chkOptsCopy,
+		Container:       e.Container,
+		declarations:    decsCopy,
+		functions:       funcsCopy,
+		macros:          macsCopy,
+		progOpts:        progOptsCopy,
+		adapter:         adapter,
+		features:        featuresCopy,
+		appliedFeatures: appliedFeaturesCopy,
+		provider:        provider,
+		chkOpts:         chkOptsCopy,
 	}
 	return ext.configure(opts)
 }
@@ -458,9 +465,15 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 
 	// If the default UTC timezone fix has been enabled, make sure the library is configured
 	if e.HasFeature(featureDefaultUTCTimeZone) {
-		e, err = Lib(timeUTCLibrary{})(e)
-		if err != nil {
-			return nil, err
+		if _, found := e.appliedFeatures[featureDefaultUTCTimeZone]; !found {
+			e, err = Lib(timeUTCLibrary{})(e)
+			if err != nil {
+				return nil, err
+			}
+			// record that the feature has been applied since it will generate declarations
+			// and functions which will be propagated on Extend() calls and which should only
+			// be registered once.
+			e.appliedFeatures[featureDefaultUTCTimeZone] = true
 		}
 	}
 
