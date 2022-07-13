@@ -18,7 +18,6 @@ package cache
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"testing"
 
@@ -460,6 +459,8 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 	verifyVolumeMountedElsewhere(t, podName2, generatedVolumeName2, true /*expectedMountedElsewhere */, asw)
 }
 
+// Test if volumes that were recorded to be read from disk during reconstruction
+// are handled correctly by the ASOW.
 func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -555,7 +556,7 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 				VolumeSpec:          volumeSpec1,
 				VolumeMountState:    operationexecutor.VolumeMountUncertain,
 			}
-			err = asw.AddVolumeViaReconstruction(markVolumeOpts1)
+			_, err = asw.CheckAndMarkVolumeAsUncertainViaReconstruction(markVolumeOpts1)
 			if err != nil {
 				t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
 			}
