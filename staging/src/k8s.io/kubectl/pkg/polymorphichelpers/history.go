@@ -25,7 +25,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
 	clientappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/apps"
 	"k8s.io/kubectl/pkg/describe"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
@@ -48,6 +48,7 @@ const (
 // HistoryViewer provides an interface for resources have historical information.
 type HistoryViewer interface {
 	ViewHistory(namespace, name string, revision int64) (string, error)
+	GetHistory(namespace, name string) (map[int64]runtime.Object, error)
 }
 
 type HistoryVisitor struct {
@@ -101,24 +102,16 @@ type DeploymentHistoryViewer struct {
 // ViewHistory returns a revision-to-replicaset map as the revision history of a deployment
 // TODO: this should be a describer
 func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	versionedAppsClient := h.c.AppsV1()
-	deployment, err := versionedAppsClient.Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	allRSs, err := getDeploymentReplicaSets(h.c.AppsV1(), namespace, name)
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
-	}
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, versionedAppsClient)
-	if err != nil {
-		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", name, err)
-	}
-	allRSs := allOldRSs
-	if newRS != nil {
-		allRSs = append(allRSs, newRS)
+		return "", err
 	}
 
 	historyInfo := make(map[int64]*corev1.PodTemplateSpec)
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
+			klog.Warningf("unable to get revision from replicaset %s for deployment %s in namespace %s: %v", rs.Name, name, namespace, err)
 			continue
 		}
 		historyInfo[v] = &rs.Spec.Template
@@ -165,6 +158,26 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 	})
 }
 
+// GetHistory returns the ReplicaSet revisions associated with a Deployment
+func (h *DeploymentHistoryViewer) GetHistory(namespace, name string) (map[int64]runtime.Object, error) {
+	allRSs, err := getDeploymentReplicaSets(h.c.AppsV1(), namespace, name)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[int64]runtime.Object)
+	for _, rs := range allRSs {
+		v, err := deploymentutil.Revision(rs)
+		if err != nil {
+			klog.Warningf("unable to get revision from replicaset %s for deployment %s in namespace %s: %v", rs.Name, name, namespace, err)
+			continue
+		}
+		result[v] = rs
+	}
+
+	return result, nil
+}
+
 func printTemplate(template *corev1.PodTemplateSpec) (string, error) {
 	buf := bytes.NewBuffer([]byte{})
 	w := describe.NewPrefixWriter(buf)
@@ -190,6 +203,25 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 		}
 		return &dsOfHistory.Spec.Template, err
 	})
+}
+
+// GetHistory returns the revisions associated with a DaemonSet
+func (h *DaemonSetHistoryViewer) GetHistory(namespace, name string) (map[int64]runtime.Object, error) {
+	ds, history, err := daemonSetHistory(h.c.AppsV1(), namespace, name)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[int64]runtime.Object)
+	for _, h := range history {
+		applied, err := applyDaemonSetHistory(ds, h)
+		if err != nil {
+			return nil, err
+		}
+		result[h.Revision] = applied
+	}
+
+	return result, nil
 }
 
 // printHistory returns the podTemplate of the given revision if it is non-zero
@@ -257,6 +289,42 @@ func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision 
 		}
 		return &stsOfHistory.Spec.Template, err
 	})
+}
+
+// GetHistory returns the revisions associated with a StatefulSet
+func (h *StatefulSetHistoryViewer) GetHistory(namespace, name string) (map[int64]runtime.Object, error) {
+	sts, history, err := statefulSetHistory(h.c.AppsV1(), namespace, name)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[int64]runtime.Object)
+	for _, h := range history {
+		applied, err := applyStatefulSetHistory(sts, h)
+		if err != nil {
+			return nil, err
+		}
+		result[h.Revision] = applied
+	}
+
+	return result, nil
+}
+
+func getDeploymentReplicaSets(apps clientappsv1.AppsV1Interface, namespace, name string) ([]*appsv1.ReplicaSet, error) {
+	deployment, err := apps.Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
+	}
+
+	_, oldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, apps)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", name, err)
+	}
+
+	if newRS == nil {
+		return oldRSs, nil
+	}
+	return append(oldRSs, newRS), nil
 }
 
 // controlledHistories returns all ControllerRevisions in namespace that selected by selector and owned by accessor
