@@ -1661,8 +1661,8 @@ func GetTestKubeletVolumePluginMgrWithNode(t *testing.T, node *v1.Node) (*Volume
 	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
 }
 
-func GetTestKubeletVolumePluginMgrWithNodeAndRoot(t *testing.T, node *v1.Node, rootDir string) (*VolumePluginMgr, *FakeVolumePlugin) {
-	plugins := ProbeVolumePlugins(VolumeConfig{})
+func GetTestKubeletVolumePluginMgrWithNodeAndRoot(t *testing.T, node *v1.Node, rootDir string) (*volume.VolumePluginMgr, *FakeVolumePlugin) {
+	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
 	v := NewFakeKubeletVolumeHost(
 		t,
 		rootDir, /* rootDir */
