@@ -209,6 +209,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		// make the nodes have balanced cpu,mem usage ratio
 		cleanUp, err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
 		defer cleanUp()
+		//err = fmt.Errorf("dave:create an error anyway %v", err)
 		framework.ExpectNoError(err)
 		// Apply 10 taints to first node
 		nodeName := nodeList.Items[0].Name

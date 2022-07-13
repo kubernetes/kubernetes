@@ -174,6 +174,8 @@ fi
   "${auth_config[@]:+${auth_config[@]}}" \
   --ginkgo.flake-attempts="${FLAKE_ATTEMPTS}" \
   --ginkgo.timeout="24h" \
+  --ginkgo.v
+  --ginkgo.always-emit-ginkgo-writer
   --ginkgo.output-interceptor-mode=none \
   --host="${KUBE_MASTER_URL}" \
   --provider="${KUBERNETES_PROVIDER}" \

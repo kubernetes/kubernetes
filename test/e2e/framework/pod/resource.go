@@ -351,6 +351,11 @@ func DumpAllPodInfoForNamespace(c clientset.Interface, namespace, reportDir stri
 	if err != nil {
 		e2elog.Logf("unable to fetch pod debug info: %v", err)
 	}
+	var podName string
+	for i := range pods.Items {
+		podName = podName + pods.Items[i].Name + " "
+	}
+	fmt.Printf("Dave ... saw those pod here... %v \n", podName)
 	LogPodStates(pods.Items)
 	logPodTerminationMessages(pods.Items)
 	logPodLogs(c, namespace, pods.Items, reportDir)

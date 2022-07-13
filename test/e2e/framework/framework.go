@@ -56,10 +56,11 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
 
-const (
-	// DefaultNamespaceDeletionTimeout is timeout duration for waiting for a namespace deletion.
-	DefaultNamespaceDeletionTimeout = 5 * time.Minute
-)
+//const (
+// DefaultNamespaceDeletionTimeout is timeout duration for waiting for a namespace deletion.
+var DefaultNamespaceDeletionTimeout = 5 * time.Minute
+
+//)
 
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
 // Eventual goal is to merge this with integration test framework.
@@ -494,9 +495,13 @@ func (f *Framework) DeleteNamespace(name string) {
 			Logf("error deleting namespace %s: %v", name, err)
 			return
 		}
+		DefaultNamespaceDeletionTimeout = 2 * time.Minute
+		fmt.Printf("Dave... before namespace deletion... %v \n", name)
 		err = WaitForNamespacesDeleted(f.ClientSet, []string{name}, DefaultNamespaceDeletionTimeout)
 		if err != nil {
+			fmt.Printf("Dave... check if the hang happen here...%v \n", name)
 			Logf("error deleting namespace %s: %v", name, err)
+			DumpAllNamespaceInfo(f.ClientSet, name)
 			return
 		}
 		// remove deleted namespace from namespacesToDelete map

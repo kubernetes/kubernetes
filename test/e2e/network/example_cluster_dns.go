@@ -91,6 +91,7 @@ var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 			var err error
 			namespaceName := fmt.Sprintf("dnsexample%d", i)
 			namespaces[i], err = f.CreateNamespace(namespaceName, nil)
+			//err = fmt.Errorf("dave:create an error anyway - nonSerial %v", err)
 			framework.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
 		}
 

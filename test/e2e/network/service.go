@@ -780,6 +780,7 @@ var _ = common.SIGDescribe("Services", func() {
 	*/
 	framework.ConformanceIt("should provide secure master service ", func() {
 		_, err := cs.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
+		//err = fmt.Errorf("dave:create an error anyway - conformance %v", err)
 		framework.ExpectNoError(err, "failed to fetch the service object for the service named kubernetes")
 	})
 
