@@ -416,7 +416,7 @@ func TestDescribePodRuntimeClass(t *testing.T) {
 				"Name", "bar",
 			},
 			unexpect: []string{
-				"Runtime Class Name", "test2",
+				"Runtime Class Name",
 			},
 		},
 		{
@@ -431,7 +431,7 @@ func TestDescribePodRuntimeClass(t *testing.T) {
 				"Name", "bar",
 			},
 			unexpect: []string{
-				"Runtime Class Name", "test3",
+				"Runtime Class Name",
 			},
 		},
 	}
