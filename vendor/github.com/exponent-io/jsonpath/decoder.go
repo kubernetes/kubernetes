@@ -83,7 +83,7 @@ func (d *Decoder) Path() JsonPath {
 }
 
 // Token is equivalent to the Token() method on json.Decoder. The primary difference is that it distinguishes
-// between strings that are keys and and strings that are values. String tokens that are object keys are returned as a
+// between strings that are keys and strings that are values. String tokens that are object keys are returned as a
 // KeyString rather than as a native string.
 func (d *Decoder) Token() (json.Token, error) {
 	t, err := d.Decoder.Token()
