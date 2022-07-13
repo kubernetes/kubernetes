@@ -181,7 +181,6 @@ func (rc *reconciler) reconcile() {
 	// After running the above operations if skippedDuringReconstruction is not empty
 	// then ensure that all volumes which were discovered and skipped during reconstruction
 	// are added to actualStateOfWorld in uncertain state.
-	// This should be called only ONCE after reconstruction.
 	if len(rc.skippedDuringReconstruction) > 0 {
 		rc.processReconstructedVolumes()
 	}
@@ -265,42 +264,43 @@ func (rc *reconciler) mountAttachedVolumes(volumeToMount cache.VolumeToMount, po
 // But if mount operation fails for some reason then we still need to mark the volume as uncertain
 // and wait for the next reconciliation loop to deal with it.
 func (rc *reconciler) processReconstructedVolumes() {
-	if rc.kubeClient != nil {
-		rc.updateDevicePath(rc.skippedDuringReconstruction)
-	}
 	for volumeName, glblVolumeInfo := range rc.skippedDuringReconstruction {
 		// check if volume is marked as attached to the node
 		// for now lets only process volumes which are at least known as attached to the node
 		// this should help with most volume types (including secret, configmap etc)
 		if !rc.actualStateOfWorld.VolumeExists(volumeName) {
 			klog.V(4).InfoS("Volume is not marked as attached to the node. Skipping processing of the volume", "volumeName", volumeName)
-			delete(rc.skippedDuringReconstruction, volumeName)
 			continue
 		}
 		uncertainVolumeCount := 0
+		// only delete volumes which were marked as attached here.
+		// This should ensure that  - we will wait for volumes which were not marked as attached
+		// before adding them in uncertain state during reconstruction.
+		delete(rc.skippedDuringReconstruction, volumeName)
 
 		for podName, volume := range glblVolumeInfo.podVolumes {
-			volumeNotMounted := rc.actualStateOfWorld.PodRemovedFromVolume(podName, volume.volumeName)
+			markVolumeOpts := operationexecutor.MarkVolumeOpts{
+				PodName:             volume.podName,
+				PodUID:              types.UID(podName),
+				VolumeName:          volume.volumeName,
+				Mounter:             volume.mounter,
+				BlockVolumeMapper:   volume.blockVolumeMapper,
+				OuterVolumeSpecName: volume.outerVolumeSpecName,
+				VolumeGidVolume:     volume.volumeGidValue,
+				VolumeSpec:          volume.volumeSpec,
+				VolumeMountState:    operationexecutor.VolumeMountUncertain,
+			}
+
+			volumeAdded, err := rc.actualStateOfWorld.CheckAndMarkVolumeAsUncertainViaReconstruction(markVolumeOpts)
+
 			// if volume is not mounted then lets mark volume mounted in uncertain state in ASOW
-			if volumeNotMounted {
-				markVolumeOpts := operationexecutor.MarkVolumeOpts{
-					PodName:             volume.podName,
-					PodUID:              types.UID(volume.podName),
-					VolumeName:          volume.volumeName,
-					Mounter:             volume.mounter,
-					BlockVolumeMapper:   volume.blockVolumeMapper,
-					OuterVolumeSpecName: volume.outerVolumeSpecName,
-					VolumeGidVolume:     volume.volumeGidValue,
-					VolumeSpec:          volume.volumeSpec,
-					VolumeMountState:    operationexecutor.VolumeMountUncertain,
-				}
-				err := rc.actualStateOfWorld.AddVolumeViaReconstruction(markVolumeOpts)
+			if volumeAdded {
 				uncertainVolumeCount += 1
 				if err != nil {
 					klog.ErrorS(err, "Could not add pod to volume information to actual state of world", "pod", klog.KObj(volume.pod))
 					continue
 				}
-				klog.V(4).InfoS("Volume is marked as mounted and added into the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName)
+				klog.V(4).InfoS("Volume is marked as mounted in uncertain state and added to the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName)
 			}
 		}
 
@@ -312,19 +312,13 @@ func (rc *reconciler) processReconstructedVolumes() {
 					klog.ErrorS(err, "Could not find device mount path for volume", "volumeName", glblVolumeInfo.volumeName)
 					continue
 				}
-				currentMountState := rc.actualStateOfWorld.GetDeviceMountState(glblVolumeInfo.volumeName)
-				if currentMountState == operationexecutor.DeviceNotMounted {
-					err = rc.actualStateOfWorld.MarkDeviceAsUncertain(glblVolumeInfo.volumeName, glblVolumeInfo.devicePath, deviceMountPath)
-					if err != nil {
-						klog.ErrorS(err, "Could not mark device is mounted to actual state of world", "volume", glblVolumeInfo.volumeName)
-						continue
-					}
-					klog.V(4).InfoS("Volume is marked device as mounted and added into the actual state", "volumeName", glblVolumeInfo.volumeName)
+				deviceMounted := rc.actualStateOfWorld.CheckAndMarkDeviceUncertainViaReconstruction(glblVolumeInfo.volumeName, deviceMountPath)
+				if !deviceMounted {
+					klog.V(3).InfoS("Could not mark device as mounted in uncertain state", "volumeName", glblVolumeInfo.volumeName)
 				}
 			}
 		}
 	}
-	rc.skippedDuringReconstruction = make(map[v1.UniqueVolumeName]*globalVolumeInfo)
 }
 
 func (rc *reconciler) waitForVolumeAttach(volumeToMount cache.VolumeToMount) {

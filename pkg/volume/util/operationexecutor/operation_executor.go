@@ -216,9 +216,18 @@ type ActualStateOfWorldMounterUpdater interface {
 	// volume expansion must not be retried for this volume
 	MarkForInUseExpansionError(volumeName v1.UniqueVolumeName)
 
-	// AddVolumeViaReconstruction adds the volume to actual state of the world and also
-	// marks the volume as one found during reconstruction.
-	AddVolumeViaReconstruction(opts MarkVolumeOpts) error
+	// CheckAndMarkVolumeAsUncertainViaReconstruction only adds volume to actual state of the world
+	// if volume was not already there. This avoid overwriting in any previously stored
+	// state. It returns error if there was an error adding the volume to ASOW.
+	// It returns true, if this operation resulted in volume being added to ASOW
+	// otherwise it returns false.
+	CheckAndMarkVolumeAsUncertainViaReconstruction(opts MarkVolumeOpts) (bool, error)
+
+	// CheckAndMarkDeviceUncertainViaReconstruction only adds device to actual state of the world
+	// if device was not already there. This avoids overwriting in any previously stored
+	// state. We only supply deviceMountPath because devicePath is already determined from
+	// VerifyControllerAttachedVolume function.
+	CheckAndMarkDeviceUncertainViaReconstruction(volumeName v1.UniqueVolumeName, deviceMountPath string) bool
 
 	// IsVolumeReconstructed returns true if volume currently added to actual state of the world
 	// was found during reconstruction.

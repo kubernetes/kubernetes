@@ -788,7 +788,7 @@ func (og *operationGenerator) markVolumeErrorState(volumeToMount VolumeToMount, 
 		// if volume was previously reconstructed we are not going to change its state as unmounted even
 		// if mount operation fails.
 		if actualStateOfWorld.IsVolumeReconstructed(volumeToMount.VolumeName, volumeToMount.PodName) {
-			klog.V(3).Infof("MountVolume.markVolumeErrorState leaving volume uncertain", "volumeName", volumeToMount.VolumeName)
+			klog.V(3).InfoS("MountVolume.markVolumeErrorState leaving volume uncertain", "volumeName", volumeToMount.VolumeName)
 			return
 		}
 

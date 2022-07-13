@@ -2202,6 +2202,28 @@ func getFakeNode() *v1.Node {
 	}
 }
 
+func getInlineFakePod(podName, podUUID, outerName, innerName string) *v1.Pod {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+			UID:  k8stypes.UID(podUUID),
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: outerName,
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: innerName,
+						},
+					},
+				},
+			},
+		},
+	}
+	return pod
+}
+
 func getReconciler(kubeletDir string, t *testing.T, volumePaths []string) (Reconciler, *volumetesting.FakeVolumePlugin) {
 	node := getFakeNode()
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNodeAndRoot(t, node, kubeletDir)
@@ -2239,11 +2261,23 @@ func getReconciler(kubeletDir string, t *testing.T, volumePaths []string) (Recon
 }
 
 func TestSyncStates(t *testing.T) {
+	type podInfo struct {
+		podName         string
+		podUID          string
+		outerVolumeName string
+		innerVolumeName string
+	}
+	defaultPodInfo := podInfo{
+		podName:         "pod1",
+		podUID:          "pod1uid",
+		outerVolumeName: "volume-name",
+		innerVolumeName: "volume-name",
+	}
 	tests := []struct {
 		name                 string
 		volumePaths          []string
 		createMountPoint     bool
-		addToDSOW            bool
+		podInfos             []podInfo
 		postSyncStatCallback func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error
 		verifyFunc           func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error
 	}{
@@ -2254,10 +2288,31 @@ func TestSyncStates(t *testing.T) {
 				path.Join("pod2", "volumes", "fake-plugin", "pvc-abcdef"),
 			},
 			createMountPoint: true,
+			podInfos:         []podInfo{},
 			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
 				mountedPods := rcInstance.actualStateOfWorld.GetMountedVolumes()
 				if len(mountedPods) != 2 {
 					return fmt.Errorf("expected 2 pods to in asw got %d", len(mountedPods))
+				}
+				return nil
+			},
+		},
+		{
+			name: "when two pods are using same volume and one of them is deleted",
+			volumePaths: []string{
+				path.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
+				path.Join("pod2uid", "volumes", "fake-plugin", "volume-name"),
+			},
+			createMountPoint: true,
+			podInfos:         []podInfo{defaultPodInfo},
+			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
+				// for pod that is deleted, volume is considered as mounted
+				mountedPods := rcInstance.actualStateOfWorld.GetMountedVolumes()
+				if len(mountedPods) != 1 {
+					return fmt.Errorf("expected 1 pods to in asw got %d", len(mountedPods))
+				}
+				if types.UniquePodName("pod2uid") != mountedPods[0].PodName {
+					return fmt.Errorf("expected mounted pod to be %s got %s", "pod2uid", mountedPods[0].PodName)
 				}
 				return nil
 			},
@@ -2268,6 +2323,7 @@ func TestSyncStates(t *testing.T) {
 				path.Join("pod1", "volumes", "fake-plugin", "pvc-abcdef"),
 			},
 			createMountPoint: false,
+			podInfos:         []podInfo{},
 			verifyFunc: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
 				return retryWithExponentialBackOff(reconcilerSyncWaitDuration, func() (bool, error) {
 					err := volumetesting.VerifyTearDownCallCount(1, fakePlugin)
@@ -2284,7 +2340,7 @@ func TestSyncStates(t *testing.T) {
 				path.Join("pod1uid", "volumes", "fake-plugin", "volume-name"),
 			},
 			createMountPoint: true,
-			addToDSOW:        true,
+			podInfos:         []podInfo{defaultPodInfo},
 			postSyncStatCallback: func(rcInstance *reconciler, fakePlugin *volumetesting.FakeVolumePlugin) error {
 				skippedVolumes := rcInstance.skippedDuringReconstruction
 				if len(skippedVolumes) != 1 {
@@ -2303,6 +2359,22 @@ func TestSyncStates(t *testing.T) {
 				if !addedViaReconstruction {
 					return fmt.Errorf("expected volume %s to be marked as added via reconstruction", mountedPodVolume.VolumeName)
 				}
+
+				// check device mount state
+				attachedVolumes := rcInstance.actualStateOfWorld.GetAttachedVolumes()
+				if len(attachedVolumes) != 1 {
+					return fmt.Errorf("expected 1 volume to be unmounted, got %d", len(attachedVolumes))
+				}
+				firstAttachedVolume := attachedVolumes[0]
+				if !firstAttachedVolume.DeviceMayBeMounted() {
+					return fmt.Errorf("expected %s volume to be mounted in uncertain state", firstAttachedVolume.VolumeName)
+				}
+
+				// also skippedVolumes map should be empty
+				skippedVolumes := rcInstance.skippedDuringReconstruction
+				if len(skippedVolumes) > 0 {
+					return fmt.Errorf("expected 0 pods in skipped volumes found %d", len(skippedVolumes))
+				}
 				return nil
 			},
 		},
@@ -2314,28 +2386,6 @@ func TestSyncStates(t *testing.T) {
 				t.Fatalf("can't make a temp directory for kubeletPods: %v", err)
 			}
 			defer os.RemoveAll(tmpKubeletDir)
-
-			pod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod1",
-					UID:  "pod1uid",
-				},
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
-						{
-							Name: "volume-name",
-							VolumeSource: v1.VolumeSource{
-								GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-									PDName: "volume-name",
-								},
-							},
-						},
-					},
-				},
-			}
-
-			volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
-			podName := util.GetUniquePodName(pod)
 
 			// create kubelet pod directory
 			tmpKubeletPodDir := filepath.Join(tmpKubeletDir, "pods")
@@ -2355,7 +2405,10 @@ func TestSyncStates(t *testing.T) {
 			rc, fakePlugin := getReconciler(tmpKubeletDir, t, mountPaths)
 			rcInstance, _ := rc.(*reconciler)
 
-			if tc.addToDSOW {
+			for _, tpodInfo := range tc.podInfos {
+				pod := getInlineFakePod(tpodInfo.podName, tpodInfo.podUID, tpodInfo.outerVolumeName, tpodInfo.innerVolumeName)
+				volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+				podName := util.GetUniquePodName(pod)
 				volumeName, err := rcInstance.desiredStateOfWorld.AddPodToVolume(
 					podName, pod, volumeSpec, volumeSpec.Name(), "" /* volumeGidValue */)
 				if err != nil {
