@@ -93,15 +93,14 @@ func (d *decodeState) saveStrictError(err *strictError) {
 	}
 	// dedupe accumulated strict errors
 	if d.seenStrictErrors == nil {
-		d.seenStrictErrors = map[string]struct{}{}
+		d.seenStrictErrors = map[strictError]struct{}{}
 	}
-	msg := err.Error()
-	if _, seen := d.seenStrictErrors[msg]; seen {
+	if _, seen := d.seenStrictErrors[*err]; seen {
 		return
 	}
 
 	// accumulate the error
-	d.seenStrictErrors[msg] = struct{}{}
+	d.seenStrictErrors[*err] = struct{}{}
 	d.savedStrictErrors = append(d.savedStrictErrors, err)
 }
 
