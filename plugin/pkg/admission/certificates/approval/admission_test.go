@@ -38,6 +38,15 @@ func TestPlugin_Validate(t *testing.T) {
 		allowed     bool
 		authzErr    error
 	}{
+		"ignored calls": {
+			attributes: &testAttributes{
+				resource:    certificatesapi.Resource("certificatesigningrequests"),
+				subresource: "app",
+				oldObj:      &certificatesapi.CertificateSigningRequestList{},
+				operation:   admission.Update,
+			},
+			allowed: true,
+		},
 		"wrong type": {
 			attributes: &testAttributes{
 				resource:    certificatesapi.Resource("certificatesigningrequests"),
