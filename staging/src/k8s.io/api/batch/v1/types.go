@@ -115,6 +115,14 @@ type JobSpec struct {
 	// +optional
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,3,opt,name=activeDeadlineSeconds"`
 
+	// Specifies the policy of handling failed pods. In particular, it allows to
+	// specify the set of actions and conditions which need to be
+	// satisfied to take the associated action.
+	// If empty, the default behaviour applies - the counter of pod failed is
+	// incremented and it is checked against the backoffLimit
+	// +optional
+	BackoffPolicy *corev1.BackoffPolicy `json:"backoffPolicy,omitempty" protobuf:"bytes,11,opt,name=backoffPolicy"`
+
 	// Specifies the number of retries before marking this job failed.
 	// Defaults to 6
 	// +optional

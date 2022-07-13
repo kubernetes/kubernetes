@@ -770,6 +770,22 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rEr
 		jm.queue.AddAfter(key, syncDuration)
 	}
 
+	klog.InfoS("______ syncJob check if to handle!!!!", "enabled", feature.DefaultFeatureGate.Enabled(features.JobBackoffPolicy), "BackoffPolicyOk", job.Spec.BackoffPolicy != nil, "restartPolicyOk", job.Spec.Template.Spec.RestartPolicy == v1.RestartPolicyNever, "finishedConditionOk", finishedCondition == nil)
+	if feature.DefaultFeatureGate.Enabled(features.JobBackoffPolicy) && job.Spec.BackoffPolicy != nil && job.Spec.Template.Spec.RestartPolicy == v1.RestartPolicyNever && finishedCondition == nil {
+		failedPods := getFailedPods(pods)
+		klog.InfoS("_____ handling of failed pods starts!!!!", "failedPodsCount", len(failedPods), "podsCount", len(pods))
+		for _, failedPod := range failedPods {
+			klog.InfoS("______ Analysing failed pod", "failedPod", failedPod)
+			matchingRule := findMatchingBackoffPolicyRule(&job, failedPod)
+			if matchingRule != nil {
+				klog.InfoS("______ Found matching rule!!!", "matchingRule", matchingRule)
+				if matchingRule.Action == v1.BackoffActionTerminate {
+					finishedCondition = newCondition(batch.JobFailed, v1.ConditionTrue, "BackoffPolicyTermination", "Job was terminated by a backoff policy rule")
+				}
+			}
+		}
+	}
+
 	var prevSucceededIndexes, succeededIndexes orderedIntervals
 	if isIndexedJob(&job) {
 		prevSucceededIndexes, succeededIndexes = calculateSucceededIndexes(&job, pods)
@@ -1680,6 +1696,69 @@ func recordJobPodFinished(job *batch.Job, oldCounters batch.JobStatus) {
 	metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Succeeded).Add(float64(diff))
 	diff = job.Status.Failed - oldCounters.Failed
 	metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Failed).Add(float64(diff))
+}
+
+func getFailedPods(pods []*v1.Pod) []*v1.Pod {
+	var result []*v1.Pod
+	for _, p := range pods {
+		if p.Status.Phase == v1.PodFailed {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+func findMatchingBackoffPolicyRule(job *batch.Job, failedPod *v1.Pod) *v1.BackoffPolicyRule {
+	for _, backoffPolicyRule := range job.Spec.BackoffPolicy.Rules {
+		if backoffPolicyRule.OnExitCodes != nil {
+			if isOnExitCodesMatching(failedPod, backoffPolicyRule.OnExitCodes) {
+				return &backoffPolicyRule
+			}
+		}
+	}
+	return nil
+}
+
+func isOnExitCodesMatching(failedPod *v1.Pod, requirement *v1.BackoffPolicyOnExitCodesRequirement) bool {
+	containerStatuses := getAllContainers(failedPod.Status)
+	klog.InfoS("_______ containerStatuses", "containerStatuses", containerStatuses)
+	for _, containerStatus := range containerStatuses {
+		if requirement.ContainerName == nil || *requirement.ContainerName == containerStatus.Name {
+			if isOnExitCodesOperatorMatching(containerStatus.State.Terminated.ExitCode, requirement.Operator, requirement.Values) {
+				return true
+			}
+		}
+		if requirement.ContainerName != nil && *requirement.ContainerName == containerStatus.Name {
+			return false
+		}
+	}
+	return false
+}
+
+func isOnExitCodesOperatorMatching(exitCode int32, operator v1.BackoffPolicyOnExitCodesOperator, values []int32) bool {
+	if operator == v1.BackoffPolicyOnExitCodesOpIn {
+		for _, value := range values {
+			if value == exitCode {
+				return true
+			}
+		}
+		return false
+	} else if operator == v1.BackoffPolicyOnExitCodesOpNotIn {
+		for _, value := range values {
+			if value == exitCode {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func getAllContainers(podStatus v1.PodStatus) []v1.ContainerStatus {
+	containerStatuses := make([]v1.ContainerStatus, 0, len(podStatus.ContainerStatuses)+len(podStatus.InitContainerStatuses))
+	containerStatuses = append(containerStatuses, podStatus.ContainerStatuses...)
+	containerStatuses = append(containerStatuses, podStatus.InitContainerStatuses...)
+	return containerStatuses
 }
 
 func countReadyPods(pods []*v1.Pod) int32 {

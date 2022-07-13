@@ -128,6 +128,14 @@ type JobSpec struct {
 	// +optional
 	Completions *int32
 
+	// Specifies the policy of handling failed pods. In particular, it allows to
+	// specify the set of actions and conditions which need to be
+	// satisfied to take the associated action.
+	// If empty, the default behaviour applies - the counter of pod failed is
+	// incremented and it is checked against the backoffLimit
+	// +optional
+	BackoffPolicy *api.BackoffPolicy
+
 	// Specifies the duration in seconds relative to the startTime that the job
 	// may be continuously active before the system tries to terminate it; value
 	// must be positive integer. If a Job is suspended (at creation or through an

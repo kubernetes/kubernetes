@@ -4016,6 +4016,64 @@ type PodTemplateList struct {
 	Items []PodTemplate `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// BackoffPolicyAction specifies how a Pod failure is handled.
+type BackoffPolicyAction string
+
+const (
+
+	// This is an action which might be taken on pod failure - mark the
+	// pod's job as Failed and terminate all running pods.
+	BackoffActionTerminate BackoffPolicyAction = "Terminate"
+
+	// This is an action which might be taken on pod failure - the pod will be
+	// restarted and the counter for .backoffLimit will not be incremented.
+	BackoffActionIgnore BackoffPolicyAction = "Ignore"
+)
+
+type BackoffPolicyOnExitCodesOperator string
+
+const (
+	BackoffPolicyOnExitCodesOpIn    BackoffPolicyOnExitCodesOperator = "In"
+	BackoffPolicyOnExitCodesOpNotIn BackoffPolicyOnExitCodesOperator = "NotIn"
+)
+
+type BackoffPolicyOnExitCodesRequirement struct {
+	// Restricts the check for exit codes to only apply to the container with
+	// the specified name. When empty the rule applies to all containers
+	// +optional
+	ContainerName *string `json:"containerName" protobuf:"bytes,1,opt,name=containerName"`
+
+	// Represents the relationship between the container exit code(s) and the
+	// specified values.
+	Operator BackoffPolicyOnExitCodesOperator `json:"operator" protobuf:"bytes,2,req,name=operator"`
+
+	// Specifies the set of values. Each returned container exit code (might be
+	// multiple in case of multiple containers) is checked against this set of
+	// values with respect to the operator
+	// +listType=set
+	Values []int32 `json:"values" protobuf:"varint,3,rep,name=values"`
+}
+
+type BackoffPolicyRule struct {
+	// Specifies the action taken on a pod failure when the requirements are satisfied.
+	Action BackoffPolicyAction `json:"action" protobuf:"bytes,1,req,name=action"`
+
+	// Represents the requirement on the container exit code
+	// +optional
+	OnExitCodes *BackoffPolicyOnExitCodesRequirement `json:"onExitCodes" protobuf:"bytes,2,opt,name=onExitCodes"`
+}
+
+// BackoffPolicy describes how failed pods influence the backoffLimit.
+type BackoffPolicy struct {
+	// A list of backoff policy rules. The rules are evaluated in order.
+	// Once a rule matches a Pod failure, the remaining of the rules are ignored.
+	// When no rule matches the Pod failure, the default handling applies - the
+	// counter of pod failures is incremented and it is checked against
+	// the backoffLimit
+	// +listType=atomic
+	Rules []BackoffPolicyRule `json:"rules" protobuf:"bytes,1,opt,name=rules"`
+}
+
 // ReplicationControllerSpec is the specification of a replication controller.
 type ReplicationControllerSpec struct {
 	// Replicas is the number of desired replicas.

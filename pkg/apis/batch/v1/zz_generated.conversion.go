@@ -399,6 +399,7 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *v1.JobSpec, out *batch.JobSpec,
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
+	out.BackoffPolicy = (*core.BackoffPolicy)(unsafe.Pointer(in.BackoffPolicy))
 	out.BackoffLimit = (*int32)(unsafe.Pointer(in.BackoffLimit))
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))
 	out.ManualSelector = (*bool)(unsafe.Pointer(in.ManualSelector))
@@ -414,6 +415,7 @@ func autoConvert_v1_JobSpec_To_batch_JobSpec(in *v1.JobSpec, out *batch.JobSpec,
 func autoConvert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *v1.JobSpec, s conversion.Scope) error {
 	out.Parallelism = (*int32)(unsafe.Pointer(in.Parallelism))
 	out.Completions = (*int32)(unsafe.Pointer(in.Completions))
+	out.BackoffPolicy = (*corev1.BackoffPolicy)(unsafe.Pointer(in.BackoffPolicy))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
 	out.BackoffLimit = (*int32)(unsafe.Pointer(in.BackoffLimit))
 	out.Selector = (*metav1.LabelSelector)(unsafe.Pointer(in.Selector))

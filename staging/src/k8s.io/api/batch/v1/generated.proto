@@ -198,6 +198,14 @@ message JobSpec {
   // +optional
   optional int64 activeDeadlineSeconds = 3;
 
+  // Specifies the policy of handling failed pods. In particular, it allows to
+  // specify the set of actions and conditions which need to be
+  // satisfied to take the associated action.
+  // If empty, the default behaviour applies - the counter of pod failed is
+  // incremented and it is checked against the backoffLimit
+  // +optional
+  optional k8s.io.api.core.v1.BackoffPolicy backoffPolicy = 11;
+
   // Specifies the number of retries before marking this job failed.
   // Defaults to 6
   // +optional

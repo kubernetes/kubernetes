@@ -791,6 +791,14 @@ const (
 	// Allow users to specify whether to take nodeAffinity/nodeTaint into consideration when
 	// calculating pod topology spread skew.
 	NodeInclusionPolicyInPodTopologySpread featuregate.Feature = "NodeInclusionPolicyInPodTopologySpread"
+
+	// owner: @mimowo
+	// kep: http://kep.k8s.io/3329
+	// alpha: v1.25
+	//
+	// Allow users to specify handling of pod failures based on container exit codes
+	// and pod end state.
+	JobBackoffPolicy featuregate.Feature = "JobBackoffPolicy"
 )
 
 func init() {
@@ -913,6 +921,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginvSphereUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
 	IndexedJob: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
+
+	JobBackoffPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
 	JobMutableNodeSchedulingDirectives: {Default: true, PreRelease: featuregate.Beta},
 

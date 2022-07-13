@@ -309,6 +309,9 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/core/v1.AzureDiskVolumeSource":                                                        schema_k8sio_api_core_v1_AzureDiskVolumeSource(ref),
 		"k8s.io/api/core/v1.AzureFilePersistentVolumeSource":                                              schema_k8sio_api_core_v1_AzureFilePersistentVolumeSource(ref),
 		"k8s.io/api/core/v1.AzureFileVolumeSource":                                                        schema_k8sio_api_core_v1_AzureFileVolumeSource(ref),
+		"k8s.io/api/core/v1.BackoffPolicy":                                                                schema_k8sio_api_core_v1_BackoffPolicy(ref),
+		"k8s.io/api/core/v1.BackoffPolicyOnExitCodesRequirement":                                          schema_k8sio_api_core_v1_BackoffPolicyOnExitCodesRequirement(ref),
+		"k8s.io/api/core/v1.BackoffPolicyRule":                                                            schema_k8sio_api_core_v1_BackoffPolicyRule(ref),
 		"k8s.io/api/core/v1.Binding":                                                                      schema_k8sio_api_core_v1_Binding(ref),
 		"k8s.io/api/core/v1.CSIPersistentVolumeSource":                                                    schema_k8sio_api_core_v1_CSIPersistentVolumeSource(ref),
 		"k8s.io/api/core/v1.CSIVolumeSource":                                                              schema_k8sio_api_core_v1_CSIVolumeSource(ref),
@@ -12974,6 +12977,12 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 							Format:      "int64",
 						},
 					},
+					"backoffPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the policy of handling failed pods. In particular, it allows to specify the set of actions and conditions which need to be satisfied to take the associated action. If empty, the default behaviour applies - the counter of pod failed is incremented and it is checked against the backoffLimit",
+							Ref:         ref("k8s.io/api/core/v1.BackoffPolicy"),
+						},
+					},
 					"backoffLimit": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specifies the number of retries before marking this job failed. Defaults to 6",
@@ -13027,7 +13036,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.PodTemplateSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
+			"k8s.io/api/core/v1.BackoffPolicy", "k8s.io/api/core/v1.PodTemplateSpec", "k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector"},
 	}
 }
 
@@ -14698,6 +14707,118 @@ func schema_k8sio_api_core_v1_AzureFileVolumeSource(ref common.ReferenceCallback
 				Required: []string{"secretName", "shareName"},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_core_v1_BackoffPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "BackoffPolicy describes how failed pods influence the backoffLimit.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"rules": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "A list of backoff policy rules. The rules are evaluated in order. Once a rule matches a Pod failure, the remaining of the rules are ignored. When no rule matches the Pod failure, the default handling applies - the counter of pod failures is incremented and it is checked against the backoffLimit",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/core/v1.BackoffPolicyRule"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"rules"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.BackoffPolicyRule"},
+	}
+}
+
+func schema_k8sio_api_core_v1_BackoffPolicyOnExitCodesRequirement(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"containerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Restricts the check for exit codes to only apply to the container with the specified name. When empty the rule applies to all containers",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"operator": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the relationship between the container exit code(s) and the specified values.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"values": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the set of values. Each returned container exit code (might be multiple in case of multiple containers) is checked against this set of values with respect to the operator",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: 0,
+										Type:    []string{"integer"},
+										Format:  "int32",
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"operator", "values"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_core_v1_BackoffPolicyRule(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"action": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Specifies the action taken on a pod failure when the requirements are satisfied.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"onExitCodes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Represents the requirement on the container exit code",
+							Ref:         ref("k8s.io/api/core/v1.BackoffPolicyOnExitCodesRequirement"),
+						},
+					},
+				},
+				Required: []string{"action"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.BackoffPolicyOnExitCodesRequirement"},
 	}
 }
 

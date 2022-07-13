@@ -252,6 +252,11 @@ func (in *JobSpec) DeepCopyInto(out *JobSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.BackoffPolicy != nil {
+		in, out := &in.BackoffPolicy, &out.BackoffPolicy
+		*out = new(core.BackoffPolicy)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.ActiveDeadlineSeconds != nil {
 		in, out := &in.ActiveDeadlineSeconds, &out.ActiveDeadlineSeconds
 		*out = new(int64)
