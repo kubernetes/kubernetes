@@ -1929,6 +1929,84 @@ func TestCELValidationContextCancellation(t *testing.T) {
 	}
 }
 
+// TestCELMaxRecursionDepth tests CEL setting for maxRecursionDepth.
+func TestCELMaxRecursionDepth(t *testing.T) {
+	tests := []struct {
+		name          string
+		schema        *schema.Structural
+		obj           interface{}
+		oldObj        interface{}
+		valid         []string
+		errors        map[string]string // rule -> string that error message must contain
+		costBudget    int64
+		isRoot        bool
+		expectSkipped bool
+	}{
+		{name: "test CEL maxRecursionDepth",
+			obj:    objs(true),
+			schema: schemas(booleanType),
+			valid: []string{
+				strings.Repeat("self.val1"+" == ", 242) + "self.val1",
+			},
+			errors: map[string]string{
+				strings.Repeat("self.val1"+" == ", 243) + "self.val1": "max recursion depth exceeded",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.costBudget = RuntimeCELCostBudget
+			ctx := context.TODO()
+			for j := range tt.valid {
+				validRule := tt.valid[j]
+				testName := validRule
+				t.Run(testName, func(t *testing.T) {
+					t.Parallel()
+					s := withRule(*tt.schema, validRule)
+					celValidator := validator(&s, tt.isRoot, PerCallLimit)
+					if celValidator == nil {
+						t.Fatal("expected non nil validator")
+					}
+					errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
+					for _, err := range errs {
+						t.Errorf("unexpected error: %v", err)
+					}
+					if tt.expectSkipped {
+						// Skipped validations should have no cost. The only possible false positive here would be the CEL expression 'true'.
+						if remainingBudget != tt.costBudget {
+							t.Errorf("expected no cost expended for skipped validation, but got %d remaining from %d budget", remainingBudget, tt.costBudget)
+						}
+						return
+					}
+				})
+			}
+			for rule, expectErrToContain := range tt.errors {
+				testName := rule
+				if len(testName) > 127 {
+					testName = testName[:127]
+				}
+				t.Run(testName, func(t *testing.T) {
+					s := withRule(*tt.schema, rule)
+					celValidator := NewValidator(&s, PerCallLimit)
+					if celValidator == nil {
+						t.Fatal("expected non nil validator")
+					}
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
+					if len(errs) == 0 {
+						t.Error("expected validation errors but got none")
+					}
+					for _, err := range errs {
+						if err.Type != field.ErrorTypeInvalid || !strings.Contains(err.Error(), expectErrToContain) {
+							t.Errorf("expected error to contain '%s', but got: %v", expectErrToContain, err)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 func BenchmarkCELValidationWithContext(b *testing.B) {
 	items := make([]interface{}, 1000)
 	for i := int64(0); i < 1000; i++ {
