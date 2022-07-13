@@ -467,12 +467,12 @@ func AfterReadingAllFlags(t *TestContextType) {
 
 	// These flags are not exposed via the normal command line flag set,
 	// therefore we have to use our own private one here.
-	var fs flag.FlagSet
-	klog.InitFlags(&fs)
-	fs.Set("logtostderr", "false")
-	fs.Set("alsologtostderr", "false")
-	fs.Set("one_output", "true")
-	klog.SetOutput(ginkgo.GinkgoWriter)
+	//var fs flag.FlagSet
+	//klog.InitFlags(&fs)
+	//fs.Set("logtostderr", "false")
+	//fs.Set("alsologtostderr", "false")
+	//fs.Set("one_output", "true")
+	//klog.SetOutput(ginkgo.GinkgoWriter)
 
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
