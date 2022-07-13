@@ -80,7 +80,7 @@ func getBaseEnv() (*cel.Env, error) {
 		// Validate function declarations once during base env initialization,
 		// so they don't need to be evaluated each time a CEL rule is compiled.
 		// This is a relatively expensive operation.
-		opts = append(opts, cel.EagerlyValidateDeclarations(true))
+		opts = append(opts, cel.EagerlyValidateDeclarations(true), cel.DefaultUTCTimeZone(true))
 		opts = append(opts, library.ExtensionLibs...)
 
 		initEnv, initEnvErr = cel.NewEnv(opts...)
