@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
@@ -41,7 +40,6 @@ func NewListType(elem *DeclType, maxItems int64) *DeclType {
 		name:         "list",
 		ElemType:     elem,
 		MaxElements:  maxItems,
-		exprType:     decls.NewListType(elem.ExprType()),
 		celType:      cel.ListType(elem.CelType()),
 		defaultValue: NewListValue(),
 	}
@@ -54,7 +52,6 @@ func NewMapType(key, elem *DeclType, maxProperties int64) *DeclType {
 		KeyType:      key,
 		ElemType:     elem,
 		MaxElements:  maxProperties,
-		exprType:     decls.NewMapType(key.ExprType(), elem.ExprType()),
 		celType:      cel.MapType(key.CelType(), elem.CelType()),
 		defaultValue: NewMapValue(),
 	}
@@ -65,7 +62,6 @@ func NewObjectType(name string, fields map[string]*DeclField) *DeclType {
 	t := &DeclType{
 		name:      name,
 		Fields:    fields,
-		exprType:  decls.NewObjectType(name),
 		celType:   cel.ObjectType(name),
 		traitMask: traits.FieldTesterType | traits.IndexerType,
 	}
@@ -73,34 +69,9 @@ func NewObjectType(name string, fields map[string]*DeclField) *DeclType {
 	return t
 }
 
-// NewObjectTypeRef returns a reference to an object type by name
-func NewObjectTypeRef(name string) *DeclType {
-	t := &DeclType{
-		name:      name,
-		exprType:  decls.NewObjectType(name),
-		celType:   cel.ObjectType(name),
-		traitMask: traits.FieldTesterType | traits.IndexerType,
-	}
-	return t
-}
-
-// NewTypeParam creates a type parameter type with a simple name.
-//
-// Type parameters are resolved at compilation time to concrete types, or CEL 'dyn' type if no
-// type assignment can be inferred.
-func NewTypeParam(name string) *DeclType {
-	return &DeclType{
-		name:      name,
-		TypeParam: true,
-		exprType:  decls.NewTypeParamType(name),
-		celType:   cel.TypeParamType(name),
-	}
-}
-
-func newSimpleType(name string, exprType *exprpb.Type, celType *cel.Type, zeroVal ref.Val) *DeclType {
+func newSimpleType(name string, celType *cel.Type, zeroVal ref.Val) *DeclType {
 	return &DeclType{
 		name:         name,
-		exprType:     exprType,
 		celType:      celType,
 		defaultValue: zeroVal,
 	}
@@ -118,7 +89,6 @@ type DeclType struct {
 	Metadata    map[string]string
 	MaxElements int64
 
-	exprType     *exprpb.Type
 	celType      *cel.Type
 	traitMask    int
 	defaultValue ref.Val
@@ -164,7 +134,6 @@ func (t *DeclType) MaybeAssignTypeName(name string) *DeclType {
 			ElemType:     t.ElemType,
 			TypeParam:    t.TypeParam,
 			Metadata:     t.Metadata,
-			exprType:     decls.NewObjectType(name),
 			celType:      cel.ObjectType(name),
 			traitMask:    t.traitMask,
 			defaultValue: t.defaultValue,
@@ -190,8 +159,8 @@ func (t *DeclType) MaybeAssignTypeName(name string) *DeclType {
 }
 
 // ExprType returns the CEL expression type of this declaration.
-func (t *DeclType) ExprType() *exprpb.Type {
-	return t.exprType
+func (t *DeclType) ExprType() (*exprpb.Type, error) {
+	return cel.TypeToExprType(t.celType)
 }
 
 // CelType returns the CEL type of this declaration.
@@ -382,7 +351,11 @@ func (rt *RuleTypes) EnvOptions(tp ref.TypeProvider) ([]cel.EnvOption, error) {
 	}
 	for name, declType := range rt.ruleSchemaDeclTypes.types {
 		tpType, found := tp.FindType(name)
-		if found && !proto.Equal(tpType, declType.ExprType()) {
+		expT, err := declType.ExprType()
+		if err != nil {
+			return nil, fmt.Errorf("fail to get cel type: %s", err)
+		}
+		if found && !proto.Equal(tpType, expT) {
 			return nil, fmt.Errorf(
 				"type %s definition differs between CEL environment and rule", name)
 		}
@@ -407,7 +380,11 @@ func (rt *RuleTypes) FindType(typeName string) (*exprpb.Type, bool) {
 	}
 	declType, found := rt.findDeclType(typeName)
 	if found {
-		return declType.ExprType(), found
+		expT, err := declType.ExprType()
+		if err != nil {
+			return expT, false
+		}
+		return expT, found
 	}
 	return rt.TypeProvider.FindType(typeName)
 }
@@ -435,15 +412,23 @@ func (rt *RuleTypes) FindFieldType(typeName, fieldName string) (*ref.FieldType, 
 	f, found := st.Fields[fieldName]
 	if found {
 		ft := f.Type
+		expT, err := ft.ExprType()
+		if err != nil {
+			return nil, false
+		}
 		return &ref.FieldType{
-			Type: ft.ExprType(),
+			Type: expT,
 		}, true
 	}
 	// This could be a dynamic map.
 	if st.IsMap() {
 		et := st.ElemType
+		expT, err := et.ExprType()
+		if err != nil {
+			return nil, false
+		}
 		return &ref.FieldType{
-			Type: et.ExprType(),
+			Type: expT,
 		}, true
 	}
 	return nil, false
@@ -528,42 +513,42 @@ type schemaTypeProvider struct {
 var (
 	// AnyType is equivalent to the CEL 'protobuf.Any' type in that the value may have any of the
 	// types supported.
-	AnyType = newSimpleType("any", decls.Any, cel.AnyType, nil)
+	AnyType = newSimpleType("any", cel.AnyType, nil)
 
 	// BoolType is equivalent to the CEL 'bool' type.
-	BoolType = newSimpleType("bool", decls.Bool, cel.BoolType, types.False)
+	BoolType = newSimpleType("bool", cel.BoolType, types.False)
 
 	// BytesType is equivalent to the CEL 'bytes' type.
-	BytesType = newSimpleType("bytes", decls.Bytes, cel.BytesType, types.Bytes([]byte{}))
+	BytesType = newSimpleType("bytes", cel.BytesType, types.Bytes([]byte{}))
 
 	// DoubleType is equivalent to the CEL 'double' type which is a 64-bit floating point value.
-	DoubleType = newSimpleType("double", decls.Double, cel.DoubleType, types.Double(0))
+	DoubleType = newSimpleType("double", cel.DoubleType, types.Double(0))
 
 	// DurationType is equivalent to the CEL 'duration' type.
-	DurationType = newSimpleType("duration", decls.Duration, cel.DurationType, types.Duration{Duration: time.Duration(0)})
+	DurationType = newSimpleType("duration", cel.DurationType, types.Duration{Duration: time.Duration(0)})
 
 	// DateType is equivalent to the CEL 'date' type.
-	DateType = newSimpleType("date", decls.Timestamp, cel.TimestampType, types.Timestamp{Time: time.Time{}})
+	DateType = newSimpleType("date", cel.TimestampType, types.Timestamp{Time: time.Time{}})
 
 	// DynType is the equivalent of the CEL 'dyn' concept which indicates that the type will be
 	// determined at runtime rather than compile time.
-	DynType = newSimpleType("dyn", decls.Dyn, cel.DynType, nil)
+	DynType = newSimpleType("dyn", cel.DynType, nil)
 
 	// IntType is equivalent to the CEL 'int' type which is a 64-bit signed int.
-	IntType = newSimpleType("int", decls.Int, cel.IntType, types.IntZero)
+	IntType = newSimpleType("int", cel.IntType, types.IntZero)
 
 	// NullType is equivalent to the CEL 'null_type'.
-	NullType = newSimpleType("null_type", decls.Null, cel.NullType, types.NullValue)
+	NullType = newSimpleType("null_type", cel.NullType, types.NullValue)
 
 	// StringType is equivalent to the CEL 'string' type which is expected to be a UTF-8 string.
 	// StringType values may either be string literals or expression strings.
-	StringType = newSimpleType("string", decls.String, cel.StringType, types.String(""))
+	StringType = newSimpleType("string", cel.StringType, types.String(""))
 
 	// TimestampType corresponds to the well-known protobuf.Timestamp type supported within CEL.
-	TimestampType = newSimpleType("timestamp", decls.Timestamp, cel.TimestampType, types.Timestamp{Time: time.Time{}})
+	TimestampType = newSimpleType("timestamp", cel.TimestampType, types.Timestamp{Time: time.Time{}})
 
 	// UintType is equivalent to the CEL 'uint' type.
-	UintType = newSimpleType("uint", decls.Uint, cel.UintType, types.Uint(0))
+	UintType = newSimpleType("uint", cel.UintType, types.Uint(0))
 
 	// ListType is equivalent to the CEL 'list' type.
 	ListType = NewListType(AnyType, noMaxLength)

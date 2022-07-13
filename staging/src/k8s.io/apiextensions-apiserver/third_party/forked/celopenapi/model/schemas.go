@@ -18,7 +18,6 @@ import (
 	"github.com/google/cel-go/cel"
 	"time"
 
-	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
@@ -73,7 +72,7 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		// To validate requirements on both the int and string representation:
 		//  `type(intOrStringField) == int ? intOrStringField < 5 : double(intOrStringField.replace('%', '')) < 0.5
 		//
-		dyn := newSimpleType("dyn", decls.Dyn, cel.DynType, nil)
+		dyn := newSimpleType("dyn", cel.DynType, nil)
 		// handle x-kubernetes-int-or-string by returning the max length of the largest possible string
 		dyn.MaxElements = maxRequestSizeBytes - 2
 		return dyn
@@ -150,7 +149,7 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 		if s.ValueValidation != nil {
 			switch s.ValueValidation.Format {
 			case "byte":
-				byteWithMaxLength := newSimpleType("bytes", decls.Bytes, cel.BytesType, types.Bytes([]byte{}))
+				byteWithMaxLength := newSimpleType("bytes", cel.BytesType, types.Bytes([]byte{}))
 				if s.ValueValidation.MaxLength != nil {
 					byteWithMaxLength.MaxElements = zeroIfNegative(*s.ValueValidation.MaxLength)
 				} else {
@@ -158,16 +157,16 @@ func SchemaDeclType(s *schema.Structural, isResourceRoot bool) *DeclType {
 				}
 				return byteWithMaxLength
 			case "duration":
-				durationWithMaxLength := newSimpleType("duration", decls.Duration, cel.DurationType, types.Duration{Duration: time.Duration(0)})
+				durationWithMaxLength := newSimpleType("duration", cel.DurationType, types.Duration{Duration: time.Duration(0)})
 				durationWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
 				return durationWithMaxLength
 			case "date", "date-time":
-				timestampWithMaxLength := newSimpleType("timestamp", decls.Timestamp, cel.TimestampType, types.Timestamp{Time: time.Time{}})
+				timestampWithMaxLength := newSimpleType("timestamp", cel.TimestampType, types.Timestamp{Time: time.Time{}})
 				timestampWithMaxLength.MaxElements = estimateMaxStringLengthPerRequest(s)
 				return timestampWithMaxLength
 			}
 		}
-		strWithMaxLength := newSimpleType("string", decls.String, cel.StringType, types.String(""))
+		strWithMaxLength := newSimpleType("string", cel.StringType, types.String(""))
 		if s.ValueValidation != nil && s.ValueValidation.MaxLength != nil {
 			// multiply the user-provided max length by 4 in the case of an otherwise-untyped string
 			// we do this because the OpenAPIv3 spec indicates that maxLength is specified in runes/code points,
