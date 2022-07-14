@@ -84,6 +84,7 @@ const (
 	// owner: @cici37
 	// kep: http://kep.k8s.io/2876
 	// alpha: v1.23
+	// beta: v1.25
 	//
 	// Enables expression validation for Custom Resource
 	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
@@ -198,7 +199,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AdvancedAuditing: {Default: true, PreRelease: featuregate.GA},
 
-	CustomResourceValidationExpressions: {Default: false, PreRelease: featuregate.Alpha},
+	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
 	DryRun: {Default: true, PreRelease: featuregate.GA},
 
