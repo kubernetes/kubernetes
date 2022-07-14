@@ -17,10 +17,10 @@ limitations under the License.
 package disk
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
-	"hash/fnv"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -95,7 +95,7 @@ func (c *crcDiskCache) Get(key string) ([]byte, bool) {
 	return response, true
 }
 
-// Set writes the response to a file on disk. The filename will be the FNV-32a
+// Set writes the response to a file on disk. The filename will be the SHA256
 // hash of the key. The file will contain the CRC-32 checksum of the response
 // bytes, followed by said response bytes.
 func (c *crcDiskCache) Set(key string, response []byte) {
@@ -113,7 +113,8 @@ func (c *crcDiskCache) Delete(key string) {
 // the request method was GET) or "<method> <url>" for other methods, per the
 // httpcache.cacheKey function.
 func sanitize(key string) string {
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(key)) // Writing to a hash never returns an error.
-	return fmt.Sprintf("%X", h.Sum32())
+	// These keys are not sensitive. We use sha256 to avoid a (potentially
+	// malicious) collision causing the wrong cache data to be written or
+	// accessed.
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
 }
