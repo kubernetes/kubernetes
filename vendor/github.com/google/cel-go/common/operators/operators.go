@@ -141,3 +141,13 @@ func Precedence(symbol string) int {
 	}
 	return op.precedence
 }
+
+// Arity returns the number of argument the operator takes
+// -1 is returned if an undefined symbol is provided
+func Arity(symbol string) int {
+	op, found := operatorMap[symbol]
+	if !found {
+		return -1
+	}
+	return op.arity
+}

@@ -19,16 +19,13 @@ package ext
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"unicode"
 
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/interpreter/functions"
-
-	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
 // Strings returns a cel.EnvOption to configure extended functions for string manipulation.
@@ -207,194 +204,128 @@ type stringLib struct{}
 
 func (stringLib) CompileOptions() []cel.EnvOption {
 	return []cel.EnvOption{
-		cel.Declarations(
-			decls.NewFunction("charAt",
-				decls.NewInstanceOverload("string_char_at_int",
-					[]*exprpb.Type{decls.String, decls.Int},
-					decls.String)),
-			decls.NewFunction("indexOf",
-				decls.NewInstanceOverload("string_index_of_string",
-					[]*exprpb.Type{decls.String, decls.String},
-					decls.Int),
-				decls.NewInstanceOverload("string_index_of_string_int",
-					[]*exprpb.Type{decls.String, decls.String, decls.Int},
-					decls.Int)),
-			decls.NewFunction("lastIndexOf",
-				decls.NewInstanceOverload("string_last_index_of_string",
-					[]*exprpb.Type{decls.String, decls.String},
-					decls.Int),
-				decls.NewInstanceOverload("string_last_index_of_string_int",
-					[]*exprpb.Type{decls.String, decls.String, decls.Int},
-					decls.Int)),
-			decls.NewFunction("lowerAscii",
-				decls.NewInstanceOverload("string_lower_ascii",
-					[]*exprpb.Type{decls.String},
-					decls.String)),
-			decls.NewFunction("replace",
-				decls.NewInstanceOverload("string_replace_string_string",
-					[]*exprpb.Type{decls.String, decls.String, decls.String},
-					decls.String),
-				decls.NewInstanceOverload("string_replace_string_string_int",
-					[]*exprpb.Type{decls.String, decls.String, decls.String, decls.Int},
-					decls.String)),
-			decls.NewFunction("split",
-				decls.NewInstanceOverload("string_split_string",
-					[]*exprpb.Type{decls.String, decls.String},
-					decls.NewListType(decls.String)),
-				decls.NewInstanceOverload("string_split_string_int",
-					[]*exprpb.Type{decls.String, decls.String, decls.Int},
-					decls.NewListType(decls.String))),
-			decls.NewFunction("substring",
-				decls.NewInstanceOverload("string_substring_int",
-					[]*exprpb.Type{decls.String, decls.Int},
-					decls.String),
-				decls.NewInstanceOverload("string_substring_int_int",
-					[]*exprpb.Type{decls.String, decls.Int, decls.Int},
-					decls.String)),
-			decls.NewFunction("trim",
-				decls.NewInstanceOverload("string_trim",
-					[]*exprpb.Type{decls.String},
-					decls.String)),
-			decls.NewFunction("upperAscii",
-				decls.NewInstanceOverload("string_upper_ascii",
-					[]*exprpb.Type{decls.String},
-					decls.String)),
-			decls.NewFunction("join",
-				decls.NewInstanceOverload("list_join",
-					[]*exprpb.Type{decls.NewListType(decls.String)},
-					decls.String),
-				decls.NewInstanceOverload("list_join_string",
-					[]*exprpb.Type{decls.NewListType(decls.String), decls.String},
-					decls.String),
-			),
-		),
+		cel.Function("charAt",
+			cel.MemberOverload("string_char_at_int", []*cel.Type{cel.StringType, cel.IntType}, cel.StringType,
+				cel.BinaryBinding(func(str, ind ref.Val) ref.Val {
+					s := str.(types.String)
+					i := ind.(types.Int)
+					return stringOrError(charAt(string(s), int64(i)))
+				}))),
+		cel.Function("indexOf",
+			cel.MemberOverload("string_index_of_string", []*cel.Type{cel.StringType, cel.StringType}, cel.IntType,
+				cel.BinaryBinding(func(str, substr ref.Val) ref.Val {
+					s := str.(types.String)
+					sub := substr.(types.String)
+					return intOrError(indexOf(string(s), string(sub)))
+				})),
+			cel.MemberOverload("string_index_of_string_int", []*cel.Type{cel.StringType, cel.StringType, cel.IntType}, cel.IntType,
+				cel.FunctionBinding(func(args ...ref.Val) ref.Val {
+					s := args[0].(types.String)
+					sub := args[1].(types.String)
+					offset := args[2].(types.Int)
+					return intOrError(indexOfOffset(string(s), string(sub), int64(offset)))
+				}))),
+		cel.Function("lastIndexOf",
+			cel.MemberOverload("string_last_index_of_string", []*cel.Type{cel.StringType, cel.StringType}, cel.IntType,
+				cel.BinaryBinding(func(str, substr ref.Val) ref.Val {
+					s := str.(types.String)
+					sub := substr.(types.String)
+					return intOrError(lastIndexOf(string(s), string(sub)))
+				})),
+			cel.MemberOverload("string_last_index_of_string_int", []*cel.Type{cel.StringType, cel.StringType, cel.IntType}, cel.IntType,
+				cel.FunctionBinding(func(args ...ref.Val) ref.Val {
+					s := args[0].(types.String)
+					sub := args[1].(types.String)
+					offset := args[2].(types.Int)
+					return intOrError(lastIndexOfOffset(string(s), string(sub), int64(offset)))
+				}))),
+		cel.Function("lowerAscii",
+			cel.MemberOverload("string_lower_ascii", []*cel.Type{cel.StringType}, cel.StringType,
+				cel.UnaryBinding(func(str ref.Val) ref.Val {
+					s := str.(types.String)
+					return stringOrError(lowerASCII(string(s)))
+				}))),
+		cel.Function("replace",
+			cel.MemberOverload(
+				"string_replace_string_string", []*cel.Type{cel.StringType, cel.StringType, cel.StringType}, cel.StringType,
+				cel.FunctionBinding(func(args ...ref.Val) ref.Val {
+					str := args[0].(types.String)
+					old := args[1].(types.String)
+					new := args[2].(types.String)
+					return stringOrError(replace(string(str), string(old), string(new)))
+				})),
+			cel.MemberOverload(
+				"string_replace_string_string_int", []*cel.Type{cel.StringType, cel.StringType, cel.StringType, cel.IntType}, cel.StringType,
+				cel.FunctionBinding(func(args ...ref.Val) ref.Val {
+					str := args[0].(types.String)
+					old := args[1].(types.String)
+					new := args[2].(types.String)
+					n := args[3].(types.Int)
+					return stringOrError(replaceN(string(str), string(old), string(new), int64(n)))
+				}))),
+		cel.Function("split",
+			cel.MemberOverload("string_split_string", []*cel.Type{cel.StringType, cel.StringType}, cel.ListType(cel.StringType),
+				cel.BinaryBinding(func(str, separator ref.Val) ref.Val {
+					s := str.(types.String)
+					sep := separator.(types.String)
+					return listStringOrError(split(string(s), string(sep)))
+				})),
+			cel.MemberOverload("string_split_string_int", []*cel.Type{cel.StringType, cel.StringType, cel.IntType}, cel.ListType(cel.StringType),
+				cel.FunctionBinding(func(args ...ref.Val) ref.Val {
+					s := args[0].(types.String)
+					sep := args[1].(types.String)
+					n := args[2].(types.Int)
+					return listStringOrError(splitN(string(s), string(sep), int64(n)))
+				}))),
+		cel.Function("substring",
+			cel.MemberOverload("string_substring_int", []*cel.Type{cel.StringType, cel.IntType}, cel.StringType,
+				cel.BinaryBinding(func(str, offset ref.Val) ref.Val {
+					s := str.(types.String)
+					off := offset.(types.Int)
+					return stringOrError(substr(string(s), int64(off)))
+				})),
+			cel.MemberOverload("string_substring_int_int", []*cel.Type{cel.StringType, cel.IntType, cel.IntType}, cel.StringType,
+				cel.FunctionBinding(func(args ...ref.Val) ref.Val {
+					s := args[0].(types.String)
+					start := args[1].(types.Int)
+					end := args[2].(types.Int)
+					return stringOrError(substrRange(string(s), int64(start), int64(end)))
+				}))),
+		cel.Function("trim",
+			cel.MemberOverload("string_trim", []*cel.Type{cel.StringType}, cel.StringType,
+				cel.UnaryBinding(func(str ref.Val) ref.Val {
+					s := str.(types.String)
+					return stringOrError(trimSpace(string(s)))
+				}))),
+		cel.Function("upperAscii",
+			cel.MemberOverload("string_upper_ascii", []*cel.Type{cel.StringType}, cel.StringType,
+				cel.UnaryBinding(func(str ref.Val) ref.Val {
+					s := str.(types.String)
+					return stringOrError(upperASCII(string(s)))
+				}))),
+		cel.Function("join",
+			cel.MemberOverload("list_join", []*cel.Type{cel.ListType(cel.StringType)}, cel.StringType,
+				cel.UnaryBinding(func(list ref.Val) ref.Val {
+					l, err := list.ConvertToNative(stringListType)
+					if err != nil {
+						return types.NewErr(err.Error())
+					}
+					return stringOrError(join(l.([]string)))
+				})),
+			cel.MemberOverload("list_join_string", []*cel.Type{cel.ListType(cel.StringType), cel.StringType}, cel.StringType,
+				cel.BinaryBinding(func(list, delim ref.Val) ref.Val {
+					l, err := list.ConvertToNative(stringListType)
+					if err != nil {
+						return types.NewErr(err.Error())
+					}
+					d := delim.(types.String)
+					return stringOrError(joinSeparator(l.([]string), string(d)))
+				}))),
 	}
 }
 
 func (stringLib) ProgramOptions() []cel.ProgramOption {
-	wrappedReplace := callInStrStrStrOutStr(replace)
-	wrappedReplaceN := callInStrStrStrIntOutStr(replaceN)
-	return []cel.ProgramOption{
-		cel.Functions(
-			&functions.Overload{
-				Operator: "charAt",
-				Binary:   callInStrIntOutStr(charAt),
-			},
-			&functions.Overload{
-				Operator: "string_char_at_int",
-				Binary:   callInStrIntOutStr(charAt),
-			},
-			&functions.Overload{
-				Operator: "indexOf",
-				Binary:   callInStrStrOutInt(indexOf),
-				Function: callInStrStrIntOutInt(indexOfOffset),
-			},
-			&functions.Overload{
-				Operator: "string_index_of_string",
-				Binary:   callInStrStrOutInt(indexOf),
-			},
-			&functions.Overload{
-				Operator: "string_index_of_string_int",
-				Function: callInStrStrIntOutInt(indexOfOffset),
-			},
-			&functions.Overload{
-				Operator: "lastIndexOf",
-				Binary:   callInStrStrOutInt(lastIndexOf),
-				Function: callInStrStrIntOutInt(lastIndexOfOffset),
-			},
-			&functions.Overload{
-				Operator: "string_last_index_of_string",
-				Binary:   callInStrStrOutInt(lastIndexOf),
-			},
-			&functions.Overload{
-				Operator: "string_last_index_of_string_int",
-				Function: callInStrStrIntOutInt(lastIndexOfOffset),
-			},
-			&functions.Overload{
-				Operator: "lowerAscii",
-				Unary:    callInStrOutStr(lowerASCII),
-			},
-			&functions.Overload{
-				Operator: "string_lower_ascii",
-				Unary:    callInStrOutStr(lowerASCII),
-			},
-			&functions.Overload{
-				Operator: "replace",
-				Function: func(values ...ref.Val) ref.Val {
-					if len(values) == 3 {
-						return wrappedReplace(values...)
-					}
-					if len(values) == 4 {
-						return wrappedReplaceN(values...)
-					}
-					return types.NoSuchOverloadErr()
-				},
-			},
-			&functions.Overload{
-				Operator: "string_replace_string_string",
-				Function: wrappedReplace,
-			},
-			&functions.Overload{
-				Operator: "string_replace_string_string_int",
-				Function: wrappedReplaceN,
-			},
-			&functions.Overload{
-				Operator: "split",
-				Binary:   callInStrStrOutListStr(split),
-				Function: callInStrStrIntOutListStr(splitN),
-			},
-			&functions.Overload{
-				Operator: "string_split_string",
-				Binary:   callInStrStrOutListStr(split),
-			},
-			&functions.Overload{
-				Operator: "string_split_string_int",
-				Function: callInStrStrIntOutListStr(splitN),
-			},
-			&functions.Overload{
-				Operator: "substring",
-				Binary:   callInStrIntOutStr(substr),
-				Function: callInStrIntIntOutStr(substrRange),
-			},
-			&functions.Overload{
-				Operator: "string_substring_int",
-				Binary:   callInStrIntOutStr(substr),
-			},
-			&functions.Overload{
-				Operator: "string_substring_int_int",
-				Function: callInStrIntIntOutStr(substrRange),
-			},
-			&functions.Overload{
-				Operator: "trim",
-				Unary:    callInStrOutStr(trimSpace),
-			},
-			&functions.Overload{
-				Operator: "string_trim",
-				Unary:    callInStrOutStr(trimSpace),
-			},
-			&functions.Overload{
-				Operator: "upperAscii",
-				Unary:    callInStrOutStr(upperASCII),
-			},
-			&functions.Overload{
-				Operator: "string_upper_ascii",
-				Unary:    callInStrOutStr(upperASCII),
-			},
-			&functions.Overload{
-				Operator: "join",
-				Unary:    callInListStrOutStr(join),
-				Binary:   callInListStrStrOutStr(joinSeparator),
-			},
-			&functions.Overload{
-				Operator: "list_join",
-				Unary:    callInListStrOutStr(join),
-			},
-			&functions.Overload{
-				Operator: "list_join_string",
-				Binary:   callInListStrStrOutStr(joinSeparator),
-			},
-		),
-	}
+	return []cel.ProgramOption{}
 }
 
 func charAt(str string, ind int64) (string, error) {
@@ -546,3 +477,7 @@ func joinSeparator(strs []string, separator string) (string, error) {
 func join(strs []string) (string, error) {
 	return strings.Join(strs, ""), nil
 }
+
+var (
+	stringListType = reflect.TypeOf([]string{})
+)

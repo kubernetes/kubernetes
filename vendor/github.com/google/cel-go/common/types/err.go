@@ -72,16 +72,13 @@ func MaybeNoSuchOverloadErr(val ref.Val) ref.Val {
 	return ValOrErr(val, "no such overload")
 }
 
-// ValOrErr either returns the existing error or create a new one.
+// ValOrErr either returns the existing error or creates a new one.
 // TODO: Audit the use of this function and standardize the error messages and codes.
 func ValOrErr(val ref.Val, format string, args ...interface{}) ref.Val {
-	if val == nil {
+	if val == nil || !IsUnknownOrError(val) {
 		return NewErr(format, args...)
 	}
-	if IsUnknownOrError(val) {
-		return val
-	}
-	return NewErr(format, args...)
+	return val
 }
 
 // wrapErr wraps an existing Go error value into a CEL Err value.

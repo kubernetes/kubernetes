@@ -168,6 +168,18 @@ func newProgram(e *Env, ast *Ast, opts []ProgramOption) (Program, error) {
 		}
 	}
 
+	// Add the function bindings created via Function() options.
+	for _, fn := range e.functions {
+		bindings, err := fn.bindings()
+		if err != nil {
+			return nil, err
+		}
+		err = disp.Add(bindings...)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Set the attribute factory after the options have been set.
 	var attrFactory interpreter.AttributeFactory
 	if p.evalOpts&OptPartialEval == OptPartialEval {

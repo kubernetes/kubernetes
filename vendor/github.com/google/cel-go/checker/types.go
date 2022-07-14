@@ -88,6 +88,8 @@ func FormatCheckedType(t *exprpb.Type) string {
 			FormatCheckedType(decls.NewPrimitiveType(t.GetWrapper())))
 	case kindError:
 		return "!error!"
+	case kindTypeParam:
+		return t.GetTypeParam()
 	}
 	return t.String()
 }
@@ -238,14 +240,25 @@ func internalIsAssignable(m *mapping, t1 *exprpb.Type, t2 *exprpb.Type) bool {
 // - t2 has a type substitution (t2sub) assignable to t1
 // - t2 does not occur within t1.
 func isValidTypeSubstitution(m *mapping, t1, t2 *exprpb.Type) (valid, hasSub bool) {
+	// Early return if the t1 and t2 are the same instance.
+	kind1, kind2 := kindOf(t1), kindOf(t2)
+	if kind1 == kind2 && (t1 == t2 || proto.Equal(t1, t2)) {
+		return true, true
+	}
 	if t2Sub, found := m.find(t2); found {
-		kind1, kind2 := kindOf(t1), kindOf(t2)
-		if kind1 == kind2 && proto.Equal(t1, t2Sub) {
+		// Early return if t1 and t2Sub are the same instance as otherwise the mapping
+		// might mark a type as being a subtitution for itself.
+		if kind1 == kindOf(t2Sub) && (t1 == t2Sub || proto.Equal(t1, t2Sub)) {
 			return true, true
 		}
 		// If the types are compatible, pick the more general type and return true
 		if internalIsAssignable(m, t1, t2Sub) {
-			m.add(t2, mostGeneral(t1, t2Sub))
+			t2New := mostGeneral(t1, t2Sub)
+			// only update the type reference map if the target type does not occur within it.
+			if notReferencedIn(m, t2, t2New) {
+				m.add(t2, t2New)
+			}
+			// acknowledge the type agreement, and that the substitution is already tracked.
 			return true, true
 		}
 		return false, true

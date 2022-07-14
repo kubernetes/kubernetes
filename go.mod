@@ -88,9 +88,9 @@ require (
 	golang.org/x/tools v0.1.10
 	gonum.org/v1/gonum v0.6.2
 	google.golang.org/api v0.60.0
-	google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6
+	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21
 	google.golang.org/grpc v1.47.0
-	google.golang.org/protobuf v1.27.1
+	google.golang.org/protobuf v1.28.0
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.4.0
@@ -142,7 +142,7 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
-	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220209173558-ad29539cd2e9 // indirect
+	github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220418222510-f25a4f6275ed // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
 	github.com/auth0/go-jwt-middleware v1.0.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -176,7 +176,7 @@ require (
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
 	github.com/google/btree v1.0.1 // indirect
-	github.com/google/cel-go v0.11.2 // indirect
+	github.com/google/cel-go v0.12.3 // indirect
 	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
@@ -292,7 +292,7 @@ replace (
 	github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
 	github.com/ajstarks/svgo => github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af
 	github.com/antihax/optional => github.com/antihax/optional v1.0.0
-	github.com/antlr/antlr4/runtime/Go/antlr => github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220209173558-ad29539cd2e9
+	github.com/antlr/antlr4/runtime/Go/antlr => github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220418222510-f25a4f6275ed
 	github.com/armon/circbuf => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 	github.com/armon/go-socks5 => github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/asaskevich/govalidator => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
@@ -390,7 +390,7 @@ replace (
 	github.com/golangplus/testing => github.com/golangplus/testing v1.0.0
 	github.com/google/btree => github.com/google/btree v1.0.1
 	github.com/google/cadvisor => github.com/google/cadvisor v0.44.1
-	github.com/google/cel-go => github.com/google/cel-go v0.11.2
+	github.com/google/cel-go => github.com/google/cel-go v0.12.3
 	github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.6
 	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
@@ -550,10 +550,10 @@ replace (
 	gonum.org/v1/plot => gonum.org/v1/plot v0.0.0-20190515093506-e2840ee46a6b
 	google.golang.org/api => google.golang.org/api v0.60.0
 	google.golang.org/appengine => google.golang.org/appengine v1.6.7
-	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20220310185008-1973136f34c6
+	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21
 	google.golang.org/grpc => google.golang.org/grpc v1.47.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc => google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0
-	google.golang.org/protobuf => google.golang.org/protobuf v1.27.1
+	google.golang.org/protobuf => google.golang.org/protobuf v1.28.0
 	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f
 	gopkg.in/errgo.v2 => gopkg.in/errgo.v2 v2.1.0

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package ref contains the reference interfaces used throughout the types
-// components.
+// Package ref contains the reference interfaces used throughout the types components.
 package ref
 
 import (
@@ -29,31 +28,27 @@ type Type interface {
 
 	// TypeName returns the qualified type name of the type.
 	//
-	// The type name is also used as the type's identifier name at type-check
-	// and interpretation time.
+	// The type name is also used as the type's identifier name at type-check and interpretation time.
 	TypeName() string
 }
 
 // Val interface defines the functions supported by all expression values.
-// Val implementations may specialize the behavior of the value through the
-// addition of traits.
+// Val implementations may specialize the behavior of the value through the addition of traits.
 type Val interface {
 	// ConvertToNative converts the Value to a native Go struct according to the
 	// reflected type description, or error if the conversion is not feasible.
 	ConvertToNative(typeDesc reflect.Type) (interface{}, error)
 
-	// ConvertToType supports type conversions between value types supported by
-	// the expression language.
+	// ConvertToType supports type conversions between value types supported by the expression language.
 	ConvertToType(typeValue Type) Val
 
-	// Equal returns true if the `other` value has the same type and content as
-	// the implementing struct.
+	// Equal returns true if the `other` value has the same type and content as the implementing struct.
 	Equal(other Val) Val
 
 	// Type returns the TypeValue of the value.
 	Type() Type
 
-	// Value returns the raw value of the instance which may not be directly
-	// compatible with the expression language types.
+	// Value returns the raw value of the instance which may not be directly compatible with the expression
+	// language types.
 	Value() interface{}
 }
