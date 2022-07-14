@@ -253,7 +253,7 @@ func (sched *Scheduler) bindingCycle(
 	}
 
 	// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
-	klog.V(2).InfoS("Successfully bound pod to node", "pod", klog.KObj(assumedPod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
+	logger.V(2).Info("Successfully bound pod to node", "pod", klog.KObj(assumedPod), "node", scheduleResult.SuggestedHost, "evaluatedNodes", scheduleResult.EvaluatedNodes, "feasibleNodes", scheduleResult.FeasibleNodes)
 	metrics.PodScheduled(fwk.ProfileName(), metrics.SinceInSeconds(start))
 	metrics.PodSchedulingAttempts.Observe(float64(assumedPodInfo.Attempts))
 	metrics.PodSchedulingDuration.WithLabelValues(getAttemptsLabel(assumedPodInfo)).Observe(metrics.SinceInSeconds(assumedPodInfo.InitialAttemptTimestamp))
@@ -871,13 +871,13 @@ func (sched *Scheduler) handleSchedulingFailure(logger klog.Logger, ctx context.
 	errMsg := status.Message()
 
 	if err == ErrNoNodesAvailable {
-		klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod), "err", err)
-	} else if fitError, ok := err.(*framework.FitError); ok {
-		// Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
+
+		logger.V(2).Info("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
+	} else if fitError, ok := err.(*framework.FitError); ok {		// Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
-		klog.V(2).InfoS("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
+		logger.V(2).Info("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
 	} else if apierrors.IsNotFound(err) {
-		klog.V(2).InfoS("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", errMsg)
+		logger.V(2).Info("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", errMsg)
 		if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
 			nodeName := errStatus.Status().Details.Name
 			// when node is not found, We do not remove the node right away. Trying again to get
@@ -886,31 +886,31 @@ func (sched *Scheduler) handleSchedulingFailure(logger klog.Logger, ctx context.
 			if err != nil && apierrors.IsNotFound(err) {
 				node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}
 				if err := sched.Cache.RemoveNode(logger, &node); err != nil {
-					klog.V(4).InfoS("Node is not found; failed to remove it from the cache", "node", node.Name)
+					logger.V(4).Info("Node is not found; failed to remove it from the cache", "node", node.Name)
 				}
 			}
 		}
 	} else {
-		klog.ErrorS(err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
+		logger.Error(err, "Error scheduling pod; retrying", "pod", klog.KObj(pod))
 	}
 
 	// Check if the Pod exists in informer cache.
 	podLister := fwk.SharedInformerFactory().Core().V1().Pods().Lister()
 	cachedPod, e := podLister.Pods(pod.Namespace).Get(pod.Name)
 	if e != nil {
-		klog.InfoS("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", e)
+		logger.Info("Pod doesn't exist in informer cache", "pod", klog.KObj(pod), "err", e)
 	} else {
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
 		if len(cachedPod.Spec.NodeName) != 0 {
-			klog.InfoS("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
+			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
 		} else {
 			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 			// ignore this err since apiserver doesn't properly validate affinity terms
 			// and we can't fix the validation for backwards compatibility.
 			podInfo.PodInfo, _ = framework.NewPodInfo(cachedPod.DeepCopy())
 			if err := sched.SchedulingQueue.AddUnschedulableIfNotPresent(logger, podInfo, sched.SchedulingQueue.SchedulingCycle()); err != nil {
-				klog.ErrorS(err, "Error occurred")
+				logger.Error(err, "Error occurred")
 			}
 		}
 	}

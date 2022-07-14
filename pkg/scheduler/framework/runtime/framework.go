@@ -626,9 +626,11 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 	var result *framework.PreFilterResult
 	var pluginsWithNodes []string
 	skipPlugins := sets.New[string]()
-	logger := klog.FromContext(ctx).WithName("PreFilter").WithValues("pod", klog.KObj(pod))
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "PreFilter")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 	for _, pl := range f.preFilterPlugins {
-		logger := logger.WithName(pl.Name())
+		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		r, s := f.runPreFilterPlugin(ctx, pl, state, pod)
 		if s.IsSkip() {
@@ -678,12 +680,14 @@ func (f *frameworkImpl) RunPreFilterExtensionAddPod(
 	podInfoToAdd *framework.PodInfo,
 	nodeInfo *framework.NodeInfo,
 ) (status *framework.Status) {
-	logger := klog.FromContext(ctx).WithName("AddPod").WithValues("pod", klog.KObj(podToSchedule), "node", klog.KObj(nodeInfo.Node()))
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "AddPod")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(podToSchedule), "node", klog.KObj(nodeInfo.Node()))
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil || state.SkipFilterPlugins.Has(pl.Name()) {
 			continue
 		}
-		logger := logger.WithName(pl.Name())
+		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		status = f.runPreFilterExtensionAddPod(ctx, pl, state, podToSchedule, podInfoToAdd, nodeInfo)
 		if !status.IsSuccess() {
@@ -716,12 +720,14 @@ func (f *frameworkImpl) RunPreFilterExtensionRemovePod(
 	podInfoToRemove *framework.PodInfo,
 	nodeInfo *framework.NodeInfo,
 ) (status *framework.Status) {
-	logger := klog.FromContext(ctx).WithName("RemovePod").WithValues("pod", klog.KObj(podToSchedule), "node", klog.KObj(nodeInfo.Node()))
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "RemovePod")
+	logger = klog.LoggerWithValues(logger, klog.KObj(podToSchedule), "node", klog.KObj(nodeInfo.Node()))
 	for _, pl := range f.preFilterPlugins {
 		if pl.PreFilterExtensions() == nil || state.SkipFilterPlugins.Has(pl.Name()) {
 			continue
 		}
-		logger := logger.WithName(pl.Name())
+		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		status = f.runPreFilterExtensionRemovePod(ctx, pl, state, podToSchedule, podInfoToRemove, nodeInfo)
 		if !status.IsSuccess() {
@@ -754,9 +760,12 @@ func (f *frameworkImpl) RunFilterPlugins(
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo,
 ) *framework.Status {
-	logger := klog.FromContext(ctx).WithName("Filter").WithValues("pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()))
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "Filter")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "node", klog.KObj(nodeInfo.Node()))
+
 	for _, pl := range f.filterPlugins {
-		logger := logger.WithName(pl.Name())
+		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		if state.SkipFilterPlugins.Has(pl.Name()) {
 			continue
@@ -792,13 +801,15 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state *framewo
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(postFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-
-	logger := klog.FromContext(ctx).WithName("PostFilter").WithValues("pod", klog.KObj(pod))
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "PostFilter")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+	// `result` records the last meaningful(non-noop) PostFilterResult.
 	var result *framework.PostFilterResult
 	var reasons []string
 	var failedPlugin string
 	for _, pl := range f.postFilterPlugins {
-		logger := logger.WithName(pl.Name())
+		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		r, s := f.runPostFilterPlugin(ctx, pl, state, pod, filteredNodeStatusMap)
 		if s.IsSuccess() {
@@ -865,7 +876,8 @@ func (f *frameworkImpl) RunFilterPluginsWithNominatedPods(ctx context.Context, s
 	// the nominated pods are treated as not running. We can't just assume the
 	// nominated pods are running because they are not running right now and in fact,
 	// they may end up getting scheduled to a different node.
-	logger := klog.FromContext(ctx).WithName("NominatedPods")
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "NominatedPods")
 	ctx = klog.NewContext(ctx, logger)
 	for i := 0; i < 2; i++ {
 		stateToUse := state
@@ -933,9 +945,11 @@ func (f *frameworkImpl) RunPreScorePlugins(
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(preScore, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	skipPlugins := sets.New[string]()
-	logger := klog.FromContext(ctx).WithName("PreScore").WithValues("pod", klog.KObj(pod))
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "PreScore")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 	for _, pl := range f.preScorePlugins {
-		logger := logger.WithName(pl.Name())
+		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		status = f.runPreScorePlugin(ctx, pl, state, pod, nodes)
 		if status.IsSkip() {
@@ -985,13 +999,15 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	errCh := parallelize.NewErrorChannel()
 
 	if len(plugins) > 0 {
-		logger := klog.FromContext(ctx).WithName("Score").WithValues("pod", klog.KObj(pod))
+		logger := klog.FromContext(ctx)
+		logger = klog.LoggerWithName(logger, "Score")
+		logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
 		// Run Score method for each node in parallel.
 		f.Parallelizer().Until(ctx, len(nodes), func(index int) {
 			nodeName := nodes[index].Name
-			logger := logger.WithValues("node", klog.ObjectRef{Name: nodeName})
+			logger := klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 			for _, pl := range plugins {
-				logger := logger.WithName(pl.Name())
+				logger := klog.LoggerWithName(logger, pl.Name())
 				ctx := klog.NewContext(ctx, logger)
 				nodeName := nodes[index].Name
 				s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
@@ -1091,9 +1107,12 @@ func (f *frameworkImpl) RunPreBindPlugins(ctx context.Context, state *framework.
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(preBind, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	logger := klog.FromContext(ctx).WithName("PreBind").WithValues("pod", klog.KObj(pod)).WithValues("node", klog.ObjectRef{Name: nodeName})
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "PreBind")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod))
+	logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
 	for _, pl := range f.preBindPlugins {
-		logger := logger.WithName(pl.Name())
+		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		status = f.runPreBindPlugin(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
@@ -1129,9 +1148,11 @@ func (f *frameworkImpl) RunBindPlugins(ctx context.Context, state *framework.Cyc
 	if len(f.bindPlugins) == 0 {
 		return framework.NewStatus(framework.Skip, "")
 	}
-	logger := klog.FromContext(ctx).WithName("Bind").WithValues("pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "Bind")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
 	for _, bp := range f.bindPlugins {
-		logger := logger.WithName(bp.Name())
+		logger := klog.LoggerWithName(logger, bp.Name())
 		ctx := klog.NewContext(ctx, logger)
 		status = f.runBindPlugin(ctx, bp, state, pod, nodeName)
 		if status.IsSkip() {
@@ -1168,9 +1189,11 @@ func (f *frameworkImpl) RunPostBindPlugins(ctx context.Context, state *framework
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(postBind, framework.Success.String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	logger := klog.FromContext(ctx).WithName("PostBind").WithValues("pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "PostBind")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
 	for _, pl := range f.postBindPlugins {
-		logger := logger.WithName(pl.Name())
+		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		f.runPostBindPlugin(ctx, pl, state, pod, nodeName)
 	}
@@ -1196,9 +1219,11 @@ func (f *frameworkImpl) RunReservePluginsReserve(ctx context.Context, state *fra
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(reserve, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	logger := klog.FromContext(ctx).WithName("Reserve").WithValues("pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "Reserve")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
 	for _, pl := range f.reservePlugins {
-		logger := logger.WithName(pl.Name())
+		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		status = f.runReservePluginReserve(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
@@ -1229,9 +1254,11 @@ func (f *frameworkImpl) RunReservePluginsUnreserve(ctx context.Context, state *f
 	}()
 	// Execute the Unreserve operation of each reserve plugin in the
 	// *reverse* order in which the Reserve operation was executed.
-	logger := klog.FromContext(ctx).WithName("Unreserve").WithValues("pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "Unreserve")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
 	for i := len(f.reservePlugins) - 1; i >= 0; i-- {
-		logger := logger.WithName(f.reservePlugins[i].Name())
+		logger := klog.LoggerWithName(logger, f.reservePlugins[i].Name())
 		ctx := klog.NewContext(ctx, logger)
 		f.runReservePluginUnreserve(ctx, f.reservePlugins[i], state, pod, nodeName)
 	}
@@ -1260,9 +1287,11 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 	}()
 	pluginsWaitTime := make(map[string]time.Duration)
 	statusCode := framework.Success
-	logger := klog.FromContext(ctx).WithName("Permit").WithValues("pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithName(logger, "Permit")
+	logger = klog.LoggerWithValues(logger, "pod", klog.KObj(pod), "node", klog.ObjectRef{Name: nodeName})
 	for _, pl := range f.permitPlugins {
-		logger := logger.WithName(pl.Name())
+		logger := klog.LoggerWithName(logger, pl.Name())
 		ctx := klog.NewContext(ctx, logger)
 		status, timeout := f.runPermitPlugin(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {

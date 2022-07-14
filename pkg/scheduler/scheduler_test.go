@@ -263,7 +263,7 @@ func TestFailureHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			_, cancel := context.WithCancel(context.Background())
 			logger, ctx := ktesting.NewTestContext(t)
 			defer cancel()
 
@@ -385,7 +385,7 @@ func TestFailureHandler_NodeNotFound(t *testing.T) {
 }
 
 func TestFailureHandler_PodAlreadyBound(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(context.Background())
 	logger, ctx := ktesting.NewTestContext(t)
 	defer cancel()
 
