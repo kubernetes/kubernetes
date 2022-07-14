@@ -21,6 +21,7 @@ package v1
 import (
 	"net/http"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/authorization/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -37,6 +38,7 @@ type AuthorizationV1Interface interface {
 // AuthorizationV1Client is used to interact with features provided by the authorization.k8s.io group.
 type AuthorizationV1Client struct {
 	restClient rest.Interface
+	cluster    logicalcluster.Name
 }
 
 func (c *AuthorizationV1Client) LocalSubjectAccessReviews(namespace string) LocalSubjectAccessReviewInterface {
@@ -81,7 +83,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*AuthorizationV1Clie
 	if err != nil {
 		return nil, err
 	}
-	return &AuthorizationV1Client{client}, nil
+	return &AuthorizationV1Client{restClient: client}, nil
 }
 
 // NewForConfigOrDie creates a new AuthorizationV1Client for the given config and
@@ -96,7 +98,12 @@ func NewForConfigOrDie(c *rest.Config) *AuthorizationV1Client {
 
 // New creates a new AuthorizationV1Client for the given RESTClient.
 func New(c rest.Interface) *AuthorizationV1Client {
-	return &AuthorizationV1Client{c}
+	return &AuthorizationV1Client{restClient: c}
+}
+
+// NewWithCluster creates a new AuthorizationV1Client for the given RESTClient and cluster.
+func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *AuthorizationV1Client {
+	return &AuthorizationV1Client{restClient: c, cluster: cluster}
 }
 
 func setConfigDefaults(config *rest.Config) error {

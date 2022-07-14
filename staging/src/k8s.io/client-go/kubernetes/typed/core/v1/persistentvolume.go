@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -57,13 +58,15 @@ type PersistentVolumeInterface interface {
 
 // persistentVolumes implements PersistentVolumeInterface
 type persistentVolumes struct {
-	client rest.Interface
+	client  rest.Interface
+	cluster logicalcluster.Name
 }
 
 // newPersistentVolumes returns a PersistentVolumes
 func newPersistentVolumes(c *CoreV1Client) *persistentVolumes {
 	return &persistentVolumes{
-		client: c.RESTClient(),
+		client:  c.RESTClient(),
+		cluster: c.cluster,
 	}
 }
 
@@ -71,6 +74,7 @@ func newPersistentVolumes(c *CoreV1Client) *persistentVolumes {
 func (c *persistentVolumes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.PersistentVolume, err error) {
 	result = &v1.PersistentVolume{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("persistentvolumes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -87,6 +91,7 @@ func (c *persistentVolumes) List(ctx context.Context, opts metav1.ListOptions) (
 	}
 	result = &v1.PersistentVolumeList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("persistentvolumes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -103,6 +108,7 @@ func (c *persistentVolumes) Watch(ctx context.Context, opts metav1.ListOptions) 
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Resource("persistentvolumes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -113,6 +119,7 @@ func (c *persistentVolumes) Watch(ctx context.Context, opts metav1.ListOptions) 
 func (c *persistentVolumes) Create(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.CreateOptions) (result *v1.PersistentVolume, err error) {
 	result = &v1.PersistentVolume{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Resource("persistentvolumes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(persistentVolume).
@@ -125,6 +132,7 @@ func (c *persistentVolumes) Create(ctx context.Context, persistentVolume *v1.Per
 func (c *persistentVolumes) Update(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.UpdateOptions) (result *v1.PersistentVolume, err error) {
 	result = &v1.PersistentVolume{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Resource("persistentvolumes").
 		Name(persistentVolume.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -139,6 +147,7 @@ func (c *persistentVolumes) Update(ctx context.Context, persistentVolume *v1.Per
 func (c *persistentVolumes) UpdateStatus(ctx context.Context, persistentVolume *v1.PersistentVolume, opts metav1.UpdateOptions) (result *v1.PersistentVolume, err error) {
 	result = &v1.PersistentVolume{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Resource("persistentvolumes").
 		Name(persistentVolume.Name).
 		SubResource("status").
@@ -152,6 +161,7 @@ func (c *persistentVolumes) UpdateStatus(ctx context.Context, persistentVolume *
 // Delete takes name of the persistentVolume and deletes it. Returns an error if one occurs.
 func (c *persistentVolumes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("persistentvolumes").
 		Name(name).
 		Body(&opts).
@@ -166,6 +176,7 @@ func (c *persistentVolumes) DeleteCollection(ctx context.Context, opts metav1.De
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("persistentvolumes").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -178,6 +189,7 @@ func (c *persistentVolumes) DeleteCollection(ctx context.Context, opts metav1.De
 func (c *persistentVolumes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.PersistentVolume, err error) {
 	result = &v1.PersistentVolume{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Resource("persistentvolumes").
 		Name(name).
 		SubResource(subresources...).
@@ -204,6 +216,7 @@ func (c *persistentVolumes) Apply(ctx context.Context, persistentVolume *corev1.
 	}
 	result = &v1.PersistentVolume{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Resource("persistentvolumes").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -232,6 +245,7 @@ func (c *persistentVolumes) ApplyStatus(ctx context.Context, persistentVolume *c
 
 	result = &v1.PersistentVolume{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Resource("persistentvolumes").
 		Name(*name).
 		SubResource("status").

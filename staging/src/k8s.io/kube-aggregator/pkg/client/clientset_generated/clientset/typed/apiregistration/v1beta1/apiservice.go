@@ -22,6 +22,7 @@ import (
 	"context"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -52,13 +53,15 @@ type APIServiceInterface interface {
 
 // aPIServices implements APIServiceInterface
 type aPIServices struct {
-	client rest.Interface
+	client  rest.Interface
+	cluster logicalcluster.Name
 }
 
 // newAPIServices returns a APIServices
 func newAPIServices(c *ApiregistrationV1beta1Client) *aPIServices {
 	return &aPIServices{
-		client: c.RESTClient(),
+		client:  c.RESTClient(),
+		cluster: c.cluster,
 	}
 }
 
@@ -66,6 +69,7 @@ func newAPIServices(c *ApiregistrationV1beta1Client) *aPIServices {
 func (c *aPIServices) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.APIService, err error) {
 	result = &v1beta1.APIService{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("apiservices").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -82,6 +86,7 @@ func (c *aPIServices) List(ctx context.Context, opts v1.ListOptions) (result *v1
 	}
 	result = &v1beta1.APIServiceList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("apiservices").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -98,6 +103,7 @@ func (c *aPIServices) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Resource("apiservices").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,6 +114,7 @@ func (c *aPIServices) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 func (c *aPIServices) Create(ctx context.Context, aPIService *v1beta1.APIService, opts v1.CreateOptions) (result *v1beta1.APIService, err error) {
 	result = &v1beta1.APIService{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Resource("apiservices").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(aPIService).
@@ -120,6 +127,7 @@ func (c *aPIServices) Create(ctx context.Context, aPIService *v1beta1.APIService
 func (c *aPIServices) Update(ctx context.Context, aPIService *v1beta1.APIService, opts v1.UpdateOptions) (result *v1beta1.APIService, err error) {
 	result = &v1beta1.APIService{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Resource("apiservices").
 		Name(aPIService.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -134,6 +142,7 @@ func (c *aPIServices) Update(ctx context.Context, aPIService *v1beta1.APIService
 func (c *aPIServices) UpdateStatus(ctx context.Context, aPIService *v1beta1.APIService, opts v1.UpdateOptions) (result *v1beta1.APIService, err error) {
 	result = &v1beta1.APIService{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Resource("apiservices").
 		Name(aPIService.Name).
 		SubResource("status").
@@ -147,6 +156,7 @@ func (c *aPIServices) UpdateStatus(ctx context.Context, aPIService *v1beta1.APIS
 // Delete takes name of the aPIService and deletes it. Returns an error if one occurs.
 func (c *aPIServices) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("apiservices").
 		Name(name).
 		Body(&opts).
@@ -161,6 +171,7 @@ func (c *aPIServices) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("apiservices").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -173,6 +184,7 @@ func (c *aPIServices) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 func (c *aPIServices) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.APIService, err error) {
 	result = &v1beta1.APIService{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Resource("apiservices").
 		Name(name).
 		SubResource(subresources...).

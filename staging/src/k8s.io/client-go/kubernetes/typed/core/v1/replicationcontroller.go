@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,15 +62,17 @@ type ReplicationControllerInterface interface {
 
 // replicationControllers implements ReplicationControllerInterface
 type replicationControllers struct {
-	client rest.Interface
-	ns     string
+	client  rest.Interface
+	cluster logicalcluster.Name
+	ns      string
 }
 
 // newReplicationControllers returns a ReplicationControllers
 func newReplicationControllers(c *CoreV1Client, namespace string) *replicationControllers {
 	return &replicationControllers{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:  c.RESTClient(),
+		cluster: c.cluster,
+		ns:      namespace,
 	}
 }
 
@@ -77,6 +80,7 @@ func newReplicationControllers(c *CoreV1Client, namespace string) *replicationCo
 func (c *replicationControllers) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(name).
@@ -94,6 +98,7 @@ func (c *replicationControllers) List(ctx context.Context, opts metav1.ListOptio
 	}
 	result = &v1.ReplicationControllerList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -111,6 +116,7 @@ func (c *replicationControllers) Watch(ctx context.Context, opts metav1.ListOpti
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -122,6 +128,7 @@ func (c *replicationControllers) Watch(ctx context.Context, opts metav1.ListOpti
 func (c *replicationControllers) Create(ctx context.Context, replicationController *v1.ReplicationController, opts metav1.CreateOptions) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -135,6 +142,7 @@ func (c *replicationControllers) Create(ctx context.Context, replicationControll
 func (c *replicationControllers) Update(ctx context.Context, replicationController *v1.ReplicationController, opts metav1.UpdateOptions) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(replicationController.Name).
@@ -150,6 +158,7 @@ func (c *replicationControllers) Update(ctx context.Context, replicationControll
 func (c *replicationControllers) UpdateStatus(ctx context.Context, replicationController *v1.ReplicationController, opts metav1.UpdateOptions) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(replicationController.Name).
@@ -164,6 +173,7 @@ func (c *replicationControllers) UpdateStatus(ctx context.Context, replicationCo
 // Delete takes name of the replicationController and deletes it. Returns an error if one occurs.
 func (c *replicationControllers) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(name).
@@ -179,6 +189,7 @@ func (c *replicationControllers) DeleteCollection(ctx context.Context, opts meta
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -192,6 +203,7 @@ func (c *replicationControllers) DeleteCollection(ctx context.Context, opts meta
 func (c *replicationControllers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ReplicationController, err error) {
 	result = &v1.ReplicationController{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(name).
@@ -219,6 +231,7 @@ func (c *replicationControllers) Apply(ctx context.Context, replicationControlle
 	}
 	result = &v1.ReplicationController{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(*name).
@@ -248,6 +261,7 @@ func (c *replicationControllers) ApplyStatus(ctx context.Context, replicationCon
 
 	result = &v1.ReplicationController{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(*name).
@@ -263,6 +277,7 @@ func (c *replicationControllers) ApplyStatus(ctx context.Context, replicationCon
 func (c *replicationControllers) GetScale(ctx context.Context, replicationControllerName string, options metav1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(replicationControllerName).
@@ -277,6 +292,7 @@ func (c *replicationControllers) GetScale(ctx context.Context, replicationContro
 func (c *replicationControllers) UpdateScale(ctx context.Context, replicationControllerName string, scale *autoscalingv1.Scale, opts metav1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	result = &autoscalingv1.Scale{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicationcontrollers").
 		Name(replicationControllerName).

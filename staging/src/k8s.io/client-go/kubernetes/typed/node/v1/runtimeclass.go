@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/node/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -55,13 +56,15 @@ type RuntimeClassInterface interface {
 
 // runtimeClasses implements RuntimeClassInterface
 type runtimeClasses struct {
-	client rest.Interface
+	client  rest.Interface
+	cluster logicalcluster.Name
 }
 
 // newRuntimeClasses returns a RuntimeClasses
 func newRuntimeClasses(c *NodeV1Client) *runtimeClasses {
 	return &runtimeClasses{
-		client: c.RESTClient(),
+		client:  c.RESTClient(),
+		cluster: c.cluster,
 	}
 }
 
@@ -69,6 +72,7 @@ func newRuntimeClasses(c *NodeV1Client) *runtimeClasses {
 func (c *runtimeClasses) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.RuntimeClass, err error) {
 	result = &v1.RuntimeClass{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("runtimeclasses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,6 +89,7 @@ func (c *runtimeClasses) List(ctx context.Context, opts metav1.ListOptions) (res
 	}
 	result = &v1.RuntimeClassList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("runtimeclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -101,6 +106,7 @@ func (c *runtimeClasses) Watch(ctx context.Context, opts metav1.ListOptions) (wa
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Resource("runtimeclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -111,6 +117,7 @@ func (c *runtimeClasses) Watch(ctx context.Context, opts metav1.ListOptions) (wa
 func (c *runtimeClasses) Create(ctx context.Context, runtimeClass *v1.RuntimeClass, opts metav1.CreateOptions) (result *v1.RuntimeClass, err error) {
 	result = &v1.RuntimeClass{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Resource("runtimeclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(runtimeClass).
@@ -123,6 +130,7 @@ func (c *runtimeClasses) Create(ctx context.Context, runtimeClass *v1.RuntimeCla
 func (c *runtimeClasses) Update(ctx context.Context, runtimeClass *v1.RuntimeClass, opts metav1.UpdateOptions) (result *v1.RuntimeClass, err error) {
 	result = &v1.RuntimeClass{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Resource("runtimeclasses").
 		Name(runtimeClass.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -135,6 +143,7 @@ func (c *runtimeClasses) Update(ctx context.Context, runtimeClass *v1.RuntimeCla
 // Delete takes name of the runtimeClass and deletes it. Returns an error if one occurs.
 func (c *runtimeClasses) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("runtimeclasses").
 		Name(name).
 		Body(&opts).
@@ -149,6 +158,7 @@ func (c *runtimeClasses) DeleteCollection(ctx context.Context, opts metav1.Delet
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("runtimeclasses").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -161,6 +171,7 @@ func (c *runtimeClasses) DeleteCollection(ctx context.Context, opts metav1.Delet
 func (c *runtimeClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RuntimeClass, err error) {
 	result = &v1.RuntimeClass{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Resource("runtimeclasses").
 		Name(name).
 		SubResource(subresources...).
@@ -187,6 +198,7 @@ func (c *runtimeClasses) Apply(ctx context.Context, runtimeClass *nodev1.Runtime
 	}
 	result = &v1.RuntimeClass{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Resource("runtimeclasses").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

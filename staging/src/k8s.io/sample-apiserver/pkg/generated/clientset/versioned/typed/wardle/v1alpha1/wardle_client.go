@@ -21,6 +21,7 @@ package v1alpha1
 import (
 	"net/http"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	rest "k8s.io/client-go/rest"
 	v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
@@ -35,6 +36,7 @@ type WardleV1alpha1Interface interface {
 // WardleV1alpha1Client is used to interact with features provided by the wardle.example.com group.
 type WardleV1alpha1Client struct {
 	restClient rest.Interface
+	cluster    logicalcluster.Name
 }
 
 func (c *WardleV1alpha1Client) Fischers() FischerInterface {
@@ -71,7 +73,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*WardleV1alpha1Clien
 	if err != nil {
 		return nil, err
 	}
-	return &WardleV1alpha1Client{client}, nil
+	return &WardleV1alpha1Client{restClient: client}, nil
 }
 
 // NewForConfigOrDie creates a new WardleV1alpha1Client for the given config and
@@ -86,7 +88,12 @@ func NewForConfigOrDie(c *rest.Config) *WardleV1alpha1Client {
 
 // New creates a new WardleV1alpha1Client for the given RESTClient.
 func New(c rest.Interface) *WardleV1alpha1Client {
-	return &WardleV1alpha1Client{c}
+	return &WardleV1alpha1Client{restClient: c}
+}
+
+// NewWithCluster creates a new WardleV1alpha1Client for the given RESTClient and cluster.
+func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *WardleV1alpha1Client {
+	return &WardleV1alpha1Client{restClient: c, cluster: cluster}
 }
 
 func setConfigDefaults(config *rest.Config) error {

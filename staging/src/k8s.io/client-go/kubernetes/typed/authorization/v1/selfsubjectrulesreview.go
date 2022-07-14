@@ -21,6 +21,7 @@ package v1
 import (
 	"context"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -41,13 +42,15 @@ type SelfSubjectRulesReviewInterface interface {
 
 // selfSubjectRulesReviews implements SelfSubjectRulesReviewInterface
 type selfSubjectRulesReviews struct {
-	client rest.Interface
+	client  rest.Interface
+	cluster logicalcluster.Name
 }
 
 // newSelfSubjectRulesReviews returns a SelfSubjectRulesReviews
 func newSelfSubjectRulesReviews(c *AuthorizationV1Client) *selfSubjectRulesReviews {
 	return &selfSubjectRulesReviews{
-		client: c.RESTClient(),
+		client:  c.RESTClient(),
+		cluster: c.cluster,
 	}
 }
 
@@ -55,6 +58,7 @@ func newSelfSubjectRulesReviews(c *AuthorizationV1Client) *selfSubjectRulesRevie
 func (c *selfSubjectRulesReviews) Create(ctx context.Context, selfSubjectRulesReview *v1.SelfSubjectRulesReview, opts metav1.CreateOptions) (result *v1.SelfSubjectRulesReview, err error) {
 	result = &v1.SelfSubjectRulesReview{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Resource("selfsubjectrulesreviews").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(selfSubjectRulesReview).

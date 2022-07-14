@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -55,15 +56,17 @@ type ConfigMapInterface interface {
 
 // configMaps implements ConfigMapInterface
 type configMaps struct {
-	client rest.Interface
-	ns     string
+	client  rest.Interface
+	cluster logicalcluster.Name
+	ns      string
 }
 
 // newConfigMaps returns a ConfigMaps
 func newConfigMaps(c *CoreV1Client, namespace string) *configMaps {
 	return &configMaps{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:  c.RESTClient(),
+		cluster: c.cluster,
+		ns:      namespace,
 	}
 }
 
@@ -71,6 +74,7 @@ func newConfigMaps(c *CoreV1Client, namespace string) *configMaps {
 func (c *configMaps) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(name).
@@ -88,6 +92,7 @@ func (c *configMaps) List(ctx context.Context, opts metav1.ListOptions) (result 
 	}
 	result = &v1.ConfigMapList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -105,6 +110,7 @@ func (c *configMaps) Watch(ctx context.Context, opts metav1.ListOptions) (watch.
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -116,6 +122,7 @@ func (c *configMaps) Watch(ctx context.Context, opts metav1.ListOptions) (watch.
 func (c *configMaps) Create(ctx context.Context, configMap *v1.ConfigMap, opts metav1.CreateOptions) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -129,6 +136,7 @@ func (c *configMaps) Create(ctx context.Context, configMap *v1.ConfigMap, opts m
 func (c *configMaps) Update(ctx context.Context, configMap *v1.ConfigMap, opts metav1.UpdateOptions) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(configMap.Name).
@@ -142,6 +150,7 @@ func (c *configMaps) Update(ctx context.Context, configMap *v1.ConfigMap, opts m
 // Delete takes name of the configMap and deletes it. Returns an error if one occurs.
 func (c *configMaps) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(name).
@@ -157,6 +166,7 @@ func (c *configMaps) DeleteCollection(ctx context.Context, opts metav1.DeleteOpt
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("configmaps").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -170,6 +180,7 @@ func (c *configMaps) DeleteCollection(ctx context.Context, opts metav1.DeleteOpt
 func (c *configMaps) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ConfigMap, err error) {
 	result = &v1.ConfigMap{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(name).
@@ -197,6 +208,7 @@ func (c *configMaps) Apply(ctx context.Context, configMap *corev1.ConfigMapApply
 	}
 	result = &v1.ConfigMap{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("configmaps").
 		Name(*name).

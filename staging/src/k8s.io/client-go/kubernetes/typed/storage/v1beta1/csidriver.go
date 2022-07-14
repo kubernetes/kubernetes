@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -55,13 +56,15 @@ type CSIDriverInterface interface {
 
 // cSIDrivers implements CSIDriverInterface
 type cSIDrivers struct {
-	client rest.Interface
+	client  rest.Interface
+	cluster logicalcluster.Name
 }
 
 // newCSIDrivers returns a CSIDrivers
 func newCSIDrivers(c *StorageV1beta1Client) *cSIDrivers {
 	return &cSIDrivers{
-		client: c.RESTClient(),
+		client:  c.RESTClient(),
+		cluster: c.cluster,
 	}
 }
 
@@ -69,6 +72,7 @@ func newCSIDrivers(c *StorageV1beta1Client) *cSIDrivers {
 func (c *cSIDrivers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.CSIDriver, err error) {
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("csidrivers").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,6 +89,7 @@ func (c *cSIDrivers) List(ctx context.Context, opts v1.ListOptions) (result *v1b
 	}
 	result = &v1beta1.CSIDriverList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("csidrivers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -101,6 +106,7 @@ func (c *cSIDrivers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inte
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Resource("csidrivers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -111,6 +117,7 @@ func (c *cSIDrivers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inte
 func (c *cSIDrivers) Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.CreateOptions) (result *v1beta1.CSIDriver, err error) {
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Resource("csidrivers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cSIDriver).
@@ -123,6 +130,7 @@ func (c *cSIDrivers) Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver, o
 func (c *cSIDrivers) Update(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.UpdateOptions) (result *v1beta1.CSIDriver, err error) {
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Resource("csidrivers").
 		Name(cSIDriver.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -135,6 +143,7 @@ func (c *cSIDrivers) Update(ctx context.Context, cSIDriver *v1beta1.CSIDriver, o
 // Delete takes name of the cSIDriver and deletes it. Returns an error if one occurs.
 func (c *cSIDrivers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("csidrivers").
 		Name(name).
 		Body(&opts).
@@ -149,6 +158,7 @@ func (c *cSIDrivers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("csidrivers").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -161,6 +171,7 @@ func (c *cSIDrivers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions
 func (c *cSIDrivers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CSIDriver, err error) {
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Resource("csidrivers").
 		Name(name).
 		SubResource(subresources...).
@@ -187,6 +198,7 @@ func (c *cSIDrivers) Apply(ctx context.Context, cSIDriver *storagev1beta1.CSIDri
 	}
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Resource("csidrivers").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

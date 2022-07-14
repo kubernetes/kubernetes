@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -61,15 +62,17 @@ type ReplicaSetInterface interface {
 
 // replicaSets implements ReplicaSetInterface
 type replicaSets struct {
-	client rest.Interface
-	ns     string
+	client  rest.Interface
+	cluster logicalcluster.Name
+	ns      string
 }
 
 // newReplicaSets returns a ReplicaSets
 func newReplicaSets(c *ExtensionsV1beta1Client, namespace string) *replicaSets {
 	return &replicaSets{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:  c.RESTClient(),
+		cluster: c.cluster,
+		ns:      namespace,
 	}
 }
 
@@ -77,6 +80,7 @@ func newReplicaSets(c *ExtensionsV1beta1Client, namespace string) *replicaSets {
 func (c *replicaSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.ReplicaSet, err error) {
 	result = &v1beta1.ReplicaSet{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(name).
@@ -94,6 +98,7 @@ func (c *replicaSets) List(ctx context.Context, opts v1.ListOptions) (result *v1
 	}
 	result = &v1beta1.ReplicaSetList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -111,6 +116,7 @@ func (c *replicaSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -122,6 +128,7 @@ func (c *replicaSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 func (c *replicaSets) Create(ctx context.Context, replicaSet *v1beta1.ReplicaSet, opts v1.CreateOptions) (result *v1beta1.ReplicaSet, err error) {
 	result = &v1beta1.ReplicaSet{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -135,6 +142,7 @@ func (c *replicaSets) Create(ctx context.Context, replicaSet *v1beta1.ReplicaSet
 func (c *replicaSets) Update(ctx context.Context, replicaSet *v1beta1.ReplicaSet, opts v1.UpdateOptions) (result *v1beta1.ReplicaSet, err error) {
 	result = &v1beta1.ReplicaSet{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSet.Name).
@@ -150,6 +158,7 @@ func (c *replicaSets) Update(ctx context.Context, replicaSet *v1beta1.ReplicaSet
 func (c *replicaSets) UpdateStatus(ctx context.Context, replicaSet *v1beta1.ReplicaSet, opts v1.UpdateOptions) (result *v1beta1.ReplicaSet, err error) {
 	result = &v1beta1.ReplicaSet{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSet.Name).
@@ -164,6 +173,7 @@ func (c *replicaSets) UpdateStatus(ctx context.Context, replicaSet *v1beta1.Repl
 // Delete takes name of the replicaSet and deletes it. Returns an error if one occurs.
 func (c *replicaSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(name).
@@ -179,6 +189,7 @@ func (c *replicaSets) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -192,6 +203,7 @@ func (c *replicaSets) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 func (c *replicaSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ReplicaSet, err error) {
 	result = &v1beta1.ReplicaSet{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(name).
@@ -219,6 +231,7 @@ func (c *replicaSets) Apply(ctx context.Context, replicaSet *extensionsv1beta1.R
 	}
 	result = &v1beta1.ReplicaSet{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(*name).
@@ -248,6 +261,7 @@ func (c *replicaSets) ApplyStatus(ctx context.Context, replicaSet *extensionsv1b
 
 	result = &v1beta1.ReplicaSet{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(*name).
@@ -263,6 +277,7 @@ func (c *replicaSets) ApplyStatus(ctx context.Context, replicaSet *extensionsv1b
 func (c *replicaSets) GetScale(ctx context.Context, replicaSetName string, options v1.GetOptions) (result *v1beta1.Scale, err error) {
 	result = &v1beta1.Scale{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSetName).
@@ -277,6 +292,7 @@ func (c *replicaSets) GetScale(ctx context.Context, replicaSetName string, optio
 func (c *replicaSets) UpdateScale(ctx context.Context, replicaSetName string, scale *v1beta1.Scale, opts v1.UpdateOptions) (result *v1beta1.Scale, err error) {
 	result = &v1beta1.Scale{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSetName).
@@ -302,6 +318,7 @@ func (c *replicaSets) ApplyScale(ctx context.Context, replicaSetName string, sca
 
 	result = &v1beta1.Scale{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("replicasets").
 		Name(replicaSetName).

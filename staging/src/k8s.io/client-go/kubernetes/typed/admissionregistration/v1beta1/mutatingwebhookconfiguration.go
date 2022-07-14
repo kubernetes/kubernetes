@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -55,13 +56,15 @@ type MutatingWebhookConfigurationInterface interface {
 
 // mutatingWebhookConfigurations implements MutatingWebhookConfigurationInterface
 type mutatingWebhookConfigurations struct {
-	client rest.Interface
+	client  rest.Interface
+	cluster logicalcluster.Name
 }
 
 // newMutatingWebhookConfigurations returns a MutatingWebhookConfigurations
 func newMutatingWebhookConfigurations(c *AdmissionregistrationV1beta1Client) *mutatingWebhookConfigurations {
 	return &mutatingWebhookConfigurations{
-		client: c.RESTClient(),
+		client:  c.RESTClient(),
+		cluster: c.cluster,
 	}
 }
 
@@ -69,6 +72,7 @@ func newMutatingWebhookConfigurations(c *AdmissionregistrationV1beta1Client) *mu
 func (c *mutatingWebhookConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.MutatingWebhookConfiguration, err error) {
 	result = &v1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("mutatingwebhookconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,6 +89,7 @@ func (c *mutatingWebhookConfigurations) List(ctx context.Context, opts v1.ListOp
 	}
 	result = &v1beta1.MutatingWebhookConfigurationList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("mutatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -101,6 +106,7 @@ func (c *mutatingWebhookConfigurations) Watch(ctx context.Context, opts v1.ListO
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Resource("mutatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -111,6 +117,7 @@ func (c *mutatingWebhookConfigurations) Watch(ctx context.Context, opts v1.ListO
 func (c *mutatingWebhookConfigurations) Create(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration, opts v1.CreateOptions) (result *v1beta1.MutatingWebhookConfiguration, err error) {
 	result = &v1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Resource("mutatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(mutatingWebhookConfiguration).
@@ -123,6 +130,7 @@ func (c *mutatingWebhookConfigurations) Create(ctx context.Context, mutatingWebh
 func (c *mutatingWebhookConfigurations) Update(ctx context.Context, mutatingWebhookConfiguration *v1beta1.MutatingWebhookConfiguration, opts v1.UpdateOptions) (result *v1beta1.MutatingWebhookConfiguration, err error) {
 	result = &v1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Resource("mutatingwebhookconfigurations").
 		Name(mutatingWebhookConfiguration.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -135,6 +143,7 @@ func (c *mutatingWebhookConfigurations) Update(ctx context.Context, mutatingWebh
 // Delete takes name of the mutatingWebhookConfiguration and deletes it. Returns an error if one occurs.
 func (c *mutatingWebhookConfigurations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("mutatingwebhookconfigurations").
 		Name(name).
 		Body(&opts).
@@ -149,6 +158,7 @@ func (c *mutatingWebhookConfigurations) DeleteCollection(ctx context.Context, op
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("mutatingwebhookconfigurations").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -161,6 +171,7 @@ func (c *mutatingWebhookConfigurations) DeleteCollection(ctx context.Context, op
 func (c *mutatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.MutatingWebhookConfiguration, err error) {
 	result = &v1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Resource("mutatingwebhookconfigurations").
 		Name(name).
 		SubResource(subresources...).
@@ -187,6 +198,7 @@ func (c *mutatingWebhookConfigurations) Apply(ctx context.Context, mutatingWebho
 	}
 	result = &v1beta1.MutatingWebhookConfiguration{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Resource("mutatingwebhookconfigurations").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

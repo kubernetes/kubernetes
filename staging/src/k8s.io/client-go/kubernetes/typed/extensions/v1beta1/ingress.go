@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -57,15 +58,17 @@ type IngressInterface interface {
 
 // ingresses implements IngressInterface
 type ingresses struct {
-	client rest.Interface
-	ns     string
+	client  rest.Interface
+	cluster logicalcluster.Name
+	ns      string
 }
 
 // newIngresses returns a Ingresses
 func newIngresses(c *ExtensionsV1beta1Client, namespace string) *ingresses {
 	return &ingresses{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:  c.RESTClient(),
+		cluster: c.cluster,
+		ns:      namespace,
 	}
 }
 
@@ -73,6 +76,7 @@ func newIngresses(c *ExtensionsV1beta1Client, namespace string) *ingresses {
 func (c *ingresses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(name).
@@ -90,6 +94,7 @@ func (c *ingresses) List(ctx context.Context, opts v1.ListOptions) (result *v1be
 	}
 	result = &v1beta1.IngressList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -107,6 +112,7 @@ func (c *ingresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inter
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -118,6 +124,7 @@ func (c *ingresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inter
 func (c *ingresses) Create(ctx context.Context, ingress *v1beta1.Ingress, opts v1.CreateOptions) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -131,6 +138,7 @@ func (c *ingresses) Create(ctx context.Context, ingress *v1beta1.Ingress, opts v
 func (c *ingresses) Update(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(ingress.Name).
@@ -146,6 +154,7 @@ func (c *ingresses) Update(ctx context.Context, ingress *v1beta1.Ingress, opts v
 func (c *ingresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, opts v1.UpdateOptions) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(ingress.Name).
@@ -160,6 +169,7 @@ func (c *ingresses) UpdateStatus(ctx context.Context, ingress *v1beta1.Ingress, 
 // Delete takes name of the ingress and deletes it. Returns an error if one occurs.
 func (c *ingresses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(name).
@@ -175,6 +185,7 @@ func (c *ingresses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions,
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("ingresses").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -188,6 +199,7 @@ func (c *ingresses) DeleteCollection(ctx context.Context, opts v1.DeleteOptions,
 func (c *ingresses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(name).
@@ -215,6 +227,7 @@ func (c *ingresses) Apply(ctx context.Context, ingress *extensionsv1beta1.Ingres
 	}
 	result = &v1beta1.Ingress{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(*name).
@@ -244,6 +257,7 @@ func (c *ingresses) ApplyStatus(ctx context.Context, ingress *extensionsv1beta1.
 
 	result = &v1beta1.Ingress{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("ingresses").
 		Name(*name).

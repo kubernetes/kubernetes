@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -55,15 +56,17 @@ type CSIStorageCapacityInterface interface {
 
 // cSIStorageCapacities implements CSIStorageCapacityInterface
 type cSIStorageCapacities struct {
-	client rest.Interface
-	ns     string
+	client  rest.Interface
+	cluster logicalcluster.Name
+	ns      string
 }
 
 // newCSIStorageCapacities returns a CSIStorageCapacities
 func newCSIStorageCapacities(c *StorageV1alpha1Client, namespace string) *cSIStorageCapacities {
 	return &cSIStorageCapacities{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:  c.RESTClient(),
+		cluster: c.cluster,
+		ns:      namespace,
 	}
 }
 
@@ -71,6 +74,7 @@ func newCSIStorageCapacities(c *StorageV1alpha1Client, namespace string) *cSISto
 func (c *cSIStorageCapacities) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.CSIStorageCapacity, err error) {
 	result = &v1alpha1.CSIStorageCapacity{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		Name(name).
@@ -88,6 +92,7 @@ func (c *cSIStorageCapacities) List(ctx context.Context, opts v1.ListOptions) (r
 	}
 	result = &v1alpha1.CSIStorageCapacityList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -105,6 +110,7 @@ func (c *cSIStorageCapacities) Watch(ctx context.Context, opts v1.ListOptions) (
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -116,6 +122,7 @@ func (c *cSIStorageCapacities) Watch(ctx context.Context, opts v1.ListOptions) (
 func (c *cSIStorageCapacities) Create(ctx context.Context, cSIStorageCapacity *v1alpha1.CSIStorageCapacity, opts v1.CreateOptions) (result *v1alpha1.CSIStorageCapacity, err error) {
 	result = &v1alpha1.CSIStorageCapacity{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -129,6 +136,7 @@ func (c *cSIStorageCapacities) Create(ctx context.Context, cSIStorageCapacity *v
 func (c *cSIStorageCapacities) Update(ctx context.Context, cSIStorageCapacity *v1alpha1.CSIStorageCapacity, opts v1.UpdateOptions) (result *v1alpha1.CSIStorageCapacity, err error) {
 	result = &v1alpha1.CSIStorageCapacity{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		Name(cSIStorageCapacity.Name).
@@ -142,6 +150,7 @@ func (c *cSIStorageCapacities) Update(ctx context.Context, cSIStorageCapacity *v
 // Delete takes name of the cSIStorageCapacity and deletes it. Returns an error if one occurs.
 func (c *cSIStorageCapacities) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		Name(name).
@@ -157,6 +166,7 @@ func (c *cSIStorageCapacities) DeleteCollection(ctx context.Context, opts v1.Del
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -170,6 +180,7 @@ func (c *cSIStorageCapacities) DeleteCollection(ctx context.Context, opts v1.Del
 func (c *cSIStorageCapacities) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.CSIStorageCapacity, err error) {
 	result = &v1alpha1.CSIStorageCapacity{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		Name(name).
@@ -197,6 +208,7 @@ func (c *cSIStorageCapacities) Apply(ctx context.Context, cSIStorageCapacity *st
 	}
 	result = &v1alpha1.CSIStorageCapacity{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("csistoragecapacities").
 		Name(*name).

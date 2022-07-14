@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -55,15 +56,17 @@ type RoleBindingInterface interface {
 
 // roleBindings implements RoleBindingInterface
 type roleBindings struct {
-	client rest.Interface
-	ns     string
+	client  rest.Interface
+	cluster logicalcluster.Name
+	ns      string
 }
 
 // newRoleBindings returns a RoleBindings
 func newRoleBindings(c *RbacV1Client, namespace string) *roleBindings {
 	return &roleBindings{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:  c.RESTClient(),
+		cluster: c.cluster,
+		ns:      namespace,
 	}
 }
 
@@ -71,6 +74,7 @@ func newRoleBindings(c *RbacV1Client, namespace string) *roleBindings {
 func (c *roleBindings) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.RoleBinding, err error) {
 	result = &v1.RoleBinding{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(name).
@@ -88,6 +92,7 @@ func (c *roleBindings) List(ctx context.Context, opts metav1.ListOptions) (resul
 	}
 	result = &v1.RoleBindingList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("rolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -105,6 +110,7 @@ func (c *roleBindings) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("rolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -116,6 +122,7 @@ func (c *roleBindings) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 func (c *roleBindings) Create(ctx context.Context, roleBinding *v1.RoleBinding, opts metav1.CreateOptions) (result *v1.RoleBinding, err error) {
 	result = &v1.RoleBinding{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("rolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -129,6 +136,7 @@ func (c *roleBindings) Create(ctx context.Context, roleBinding *v1.RoleBinding, 
 func (c *roleBindings) Update(ctx context.Context, roleBinding *v1.RoleBinding, opts metav1.UpdateOptions) (result *v1.RoleBinding, err error) {
 	result = &v1.RoleBinding{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(roleBinding.Name).
@@ -142,6 +150,7 @@ func (c *roleBindings) Update(ctx context.Context, roleBinding *v1.RoleBinding, 
 // Delete takes name of the roleBinding and deletes it. Returns an error if one occurs.
 func (c *roleBindings) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(name).
@@ -157,6 +166,7 @@ func (c *roleBindings) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("rolebindings").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -170,6 +180,7 @@ func (c *roleBindings) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 func (c *roleBindings) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.RoleBinding, err error) {
 	result = &v1.RoleBinding{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(name).
@@ -197,6 +208,7 @@ func (c *roleBindings) Apply(ctx context.Context, roleBinding *rbacv1.RoleBindin
 	}
 	result = &v1.RoleBinding{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("rolebindings").
 		Name(*name).

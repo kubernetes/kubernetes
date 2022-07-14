@@ -21,6 +21,7 @@ package v1beta1
 import (
 	"net/http"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -38,6 +39,7 @@ type StorageV1beta1Interface interface {
 // StorageV1beta1Client is used to interact with features provided by the storage.k8s.io group.
 type StorageV1beta1Client struct {
 	restClient rest.Interface
+	cluster    logicalcluster.Name
 }
 
 func (c *StorageV1beta1Client) CSIDrivers() CSIDriverInterface {
@@ -86,7 +88,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*StorageV1beta1Clien
 	if err != nil {
 		return nil, err
 	}
-	return &StorageV1beta1Client{client}, nil
+	return &StorageV1beta1Client{restClient: client}, nil
 }
 
 // NewForConfigOrDie creates a new StorageV1beta1Client for the given config and
@@ -101,7 +103,12 @@ func NewForConfigOrDie(c *rest.Config) *StorageV1beta1Client {
 
 // New creates a new StorageV1beta1Client for the given RESTClient.
 func New(c rest.Interface) *StorageV1beta1Client {
-	return &StorageV1beta1Client{c}
+	return &StorageV1beta1Client{restClient: c}
+}
+
+// NewWithCluster creates a new StorageV1beta1Client for the given RESTClient and cluster.
+func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *StorageV1beta1Client {
+	return &StorageV1beta1Client{restClient: c, cluster: cluster}
 }
 
 func setConfigDefaults(config *rest.Config) error {

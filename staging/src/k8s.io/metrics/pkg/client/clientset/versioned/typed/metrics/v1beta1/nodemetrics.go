@@ -22,6 +22,7 @@ import (
 	"context"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -45,13 +46,15 @@ type NodeMetricsInterface interface {
 
 // nodeMetricses implements NodeMetricsInterface
 type nodeMetricses struct {
-	client rest.Interface
+	client  rest.Interface
+	cluster logicalcluster.Name
 }
 
 // newNodeMetricses returns a NodeMetricses
 func newNodeMetricses(c *MetricsV1beta1Client) *nodeMetricses {
 	return &nodeMetricses{
-		client: c.RESTClient(),
+		client:  c.RESTClient(),
+		cluster: c.cluster,
 	}
 }
 
@@ -59,6 +62,7 @@ func newNodeMetricses(c *MetricsV1beta1Client) *nodeMetricses {
 func (c *nodeMetricses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.NodeMetrics, err error) {
 	result = &v1beta1.NodeMetrics{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("nodes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -75,6 +79,7 @@ func (c *nodeMetricses) List(ctx context.Context, opts v1.ListOptions) (result *
 	}
 	result = &v1beta1.NodeMetricsList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -91,6 +96,7 @@ func (c *nodeMetricses) Watch(ctx context.Context, opts v1.ListOptions) (watch.I
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

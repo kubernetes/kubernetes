@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -55,13 +56,15 @@ type CSINodeInterface interface {
 
 // cSINodes implements CSINodeInterface
 type cSINodes struct {
-	client rest.Interface
+	client  rest.Interface
+	cluster logicalcluster.Name
 }
 
 // newCSINodes returns a CSINodes
 func newCSINodes(c *StorageV1Client) *cSINodes {
 	return &cSINodes{
-		client: c.RESTClient(),
+		client:  c.RESTClient(),
+		cluster: c.cluster,
 	}
 }
 
@@ -69,6 +72,7 @@ func newCSINodes(c *StorageV1Client) *cSINodes {
 func (c *cSINodes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.CSINode, err error) {
 	result = &v1.CSINode{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("csinodes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,6 +89,7 @@ func (c *cSINodes) List(ctx context.Context, opts metav1.ListOptions) (result *v
 	}
 	result = &v1.CSINodeList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("csinodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -101,6 +106,7 @@ func (c *cSINodes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.In
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Resource("csinodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -111,6 +117,7 @@ func (c *cSINodes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.In
 func (c *cSINodes) Create(ctx context.Context, cSINode *v1.CSINode, opts metav1.CreateOptions) (result *v1.CSINode, err error) {
 	result = &v1.CSINode{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Resource("csinodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cSINode).
@@ -123,6 +130,7 @@ func (c *cSINodes) Create(ctx context.Context, cSINode *v1.CSINode, opts metav1.
 func (c *cSINodes) Update(ctx context.Context, cSINode *v1.CSINode, opts metav1.UpdateOptions) (result *v1.CSINode, err error) {
 	result = &v1.CSINode{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Resource("csinodes").
 		Name(cSINode.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -135,6 +143,7 @@ func (c *cSINodes) Update(ctx context.Context, cSINode *v1.CSINode, opts metav1.
 // Delete takes name of the cSINode and deletes it. Returns an error if one occurs.
 func (c *cSINodes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("csinodes").
 		Name(name).
 		Body(&opts).
@@ -149,6 +158,7 @@ func (c *cSINodes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptio
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("csinodes").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -161,6 +171,7 @@ func (c *cSINodes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptio
 func (c *cSINodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CSINode, err error) {
 	result = &v1.CSINode{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Resource("csinodes").
 		Name(name).
 		SubResource(subresources...).
@@ -187,6 +198,7 @@ func (c *cSINodes) Apply(ctx context.Context, cSINode *storagev1.CSINodeApplyCon
 	}
 	result = &v1.CSINode{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Resource("csinodes").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

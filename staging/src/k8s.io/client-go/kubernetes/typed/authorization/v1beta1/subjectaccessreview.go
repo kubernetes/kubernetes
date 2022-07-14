@@ -21,6 +21,7 @@ package v1beta1
 import (
 	"context"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/authorization/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
@@ -41,13 +42,15 @@ type SubjectAccessReviewInterface interface {
 
 // subjectAccessReviews implements SubjectAccessReviewInterface
 type subjectAccessReviews struct {
-	client rest.Interface
+	client  rest.Interface
+	cluster logicalcluster.Name
 }
 
 // newSubjectAccessReviews returns a SubjectAccessReviews
 func newSubjectAccessReviews(c *AuthorizationV1beta1Client) *subjectAccessReviews {
 	return &subjectAccessReviews{
-		client: c.RESTClient(),
+		client:  c.RESTClient(),
+		cluster: c.cluster,
 	}
 }
 
@@ -55,6 +58,7 @@ func newSubjectAccessReviews(c *AuthorizationV1beta1Client) *subjectAccessReview
 func (c *subjectAccessReviews) Create(ctx context.Context, subjectAccessReview *v1beta1.SubjectAccessReview, opts v1.CreateOptions) (result *v1beta1.SubjectAccessReview, err error) {
 	result = &v1beta1.SubjectAccessReview{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Resource("subjectaccessreviews").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(subjectAccessReview).

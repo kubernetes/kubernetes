@@ -21,6 +21,7 @@ package v1beta1
 import (
 	"net/http"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -36,6 +37,7 @@ type AppsV1beta1Interface interface {
 // AppsV1beta1Client is used to interact with features provided by the apps group.
 type AppsV1beta1Client struct {
 	restClient rest.Interface
+	cluster    logicalcluster.Name
 }
 
 func (c *AppsV1beta1Client) ControllerRevisions(namespace string) ControllerRevisionInterface {
@@ -76,7 +78,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*AppsV1beta1Client, 
 	if err != nil {
 		return nil, err
 	}
-	return &AppsV1beta1Client{client}, nil
+	return &AppsV1beta1Client{restClient: client}, nil
 }
 
 // NewForConfigOrDie creates a new AppsV1beta1Client for the given config and
@@ -91,7 +93,12 @@ func NewForConfigOrDie(c *rest.Config) *AppsV1beta1Client {
 
 // New creates a new AppsV1beta1Client for the given RESTClient.
 func New(c rest.Interface) *AppsV1beta1Client {
-	return &AppsV1beta1Client{c}
+	return &AppsV1beta1Client{restClient: c}
+}
+
+// NewWithCluster creates a new AppsV1beta1Client for the given RESTClient and cluster.
+func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *AppsV1beta1Client {
+	return &AppsV1beta1Client{restClient: c, cluster: cluster}
 }
 
 func setConfigDefaults(config *rest.Config) error {

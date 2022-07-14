@@ -21,6 +21,7 @@ package v1
 import (
 	"net/http"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
 	"k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/scheme"
 	rest "k8s.io/client-go/rest"
@@ -34,6 +35,7 @@ type CrV1Interface interface {
 // CrV1Client is used to interact with features provided by the cr.example.apiextensions.k8s.io group.
 type CrV1Client struct {
 	restClient rest.Interface
+	cluster    logicalcluster.Name
 }
 
 func (c *CrV1Client) Examples(namespace string) ExampleInterface {
@@ -66,7 +68,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*CrV1Client, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &CrV1Client{client}, nil
+	return &CrV1Client{restClient: client}, nil
 }
 
 // NewForConfigOrDie creates a new CrV1Client for the given config and
@@ -81,7 +83,12 @@ func NewForConfigOrDie(c *rest.Config) *CrV1Client {
 
 // New creates a new CrV1Client for the given RESTClient.
 func New(c rest.Interface) *CrV1Client {
-	return &CrV1Client{c}
+	return &CrV1Client{restClient: c}
+}
+
+// NewWithCluster creates a new CrV1Client for the given RESTClient and cluster.
+func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *CrV1Client {
+	return &CrV1Client{restClient: c, cluster: cluster}
 }
 
 func setConfigDefaults(config *rest.Config) error {

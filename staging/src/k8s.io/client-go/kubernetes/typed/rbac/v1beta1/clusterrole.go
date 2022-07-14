@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/rbac/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -55,13 +56,15 @@ type ClusterRoleInterface interface {
 
 // clusterRoles implements ClusterRoleInterface
 type clusterRoles struct {
-	client rest.Interface
+	client  rest.Interface
+	cluster logicalcluster.Name
 }
 
 // newClusterRoles returns a ClusterRoles
 func newClusterRoles(c *RbacV1beta1Client) *clusterRoles {
 	return &clusterRoles{
-		client: c.RESTClient(),
+		client:  c.RESTClient(),
+		cluster: c.cluster,
 	}
 }
 
@@ -69,6 +72,7 @@ func newClusterRoles(c *RbacV1beta1Client) *clusterRoles {
 func (c *clusterRoles) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.ClusterRole, err error) {
 	result = &v1beta1.ClusterRole{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("clusterroles").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,6 +89,7 @@ func (c *clusterRoles) List(ctx context.Context, opts v1.ListOptions) (result *v
 	}
 	result = &v1beta1.ClusterRoleList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Resource("clusterroles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -101,6 +106,7 @@ func (c *clusterRoles) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Resource("clusterroles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -111,6 +117,7 @@ func (c *clusterRoles) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 func (c *clusterRoles) Create(ctx context.Context, clusterRole *v1beta1.ClusterRole, opts v1.CreateOptions) (result *v1beta1.ClusterRole, err error) {
 	result = &v1beta1.ClusterRole{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Resource("clusterroles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clusterRole).
@@ -123,6 +130,7 @@ func (c *clusterRoles) Create(ctx context.Context, clusterRole *v1beta1.ClusterR
 func (c *clusterRoles) Update(ctx context.Context, clusterRole *v1beta1.ClusterRole, opts v1.UpdateOptions) (result *v1beta1.ClusterRole, err error) {
 	result = &v1beta1.ClusterRole{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Resource("clusterroles").
 		Name(clusterRole.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -135,6 +143,7 @@ func (c *clusterRoles) Update(ctx context.Context, clusterRole *v1beta1.ClusterR
 // Delete takes name of the clusterRole and deletes it. Returns an error if one occurs.
 func (c *clusterRoles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("clusterroles").
 		Name(name).
 		Body(&opts).
@@ -149,6 +158,7 @@ func (c *clusterRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Resource("clusterroles").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -161,6 +171,7 @@ func (c *clusterRoles) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 func (c *clusterRoles) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ClusterRole, err error) {
 	result = &v1beta1.ClusterRole{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Resource("clusterroles").
 		Name(name).
 		SubResource(subresources...).
@@ -187,6 +198,7 @@ func (c *clusterRoles) Apply(ctx context.Context, clusterRole *rbacv1beta1.Clust
 	}
 	result = &v1beta1.ClusterRole{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Resource("clusterroles").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

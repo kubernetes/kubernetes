@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -55,15 +56,17 @@ type EndpointsInterface interface {
 
 // endpoints implements EndpointsInterface
 type endpoints struct {
-	client rest.Interface
-	ns     string
+	client  rest.Interface
+	cluster logicalcluster.Name
+	ns      string
 }
 
 // newEndpoints returns a Endpoints
 func newEndpoints(c *CoreV1Client, namespace string) *endpoints {
 	return &endpoints{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:  c.RESTClient(),
+		cluster: c.cluster,
+		ns:      namespace,
 	}
 }
 
@@ -71,6 +74,7 @@ func newEndpoints(c *CoreV1Client, namespace string) *endpoints {
 func (c *endpoints) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Endpoints, err error) {
 	result = &v1.Endpoints{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
@@ -88,6 +92,7 @@ func (c *endpoints) List(ctx context.Context, opts metav1.ListOptions) (result *
 	}
 	result = &v1.EndpointsList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("endpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -105,6 +110,7 @@ func (c *endpoints) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("endpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -116,6 +122,7 @@ func (c *endpoints) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 func (c *endpoints) Create(ctx context.Context, endpoints *v1.Endpoints, opts metav1.CreateOptions) (result *v1.Endpoints, err error) {
 	result = &v1.Endpoints{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("endpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -129,6 +136,7 @@ func (c *endpoints) Create(ctx context.Context, endpoints *v1.Endpoints, opts me
 func (c *endpoints) Update(ctx context.Context, endpoints *v1.Endpoints, opts metav1.UpdateOptions) (result *v1.Endpoints, err error) {
 	result = &v1.Endpoints{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(endpoints.Name).
@@ -142,6 +150,7 @@ func (c *endpoints) Update(ctx context.Context, endpoints *v1.Endpoints, opts me
 // Delete takes name of the endpoints and deletes it. Returns an error if one occurs.
 func (c *endpoints) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
@@ -157,6 +166,7 @@ func (c *endpoints) DeleteCollection(ctx context.Context, opts metav1.DeleteOpti
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("endpoints").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -170,6 +180,7 @@ func (c *endpoints) DeleteCollection(ctx context.Context, opts metav1.DeleteOpti
 func (c *endpoints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Endpoints, err error) {
 	result = &v1.Endpoints{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(name).
@@ -197,6 +208,7 @@ func (c *endpoints) Apply(ctx context.Context, endpoints *corev1.EndpointsApplyC
 	}
 	result = &v1.Endpoints{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("endpoints").
 		Name(*name).

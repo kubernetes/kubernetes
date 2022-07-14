@@ -21,6 +21,7 @@ package v1
 import (
 	"net/http"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/node/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -34,6 +35,7 @@ type NodeV1Interface interface {
 // NodeV1Client is used to interact with features provided by the node.k8s.io group.
 type NodeV1Client struct {
 	restClient rest.Interface
+	cluster    logicalcluster.Name
 }
 
 func (c *NodeV1Client) RuntimeClasses() RuntimeClassInterface {
@@ -66,7 +68,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*NodeV1Client, error
 	if err != nil {
 		return nil, err
 	}
-	return &NodeV1Client{client}, nil
+	return &NodeV1Client{restClient: client}, nil
 }
 
 // NewForConfigOrDie creates a new NodeV1Client for the given config and
@@ -81,7 +83,12 @@ func NewForConfigOrDie(c *rest.Config) *NodeV1Client {
 
 // New creates a new NodeV1Client for the given RESTClient.
 func New(c rest.Interface) *NodeV1Client {
-	return &NodeV1Client{c}
+	return &NodeV1Client{restClient: c}
+}
+
+// NewWithCluster creates a new NodeV1Client for the given RESTClient and cluster.
+func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *NodeV1Client {
+	return &NodeV1Client{restClient: c, cluster: cluster}
 }
 
 func setConfigDefaults(config *rest.Config) error {

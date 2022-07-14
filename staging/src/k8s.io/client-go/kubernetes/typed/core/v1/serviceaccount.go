@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,15 +59,17 @@ type ServiceAccountInterface interface {
 
 // serviceAccounts implements ServiceAccountInterface
 type serviceAccounts struct {
-	client rest.Interface
-	ns     string
+	client  rest.Interface
+	cluster logicalcluster.Name
+	ns      string
 }
 
 // newServiceAccounts returns a ServiceAccounts
 func newServiceAccounts(c *CoreV1Client, namespace string) *serviceAccounts {
 	return &serviceAccounts{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:  c.RESTClient(),
+		cluster: c.cluster,
+		ns:      namespace,
 	}
 }
 
@@ -74,6 +77,7 @@ func newServiceAccounts(c *CoreV1Client, namespace string) *serviceAccounts {
 func (c *serviceAccounts) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(name).
@@ -91,6 +95,7 @@ func (c *serviceAccounts) List(ctx context.Context, opts metav1.ListOptions) (re
 	}
 	result = &v1.ServiceAccountList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -108,6 +113,7 @@ func (c *serviceAccounts) Watch(ctx context.Context, opts metav1.ListOptions) (w
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -119,6 +125,7 @@ func (c *serviceAccounts) Watch(ctx context.Context, opts metav1.ListOptions) (w
 func (c *serviceAccounts) Create(ctx context.Context, serviceAccount *v1.ServiceAccount, opts metav1.CreateOptions) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -132,6 +139,7 @@ func (c *serviceAccounts) Create(ctx context.Context, serviceAccount *v1.Service
 func (c *serviceAccounts) Update(ctx context.Context, serviceAccount *v1.ServiceAccount, opts metav1.UpdateOptions) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(serviceAccount.Name).
@@ -145,6 +153,7 @@ func (c *serviceAccounts) Update(ctx context.Context, serviceAccount *v1.Service
 // Delete takes name of the serviceAccount and deletes it. Returns an error if one occurs.
 func (c *serviceAccounts) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(name).
@@ -160,6 +169,7 @@ func (c *serviceAccounts) DeleteCollection(ctx context.Context, opts metav1.Dele
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -173,6 +183,7 @@ func (c *serviceAccounts) DeleteCollection(ctx context.Context, opts metav1.Dele
 func (c *serviceAccounts) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ServiceAccount, err error) {
 	result = &v1.ServiceAccount{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(name).
@@ -200,6 +211,7 @@ func (c *serviceAccounts) Apply(ctx context.Context, serviceAccount *corev1.Serv
 	}
 	result = &v1.ServiceAccount{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(*name).
@@ -214,6 +226,7 @@ func (c *serviceAccounts) Apply(ctx context.Context, serviceAccount *corev1.Serv
 func (c *serviceAccounts) CreateToken(ctx context.Context, serviceAccountName string, tokenRequest *authenticationv1.TokenRequest, opts metav1.CreateOptions) (result *authenticationv1.TokenRequest, err error) {
 	result = &authenticationv1.TokenRequest{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("serviceaccounts").
 		Name(serviceAccountName).

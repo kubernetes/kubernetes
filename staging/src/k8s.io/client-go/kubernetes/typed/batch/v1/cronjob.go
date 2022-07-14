@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -57,15 +58,17 @@ type CronJobInterface interface {
 
 // cronJobs implements CronJobInterface
 type cronJobs struct {
-	client rest.Interface
-	ns     string
+	client  rest.Interface
+	cluster logicalcluster.Name
+	ns      string
 }
 
 // newCronJobs returns a CronJobs
 func newCronJobs(c *BatchV1Client, namespace string) *cronJobs {
 	return &cronJobs{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:  c.RESTClient(),
+		cluster: c.cluster,
+		ns:      namespace,
 	}
 }
 
@@ -73,6 +76,7 @@ func newCronJobs(c *BatchV1Client, namespace string) *cronJobs {
 func (c *cronJobs) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.CronJob, err error) {
 	result = &v1.CronJob{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(name).
@@ -90,6 +94,7 @@ func (c *cronJobs) List(ctx context.Context, opts metav1.ListOptions) (result *v
 	}
 	result = &v1.CronJobList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -107,6 +112,7 @@ func (c *cronJobs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.In
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -118,6 +124,7 @@ func (c *cronJobs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.In
 func (c *cronJobs) Create(ctx context.Context, cronJob *v1.CronJob, opts metav1.CreateOptions) (result *v1.CronJob, err error) {
 	result = &v1.CronJob{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -131,6 +138,7 @@ func (c *cronJobs) Create(ctx context.Context, cronJob *v1.CronJob, opts metav1.
 func (c *cronJobs) Update(ctx context.Context, cronJob *v1.CronJob, opts metav1.UpdateOptions) (result *v1.CronJob, err error) {
 	result = &v1.CronJob{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(cronJob.Name).
@@ -146,6 +154,7 @@ func (c *cronJobs) Update(ctx context.Context, cronJob *v1.CronJob, opts metav1.
 func (c *cronJobs) UpdateStatus(ctx context.Context, cronJob *v1.CronJob, opts metav1.UpdateOptions) (result *v1.CronJob, err error) {
 	result = &v1.CronJob{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(cronJob.Name).
@@ -160,6 +169,7 @@ func (c *cronJobs) UpdateStatus(ctx context.Context, cronJob *v1.CronJob, opts m
 // Delete takes name of the cronJob and deletes it. Returns an error if one occurs.
 func (c *cronJobs) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(name).
@@ -175,6 +185,7 @@ func (c *cronJobs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptio
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -188,6 +199,7 @@ func (c *cronJobs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptio
 func (c *cronJobs) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.CronJob, err error) {
 	result = &v1.CronJob{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(name).
@@ -215,6 +227,7 @@ func (c *cronJobs) Apply(ctx context.Context, cronJob *batchv1.CronJobApplyConfi
 	}
 	result = &v1.CronJob{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(*name).
@@ -244,6 +257,7 @@ func (c *cronJobs) ApplyStatus(ctx context.Context, cronJob *batchv1.CronJobAppl
 
 	result = &v1.CronJob{}
 	err = c.client.Patch(types.ApplyPatchType).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("cronjobs").
 		Name(*name).

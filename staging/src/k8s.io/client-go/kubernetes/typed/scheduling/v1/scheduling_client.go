@@ -21,6 +21,7 @@ package v1
 import (
 	"net/http"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/scheduling/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -34,6 +35,7 @@ type SchedulingV1Interface interface {
 // SchedulingV1Client is used to interact with features provided by the scheduling.k8s.io group.
 type SchedulingV1Client struct {
 	restClient rest.Interface
+	cluster    logicalcluster.Name
 }
 
 func (c *SchedulingV1Client) PriorityClasses() PriorityClassInterface {
@@ -66,7 +68,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*SchedulingV1Client,
 	if err != nil {
 		return nil, err
 	}
-	return &SchedulingV1Client{client}, nil
+	return &SchedulingV1Client{restClient: client}, nil
 }
 
 // NewForConfigOrDie creates a new SchedulingV1Client for the given config and
@@ -81,7 +83,12 @@ func NewForConfigOrDie(c *rest.Config) *SchedulingV1Client {
 
 // New creates a new SchedulingV1Client for the given RESTClient.
 func New(c rest.Interface) *SchedulingV1Client {
-	return &SchedulingV1Client{c}
+	return &SchedulingV1Client{restClient: c}
+}
+
+// NewWithCluster creates a new SchedulingV1Client for the given RESTClient and cluster.
+func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *SchedulingV1Client {
+	return &SchedulingV1Client{restClient: c, cluster: cluster}
 }
 
 func setConfigDefaults(config *rest.Config) error {

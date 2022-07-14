@@ -21,6 +21,7 @@ package v1beta1
 import (
 	"net/http"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1beta1 "k8s.io/api/authentication/v1beta1"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
@@ -34,6 +35,7 @@ type AuthenticationV1beta1Interface interface {
 // AuthenticationV1beta1Client is used to interact with features provided by the authentication.k8s.io group.
 type AuthenticationV1beta1Client struct {
 	restClient rest.Interface
+	cluster    logicalcluster.Name
 }
 
 func (c *AuthenticationV1beta1Client) TokenReviews() TokenReviewInterface {
@@ -66,7 +68,7 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*AuthenticationV1bet
 	if err != nil {
 		return nil, err
 	}
-	return &AuthenticationV1beta1Client{client}, nil
+	return &AuthenticationV1beta1Client{restClient: client}, nil
 }
 
 // NewForConfigOrDie creates a new AuthenticationV1beta1Client for the given config and
@@ -81,7 +83,12 @@ func NewForConfigOrDie(c *rest.Config) *AuthenticationV1beta1Client {
 
 // New creates a new AuthenticationV1beta1Client for the given RESTClient.
 func New(c rest.Interface) *AuthenticationV1beta1Client {
-	return &AuthenticationV1beta1Client{c}
+	return &AuthenticationV1beta1Client{restClient: c}
+}
+
+// NewWithCluster creates a new AuthenticationV1beta1Client for the given RESTClient and cluster.
+func NewWithCluster(c rest.Interface, cluster logicalcluster.Name) *AuthenticationV1beta1Client {
+	return &AuthenticationV1beta1Client{restClient: c, cluster: cluster}
 }
 
 func setConfigDefaults(config *rest.Config) error {

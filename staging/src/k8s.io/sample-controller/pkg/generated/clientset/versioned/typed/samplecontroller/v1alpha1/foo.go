@@ -22,6 +22,7 @@ import (
 	"context"
 	"time"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -52,15 +53,17 @@ type FooInterface interface {
 
 // foos implements FooInterface
 type foos struct {
-	client rest.Interface
-	ns     string
+	client  rest.Interface
+	cluster logicalcluster.Name
+	ns      string
 }
 
 // newFoos returns a Foos
 func newFoos(c *SamplecontrollerV1alpha1Client, namespace string) *foos {
 	return &foos{
-		client: c.RESTClient(),
-		ns:     namespace,
+		client:  c.RESTClient(),
+		cluster: c.cluster,
+		ns:      namespace,
 	}
 }
 
@@ -68,6 +71,7 @@ func newFoos(c *SamplecontrollerV1alpha1Client, namespace string) *foos {
 func (c *foos) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("foos").
 		Name(name).
@@ -85,6 +89,7 @@ func (c *foos) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.
 	}
 	result = &v1alpha1.FooList{}
 	err = c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("foos").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -102,6 +107,7 @@ func (c *foos) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface,
 	}
 	opts.Watch = true
 	return c.client.Get().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("foos").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -113,6 +119,7 @@ func (c *foos) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface,
 func (c *foos) Create(ctx context.Context, foo *v1alpha1.Foo, opts v1.CreateOptions) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Post().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("foos").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -126,6 +133,7 @@ func (c *foos) Create(ctx context.Context, foo *v1alpha1.Foo, opts v1.CreateOpti
 func (c *foos) Update(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("foos").
 		Name(foo.Name).
@@ -141,6 +149,7 @@ func (c *foos) Update(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOpti
 func (c *foos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOptions) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Put().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("foos").
 		Name(foo.Name).
@@ -155,6 +164,7 @@ func (c *foos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.Upda
 // Delete takes name of the foo and deletes it. Returns an error if one occurs.
 func (c *foos) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("foos").
 		Name(name).
@@ -170,6 +180,7 @@ func (c *foos) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, list
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("foos").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
@@ -183,6 +194,7 @@ func (c *foos) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, list
 func (c *foos) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.Foo, err error) {
 	result = &v1alpha1.Foo{}
 	err = c.client.Patch(pt).
+		Cluster(c.cluster).
 		Namespace(c.ns).
 		Resource("foos").
 		Name(name).
