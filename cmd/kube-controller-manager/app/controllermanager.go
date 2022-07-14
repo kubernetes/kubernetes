@@ -445,7 +445,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	controllers["persistentvolume-binder"] = startPersistentVolumeBinderController
 	controllers["attachdetach"] = startAttachDetachController
 	controllers["persistentvolume-expander"] = startVolumeExpandController
-	controllers["clusterrole-aggregation"] = startClusterRoleAggregrationController
+	controllers["clusterrole-aggregation"] = startClusterRoleAggregationController
 	controllers["pvc-protection"] = startPVCProtectionController
 	controllers["pv-protection"] = startPVProtectionController
 	controllers["ttl-after-finished"] = startTTLAfterFinishedController

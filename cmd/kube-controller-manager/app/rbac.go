@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
 )
 
-func startClusterRoleAggregrationController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+func startClusterRoleAggregationController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
 	if !controllerContext.AvailableResources[schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterroles"}] {
 		return nil, false, nil
 	}
