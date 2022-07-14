@@ -15,9 +15,9 @@
 package model
 
 import (
-	"github.com/google/cel-go/cel"
 	"time"
 
+	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
