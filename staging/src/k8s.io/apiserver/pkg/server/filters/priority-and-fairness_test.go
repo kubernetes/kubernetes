@@ -220,13 +220,6 @@ func TestApfRejectRequest(t *testing.T) {
 }
 
 func TestApfExemptRequest(t *testing.T) {
-	epmetrics.Register()
-	fcmetrics.Register()
-
-	// Wait for at least one sampling window to pass since creation of metrics.ReadWriteConcurrencyObserverPairGenerator,
-	// so that an observation will cause some data to go into the Prometheus metrics.
-	time.Sleep(time.Millisecond * 50)
-
 	server := newApfServerWithSingleRequest(t, decisionNoQueuingExecute)
 	defer server.Close()
 
@@ -240,19 +233,11 @@ func TestApfExemptRequest(t *testing.T) {
 
 	checkForExpectedMetrics(t, []string{
 		"apiserver_current_inflight_requests",
-		"apiserver_flowcontrol_read_vs_write_request_count_watermarks",
-		"apiserver_flowcontrol_read_vs_write_request_count_samples",
+		"apiserver_flowcontrol_read_vs_write_current_requests",
 	})
 }
 
 func TestApfExecuteRequest(t *testing.T) {
-	epmetrics.Register()
-	fcmetrics.Register()
-
-	// Wait for at least one sampling window to pass since creation of metrics.ReadWriteConcurrencyObserverPairGenerator,
-	// so that an observation will cause some data to go into the Prometheus metrics.
-	time.Sleep(time.Millisecond * 50)
-
 	server := newApfServerWithSingleRequest(t, decisionQueuingExecute)
 	defer server.Close()
 
@@ -267,19 +252,11 @@ func TestApfExecuteRequest(t *testing.T) {
 	checkForExpectedMetrics(t, []string{
 		"apiserver_current_inflight_requests",
 		"apiserver_current_inqueue_requests",
-		"apiserver_flowcontrol_read_vs_write_request_count_watermarks",
-		"apiserver_flowcontrol_read_vs_write_request_count_samples",
+		"apiserver_flowcontrol_read_vs_write_current_requests",
 	})
 }
 
 func TestApfExecuteMultipleRequests(t *testing.T) {
-	epmetrics.Register()
-	fcmetrics.Register()
-
-	// Wait for at least one sampling window to pass since creation of metrics.ReadWriteConcurrencyObserverPairGenerator,
-	// so that an observation will cause some data to go into the Prometheus metrics.
-	time.Sleep(time.Millisecond * 50)
-
 	concurrentRequests := 5
 	preStartExecute, postStartExecute := &sync.WaitGroup{}, &sync.WaitGroup{}
 	preEnqueue, postEnqueue := &sync.WaitGroup{}, &sync.WaitGroup{}
@@ -347,8 +324,7 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	checkForExpectedMetrics(t, []string{
 		"apiserver_current_inflight_requests",
 		"apiserver_current_inqueue_requests",
-		"apiserver_flowcontrol_read_vs_write_request_count_watermarks",
-		"apiserver_flowcontrol_read_vs_write_request_count_samples",
+		"apiserver_flowcontrol_read_vs_write_current_requests",
 	})
 }
 
