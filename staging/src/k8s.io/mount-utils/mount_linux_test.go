@@ -525,6 +525,14 @@ func TestSensitiveMountOptions(t *testing.T) {
 	}
 }
 
+func TestHasSystemd(t *testing.T) {
+	mounter := &Mounter{}
+	_ = mounter.hasSystemd()
+	if mounter.withSystemd == nil {
+		t.Error("Failed to run detectSystemd()")
+	}
+}
+
 func mountArgsContainString(t *testing.T, mountArgs []string, wanted string) bool {
 	for _, mountArg := range mountArgs {
 		if mountArg == wanted {

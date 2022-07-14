@@ -58,7 +58,7 @@ const (
 // kubelet is running in the host's root mount namespace.
 type Mounter struct {
 	mounterPath                string
-	withSystemd                bool
+	withSystemd                *bool
 	withSafeNotMountedBehavior bool
 }
 
@@ -70,9 +70,19 @@ var _ MounterForceUnmounter = &Mounter{}
 func New(mounterPath string) Interface {
 	return &Mounter{
 		mounterPath:                mounterPath,
-		withSystemd:                detectSystemd(),
 		withSafeNotMountedBehavior: detectSafeNotMountedBehavior(),
 	}
+}
+
+// hasSystemd validates that the withSystemd bool is set, if it is not,
+// detectSystemd will be called once for this Mounter instance.
+func (mounter *Mounter) hasSystemd() bool {
+	if mounter.withSystemd == nil {
+		withSystemd := detectSystemd()
+		mounter.withSystemd = &withSystemd
+	}
+
+	return *mounter.withSystemd
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
@@ -154,7 +164,7 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 		mountCmd = mounterPath
 	}
 
-	if mounter.withSystemd && systemdMountRequired {
+	if mounter.hasSystemd() && systemdMountRequired {
 		// Try to run mount via systemd-run --scope. This will escape the
 		// service where kubelet runs and any fuse daemons will be started in a
 		// specific scope. kubelet service than can be restarted without killing
