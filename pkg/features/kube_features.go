@@ -449,6 +449,14 @@ const (
 	// Add support for distributed tracing in the kubelet
 	KubeletTracing featuregate.Feature = "KubeletTracing"
 
+	// owner: @alexanderConstantinescu
+	// kep: http://kep.k8s.io/3836
+	// alpha: v1.28
+	//
+	// Implement connection draining for terminating nodes for
+	// `externalTrafficPolicy: Cluster` services.
+	KubeProxyDrainingTerminatingNodes featuregate.Feature = "KubeProxyDrainingTerminatingNodes"
+
 	// owner: @zshihang
 	// kep: https://kep.k8s.io/2800
 	// beta: v1.24
@@ -975,6 +983,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletPodResourcesGetAllocatable: {Default: true, PreRelease: featuregate.Beta},
 
 	KubeletTracing: {Default: true, PreRelease: featuregate.Beta},
+
+	KubeProxyDrainingTerminatingNodes: {Default: false, PreRelease: featuregate.Alpha},
 
 	LegacyServiceAccountTokenNoAutoGeneration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.29
 

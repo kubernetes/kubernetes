@@ -652,6 +652,7 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 			"eventNode", node.Name, "currentNode", proxier.hostname)
 		return
 	}
+
 	proxier.mu.Lock()
 	proxier.nodeLabels = nil
 	proxier.needFullSync = true

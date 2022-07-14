@@ -27,6 +27,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -131,6 +133,7 @@ type hcPayload struct {
 type healthzPayload struct {
 	LastUpdated string
 	CurrentTime string
+	NodeHealthy bool
 }
 
 type fakeProxierHealthChecker struct {
@@ -427,6 +430,30 @@ func tHandler(hcs *server, nsn types.NamespacedName, status int, endpoints int, 
 	}
 }
 
+type nodeTweak func(n *v1.Node)
+
+func makeNode(tweaks ...nodeTweak) *v1.Node {
+	n := &v1.Node{}
+	for _, tw := range tweaks {
+		tw(n)
+	}
+	return n
+}
+
+func tweakDeleted() nodeTweak {
+	return func(n *v1.Node) {
+		n.DeletionTimestamp = &metav1.Time{
+			Time: time.Now(),
+		}
+	}
+}
+
+func tweakTainted(key string) nodeTweak {
+	return func(n *v1.Node) {
+		n.Spec.Taints = append(n.Spec.Taints, v1.Taint{Key: key})
+	}
+}
+
 func TestHealthzServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
@@ -436,30 +463,99 @@ func TestHealthzServer(t *testing.T) {
 	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
 
 	// Should return 200 "OK" by default.
-	testHealthzHandler(server, http.StatusOK, t)
+	testHTTPHandler(server, healthzURL, http.StatusOK, t)
 
 	// Should return 200 "OK" after first update
 	hs.Updated()
-	testHealthzHandler(server, http.StatusOK, t)
+	testHTTPHandler(server, healthzURL, http.StatusOK, t)
 
 	// Should continue to return 200 "OK" as long as no further updates are queued
 	fakeClock.Step(25 * time.Second)
-	testHealthzHandler(server, http.StatusOK, t)
+	testHTTPHandler(server, healthzURL, http.StatusOK, t)
 
 	// Should return 503 "ServiceUnavailable" if exceed max update-processing time
 	hs.QueuedUpdate()
 	fakeClock.Step(25 * time.Second)
-	testHealthzHandler(server, http.StatusServiceUnavailable, t)
+	testHTTPHandler(server, healthzURL, http.StatusServiceUnavailable, t)
 
 	// Should return 200 "OK" after processing update
 	hs.Updated()
 	fakeClock.Step(5 * time.Second)
-	testHealthzHandler(server, http.StatusOK, t)
+	testHTTPHandler(server, healthzURL, http.StatusOK, t)
+
+	// Should return 200 "OK" if we've synced a node, tainted in any other way
+	hs.SyncNode(makeNode(tweakTainted("other")))
+	testHTTPHandler(server, healthzURL, http.StatusOK, t)
+
+	// Should return 503 "ServiceUnavailable" if we've synced a ToBeDeletedTaint node
+	hs.SyncNode(makeNode(tweakTainted(ToBeDeletedTaint)))
+	testHTTPHandler(server, healthzURL, http.StatusServiceUnavailable, t)
+
+	// Should return 200 "OK" if we've synced a node, tainted in any other way
+	hs.SyncNode(makeNode(tweakTainted("other")))
+	testHTTPHandler(server, healthzURL, http.StatusOK, t)
+
+	// Should return 503 "ServiceUnavailable" if we've synced a deleted node
+	hs.SyncNode(makeNode(tweakDeleted()))
+	testHTTPHandler(server, healthzURL, http.StatusServiceUnavailable, t)
 }
 
-func testHealthzHandler(server httpServer, status int, t *testing.T) {
+func TestLivezServer(t *testing.T) {
+	listener := newFakeListener()
+	httpFactory := newFakeHTTPServerFactory()
+	fakeClock := testingclock.NewFakeClock(time.Now())
+
+	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil)
+	server := hs.httpFactory.New(hs.addr, livezHandler{hs: hs})
+
+	// Should return 200 "OK" by default.
+	testHTTPHandler(server, livezURL, http.StatusOK, t)
+
+	// Should return 200 "OK" after first update
+	hs.Updated()
+	testHTTPHandler(server, livezURL, http.StatusOK, t)
+
+	// Should continue to return 200 "OK" as long as no further updates are queued
+	fakeClock.Step(25 * time.Second)
+	testHTTPHandler(server, livezURL, http.StatusOK, t)
+
+	// Should return 503 "ServiceUnavailable" if exceed max update-processing time
+	hs.QueuedUpdate()
+	fakeClock.Step(25 * time.Second)
+	testHTTPHandler(server, livezURL, http.StatusServiceUnavailable, t)
+
+	// Should return 200 "OK" after processing update
+	hs.Updated()
+	fakeClock.Step(5 * time.Second)
+	testHTTPHandler(server, livezURL, http.StatusOK, t)
+
+	// Should return 200 "OK" irrespective of node syncs
+	hs.SyncNode(makeNode(tweakTainted("other")))
+	testHTTPHandler(server, livezURL, http.StatusOK, t)
+
+	// Should return 200 "OK" irrespective of node syncs
+	hs.SyncNode(makeNode(tweakTainted(ToBeDeletedTaint)))
+	testHTTPHandler(server, livezURL, http.StatusOK, t)
+
+	// Should return 200 "OK" irrespective of node syncs
+	hs.SyncNode(makeNode(tweakTainted("other")))
+	testHTTPHandler(server, livezURL, http.StatusOK, t)
+
+	// Should return 200 "OK" irrespective of node syncs
+	hs.SyncNode(makeNode(tweakDeleted()))
+	testHTTPHandler(server, livezURL, http.StatusOK, t)
+}
+
+type url string
+
+var (
+	healthzURL url = "/healthz"
+	livezURL   url = "/livez"
+)
+
+func testHTTPHandler(server httpServer, u url, status int, t *testing.T) {
 	handler := server.(*fakeHTTPServer).handler
-	req, err := http.NewRequest("GET", "/healthz", nil)
+	req, err := http.NewRequest("GET", string(u), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
