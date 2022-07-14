@@ -437,9 +437,9 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 
 		usePersistentConfig: usePersistentConfig,
 		// The more groups you have, the more discovery requests you need to make.
-		// given 25 groups (our groups + a few custom resources) with one-ish version each, discovery needs to make 50 requests
-		// double it just so we don't end up here again for a while.  This config is only used for discovery.
-		discoveryBurst: 100,
+		// with a burst of 300, we will not be rate-limiting for most clusters but
+		// the safeguard will still be here. This config is only used for discovery.
+		discoveryBurst: 300,
 	}
 }
 
