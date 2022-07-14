@@ -566,10 +566,16 @@ func doSafeOpen(pathname string, base string) (int, error) {
 	// Follow the segments one by one using openat() to make
 	// sure the user cannot change already existing directories into symlinks.
 	for _, seg := range segments {
+		var deviceStat unix.Stat_t
+
 		currentPath = filepath.Join(currentPath, seg)
 		if !mount.PathWithinBase(currentPath, base) {
 			return -1, fmt.Errorf("path %s is outside of allowed base %s", currentPath, base)
 		}
+
+		// Trigger auto mount if it's an auto-mounted directory, ignore error if not a directory.
+		// Notice the trailing slash is mandatory, see "automount" in openat(2) and open_by_handle_at(2).
+		unix.Fstatat(parentFD, seg+"/", &deviceStat, unix.AT_SYMLINK_NOFOLLOW)
 
 		klog.V(5).Infof("Opening path %s", currentPath)
 		childFD, err = syscall.Openat(parentFD, seg, openFDFlags|unix.O_CLOEXEC, 0)
@@ -577,7 +583,6 @@ func doSafeOpen(pathname string, base string) (int, error) {
 			return -1, fmt.Errorf("cannot open %s: %s", currentPath, err)
 		}
 
-		var deviceStat unix.Stat_t
 		err := unix.Fstat(childFD, &deviceStat)
 		if err != nil {
 			return -1, fmt.Errorf("error running fstat on %s with %v", currentPath, err)
