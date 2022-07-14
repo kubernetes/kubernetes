@@ -455,14 +455,6 @@ kube::golang::set_platform_envs() {
   fi
 }
 
-kube::golang::unset_platform_envs() {
-  unset GOOS
-  unset GOARCH
-  unset GOROOT
-  unset CGO_ENABLED
-  unset CC
-}
-
 # Create the GOPATH tree under $KUBE_OUTPUT
 kube::golang::create_gopath_tree() {
   local go_pkg_dir="${KUBE_GOPATH}/src/${KUBE_GO_PACKAGE}"
