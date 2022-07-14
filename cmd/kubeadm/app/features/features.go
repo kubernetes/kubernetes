@@ -41,7 +41,7 @@ const (
 var InitFeatureGates = FeatureList{
 	PublicKeysECDSA:             {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 	RootlessControlPlane:        {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
-	UnversionedKubeletConfigMap: {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta, LockToDefault: true}},
+	UnversionedKubeletConfigMap: {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.GA, LockToDefault: true}},
 }
 
 // Feature represents a feature being gated
