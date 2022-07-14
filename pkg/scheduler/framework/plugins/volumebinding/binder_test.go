@@ -1529,7 +1529,7 @@ func TestBindAPIUpdate(t *testing.T) {
 		testEnv.assumeVolumes(t, "node1", pod, scenario.bindings, scenario.provisionedPVCs)
 
 		// Execute
-		err := testEnv.internalBinder.bindAPIUpdate(pod, scenario.bindings, scenario.provisionedPVCs)
+		err := testEnv.internalBinder.bindAPIUpdate(ctx, pod, scenario.bindings, scenario.provisionedPVCs)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
@@ -2085,7 +2085,7 @@ func TestBindPodVolumes(t *testing.T) {
 			StaticBindings:    bindings,
 			DynamicProvisions: claimsToProvision,
 		}
-		err := testEnv.binder.BindPodVolumes(pod, podVolumes)
+		err := testEnv.binder.BindPodVolumes(ctx, pod, podVolumes)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {
