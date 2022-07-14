@@ -34,3 +34,14 @@ func EqualitiesOrDie(funcs ...interface{}) Equalities {
 	}
 	return e
 }
+
+// Performs a shallow copy of the equalities map
+func (e Equalities) Copy() Equalities {
+	result := Equalities{reflect.Equalities{}}
+
+	for key, value := range e.Equalities {
+		result.Equalities[key] = value
+	}
+
+	return result
+}
