@@ -136,7 +136,7 @@ func StartRealAPIServerOrDie(t *testing.T, configFuncs ...func(*options.ServerRu
 
 	stopCh := make(chan struct{})
 
-	kubeAPIServer, err := app.CreateServerChain(completedOptions, stopCh)
+	kubeAPIServer, err := app.CreateServerChain(completedOptions)
 	if err != nil {
 		t.Fatal(err)
 	}

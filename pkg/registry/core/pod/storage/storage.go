@@ -157,6 +157,12 @@ func (r *BindingREST) New() runtime.Object {
 	return &api.Binding{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *BindingREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 var _ = rest.NamedCreater(&BindingREST{})
 
 // Create ensures a pod is bound to a specific host.
@@ -263,6 +269,12 @@ func (r *LegacyBindingREST) New() runtime.Object {
 	return r.bindingRest.New()
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *LegacyBindingREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Create ensures a pod is bound to a specific host.
 func (r *LegacyBindingREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
 	metadata, err := meta.Accessor(obj)
@@ -280,6 +292,12 @@ type StatusREST struct {
 // New creates a new pod resource
 func (r *StatusREST) New() runtime.Object {
 	return &api.Pod{}
+}
+
+// Destroy cleans up resources on shutdown.
+func (r *StatusREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
@@ -322,6 +340,12 @@ func (r *EphemeralContainersREST) Get(ctx context.Context, name string, options 
 // New creates a new pod resource
 func (r *EphemeralContainersREST) New() runtime.Object {
 	return &api.Pod{}
+}
+
+// Destroy cleans up resources on shutdown.
+func (r *EphemeralContainersREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
 }
 
 // Update alters the EphemeralContainers field in PodSpec

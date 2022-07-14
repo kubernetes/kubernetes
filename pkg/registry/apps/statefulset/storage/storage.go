@@ -124,6 +124,12 @@ func (r *StatusREST) New() runtime.Object {
 	return &apps.StatefulSet{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *StatusREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Get retrieves the object from the storage. It is required to support Patch.
 func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return r.store.Get(ctx, name, options)
@@ -177,6 +183,12 @@ func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.Gr
 // New creates a new Scale object
 func (r *ScaleREST) New() runtime.Object {
 	return &autoscaling.Scale{}
+}
+
+// Destroy cleans up resources on shutdown.
+func (r *ScaleREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
 }
 
 // Get retrieves object from Scale storage.
