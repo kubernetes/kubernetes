@@ -19,7 +19,9 @@ package fieldmanager
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
+	"strconv"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -28,6 +30,24 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/klog/v2"
+)
+
+func determineIgnoreNonSemanticUpdatesEnabled() bool {
+	if ignoreNonSemanticUpdatesString, exists := os.LookupEnv("KUBE_APISERVER_IGNORE_NON_SEMANTIC_UPDATES"); exists {
+		if ret, err := strconv.ParseBool(ignoreNonSemanticUpdatesString); err == nil {
+			return ret
+		} else {
+			klog.Errorf("failed to parse envar KUBE_APISERVER_IGNORE_NON_SEMANTIC_UPDATES: %v", err)
+		}
+	}
+
+	// enabled by default
+	return true
+}
+
+var (
+	ignoreNonSemanticUpdatesEnabled = determineIgnoreNonSemanticUpdatesEnabled()
 )
 
 var ignoreTimestampEqualities = func() conversion.Equalities {
@@ -57,6 +77,10 @@ func IgnoreManagedFieldsTimestampsTransformer(
 	newObj runtime.Object,
 	oldObj runtime.Object,
 ) (res runtime.Object, err error) {
+	if !ignoreNonSemanticUpdatesEnabled {
+		return newObj, nil
+	}
+
 	outcome := "unequal_objects_fast"
 	start := time.Now()
 	err = nil
