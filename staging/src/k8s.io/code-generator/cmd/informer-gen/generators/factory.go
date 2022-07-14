@@ -74,6 +74,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		gvNewFuncs[groupPkgName] = c.Universe.Function(types.Name{Package: path.Join(g.outputPackage, groupPkgName), Name: "New"})
 	}
 	m := map[string]interface{}{
+		"cacheIndexers":                  c.Universe.Type(cacheIndexers),
 		"cacheSharedIndexInformer":       c.Universe.Type(cacheSharedIndexInformer),
 		"groupVersions":                  g.groupVersions,
 		"gvInterfaces":                   gvInterfaces,
@@ -82,6 +83,7 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"interfacesNewInformerFunc":      c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "NewInformerFunc"}),
 		"interfacesTweakListOptionsFunc": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
 		"informerFactoryInterface":       c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
+		"cacheKeyFunc":                   c.Universe.Type(cacheKeyFunc),
 		"clientSetInterface":             c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"}),
 		"reflectType":                    c.Universe.Type(reflectType),
 		"runtimeObject":                  c.Universe.Type(runtimeObject),
@@ -109,6 +111,9 @@ type sharedInformerFactory struct {
 	lock {{.syncMutex|raw}}
 	defaultResync {{.timeDuration|raw}}
 	customResync map[{{.reflectType|raw}}]{{.timeDuration|raw}}
+	extraClusterScopedIndexers {{.cacheIndexers|raw}}
+	extraNamespaceScopedIndexers {{.cacheIndexers|raw}}
+	keyFunc {{.cacheKeyFunc|raw}}
 
 	informers map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}
 	// startedInformers is used for tracking which informers have been started.
@@ -142,6 +147,30 @@ func WithNamespace(namespace string) SharedInformerOption {
 	}
 }
 
+// WithExtraClusterScopedIndexers adds cluster scoped indexers on all informers of the configured SharedInformerFactory
+func WithExtraClusterScopedIndexers(indexers {{.cacheIndexers|raw}}) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.extraClusterScopedIndexers = indexers
+		return factory
+	}
+}
+
+// WithExtraNamespaceScopedIndexers adds namespace scoped indexers on all informers of the configured SharedInformerFactory
+func WithExtraNamespaceScopedIndexers(indexers {{.cacheIndexers|raw}}) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.extraNamespaceScopedIndexers = indexers
+		return factory
+	}
+}
+
+// WithKeyFunction sets a custom key function for all informers of the configured SharedInformerFactory
+func WithKeyFunction(keyFunc {{.cacheKeyFunc|raw}}) SharedInformerOption {
+	return func(factory *sharedInformerFactory) *sharedInformerFactory {
+		factory.keyFunc = keyFunc
+		return factory
+	}
+}
+
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory for all namespaces.
 func NewSharedInformerFactory(client {{.clientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}) SharedInformerFactory {
 	return NewSharedInformerFactoryWithOptions(client, defaultResync)
@@ -158,12 +187,14 @@ func NewFilteredSharedInformerFactory(client {{.clientSetInterface|raw}}, defaul
 // NewSharedInformerFactoryWithOptions constructs a new instance of a SharedInformerFactory with additional options.
 func NewSharedInformerFactoryWithOptions(client {{.clientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}, options ...SharedInformerOption) SharedInformerFactory {
 	factory := &sharedInformerFactory{
-		client:           client,
-		namespace:        v1.NamespaceAll,
-		defaultResync:    defaultResync,
-		informers:        make(map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}),
-		startedInformers: make(map[{{.reflectType|raw}}]bool),
-		customResync:     make(map[{{.reflectType|raw}}]{{.timeDuration|raw}}),
+		client:                       client,
+		namespace:                    v1.NamespaceAll,
+		defaultResync:                defaultResync,
+		informers:                    make(map[{{.reflectType|raw}}]{{.cacheSharedIndexInformer|raw}}),
+		startedInformers:             make(map[{{.reflectType|raw}}]bool),
+		customResync:                 make(map[{{.reflectType|raw}}]{{.timeDuration|raw}}),
+		extraClusterScopedIndexers:   {{.cacheIndexers|raw}}{},
+		extraNamespaceScopedIndexers: {{.cacheIndexers|raw}}{},
 	}
 
 	// Apply all options
@@ -232,6 +263,20 @@ func (f *sharedInformerFactory) InformerFor(obj {{.runtimeObject|raw}}, newFunc 
   return informer
 }
 
+// KeyFunction returns any extra cluster scoped indexers set on the factory
+func (f *sharedInformerFactory) ExtraClusterScopedIndexers() {{.cacheIndexers|raw}} {
+  return f.extraClusterScopedIndexers
+}
+
+// KeyFunction returns any extra namespace scoped indexers set on the factory
+func (f *sharedInformerFactory) ExtraNamespaceScopedIndexers() {{.cacheIndexers|raw}} {
+  return f.extraNamespaceScopedIndexers
+}
+
+// KeyFunction returns the keyfunction set on the factory
+func (f *sharedInformerFactory) KeyFunction() {{.cacheKeyFunc|raw}} {
+	return f.keyFunc
+}
 `
 
 var sharedInformerFactoryInterface = `

@@ -80,6 +80,10 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 	m := map[string]interface{}{
 		"apiScheme":                       c.Universe.Type(apiScheme),
 		"cacheIndexers":                   c.Universe.Type(cacheIndexers),
+		"cacheSharedInformerOption":       c.Universe.Type(cacheSharedInformerOption),
+		"cacheWithResyncPeriod":           c.Universe.Function(cacheWithResyncPeriod),
+		"cacheWithKeyFunction":            c.Universe.Function(cacheWithKeyFunction),
+		"cacheWithIndexers":               c.Universe.Function(cacheWithIndexers),
 		"cacheListWatch":                  c.Universe.Type(cacheListWatch),
 		"cacheMetaNamespaceIndexFunc":     c.Universe.Function(cacheMetaNamespaceIndexFunc),
 		"cacheNamespaceIndex":             c.Universe.Variable(cacheNamespaceIndex),
@@ -145,7 +149,11 @@ var typeFilteredInformerPublicConstructor = `
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, resyncPeriod $.timeDuration|raw$, indexers $.cacheIndexers|raw$, tweakListOptions $.interfacesTweakListOptionsFunc|raw$) $.cacheSharedIndexInformer|raw$ {
-	return $.cacheNewSharedIndexInformer|raw$(
+	return NewFiltered$.type|public$InformerWithOptions(client$if .namespaced$, namespace$end$, tweakListOptions, $.cacheWithResyncPeriod|raw$(resyncPeriod), $.cacheWithIndexers|raw$(indexers))
+}
+
+func NewFiltered$.type|public$InformerWithOptions(client $.clientSetInterface|raw$$if .namespaced$, namespace string$end$, tweakListOptions $.interfacesTweakListOptionsFunc|raw$, opts ...$.cacheSharedInformerOption|raw$) $.cacheSharedIndexInformer|raw$ {
+	return $.cacheNewSharedIndexInformer|raw$WithOptions(
 		&$.cacheListWatch|raw${
 			ListFunc: func(options $.v1ListOptions|raw$) ($.runtimeObject|raw$, error) {
 				if tweakListOptions != nil {
@@ -161,15 +169,28 @@ func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .name
 			},
 		},
 		&$.type|raw${},
-		resyncPeriod,
-		indexers,
+		opts...,
 	)
 }
 `
 
 var typeInformerConstructor = `
 func (f *$.type|private$Informer) defaultInformer(client $.clientSetInterface|raw$, resyncPeriod $.timeDuration|raw$) $.cacheSharedIndexInformer|raw$ {
-	return NewFiltered$.type|public$Informer(client$if .namespaced$, f.namespace$end$, resyncPeriod, $.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$}, f.tweakListOptions)
+	$if .namespaced$ indexers := $.cacheIndexers|raw${$.cacheNamespaceIndex|raw$: $.cacheMetaNamespaceIndexFunc|raw$}
+	for k, v := range f.factory.ExtraNamespaceScopedIndexers() {
+		indexers[k] = v
+	}
+	$else$indexers := $.cacheIndexers|raw${}
+	for k, v := range f.factory.ExtraClusterScopedIndexers() {
+		indexers[k] = v
+	}$end$
+
+	return NewFiltered$.type|public$InformerWithOptions(client$if .namespaced$, f.namespace$end$,
+		f.tweakListOptions, 
+		$.cacheWithResyncPeriod|raw$(resyncPeriod), 
+		$.cacheWithIndexers|raw$(indexers),
+		$.cacheWithKeyFunction|raw$(f.factory.KeyFunction()),
+	)
 }
 `
 

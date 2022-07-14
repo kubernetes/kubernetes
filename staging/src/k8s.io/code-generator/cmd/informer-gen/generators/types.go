@@ -19,15 +19,21 @@ package generators
 import "k8s.io/gengo/types"
 
 var (
-	apiScheme                   = types.Name{Package: "k8s.io/kubernetes/pkg/api/legacyscheme", Name: "Scheme"}
-	cacheGenericLister          = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "GenericLister"}
-	cacheIndexers               = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "Indexers"}
+	apiScheme                 = types.Name{Package: "k8s.io/kubernetes/pkg/api/legacyscheme", Name: "Scheme"}
+	cacheGenericLister        = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "GenericLister"}
+	cacheIndexers             = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "Indexers"}
+	cacheSharedInformerOption = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SharedInformerOption"}
+	cacheWithIndexers         = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "WithIndexers"}
+	cacheWithKeyFunction      = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "WithKeyFunction"}
+	cacheWithResyncPeriod     = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "WithResyncPeriod"}
+
 	cacheListWatch              = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "ListWatch"}
 	cacheMetaNamespaceIndexFunc = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "MetaNamespaceIndexFunc"}
 	cacheNamespaceIndex         = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NamespaceIndex"}
 	cacheNewGenericLister       = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewGenericLister"}
 	cacheNewSharedIndexInformer = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "NewSharedIndexInformer"}
 	cacheSharedIndexInformer    = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "SharedIndexInformer"}
+	cacheKeyFunc                = types.Name{Package: "k8s.io/client-go/tools/cache", Name: "KeyFunc"}
 	listOptions                 = types.Name{Package: "k8s.io/kubernetes/pkg/apis/core", Name: "ListOptions"}
 	reflectType                 = types.Name{Package: "reflect", Name: "Type"}
 	runtimeObject               = types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "Object"}
