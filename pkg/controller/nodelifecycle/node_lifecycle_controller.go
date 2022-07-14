@@ -475,12 +475,10 @@ func NewNodeLifecycleController(
 		return pods, nil
 	}
 	nc.podLister = podInformer.Lister()
+	nc.nodeLister = nodeInformer.Lister()
 
 	if nc.runTaintManager {
-		podGetter := func(name, namespace string) (*v1.Pod, error) { return nc.podLister.Pods(namespace).Get(name) }
-		nodeLister := nodeInformer.Lister()
-		nodeGetter := func(name string) (*v1.Node, error) { return nodeLister.Get(name) }
-		nc.taintManager = scheduler.NewNoExecuteTaintManager(ctx, kubeClient, podGetter, nodeGetter, nc.getPodsAssignedToNode)
+		nc.taintManager = scheduler.NewNoExecuteTaintManager(ctx, kubeClient, nc.podLister, nc.nodeLister, nc.getPodsAssignedToNode)
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
 				nc.taintManager.NodeUpdated(nil, node)
@@ -518,7 +516,6 @@ func NewNodeLifecycleController(
 	nc.leaseLister = leaseInformer.Lister()
 	nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
 
-	nc.nodeLister = nodeInformer.Lister()
 	nc.nodeInformerSynced = nodeInformer.Informer().HasSynced
 
 	nc.daemonSetStore = daemonSetInformer.Lister()
