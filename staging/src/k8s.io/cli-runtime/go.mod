@@ -5,6 +5,7 @@ module k8s.io/cli-runtime
 go 1.18
 
 require (
+	github.com/adrg/xdg v0.4.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/google/gnostic v0.5.7-v3refs
