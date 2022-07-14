@@ -2564,7 +2564,7 @@ func TestRequestWatchWithRetry(t *testing.T) {
 	testRequestWithRetry(t, "Watch", func(ctx context.Context, r *Request) {
 		w, err := r.Watch(ctx)
 		if err == nil {
-			// in this test the the response body returned by the server is always empty,
+			// in this test the response body returned by the server is always empty,
 			// this will cause StreamWatcher.receive() to:
 			// - return an io.EOF to indicate that the watch closed normally and
 			// - then close the io.Reader

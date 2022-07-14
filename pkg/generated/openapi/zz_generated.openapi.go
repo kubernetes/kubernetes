@@ -53330,7 +53330,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"kernelMemcgNotification": {
 						SchemaProps: spec.SchemaProps{
-							Description: "kernelMemcgNotification, if set, instructs the the kubelet to integrate with the kernel memcg notification for determining if memory eviction thresholds are exceeded rather than polling. Default: false",
+							Description: "kernelMemcgNotification, if set, instructs the kubelet to integrate with the kernel memcg notification for determining if memory eviction thresholds are exceeded rather than polling. Default: false",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},

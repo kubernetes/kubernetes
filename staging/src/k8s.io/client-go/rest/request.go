@@ -710,7 +710,7 @@ func updateURLMetrics(ctx context.Context, req *Request, resp *http.Response, er
 	if err != nil {
 		metrics.RequestResult.Increment(ctx, "<error>", req.verb, url)
 	} else {
-		//Metrics for failure codes
+		// Metrics for failure codes
 		metrics.RequestResult.Increment(ctx, strconv.Itoa(resp.StatusCode), req.verb, url)
 	}
 }
@@ -823,7 +823,7 @@ func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
 // fn at most once. It will return an error if a problem occurred prior to connecting to the
 // server - the provided function is responsible for handling server errors.
 func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Response)) error {
-	//Metrics for total request latency
+	// Metrics for total request latency
 	start := time.Now()
 	defer func() {
 		metrics.RequestLatency.Observe(ctx, r.verb, *r.URL(), time.Since(start))
@@ -892,7 +892,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		done := func() bool {
 			defer readAndCloseResponseBody(resp)
 
-			// if the the server returns an error in err, the response will be nil.
+			// if the server returns an error in err, the response will be nil.
 			f := func(req *http.Request, resp *http.Response) {
 				if resp == nil {
 					return
