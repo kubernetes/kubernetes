@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	sysruntime "runtime"
 	"sort"
 	"strings"
@@ -60,6 +61,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/component-helpers/apimachinery/lease"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -1229,6 +1231,7 @@ func (kl *Kubelet) RlimitStats() (*statsapi.RlimitStats, error) {
 // 2.  the pods directory
 // 3.  the plugins directory
 // 4.  the pod-resources directory
+// 5.  the checkpoint directory
 func (kl *Kubelet) setupDataDirs() error {
 	kl.rootDirectory = path.Clean(kl.rootDirectory)
 	pluginRegistrationDir := kl.getPluginsRegistrationDir()
@@ -1250,6 +1253,11 @@ func (kl *Kubelet) setupDataDirs() error {
 	}
 	if err := os.MkdirAll(kl.getPodResourcesDir(), 0750); err != nil {
 		return fmt.Errorf("error creating podresources directory: %v", err)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerCheckpoint) {
+		if err := os.MkdirAll(kl.getCheckpointsDir(), 0700); err != nil {
+			return fmt.Errorf("error creating checkpoint directory: %v", err)
+		}
 	}
 	if selinux.GetEnabled() {
 		err := selinux.SetFileLabel(pluginRegistrationDir, config.KubeletPluginsDirSELinuxLabel)
@@ -2437,6 +2445,44 @@ func (kl *Kubelet) fastStatusUpdateOnce() {
 			return
 		}
 	}
+}
+
+// CheckpointContainer tries to checkpoint a container. The parameters are used to
+// look up the specified container. If the container specified by the given parameters
+// cannot be found an error is returned. If the container is found the container
+// engine will be asked to checkpoint the given container into the kubelet's default
+// checkpoint directory.
+func (kl *Kubelet) CheckpointContainer(
+	podUID types.UID,
+	podFullName,
+	containerName string,
+	options *runtimeapi.CheckpointContainerRequest,
+) error {
+	container, err := kl.findContainer(podFullName, podUID, containerName)
+	if err != nil {
+		return err
+	}
+	if container == nil {
+		return fmt.Errorf("container %v not found", containerName)
+	}
+
+	options.Location = filepath.Join(
+		kl.getCheckpointsDir(),
+		fmt.Sprintf(
+			"checkpoint-%s-%s-%s.tar",
+			podFullName,
+			containerName,
+			time.Now().Format(time.RFC3339),
+		),
+	)
+
+	options.ContainerId = string(container.ID.ID)
+
+	if err := kl.containerRuntime.CheckpointContainer(options); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // isSyncPodWorthy filters out events that are not worthy of pod syncing

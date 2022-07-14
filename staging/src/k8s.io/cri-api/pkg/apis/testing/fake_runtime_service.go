@@ -694,3 +694,17 @@ func (r *FakeRuntimeService) ReopenContainerLog(containerID string) error {
 
 	return nil
 }
+
+// CheckpointContainer emulates call to checkpoint a container in the FakeRuntimeService.
+func (r *FakeRuntimeService) CheckpointContainer(options *runtimeapi.CheckpointContainerRequest) error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "CheckpointContainer")
+
+	if err := r.popError("CheckpointContainer"); err != nil {
+		return err
+	}
+
+	return nil
+}

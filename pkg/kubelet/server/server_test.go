@@ -53,7 +53,10 @@ import (
 	"k8s.io/utils/pointer"
 
 	// Do some initialization to decode the query parameters correctly.
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
@@ -144,6 +147,13 @@ func (fk *fakeKubelet) GetHostname() string {
 
 func (fk *fakeKubelet) RunInContainer(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
 	return fk.runFunc(podFullName, uid, containerName, cmd)
+}
+
+func (fk *fakeKubelet) CheckpointContainer(podUID types.UID, podFullName, containerName string, options *runtimeapi.CheckpointContainerRequest) error {
+	if containerName == "checkpointingFailure" {
+		return fmt.Errorf("Returning error for test")
+	}
+	return nil
 }
 
 type fakeRuntime struct {
@@ -348,7 +358,8 @@ func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletCo
 		fw.fakeKubelet,
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
 		fw.fakeAuth,
-		kubeCfg)
+		kubeCfg,
+	)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
@@ -459,7 +470,6 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 	}
 
 	resp, err := http.Post(fw.testHTTPServer.URL+"/run/"+podNamespace+"/"+podName+"/"+testUID+"/"+expectedContainerName+"?cmd=ls%20-a", "", nil)
-
 	if err != nil {
 		t.Fatalf("Got error POSTing: %v", err)
 	}
@@ -546,6 +556,9 @@ func TestAuthzCoverage(t *testing.T) {
 }
 
 func TestAuthFilters(t *testing.T) {
+	// Enable features.ContainerCheckpoint during test
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
+
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
 
@@ -838,6 +851,78 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 	if resp.StatusCode != http.StatusUnprocessableEntity {
 		t.Errorf("Unexpected non-error reading container logs: %#v", resp)
 	}
+}
+
+func TestCheckpointContainer(t *testing.T) {
+	// Enable features.ContainerCheckpoint during test
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
+
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+	podNamespace := "other"
+	podName := "foo"
+	expectedContainerName := "baz"
+	// GetPodByName() should always fail
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+		return nil, false
+	}
+	t.Run("wrong pod namespace", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/"+expectedContainerName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Unexpected non-error checkpointing container: %#v", resp)
+		}
+	})
+	// let GetPodByName() return a result, but our container "wrongContainerName" is not part of the Pod
+	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+	t.Run("wrong container name", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/wrongContainerName", "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Unexpected non-error checkpointing container: %#v", resp)
+		}
+	})
+	// Now the checkpointing of the container fails
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: podNamespace,
+				Name:      podName,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "checkpointingFailure",
+					},
+				},
+			},
+		}, true
+	}
+	t.Run("checkpointing fails", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/checkpointingFailure", "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		assert.Equal(t, resp.StatusCode, 500)
+		body, _ := ioutil.ReadAll(resp.Body)
+		assert.Equal(t, string(body), "checkpointing of other/foo/checkpointingFailure failed (Returning error for test)")
+	})
+	// Now test a successful checkpoint succeeds
+	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+	t.Run("checkpointing succeeds", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/"+expectedContainerName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		assert.Equal(t, resp.StatusCode, 200)
+	})
 }
 
 func makeReq(t *testing.T, method, url, clientProtocol string) *http.Request {

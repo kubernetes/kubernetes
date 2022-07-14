@@ -56,6 +56,8 @@ type ContainerManager interface {
 	// for the container. If it returns error, new container log file MUST NOT
 	// be created.
 	ReopenContainerLog(ContainerID string) error
+	// CheckpointContainer checkpoints a container
+	CheckpointContainer(options *runtimeapi.CheckpointContainerRequest) error
 }
 
 // PodSandboxManager contains methods for operating on PodSandboxes. The methods
