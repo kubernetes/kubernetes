@@ -105,6 +105,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"restRESTClientFor":                c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientFor"}),
 		"restRESTClientForConfigAndClient": c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientForConfigAndClient"}),
 		"SchemeGroupVersion":               c.Universe.Variable(types.Name{Package: path.Vendorless(g.inputPackage), Name: "SchemeGroupVersion"}),
+		"LogicalCluster":                   c.Universe.Type(types.Name{Package: "github.com/kcp-dev/logicalcluster/v2", Name: "Name"}),
 	}
 	sw.Do(groupInterfaceTemplate, m)
 	sw.Do(groupClientTemplate, m)
@@ -128,6 +129,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	sw.Do(newClientForConfigAndClientTemplate, m)
 	sw.Do(newClientForConfigOrDieTemplate, m)
 	sw.Do(newClientForRESTClientTemplate, m)
+	sw.Do(newClientForRESTClientAndClusterTemplate, m)
 	if g.version == "" {
 		sw.Do(setInternalVersionClientDefaultsTemplate, m)
 	} else {
@@ -150,6 +152,7 @@ var groupClientTemplate = `
 // $.GroupGoName$$.Version$Client is used to interact with features provided by the $.groupName$ group.
 type $.GroupGoName$$.Version$Client struct {
 	restClient $.restRESTClientInterface|raw$
+	cluster    $.LogicalCluster|raw$
 }
 `
 
@@ -194,7 +197,7 @@ func NewForConfigAndClient(c *$.restConfig|raw$, h *http.Client) (*$.GroupGoName
 	if err != nil {
 		return nil, err
 	}
-	return &$.GroupGoName$$.Version$Client{client}, nil
+	return &$.GroupGoName$$.Version$Client{restClient: client}, nil
 }
 `
 
@@ -224,7 +227,14 @@ func (c *$.GroupGoName$$.Version$Client) RESTClient() $.restRESTClientInterface|
 var newClientForRESTClientTemplate = `
 // New creates a new $.GroupGoName$$.Version$Client for the given RESTClient.
 func New(c $.restRESTClientInterface|raw$) *$.GroupGoName$$.Version$Client {
-	return &$.GroupGoName$$.Version$Client{c}
+	return &$.GroupGoName$$.Version$Client{restClient: c}
+}
+`
+
+var newClientForRESTClientAndClusterTemplate = `
+// NewWithCluster creates a new $.GroupGoName$$.Version$Client for the given RESTClient and cluster.
+func NewWithCluster(c $.restRESTClientInterface|raw$, cluster $.LogicalCluster|raw$) *$.GroupGoName$$.Version$Client {
+	return &$.GroupGoName$$.Version$Client{restClient: c, cluster: cluster}
 }
 `
 
