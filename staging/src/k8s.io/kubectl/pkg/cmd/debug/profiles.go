@@ -62,9 +62,7 @@ func (p *legacyProfile) Apply(pod *corev1.Pod, containerName string, target runt
 			})
 		}
 
-		pod.Spec.HostIPC = true
-		pod.Spec.HostNetwork = true
-		pod.Spec.HostPID = true
+		setHostNamespace(pod, true)
 		return nil
 	default:
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileLegacy, target)
@@ -81,8 +79,7 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 			}
 			// For copy of pod: sets SYS_PTRACE in debugging container, sets shareProcessNamespace
 			// Probes and labels are stripped from Pod copies.
-			container.LivenessProbe = nil
-			container.ReadinessProbe = nil
+			clearProbes(container)
 			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
 			if container.SecurityContext == nil {
 				container.SecurityContext = &corev1.SecurityContext{}
@@ -126,9 +123,7 @@ func (p *generalProfile) Apply(pod *corev1.Pod, containerName string, target run
 		}
 
 		pod.Spec.SecurityContext = nil
-		pod.Spec.HostIPC = true
-		pod.Spec.HostNetwork = true
-		pod.Spec.HostPID = true
+		setHostNamespace(pod, true)
 	default:
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileGeneral, target)
 	}
@@ -140,9 +135,7 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 	switch target.(type) {
 	case *corev1.Pod:
 		pod.Spec.SecurityContext = nil
-		pod.Spec.HostNetwork = false
-		pod.Spec.HostPID = false
-		pod.Spec.HostIPC = false
+		setHostNamespace(pod, false)
 
 		for i := range pod.Spec.Containers {
 			container := &pod.Spec.Containers[i]
@@ -150,8 +143,7 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 				continue
 			}
 			// For copy of pod: empty securityContext; sets shareProcessNamespace
-			container.LivenessProbe = nil
-			container.ReadinessProbe = nil
+			clearProbes(container)
 			container.SecurityContext = nil
 			pod.Spec.ShareProcessNamespace = pointer.BoolPtr(true)
 		}
@@ -168,9 +160,7 @@ func (p *baselineProfile) Apply(pod *corev1.Pod, containerName string, target ru
 	case *corev1.Node:
 		// empty securityContext; uses isolated namespaces
 		pod.Spec.SecurityContext = nil
-		pod.Spec.HostNetwork = false
-		pod.Spec.HostPID = false
-		pod.Spec.HostIPC = false
+		setHostNamespace(pod, false)
 
 	default:
 		return fmt.Errorf("the %s profile doesn't support objects of type %T", ProfileBaseline, target)
@@ -183,9 +173,7 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 	switch target.(type) {
 	case *corev1.Pod:
 		pod.Spec.SecurityContext = nil
-		pod.Spec.HostNetwork = false
-		pod.Spec.HostPID = false
-		pod.Spec.HostIPC = false
+		setHostNamespace(pod, false)
 
 		for i := range pod.Spec.Containers {
 			container := &pod.Spec.Containers[i]
@@ -194,8 +182,7 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 			}
 			// For copy of pod: empty securityContext; sets shareProcessNamespace
 			// Probes and labels are stripped from Pod copies.
-			container.LivenessProbe = nil
-			container.ReadinessProbe = nil
+			clearProbes(container)
 			container.SecurityContext = &corev1.SecurityContext{
 				RunAsNonRoot: pointer.BoolPtr(true),
 				Capabilities: &corev1.Capabilities{
@@ -228,4 +215,15 @@ func (p *restrictedProfile) Apply(pod *corev1.Pod, containerName string, target 
 	}
 
 	return nil
+}
+
+func clearProbes(c *corev1.Container) {
+	c.LivenessProbe = nil
+	c.ReadinessProbe = nil
+}
+
+func setHostNamespace(pod *corev1.Pod, enabled bool) {
+	pod.Spec.HostNetwork = enabled
+	pod.Spec.HostPID = enabled
+	pod.Spec.HostIPC = enabled
 }
