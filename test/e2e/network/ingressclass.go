@@ -18,7 +18,7 @@ package network
 
 import (
 	"context"
-	"strings"
+	"fmt"
 	"time"
 
 	networkingv1 "k8s.io/api/networking/v1"
@@ -73,7 +73,7 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		}
 	})
 
-	ginkgo.It("should prevent Ingress creation if more than 1 IngressClass marked as default [Serial]", func() {
+	ginkgo.It("should choose the one with the later CreationTimestamp, if equal the one with the lower name when two ingressClasses are marked as default[Serial]", func() {
 		ingressClass1, err := createIngressClass(cs, "ingressclass1", true, f.UniqueName)
 		framework.ExpectNoError(err)
 		defer deleteIngressClass(cs, ingressClass1.Name)
@@ -82,19 +82,42 @@ var _ = common.SIGDescribe("IngressClass [Feature:Ingress]", func() {
 		framework.ExpectNoError(err)
 		defer deleteIngressClass(cs, ingressClass2.Name)
 
+		expectedName := ingressClass1.Name
+		if ingressClass2.CreationTimestamp.UnixNano() > ingressClass1.CreationTimestamp.UnixNano() {
+			expectedName = ingressClass2.Name
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		// the admission controller may take a few seconds to observe both ingress classes
-		expectedErr := "2 default IngressClasses were found, only 1 allowed"
-		var lastErr error
 		if err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
-			defer cs.NetworkingV1().Ingresses(f.Namespace.Name).Delete(context.TODO(), "ingress1", metav1.DeleteOptions{})
-			_, err := createBasicIngress(cs, f.Namespace.Name)
-			if err == nil {
+			classes, err := cs.NetworkingV1().IngressClasses().List(ctx, metav1.ListOptions{})
+			if err != nil {
 				return false, nil
 			}
-			lastErr = err
-			return strings.Contains(err.Error(), expectedErr), nil
+			cntDefault := 0
+			for _, class := range classes.Items {
+				if class.Annotations[networkingv1.AnnotationIsDefaultIngressClass] == "true" {
+					cntDefault++
+				}
+			}
+			if cntDefault < 2 {
+				return false, nil
+			}
+			ingress, err := createBasicIngress(cs, f.Namespace.Name)
+			if err != nil {
+				return false, nil
+			}
+			if ingress.Spec.IngressClassName == nil {
+				return false, fmt.Errorf("expected IngressClassName to be set by Admission Controller")
+			}
+			if *ingress.Spec.IngressClassName != expectedName {
+				return false, fmt.Errorf("expected ingress class %s but created with %s", expectedName, *ingress.Spec.IngressClassName)
+			}
+			return true, nil
 		}); err != nil {
-			framework.Failf("Expected error to contain %s, got %s", expectedErr, lastErr.Error())
+			framework.Failf("Failed to create ingress when two ingressClasses are marked as default ,got error %v", err)
 		}
 	})
 
