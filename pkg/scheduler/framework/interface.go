@@ -209,7 +209,7 @@ func (s *Status) IsUnschedulable() bool {
 	return code == Unschedulable || code == UnschedulableAndUnresolvable
 }
 
-// AsError returns nil if the status is a success or a wait; otherwise returns an "error" object
+// AsError returns nil if the status is a success, a wait or a skip; otherwise returns an "error" object
 // with a concatenated message on reasons of the Status.
 func (s *Status) AsError() error {
 	if s.IsSuccess() || s.IsWait() || s.IsSkip() {
