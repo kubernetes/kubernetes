@@ -690,39 +690,28 @@ func generateStatefulSetSpec(minSeconds int32) *apps.StatefulSetSpec {
 // TestValidateStatefulSetMinReadySeconds tests the StatefulSet Spec's minReadySeconds field
 func TestValidateStatefulSetMinReadySeconds(t *testing.T) {
 	testCases := map[string]struct {
-		ss                    *apps.StatefulSetSpec
-		enableMinReadySeconds bool
-		expectErr             bool
+		ss        *apps.StatefulSetSpec
+		expectErr bool
 	}{
 		"valid : minReadySeconds enabled, zero": {
-			ss:                    generateStatefulSetSpec(0),
-			enableMinReadySeconds: true,
-			expectErr:             false,
+			ss:        generateStatefulSetSpec(0),
+			expectErr: false,
 		},
 		"invalid : minReadySeconds enabled, negative": {
-			ss:                    generateStatefulSetSpec(-1),
-			enableMinReadySeconds: true,
-			expectErr:             true,
+			ss:        generateStatefulSetSpec(-1),
+			expectErr: true,
 		},
 		"valid : minReadySeconds enabled, very large value": {
-			ss:                    generateStatefulSetSpec(2147483647),
-			enableMinReadySeconds: true,
-			expectErr:             false,
+			ss:        generateStatefulSetSpec(2147483647),
+			expectErr: false,
 		},
 		"invalid : minReadySeconds enabled, large negative": {
-			ss:                    generateStatefulSetSpec(-2147483648),
-			enableMinReadySeconds: true,
-			expectErr:             true,
-		},
-		"valid : minReadySeconds disabled, we don't validate anything": {
-			ss:                    generateStatefulSetSpec(-2147483648),
-			enableMinReadySeconds: false,
-			expectErr:             false,
+			ss:        generateStatefulSetSpec(-2147483648),
+			expectErr: true,
 		},
 	}
 	for tcName, tc := range testCases {
 		t.Run(tcName, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, tc.enableMinReadySeconds)()
 			errs := ValidateStatefulSetSpec(tc.ss, field.NewPath("spec", "minReadySeconds"),
 				corevalidation.PodValidationOptions{})
 			if tc.expectErr && len(errs) == 0 {
@@ -739,16 +728,15 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 	observedGenerationMinusOne := int64(-1)
 	collisionCountMinusOne := int32(-1)
 	tests := []struct {
-		name                  string
-		replicas              int32
-		readyReplicas         int32
-		currentReplicas       int32
-		updatedReplicas       int32
-		availableReplicas     int32
-		enableMinReadySeconds bool
-		observedGeneration    *int64
-		collisionCount        *int32
-		expectedErr           bool
+		name               string
+		replicas           int32
+		readyReplicas      int32
+		currentReplicas    int32
+		updatedReplicas    int32
+		availableReplicas  int32
+		observedGeneration *int64
+		collisionCount     *int32
+		expectedErr        bool
 	}{
 		{
 			name:            "valid status",
@@ -833,64 +821,33 @@ func TestValidateStatefulSetStatus(t *testing.T) {
 			expectedErr:     true,
 		},
 		{
-			name:                  "invalid: number of available replicas",
-			replicas:              3,
-			readyReplicas:         3,
-			currentReplicas:       2,
-			availableReplicas:     int32(-1),
-			expectedErr:           true,
-			enableMinReadySeconds: true,
+			name:              "invalid: number of available replicas",
+			replicas:          3,
+			readyReplicas:     3,
+			currentReplicas:   2,
+			availableReplicas: int32(-1),
+			expectedErr:       true,
 		},
 		{
-			name:                  "invalid: available replicas greater than replicas",
-			replicas:              3,
-			readyReplicas:         3,
-			currentReplicas:       2,
-			availableReplicas:     int32(4),
-			expectedErr:           true,
-			enableMinReadySeconds: true,
+			name:              "invalid: available replicas greater than replicas",
+			replicas:          3,
+			readyReplicas:     3,
+			currentReplicas:   2,
+			availableReplicas: int32(4),
+			expectedErr:       true,
 		},
 		{
-			name:                  "invalid: available replicas greater than ready replicas",
-			replicas:              3,
-			readyReplicas:         2,
-			currentReplicas:       2,
-			availableReplicas:     int32(3),
-			expectedErr:           true,
-			enableMinReadySeconds: true,
-		},
-		{
-			name:                  "minReadySeconds flag not set, no validation: number of available replicas",
-			replicas:              3,
-			readyReplicas:         3,
-			currentReplicas:       2,
-			availableReplicas:     int32(-1),
-			expectedErr:           false,
-			enableMinReadySeconds: false,
-		},
-		{
-			name:                  "minReadySeconds flag not set, no validation: available replicas greater than replicas",
-			replicas:              3,
-			readyReplicas:         3,
-			currentReplicas:       2,
-			availableReplicas:     int32(4),
-			expectedErr:           false,
-			enableMinReadySeconds: false,
-		},
-		{
-			name:                  "minReadySeconds flag not set, no validation: available replicas greater than ready replicas",
-			replicas:              3,
-			readyReplicas:         2,
-			currentReplicas:       2,
-			availableReplicas:     int32(3),
-			expectedErr:           false,
-			enableMinReadySeconds: false,
+			name:              "invalid: available replicas greater than ready replicas",
+			replicas:          3,
+			readyReplicas:     2,
+			currentReplicas:   2,
+			availableReplicas: int32(3),
+			expectedErr:       true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetMinReadySeconds, test.enableMinReadySeconds)()
 			status := apps.StatefulSetStatus{
 				Replicas:           test.replicas,
 				ReadyReplicas:      test.readyReplicas,
