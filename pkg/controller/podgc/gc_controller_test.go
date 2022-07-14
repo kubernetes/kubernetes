@@ -18,7 +18,6 @@ package podgc
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -32,6 +31,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller"
@@ -61,6 +61,17 @@ func compareStringSetToList(set sets.String, list []string) bool {
 		return false
 	}
 	return true
+}
+
+func getDeletedPodNames(client *fake.Clientset) []string {
+	deletedPodNames := make([]string, 0)
+	for _, action := range client.Actions() {
+		if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
+			deleteAction := action.(clienttesting.DeleteAction)
+			deletedPodNames = append(deletedPodNames, deleteAction.GetName())
+		}
+	}
+	return deletedPodNames
 }
 
 func TestGCTerminated(t *testing.T) {
@@ -129,14 +140,6 @@ func TestGCTerminated(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
 			gcc, podInformer, _ := NewFromClient(client, test.threshold)
-			deletedPodNames := make([]string, 0)
-			var lock sync.Mutex
-			gcc.deletePod = func(_, name string) error {
-				lock.Lock()
-				defer lock.Unlock()
-				deletedPodNames = append(deletedPodNames, name)
-				return nil
-			}
 
 			creationTime := time.Unix(0, 0)
 			for _, pod := range test.pods {
@@ -149,6 +152,8 @@ func TestGCTerminated(t *testing.T) {
 			}
 
 			gcc.gc(context.TODO())
+
+			deletedPodNames := getDeletedPodNames(client)
 
 			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
 				t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v",
@@ -329,17 +334,10 @@ func TestGCOrphaned(t *testing.T) {
 			gcc.nodeQueue.ShutDown()
 			gcc.nodeQueue = workqueue.NewDelayingQueueWithCustomClock(fakeClock, "podgc_test_queue")
 
-			deletedPodNames := make([]string, 0)
-			var lock sync.Mutex
-			gcc.deletePod = func(_, name string) error {
-				lock.Lock()
-				defer lock.Unlock()
-				deletedPodNames = append(deletedPodNames, name)
-				return nil
-			}
-
 			// First GC of orphaned pods
 			gcc.gc(context.TODO())
+			deletedPodNames := getDeletedPodNames(client)
+
 			if len(deletedPodNames) > 0 {
 				t.Errorf("no pods should be deleted at this point.\n\tactual: %v", deletedPodNames)
 			}
@@ -371,6 +369,7 @@ func TestGCOrphaned(t *testing.T) {
 
 			// Actual pod deletion
 			gcc.gc(context.TODO())
+			deletedPodNames = getDeletedPodNames(client)
 
 			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
 				t.Errorf("pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v",
@@ -417,14 +416,6 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset()
 			gcc, podInformer, _ := NewFromClient(client, -1)
-			deletedPodNames := make([]string, 0)
-			var lock sync.Mutex
-			gcc.deletePod = func(_, name string) error {
-				lock.Lock()
-				defer lock.Unlock()
-				deletedPodNames = append(deletedPodNames, name)
-				return nil
-			}
 
 			creationTime := time.Unix(0, 0)
 			for _, pod := range test.pods {
@@ -442,7 +433,8 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 				t.Errorf("Error while listing all Pods: %v", err)
 				return
 			}
-			gcc.gcUnscheduledTerminating(pods)
+			gcc.gcUnscheduledTerminating(context.TODO(), pods)
+			deletedPodNames := getDeletedPodNames(client)
 
 			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
 				t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v, test: %v",
@@ -557,14 +549,7 @@ func TestGCTerminating(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node-a")}})
 			gcc, podInformer, nodeInformer := NewFromClient(client, -1)
-			deletedPodNames := make([]string, 0)
-			var lock sync.Mutex
-			gcc.deletePod = func(_, name string) error {
-				lock.Lock()
-				defer lock.Unlock()
-				deletedPodNames = append(deletedPodNames, name)
-				return nil
-			}
+
 			creationTime := time.Unix(0, 0)
 			for _, node := range test.nodes {
 				creationTime = creationTime.Add(2 * time.Hour)
@@ -595,6 +580,8 @@ func TestGCTerminating(t *testing.T) {
 			}
 
 			gcc.gc(context.TODO())
+			deletedPodNames := getDeletedPodNames(client)
+
 			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
 				t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v",
 					i, test.deletedPodNames.List(), deletedPodNames)
