@@ -766,4 +766,4 @@ func celBool(pred bool) ref.Val {
 	return types.False
 }
 
-var unknownType = &DeclType{name: "unknown"}
+var unknownType = &DeclType{name: "unknown", MinSerializedSize: 1}
