@@ -47,6 +47,33 @@ func init() {
 	metav1.AddToGroupVersion(deleteScheme, versionV1)
 }
 
+// NewClusterForConfig creates a new Cluster for the given config.
+func NewClusterForConfig(c *rest.Config) (*Cluster, error) {
+	i, err := NewForConfig(c)
+	if err != nil {
+		return nil, err
+	}
+	client := i.(*Client)
+	return &Cluster{
+		client: client,
+	}, nil
+}
+
+type ClusterInterface interface {
+	Cluster(name string) Interface
+}
+
+type Cluster struct {
+	client *Client
+}
+
+// Cluster sets the cluster for a Clientset.
+func (c *Cluster) Cluster(name string) Interface {
+	client := *c.client
+	client.cluster = name
+	return &client
+}
+
 // Client allows callers to retrieve the object metadata for any
 // Kubernetes-compatible API endpoint. The client uses the
 // meta.k8s.io/v1 PartialObjectMetadata resource to more efficiently
@@ -54,7 +81,8 @@ func init() {
 // (Kubernetes 1.14 and before) will retrieve the object and then
 // convert the metadata.
 type Client struct {
-	client *rest.RESTClient
+	client  *rest.RESTClient
+	cluster string
 }
 
 var _ Interface = &Client{}
@@ -307,6 +335,9 @@ func (c *client) Patch(ctx context.Context, name string, pt types.PatchType, dat
 
 func (c *client) makeURLSegments(name string) []string {
 	url := []string{}
+	if len(c.client.cluster) > 0 {
+		url = append(url, "clusters", c.client.cluster)
+	}
 	if len(c.resource.Group) == 0 {
 		url = append(url, "api")
 	} else {

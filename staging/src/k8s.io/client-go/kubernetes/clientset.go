@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
 	discovery "k8s.io/client-go/discovery"
 	admissionregistrationv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
@@ -71,6 +72,33 @@ import (
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
 )
+
+type ClusterInterface interface {
+	Cluster(name logicalcluster.Name) Interface
+}
+
+type Cluster struct {
+	*scopedClientset
+}
+
+// Cluster sets the cluster for a Clientset.
+func (c *Cluster) Cluster(name logicalcluster.Name) Interface {
+	return &Clientset{
+		scopedClientset: c.scopedClientset,
+		cluster:         name,
+	}
+}
+
+// NewClusterForConfig creates a new Cluster for the given config.
+// If config's RateLimiter is not set and QPS and Burst are acceptable,
+// NewClusterForConfig will generate a rate-limiter in configShallowCopy.
+func NewClusterForConfig(c *rest.Config) (*Cluster, error) {
+	cs, err := NewForConfig(c)
+	if err != nil {
+		return nil, err
+	}
+	return &Cluster{scopedClientset: cs.scopedClientset}, nil
+}
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
@@ -124,6 +152,13 @@ type Interface interface {
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
+	*scopedClientset
+	cluster logicalcluster.Name
+}
+
+// scopedClientset contains the clients for groups. Each group has exactly one
+// version included in a Clientset.
+type scopedClientset struct {
 	*discovery.DiscoveryClient
 	admissionregistrationV1      *admissionregistrationv1.AdmissionregistrationV1Client
 	admissionregistrationV1beta1 *admissionregistrationv1beta1.AdmissionregistrationV1beta1Client
@@ -174,227 +209,227 @@ type Clientset struct {
 
 // AdmissionregistrationV1 retrieves the AdmissionregistrationV1Client
 func (c *Clientset) AdmissionregistrationV1() admissionregistrationv1.AdmissionregistrationV1Interface {
-	return c.admissionregistrationV1
+	return admissionregistrationv1.NewWithCluster(c.admissionregistrationV1.RESTClient(), c.cluster)
 }
 
 // AdmissionregistrationV1beta1 retrieves the AdmissionregistrationV1beta1Client
 func (c *Clientset) AdmissionregistrationV1beta1() admissionregistrationv1beta1.AdmissionregistrationV1beta1Interface {
-	return c.admissionregistrationV1beta1
+	return admissionregistrationv1beta1.NewWithCluster(c.admissionregistrationV1beta1.RESTClient(), c.cluster)
 }
 
 // InternalV1alpha1 retrieves the InternalV1alpha1Client
 func (c *Clientset) InternalV1alpha1() internalv1alpha1.InternalV1alpha1Interface {
-	return c.internalV1alpha1
+	return internalv1alpha1.NewWithCluster(c.internalV1alpha1.RESTClient(), c.cluster)
 }
 
 // AppsV1 retrieves the AppsV1Client
 func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
-	return c.appsV1
+	return appsv1.NewWithCluster(c.appsV1.RESTClient(), c.cluster)
 }
 
 // AppsV1beta1 retrieves the AppsV1beta1Client
 func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
-	return c.appsV1beta1
+	return appsv1beta1.NewWithCluster(c.appsV1beta1.RESTClient(), c.cluster)
 }
 
 // AppsV1beta2 retrieves the AppsV1beta2Client
 func (c *Clientset) AppsV1beta2() appsv1beta2.AppsV1beta2Interface {
-	return c.appsV1beta2
+	return appsv1beta2.NewWithCluster(c.appsV1beta2.RESTClient(), c.cluster)
 }
 
 // AuthenticationV1 retrieves the AuthenticationV1Client
 func (c *Clientset) AuthenticationV1() authenticationv1.AuthenticationV1Interface {
-	return c.authenticationV1
+	return authenticationv1.NewWithCluster(c.authenticationV1.RESTClient(), c.cluster)
 }
 
 // AuthenticationV1beta1 retrieves the AuthenticationV1beta1Client
 func (c *Clientset) AuthenticationV1beta1() authenticationv1beta1.AuthenticationV1beta1Interface {
-	return c.authenticationV1beta1
+	return authenticationv1beta1.NewWithCluster(c.authenticationV1beta1.RESTClient(), c.cluster)
 }
 
 // AuthorizationV1 retrieves the AuthorizationV1Client
 func (c *Clientset) AuthorizationV1() authorizationv1.AuthorizationV1Interface {
-	return c.authorizationV1
+	return authorizationv1.NewWithCluster(c.authorizationV1.RESTClient(), c.cluster)
 }
 
 // AuthorizationV1beta1 retrieves the AuthorizationV1beta1Client
 func (c *Clientset) AuthorizationV1beta1() authorizationv1beta1.AuthorizationV1beta1Interface {
-	return c.authorizationV1beta1
+	return authorizationv1beta1.NewWithCluster(c.authorizationV1beta1.RESTClient(), c.cluster)
 }
 
 // AutoscalingV1 retrieves the AutoscalingV1Client
 func (c *Clientset) AutoscalingV1() autoscalingv1.AutoscalingV1Interface {
-	return c.autoscalingV1
+	return autoscalingv1.NewWithCluster(c.autoscalingV1.RESTClient(), c.cluster)
 }
 
 // AutoscalingV2 retrieves the AutoscalingV2Client
 func (c *Clientset) AutoscalingV2() autoscalingv2.AutoscalingV2Interface {
-	return c.autoscalingV2
+	return autoscalingv2.NewWithCluster(c.autoscalingV2.RESTClient(), c.cluster)
 }
 
 // AutoscalingV2beta1 retrieves the AutoscalingV2beta1Client
 func (c *Clientset) AutoscalingV2beta1() autoscalingv2beta1.AutoscalingV2beta1Interface {
-	return c.autoscalingV2beta1
+	return autoscalingv2beta1.NewWithCluster(c.autoscalingV2beta1.RESTClient(), c.cluster)
 }
 
 // AutoscalingV2beta2 retrieves the AutoscalingV2beta2Client
 func (c *Clientset) AutoscalingV2beta2() autoscalingv2beta2.AutoscalingV2beta2Interface {
-	return c.autoscalingV2beta2
+	return autoscalingv2beta2.NewWithCluster(c.autoscalingV2beta2.RESTClient(), c.cluster)
 }
 
 // BatchV1 retrieves the BatchV1Client
 func (c *Clientset) BatchV1() batchv1.BatchV1Interface {
-	return c.batchV1
+	return batchv1.NewWithCluster(c.batchV1.RESTClient(), c.cluster)
 }
 
 // BatchV1beta1 retrieves the BatchV1beta1Client
 func (c *Clientset) BatchV1beta1() batchv1beta1.BatchV1beta1Interface {
-	return c.batchV1beta1
+	return batchv1beta1.NewWithCluster(c.batchV1beta1.RESTClient(), c.cluster)
 }
 
 // CertificatesV1 retrieves the CertificatesV1Client
 func (c *Clientset) CertificatesV1() certificatesv1.CertificatesV1Interface {
-	return c.certificatesV1
+	return certificatesv1.NewWithCluster(c.certificatesV1.RESTClient(), c.cluster)
 }
 
 // CertificatesV1beta1 retrieves the CertificatesV1beta1Client
 func (c *Clientset) CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta1Interface {
-	return c.certificatesV1beta1
+	return certificatesv1beta1.NewWithCluster(c.certificatesV1beta1.RESTClient(), c.cluster)
 }
 
 // CoordinationV1beta1 retrieves the CoordinationV1beta1Client
 func (c *Clientset) CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface {
-	return c.coordinationV1beta1
+	return coordinationv1beta1.NewWithCluster(c.coordinationV1beta1.RESTClient(), c.cluster)
 }
 
 // CoordinationV1 retrieves the CoordinationV1Client
 func (c *Clientset) CoordinationV1() coordinationv1.CoordinationV1Interface {
-	return c.coordinationV1
+	return coordinationv1.NewWithCluster(c.coordinationV1.RESTClient(), c.cluster)
 }
 
 // CoreV1 retrieves the CoreV1Client
 func (c *Clientset) CoreV1() corev1.CoreV1Interface {
-	return c.coreV1
+	return corev1.NewWithCluster(c.coreV1.RESTClient(), c.cluster)
 }
 
 // DiscoveryV1 retrieves the DiscoveryV1Client
 func (c *Clientset) DiscoveryV1() discoveryv1.DiscoveryV1Interface {
-	return c.discoveryV1
+	return discoveryv1.NewWithCluster(c.discoveryV1.RESTClient(), c.cluster)
 }
 
 // DiscoveryV1beta1 retrieves the DiscoveryV1beta1Client
 func (c *Clientset) DiscoveryV1beta1() discoveryv1beta1.DiscoveryV1beta1Interface {
-	return c.discoveryV1beta1
+	return discoveryv1beta1.NewWithCluster(c.discoveryV1beta1.RESTClient(), c.cluster)
 }
 
 // EventsV1 retrieves the EventsV1Client
 func (c *Clientset) EventsV1() eventsv1.EventsV1Interface {
-	return c.eventsV1
+	return eventsv1.NewWithCluster(c.eventsV1.RESTClient(), c.cluster)
 }
 
 // EventsV1beta1 retrieves the EventsV1beta1Client
 func (c *Clientset) EventsV1beta1() eventsv1beta1.EventsV1beta1Interface {
-	return c.eventsV1beta1
+	return eventsv1beta1.NewWithCluster(c.eventsV1beta1.RESTClient(), c.cluster)
 }
 
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
 func (c *Clientset) ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface {
-	return c.extensionsV1beta1
+	return extensionsv1beta1.NewWithCluster(c.extensionsV1beta1.RESTClient(), c.cluster)
 }
 
 // FlowcontrolV1alpha1 retrieves the FlowcontrolV1alpha1Client
 func (c *Clientset) FlowcontrolV1alpha1() flowcontrolv1alpha1.FlowcontrolV1alpha1Interface {
-	return c.flowcontrolV1alpha1
+	return flowcontrolv1alpha1.NewWithCluster(c.flowcontrolV1alpha1.RESTClient(), c.cluster)
 }
 
 // FlowcontrolV1beta1 retrieves the FlowcontrolV1beta1Client
 func (c *Clientset) FlowcontrolV1beta1() flowcontrolv1beta1.FlowcontrolV1beta1Interface {
-	return c.flowcontrolV1beta1
+	return flowcontrolv1beta1.NewWithCluster(c.flowcontrolV1beta1.RESTClient(), c.cluster)
 }
 
 // FlowcontrolV1beta2 retrieves the FlowcontrolV1beta2Client
 func (c *Clientset) FlowcontrolV1beta2() flowcontrolv1beta2.FlowcontrolV1beta2Interface {
-	return c.flowcontrolV1beta2
+	return flowcontrolv1beta2.NewWithCluster(c.flowcontrolV1beta2.RESTClient(), c.cluster)
 }
 
 // NetworkingV1 retrieves the NetworkingV1Client
 func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
-	return c.networkingV1
+	return networkingv1.NewWithCluster(c.networkingV1.RESTClient(), c.cluster)
 }
 
 // NetworkingV1beta1 retrieves the NetworkingV1beta1Client
 func (c *Clientset) NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface {
-	return c.networkingV1beta1
+	return networkingv1beta1.NewWithCluster(c.networkingV1beta1.RESTClient(), c.cluster)
 }
 
 // NodeV1 retrieves the NodeV1Client
 func (c *Clientset) NodeV1() nodev1.NodeV1Interface {
-	return c.nodeV1
+	return nodev1.NewWithCluster(c.nodeV1.RESTClient(), c.cluster)
 }
 
 // NodeV1alpha1 retrieves the NodeV1alpha1Client
 func (c *Clientset) NodeV1alpha1() nodev1alpha1.NodeV1alpha1Interface {
-	return c.nodeV1alpha1
+	return nodev1alpha1.NewWithCluster(c.nodeV1alpha1.RESTClient(), c.cluster)
 }
 
 // NodeV1beta1 retrieves the NodeV1beta1Client
 func (c *Clientset) NodeV1beta1() nodev1beta1.NodeV1beta1Interface {
-	return c.nodeV1beta1
+	return nodev1beta1.NewWithCluster(c.nodeV1beta1.RESTClient(), c.cluster)
 }
 
 // PolicyV1 retrieves the PolicyV1Client
 func (c *Clientset) PolicyV1() policyv1.PolicyV1Interface {
-	return c.policyV1
+	return policyv1.NewWithCluster(c.policyV1.RESTClient(), c.cluster)
 }
 
 // PolicyV1beta1 retrieves the PolicyV1beta1Client
 func (c *Clientset) PolicyV1beta1() policyv1beta1.PolicyV1beta1Interface {
-	return c.policyV1beta1
+	return policyv1beta1.NewWithCluster(c.policyV1beta1.RESTClient(), c.cluster)
 }
 
 // RbacV1 retrieves the RbacV1Client
 func (c *Clientset) RbacV1() rbacv1.RbacV1Interface {
-	return c.rbacV1
+	return rbacv1.NewWithCluster(c.rbacV1.RESTClient(), c.cluster)
 }
 
 // RbacV1beta1 retrieves the RbacV1beta1Client
 func (c *Clientset) RbacV1beta1() rbacv1beta1.RbacV1beta1Interface {
-	return c.rbacV1beta1
+	return rbacv1beta1.NewWithCluster(c.rbacV1beta1.RESTClient(), c.cluster)
 }
 
 // RbacV1alpha1 retrieves the RbacV1alpha1Client
 func (c *Clientset) RbacV1alpha1() rbacv1alpha1.RbacV1alpha1Interface {
-	return c.rbacV1alpha1
+	return rbacv1alpha1.NewWithCluster(c.rbacV1alpha1.RESTClient(), c.cluster)
 }
 
 // SchedulingV1alpha1 retrieves the SchedulingV1alpha1Client
 func (c *Clientset) SchedulingV1alpha1() schedulingv1alpha1.SchedulingV1alpha1Interface {
-	return c.schedulingV1alpha1
+	return schedulingv1alpha1.NewWithCluster(c.schedulingV1alpha1.RESTClient(), c.cluster)
 }
 
 // SchedulingV1beta1 retrieves the SchedulingV1beta1Client
 func (c *Clientset) SchedulingV1beta1() schedulingv1beta1.SchedulingV1beta1Interface {
-	return c.schedulingV1beta1
+	return schedulingv1beta1.NewWithCluster(c.schedulingV1beta1.RESTClient(), c.cluster)
 }
 
 // SchedulingV1 retrieves the SchedulingV1Client
 func (c *Clientset) SchedulingV1() schedulingv1.SchedulingV1Interface {
-	return c.schedulingV1
+	return schedulingv1.NewWithCluster(c.schedulingV1.RESTClient(), c.cluster)
 }
 
 // StorageV1beta1 retrieves the StorageV1beta1Client
 func (c *Clientset) StorageV1beta1() storagev1beta1.StorageV1beta1Interface {
-	return c.storageV1beta1
+	return storagev1beta1.NewWithCluster(c.storageV1beta1.RESTClient(), c.cluster)
 }
 
 // StorageV1 retrieves the StorageV1Client
 func (c *Clientset) StorageV1() storagev1.StorageV1Interface {
-	return c.storageV1
+	return storagev1.NewWithCluster(c.storageV1.RESTClient(), c.cluster)
 }
 
 // StorageV1alpha1 retrieves the StorageV1alpha1Client
 func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
-	return c.storageV1alpha1
+	return storagev1alpha1.NewWithCluster(c.storageV1alpha1.RESTClient(), c.cluster)
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -402,7 +437,7 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	if c == nil {
 		return nil
 	}
-	return c.DiscoveryClient
+	return c.DiscoveryClient.WithCluster(c.cluster)
 }
 
 // NewForConfig creates a new Clientset for the given config.
@@ -439,7 +474,7 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
 
-	var cs Clientset
+	var cs scopedClientset
 	var err error
 	cs.admissionregistrationV1, err = admissionregistrationv1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
@@ -626,7 +661,7 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
-	return &cs, nil
+	return &Clientset{scopedClientset: &cs}, nil
 }
 
 // NewForConfigOrDie creates a new Clientset for the given config and
@@ -641,7 +676,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
-	var cs Clientset
+	var cs scopedClientset
 	cs.admissionregistrationV1 = admissionregistrationv1.New(c)
 	cs.admissionregistrationV1beta1 = admissionregistrationv1beta1.New(c)
 	cs.internalV1alpha1 = internalv1alpha1.New(c)
@@ -689,5 +724,5 @@ func New(c rest.Interface) *Clientset {
 	cs.storageV1alpha1 = storagev1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
-	return &cs
+	return &Clientset{scopedClientset: &cs}
 }
