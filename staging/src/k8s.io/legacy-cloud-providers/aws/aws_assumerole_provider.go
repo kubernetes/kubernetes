@@ -24,14 +24,14 @@ import (
 )
 
 const (
-	invalidateCredsAfter = 1 * time.Second
+	invalidateCredsCacheAfter = 1 * time.Second
 )
 
 // assumeRoleProviderWithRateLimiting makes sure we call the underlying provider only
-// once after `invalidateCredsAfter` period
+// once after `invalidateCredsCacheAfter` period
 type assumeRoleProviderWithRateLimiting struct {
-	provider             credentials.Provider
-	invalidateCredsAfter time.Duration
+	provider                  credentials.Provider
+	invalidateCredsCacheAfter time.Duration
 	sync.RWMutex
 	lastError        error
 	lastValue        credentials.Value
@@ -40,13 +40,13 @@ type assumeRoleProviderWithRateLimiting struct {
 
 func assumeRoleProvider(provider credentials.Provider) credentials.Provider {
 	return &assumeRoleProviderWithRateLimiting{provider: provider,
-		invalidateCredsAfter: invalidateCredsAfter}
+		invalidateCredsCacheAfter: invalidateCredsCacheAfter}
 }
 
 func (l *assumeRoleProviderWithRateLimiting) Retrieve() (credentials.Value, error) {
 	l.Lock()
 	defer l.Unlock()
-	if time.Since(l.lastRetrieveTime) < l.invalidateCredsAfter {
+	if time.Since(l.lastRetrieveTime) < l.invalidateCredsCacheAfter {
 		if l.lastError != nil {
 			return credentials.Value{}, l.lastError
 		}
