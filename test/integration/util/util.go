@@ -217,6 +217,22 @@ func CleanupTest(t *testing.T, testCtx *TestContext) {
 	testCtx.CloseFn()
 }
 
+// RemovePodFinalizers removes pod finalizers for the pods
+func RemovePodFinalizers(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
+	for _, p := range pods {
+		pod, err := cs.CoreV1().Pods(p.Namespace).Get(context.TODO(), p.Name, metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			t.Errorf("error while removing pod finalizers for %v: %v", klog.KObj(p), err)
+		} else if pod != nil {
+			pod.ObjectMeta.Finalizers = nil
+			_, err = cs.CoreV1().Pods(pod.Namespace).Update(context.TODO(), pod, metav1.UpdateOptions{})
+			if err != nil {
+				t.Errorf("error while updating pod status for %v: %v", klog.KObj(p), err)
+			}
+		}
+	}
+}
+
 // CleanupPods deletes the given pods and waits for them to be actually deleted.
 func CleanupPods(cs clientset.Interface, t *testing.T, pods []*v1.Pod) {
 	for _, p := range pods {
