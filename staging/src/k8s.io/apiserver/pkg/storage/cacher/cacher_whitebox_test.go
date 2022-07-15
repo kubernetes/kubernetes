@@ -647,10 +647,11 @@ func TestCacheDontAcceptRequestsStopped(t *testing.T) {
 		t.Fatalf("Success to create Get: %v", err)
 	}
 
+	listResult := &example.PodList{}
 	err = cacher.GetList(context.TODO(), "pods/ns", storage.ListOptions{
 		ResourceVersion: "1",
 		Recursive:       true,
-	}, result)
+	}, listResult)
 	if err == nil {
 		t.Fatalf("Success to create GetList: %v", err)
 	}
@@ -660,7 +661,6 @@ func TestCacheDontAcceptRequestsStopped(t *testing.T) {
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("timed out waiting for watch to close")
 	}
-
 }
 
 func TestTimeBucketWatchersBasic(t *testing.T) {
