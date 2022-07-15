@@ -175,6 +175,12 @@ func NodeRules() []rbacv1.PolicyRule {
 
 	// RuntimeClass
 	nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get", "list", "watch").Groups("node.k8s.io").Resources("runtimeclasses").RuleOrDie())
+
+	// DRA Resource Claims
+	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
+		nodePolicyRules = append(nodePolicyRules, rbacv1helpers.NewRule("get").Groups(resourceGroup).Resources("resourceclaims").RuleOrDie())
+	}
+
 	return nodePolicyRules
 }
 
