@@ -205,12 +205,24 @@ type SharedIndexInformer interface {
 	GetIndexer() Indexer
 }
 
-// NewSharedInformer creates a new instance for the listwatcher.
+// NewSharedInformer delegates to NewSharedIndexInformerWithOptions to
+// create a new instance for the listwatcher.
 func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration) SharedInformer {
-	return NewSharedIndexInformer(lw, exampleObject, defaultEventHandlerResyncPeriod, Indexers{})
+	return NewSharedIndexInformerWithOptions(lw, exampleObject, WithResyncPeriod(defaultEventHandlerResyncPeriod))
 }
 
-// NewSharedIndexInformer creates a new instance for the listwatcher.
+// NewSharedIndexInformer delegates to NewSharedIndexInformerWithOptions
+// to create a new instance for the listwatcher.
+func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
+	return NewSharedIndexInformerWithOptions(
+		lw,
+		exampleObject,
+		WithResyncPeriod(defaultEventHandlerResyncPeriod),
+		WithIndexers(indexers),
+	)
+}
+
+// NewSharedIndexInformerWithOptions creates a new instance for the listwatcher.
 // The created informer will not do resyncs if the given
 // defaultEventHandlerResyncPeriod is zero.  Otherwise: for each
 // handler that with a non-zero requested resync period, whether added
@@ -222,19 +234,54 @@ func NewSharedInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEv
 // requested before the informer starts and the
 // defaultEventHandlerResyncPeriod given here and (b) the constant
 // `minimumResyncPeriod` defined in this file.
-func NewSharedIndexInformer(lw ListerWatcher, exampleObject runtime.Object, defaultEventHandlerResyncPeriod time.Duration, indexers Indexers) SharedIndexInformer {
+func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.Object, opts ...SharedInformerOption) SharedIndexInformer {
 	realClock := &clock.RealClock{}
 	sharedIndexInformer := &sharedIndexInformer{
-		processor:                       &sharedProcessor{clock: realClock},
-		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers),
-		listerWatcher:                   lw,
-		objectType:                      exampleObject,
-		resyncCheckPeriod:               defaultEventHandlerResyncPeriod,
-		defaultEventHandlerResyncPeriod: defaultEventHandlerResyncPeriod,
-		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
-		clock:                           realClock,
+		processor:             &sharedProcessor{clock: realClock},
+		listerWatcher:         lw,
+		objectType:            exampleObject,
+		cacheMutationDetector: NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
+		clock:                 realClock,
 	}
+
+	for _, opt := range opts {
+		opt(sharedIndexInformer)
+	}
+
+	if sharedIndexInformer.keyFunc == nil {
+		sharedIndexInformer.keyFunc = DeletionHandlingMetaNamespaceKeyFunc
+	}
+	if sharedIndexInformer.indexers == nil {
+		sharedIndexInformer.indexers = Indexers{}
+	}
+	sharedIndexInformer.indexer = NewIndexer(sharedIndexInformer.keyFunc, sharedIndexInformer.indexers)
+
 	return sharedIndexInformer
+}
+
+// SharedInformerOption defines the functional option type for the SharedInformer
+type SharedInformerOption func(*sharedIndexInformer)
+
+// WithResyncPeriod sets a custom resync period for the informer
+func WithResyncPeriod(t time.Duration) SharedInformerOption {
+	return func(s *sharedIndexInformer) {
+		s.resyncCheckPeriod = t
+		s.defaultEventHandlerResyncPeriod = t
+	}
+}
+
+// WithKeyFunction sets the key function for an informer
+func WithKeyFunction(k KeyFunc) SharedInformerOption {
+	return func(s *sharedIndexInformer) {
+		s.keyFunc = k
+	}
+}
+
+// WithIndexers sets the indexers for the informer
+func WithIndexers(ind Indexers) SharedInformerOption {
+	return func(s *sharedIndexInformer) {
+		s.indexers = ind
+	}
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -302,6 +349,9 @@ func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool
 type sharedIndexInformer struct {
 	indexer    Indexer
 	controller Controller
+
+	keyFunc  KeyFunc
+	indexers Indexers
 
 	processor             *sharedProcessor
 	cacheMutationDetector MutationDetector
@@ -402,6 +452,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		return
 	}
 	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction:           s.keyFunc,
 		KnownObjects:          s.indexer,
 		EmitDeltaTypeReplaced: true,
 	})

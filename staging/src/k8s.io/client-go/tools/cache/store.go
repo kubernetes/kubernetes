@@ -20,7 +20,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kcp-dev/logicalcluster/v2"
+
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/tools/clusters"
 )
 
 // Store is a generic object storage and processing interface.  A
@@ -105,14 +108,16 @@ func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	if key, ok := obj.(ExplicitKey); ok {
 		return string(key), nil
 	}
-	meta, err := meta.Accessor(obj)
+	metaObj, err := meta.Accessor(obj)
 	if err != nil {
 		return "", fmt.Errorf("object has no meta: %v", err)
 	}
-	if len(meta.GetNamespace()) > 0 {
-		return meta.GetNamespace() + "/" + meta.GetName(), nil
+
+	name := clusters.ToClusterAwareKey(logicalcluster.From(metaObj), metaObj.GetName())
+	if len(metaObj.GetNamespace()) > 0 {
+		return metaObj.GetNamespace() + "/" + name, nil
 	}
-	return meta.GetName(), nil
+	return name, nil
 }
 
 // SplitMetaNamespaceKey returns the namespace and name that
