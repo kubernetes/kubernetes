@@ -28,12 +28,12 @@ import (
 
 func Test_assumeRoleProviderWithRateLimiting_Retrieve(t *testing.T) {
 	type fields struct {
-		provider             credentials.Provider
-		invalidateCredsAfter time.Duration
-		RWMutex              sync.RWMutex
-		lastError            error
-		lastValue            credentials.Value
-		lastRetrieveTime     time.Time
+		provider                  credentials.Provider
+		invalidateCredsCacheAfter time.Duration
+		RWMutex                   sync.RWMutex
+		lastError                 error
+		lastValue                 credentials.Value
+		lastRetrieveTime          time.Time
 	}
 	tests := []struct {
 		name                       string
@@ -51,10 +51,10 @@ func Test_assumeRoleProviderWithRateLimiting_Retrieve(t *testing.T) {
 	}, {
 		name: "Immediate call to assume role API, shouldn't call the underlying provider and return the last value",
 		fields: fields{
-			provider:             &fakeAssumeRoleProvider{accesskeyID: "fakeID"},
-			invalidateCredsAfter: 100 * time.Millisecond,
-			lastValue:            credentials.Value{AccessKeyID: "fakeID1"},
-			lastRetrieveTime:     time.Now(),
+			provider:                  &fakeAssumeRoleProvider{accesskeyID: "fakeID"},
+			invalidateCredsCacheAfter: 100 * time.Millisecond,
+			lastValue:                 credentials.Value{AccessKeyID: "fakeID1"},
+			lastRetrieveTime:          time.Now(),
 		},
 		want:                       credentials.Value{AccessKeyID: "fakeID1"},
 		wantProviderCalled:         false,
@@ -62,9 +62,9 @@ func Test_assumeRoleProviderWithRateLimiting_Retrieve(t *testing.T) {
 	}, {
 		name: "Assume role provider returns an error when trying to assume a role",
 		fields: fields{
-			provider:             &fakeAssumeRoleProvider{err: fmt.Errorf("can't assume fake role")},
-			invalidateCredsAfter: 10 * time.Millisecond,
-			lastRetrieveTime:     time.Now(),
+			provider:                  &fakeAssumeRoleProvider{err: fmt.Errorf("can't assume fake role")},
+			invalidateCredsCacheAfter: 10 * time.Millisecond,
+			lastRetrieveTime:          time.Now(),
 		},
 		wantProviderCalled:         true,
 		wantErr:                    true,
@@ -73,9 +73,9 @@ func Test_assumeRoleProviderWithRateLimiting_Retrieve(t *testing.T) {
 	}, {
 		name: "Immediate call to assume role API, shouldn't call the underlying provider and return the last error value",
 		fields: fields{
-			provider:             &fakeAssumeRoleProvider{},
-			invalidateCredsAfter: 100 * time.Millisecond,
-			lastRetrieveTime:     time.Now(),
+			provider:                  &fakeAssumeRoleProvider{},
+			invalidateCredsCacheAfter: 100 * time.Millisecond,
+			lastRetrieveTime:          time.Now(),
 		},
 		want:               credentials.Value{},
 		wantProviderCalled: false,
@@ -84,9 +84,9 @@ func Test_assumeRoleProviderWithRateLimiting_Retrieve(t *testing.T) {
 	}, {
 		name: "Delayed call to assume role API, should call the underlying provider",
 		fields: fields{
-			provider:             &fakeAssumeRoleProvider{accesskeyID: "fakeID2"},
-			invalidateCredsAfter: 20 * time.Millisecond,
-			lastRetrieveTime:     time.Now(),
+			provider:                  &fakeAssumeRoleProvider{accesskeyID: "fakeID2"},
+			invalidateCredsCacheAfter: 20 * time.Millisecond,
+			lastRetrieveTime:          time.Now(),
 		},
 		want:                       credentials.Value{AccessKeyID: "fakeID2"},
 		wantProviderCalled:         true,
@@ -95,11 +95,11 @@ func Test_assumeRoleProviderWithRateLimiting_Retrieve(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			l := &assumeRoleProviderWithRateLimiting{
-				provider:             tt.fields.provider,
-				invalidateCredsAfter: tt.fields.invalidateCredsAfter,
-				lastError:            tt.fields.lastError,
-				lastValue:            tt.fields.lastValue,
-				lastRetrieveTime:     tt.fields.lastRetrieveTime,
+				provider:                  tt.fields.provider,
+				invalidateCredsCacheAfter: tt.fields.invalidateCredsCacheAfter,
+				lastError:                 tt.fields.lastError,
+				lastValue:                 tt.fields.lastValue,
+				lastRetrieveTime:          tt.fields.lastRetrieveTime,
 			}
 			time.Sleep(tt.sleepBeforeCallingProvider)
 			got, err := l.Retrieve()
