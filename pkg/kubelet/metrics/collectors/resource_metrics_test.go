@@ -191,6 +191,45 @@ func TestCollectResourceMetrics(t *testing.T) {
 			`,
 		},
 		{
+			name: "arbitrary container metrics for negative StartTime",
+			summary: &statsapi.Summary{
+				Pods: []statsapi.PodStats{
+					{
+						PodRef: statsapi.PodReference{
+							Name:      "pod_a",
+							Namespace: "namespace_a",
+						},
+						Containers: []statsapi.ContainerStats{
+							{
+								Name:      "container_a",
+								StartTime: metav1.NewTime(time.Unix(0, -1624396278302091597)),
+								CPU: &statsapi.CPUStats{
+									Time:                 testTime,
+									UsageCoreNanoSeconds: uint64Ptr(10000000000),
+								},
+								Memory: &statsapi.MemoryStats{
+									Time:            testTime,
+									WorkingSetBytes: uint64Ptr(1000),
+								},
+							},
+						},
+					},
+				},
+			},
+			summaryErr: nil,
+			expectedMetrics: `
+				# HELP scrape_error [ALPHA] 1 if there was an error while getting container metrics, 0 otherwise
+				# TYPE scrape_error gauge
+				scrape_error 0
+				# HELP container_cpu_usage_seconds_total [ALPHA] Cumulative cpu time consumed by the container in core-seconds
+				# TYPE container_cpu_usage_seconds_total counter
+				container_cpu_usage_seconds_total{container="container_a",namespace="namespace_a",pod="pod_a"} 10 1624396278302
+				# HELP container_memory_working_set_bytes [ALPHA] Current working set of the container in bytes
+				# TYPE container_memory_working_set_bytes gauge
+				container_memory_working_set_bytes{container="container_a",namespace="namespace_a",pod="pod_a"} 1000 1624396278302
+			`,
+		},
+		{
 			name: "nil container metrics",
 			summary: &statsapi.Summary{
 				Pods: []statsapi.PodStats{
