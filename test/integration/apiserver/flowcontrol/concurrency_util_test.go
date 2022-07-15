@@ -59,8 +59,8 @@ const (
 	requestConcurrencyLimitMetricsName = "apiserver_flowcontrol_request_concurrency_limit"
 	requestExecutionSecondsSumName     = "apiserver_flowcontrol_request_execution_seconds_sum"
 	requestExecutionSecondsCountName   = "apiserver_flowcontrol_request_execution_seconds_count"
-	priorityLevelSeatUtilSumName       = "apiserver_flowcontrol_priority_level_request_count_samples_sum"
-	priorityLevelSeatUtilCountName     = "apiserver_flowcontrol_priority_level_request_count_samples_count"
+	priorityLevelSeatUtilSumName       = "apiserver_flowcontrol_priority_level_seat_utilization_sum"
+	priorityLevelSeatUtilCountName     = "apiserver_flowcontrol_priority_level_seat_utilization_count"
 	fakeworkDuration                   = 200 * time.Millisecond
 	testWarmUpTime                     = 2 * time.Second
 	testTime                           = 10 * time.Second
