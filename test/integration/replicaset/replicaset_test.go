@@ -781,16 +781,17 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 		if err != nil {
 			// If the pod is not found, it means the RS picks the pod for deletion (it is extra)
 			// Verify there is only one pod in namespace and it has ControllerRef to the RS
-			if apierrors.IsNotFound(err) {
-				pods := getPods(t, podClient, labelMap())
-				if len(pods.Items) != 1 {
-					return false, fmt.Errorf("Expected 1 pod in current namespace, got %d", len(pods.Items))
-				}
-				// Set the pod accordingly
-				pod = &pods.Items[0]
-				return true, nil
+			if !apierrors.IsNotFound(err) {
+				return false, err
 			}
-			return false, err
+
+			pods := getPods(t, podClient, labelMap())
+			if len(pods.Items) != 1 {
+				return false, fmt.Errorf("Expected 1 pod in current namespace, got %d", len(pods.Items))
+			}
+			// Set the pod accordingly
+			pod = &pods.Items[0]
+			return true, nil
 		}
 		// Always update the pod so that we can save a GET call to API server later
 		pod = newPod
