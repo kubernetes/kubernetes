@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -30,6 +31,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/config"
 )
@@ -68,9 +70,9 @@ type PodConfig struct {
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
 // of normalized updates to a pod configuration.
-func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder) *PodConfig {
+func NewPodConfig(mode PodConfigNotificationMode, recorder record.EventRecorder, podStartupLatencyTracker *util.PodStartupLatencyTracker) *PodConfig {
 	updates := make(chan kubetypes.PodUpdate, 50)
-	storage := newPodStorage(updates, mode, recorder)
+	storage := newPodStorage(updates, mode, recorder, podStartupLatencyTracker)
 	podConfig := &PodConfig{
 		pods:    storage,
 		mux:     config.NewMux(storage),
@@ -132,18 +134,21 @@ type podStorage struct {
 
 	// the EventRecorder to use
 	recorder record.EventRecorder
+
+	podStartupLatencyTracker *util.PodStartupLatencyTracker
 }
 
 // TODO: PodConfigNotificationMode could be handled by a listener to the updates channel
 // in the future, especially with multiple listeners.
 // TODO: allow initialization of the current state of the store with snapshotted version.
-func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificationMode, recorder record.EventRecorder) *podStorage {
+func newPodStorage(updates chan<- kubetypes.PodUpdate, mode PodConfigNotificationMode, recorder record.EventRecorder, podStartupLatencyTracker *util.PodStartupLatencyTracker) *podStorage {
 	return &podStorage{
-		pods:        make(map[string]map[types.UID]*v1.Pod),
-		mode:        mode,
-		updates:     updates,
-		sourcesSeen: sets.String{},
-		recorder:    recorder,
+		pods:                     make(map[string]map[types.UID]*v1.Pod),
+		mode:                     mode,
+		updates:                  updates,
+		sourcesSeen:              sets.String{},
+		recorder:                 recorder,
+		podStartupLatencyTracker: podStartupLatencyTracker,
 	}
 }
 
@@ -235,6 +240,10 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				ref.Annotations = make(map[string]string)
 			}
 			ref.Annotations[kubetypes.ConfigSourceAnnotationKey] = source
+			// ignore static pods
+			if !kubetypes.IsStaticPod(ref) {
+				s.podStartupLatencyTracker.ObservedPodOnWatch(ref, time.Now())
+			}
 			if existing, found := oldPods[ref.UID]; found {
 				pods[ref.UID] = existing
 				needUpdate, needReconcile, needGracefulDelete := checkAndUpdatePod(existing, ref)

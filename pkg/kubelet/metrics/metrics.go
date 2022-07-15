@@ -35,6 +35,7 @@ const (
 	NodeLabelKey                       = "node"
 	PodWorkerDurationKey               = "pod_worker_duration_seconds"
 	PodStartDurationKey                = "pod_start_duration_seconds"
+	PodStartSLIDurationKey             = "pod_start_sli_duration_seconds"
 	CgroupManagerOperationsKey         = "cgroup_manager_duration_seconds"
 	PodWorkerStartDurationKey          = "pod_worker_start_duration_seconds"
 	PodStatusSyncDurationKey           = "pod_status_sync_duration_seconds"
@@ -135,6 +136,24 @@ var (
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
+	)
+	// PodStartSLIDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to run,
+	// excluding the time for image pulling. This metric should reflect the "Pod startup latency SLI" definition
+	// ref: https://github.com/kubernetes/community/blob/master/sig-scalability/slos/pod_startup_latency.md
+	//
+	// The histogram bucket boundaries for pod startup latency metrics, measured in seconds. These are hand-picked
+	// so as to be roughly exponential but still round numbers in everyday units. This is to minimise the number
+	// of buckets while allowing accurate measurement of thresholds which might be used in SLOs
+	// e.g. x% of pods start up within 30 seconds, or 15 minutes, etc.
+	PodStartSLIDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodStartSLIDurationKey,
+			Help:           "Duration in seconds to start a pod, excluding time to pull images and run init containers, measured from pod creation timestamp to when all its containers are reported as started and observed via watch",
+			Buckets:        []float64{0.5, 1, 2, 3, 4, 5, 6, 8, 10, 20, 30, 45, 60, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 2700, 3600},
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{},
 	)
 	// CgroupManagerDuration is a Histogram that tracks the duration (in seconds) it takes for cgroup manager operations to complete.
 	// Broken down by method.
@@ -517,6 +536,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(NodeName)
 		legacyregistry.MustRegister(PodWorkerDuration)
 		legacyregistry.MustRegister(PodStartDuration)
+		legacyregistry.MustRegister(PodStartSLIDuration)
 		legacyregistry.MustRegister(CgroupManagerDuration)
 		legacyregistry.MustRegister(PodWorkerStartDuration)
 		legacyregistry.MustRegister(PodStatusSyncDuration)
