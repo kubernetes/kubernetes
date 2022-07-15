@@ -65,7 +65,7 @@ const (
 
 var (
 	defObjectives = map[float64]float64{0.5: 0.5, 0.75: 0.75}
-	// NodeName is a Gauge that tracks the ode's name. The count is always 1.
+	// NodeName is a Gauge that tracks the node's name. The count is always 1.
 	NodeName = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
