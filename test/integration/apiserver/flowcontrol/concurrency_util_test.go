@@ -56,14 +56,14 @@ import (
 )
 
 const (
-	requestConcurrencyLimitMetricsName     = "apiserver_flowcontrol_request_concurrency_limit"
-	requestExecutionSecondsSumName         = "apiserver_flowcontrol_request_execution_seconds_sum"
-	requestExecutionSecondsCountName       = "apiserver_flowcontrol_request_execution_seconds_count"
-	priorityLevelSeatCountSamplesSumName   = "apiserver_flowcontrol_priority_level_seat_count_samples_sum"
-	priorityLevelSeatCountSamplesCountName = "apiserver_flowcontrol_priority_level_seat_count_samples_count"
-	fakeworkDuration                       = 200 * time.Millisecond
-	testWarmUpTime                         = 2 * time.Second
-	testTime                               = 10 * time.Second
+	requestConcurrencyLimitMetricsName = "apiserver_flowcontrol_request_concurrency_limit"
+	requestExecutionSecondsSumName     = "apiserver_flowcontrol_request_execution_seconds_sum"
+	requestExecutionSecondsCountName   = "apiserver_flowcontrol_request_execution_seconds_count"
+	priorityLevelSeatUtilSumName       = "apiserver_flowcontrol_priority_level_request_count_samples_sum"
+	priorityLevelSeatUtilCountName     = "apiserver_flowcontrol_priority_level_request_count_samples_count"
+	fakeworkDuration                   = 200 * time.Millisecond
+	testWarmUpTime                     = 2 * time.Second
+	testTime                           = 10 * time.Second
 )
 
 func setupWithAuthorizer(t testing.TB, maxReadonlyRequestsInFlight, maxMutatingRequestsInFlight int, authz authorizer.Authorizer) (*rest.Config, framework.TearDownFunc) {
@@ -185,21 +185,25 @@ func TestConcurrencyIsolation(t *testing.T) {
 	noxu2ClientRequestLatencySum = 0
 	noxu2ClientRequestLatencySumSq = 0
 	noxu2Mutex.Unlock()
-	earlierRequestExecutionSecondsSum, earlierRequestExecutionSecondsCount, earlierPLSeatUtilSamplesSum, earlierPLSeatUtilSamplesCount, err := getRequestExecutionMetrics(loopbackClient)
+	earlierRequestExecutionSecondsSum, earlierRequestExecutionSecondsCount, earlierPLSeatUtilSum, earlierPLSeatUtilCount, err := getRequestExecutionMetrics(loopbackClient)
 	if err != nil {
 		t.Error(err)
 	}
 	time.Sleep(testTime) // after warming up, the test enters a steady state
-	laterRequestExecutionSecondsSum, laterRequestExecutionSecondsCount, laterPLSeatUtilSamplesSum, laterPLSeatUtilSamplesCount, err := getRequestExecutionMetrics(loopbackClient)
+	laterRequestExecutionSecondsSum, laterRequestExecutionSecondsCount, laterPLSeatUtilSum, laterPLSeatUtilCount, err := getRequestExecutionMetrics(loopbackClient)
 	if err != nil {
 		t.Error(err)
+	}
+	if (earlierPLSeatUtilCount[priorityLevelNoxu1.Name] >= laterPLSeatUtilCount[priorityLevelNoxu1.Name]) || (earlierPLSeatUtilCount[priorityLevelNoxu2.Name] >= laterPLSeatUtilCount[priorityLevelNoxu2.Name]) {
+		t.Errorf("PLSeatUtilCount check failed: noxu1 earlier count %v, later count %v; noxu2 earlier count %v, later count %v",
+			earlierPLSeatUtilCount[priorityLevelNoxu1.Name], laterPLSeatUtilCount[priorityLevelNoxu1.Name], earlierPLSeatUtilCount[priorityLevelNoxu2.Name], laterPLSeatUtilCount[priorityLevelNoxu2.Name])
 	}
 	close(stopCh)
 
 	noxu1RequestExecutionSecondsAvg := (laterRequestExecutionSecondsSum[priorityLevelNoxu1.Name] - earlierRequestExecutionSecondsSum[priorityLevelNoxu1.Name]) / float64(laterRequestExecutionSecondsCount[priorityLevelNoxu1.Name]-earlierRequestExecutionSecondsCount[priorityLevelNoxu1.Name])
 	noxu2RequestExecutionSecondsAvg := (laterRequestExecutionSecondsSum[priorityLevelNoxu2.Name] - earlierRequestExecutionSecondsSum[priorityLevelNoxu2.Name]) / float64(laterRequestExecutionSecondsCount[priorityLevelNoxu2.Name]-earlierRequestExecutionSecondsCount[priorityLevelNoxu2.Name])
-	noxu1PLSeatUtilAvg := (laterPLSeatUtilSamplesSum[priorityLevelNoxu1.Name] - earlierPLSeatUtilSamplesSum[priorityLevelNoxu1.Name]) / float64(laterPLSeatUtilSamplesCount[priorityLevelNoxu1.Name]-earlierPLSeatUtilSamplesCount[priorityLevelNoxu1.Name])
-	noxu2PLSeatUtilAvg := (laterPLSeatUtilSamplesSum[priorityLevelNoxu2.Name] - earlierPLSeatUtilSamplesSum[priorityLevelNoxu2.Name]) / float64(laterPLSeatUtilSamplesCount[priorityLevelNoxu2.Name]-earlierPLSeatUtilSamplesCount[priorityLevelNoxu2.Name])
+	noxu1PLSeatUtilAvg := (laterPLSeatUtilSum[priorityLevelNoxu1.Name] - earlierPLSeatUtilSum[priorityLevelNoxu1.Name]) / float64(laterPLSeatUtilCount[priorityLevelNoxu1.Name]-earlierPLSeatUtilCount[priorityLevelNoxu1.Name])
+	noxu2PLSeatUtilAvg := (laterPLSeatUtilSum[priorityLevelNoxu2.Name] - earlierPLSeatUtilSum[priorityLevelNoxu2.Name]) / float64(laterPLSeatUtilCount[priorityLevelNoxu2.Name]-earlierPLSeatUtilCount[priorityLevelNoxu2.Name])
 	t.Logf("\nnoxu1RequestExecutionSecondsAvg %v\nnoxu2RequestExecutionSecondsAvg %v", noxu1RequestExecutionSecondsAvg, noxu2RequestExecutionSecondsAvg)
 	t.Logf("\nnoxu1PLSeatUtilAvg %v\nnoxu2PLSeatUtilAvg %v", noxu1PLSeatUtilAvg, noxu2PLSeatUtilAvg)
 
@@ -306,8 +310,8 @@ func getRequestExecutionMetrics(c clientset.Interface) (map[string]float64, map[
 
 	RequestExecutionSecondsSum := make(map[string]float64)
 	RequestExecutionSecondsCount := make(map[string]int)
-	PriorityLevelSeatCountSamplesSum := make(map[string]float64)
-	PriorityLevelSeatCountSamplesCount := make(map[string]int)
+	PLSeatUtilSum := make(map[string]float64)
+	PLSeatUtilCount := make(map[string]int)
 
 	for {
 		var v model.Vector
@@ -315,7 +319,7 @@ func getRequestExecutionMetrics(c clientset.Interface) (map[string]float64, map[
 			if err == io.EOF {
 				// Expected loop termination condition.
 				return RequestExecutionSecondsSum, RequestExecutionSecondsCount,
-					PriorityLevelSeatCountSamplesSum, PriorityLevelSeatCountSamplesCount, nil
+					PLSeatUtilSum, PLSeatUtilCount, nil
 			}
 			return nil, nil, nil, nil, fmt.Errorf("failed decoding metrics: %v", err)
 		}
@@ -325,10 +329,10 @@ func getRequestExecutionMetrics(c clientset.Interface) (map[string]float64, map[
 				RequestExecutionSecondsSum[string(metric.Metric[labelPriorityLevel])] = float64(metric.Value)
 			case requestExecutionSecondsCountName:
 				RequestExecutionSecondsCount[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
-			case priorityLevelSeatCountSamplesSumName:
-				PriorityLevelSeatCountSamplesSum[string(metric.Metric[labelPriorityLevel])] = float64(metric.Value)
-			case priorityLevelSeatCountSamplesCountName:
-				PriorityLevelSeatCountSamplesCount[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
+			case priorityLevelSeatUtilSumName:
+				PLSeatUtilSum[string(metric.Metric[labelPriorityLevel])] = float64(metric.Value)
+			case priorityLevelSeatUtilCountName:
+				PLSeatUtilCount[string(metric.Metric[labelPriorityLevel])] = int(metric.Value)
 			}
 		}
 	}
@@ -351,6 +355,7 @@ func streamRequestsWithIndex(parallel int, request func(idx int), wg *sync.WaitG
 	}
 }
 
+// Webhook authorizer code copied from staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook/webhook_v1_test.go with minor changes
 // V1Service mocks a remote service.
 type V1Service interface {
 	Review(*authorizationv1.SubjectAccessReview)
