@@ -364,7 +364,6 @@ func (o *DebugOptions) Run(f cmdutil.Factory, cmd *cobra.Command) error {
 					TTY:       o.TTY,
 					Quiet:     o.Quiet,
 				},
-				// TODO(verb): kubectl prints an incorrect "Session ended" message for debug containers.
 				CommandName: cmd.Parent().CommandPath() + " attach",
 
 				Attach: &attach.DefaultRemoteAttach{},

@@ -484,3 +484,76 @@ func setDefaultContainer(pod *corev1.Pod, name string) *corev1.Pod {
 	pod.Annotations[podcmd.DefaultContainerAnnotationName] = name
 	return pod
 }
+
+func TestReattachMessage(t *testing.T) {
+	tests := []struct {
+		name          string
+		pod           *corev1.Pod
+		rawTTY, stdin bool
+		container     string
+		expected      string
+	}{
+		{
+			name:      "normal interactive session",
+			pod:       attachPod(),
+			container: "bar",
+			rawTTY:    true,
+			stdin:     true,
+			expected:  "Session ended, resume using",
+		},
+		{
+			name:      "no stdin",
+			pod:       attachPod(),
+			container: "bar",
+			rawTTY:    true,
+			stdin:     false,
+			expected:  "",
+		},
+		{
+			name:      "not connected to a real TTY",
+			pod:       attachPod(),
+			container: "bar",
+			rawTTY:    false,
+			stdin:     true,
+			expected:  "",
+		},
+		{
+			name: "no restarts",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers:    []corev1.Container{{Name: "bar"}},
+				},
+				Status: corev1.PodStatus{Phase: corev1.PodRunning},
+			},
+			container: "bar",
+			rawTTY:    true,
+			stdin:     true,
+			expected:  "",
+		},
+		{
+			name:      "ephemeral container",
+			pod:       attachPod(),
+			container: "debugger",
+			rawTTY:    true,
+			stdin:     true,
+			expected:  "Session ended, the ephemeral container will not be restarted",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			options := &AttachOptions{
+				StreamOptions: exec.StreamOptions{
+					Stdin: test.stdin,
+				},
+				Pod: test.pod,
+			}
+			if msg := options.reattachMessage(test.container, test.rawTTY); test.expected == "" && msg != "" {
+				t.Errorf("reattachMessage(%v, %v) = %q, wanted empty string", test.container, test.rawTTY, msg)
+			} else if !strings.Contains(msg, test.expected) {
+				t.Errorf("reattachMessage(%v, %v) = %q, want string containing %q", test.container, test.rawTTY, msg, test.expected)
+			}
+		})
+	}
+}
