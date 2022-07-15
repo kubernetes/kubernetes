@@ -116,6 +116,7 @@ do
 done
 
 install -p -m 755 openshift-hack/images/hyperkube/hyperkube %{buildroot}%{_bindir}/hyperkube
+install -p -m 755 openshift-hack/images/hyperkube/kubensenter %{buildroot}%{_bindir}/kubensenter
 
 %files hyperkube
 %license LICENSE
@@ -124,6 +125,7 @@ install -p -m 755 openshift-hack/images/hyperkube/hyperkube %{buildroot}%{_bindi
 %{_bindir}/kube-controller-manager
 %{_bindir}/kube-scheduler
 %{_bindir}/kubelet
+%{_bindir}/kubensenter
 %defattr(-,root,root,0700)
 
 %changelog
