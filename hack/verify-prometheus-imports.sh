@@ -74,6 +74,7 @@ allowed_prometheus_importers=(
   ./test/e2e_node/resource_metrics_test.go
   ./test/instrumentation/main_test.go
   ./test/integration/apiserver/flowcontrol/concurrency_test.go
+  ./test/integration/apiserver/flowcontrol/concurrency_util_test.go
   ./test/integration/metrics/metrics_test.go
 )
 
