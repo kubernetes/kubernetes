@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -71,6 +72,7 @@ func TestRunOnce(t *testing.T) {
 	podManager := kubepod.NewBasicPodManager(
 		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager)
 	fakeRuntime := &containertest.FakeRuntime{}
+	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 	basePath, err := utiltesting.MkTmpdir("kubelet")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir %v", err)
@@ -81,7 +83,7 @@ func TestRunOnce(t *testing.T) {
 		recorder:         &record.FakeRecorder{},
 		cadvisor:         cadvisor,
 		nodeLister:       testNodeLister{},
-		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}),
+		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker),
 		podManager:       podManager,
 		podWorkers:       &fakePodWorkers{},
 		os:               &containertest.FakeOS{},

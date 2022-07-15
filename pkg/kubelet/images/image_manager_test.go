@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	. "k8s.io/kubernetes/pkg/kubelet/container"
 	ctest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -176,7 +177,9 @@ func pullerTestEnv(c pullerTestCase, serialized bool) (puller ImageManager, fake
 	fakeRuntime.Err = c.pullerErr
 	fakeRuntime.InspectErr = c.inspectErr
 
-	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, c.qps, c.burst)
+	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
+
+	puller = NewImageManager(fakeRecorder, fakeRuntime, backOff, serialized, c.qps, c.burst, podStartupLatencyTracker)
 	return
 }
 

@@ -580,7 +580,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	mirrorPodClient := kubepod.NewBasicMirrorClient(klet.kubeClient, string(nodeName), nodeLister)
 	klet.podManager = kubepod.NewBasicPodManager(mirrorPodClient, secretManager, configMapManager)
 
-	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet)
+	podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
+
+	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, podStartupLatencyTracker)
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 
@@ -644,6 +646,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
 		*kubeCfg.MemoryThrottlingFactor,
+		podStartupLatencyTracker,
 	)
 	if err != nil {
 		return nil, err

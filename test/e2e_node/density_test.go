@@ -52,7 +52,7 @@ const (
 	kubeletAddr = "localhost:10255"
 )
 
-var _ = SIGDescribe("Density [Serial] [Slow]", func() {
+var _ = SIGDescribe("Density [azylinski] [NodeConformance]", func() {
 	const (
 		// The data collection time of resource collector and the standalone cadvisor
 		// is not synchronized, so resource collector may miss data or
@@ -467,12 +467,12 @@ func getPodStartLatency(node string) (e2emetrics.KubeletLatencyMetrics, error) {
 
 	for _, samples := range ms {
 		for _, sample := range samples {
-			if sample.Metric["__name__"] == kubemetrics.KubeletSubsystem+"_"+kubemetrics.PodStartDurationKey {
+			if sample.Metric["__name__"] == kubemetrics.KubeletSubsystem+"_"+kubemetrics.PodStartSLODurationKey {
 				quantile, _ := strconv.ParseFloat(string(sample.Metric["quantile"]), 64)
 				latencyMetrics = append(latencyMetrics,
 					e2emetrics.KubeletLatencyMetric{
 						Quantile: quantile,
-						Method:   kubemetrics.PodStartDurationKey,
+						Method:   kubemetrics.PodStartSLODurationKey,
 						Latency:  time.Duration(int(sample.Value)) * time.Microsecond})
 			}
 		}

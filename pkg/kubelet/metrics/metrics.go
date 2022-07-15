@@ -35,6 +35,7 @@ const (
 	NodeLabelKey                       = "node"
 	PodWorkerDurationKey               = "pod_worker_duration_seconds"
 	PodStartDurationKey                = "pod_start_duration_seconds"
+	PodStartSLODurationKey             = "pod_start_slo_duration_seconds"
 	CgroupManagerOperationsKey         = "cgroup_manager_duration_seconds"
 	PodWorkerStartDurationKey          = "pod_worker_start_duration_seconds"
 	PLEGRelistDurationKey              = "pleg_relist_duration_seconds"
@@ -130,6 +131,16 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PodStartDurationKey,
 			Help:           "Duration in seconds from kubelet seeing a pod for the first time to the pod starting to run",
+			Buckets:        metrics.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// PodStartSLODuration TBD
+	PodStartSLODuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodStartSLODurationKey,
+			Help:           "TBD",
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -494,6 +505,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(NodeName)
 		legacyregistry.MustRegister(PodWorkerDuration)
 		legacyregistry.MustRegister(PodStartDuration)
+		legacyregistry.MustRegister(PodStartSLODuration)
 		legacyregistry.MustRegister(CgroupManagerDuration)
 		legacyregistry.MustRegister(PodWorkerStartDuration)
 		legacyregistry.MustRegister(ContainersPerPodCount)
