@@ -581,7 +581,9 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
-		a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa)
+		if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
+			utilruntime.HandleError(err)
+		}
 		return fmt.Errorf("invalid API version in scale target reference: %v", err)
 	}
 
@@ -594,7 +596,9 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
-		a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa)
+		if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
+			utilruntime.HandleError(err)
+		}
 		return fmt.Errorf("unable to determine resource for scale target reference: %v", err)
 	}
 
@@ -602,7 +606,9 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
-		a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa)
+		if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
+			utilruntime.HandleError(err)
+		}
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
 	}
 	setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "SucceededGetScale", "the HPA controller was able to get the target's current scale")
