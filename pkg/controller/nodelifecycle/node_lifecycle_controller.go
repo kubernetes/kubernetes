@@ -996,9 +996,7 @@ func isNodeExcludedFromDisruptionChecks(node *v1.Node) bool {
 // which given node is entitled, state of current and last observed Ready Condition, and an error if it occurred.
 func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (time.Duration, v1.NodeCondition, *v1.NodeCondition, error) {
 	nodeHealth := nc.nodeHealthMap.getDeepCopy(node.Name)
-	defer func() {
-		nc.nodeHealthMap.set(node.Name, nodeHealth)
-	}()
+	defer nc.nodeHealthMap.set(node.Name, nodeHealth)
 
 	var gracePeriod time.Duration
 	var observedReadyCondition v1.NodeCondition

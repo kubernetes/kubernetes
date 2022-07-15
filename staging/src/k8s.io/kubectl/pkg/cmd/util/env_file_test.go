@@ -88,7 +88,7 @@ func Test_processEnvFileLine_readEnvironment(t *testing.T) {
 	// Just in case, these two lines ensure the environment is restored to
 	// its original state.
 	original := os.Getenv(realKey)
-	defer func() { os.Setenv(realKey, original) }()
+	defer os.Setenv(realKey, original)
 
 	os.Setenv(realKey, `my_value`)
 

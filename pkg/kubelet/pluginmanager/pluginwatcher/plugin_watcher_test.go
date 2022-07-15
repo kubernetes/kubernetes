@@ -218,9 +218,7 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 
 		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
-		defer func(p *examplePlugin) {
-			require.NoError(t, p.Stop())
-		}(p)
+		defer require.NoError(t, p.Stop())
 
 		plugins[i] = p
 	}

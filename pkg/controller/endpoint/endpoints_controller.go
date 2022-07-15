@@ -361,9 +361,7 @@ func (e *Controller) handleErr(err error, key interface{}) {
 
 func (e *Controller) syncService(ctx context.Context, key string) error {
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing service %q endpoints. (%v)", key, time.Since(startTime))
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

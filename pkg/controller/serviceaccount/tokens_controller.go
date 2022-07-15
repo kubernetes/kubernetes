@@ -231,9 +231,7 @@ func (e *TokensController) syncServiceAccount() {
 	defer e.syncServiceAccountQueue.Done(key)
 
 	retry := false
-	defer func() {
-		e.retryOrForget(e.syncServiceAccountQueue, key, retry)
-	}()
+	defer e.retryOrForget(e.syncServiceAccountQueue, key, retry)
 
 	saInfo, err := parseServiceAccountKey(key)
 	if err != nil {
@@ -272,9 +270,7 @@ func (e *TokensController) syncSecret() {
 
 	// Track whether or not we should retry this sync
 	retry := false
-	defer func() {
-		e.retryOrForget(e.syncSecretQueue, key, retry)
-	}()
+	defer e.retryOrForget(e.syncSecretQueue, key, retry)
 
 	secretInfo, err := parseSecretQueueKey(key)
 	if err != nil {

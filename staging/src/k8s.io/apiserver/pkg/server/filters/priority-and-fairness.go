@@ -201,9 +201,7 @@ func WithPriorityAndFairness(
 
 			execute := func() {
 				startedAt := time.Now()
-				defer func() {
-					httplog.AddKeyValue(ctx, "apf_init_latency", time.Since(startedAt))
-				}()
+				defer httplog.AddKeyValue(ctx, "apf_init_latency", time.Since(startedAt))
 				noteExecutingDelta(1)
 				defer noteExecutingDelta(-1)
 				served = true

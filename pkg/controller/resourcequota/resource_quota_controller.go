@@ -302,9 +302,7 @@ func (rq *Controller) Run(ctx context.Context, workers int) {
 // syncResourceQuotaFromKey syncs a quota key
 func (rq *Controller) syncResourceQuotaFromKey(ctx context.Context, key string) (err error) {
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing resource quota %q (%v)", key, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing resource quota %q (%v)", key, time.Since(startTime))
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

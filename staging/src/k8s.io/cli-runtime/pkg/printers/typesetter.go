@@ -47,9 +47,7 @@ func (p *TypeSetterPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 
 	// we were empty coming in, make sure we're empty going out.  This makes the call thread-unsafe
-	defer func() {
-		obj.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	}()
+	defer obj.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 
 	gvks, _, err := p.Typer.ObjectKinds(obj)
 	if err != nil {

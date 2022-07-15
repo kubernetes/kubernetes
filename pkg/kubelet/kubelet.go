@@ -1610,9 +1610,7 @@ func (kl *Kubelet) syncPod(_ context.Context, updateType kubetypes.SyncPodType, 
 	// Currently, using that context causes test failures.
 	ctx := context.TODO()
 	klog.V(4).InfoS("syncPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
-	defer func() {
-		klog.V(4).InfoS("syncPod exit", "pod", klog.KObj(pod), "podUID", pod.UID, "isTerminal", isTerminal)
-	}()
+	defer klog.V(4).InfoS("syncPod exit", "pod", klog.KObj(pod), "podUID", pod.UID, "isTerminal", isTerminal)
 
 	// Latency measurements for the main workflow are relative to the
 	// first time the pod was seen by kubelet.
