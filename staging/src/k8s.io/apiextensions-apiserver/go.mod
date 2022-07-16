@@ -32,7 +32,7 @@ require (
 	k8s.io/utils v0.0.0-20220725171434-9bab9ef40391
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1
-	sigs.k8s.io/yaml v1.2.0
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -51,7 +51,7 @@ require (
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
-	github.com/fsnotify/fsnotify v1.4.9 // indirect
+	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
@@ -125,6 +125,7 @@ require (
 )
 
 replace (
+	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.9
 	k8s.io/api => ../api
 	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
 	k8s.io/apimachinery => ../apimachinery
@@ -132,4 +133,5 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
+	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )

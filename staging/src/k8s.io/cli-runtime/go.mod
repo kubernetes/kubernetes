@@ -22,7 +22,7 @@ require (
 	k8s.io/utils v0.0.0-20220725171434-9bab9ef40391
 	sigs.k8s.io/kustomize/api v0.11.4
 	sigs.k8s.io/kustomize/kyaml v0.13.6
-	sigs.k8s.io/yaml v1.2.0
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -74,4 +74,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime
 	k8s.io/client-go => ../client-go
+	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )

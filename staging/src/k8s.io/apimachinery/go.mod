@@ -26,7 +26,7 @@ require (
 	k8s.io/utils v0.0.0-20220725171434-9bab9ef40391
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1
-	sigs.k8s.io/yaml v1.2.0
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -46,4 +46,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	k8s.io/apimachinery => ../apimachinery
+	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
+)

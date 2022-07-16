@@ -30,7 +30,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20220627174259-011e075b9cb8
 	k8s.io/utils v0.0.0-20220725171434-9bab9ef40391
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1
-	sigs.k8s.io/yaml v1.2.0
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -64,4 +64,5 @@ replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
+	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )

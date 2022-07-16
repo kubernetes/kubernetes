@@ -10,7 +10,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/emicklei/go-restful/v3 v3.8.0
 	github.com/evanphx/json-patch v4.12.0+incompatible
-	github.com/fsnotify/fsnotify v1.4.9
+	github.com/fsnotify/fsnotify v1.5.1
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.6
@@ -48,7 +48,7 @@ require (
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.32
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1
-	sigs.k8s.io/yaml v1.2.0
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -119,9 +119,11 @@ require (
 )
 
 replace (
+	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.9
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )

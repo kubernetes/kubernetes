@@ -39,7 +39,10 @@ require (
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
-	sigs.k8s.io/yaml v1.2.0 // indirect
+	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace k8s.io/code-generator => ../code-generator
+replace (
+	k8s.io/code-generator => ../code-generator
+	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
+)

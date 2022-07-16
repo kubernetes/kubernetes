@@ -35,7 +35,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
-	github.com/fsnotify/fsnotify v1.4.9 // indirect
+	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
@@ -101,11 +101,12 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/gengo v0.0.0-20211129171323-c02415ce4185 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.32 // indirect
-	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
-	sigs.k8s.io/yaml v1.2.0 // indirect
+	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
+	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 replace (
+	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.9
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
@@ -113,4 +114,5 @@ replace (
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
 	k8s.io/kube-aggregator => ../kube-aggregator
+	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )

@@ -43,7 +43,7 @@ require (
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2
 	sigs.k8s.io/kustomize/kustomize/v4 v4.5.4
 	sigs.k8s.io/kustomize/kyaml v0.13.6
-	sigs.k8s.io/yaml v1.2.0
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -103,4 +103,5 @@ replace (
 	k8s.io/component-helpers => ../component-helpers
 	k8s.io/kubectl => ../kubectl
 	k8s.io/metrics => ../metrics
+	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )

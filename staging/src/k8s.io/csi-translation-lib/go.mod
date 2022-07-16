@@ -35,4 +35,5 @@ replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/csi-translation-lib => ../csi-translation-lib
+	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )

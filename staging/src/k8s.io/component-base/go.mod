@@ -81,7 +81,7 @@ require (
 	k8s.io/api v0.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20220627174259-011e075b9cb8 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
-	sigs.k8s.io/yaml v1.2.0 // indirect
+	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 replace (
@@ -89,4 +89,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )
