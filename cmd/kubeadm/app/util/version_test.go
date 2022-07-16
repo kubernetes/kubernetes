@@ -382,6 +382,11 @@ func TestKubeadmVersion(t *testing.T) {
 			parsingError: true,
 		},
 		{
+			name:        "invalid version with label and stray dot",
+			input:       "v1.8.0-alpha.2.",
+			parsingError: true,
+		},
+		{
 			name:        "invalid version with label and metadata",
 			input:       "v1.8.0-alpha.2.1231+afabd012389d53a",
 			output:      "v1.8.0-alpha.3",
