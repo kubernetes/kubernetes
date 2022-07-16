@@ -766,6 +766,9 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		if len(pod.Spec.PriorityClassName) > 0 {
 			w.Write(LEVEL_0, "Priority Class Name:\t%s\n", stringOrNone(pod.Spec.PriorityClassName))
 		}
+		if len(pod.Spec.ServiceAccountName) > 0 {
+			w.Write(LEVEL_0, "Service Account:\t%s\n", pod.Spec.ServiceAccountName)
+		}
 		if pod.Spec.NodeName == "" {
 			w.Write(LEVEL_0, "Node:\t<none>\n")
 		} else {
