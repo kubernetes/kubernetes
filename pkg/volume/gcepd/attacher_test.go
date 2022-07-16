@@ -248,7 +248,7 @@ func TestVerifyVolumesAttached(t *testing.T) {
 	verifyDiskAttachedInResult := func(results map[*volume.Spec]bool, spec *volume.Spec, expected bool) error {
 		found, ok := results[spec]
 		if !ok {
-			return fmt.Errorf("expected to find volume %s in verifcation result, but didn't", spec.Name())
+			return fmt.Errorf("expected to find volume %s in verification result, but didn't", spec.Name())
 		}
 		if found != expected {
 			return fmt.Errorf("expected to find volume %s to be have attached value %v but got %v", spec.Name(), expected, found)
