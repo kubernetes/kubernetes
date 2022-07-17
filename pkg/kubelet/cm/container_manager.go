@@ -115,6 +115,9 @@ type ContainerManager interface {
 	// GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
 	GetNodeAllocatableAbsolute() v1.ResourceList
 
+	// UnrepareResources unprepares pod resources
+	UnprepareResources(*v1.Pod) error
+
 	// Implements the podresources Provider API for CPUs, Memory and Devices
 	podresources.CPUsProvider
 	podresources.DevicesProvider

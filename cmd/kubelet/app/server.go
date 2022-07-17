@@ -741,7 +741,9 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			},
 			s.FailSwapOn,
 			devicePluginEnabled,
-			kubeDeps.Recorder)
+			kubeDeps.Recorder,
+			kubeDeps.KubeClient,
+		)
 
 		if err != nil {
 			return err

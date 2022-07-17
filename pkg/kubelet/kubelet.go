@@ -66,6 +66,7 @@ import (
 	pluginwatcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -1400,7 +1401,9 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 	// Adding Registration Callback function for Device Manager
 	kl.pluginManager.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler())
 	// Adding Registration Callback function for DRA Plugin
-	kl.pluginManager.AddHandler(pluginwatcherapi.DRAPlugin, plugincache.PluginHandler(draplugin.PluginHandler))
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+		kl.pluginManager.AddHandler(pluginwatcherapi.DRAPlugin, plugincache.PluginHandler(draplugin.PluginHandler))
+	}
 
 	// Start the plugin manager
 	klog.V(4).InfoS("Starting plugin manager")
@@ -1861,6 +1864,15 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	// generate the final status of the pod
 	// TODO: should we simply fold this into TerminatePod? that would give a single pod update
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
+
+	// NOTE: resources must be unprepared BEFORE pod status is changed on the API server
+	// to avoid raice conditions with the resource deallocation code in kubernetes core
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
+		if err := kl.containerManager.UnprepareResources(pod); err != nil {
+			return err
+		}
+	}
+
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	// volumes are unmounted after the pod worker reports ShouldPodRuntimeBeRemoved (which is satisfied
