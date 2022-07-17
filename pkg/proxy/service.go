@@ -56,6 +56,7 @@ type BaseServiceInfo struct {
 	internalPolicyLocal      bool
 	internalTrafficPolicy    *v1.ServiceInternalTrafficPolicyType
 	hintsAnnotation          string
+	annotations              map[string]string
 }
 
 var _ ServicePort = &BaseServiceInfo{}
@@ -108,6 +109,11 @@ func (info *BaseServiceInfo) NodePort() int {
 // ExternalIPStrings is part of ServicePort interface.
 func (info *BaseServiceInfo) ExternalIPStrings() []string {
 	return info.externalIPs
+}
+
+// GetAnnotationsis part of ServicePort interface.
+func (info *BaseServiceInfo) GetAnnotations() map[string]string {
+	return info.annotations
 }
 
 // LoadBalancerIPStrings is part of ServicePort interface.
@@ -184,6 +190,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		internalPolicyLocal:   internalPolicyLocal,
 		internalTrafficPolicy: service.Spec.InternalTrafficPolicy,
 		hintsAnnotation:       service.Annotations[v1.AnnotationTopologyAwareHints],
+                annotations: make(map[string]string),
 	}
 
 	loadBalancerSourceRanges := make([]string, len(service.Spec.LoadBalancerSourceRanges))
@@ -239,6 +246,12 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 			klog.ErrorS(nil, "Service has no healthcheck nodeport", "service", klog.KObj(service))
 		} else {
 			info.healthCheckNodePort = int(p)
+		}
+	}
+        
+        for k, v := range service.ObjectMeta.Annotations {
+		if strings.HasPrefix(k, "kube-proxy.kubernetes.io/") {
+			info.annotations[k] = v
 		}
 	}
 

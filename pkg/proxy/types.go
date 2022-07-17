@@ -100,6 +100,8 @@ type ServicePort interface {
 	// UsesLocalEndpoints returns true if the service port ever sends traffic to
 	// endpoints based on "Local" traffic policy
 	UsesLocalEndpoints() bool
+        // GetAnnotations returns annotations in the service. Only "kube-proxy.kubernetes.io/" annotations are returned.
+	GetAnnotations() map[string]string
 }
 
 // Endpoint in an interface which abstracts information about an endpoint.

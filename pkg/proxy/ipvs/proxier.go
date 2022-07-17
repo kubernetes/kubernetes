@@ -1000,6 +1000,28 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 func (proxier *Proxier) OnNodeSynced() {
 }
 
+const ipvsOnePacketScheduling = "kube-proxy.kubernetes.io/ipvs-ops"
+var validValues = sets.NewString("true","True","TRUE")
+
+// getOpsMode when called checks whether the ipvsOnePacketScheduling annotations
+// is mentioned in the serivce and protocol for that service endpoint is UDP 
+// OPS mode of IPVS fails in case of NAT and TCP
+func (proxier *Proxier) getOpsMode(sp proxy.ServicePort) bool {
+        protocol := strings.ToLower(string(sp.Protocol()))
+	if v, ok := sp.GetAnnotations()[ipvsOnePacketScheduling]; ok {
+                // ops mode is applicable for UDP protocol Only. 
+                if netutils.Protocol(sp.Protocol()) == netutils.UDP && validValues.Has(v) {
+	        	klog.InfoS("Ops mode enabled for -", "protocol", protocol, "protocol", netutils.UDP)
+                        return true
+                }
+		// Delete the entry to avoid unnecessary re-checks and log flooding
+		delete(sp.GetAnnotations(), ipvsOnePacketScheduling)
+		klog.V(2).InfoS("Invalid ipvs-ops arg ignored", "argument", v)
+	}
+        // default is false
+        return false
+}
+
 // This is where all of the ipvs calls happen.
 func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
@@ -1210,7 +1232,10 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 			serv.Flags |= utilipvs.FlagPersistent
 			serv.Timeout = uint32(svcInfo.StickyMaxAgeSeconds())
-		}
+		} else if proxier.getOpsMode(svcInfo) {
+                        klog.InfoS("One Packet scheduling enabled for :", "Cluster IP", svcInfo.ClusterIP(), "Port", uint16(svcInfo.Port()))
+                        serv.Flags |= utilipvs.FlagOnePacket
+                }
 		// We need to bind ClusterIP to dummy interface, so set `bindAddr` parameter to `true` in syncService()
 		if err := proxier.syncService(svcPortNameString, serv, true, bindedAddresses); err == nil {
 			activeIPVSServices[serv.String()] = true

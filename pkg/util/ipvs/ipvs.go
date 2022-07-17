@@ -69,6 +69,8 @@ const (
 	FlagPersistent = 0x1
 	// FlagHashed specify IPVS service hash flag
 	FlagHashed = 0x2
+        // FlagOnePacket specify IPVS one-packet-scheduling flag
+        FlagOnePacket = 0x4
 )
 
 // IPVS required kernel modules.

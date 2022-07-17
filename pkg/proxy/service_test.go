@@ -38,6 +38,7 @@ func makeTestServiceInfo(clusterIP string, port int, protocol string, healthchec
 		clusterIP: netutils.ParseIPSloppy(clusterIP),
 		port:      port,
 		protocol:  v1.Protocol(protocol),
+		annotations: make(map[string]string),
 	}
 	if healthcheckNodePort != 0 {
 		info.healthCheckNodePort = healthcheckNodePort
@@ -151,6 +152,21 @@ func TestServiceToServiceMap(t *testing.T) {
 			expected: map[ServicePortName]*BaseServiceInfo{
 				makeServicePortName("ns2", "cluster-ip", "p1", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.4", 1234, "UDP", 0),
 				makeServicePortName("ns2", "cluster-ip", "p2", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.4", 1235, "UDP", 0),
+			},
+		},
+	        {
+			desc: "cluster ip service with annotation for ops Mode",
+			service: makeTestService("ns2", "cluster-ip", func(svc *v1.Service) {
+				svc.Spec.Type = v1.ServiceTypeClusterIP
+				svc.Spec.ClusterIP = "172.16.55.4"
+				svc.Spec.Ports = addTestPort(svc.Spec.Ports, "p1", "UDP", 1234, 4321, 0)
+				svc.ObjectMeta.Annotations["kube-proxy.kubernetes.io/ipvs-ops"] = "true"
+				svc.ObjectMeta.Annotations["ignored-annotation"] = "junk"
+			}),
+			expected: map[ServicePortName]*BaseServiceInfo{
+				makeServicePortName("ns2", "cluster-ip", "p1", v1.ProtocolUDP): makeTestServiceInfo("172.16.55.4", 1234, "UDP", 0, func(info *BaseServiceInfo) {
+					info.annotations["kube-proxy.kubernetes.io/ipvs-ops"] = "true"
+				}),
 			},
 		},
 		{
@@ -484,6 +500,7 @@ func TestServiceToServiceMap(t *testing.T) {
 					svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
 					!sets.NewString(svcInfo.externalIPs...).Equal(sets.NewString(expectedInfo.externalIPs...)) ||
 					!sets.NewString(svcInfo.loadBalancerSourceRanges...).Equal(sets.NewString(expectedInfo.loadBalancerSourceRanges...)) ||
+                                        len(svcInfo.annotations) > 0 && !reflect.DeepEqual(svcInfo.annotations, expectedInfo.annotations)  ||
 					!reflect.DeepEqual(svcInfo.loadBalancerStatus, expectedInfo.loadBalancerStatus) {
 					t.Errorf("[%s] expected new[%v]to be %v, got %v", tc.desc, svcKey, expectedInfo, *svcInfo)
 				}
@@ -494,7 +511,8 @@ func TestServiceToServiceMap(t *testing.T) {
 						svcInfo.protocol != expectedInfo.protocol ||
 						svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
 						!sets.NewString(svcInfo.externalIPs...).Equal(sets.NewString(expectedInfo.externalIPs...)) ||
-						!sets.NewString(svcInfo.loadBalancerSourceRanges...).Equal(sets.NewString(expectedInfo.loadBalancerSourceRanges...)) ||
+						!sets.NewString(svcInfo.loadBalancerSourceRanges...).Equal(sets.NewString(expectedInfo.loadBalancerSourceRanges...)) || 
+					        len(svcInfo.annotations) > 0 && !reflect.DeepEqual(svcInfo.annotations, expectedInfo.annotations)  ||
 						!reflect.DeepEqual(svcInfo.loadBalancerStatus, expectedInfo.loadBalancerStatus) {
 						t.Errorf("expected new[%v]to be %v, got %v", svcKey, expectedInfo, *svcInfo)
 					}
