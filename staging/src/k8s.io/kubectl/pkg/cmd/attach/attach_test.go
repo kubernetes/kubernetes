@@ -550,7 +550,7 @@ func TestReattachMessage(t *testing.T) {
 				Pod: test.pod,
 			}
 			if msg := options.reattachMessage(test.container, test.rawTTY); test.expected == "" && msg != "" {
-				t.Errorf("reattachMessage(%v, %v) = %q, wanted empty string", test.container, test.rawTTY, msg)
+				t.Errorf("reattachMessage(%v, %v) = %q, want empty string", test.container, test.rawTTY, msg)
 			} else if !strings.Contains(msg, test.expected) {
 				t.Errorf("reattachMessage(%v, %v) = %q, want string containing %q", test.container, test.rawTTY, msg, test.expected)
 			}
