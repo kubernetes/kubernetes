@@ -5,11 +5,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
-	"reflect"
-	"testing"
-
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"math"
+	"reflect"
+	"testing"
+	"time"
 )
 
 func cpusetForCPUTopology(topo *topology.CPUTopology) cpuset.CPUSet {
@@ -1460,6 +1461,89 @@ func TestTakeOldVsNew(t *testing.T) {
 		newResult := takeIterator(tc.topo, tc.takeNumCpus, true, t)
 		if newResult != tc.expNew {
 			t.Errorf("\nEXP__NEW: %v\nTO EQUAL: %v", tc.expNew, newResult)
+		}
+	}
+}
+
+func makeReverseRange(min, max int) []int {
+	// like above but reverse order
+	// There is no equivalent to PHP's range in the Go standard library.
+	// You have to create one yourself.                               <-- NEAT!
+	// The simplest is to use a for loop:
+	a := make([]int, max-min+1)
+	for i := range a {
+		a[i] = max - i
+	}
+	return a
+}
+
+func TestMakeReverseRange(t *testing.T) {
+	number := 6
+	result := makeReverseRange(0, number-1)
+	for ndx, result := range result {
+		fmt.Println(ndx, result)
+		if result != number-ndx-1 {
+			t.Errorf("EXPECTED: %v to equal %v", result, number-ndx-1)
+			break
+		}
+	}
+
+}
+
+func AllocationPermutation(number int) [][]int {
+	nMax := int(math.Pow(2, float64(number-1)))
+	returnListList := make([][]int, nMax)
+	counter := 0
+	takeAll := make([]int, 1)
+	takeAll[0] = number
+	returnListList[counter] = takeAll
+	counter += 1
+	for _, n := range makeReverseRange(1, number-1) {
+		recurse := AllocationPermutation(number - n)
+		for _, rval := range recurse {
+			x := make([]int, 1+len(rval))
+			x[0] = n
+			ndx := 1
+			for _, r := range rval {
+				x[ndx] = r
+				ndx += 1
+			}
+			returnListList[counter] = x
+			counter += 1
+		}
+	}
+	return returnListList
+}
+
+func TestAllocationPermutation(t *testing.T) {
+	number := 17
+	then := time.Now()
+	listOfListOfInt := AllocationPermutation(number)
+	now := time.Now()
+	fmt.Println(len(listOfListOfInt), now.Sub(then))
+	//for ndx, value := range listOfListOfInt {
+	//	fmt.Println(ndx, value)
+	//}
+	firstAllocation := listOfListOfInt[0]
+	fmt.Println(firstAllocation)
+	if len(firstAllocation) != 1 {
+		t.Errorf("Expected %v to equal %v", len(firstAllocation), 1)
+		return
+	}
+	if firstAllocation[0] != number {
+		t.Errorf("Expected %v to equal %v", firstAllocation[0], number)
+		return
+	}
+	lastAllocation := listOfListOfInt[len(listOfListOfInt)-1]
+	fmt.Println(lastAllocation)
+	if len(lastAllocation) != number {
+		t.Errorf("Expected %v to equal %v", len(lastAllocation), number)
+		return
+	}
+	for ndx, result := range lastAllocation {
+		if result != 1 {
+			t.Errorf("Expected result[%v], %v to equal %v", ndx, result, 1)
+			return
 		}
 	}
 }
