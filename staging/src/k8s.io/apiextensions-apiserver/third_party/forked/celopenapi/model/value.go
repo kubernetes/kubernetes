@@ -200,17 +200,17 @@ func (sv *structValue) AddField(field *Field) {
 func (sv *structValue) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	if typeDesc.Kind() != reflect.Map &&
 		typeDesc.Kind() != reflect.Struct &&
-		typeDesc.Kind() != reflect.Ptr &&
+		typeDesc.Kind() != reflect.Pointer &&
 		typeDesc.Kind() != reflect.Interface {
 		return nil, fmt.Errorf("type conversion error from object to '%v'", typeDesc)
 	}
 
 	// Unwrap pointers, but track their use.
 	isPtr := false
-	if typeDesc.Kind() == reflect.Ptr {
+	if typeDesc.Kind() == reflect.Pointer {
 		tk := typeDesc
 		typeDesc = typeDesc.Elem()
-		if typeDesc.Kind() == reflect.Ptr {
+		if typeDesc.Kind() == reflect.Pointer {
 			return nil, fmt.Errorf("unsupported type conversion to '%v'", tk)
 		}
 		isPtr = true

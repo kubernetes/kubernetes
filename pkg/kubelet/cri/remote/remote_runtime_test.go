@@ -26,7 +26,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
-	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 const (

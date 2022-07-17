@@ -35,7 +35,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 
@@ -53,7 +53,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
@@ -489,10 +488,13 @@ type ClientConfigGetter func() (*restclient.Config, error)
 func LoadConfig() (config *restclient.Config, err error) {
 	defer func() {
 		if err == nil && config != nil {
-			testDesc := ginkgo.CurrentGinkgoTestDescription()
-			if len(testDesc.ComponentTexts) > 0 {
-				componentTexts := strings.Join(testDesc.ComponentTexts, " ")
-				config.UserAgent = fmt.Sprintf("%s -- %s", rest.DefaultKubernetesUserAgent(), componentTexts)
+			testDesc := ginkgo.CurrentSpecReport()
+			if len(testDesc.ContainerHierarchyTexts) > 0 {
+				testName := strings.Join(testDesc.ContainerHierarchyTexts, " ")
+				if len(testDesc.LeafNodeText) > 0 {
+					testName = testName + " " + testDesc.LeafNodeText
+				}
+				config.UserAgent = fmt.Sprintf("%s -- %s", restclient.DefaultKubernetesUserAgent(), testName)
 			}
 		}
 	}()
@@ -1357,7 +1359,7 @@ func PrettyPrintJSON(metrics interface{}) string {
 		Logf("Error indenting: %v", err)
 		return ""
 	}
-	return string(formatted.Bytes())
+	return formatted.String()
 }
 
 // taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
@@ -1422,7 +1424,7 @@ retriesLoop:
 					break actualWatchEventsLoop
 				}
 			}
-			if foundExpectedWatchEvent == false {
+			if !foundExpectedWatchEvent {
 				errs.Insert(fmt.Sprintf("Watch event %v not found", expectedWatchEvent.Type))
 			}
 			totalValidWatchEvents++

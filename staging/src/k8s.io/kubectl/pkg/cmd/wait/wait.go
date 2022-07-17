@@ -40,11 +40,13 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/util/jsonpath"
 	cmdget "k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
@@ -317,70 +319,86 @@ func (o *WaitOptions) RunWait() error {
 
 // IsDeleted is a condition func for waiting for something to be deleted
 func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
-	endTime := time.Now().Add(o.Timeout)
-	for {
-		if len(info.Name) == 0 {
-			return info.Object, false, fmt.Errorf("resource name must be provided")
-		}
+	if len(info.Name) == 0 {
+		return info.Object, false, fmt.Errorf("resource name must be provided")
+	}
 
-		nameSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
-
-		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
-		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: nameSelector})
-		if apierrors.IsNotFound(err) {
-			return info.Object, true, nil
-		}
-		if err != nil {
-			// TODO this could do something slightly fancier if we wish
-			return info.Object, false, err
-		}
-		if len(gottenObjList.Items) != 1 {
-			return info.Object, true, nil
-		}
-		gottenObj := &gottenObjList.Items[0]
-		resourceLocation := ResourceLocation{
-			GroupResource: info.Mapping.Resource.GroupResource(),
-			Namespace:     gottenObj.GetNamespace(),
-			Name:          gottenObj.GetName(),
-		}
-		if uid, ok := o.UIDMap[resourceLocation]; ok {
-			if gottenObj.GetUID() != uid {
-				return gottenObj, true, nil
-			}
-		}
-
-		watchOptions := metav1.ListOptions{}
-		watchOptions.FieldSelector = nameSelector
-		watchOptions.ResourceVersion = gottenObjList.GetResourceVersion()
-		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), watchOptions)
-		if err != nil {
-			return gottenObj, false, err
-		}
-
-		timeout := endTime.Sub(time.Now())
-		errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
-		if timeout < 0 {
-			// we're out of time
-			return gottenObj, false, errWaitTimeoutWithName
-		}
-
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, Wait{errOut: o.ErrOut}.IsDeleted)
-		cancel()
-		switch {
-		case err == nil:
-			return watchEvent.Object, true, nil
-		case err == watchtools.ErrWatchClosed:
-			continue
-		case err == wait.ErrWaitTimeout:
-			if watchEvent != nil {
-				return watchEvent.Object, false, errWaitTimeoutWithName
-			}
-			return gottenObj, false, errWaitTimeoutWithName
-		default:
-			return gottenObj, false, err
+	gottenObj, initObjGetErr := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(context.Background(), info.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(initObjGetErr) {
+		return info.Object, true, nil
+	}
+	if initObjGetErr != nil {
+		// TODO this could do something slightly fancier if we wish
+		return info.Object, false, initObjGetErr
+	}
+	resourceLocation := ResourceLocation{
+		GroupResource: info.Mapping.Resource.GroupResource(),
+		Namespace:     gottenObj.GetNamespace(),
+		Name:          gottenObj.GetName(),
+	}
+	if uid, ok := o.UIDMap[resourceLocation]; ok {
+		if gottenObj.GetUID() != uid {
+			return gottenObj, true, nil
 		}
 	}
+
+	endTime := time.Now().Add(o.Timeout)
+	timeout := time.Until(endTime)
+	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
+	if o.Timeout == 0 {
+		// If timeout is zero check if the object exists once only
+		if gottenObj == nil {
+			return nil, true, nil
+		}
+		return gottenObj, false, fmt.Errorf("condition not met for %s", info.ObjectName())
+	}
+	if timeout < 0 {
+		// we're out of time
+		return info.Object, false, errWaitTimeoutWithName
+	}
+
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+	defer cancel()
+
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
+		},
+	}
+
+	// this function is used to refresh the cache to prevent timeout waits on resources that have disappeared
+	preconditionFunc := func(store cache.Store) (bool, error) {
+		_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: info.Namespace, Name: info.Name})
+		if err != nil {
+			return true, err
+		}
+		if !exists {
+			// since we're looking for it to disappear we just return here if it no longer exists
+			return true, nil
+		}
+
+		return false, nil
+	}
+
+	intr := interrupt.New(nil, cancel)
+	err := intr.Run(func() error {
+		_, err := watchtools.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, preconditionFunc, Wait{errOut: o.ErrOut}.IsDeleted)
+		return err
+	})
+	if err != nil {
+		if err == wait.ErrWaitTimeout {
+			return gottenObj, false, errWaitTimeoutWithName
+		}
+		return gottenObj, false, err
+	}
+
+	return gottenObj, true, nil
 }
 
 // Wait has helper methods for handling watches, including error handling.
@@ -410,68 +428,85 @@ type checkCondFunc func(obj *unstructured.Unstructured) (bool, error)
 // getObjAndCheckCondition will make a List query to the API server to get the object and check if the condition is met using check function.
 // If the condition is not met, it will make a Watch query to the server and pass in the condMet function
 func getObjAndCheckCondition(info *resource.Info, o *WaitOptions, condMet isCondMetFunc, check checkCondFunc) (runtime.Object, bool, error) {
+	if len(info.Name) == 0 {
+		return info.Object, false, fmt.Errorf("resource name must be provided")
+	}
+
 	endTime := time.Now().Add(o.Timeout)
-	for {
-		if len(info.Name) == 0 {
-			return info.Object, false, fmt.Errorf("resource name must be provided")
+	timeout := time.Until(endTime)
+	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
+	if o.Timeout == 0 {
+		// If timeout is zero we will fetch the object(s) once only and check
+		gottenObj, initObjGetErr := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(context.Background(), info.Name, metav1.GetOptions{})
+		if initObjGetErr != nil {
+			return nil, false, initObjGetErr
 		}
-
-		nameSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
-
-		var gottenObj *unstructured.Unstructured
-		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
-		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), metav1.ListOptions{FieldSelector: nameSelector})
-
-		resourceVersion := ""
-		switch {
-		case err != nil:
-			return info.Object, false, err
-		case len(gottenObjList.Items) != 1:
-			resourceVersion = gottenObjList.GetResourceVersion()
-		default:
-			gottenObj = &gottenObjList.Items[0]
-			conditionMet, err := check(gottenObj)
-			if conditionMet {
-				return gottenObj, true, nil
-			}
-			if err != nil {
-				return gottenObj, false, err
-			}
-			resourceVersion = gottenObjList.GetResourceVersion()
+		if gottenObj == nil {
+			return nil, false, fmt.Errorf("condition not met for %s", info.ObjectName())
 		}
-
-		watchOptions := metav1.ListOptions{}
-		watchOptions.FieldSelector = nameSelector
-		watchOptions.ResourceVersion = resourceVersion
-		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), watchOptions)
+		conditionCheck, err := check(gottenObj)
 		if err != nil {
 			return gottenObj, false, err
 		}
-
-		timeout := endTime.Sub(time.Now())
-		errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
-		if timeout < 0 {
-			// we're out of time
-			return gottenObj, false, errWaitTimeoutWithName
+		if conditionCheck == false {
+			return gottenObj, false, fmt.Errorf("condition not met for %s", info.ObjectName())
 		}
-
-		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
-		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, watchtools.ConditionFunc(condMet))
-		cancel()
-		switch {
-		case err == nil:
-			return watchEvent.Object, true, nil
-		case err == watchtools.ErrWatchClosed:
-			continue
-		case err == wait.ErrWaitTimeout:
-			if watchEvent != nil {
-				return watchEvent.Object, false, errWaitTimeoutWithName
-			}
-			return gottenObj, false, errWaitTimeoutWithName
-		default:
-			return gottenObj, false, err
-		}
+		return gottenObj, true, nil
 	}
+	if timeout < 0 {
+		// we're out of time
+		return info.Object, false, errWaitTimeoutWithName
+	}
+
+	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+	defer cancel()
+
+	mapping := info.ResourceMapping() // used to pass back meaningful errors if object disappears
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			options.FieldSelector = fieldSelector
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.FieldSelector = fieldSelector
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
+		},
+	}
+
+	// this function is used to refresh the cache to prevent timeout waits on resources that have disappeared
+	preconditionFunc := func(store cache.Store) (bool, error) {
+		_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: info.Namespace, Name: info.Name})
+		if err != nil {
+			return true, err
+		}
+		if !exists {
+			return true, apierrors.NewNotFound(mapping.Resource.GroupResource(), info.Name)
+		}
+
+		return false, nil
+	}
+
+	var result runtime.Object
+	intr := interrupt.New(nil, cancel)
+	err := intr.Run(func() error {
+		ev, err := watchtools.UntilWithSync(ctx, lw, &unstructured.Unstructured{}, preconditionFunc, watchtools.ConditionFunc(condMet))
+		if ev != nil {
+			result = ev.Object
+		}
+		if err == context.DeadlineExceeded {
+			return errWaitTimeoutWithName
+		}
+		return err
+	})
+	if err != nil {
+		if err == wait.ErrWaitTimeout {
+			return result, false, errWaitTimeoutWithName
+		}
+		return result, false, err
+	}
+
+	return result, true, nil
 }
 
 // ConditionalWait hold information to check an API status condition

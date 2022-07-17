@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/duration"
+	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -257,6 +258,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 		}(handler)
 		// install the implementation into the command
 		cmd.RunE = func(*cobra.Command, []string) error { return renewalFunc() }
+		cmd.Args = cobra.NoArgs
 		cmdList = append(cmdList, cmd)
 	}
 
@@ -335,6 +337,14 @@ func getInternalCfg(cfgPath string, kubeconfigPath string, cfg kubeadmapiv1.Clus
 			internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, logPrefix, false, false)
 			if err == nil {
 				fmt.Println() // add empty line to separate the FetchInitConfigurationFromCluster output from the command output
+				// certificate renewal or expiration checking doesn't depend on a running cluster, which means the CertificatesDir
+				// could be set to a value other than the default value or the value fetched from the cluster.
+				// cfg.CertificatesDir could be empty if the default value is set to empty (not true today).
+				if len(cfg.CertificatesDir) != 0 {
+					klog.V(1).Infof("Overriding the cluster certificate directory with the value from command line flag --%s: %s", options.CertificatesDir, cfg.CertificatesDir)
+					internalcfg.ClusterConfiguration.CertificatesDir = cfg.CertificatesDir
+				}
+
 				return internalcfg, nil
 			}
 			fmt.Printf("[%s] Error reading configuration from the Cluster. Falling back to default configuration\n\n", logPrefix)

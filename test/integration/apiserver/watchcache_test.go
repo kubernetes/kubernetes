@@ -26,14 +26,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 // setup create kube-apiserver backed up by two separate etcds,
 // with one of them containing events and the other all other objects.
-func multiEtcdSetup(t testing.TB) (clientset.Interface, framework.CloseFunc) {
+func multiEtcdSetup(t *testing.T) (clientset.Interface, framework.CloseFunc) {
 	etcdArgs := []string{"--experimental-watch-progress-notify-interval", "1s"}
 	etcd0URL, stopEtcd0, err := framework.RunCustomEtcd("etcd_watchcache0", etcdArgs)
 	if err != nil {
@@ -51,25 +52,25 @@ func multiEtcdSetup(t testing.TB) (clientset.Interface, framework.CloseFunc) {
 	etcdOptions.EtcdServersOverrides = []string{fmt.Sprintf("/events#%s", etcd1URL)}
 	etcdOptions.EnableWatchCache = true
 
-	opts := framework.ControlPlaneConfigOptions{EtcdOptions: etcdOptions}
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
-	// Switch off endpoints reconciler to avoid unnecessary operations.
-	controlPlaneConfig.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
-	_, s, stopAPIServer := framework.RunAnAPIServer(controlPlaneConfig)
+	clientSet, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Ensure we're using the same etcd across apiserver restarts.
+			opts.Etcd = etcdOptions
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Switch off endpoints reconciler to avoid unnecessary operations.
+			config.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
+		},
+	})
 
 	closeFn := func() {
-		stopAPIServer()
+		tearDownFn()
 		stopEtcd1()
 		stopEtcd0()
 	}
 
-	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
-	if err != nil {
-		t.Fatalf("Error in create clientset: %v", err)
-	}
-
 	// Wait for apiserver to be stabilized.
-	// Everything but default service creation is checked in RunAnAPIServer above by
+	// Everything but default service creation is checked in StartTestServer above by
 	// waiting for post start hooks, so we just wait for default service to exist.
 	// TODO(wojtek-t): Figure out less fragile way.
 	ctx := context.Background()

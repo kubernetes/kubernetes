@@ -24,6 +24,8 @@
 package channelz
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -49,7 +51,8 @@ var (
 // TurnOn turns on channelz data collection.
 func TurnOn() {
 	if !IsOn() {
-		NewChannelzStorage()
+		db.set(newChannelMap())
+		idGen.reset()
 		atomic.StoreInt32(&curState, 1)
 	}
 }
@@ -94,46 +97,40 @@ func (d *dbWrapper) get() *channelMap {
 	return d.DB
 }
 
-// NewChannelzStorage initializes channelz data storage and id generator.
+// NewChannelzStorageForTesting initializes channelz data storage and id
+// generator for testing purposes.
 //
-// This function returns a cleanup function to wait for all channelz state to be reset by the
-// grpc goroutines when those entities get closed. By using this cleanup function, we make sure tests
-// don't mess up each other, i.e. lingering goroutine from previous test doing entity removal happen
-// to remove some entity just register by the new test, since the id space is the same.
-//
-// Note: This function is exported for testing purpose only. User should not call
-// it in most cases.
-func NewChannelzStorage() (cleanup func() error) {
-	db.set(&channelMap{
-		topLevelChannels: make(map[int64]struct{}),
-		channels:         make(map[int64]*channel),
-		listenSockets:    make(map[int64]*listenSocket),
-		normalSockets:    make(map[int64]*normalSocket),
-		servers:          make(map[int64]*server),
-		subChannels:      make(map[int64]*subChannel),
-	})
+// Returns a cleanup function to be invoked by the test, which waits for up to
+// 10s for all channelz state to be reset by the grpc goroutines when those
+// entities get closed. This cleanup function helps with ensuring that tests
+// don't mess up each other.
+func NewChannelzStorageForTesting() (cleanup func() error) {
+	db.set(newChannelMap())
 	idGen.reset()
+
 	return func() error {
-		var err error
 		cm := db.get()
 		if cm == nil {
 			return nil
 		}
-		for i := 0; i < 1000; i++ {
-			cm.mu.Lock()
-			if len(cm.topLevelChannels) == 0 && len(cm.servers) == 0 && len(cm.channels) == 0 && len(cm.subChannels) == 0 && len(cm.listenSockets) == 0 && len(cm.normalSockets) == 0 {
-				cm.mu.Unlock()
-				// all things stored in the channelz map have been cleared.
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		ticker := time.NewTicker(10 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			cm.mu.RLock()
+			topLevelChannels, servers, channels, subChannels, listenSockets, normalSockets := len(cm.topLevelChannels), len(cm.servers), len(cm.channels), len(cm.subChannels), len(cm.listenSockets), len(cm.normalSockets)
+			cm.mu.RUnlock()
+
+			if err := ctx.Err(); err != nil {
+				return fmt.Errorf("after 10s the channelz map has not been cleaned up yet, topchannels: %d, servers: %d, channels: %d, subchannels: %d, listen sockets: %d, normal sockets: %d", topLevelChannels, servers, channels, subChannels, listenSockets, normalSockets)
+			}
+			if topLevelChannels == 0 && servers == 0 && channels == 0 && subChannels == 0 && listenSockets == 0 && normalSockets == 0 {
 				return nil
 			}
-			cm.mu.Unlock()
-			time.Sleep(10 * time.Millisecond)
+			<-ticker.C
 		}
-
-		cm.mu.Lock()
-		err = fmt.Errorf("after 10s the channelz map has not been cleaned up yet, topchannels: %d, servers: %d, channels: %d, subchannels: %d, listen sockets: %d, normal sockets: %d", len(cm.topLevelChannels), len(cm.servers), len(cm.channels), len(cm.subChannels), len(cm.listenSockets), len(cm.normalSockets))
-		cm.mu.Unlock()
-		return err
 	}
 }
 
@@ -188,54 +185,77 @@ func GetServer(id int64) *ServerMetric {
 	return db.get().GetServer(id)
 }
 
-// RegisterChannel registers the given channel c in channelz database with ref
-// as its reference name, and add it to the child list of its parent (identified
-// by pid). pid = 0 means no parent. It returns the unique channelz tracking id
-// assigned to this channel.
-func RegisterChannel(c Channel, pid int64, ref string) int64 {
+// RegisterChannel registers the given channel c in the channelz database with
+// ref as its reference name, and adds it to the child list of its parent
+// (identified by pid). pid == nil means no parent.
+//
+// Returns a unique channelz identifier assigned to this channel.
+//
+// If channelz is not turned ON, the channelz database is not mutated.
+func RegisterChannel(c Channel, pid *Identifier, ref string) *Identifier {
 	id := idGen.genID()
+	var parent int64
+	isTopChannel := true
+	if pid != nil {
+		isTopChannel = false
+		parent = pid.Int()
+	}
+
+	if !IsOn() {
+		return newIdentifer(RefChannel, id, pid)
+	}
+
 	cn := &channel{
 		refName:     ref,
 		c:           c,
 		subChans:    make(map[int64]string),
 		nestedChans: make(map[int64]string),
 		id:          id,
-		pid:         pid,
+		pid:         parent,
 		trace:       &channelTrace{createdTime: time.Now(), events: make([]*TraceEvent, 0, getMaxTraceEntry())},
 	}
-	if pid == 0 {
-		db.get().addChannel(id, cn, true, pid)
-	} else {
-		db.get().addChannel(id, cn, false, pid)
-	}
-	return id
+	db.get().addChannel(id, cn, isTopChannel, parent)
+	return newIdentifer(RefChannel, id, pid)
 }
 
-// RegisterSubChannel registers the given channel c in channelz database with ref
-// as its reference name, and add it to the child list of its parent (identified
-// by pid). It returns the unique channelz tracking id assigned to this subchannel.
-func RegisterSubChannel(c Channel, pid int64, ref string) int64 {
-	if pid == 0 {
-		logger.Error("a SubChannel's parent id cannot be 0")
-		return 0
+// RegisterSubChannel registers the given subChannel c in the channelz database
+// with ref as its reference name, and adds it to the child list of its parent
+// (identified by pid).
+//
+// Returns a unique channelz identifier assigned to this subChannel.
+//
+// If channelz is not turned ON, the channelz database is not mutated.
+func RegisterSubChannel(c Channel, pid *Identifier, ref string) (*Identifier, error) {
+	if pid == nil {
+		return nil, errors.New("a SubChannel's parent id cannot be nil")
 	}
 	id := idGen.genID()
+	if !IsOn() {
+		return newIdentifer(RefSubChannel, id, pid), nil
+	}
+
 	sc := &subChannel{
 		refName: ref,
 		c:       c,
 		sockets: make(map[int64]string),
 		id:      id,
-		pid:     pid,
+		pid:     pid.Int(),
 		trace:   &channelTrace{createdTime: time.Now(), events: make([]*TraceEvent, 0, getMaxTraceEntry())},
 	}
-	db.get().addSubChannel(id, sc, pid)
-	return id
+	db.get().addSubChannel(id, sc, pid.Int())
+	return newIdentifer(RefSubChannel, id, pid), nil
 }
 
 // RegisterServer registers the given server s in channelz database. It returns
 // the unique channelz tracking id assigned to this server.
-func RegisterServer(s Server, ref string) int64 {
+//
+// If channelz is not turned ON, the channelz database is not mutated.
+func RegisterServer(s Server, ref string) *Identifier {
 	id := idGen.genID()
+	if !IsOn() {
+		return newIdentifer(RefServer, id, nil)
+	}
+
 	svr := &server{
 		refName:       ref,
 		s:             s,
@@ -244,71 +264,92 @@ func RegisterServer(s Server, ref string) int64 {
 		id:            id,
 	}
 	db.get().addServer(id, svr)
-	return id
+	return newIdentifer(RefServer, id, nil)
 }
 
 // RegisterListenSocket registers the given listen socket s in channelz database
 // with ref as its reference name, and add it to the child list of its parent
 // (identified by pid). It returns the unique channelz tracking id assigned to
 // this listen socket.
-func RegisterListenSocket(s Socket, pid int64, ref string) int64 {
-	if pid == 0 {
-		logger.Error("a ListenSocket's parent id cannot be 0")
-		return 0
+//
+// If channelz is not turned ON, the channelz database is not mutated.
+func RegisterListenSocket(s Socket, pid *Identifier, ref string) (*Identifier, error) {
+	if pid == nil {
+		return nil, errors.New("a ListenSocket's parent id cannot be 0")
 	}
 	id := idGen.genID()
-	ls := &listenSocket{refName: ref, s: s, id: id, pid: pid}
-	db.get().addListenSocket(id, ls, pid)
-	return id
+	if !IsOn() {
+		return newIdentifer(RefListenSocket, id, pid), nil
+	}
+
+	ls := &listenSocket{refName: ref, s: s, id: id, pid: pid.Int()}
+	db.get().addListenSocket(id, ls, pid.Int())
+	return newIdentifer(RefListenSocket, id, pid), nil
 }
 
 // RegisterNormalSocket registers the given normal socket s in channelz database
-// with ref as its reference name, and add it to the child list of its parent
+// with ref as its reference name, and adds it to the child list of its parent
 // (identified by pid). It returns the unique channelz tracking id assigned to
 // this normal socket.
-func RegisterNormalSocket(s Socket, pid int64, ref string) int64 {
-	if pid == 0 {
-		logger.Error("a NormalSocket's parent id cannot be 0")
-		return 0
+//
+// If channelz is not turned ON, the channelz database is not mutated.
+func RegisterNormalSocket(s Socket, pid *Identifier, ref string) (*Identifier, error) {
+	if pid == nil {
+		return nil, errors.New("a NormalSocket's parent id cannot be 0")
 	}
 	id := idGen.genID()
-	ns := &normalSocket{refName: ref, s: s, id: id, pid: pid}
-	db.get().addNormalSocket(id, ns, pid)
-	return id
+	if !IsOn() {
+		return newIdentifer(RefNormalSocket, id, pid), nil
+	}
+
+	ns := &normalSocket{refName: ref, s: s, id: id, pid: pid.Int()}
+	db.get().addNormalSocket(id, ns, pid.Int())
+	return newIdentifer(RefNormalSocket, id, pid), nil
 }
 
 // RemoveEntry removes an entry with unique channelz tracking id to be id from
 // channelz database.
-func RemoveEntry(id int64) {
-	db.get().removeEntry(id)
+//
+// If channelz is not turned ON, this function is a no-op.
+func RemoveEntry(id *Identifier) {
+	if !IsOn() {
+		return
+	}
+	db.get().removeEntry(id.Int())
 }
 
-// TraceEventDesc is what the caller of AddTraceEvent should provide to describe the event to be added
-// to the channel trace.
-// The Parent field is optional. It is used for event that will be recorded in the entity's parent
-// trace also.
+// TraceEventDesc is what the caller of AddTraceEvent should provide to describe
+// the event to be added to the channel trace.
+//
+// The Parent field is optional. It is used for an event that will be recorded
+// in the entity's parent trace.
 type TraceEventDesc struct {
 	Desc     string
 	Severity Severity
 	Parent   *TraceEventDesc
 }
 
-// AddTraceEvent adds trace related to the entity with specified id, using the provided TraceEventDesc.
-func AddTraceEvent(l grpclog.DepthLoggerV2, id int64, depth int, desc *TraceEventDesc) {
-	for d := desc; d != nil; d = d.Parent {
-		switch d.Severity {
-		case CtUnknown, CtInfo:
-			l.InfoDepth(depth+1, d.Desc)
-		case CtWarning:
-			l.WarningDepth(depth+1, d.Desc)
-		case CtError:
-			l.ErrorDepth(depth+1, d.Desc)
-		}
+// AddTraceEvent adds trace related to the entity with specified id, using the
+// provided TraceEventDesc.
+//
+// If channelz is not turned ON, this will simply log the event descriptions.
+func AddTraceEvent(l grpclog.DepthLoggerV2, id *Identifier, depth int, desc *TraceEventDesc) {
+	// Log only the trace description associated with the bottom most entity.
+	switch desc.Severity {
+	case CtUnknown, CtInfo:
+		l.InfoDepth(depth+1, withParens(id)+desc.Desc)
+	case CtWarning:
+		l.WarningDepth(depth+1, withParens(id)+desc.Desc)
+	case CtError:
+		l.ErrorDepth(depth+1, withParens(id)+desc.Desc)
 	}
+
 	if getMaxTraceEntry() == 0 {
 		return
 	}
-	db.get().traceEvent(id, desc)
+	if IsOn() {
+		db.get().traceEvent(id.Int(), desc)
+	}
 }
 
 // channelMap is the storage data structure for channelz.
@@ -324,6 +365,17 @@ type channelMap struct {
 	subChannels      map[int64]*subChannel
 	listenSockets    map[int64]*listenSocket
 	normalSockets    map[int64]*normalSocket
+}
+
+func newChannelMap() *channelMap {
+	return &channelMap{
+		topLevelChannels: make(map[int64]struct{}),
+		channels:         make(map[int64]*channel),
+		listenSockets:    make(map[int64]*listenSocket),
+		normalSockets:    make(map[int64]*normalSocket),
+		servers:          make(map[int64]*server),
+		subChannels:      make(map[int64]*subChannel),
+	}
 }
 
 func (c *channelMap) addServer(id int64, s *server) {

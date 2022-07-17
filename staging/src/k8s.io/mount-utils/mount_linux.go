@@ -22,6 +22,7 @@ package mount
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,14 +49,17 @@ const (
 	fsckErrorsUncorrected = 4
 	// Error thrown by exec cmd.Run() when process spawned by cmd.Start() completes before cmd.Wait() is called (see - k/k issue #103753)
 	errNoChildProcesses = "wait: no child processes"
+	// Error returned by some `umount` implementations when the specified path is not a mount point
+	errNotMounted = "not mounted"
 )
 
 // Mounter provides the default implementation of mount.Interface
 // for the linux platform.  This implementation assumes that the
 // kubelet is running in the host's root mount namespace.
 type Mounter struct {
-	mounterPath string
-	withSystemd bool
+	mounterPath                string
+	withSystemd                *bool
+	withSafeNotMountedBehavior bool
 }
 
 var _ MounterForceUnmounter = &Mounter{}
@@ -65,9 +69,20 @@ var _ MounterForceUnmounter = &Mounter{}
 // mounterPath allows using an alternative to `/bin/mount` for mounting.
 func New(mounterPath string) Interface {
 	return &Mounter{
-		mounterPath: mounterPath,
-		withSystemd: detectSystemd(),
+		mounterPath:                mounterPath,
+		withSafeNotMountedBehavior: detectSafeNotMountedBehavior(),
 	}
+}
+
+// hasSystemd validates that the withSystemd bool is set, if it is not,
+// detectSystemd will be called once for this Mounter instance.
+func (mounter *Mounter) hasSystemd() bool {
+	if mounter.withSystemd == nil {
+		withSystemd := detectSystemd()
+		mounter.withSystemd = &withSystemd
+	}
+
+	return *mounter.withSystemd
 }
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
@@ -149,7 +164,7 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 		mountCmd = mounterPath
 	}
 
-	if mounter.withSystemd && systemdMountRequired {
+	if mounter.hasSystemd() && systemdMountRequired {
 		// Try to run mount via systemd-run --scope. This will escape the
 		// service where kubelet runs and any fuse daemons will be started in a
 		// specific scope. kubelet service than can be restarted without killing
@@ -223,6 +238,36 @@ func detectSystemd() bool {
 	return true
 }
 
+// detectSafeNotMountedBehavior returns true if the umount implementation replies "not mounted"
+// when the specified path is not mounted. When not sure (permission errors, ...), it returns false.
+// When possible, we will trust umount's message and avoid doing our own mount point checks.
+// More info: https://github.com/util-linux/util-linux/blob/v2.2/mount/umount.c#L179
+func detectSafeNotMountedBehavior() bool {
+	return detectSafeNotMountedBehaviorWithExec(utilexec.New())
+}
+
+// detectSafeNotMountedBehaviorWithExec is for testing with FakeExec.
+func detectSafeNotMountedBehaviorWithExec(exec utilexec.Interface) bool {
+	// create a temp dir and try to umount it
+	path, err := ioutil.TempDir("", "kubelet-detect-safe-umount")
+	if err != nil {
+		klog.V(4).Infof("Cannot create temp dir to detect safe 'not mounted' behavior: %v", err)
+		return false
+	}
+	defer os.RemoveAll(path)
+	cmd := exec.Command("umount", path)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if strings.Contains(string(output), errNotMounted) {
+			klog.V(4).Infof("Detected umount with safe 'not mounted' behavior")
+			return true
+		}
+		klog.V(4).Infof("'umount %s' failed with: %v, output: %s", path, err, string(output))
+	}
+	klog.V(4).Infof("Detected umount with unsafe 'not mounted' behavior")
+	return false
+}
+
 // MakeMountArgs makes the arguments to the mount(8) command.
 // options MUST not contain sensitive material (like passwords).
 func MakeMountArgs(source, target, fstype string, options []string) (mountArgs []string) {
@@ -290,6 +335,7 @@ func AddSystemdScopeSensitive(systemdRunPath, mountName, command string, args []
 }
 
 // Unmount unmounts the target.
+// If the mounter has safe "not mounted" behavior, no error will be returned when the target is not a mount point.
 func (mounter *Mounter) Unmount(target string) error {
 	klog.V(4).Infof("Unmounting %s", target)
 	command := exec.Command("umount", target)
@@ -302,6 +348,10 @@ func (mounter *Mounter) Unmount(target string) error {
 			}
 			// Rewrite err with the actual exit error of the process.
 			err = &exec.ExitError{ProcessState: command.ProcessState}
+		}
+		if mounter.withSafeNotMountedBehavior && strings.Contains(string(output), errNotMounted) {
+			klog.V(4).Infof("ignoring 'not mounted' error for %s", target)
+			return nil
 		}
 		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", err, target, string(output))
 	}
@@ -349,6 +399,11 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// canSafelySkipMountPointCheck relies on the detected behavior of umount when given a target that is not a mount point.
+func (mounter *Mounter) canSafelySkipMountPointCheck() bool {
+	return mounter.withSafeNotMountedBehavior
 }
 
 // GetMountRefs finds all mount references to pathname, returns a

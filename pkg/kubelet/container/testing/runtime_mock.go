@@ -126,6 +126,20 @@ func (mr *MockRuntimeMockRecorder) APIVersion() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "APIVersion", reflect.TypeOf((*MockRuntime)(nil).APIVersion))
 }
 
+// CheckpointContainer mocks base method.
+func (m *MockRuntime) CheckpointContainer(options *v10.CheckpointContainerRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CheckpointContainer", options)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CheckpointContainer indicates an expected call of CheckpointContainer.
+func (mr *MockRuntimeMockRecorder) CheckpointContainer(options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckpointContainer", reflect.TypeOf((*MockRuntime)(nil).CheckpointContainer), options)
+}
+
 // DeleteContainer mocks base method.
 func (m *MockRuntime) DeleteContainer(containerID container.ContainerID) error {
 	m.ctrl.T.Helper()

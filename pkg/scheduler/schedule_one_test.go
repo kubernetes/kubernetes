@@ -590,10 +590,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				func() *framework.QueuedPodInfo {
 					return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(item.sendPod)}
 				},
-				func(p *framework.QueuedPodInfo, err error) {
-					gotPod = p.Pod
-					gotError = err
-				},
 				nil,
 				internalqueue.NewTestQueue(ctx, nil),
 				profile.Map{
@@ -604,6 +600,13 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				0)
 			s.SchedulePod = func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 				return item.mockResult.result, item.mockResult.err
+			}
+			s.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo) {
+				gotPod = p.Pod
+				gotError = err
+
+				msg := truncateMessage(err.Error())
+				fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 			}
 			called := make(chan struct{})
 			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
@@ -1237,7 +1240,9 @@ func TestUpdatePod(t *testing.T) {
 
 			pod := st.MakePod().Name("foo").NominatedNodeName(test.currentNominatedNodeName).Conditions(test.currentPodConditions).Obj()
 
-			if err := updatePod(cs, pod, test.newPodCondition, test.newNominatingInfo); err != nil {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if err := updatePod(ctx, cs, pod, test.newPodCondition, test.newNominatingInfo); err != nil {
 				t.Fatalf("Error calling update: %v", err)
 			}
 
@@ -2024,7 +2029,6 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				snapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			informerFactory.Start(ctx.Done())
@@ -2326,7 +2330,6 @@ func TestZeroRequest(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				snapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 
@@ -2510,7 +2513,6 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				snapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 
@@ -2566,7 +2568,6 @@ func makeScheduler(nodes []*v1.Node) *Scheduler {
 
 	s := newScheduler(
 		cache,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -2669,9 +2670,6 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 		func() *framework.QueuedPodInfo {
 			return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(clientcache.Pop(queuedPodStore).(*v1.Pod))}
 		},
-		func(p *framework.QueuedPodInfo, err error) {
-			errChan <- err
-		},
 		nil,
 		schedulingQueue,
 		profile.Map{
@@ -2680,6 +2678,12 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 		client,
 		internalcache.NewEmptySnapshot(),
 		schedulerapi.DefaultPercentageOfNodesToScore)
+	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo) {
+		errChan <- err
+
+		msg := truncateMessage(err.Error())
+		fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+	}
 	return sched, bindingChan, errChan
 }
 

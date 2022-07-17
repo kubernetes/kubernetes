@@ -35,7 +35,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -56,7 +56,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 
 	//Wait 10 seconds, then SEND delete requests for all the namespaces.
 	ginkgo.By("Waiting 10 seconds")
-	time.Sleep(time.Duration(10 * time.Second))
+	time.Sleep(10 * time.Second)
 	deleteFilter := []string{"nslifetest"}
 	deleted, err := framework.DeleteNamespaces(f.ClientSet, deleteFilter, nil /* skipFilter */)
 	framework.ExpectNoError(err, "failed to delete namespace(s) containing: %s", deleteFilter)
@@ -273,7 +273,7 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err, "failed to marshal JSON patch data")
-		_, err = f.ClientSet.CoreV1().Namespaces().Patch(context.TODO(), namespaceName, types.StrategicMergePatchType, []byte(nspatch), metav1.PatchOptions{})
+		_, err = f.ClientSet.CoreV1().Namespaces().Patch(context.TODO(), namespaceName, types.StrategicMergePatchType, nspatch, metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch Namespace")
 
 		ginkgo.By("get the Namespace and ensuring it has the label")

@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/test/utils/junit"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // TODO: Those tests should be splitted by SIG and moved to SIG-owned directories,

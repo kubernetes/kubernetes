@@ -91,7 +91,7 @@ func fill(dataString string, dataInt int, t reflect.Type, v reflect.Value, fillF
 	defer delete(filledTypes, t)
 
 	// if nil, populate pointers with a zero-value instance of the underlying type
-	if t.Kind() == reflect.Ptr && v.IsNil() {
+	if t.Kind() == reflect.Pointer && v.IsNil() {
 		if v.CanSet() {
 			v.Set(reflect.New(t.Elem()))
 		} else if v.IsNil() {
@@ -155,10 +155,10 @@ func fill(dataString string, dataInt int, t reflect.Type, v reflect.Value, fillF
 			fieldType := field.Type
 			fieldValue := v.Field(i)
 
-			fill(dataString, dataInt, reflect.PtrTo(fieldType), fieldValue.Addr(), fillFuncs, filledTypes)
+			fill(dataString, dataInt, reflect.PointerTo(fieldType), fieldValue.Addr(), fillFuncs, filledTypes)
 		}
 
-	case reflect.Ptr:
+	case reflect.Pointer:
 		fill(dataString, dataInt, t.Elem(), v.Elem(), fillFuncs, filledTypes)
 
 	case reflect.String:

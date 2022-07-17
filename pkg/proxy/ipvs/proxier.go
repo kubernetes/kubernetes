@@ -63,8 +63,11 @@ const (
 	// kubeServicesChain is the services portal chain
 	kubeServicesChain utiliptables.Chain = "KUBE-SERVICES"
 
-	// KubeFireWallChain is the kubernetes firewall chain.
-	kubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
+	// kubeProxyFirewallChain is the kube-proxy firewall chain.
+	kubeProxyFirewallChain utiliptables.Chain = "KUBE-PROXY-FIREWALL"
+
+	// kubeSourceRangesFirewallChain is the firewall subchain for LoadBalancerSourceRanges.
+	kubeSourceRangesFirewallChain utiliptables.Chain = "KUBE-SOURCE-RANGES-FIREWALL"
 
 	// kubePostroutingChain is the kubernetes postrouting chain
 	kubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
@@ -74,9 +77,6 @@ const (
 
 	// kubeNodePortChain is the kubernetes node port chain
 	kubeNodePortChain utiliptables.Chain = "KUBE-NODE-PORT"
-
-	// KubeMarkDropChain is the mark-for-drop chain
-	kubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
 
 	// kubeForwardChain is the kubernetes forward chain
 	kubeForwardChain utiliptables.Chain = "KUBE-FORWARD"
@@ -110,6 +110,8 @@ var iptablesJumpChain = []struct {
 	{utiliptables.TableNAT, utiliptables.ChainPostrouting, kubePostroutingChain, "kubernetes postrouting rules"},
 	{utiliptables.TableFilter, utiliptables.ChainForward, kubeForwardChain, "kubernetes forwarding rules"},
 	{utiliptables.TableFilter, utiliptables.ChainInput, kubeNodePortChain, "kubernetes health check rules"},
+	{utiliptables.TableFilter, utiliptables.ChainInput, kubeProxyFirewallChain, "kube-proxy firewall rules"},
+	{utiliptables.TableFilter, utiliptables.ChainForward, kubeProxyFirewallChain, "kube-proxy firewall rules"},
 }
 
 var iptablesChains = []struct {
@@ -118,19 +120,13 @@ var iptablesChains = []struct {
 }{
 	{utiliptables.TableNAT, kubeServicesChain},
 	{utiliptables.TableNAT, kubePostroutingChain},
-	{utiliptables.TableNAT, kubeFirewallChain},
 	{utiliptables.TableNAT, kubeNodePortChain},
 	{utiliptables.TableNAT, kubeLoadBalancerChain},
 	{utiliptables.TableNAT, kubeMarkMasqChain},
 	{utiliptables.TableFilter, kubeForwardChain},
 	{utiliptables.TableFilter, kubeNodePortChain},
-}
-
-var iptablesEnsureChains = []struct {
-	table utiliptables.Table
-	chain utiliptables.Chain
-}{
-	{utiliptables.TableNAT, kubeMarkDropChain},
+	{utiliptables.TableFilter, kubeProxyFirewallChain},
+	{utiliptables.TableFilter, kubeSourceRangesFirewallChain},
 }
 
 var iptablesCleanupChains = []struct {
@@ -139,11 +135,12 @@ var iptablesCleanupChains = []struct {
 }{
 	{utiliptables.TableNAT, kubeServicesChain},
 	{utiliptables.TableNAT, kubePostroutingChain},
-	{utiliptables.TableNAT, kubeFirewallChain},
 	{utiliptables.TableNAT, kubeNodePortChain},
 	{utiliptables.TableNAT, kubeLoadBalancerChain},
 	{utiliptables.TableFilter, kubeForwardChain},
 	{utiliptables.TableFilter, kubeNodePortChain},
+	{utiliptables.TableFilter, kubeProxyFirewallChain},
+	{utiliptables.TableFilter, kubeSourceRangesFirewallChain},
 }
 
 // ipsetInfo is all ipset we needed in ipvs proxier
@@ -157,7 +154,7 @@ var ipsetInfo = []struct {
 	{kubeExternalIPSet, utilipset.HashIPPort, kubeExternalIPSetComment},
 	{kubeExternalIPLocalSet, utilipset.HashIPPort, kubeExternalIPLocalSetComment},
 	{kubeLoadBalancerSet, utilipset.HashIPPort, kubeLoadBalancerSetComment},
-	{kubeLoadbalancerFWSet, utilipset.HashIPPort, kubeLoadbalancerFWSetComment},
+	{kubeLoadBalancerFWSet, utilipset.HashIPPort, kubeLoadBalancerFWSetComment},
 	{kubeLoadBalancerLocalSet, utilipset.HashIPPort, kubeLoadBalancerLocalSetComment},
 	{kubeLoadBalancerSourceIPSet, utilipset.HashIPPortIP, kubeLoadBalancerSourceIPSetComment},
 	{kubeLoadBalancerSourceCIDRSet, utilipset.HashIPPortNet, kubeLoadBalancerSourceCIDRSetComment},
@@ -177,23 +174,25 @@ var ipsetInfo = []struct {
 // Note: kubeNodePortLocalSetTCP must be prior to kubeNodePortSetTCP, the same for UDP.
 var ipsetWithIptablesChain = []struct {
 	name          string
+	table         utiliptables.Table
 	from          string
 	to            string
 	matchType     string
 	protocolMatch string
 }{
-	{kubeLoopBackIPSet, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
-	{kubeLoadBalancerSet, string(kubeServicesChain), string(kubeLoadBalancerChain), "dst,dst", ""},
-	{kubeLoadbalancerFWSet, string(kubeLoadBalancerChain), string(kubeFirewallChain), "dst,dst", ""},
-	{kubeLoadBalancerSourceCIDRSet, string(kubeFirewallChain), "RETURN", "dst,dst,src", ""},
-	{kubeLoadBalancerSourceIPSet, string(kubeFirewallChain), "RETURN", "dst,dst,src", ""},
-	{kubeLoadBalancerLocalSet, string(kubeLoadBalancerChain), "RETURN", "dst,dst", ""},
-	{kubeNodePortLocalSetTCP, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolTCP},
-	{kubeNodePortSetTCP, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolTCP},
-	{kubeNodePortLocalSetUDP, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolUDP},
-	{kubeNodePortSetUDP, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolUDP},
-	{kubeNodePortLocalSetSCTP, string(kubeNodePortChain), "RETURN", "dst,dst", utilipset.ProtocolSCTP},
-	{kubeNodePortSetSCTP, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst,dst", utilipset.ProtocolSCTP},
+	{kubeLoopBackIPSet, utiliptables.TableNAT, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
+	{kubeLoadBalancerSet, utiliptables.TableNAT, string(kubeServicesChain), string(kubeLoadBalancerChain), "dst,dst", ""},
+	{kubeLoadBalancerLocalSet, utiliptables.TableNAT, string(kubeLoadBalancerChain), "RETURN", "dst,dst", ""},
+	{kubeNodePortLocalSetTCP, utiliptables.TableNAT, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolTCP},
+	{kubeNodePortSetTCP, utiliptables.TableNAT, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolTCP},
+	{kubeNodePortLocalSetUDP, utiliptables.TableNAT, string(kubeNodePortChain), "RETURN", "dst", utilipset.ProtocolUDP},
+	{kubeNodePortSetUDP, utiliptables.TableNAT, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst", utilipset.ProtocolUDP},
+	{kubeNodePortLocalSetSCTP, utiliptables.TableNAT, string(kubeNodePortChain), "RETURN", "dst,dst", utilipset.ProtocolSCTP},
+	{kubeNodePortSetSCTP, utiliptables.TableNAT, string(kubeNodePortChain), string(kubeMarkMasqChain), "dst,dst", utilipset.ProtocolSCTP},
+
+	{kubeLoadBalancerFWSet, utiliptables.TableFilter, string(kubeProxyFirewallChain), string(kubeSourceRangesFirewallChain), "dst,dst", ""},
+	{kubeLoadBalancerSourceCIDRSet, utiliptables.TableFilter, string(kubeSourceRangesFirewallChain), "RETURN", "dst,dst,src", ""},
+	{kubeLoadBalancerSourceIPSet, utiliptables.TableFilter, string(kubeSourceRangesFirewallChain), "RETURN", "dst,dst,src", ""},
 }
 
 // In IPVS proxy mode, the following flags need to be set
@@ -1307,11 +1306,11 @@ func (proxier *Proxier) syncProxyRules() {
 				// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
 				// This currently works for loadbalancers that preserves source ips.
 				// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
-				if valid := proxier.ipsetList[kubeLoadbalancerFWSet].validateEntry(entry); !valid {
-					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadbalancerFWSet].Name)
+				if valid := proxier.ipsetList[kubeLoadBalancerFWSet].validateEntry(entry); !valid {
+					klog.ErrorS(nil, "Error adding entry to ipset", "entry", entry, "ipset", proxier.ipsetList[kubeLoadBalancerFWSet].Name)
 					continue
 				}
-				proxier.ipsetList[kubeLoadbalancerFWSet].activeEntries.Insert(entry.String())
+				proxier.ipsetList[kubeLoadBalancerFWSet].activeEntries.Insert(entry.String())
 				allowFromNode := false
 				for _, src := range svcInfo.LoadBalancerSourceRanges() {
 					// ipset call
@@ -1648,7 +1647,11 @@ func (proxier *Proxier) writeIptablesRules() {
 				"-m", "set", "--match-set", proxier.ipsetList[set.name].Name,
 				set.matchType,
 			)
-			proxier.natRules.Write(args, "-j", set.to)
+			if set.table == utiliptables.TableFilter {
+				proxier.filterRules.Write(args, "-j", set.to)
+			} else {
+				proxier.natRules.Write(args, "-j", set.to)
+			}
 		}
 	}
 
@@ -1731,16 +1734,16 @@ func (proxier *Proxier) writeIptablesRules() {
 	)
 	proxier.natRules.Write(args, "-j", string(kubeNodePortChain))
 
-	// mark drop for KUBE-LOAD-BALANCER
+	// mark for masquerading for KUBE-LOAD-BALANCER
 	proxier.natRules.Write(
 		"-A", string(kubeLoadBalancerChain),
 		"-j", string(kubeMarkMasqChain),
 	)
 
-	// mark drop for KUBE-FIRE-WALL
-	proxier.natRules.Write(
-		"-A", string(kubeFirewallChain),
-		"-j", string(kubeMarkDropChain),
+	// drop packets filtered by KUBE-SOURCE-RANGES-FIREWALL
+	proxier.filterRules.Write(
+		"-A", string(kubeSourceRangesFirewallChain),
+		"-j", "DROP",
 	)
 
 	// Accept all traffic with destination of ipvs virtual service, in case other iptables rules
@@ -1836,35 +1839,15 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 
 // createAndLinkKubeChain create all kube chains that ipvs proxier need and write basic link.
 func (proxier *Proxier) createAndLinkKubeChain() {
-	existingFilterChains := proxier.getExistingChains(proxier.filterChainsData, utiliptables.TableFilter)
-	existingNATChains := proxier.getExistingChains(proxier.iptablesData, utiliptables.TableNAT)
-
-	// ensure KUBE-MARK-DROP chain exist but do not change any rules
-	for _, ch := range iptablesEnsureChains {
-		if _, err := proxier.iptables.EnsureChain(ch.table, ch.chain); err != nil {
-			klog.ErrorS(err, "Failed to ensure chain exists", "table", ch.table, "chain", ch.chain)
-			return
-		}
-	}
-
-	// Make sure we keep stats for the top-level chains
 	for _, ch := range iptablesChains {
 		if _, err := proxier.iptables.EnsureChain(ch.table, ch.chain); err != nil {
 			klog.ErrorS(err, "Failed to ensure chain exists", "table", ch.table, "chain", ch.chain)
 			return
 		}
 		if ch.table == utiliptables.TableNAT {
-			if chain, ok := existingNATChains[ch.chain]; ok {
-				proxier.natChains.WriteBytes(chain)
-			} else {
-				proxier.natChains.Write(utiliptables.MakeChainLine(ch.chain))
-			}
+			proxier.natChains.Write(utiliptables.MakeChainLine(ch.chain))
 		} else {
-			if chain, ok := existingFilterChains[ch.chain]; ok {
-				proxier.filterChains.WriteBytes(chain)
-			} else {
-				proxier.filterChains.Write(utiliptables.MakeChainLine(ch.chain))
-			}
+			proxier.filterChains.Write(utiliptables.MakeChainLine(ch.chain))
 		}
 	}
 
@@ -1875,20 +1858,6 @@ func (proxier *Proxier) createAndLinkKubeChain() {
 		}
 	}
 
-}
-
-// getExistingChains get iptables-save output so we can check for existing chains and rules.
-// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
-// Result may SHARE memory with contents of buffer.
-func (proxier *Proxier) getExistingChains(buffer *bytes.Buffer, table utiliptables.Table) map[utiliptables.Chain][]byte {
-	buffer.Reset()
-	err := proxier.iptables.SaveInto(table, buffer)
-	if err != nil { // if we failed to get any rules
-		klog.ErrorS(err, "Failed to execute iptables-save, syncing all rules")
-	} else { // otherwise parse the output
-		return utiliptables.GetChainLines(table, buffer.Bytes())
-	}
-	return nil
 }
 
 // After a UDP or SCTP endpoint has been removed, we must flush any pending conntrack entries to it, or else we

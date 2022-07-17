@@ -27,8 +27,8 @@ import (
 
 // Tests that the apiserver rejects the export param
 func TestExportRejection(t *testing.T) {
-	_, clientSet, closeFn := setup(t)
-	defer closeFn()
+	clientSet, _, tearDownFn := setup(t)
+	defer tearDownFn()
 
 	_, err := clientSet.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: "export-fail"},

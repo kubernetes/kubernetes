@@ -19,7 +19,7 @@ package stats
 import (
 	"testing"
 
-	gomock "github.com/golang/mock/gomock"
+	"github.com/golang/mock/gomock"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 
@@ -53,6 +53,7 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 		cName11   = "c1"
 		pName2    = "pod2"
 		cName22   = "c2"
+		cName222  = "c222"
 	)
 	infos := map[string]cadvisorapiv2.ContainerInfo{
 		// ContainerInfo with past creation time and no CPU/memory usage for
@@ -78,11 +79,14 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 		// ContainerInfo with past creation time and no CPU/memory usage for
 		// simulating uncleaned cgroups of already terminated containers, which
 		// should not be shown in the results.
-		"/pod2-c0-terminated-1": getTerminatedContainerInfo(seedPastPod0Container0, pName2, namespace, cName22),
+		"/pod2-c2-terminated-1": getTerminatedContainerInfo(seedPastPod0Container0, pName2, namespace, cName22),
+
+		//ContainerInfo with no CPU/memory usage but has network usage for uncleaned cgroups, should not be filtered out
+		"/pod2-c222-zerocpumem-1": getContainerInfoWithZeroCpuMem(seedPastPod0Container0, pName2, namespace, cName222),
 	}
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
-	assert.Len(t, filteredInfos, 4)
-	assert.Len(t, allInfos, 10)
+	assert.Len(t, filteredInfos, 5)
+	assert.Len(t, allInfos, 11)
 	for _, c := range []string{"/pod0-i", "/pod0-c0"} {
 		if _, found := filteredInfos[c]; !found {
 			t.Errorf("%q is expected to be in the output\n", c)
@@ -216,6 +220,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 		info.Spec.Cpu = cadvisorapiv2.CpuSpec{}
 		info.Spec.HasMemory = false
 		info.Spec.HasCpu = false
+		info.Spec.HasNetwork = false
 		infos[name] = info
 	}
 

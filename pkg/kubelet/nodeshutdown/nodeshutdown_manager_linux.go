@@ -67,6 +67,7 @@ type dbusInhibiter interface {
 
 // managerImpl has functions that can be used to interact with the Node Shutdown Manager.
 type managerImpl struct {
+	logger       klog.Logger
 	recorder     record.EventRecorder
 	nodeRef      *v1.ObjectReference
 	probeManager prober.Manager
@@ -118,6 +119,7 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 		conf.Clock = clock.RealClock{}
 	}
 	manager := &managerImpl{
+		logger:                           conf.Logger,
 		probeManager:                     conf.ProbeManager,
 		recorder:                         conf.Recorder,
 		nodeRef:                          conf.NodeRef,
@@ -131,7 +133,7 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 			Path: filepath.Join(conf.StateDirectory, localStorageStateFile),
 		},
 	}
-	klog.InfoS("Creating node shutdown manager",
+	manager.logger.Info("Creating node shutdown manager",
 		"shutdownGracePeriodRequested", conf.ShutdownGracePeriodRequested,
 		"shutdownGracePeriodCriticalPods", conf.ShutdownGracePeriodCriticalPods,
 		"shutdownGracePeriodByPodPriority", shutdownGracePeriodByPodPriority,
@@ -159,7 +161,7 @@ func (m *managerImpl) setMetrics() {
 		sta := state{}
 		err := m.storage.Load(&sta)
 		if err != nil {
-			klog.ErrorS(err, "Failed to load graceful shutdown state")
+			m.logger.Error(err, "Failed to load graceful shutdown state")
 		} else {
 			if !sta.StartTime.IsZero() {
 				metrics.GracefulShutdownStartTime.Set(timestamp(sta.StartTime))
@@ -184,10 +186,10 @@ func (m *managerImpl) Start() error {
 			}
 
 			time.Sleep(dbusReconnectPeriod)
-			klog.V(1).InfoS("Restarting watch for node shutdown events")
+			m.logger.V(1).Info("Restarting watch for node shutdown events")
 			stop, err = m.start()
 			if err != nil {
-				klog.ErrorS(err, "Unable to watch the node for shutdown events")
+				m.logger.Error(err, "Unable to watch the node for shutdown events")
 			}
 		}
 	}()
@@ -255,11 +257,11 @@ func (m *managerImpl) start() (chan struct{}, error) {
 			select {
 			case isShuttingDown, ok := <-events:
 				if !ok {
-					klog.ErrorS(err, "Ended to watching the node for shutdown events")
+					m.logger.Error(err, "Ended to watching the node for shutdown events")
 					close(stop)
 					return
 				}
-				klog.V(1).InfoS("Shutdown manager detected new shutdown event, isNodeShuttingDownNow", "event", isShuttingDown)
+				m.logger.V(1).Info("Shutdown manager detected new shutdown event, isNodeShuttingDownNow", "event", isShuttingDown)
 
 				var shutdownType string
 				if isShuttingDown {
@@ -267,7 +269,7 @@ func (m *managerImpl) start() (chan struct{}, error) {
 				} else {
 					shutdownType = "cancelled"
 				}
-				klog.V(1).InfoS("Shutdown manager detected new shutdown event", "event", shutdownType)
+				m.logger.V(1).Info("Shutdown manager detected new shutdown event", "event", shutdownType)
 				if isShuttingDown {
 					m.recorder.Event(m.nodeRef, v1.EventTypeNormal, kubeletevents.NodeShutdown, "Shutdown manager detected shutdown event")
 				} else {
@@ -316,12 +318,12 @@ func (m *managerImpl) ShutdownStatus() error {
 }
 
 func (m *managerImpl) processShutdownEvent() error {
-	klog.V(1).InfoS("Shutdown manager processing shutdown event")
+	m.logger.V(1).Info("Shutdown manager processing shutdown event")
 	activePods := m.getPods()
 
 	defer func() {
 		m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
-		klog.V(1).InfoS("Shutdown manager completed processing shutdown event, node will shutdown shortly")
+		m.logger.V(1).Info("Shutdown manager completed processing shutdown event, node will shutdown shortly")
 	}()
 
 	if m.enableMetrics && m.storage != nil {
@@ -330,7 +332,7 @@ func (m *managerImpl) processShutdownEvent() error {
 			StartTime: startTime,
 		})
 		if err != nil {
-			klog.ErrorS(err, "Failed to store graceful shutdown state")
+			m.logger.Error(err, "Failed to store graceful shutdown state")
 		}
 		metrics.GracefulShutdownStartTime.Set(timestamp(startTime))
 		metrics.GracefulShutdownEndTime.Set(0)
@@ -342,7 +344,7 @@ func (m *managerImpl) processShutdownEvent() error {
 				EndTime:   endTime,
 			})
 			if err != nil {
-				klog.ErrorS(err, "Failed to store graceful shutdown state")
+				m.logger.Error(err, "Failed to store graceful shutdown state")
 			}
 			metrics.GracefulShutdownStartTime.Set(timestamp(endTime))
 		}()
@@ -369,7 +371,7 @@ func (m *managerImpl) processShutdownEvent() error {
 					gracePeriodOverride = *pod.Spec.TerminationGracePeriodSeconds
 				}
 
-				klog.V(1).InfoS("Shutdown manager killing pod with gracePeriod", "pod", klog.KObj(pod), "gracePeriod", gracePeriodOverride)
+				m.logger.V(1).Info("Shutdown manager killing pod with gracePeriod", "pod", klog.KObj(pod), "gracePeriod", gracePeriodOverride)
 
 				if err := m.killPodFunc(pod, false, &gracePeriodOverride, func(status *v1.PodStatus) {
 					// set the pod status to failed (unless it was already in a successful terminal phase)
@@ -379,9 +381,9 @@ func (m *managerImpl) processShutdownEvent() error {
 					status.Message = nodeShutdownMessage
 					status.Reason = nodeShutdownReason
 				}); err != nil {
-					klog.V(1).InfoS("Shutdown manager failed killing pod", "pod", klog.KObj(pod), "err", err)
+					m.logger.V(1).Info("Shutdown manager failed killing pod", "pod", klog.KObj(pod), "err", err)
 				} else {
-					klog.V(1).InfoS("Shutdown manager finished killing pod", "pod", klog.KObj(pod))
+					m.logger.V(1).Info("Shutdown manager finished killing pod", "pod", klog.KObj(pod))
 				}
 			}(pod, group)
 		}
@@ -399,7 +401,7 @@ func (m *managerImpl) processShutdownEvent() error {
 		case <-doneCh:
 			timer.Stop()
 		case <-timer.C():
-			klog.V(1).InfoS("Shutdown manager pod killing time out", "gracePeriod", group.ShutdownGracePeriodSeconds, "priority", group.Priority)
+			m.logger.V(1).Info("Shutdown manager pod killing time out", "gracePeriod", group.ShutdownGracePeriodSeconds, "priority", group.Priority)
 		}
 	}
 

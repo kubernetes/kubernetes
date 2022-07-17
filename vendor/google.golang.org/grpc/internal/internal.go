@@ -38,11 +38,10 @@ var (
 	// KeepaliveMinPingTime is the minimum ping interval.  This must be 10s by
 	// default, but tests may wish to set it lower for convenience.
 	KeepaliveMinPingTime = 10 * time.Second
-	// ParseServiceConfigForTesting is for creating a fake
-	// ClientConn for resolver testing only
-	ParseServiceConfigForTesting interface{} // func(string) *serviceconfig.ParseResult
+	// ParseServiceConfig parses a JSON representation of the service config.
+	ParseServiceConfig interface{} // func(string) *serviceconfig.ParseResult
 	// EqualServiceConfigForTesting is for testing service config generation and
-	// parsing. Both a and b should be returned by ParseServiceConfigForTesting.
+	// parsing. Both a and b should be returned by ParseServiceConfig.
 	// This function compares the config without rawJSON stripped, in case the
 	// there's difference in white space.
 	EqualServiceConfigForTesting func(a, b serviceconfig.Config) bool
@@ -86,3 +85,9 @@ const (
 	// that supports backend returned by grpclb balancer.
 	CredsBundleModeBackendFromBalancer = "backend-from-balancer"
 )
+
+// RLSLoadBalancingPolicyName is the name of the RLS LB policy.
+//
+// It currently has an experimental suffix which would be removed once
+// end-to-end testing of the policy is completed.
+const RLSLoadBalancingPolicyName = "rls_experimental"

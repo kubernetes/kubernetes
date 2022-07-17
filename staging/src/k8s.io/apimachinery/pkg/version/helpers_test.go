@@ -45,7 +45,7 @@ func TestCompareKubeAwareVersionStrings(t *testing.T) {
 			if e {
 				t.Errorf("expected %s to be greater than %s", tc.v1, tc.v2)
 			} else {
-				t.Errorf("expected %s to be less than than %s", tc.v1, tc.v2)
+				t.Errorf("expected %s to be less than %s", tc.v1, tc.v2)
 			}
 		}
 	}

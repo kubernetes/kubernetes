@@ -2151,7 +2151,7 @@ func TestHealthCheckNodePort(t *testing.T) {
 	checkIptables(t, ipt, epIpt)
 }
 
-func TestLoadBalanceSourceRanges(t *testing.T) {
+func TestLoadBalancerSourceRanges(t *testing.T) {
 	ipt, fp := buildFakeProxier()
 
 	svcIP := "10.20.30.41"
@@ -2214,7 +2214,7 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 			Protocol: strings.ToLower(string(v1.ProtocolTCP)),
 			SetType:  utilipset.HashIPPort,
 		}},
-		kubeLoadbalancerFWSet: {{
+		kubeLoadBalancerFWSet: {{
 			IP:       svcLBIP,
 			Port:     svcPort,
 			Protocol: strings.ToLower(string(v1.ProtocolTCP)),
@@ -2243,15 +2243,13 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 		}, {
 			JumpChain: "ACCEPT", MatchSet: kubeLoadBalancerSet,
 		}},
-		string(kubeLoadBalancerChain): {{
-			JumpChain: string(kubeFirewallChain), MatchSet: kubeLoadbalancerFWSet,
-		}, {
-			JumpChain: string(kubeMarkMasqChain), MatchSet: "",
+		string(kubeProxyFirewallChain): {{
+			JumpChain: string(kubeSourceRangesFirewallChain), MatchSet: kubeLoadBalancerFWSet,
 		}},
-		string(kubeFirewallChain): {{
+		string(kubeSourceRangesFirewallChain): {{
 			JumpChain: "RETURN", MatchSet: kubeLoadBalancerSourceCIDRSet,
 		}, {
-			JumpChain: string(kubeMarkDropChain), MatchSet: "",
+			JumpChain: "DROP", MatchSet: "",
 		}},
 	}
 	checkIptables(t, ipt, epIpt)
@@ -4675,13 +4673,14 @@ func TestCreateAndLinkKubeChain(t *testing.T) {
 	fp.createAndLinkKubeChain()
 	expectedNATChains := `:KUBE-SERVICES - [0:0]
 :KUBE-POSTROUTING - [0:0]
-:KUBE-FIREWALL - [0:0]
 :KUBE-NODE-PORT - [0:0]
 :KUBE-LOAD-BALANCER - [0:0]
 :KUBE-MARK-MASQ - [0:0]
 `
 	expectedFilterChains := `:KUBE-FORWARD - [0:0]
 :KUBE-NODE-PORT - [0:0]
+:KUBE-PROXY-FIREWALL - [0:0]
+:KUBE-SOURCE-RANGES-FIREWALL - [0:0]
 `
 	assert.Equal(t, expectedNATChains, string(fp.natChains.Bytes()))
 	assert.Equal(t, expectedFilterChains, string(fp.filterChains.Bytes()))

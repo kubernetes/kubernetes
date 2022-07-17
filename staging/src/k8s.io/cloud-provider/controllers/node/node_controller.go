@@ -163,7 +163,12 @@ func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 	// The periodic loop for updateNodeStatus communicates with the APIServer with a worst case complexity
 	// of O(num_nodes) per cycle. These functions are justified here because these events fire
 	// very infrequently. DO NOT MODIFY this to perform frequent operations.
-	go wait.Until(func() { cnc.UpdateNodeStatus(context.TODO()) }, cnc.nodeStatusUpdateFrequency, stopCh)
+	go wait.Until(func() {
+		if err := cnc.UpdateNodeStatus(context.TODO()); err != nil {
+			klog.Errorf("failed to update node status: %v", err)
+		}
+	}, cnc.nodeStatusUpdateFrequency, stopCh)
+
 	go wait.Until(cnc.runWorker, time.Second, stopCh)
 
 	<-stopCh

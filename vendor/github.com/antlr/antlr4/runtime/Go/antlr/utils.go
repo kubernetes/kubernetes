@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"sort"
+	"math/bits"
 	"strconv"
 	"strings"
 )
@@ -71,59 +71,92 @@ type hasher interface {
 	hash() int
 }
 
+const bitsPerWord = 64
+
+func indexForBit(bit int) int {
+	return bit / bitsPerWord
+}
+
+func wordForBit(data []uint64, bit int) uint64 {
+	idx := indexForBit(bit)
+	if idx >= len(data) {
+		return 0
+	}
+	return data[idx]
+}
+
+func maskForBit(bit int) uint64 {
+	return uint64(1) << (bit % bitsPerWord)
+}
+
+func wordsNeeded(bit int) int {
+	return indexForBit(bit) + 1
+}
+
 type BitSet struct {
-	data map[int]bool
+	data []uint64
 }
 
 func NewBitSet() *BitSet {
-	b := new(BitSet)
-	b.data = make(map[int]bool)
-	return b
+	return &BitSet{}
 }
 
 func (b *BitSet) add(value int) {
-	b.data[value] = true
+	idx := indexForBit(value)
+	if idx >= len(b.data) {
+		size := wordsNeeded(value)
+		data := make([]uint64, size)
+		copy(data, b.data)
+		b.data = data
+	}
+	b.data[idx] |= maskForBit(value)
 }
 
 func (b *BitSet) clear(index int) {
-	delete(b.data, index)
+	idx := indexForBit(index)
+	if idx >= len(b.data) {
+		return
+	}
+	b.data[idx] &= ^maskForBit(index)
 }
 
 func (b *BitSet) or(set *BitSet) {
-	for k := range set.data {
-		b.add(k)
+	// Get min size necessary to represent the bits in both sets.
+	bLen := b.minLen()
+	setLen := set.minLen()
+	maxLen := intMax(bLen, setLen)
+	if maxLen > len(b.data) {
+		// Increase the size of len(b.data) to repesent the bits in both sets.
+		data := make([]uint64, maxLen)
+		copy(data, b.data)
+		b.data = data
+	}
+	// len(b.data) is at least setLen.
+	for i := 0; i < setLen; i++ {
+		b.data[i] |= set.data[i]
 	}
 }
 
 func (b *BitSet) remove(value int) {
-	delete(b.data, value)
+	b.clear(value)
 }
 
 func (b *BitSet) contains(value int) bool {
-	return b.data[value]
-}
-
-func (b *BitSet) values() []int {
-	ks := make([]int, len(b.data))
-	i := 0
-	for k := range b.data {
-		ks[i] = k
-		i++
+	idx := indexForBit(value)
+	if idx >= len(b.data) {
+		return false
 	}
-	sort.Ints(ks)
-	return ks
+	return (b.data[idx] & maskForBit(value)) != 0
 }
 
 func (b *BitSet) minValue() int {
-	min := 2147483647
-
-	for k := range b.data {
-		if k < min {
-			min = k
+	for i, v := range b.data {
+		if v == 0 {
+			continue
 		}
+		return i*bitsPerWord + bits.TrailingZeros64(v)
 	}
-
-	return min
+	return 2147483647
 }
 
 func (b *BitSet) equals(other interface{}) bool {
@@ -132,12 +165,22 @@ func (b *BitSet) equals(other interface{}) bool {
 		return false
 	}
 
-	if len(b.data) != len(otherBitSet.data) {
+	if b == otherBitSet {
+		return true
+	}
+
+	// We only compare set bits, so we cannot rely on the two slices having the same size. Its
+	// possible for two BitSets to have different slice lengths but the same set bits. So we only
+	// compare the relavent words and ignore the trailing zeros.
+	bLen := b.minLen()
+	otherLen := otherBitSet.minLen()
+
+	if bLen != otherLen {
 		return false
 	}
 
-	for k, v := range b.data {
-		if otherBitSet.data[k] != v {
+	for i := 0; i < bLen; i++ {
+		if b.data[i] != otherBitSet.data[i] {
 			return false
 		}
 	}
@@ -145,18 +188,35 @@ func (b *BitSet) equals(other interface{}) bool {
 	return true
 }
 
+func (b *BitSet) minLen() int {
+	for i := len(b.data); i > 0; i-- {
+		if b.data[i-1] != 0 {
+			return i
+		}
+	}
+	return 0
+}
+
 func (b *BitSet) length() int {
-	return len(b.data)
+	cnt := 0
+	for _, val := range b.data {
+		cnt += bits.OnesCount64(val)
+	}
+	return cnt
 }
 
 func (b *BitSet) String() string {
-	vals := b.values()
-	valsS := make([]string, len(vals))
+	vals := make([]string, 0, b.length())
 
-	for i, val := range vals {
-		valsS[i] = strconv.Itoa(val)
+	for i, v := range b.data {
+		for v != 0 {
+			n := bits.TrailingZeros64(v)
+			vals = append(vals, strconv.Itoa(i*bitsPerWord+n))
+			v &= ^(uint64(1) << n)
+		}
 	}
-	return "{" + strings.Join(valsS, ", ") + "}"
+
+	return "{" + strings.Join(vals, ", ") + "}"
 }
 
 type AltDict struct {

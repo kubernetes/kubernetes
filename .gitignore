@@ -4,6 +4,9 @@
 # OSX trash
 .DS_Store
 
+# Developers can store local stuff in dirs named __something
+__*
+
 # Eclipse files
 .classpath
 .project

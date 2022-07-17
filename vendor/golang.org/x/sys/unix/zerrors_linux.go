@@ -260,6 +260,17 @@ const (
 	BUS_USB                                     = 0x3
 	BUS_VIRTUAL                                 = 0x6
 	CAN_BCM                                     = 0x2
+	CAN_CTRLMODE_3_SAMPLES                      = 0x4
+	CAN_CTRLMODE_BERR_REPORTING                 = 0x10
+	CAN_CTRLMODE_CC_LEN8_DLC                    = 0x100
+	CAN_CTRLMODE_FD                             = 0x20
+	CAN_CTRLMODE_FD_NON_ISO                     = 0x80
+	CAN_CTRLMODE_LISTENONLY                     = 0x2
+	CAN_CTRLMODE_LOOPBACK                       = 0x1
+	CAN_CTRLMODE_ONE_SHOT                       = 0x8
+	CAN_CTRLMODE_PRESUME_ACK                    = 0x40
+	CAN_CTRLMODE_TDC_AUTO                       = 0x200
+	CAN_CTRLMODE_TDC_MANUAL                     = 0x400
 	CAN_EFF_FLAG                                = 0x80000000
 	CAN_EFF_ID_BITS                             = 0x1d
 	CAN_EFF_MASK                                = 0x1fffffff
@@ -337,6 +348,7 @@ const (
 	CAN_RTR_FLAG                                = 0x40000000
 	CAN_SFF_ID_BITS                             = 0xb
 	CAN_SFF_MASK                                = 0x7ff
+	CAN_TERMINATION_DISABLED                    = 0x0
 	CAN_TP16                                    = 0x3
 	CAN_TP20                                    = 0x4
 	CAP_AUDIT_CONTROL                           = 0x1e
@@ -1274,6 +1286,8 @@ const (
 	IUTF8                                       = 0x4000
 	IXANY                                       = 0x800
 	JFFS2_SUPER_MAGIC                           = 0x72b6
+	KCMPROTO_CONNECTED                          = 0x0
+	KCM_RECV_DISABLE                            = 0x1
 	KEXEC_ARCH_386                              = 0x30000
 	KEXEC_ARCH_68K                              = 0x40000
 	KEXEC_ARCH_AARCH64                          = 0xb70000
@@ -2446,6 +2460,9 @@ const (
 	SIOCGSTAMPNS                                = 0x8907
 	SIOCGSTAMPNS_OLD                            = 0x8907
 	SIOCGSTAMP_OLD                              = 0x8906
+	SIOCKCMATTACH                               = 0x89e0
+	SIOCKCMCLONE                                = 0x89e2
+	SIOCKCMUNATTACH                             = 0x89e1
 	SIOCOUTQNSD                                 = 0x894b
 	SIOCPROTOPRIVATE                            = 0x89e0
 	SIOCRTMSG                                   = 0x890d

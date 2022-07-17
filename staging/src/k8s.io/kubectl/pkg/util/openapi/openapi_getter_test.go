@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	openapi_v2 "github.com/google/gnostic/openapiv2"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/kubectl/pkg/util/openapi"

@@ -407,6 +407,8 @@ func AddValidateFlags(cmd *cobra.Command) {
 		"warn" will warn about unknown or duplicate fields without blocking the request if server-side field validation is enabled on the API server, and behave as "ignore" otherwise.
 		"false" or "ignore" will not perform any schema validation, silently dropping any unknown or duplicate fields.`,
 	)
+
+	cmd.Flags().Lookup("validate").NoOptDefVal = "strict"
 }
 
 func AddFilenameOptionFlags(cmd *cobra.Command, options *resource.FilenameOptions, usage string) {
@@ -584,8 +586,6 @@ func GetValidationDirective(cmd *cobra.Command) (string, error) {
 	b, err := strconv.ParseBool(validateFlag)
 	if err != nil {
 		switch validateFlag {
-		case cmd.Flag("validate").NoOptDefVal:
-			return metav1.FieldValidationStrict, nil
 		case "strict":
 			return metav1.FieldValidationStrict, nil
 		case "warn":

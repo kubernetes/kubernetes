@@ -19,7 +19,7 @@ package v1beta1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -664,7 +664,7 @@ type KubeletConfiguration struct {
 	// Default: ""
 	// +optional
 	ProviderID string `json:"providerID,omitempty"`
-	// kernelMemcgNotification, if set, instructs the the kubelet to integrate with the
+	// kernelMemcgNotification, if set, instructs the kubelet to integrate with the
 	// kernel memcg notification for determining if memory eviction thresholds are
 	// exceeded rather than polling.
 	// Default: false
@@ -676,7 +676,7 @@ type KubeletConfiguration struct {
 	// Default:
 	//   Format: text
 	// + optional
-	Logging componentbaseconfigv1alpha1.LoggingConfiguration `json:"logging,omitempty"`
+	Logging logsapi.LoggingConfiguration `json:"logging,omitempty"`
 	// enableSystemLogHandler enables system logs via web interface host:port/logs/
 	// Default: true
 	// +optional

@@ -351,7 +351,7 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 	result := make(map[string]cadvisorapiv2.ContainerInfo)
 	for _, refs := range cinfoMap {
 		if len(refs) == 1 {
-			// ContainerInfo with no CPU/memory usage for uncleaned cgroups of
+			// ContainerInfo with no CPU/memory/network usage for uncleaned cgroups of
 			// already terminated containers, which should not be shown in the results.
 			if !isContainerTerminated(&refs[0].cinfo) {
 				result[refs[0].cgroup] = refs[0].cinfo
@@ -415,16 +415,28 @@ func hasMemoryAndCPUInstUsage(info *cadvisorapiv2.ContainerInfo) bool {
 	return cstat.CpuInst.Usage.Total != 0 && cstat.Memory.RSS != 0
 }
 
-// isContainerTerminated returns true if the specified container info has
-// both zero CPU instantaneous usage and zero memory RSS usage, and
-// false otherwise.
+// isContainerTerminated returns true if the specified container meet one of the following conditions
+// 1. info.spec both cpu memory and network are false conditions
+// 2. info.Stats both network and cpu or memory are nil
+// 3. both zero CPU instantaneous usage zero memory RSS usage and zero network usage,
+// and false otherwise.
 func isContainerTerminated(info *cadvisorapiv2.ContainerInfo) bool {
-	if !info.Spec.HasCpu && !info.Spec.HasMemory {
+	if !info.Spec.HasCpu && !info.Spec.HasMemory && !info.Spec.HasNetwork {
 		return true
 	}
 	cstat, found := latestContainerStats(info)
 	if !found {
 		return true
+	}
+	if cstat.Network != nil {
+		iStats := cadvisorInfoToNetworkStats(info)
+		if iStats != nil {
+			for _, iStat := range iStats.Interfaces {
+				if *iStat.RxErrors != 0 || *iStat.TxErrors != 0 || *iStat.RxBytes != 0 || *iStat.TxBytes != 0 {
+					return false
+				}
+			}
+		}
 	}
 	if cstat.CpuInst == nil || cstat.Memory == nil {
 		return true

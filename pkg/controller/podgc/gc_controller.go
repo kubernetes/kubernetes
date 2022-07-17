@@ -60,7 +60,6 @@ type PodGCController struct {
 
 	nodeQueue workqueue.DelayingInterface
 
-	deletePod              func(namespace, name string) error
 	terminatedPodThreshold int
 }
 
@@ -77,10 +76,6 @@ func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer c
 		nodeLister:             nodeInformer.Lister(),
 		nodeListerSynced:       nodeInformer.Informer().HasSynced,
 		nodeQueue:              workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
-		deletePod: func(namespace, name string) error {
-			klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(namespace, name))
-			return kubeClient.CoreV1().Pods(namespace).Delete(ctx, name, *metav1.NewDeleteOptions(0))
-		},
 	}
 
 	return gcc
@@ -114,13 +109,13 @@ func (gcc *PodGCController) gc(ctx context.Context) {
 		return
 	}
 	if gcc.terminatedPodThreshold > 0 {
-		gcc.gcTerminated(pods)
+		gcc.gcTerminated(ctx, pods)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeOutOfServiceVolumeDetach) {
-		gcc.gcTerminating(pods)
+		gcc.gcTerminating(ctx, pods)
 	}
 	gcc.gcOrphaned(ctx, pods, nodes)
-	gcc.gcUnscheduledTerminating(pods)
+	gcc.gcUnscheduledTerminating(ctx, pods)
 }
 
 func isPodTerminated(pod *v1.Pod) bool {
@@ -135,7 +130,7 @@ func isPodTerminating(pod *v1.Pod) bool {
 	return pod.ObjectMeta.DeletionTimestamp != nil
 }
 
-func (gcc *PodGCController) gcTerminating(pods []*v1.Pod) {
+func (gcc *PodGCController) gcTerminating(ctx context.Context, pods []*v1.Pod) {
 	klog.V(4).Info("GC'ing terminating pods that are on out-of-service nodes")
 	terminatingPods := []*v1.Pod{}
 	for _, pod := range pods {
@@ -168,7 +163,7 @@ func (gcc *PodGCController) gcTerminating(pods []*v1.Pod) {
 		wait.Add(1)
 		go func(namespace string, name string) {
 			defer wait.Done()
-			if err := gcc.deletePod(namespace, name); err != nil {
+			if err := gcc.deletePod(ctx, namespace, name); err != nil {
 				// ignore not founds
 				utilruntime.HandleError(err)
 			}
@@ -177,7 +172,7 @@ func (gcc *PodGCController) gcTerminating(pods []*v1.Pod) {
 	wait.Wait()
 }
 
-func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
+func (gcc *PodGCController) gcTerminated(ctx context.Context, pods []*v1.Pod) {
 	terminatedPods := []*v1.Pod{}
 	for _, pod := range pods {
 		if isPodTerminated(pod) {
@@ -200,7 +195,7 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 		wait.Add(1)
 		go func(namespace string, name string) {
 			defer wait.Done()
-			if err := gcc.deletePod(namespace, name); err != nil {
+			if err := gcc.deletePod(ctx, namespace, name); err != nil {
 				// ignore not founds
 				defer utilruntime.HandleError(err)
 			}
@@ -233,7 +228,7 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 			continue
 		}
 		klog.V(2).InfoS("Found orphaned Pod assigned to the Node, deleting.", "pod", klog.KObj(pod), "node", pod.Spec.NodeName)
-		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
+		if err := gcc.deletePod(ctx, pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
 			klog.V(0).InfoS("Forced deletion of orphaned Pod succeeded", "pod", klog.KObj(pod))
@@ -273,7 +268,7 @@ func (gcc *PodGCController) checkIfNodeExists(ctx context.Context, name string) 
 }
 
 // gcUnscheduledTerminating deletes pods that are terminating and haven't been scheduled to a particular node.
-func (gcc *PodGCController) gcUnscheduledTerminating(pods []*v1.Pod) {
+func (gcc *PodGCController) gcUnscheduledTerminating(ctx context.Context, pods []*v1.Pod) {
 	klog.V(4).Infof("GC'ing unscheduled pods which are terminating.")
 
 	for _, pod := range pods {
@@ -282,7 +277,7 @@ func (gcc *PodGCController) gcUnscheduledTerminating(pods []*v1.Pod) {
 		}
 
 		klog.V(2).InfoS("Found unscheduled terminating Pod not assigned to any Node, deleting.", "pod", klog.KObj(pod))
-		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
+		if err := gcc.deletePod(ctx, pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
 			klog.V(0).InfoS("Forced deletion of unscheduled terminating Pod succeeded", "pod", klog.KObj(pod))
@@ -301,4 +296,9 @@ func (o byCreationTimestamp) Less(i, j int) bool {
 		return o[i].Name < o[j].Name
 	}
 	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
+}
+
+func (gcc *PodGCController) deletePod(ctx context.Context, namespace, name string) error {
+	klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(namespace, name))
+	return gcc.kubeClient.CoreV1().Pods(namespace).Delete(ctx, name, *metav1.NewDeleteOptions(0))
 }

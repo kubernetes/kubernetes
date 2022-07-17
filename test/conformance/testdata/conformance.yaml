@@ -2021,6 +2021,13 @@
     IP address.
   release: v1.9
   file: test/e2e/common/node/pods.go
+- testname: Pods, patching status
+  codename: '[sig-node] Pods should patch a pod status [Conformance]'
+  description: A pod is created which MUST succeed and be found running. The pod status
+    when patched MUST succeed. Given the patching of the pod status, the fields MUST
+    equal the new values.
+  release: v1.25
+  file: test/e2e/common/node/pods.go
 - testname: Pods, completes the lifecycle of a Pod and the PodStatus
   codename: '[sig-node] Pods should run through the lifecycle of Pods and PodStatus
     [Conformance]'

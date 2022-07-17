@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/internal/heap"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -136,7 +137,7 @@ type PriorityQueue struct {
 	framework.PodNominator
 
 	stop  chan struct{}
-	clock util.Clock
+	clock clock.Clock
 
 	// pod initial backoff duration.
 	podInitialBackoffDuration time.Duration
@@ -175,7 +176,7 @@ type PriorityQueue struct {
 }
 
 type priorityQueueOptions struct {
-	clock                             util.Clock
+	clock                             clock.Clock
 	podInitialBackoffDuration         time.Duration
 	podMaxBackoffDuration             time.Duration
 	podMaxInUnschedulablePodsDuration time.Duration
@@ -186,8 +187,8 @@ type priorityQueueOptions struct {
 // Option configures a PriorityQueue
 type Option func(*priorityQueueOptions)
 
-// WithClock sets clock for PriorityQueue, the default clock is util.RealClock.
-func WithClock(clock util.Clock) Option {
+// WithClock sets clock for PriorityQueue, the default clock is clock.RealClock.
+func WithClock(clock clock.Clock) Option {
 	return func(o *priorityQueueOptions) {
 		o.clock = clock
 	}
@@ -229,7 +230,7 @@ func WithPodMaxInUnschedulablePodsDuration(duration time.Duration) Option {
 }
 
 var defaultPriorityQueueOptions = priorityQueueOptions{
-	clock:                             util.RealClock{},
+	clock:                             clock.RealClock{},
 	podInitialBackoffDuration:         DefaultPodInitialBackoffDuration,
 	podMaxBackoffDuration:             DefaultPodMaxBackoffDuration,
 	podMaxInUnschedulablePodsDuration: DefaultPodMaxInUnschedulablePodsDuration,
@@ -414,7 +415,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 	}
 	if p.moveRequestCycle >= podSchedulingCycle {
 		if err := p.podBackoffQ.Add(pInfo); err != nil {
-			return fmt.Errorf("error adding pod %v to the backoff queue: %v", pod.Name, err)
+			return fmt.Errorf("error adding pod %v to the backoff queue: %v", klog.KObj(pod), err)
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", ScheduleAttemptFailure).Inc()
 	} else {

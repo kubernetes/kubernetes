@@ -34,7 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
 	"google.golang.org/api/compute/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -704,12 +704,14 @@ func TestEnsureInternalFirewallDeletesLegacyFirewall(t *testing.T) {
 
 	nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
 	require.NoError(t, err)
+	destinationIP := "10.1.2.3"
 	sourceRange := []string{"10.0.0.0/20"}
 	// Manually create a firewall rule with the legacy name - lbName
 	gce.ensureInternalFirewall(
 		svc,
 		lbName,
 		"firewall with legacy name",
+		destinationIP,
 		sourceRange,
 		[]string{"123"},
 		v1.ProtocolTCP,
@@ -724,6 +726,7 @@ func TestEnsureInternalFirewallDeletesLegacyFirewall(t *testing.T) {
 		svc,
 		fwName,
 		"firewall with new name",
+		destinationIP,
 		sourceRange,
 		[]string{"123", "456"},
 		v1.ProtocolTCP,
@@ -746,6 +749,7 @@ func TestEnsureInternalFirewallDeletesLegacyFirewall(t *testing.T) {
 		svc,
 		fwName,
 		"firewall with new name",
+		destinationIP,
 		sourceRange,
 		[]string{"123", "456", "789"},
 		v1.ProtocolTCP,
@@ -776,7 +780,7 @@ func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {
 
 	c := gce.c.(*cloud.MockGCE)
 	c.MockFirewalls.InsertHook = mock.InsertFirewallsUnauthorizedErrHook
-	c.MockFirewalls.UpdateHook = mock.UpdateFirewallsUnauthorizedErrHook
+	c.MockFirewalls.PatchHook = mock.UpdateFirewallsUnauthorizedErrHook
 	gce.onXPN = true
 	require.True(t, gce.OnXPN())
 
@@ -785,11 +789,13 @@ func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {
 
 	nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
 	require.NoError(t, err)
+	destinationIP := "10.1.2.3"
 	sourceRange := []string{"10.0.0.0/20"}
 	gce.ensureInternalFirewall(
 		svc,
 		fwName,
 		"A sad little firewall",
+		destinationIP,
 		sourceRange,
 		[]string{"123"},
 		v1.ProtocolTCP,
@@ -797,17 +803,18 @@ func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {
 		lbName)
 	require.Nil(t, err, "Should success when XPN is on.")
 
-	checkEvent(t, recorder, FilewallChangeMsg, true)
+	checkEvent(t, recorder, FirewallChangeMsg, true)
 
 	// Create a firewall.
 	c.MockFirewalls.InsertHook = nil
-	c.MockFirewalls.UpdateHook = nil
+	c.MockFirewalls.PatchHook = nil
 	gce.onXPN = false
 
 	gce.ensureInternalFirewall(
 		svc,
 		fwName,
 		"A sad little firewall",
+		destinationIP,
 		sourceRange,
 		[]string{"123"},
 		v1.ProtocolTCP,
@@ -820,13 +827,14 @@ func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {
 
 	gce.onXPN = true
 	c.MockFirewalls.InsertHook = mock.InsertFirewallsUnauthorizedErrHook
-	c.MockFirewalls.UpdateHook = mock.UpdateFirewallsUnauthorizedErrHook
+	c.MockFirewalls.PatchHook = mock.UpdateFirewallsUnauthorizedErrHook
 
 	// Try to update the firewall just created.
 	gce.ensureInternalFirewall(
 		svc,
 		fwName,
 		"A happy little firewall",
+		destinationIP,
 		sourceRange,
 		[]string{"123"},
 		v1.ProtocolTCP,
@@ -834,7 +842,7 @@ func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {
 		lbName)
 	require.Nil(t, err, "Should success when XPN is on.")
 
-	checkEvent(t, recorder, FilewallChangeMsg, true)
+	checkEvent(t, recorder, FirewallChangeMsg, true)
 }
 
 func TestEnsureLoadBalancerDeletedSucceedsOnXPN(t *testing.T) {
@@ -856,7 +864,7 @@ func TestEnsureLoadBalancerDeletedSucceedsOnXPN(t *testing.T) {
 
 	err = gce.ensureInternalLoadBalancerDeleted(vals.ClusterName, vals.ClusterID, fakeLoadbalancerService(string(LBTypeInternal)))
 	assert.NoError(t, err)
-	checkEvent(t, recorder, FilewallChangeMsg, true)
+	checkEvent(t, recorder, FirewallChangeMsg, true)
 }
 
 func TestEnsureInternalInstanceGroupsDeleted(t *testing.T) {
@@ -1679,12 +1687,14 @@ func TestEnsureInternalFirewallPortRanges(t *testing.T) {
 
 	nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
 	require.NoError(t, err)
+	destinationIP := "10.1.2.3"
 	sourceRange := []string{"10.0.0.0/20"}
 	// Manually create a firewall rule with the legacy name - lbName
 	gce.ensureInternalFirewall(
 		svc,
 		fwName,
 		"firewall with legacy name",
+		destinationIP,
 		sourceRange,
 		getPortRanges(tc.Input),
 		v1.ProtocolTCP,

@@ -19,7 +19,7 @@ package validation
 import (
 	"path/filepath"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"

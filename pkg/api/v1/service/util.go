@@ -91,15 +91,3 @@ func NeedsHealthCheck(service *v1.Service) bool {
 	}
 	return ExternalPolicyLocal(service)
 }
-
-// GetServiceHealthCheckPathPort returns the path and nodePort programmed into the Cloud LB Health Check
-func GetServiceHealthCheckPathPort(service *v1.Service) (string, int32) {
-	if !NeedsHealthCheck(service) {
-		return "", 0
-	}
-	port := service.Spec.HealthCheckNodePort
-	if port == 0 {
-		return "", 0
-	}
-	return "/healthz", port
-}

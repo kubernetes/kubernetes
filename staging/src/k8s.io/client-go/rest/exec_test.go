@@ -28,7 +28,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/pkg/apis/clientauthentication"
 	clientauthenticationapi "k8s.io/client-go/pkg/apis/clientauthentication"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
@@ -353,7 +352,7 @@ func TestExecClusterToConfigRoundtrip(t *testing.T) {
 		},
 	)
 	for i := 0; i < 100; i++ {
-		expected := &clientauthentication.Cluster{}
+		expected := &clientauthenticationapi.Cluster{}
 		f.Fuzz(expected)
 
 		// Manually set URLs so we don't get an error when parsing these during the roundtrip.

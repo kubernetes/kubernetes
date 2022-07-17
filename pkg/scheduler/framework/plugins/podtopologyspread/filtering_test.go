@@ -19,6 +19,7 @@ package podtopologyspread
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"testing"
 
@@ -1220,13 +1221,14 @@ func TestPreFilterStateAddPod(t *testing.T) {
 	zoneConstraint := nodeConstraint
 	zoneConstraint.TopologyKey = "zone"
 	tests := []struct {
-		name         string
-		preemptor    *v1.Pod
-		addedPod     *v1.Pod
-		existingPods []*v1.Pod
-		nodeIdx      int // denotes which node 'addedPod' belongs to
-		nodes        []*v1.Node
-		want         *preFilterState
+		name                       string
+		preemptor                  *v1.Pod
+		addedPod                   *v1.Pod
+		existingPods               []*v1.Pod
+		nodeIdx                    int // denotes which node 'addedPod' belongs to
+		nodes                      []*v1.Node
+		want                       *preFilterState
+		enableNodeInclustionPolicy bool
 	}{
 		{
 			name: "node a and b both impact current min match",
@@ -1501,6 +1503,58 @@ func TestPreFilterStateAddPod(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "add a pod that doesn't match node affinity when NodeInclustionPolicy disabled",
+			preemptor: st.MakePod().Name("p").Label("foo", "").NodeAffinityNotIn("foo", []string{"bar"}).
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil).
+				Obj(),
+			nodeIdx:  0,
+			addedPod: st.MakePod().Name("p-a1").Node("node-b").Label("foo", "").Label("zone", "zone2").Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-b1").Node("node-a").Label("foo", "").Label("zone", "zone1").Obj(),
+				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Label("zone", "zone2").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Label("foo", "bar").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone2").Label("node", "node-b").Label("foo", "").Obj(),
+			},
+			want: &preFilterState{
+				Constraints: []topologySpreadConstraint{zoneConstraint},
+				TpKeyToCriticalPaths: map[string]*criticalPaths{
+					"zone": {{"zone2", 1}, {MatchNum: math.MaxInt32}},
+				},
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone2"}: 1,
+				},
+			},
+			enableNodeInclustionPolicy: false,
+		},
+		{
+			name: "add a pod that doesn't match node affinity when NodeInclustionPolicy enabled",
+			preemptor: st.MakePod().Name("p").Label("foo", "").NodeAffinityNotIn("foo", []string{"bar"}).
+				SpreadConstraint(1, "zone", v1.DoNotSchedule, fooSelector, nil, nil, nil).
+				Obj(),
+			nodeIdx:  0,
+			addedPod: st.MakePod().Name("p-a1").Node("node-b").Label("foo", "").Label("zone", "zone2").Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p-b1").Node("node-a").Label("foo", "").Label("zone", "zone1").Obj(),
+				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Label("zone", "zone2").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Label("foo", "bar").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone2").Label("node", "node-b").Label("foo", "").Obj(),
+			},
+			want: &preFilterState{
+				Constraints: []topologySpreadConstraint{zoneConstraint},
+				TpKeyToCriticalPaths: map[string]*criticalPaths{
+					"zone": {{"zone2", 1}, {MatchNum: math.MaxInt32}},
+				},
+				TpPairToMatchNum: map[topologyPair]int{
+					{key: "zone", value: "zone2"}: 1,
+				},
+			},
+			enableNodeInclustionPolicy: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1508,6 +1562,8 @@ func TestPreFilterStateAddPod(t *testing.T) {
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
 			pl := plugintesting.SetupPlugin(t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
+			p.enableNodeInclusionPolicyInPodTopologySpread = tt.enableNodeInclustionPolicy
+
 			cs := framework.NewCycleState()
 			if _, s := p.PreFilter(ctx, cs, tt.preemptor); !s.IsSuccess() {
 				t.Fatal(s.AsError())

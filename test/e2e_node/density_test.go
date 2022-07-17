@@ -28,6 +28,10 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
+
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -42,9 +46,6 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -432,7 +433,7 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 	rc.Start()
 
 	// Create pods sequentially (back-to-back). e2eLags have been sorted.
-	batchlag, e2eLags := createBatchPodSequential(f, testPods)
+	batchlag, e2eLags := createBatchPodSequential(f, testPods, podType)
 
 	rc.Stop()
 	deletePodsSync(f, append(bgPods, testPods...))
@@ -525,18 +526,60 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 }
 
 // createBatchPodSequential creates pods back-to-back in sequence.
-func createBatchPodSequential(f *framework.Framework, pods []*v1.Pod) (time.Duration, []e2emetrics.PodLatencyData) {
+func createBatchPodSequential(f *framework.Framework, pods []*v1.Pod, podType string) (time.Duration, []e2emetrics.PodLatencyData) {
+	var (
+		mutex       = &sync.Mutex{}
+		watchTimes  = make(map[string]metav1.Time, 0)
+		stopCh      = make(chan struct{})
+		firstCreate metav1.Time
+		lastRunning metav1.Time
+		init        = true
+	)
+	// the controller watches the change of pod status
+	controller := newInformerWatchPod(f, mutex, watchTimes, podType)
+	go controller.Run(stopCh)
+	defer close(stopCh)
+
 	batchStartTime := metav1.Now()
 	e2eLags := make([]e2emetrics.PodLatencyData, 0)
+	createTimes := make(map[string]metav1.Time)
 	for _, pod := range pods {
 		create := metav1.Now()
-		f.PodClient().CreateSync(pod)
+		createTimes[pod.Name] = create
+		p := f.PodClient().Create(pod)
+		framework.ExpectNoError(wait.PollImmediate(2*time.Second, framework.PodStartTimeout, podWatchedRunning(watchTimes, p.Name)))
 		e2eLags = append(e2eLags,
-			e2emetrics.PodLatencyData{Name: pod.Name, Latency: metav1.Now().Time.Sub(create.Time)})
+			e2emetrics.PodLatencyData{Name: pod.Name, Latency: watchTimes[pod.Name].Time.Sub(create.Time)})
 	}
-	batchLag := metav1.Now().Time.Sub(batchStartTime.Time)
+
+	for name, create := range createTimes {
+		watch, ok := watchTimes[name]
+		framework.ExpectEqual(ok, true)
+		if !init {
+			if firstCreate.Time.After(create.Time) {
+				firstCreate = create
+			}
+			if lastRunning.Time.Before(watch.Time) {
+				lastRunning = watch
+			}
+		} else {
+			init = false
+			firstCreate, lastRunning = create, watch
+		}
+	}
+	batchLag := lastRunning.Time.Sub(batchStartTime.Time)
 	sort.Sort(e2emetrics.LatencySlice(e2eLags))
 	return batchLag, e2eLags
+}
+
+// podWatchedRunning verifies whether the pod becomes Running, as the watchTime was set by informer
+func podWatchedRunning(watchTimes map[string]metav1.Time, podName string) wait.ConditionFunc {
+	return func() (done bool, err error) {
+		if _, found := watchTimes[podName]; found {
+			return true, nil
+		}
+		return false, nil
+	}
 }
 
 // verifyLatencyWithinThreshold verifies whether 50, 90 and 99th percentiles of a latency metric are

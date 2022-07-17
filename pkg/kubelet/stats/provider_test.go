@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	gomock "github.com/golang/mock/gomock"
+	"github.com/golang/mock/gomock"
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	fuzz "github.com/google/gofuzz"
@@ -447,6 +447,28 @@ func TestHasDedicatedImageFs(t *testing.T) {
 }
 
 func getTerminatedContainerInfo(seed int, podName string, podNamespace string, containerName string) cadvisorapiv2.ContainerInfo {
+	cinfo := getTestContainerInfo(seed, podName, podNamespace, containerName)
+	cinfo.Stats[0].Memory.RSS = 0
+	cinfo.Stats[0].CpuInst.Usage.Total = 0
+	cinfo.Stats[0].Network = &cadvisorapiv2.NetworkStats{
+		Interfaces: []cadvisorapiv1.InterfaceStats{{
+			Name:     "eth0",
+			RxBytes:  0,
+			RxErrors: 0,
+			TxBytes:  0,
+			TxErrors: 0,
+		}, {
+			Name:     "cbr0",
+			RxBytes:  0,
+			RxErrors: 0,
+			TxBytes:  0,
+			TxErrors: 0,
+		}},
+	}
+	return cinfo
+}
+
+func getContainerInfoWithZeroCpuMem(seed int, podName string, podNamespace string, containerName string) cadvisorapiv2.ContainerInfo {
 	cinfo := getTestContainerInfo(seed, podName, podNamespace, containerName)
 	cinfo.Stats[0].Memory.RSS = 0
 	cinfo.Stats[0].CpuInst.Usage.Total = 0

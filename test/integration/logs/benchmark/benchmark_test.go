@@ -33,7 +33,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"k8s.io/component-base/logs"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	logsjson "k8s.io/component-base/logs/json"
 	"k8s.io/klog/v2"
 )
@@ -175,7 +175,7 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 		generateOutput(b, config, nil, out)
 	})
 	b.Run("JSON", func(b *testing.B) {
-		options := logs.NewOptions()
+		c := logsapi.NewLoggingConfiguration()
 		var logger logr.Logger
 		var flush func()
 		var out1, out2 *os.File
@@ -194,14 +194,14 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 		}
 		b.Run("single-stream", func(b *testing.B) {
 			if discard {
-				logger, flush = logsjson.NewJSONLogger(options.Config.Verbosity, logsjson.AddNopSync(&output), nil, nil)
+				logger, flush = logsjson.NewJSONLogger(c.Verbosity, logsjson.AddNopSync(&output), nil, nil)
 			} else {
 				stderr := os.Stderr
 				os.Stderr = out1
 				defer func() {
 					os.Stderr = stderr
 				}()
-				logger, flush = logsjson.Factory{}.Create(options.Config)
+				logger, flush = logsjson.Factory{}.Create(*c)
 			}
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()
@@ -210,16 +210,16 @@ func benchmarkOutputFormats(b *testing.B, config loadGeneratorConfig, discard bo
 
 		b.Run("split-stream", func(b *testing.B) {
 			if discard {
-				logger, flush = logsjson.NewJSONLogger(options.Config.Verbosity, logsjson.AddNopSync(&output), logsjson.AddNopSync(&output), nil)
+				logger, flush = logsjson.NewJSONLogger(c.Verbosity, logsjson.AddNopSync(&output), logsjson.AddNopSync(&output), nil)
 			} else {
 				stdout, stderr := os.Stdout, os.Stderr
 				os.Stdout, os.Stderr = out1, out2
 				defer func() {
 					os.Stdout, os.Stderr = stdout, stderr
 				}()
-				options := logs.NewOptions()
-				options.Config.Options.JSON.SplitStream = true
-				logger, flush = logsjson.Factory{}.Create(options.Config)
+				c := logsapi.NewLoggingConfiguration()
+				c.Options.JSON.SplitStream = true
+				logger, flush = logsjson.Factory{}.Create(*c)
 			}
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()

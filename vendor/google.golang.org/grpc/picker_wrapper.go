@@ -131,7 +131,7 @@ func (pw *pickerWrapper) pick(ctx context.Context, failfast bool, info balancer.
 			}
 			if _, ok := status.FromError(err); ok {
 				// Status error: end the RPC unconditionally with this status.
-				return nil, nil, err
+				return nil, nil, dropError{error: err}
 			}
 			// For all other errors, wait for ready RPCs should block and other
 			// RPCs should fail with unavailable.
@@ -174,4 +174,10 @@ func (pw *pickerWrapper) close() {
 	}
 	pw.done = true
 	close(pw.blockingCh)
+}
+
+// dropError is a wrapper error that indicates the LB policy wishes to drop the
+// RPC and not retry it.
+type dropError struct {
+	error
 }

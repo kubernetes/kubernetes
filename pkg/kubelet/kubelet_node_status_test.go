@@ -503,6 +503,10 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 }
 
 func TestUpdateExistingNodeStatusTimeout(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	attempts := int64(0)
 	failureCallbacks := int64(0)
 
@@ -943,7 +947,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 		cond.LastTransitionTime = cond.LastTransitionTime.Rfc3339Copy()
 	}
 
-	// Expect LastHearbeat updated, other things unchanged.
+	// Expect LastHeartbeat updated, other things unchanged.
 	for i, cond := range expectedNode.Status.Conditions {
 		expectedNode.Status.Conditions[i].LastHeartbeatTime = metav1.NewTime(cond.LastHeartbeatTime.Time.Add(time.Minute)).Rfc3339Copy()
 	}
@@ -1009,7 +1013,6 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	assert.Len(t, actions, 9)
 	assert.IsType(t, core.GetActionImpl{}, actions[7])
 	assert.IsType(t, core.PatchActionImpl{}, actions[8])
-	patchAction = actions[8].(core.PatchActionImpl)
 
 	// Update node status when keeping the pod CIDR.
 	// Do not report node status if it is within the duration of nodeStatusReportFrequency.

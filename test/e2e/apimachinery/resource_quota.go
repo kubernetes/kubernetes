@@ -29,7 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
@@ -38,7 +41,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -911,6 +914,58 @@ var _ = SIGDescribe("ResourceQuota", func() {
 
 		ginkgo.By("Verifying the deleted ResourceQuota")
 		_, err = client.CoreV1().ResourceQuotas(ns).Get(context.TODO(), quotaName, metav1.GetOptions{})
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("Expected `not found` error, got: %v", err)
+		}
+	})
+
+	ginkgo.It("should manage the lifecycle of a ResourceQuota", func() {
+		client := f.ClientSet
+		ns := f.Namespace.Name
+
+		rqName := "e2e-quota-" + utilrand.String(5)
+		label := map[string]string{"e2e-rq-label": rqName}
+		labelSelector := labels.SelectorFromSet(label).String()
+
+		ginkgo.By("Creating a ResourceQuota")
+		resourceQuota := &v1.ResourceQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   rqName,
+				Labels: label,
+			},
+			Spec: v1.ResourceQuotaSpec{
+				Hard: v1.ResourceList{},
+			},
+		}
+		resourceQuota.Spec.Hard[v1.ResourceCPU] = resource.MustParse("1")
+		resourceQuota.Spec.Hard[v1.ResourceMemory] = resource.MustParse("500Mi")
+		_, err := createResourceQuota(client, ns, resourceQuota)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Getting a ResourceQuota")
+		resourceQuotaResult, err := client.CoreV1().ResourceQuotas(ns).Get(context.TODO(), rqName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(resourceQuotaResult.Spec.Hard[v1.ResourceCPU], resource.MustParse("1"))
+		framework.ExpectEqual(resourceQuotaResult.Spec.Hard[v1.ResourceMemory], resource.MustParse("500Mi"))
+
+		ginkgo.By("Listing all ResourceQuotas with LabelSelector")
+		rq, err := client.CoreV1().ResourceQuotas("").List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+		framework.ExpectNoError(err, "Failed to list job. %v", err)
+		framework.ExpectEqual(len(rq.Items), 1, "Failed to find ResourceQuotes %v", rqName)
+
+		ginkgo.By("Patching the ResourceQuota")
+		payload := "{\"metadata\":{\"labels\":{\"" + rqName + "\":\"patched\"}},\"spec\":{\"hard\":{ \"memory\":\"750Mi\"}}}"
+		patchedResourceQuota, err := client.CoreV1().ResourceQuotas(ns).Patch(context.TODO(), rqName, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
+		framework.ExpectNoError(err, "failed to patch ResourceQuota %s in namespace %s", rqName, ns)
+		framework.ExpectEqual(patchedResourceQuota.Labels[rqName], "patched", "Did not find the label for this ResourceQuota. Current labels: %v", patchedResourceQuota.Labels)
+		framework.ExpectEqual(*patchedResourceQuota.Spec.Hard.Memory(), resource.MustParse("750Mi"), "Hard memory value for ResourceQuota %q is %s not 750Mi.", patchedResourceQuota.ObjectMeta.Name, patchedResourceQuota.Spec.Hard.Memory().String())
+
+		ginkgo.By("Deleting a Collection of ResourceQuotas")
+		err = client.CoreV1().ResourceQuotas(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Verifying the deleted ResourceQuota")
+		_, err = client.CoreV1().ResourceQuotas(ns).Get(context.TODO(), rqName, metav1.GetOptions{})
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("Expected `not found` error, got: %v", err)
 		}

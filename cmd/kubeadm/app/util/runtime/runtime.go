@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog/v2"
 	utilsexec "k8s.io/utils/exec"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -84,7 +85,10 @@ func (runtime *CRIRuntime) IsRunning() error {
 
 // ListKubeContainers lists running k8s CRI pods
 func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
-	out, err := runtime.crictl("pods", "-q").CombinedOutput()
+	// Disable debug mode regardless how the crictl is configured so that the debug info won't be
+	// iterpreted to the Pod ID.
+	args := []string{"-D=false", "pods", "-q"}
+	out, err := runtime.crictl(args...).CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrapf(err, "output: %s, error", string(out))
 	}
@@ -97,15 +101,25 @@ func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 	errs := []error{}
 	for _, container := range containers {
-		out, err := runtime.crictl("stopp", container).CombinedOutput()
-		if err != nil {
-			// don't stop on errors, try to remove as many containers as possible
-			errs = append(errs, errors.Wrapf(err, "failed to stop running pod %s: output: %s, error", container, string(out)))
-		} else {
+		var lastErr error
+		for i := 0; i < constants.RemoveContainerRetry; i++ {
+			klog.V(5).Infof("Attempting to remove container %v", container)
+			out, err := runtime.crictl("stopp", container).CombinedOutput()
+			if err != nil {
+				lastErr = errors.Wrapf(err, "failed to stop running pod %s: output: %s", container, string(out))
+				continue
+			}
 			out, err = runtime.crictl("rmp", container).CombinedOutput()
 			if err != nil {
-				errs = append(errs, errors.Wrapf(err, "failed to remove running container %s: output: %s, error", container, string(out)))
+				lastErr = errors.Wrapf(err, "failed to remove running container %s: output: %s", container, string(out))
+				continue
 			}
+			lastErr = nil
+			break
+		}
+
+		if lastErr != nil {
+			errs = append(errs, lastErr)
 		}
 	}
 	return errorsutil.NewAggregate(errs)

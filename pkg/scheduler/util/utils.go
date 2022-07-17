@@ -92,7 +92,7 @@ func MoreImportantPod(pod1, pod2 *v1.Pod) bool {
 
 // PatchPodStatus calculates the delta bytes change from <old.Status> to <newStatus>,
 // and then submit a request to API server to patch the pod changes.
-func PatchPodStatus(cs kubernetes.Interface, old *v1.Pod, newStatus *v1.PodStatus) error {
+func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, old *v1.Pod, newStatus *v1.PodStatus) error {
 	if newStatus == nil {
 		return nil
 	}
@@ -115,18 +115,18 @@ func PatchPodStatus(cs kubernetes.Interface, old *v1.Pod, newStatus *v1.PodStatu
 		return nil
 	}
 
-	_, err = cs.CoreV1().Pods(old.Namespace).Patch(context.TODO(), old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
+	_, err = cs.CoreV1().Pods(old.Namespace).Patch(ctx, old.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}, "status")
 	return err
 }
 
 // DeletePod deletes the given <pod> from API server
-func DeletePod(cs kubernetes.Interface, pod *v1.Pod) error {
-	return cs.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{})
+func DeletePod(ctx context.Context, cs kubernetes.Interface, pod *v1.Pod) error {
+	return cs.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
 }
 
 // ClearNominatedNodeName internally submit a patch request to API server
 // to set each pods[*].Status.NominatedNodeName> to "".
-func ClearNominatedNodeName(cs kubernetes.Interface, pods ...*v1.Pod) utilerrors.Aggregate {
+func ClearNominatedNodeName(ctx context.Context, cs kubernetes.Interface, pods ...*v1.Pod) utilerrors.Aggregate {
 	var errs []error
 	for _, p := range pods {
 		if len(p.Status.NominatedNodeName) == 0 {
@@ -134,7 +134,7 @@ func ClearNominatedNodeName(cs kubernetes.Interface, pods ...*v1.Pod) utilerrors
 		}
 		podStatusCopy := p.Status.DeepCopy()
 		podStatusCopy.NominatedNodeName = ""
-		if err := PatchPodStatus(cs, p, podStatusCopy); err != nil {
+		if err := PatchPodStatus(ctx, cs, p, podStatusCopy); err != nil {
 			errs = append(errs, err)
 		}
 	}

@@ -33,8 +33,6 @@ import (
 	componentbasevalidation "k8s.io/component-base/config/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3"
 )
 
 // ValidateKubeSchedulerConfiguration ensures validation of the KubeSchedulerConfiguration struct
@@ -117,51 +115,6 @@ func splitHostIntPort(s string) (string, int, error) {
 	return host, portInt, err
 }
 
-type removedPlugins struct {
-	schemeGroupVersion string
-	plugins            []string
-}
-
-// removedPluginsByVersion maintains a list of removed plugins in each version.
-// Remember to add an entry to that list when creating a new component config
-// version (even if the list of removed plugins is empty).
-var removedPluginsByVersion = []removedPlugins{
-	{
-		schemeGroupVersion: v1beta2.SchemeGroupVersion.String(),
-		plugins:            []string{},
-	},
-	{
-		schemeGroupVersion: v1beta3.SchemeGroupVersion.String(),
-		plugins:            []string{},
-	},
-}
-
-// isPluginRemoved checks if a given plugin was removed in the given component
-// config version or earlier.
-func isPluginRemoved(apiVersion string, name string) (bool, string) {
-	for _, dp := range removedPluginsByVersion {
-		for _, plugin := range dp.plugins {
-			if name == plugin {
-				return true, dp.schemeGroupVersion
-			}
-		}
-		if apiVersion == dp.schemeGroupVersion {
-			break
-		}
-	}
-	return false, ""
-}
-
-func validatePluginSetForRemovedPlugins(path *field.Path, apiVersion string, ps config.PluginSet) []error {
-	var errs []error
-	for i, plugin := range ps.Enabled {
-		if removed, removedVersion := isPluginRemoved(apiVersion, plugin.Name); removed {
-			errs = append(errs, field.Invalid(path.Child("enabled").Index(i), plugin.Name, fmt.Sprintf("was removed in version %q (KubeSchedulerConfiguration is version %q)", removedVersion, apiVersion)))
-		}
-	}
-	return errs
-}
-
 func validateKubeSchedulerProfile(path *field.Path, apiVersion string, profile *config.KubeSchedulerProfile) []error {
 	var errs []error
 	if len(profile.SchedulerName) == 0 {
@@ -183,28 +136,6 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 		"VolumeBinding":                   ValidateVolumeBindingArgs,
 	}
 
-	if profile.Plugins != nil {
-		stagesToPluginSet := map[string]config.PluginSet{
-			"queueSort":  profile.Plugins.QueueSort,
-			"preFilter":  profile.Plugins.PreFilter,
-			"filter":     profile.Plugins.Filter,
-			"postFilter": profile.Plugins.PostFilter,
-			"preScore":   profile.Plugins.PreScore,
-			"score":      profile.Plugins.Score,
-			"reserve":    profile.Plugins.Reserve,
-			"permit":     profile.Plugins.Permit,
-			"preBind":    profile.Plugins.PreBind,
-			"bind":       profile.Plugins.Bind,
-			"postBind":   profile.Plugins.PostBind,
-		}
-
-		pluginsPath := path.Child("plugins")
-		for s, p := range stagesToPluginSet {
-			errs = append(errs, validatePluginSetForRemovedPlugins(
-				pluginsPath.Child(s), apiVersion, p)...)
-		}
-	}
-
 	seenPluginConfig := make(sets.String)
 
 	for i := range profile.PluginConfig {
@@ -216,9 +147,7 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 		} else {
 			seenPluginConfig.Insert(name)
 		}
-		if removed, removedVersion := isPluginRemoved(apiVersion, name); removed {
-			errs = append(errs, field.Invalid(pluginConfigPath, name, fmt.Sprintf("was removed in version %q (KubeSchedulerConfiguration is version %q)", removedVersion, apiVersion)))
-		} else if validateFunc, ok := m[name]; ok {
+		if validateFunc, ok := m[name]; ok {
 			// type mismatch, no need to validate the `args`.
 			if reflect.TypeOf(args) != reflect.ValueOf(validateFunc).Type().In(1) {
 				errs = append(errs, field.Invalid(pluginConfigPath.Child("args"), args, "has to match plugin args"))

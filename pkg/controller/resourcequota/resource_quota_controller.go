@@ -73,6 +73,8 @@ type ControllerOptions struct {
 	InformerFactory informerfactory.InformerFactory
 	// Controls full resync of objects monitored for replenishment.
 	ReplenishmentResyncPeriod controller.ResyncPeriodFunc
+	// Filters update events so we only enqueue the ones where we know quota will change
+	UpdateFilter UpdateFilter
 }
 
 // Controller is responsible for tracking quota usage status in the system
@@ -152,6 +154,7 @@ func NewController(options *ControllerOptions) (*Controller, error) {
 			resyncPeriod:      options.ReplenishmentResyncPeriod,
 			replenishmentFunc: rq.replenishQuota,
 			registry:          rq.registry,
+			updateFilter:      options.UpdateFilter,
 		}
 
 		rq.quotaMonitor = qm
@@ -269,6 +272,7 @@ func (rq *Controller) worker(ctx context.Context, queue workqueue.RateLimitingIn
 func (rq *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer rq.queue.ShutDown()
+	defer rq.missingUsageQueue.ShutDown()
 
 	klog.Infof("Starting resource quota controller")
 	defer klog.Infof("Shutting down resource quota controller")

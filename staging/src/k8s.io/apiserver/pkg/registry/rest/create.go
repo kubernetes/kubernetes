@@ -100,6 +100,11 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		return kerr
 	}
 
+	// ensure that system-critical metadata has been populated
+	if !metav1.HasObjectMetaSystemFieldValues(objectMeta) {
+		return errors.NewInternalError(fmt.Errorf("system metadata was not initialized"))
+	}
+
 	// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
 	requestNamespace, ok := genericapirequest.NamespaceFrom(ctx)
 	if !ok {
@@ -109,10 +114,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		return err
 	}
 
-	objectMeta.SetDeletionTimestamp(nil)
-	objectMeta.SetDeletionGracePeriodSeconds(nil)
 	strategy.PrepareForCreate(ctx, obj)
-	FillObjectMetaSystemFields(objectMeta)
 
 	if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
 		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))

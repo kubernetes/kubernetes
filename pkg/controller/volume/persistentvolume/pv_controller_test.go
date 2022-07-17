@@ -471,8 +471,6 @@ func makeStorageClass(scName string, mode *storagev1.VolumeBindingMode) *storage
 }
 
 func TestAnnealMigrationAnnotations(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
-
 	const testPlugin = "non-migrated-plugin"
 	const gcePlugin = "kubernetes.io/gce-pd"
 	const gceDriver = "pd.csi.storage.gke.io"
@@ -687,7 +685,7 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 			volumeAnnotations:   map[string]string{volume.AnnDynamicallyProvisioned: gcePlugin, volume.AnnMigratedTo: gceDriver},
 			expVolumeFinalizers: []string{volume.PVDeletionProtectionFinalizer},
 			expModified:         true,
-			migratedDriverGates: []featuregate.Feature{features.CSIMigration, features.CSIMigrationGCE},
+			migratedDriverGates: []featuregate.Feature{features.CSIMigrationGCE},
 		},
 		{
 			// csi-migration is not completely enabled as the specific plugin feature is not present. This is equivalent
@@ -696,7 +694,7 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 			initialVolume:       newVolumeWithFinalizers("volume-13-8", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, []string{volume.PVDeletionProtectionFinalizer}, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			expVolumeFinalizers: []string{volume.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
-			migratedDriverGates: []featuregate.Feature{features.CSIMigration},
+			migratedDriverGates: []featuregate.Feature{},
 		},
 		{
 			// same as 13-8 but multiple finalizers exists, only the pv deletion protection finalizer needs to be
@@ -705,7 +703,7 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 			initialVolume:       newVolumeWithFinalizers("volume-13-9", "1Gi", "uid11-23", "claim11-23", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classCopper, []string{volume.PVDeletionProtectionFinalizer, customFinalizer}, volume.AnnDynamicallyProvisioned, volume.AnnBoundByController),
 			expVolumeFinalizers: []string{customFinalizer, volume.PVDeletionInTreeProtectionFinalizer},
 			expModified:         true,
-			migratedDriverGates: []featuregate.Feature{features.CSIMigration},
+			migratedDriverGates: []featuregate.Feature{},
 		},
 		{
 			// corner error case.

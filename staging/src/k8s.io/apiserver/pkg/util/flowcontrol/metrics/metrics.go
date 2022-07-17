@@ -27,7 +27,6 @@ import (
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	basemetricstestutil "k8s.io/component-base/metrics/testutil"
-	"k8s.io/utils/clock"
 )
 
 const (
@@ -36,11 +35,13 @@ const (
 )
 
 const (
-	requestKind   = "request_kind"
-	priorityLevel = "priority_level"
-	flowSchema    = "flow_schema"
-	phase         = "phase"
-	mark          = "mark"
+	requestKind         = "request_kind"
+	priorityLevel       = "priority_level"
+	flowSchema          = "flow_schema"
+	phase               = "phase"
+	LabelNamePhase      = "phase"
+	LabelValueWaiting   = "waiting"
+	LabelValueExecuting = "executing"
 )
 
 var (
@@ -106,66 +107,45 @@ var (
 		[]string{priorityLevel, flowSchema},
 	)
 	// PriorityLevelExecutionSeatsGaugeVec creates observers of seats occupied throughout execution for priority levels
-	PriorityLevelExecutionSeatsGaugeVec = NewSampleAndWaterMarkHistogramsVec(clock.RealClock{}, time.Millisecond,
-		&compbasemetrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "priority_level_seat_count_samples",
-			Help:           "Periodic observations of number of seats occupied for any stage of execution (but only initial stage for WATCHes)",
-			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
+	PriorityLevelExecutionSeatsGaugeVec = NewTimingRatioHistogramVec(
+		&compbasemetrics.TimingHistogramOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "priority_level_seat_utilization",
+			Help:      "Observations, at the end of every nanosecond, of utilization of seats for any stage of execution (but only initial stage for WATCHes)",
+			// Buckets for both 0.99 and 1.0 mean PromQL's histogram_quantile will reveal saturation
+			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1},
 			ConstLabels:    map[string]string{phase: "executing"},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		&compbasemetrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "priority_level_seat_count_watermarks",
-			Help:           "Watermarks of the number of seats occupied for any stage of execution (but only initial stage for WATCHes)",
-			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
-			ConstLabels:    map[string]string{phase: "executing"},
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{priorityLevel},
+		priorityLevel,
 	)
-	// PriorityLevelConcurrencyPairVec creates pairs that observe concurrency for priority levels
-	PriorityLevelConcurrencyPairVec = NewSampleAndWaterMarkHistogramsPairVec(clock.RealClock{}, time.Millisecond,
-		&compbasemetrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "priority_level_request_count_samples",
-			Help:           "Periodic observations of the number of requests waiting or in any stage of execution (but only initial stage for WATCHes)",
-			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
+	// PriorityLevelConcurrencyGaugeVec creates gauges of concurrency broken down by phase, priority level
+	PriorityLevelConcurrencyGaugeVec = NewTimingRatioHistogramVec(
+		&compbasemetrics.TimingHistogramOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "priority_level_request_utilization",
+			Help:      "Observations, at the end of every nanosecond, of number of requests (as a fraction of the relevant limit) waiting or in any stage of execution (but only initial stage for WATCHes)",
+			// For executing: the denominator will be seats, so this metric will skew low.
+			// FOr waiting: the denominiator is individual queue length limit, so this metric can go over 1.  Issue #110160
+			Buckets:        []float64{0, 0.001, 0.0025, 0.005, 0.1, 0.25, 0.5, 0.75, 1, 10, 100},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		&compbasemetrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "priority_level_request_count_watermarks",
-			Help:           "Watermarks of the number of requests waiting or in any stage of execution (but only initial stage for WATCHes)",
-			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{priorityLevel},
+		LabelNamePhase, priorityLevel,
 	)
-	// ReadWriteConcurrencyGaugeVec creates gauges of number of requests broken down by phase and mutating vs readonly
-	ReadWriteConcurrencyGaugeVec = NewSampleAndWaterMarkHistogramsVec(clock.RealClock{}, time.Millisecond,
-		&compbasemetrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "read_vs_write_request_count_samples",
-			Help:           "Periodic observations of the number of requests waiting or in regular stage of execution",
-			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
+	// ReadWriteConcurrencyPairVec creates gauges of number of requests broken down by phase and mutating vs readonly
+	ReadWriteConcurrencyGaugeVec = NewTimingRatioHistogramVec(
+		&compbasemetrics.TimingHistogramOpts{
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "read_vs_write_current_requests",
+			Help:      "Observations, at the end of every nanosecond, of the number of requests (as a fraction of the relevant limit, if max-in-flight filter is being used) waiting or in regular stage of execution",
+			Buckets:   []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1, 3, 10, 30, 100, 300, 1000, 3000},
+			// TODO: something about the utilization vs count irregularity.  Issue #109846
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		&compbasemetrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "read_vs_write_request_count_watermarks",
-			Help:           "Watermarks of the number of requests waiting or in regular stage of execution",
-			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{LabelNamePhase, requestKind},
+		LabelNamePhase, requestKind,
 	)
 	apiserverCurrentR = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -356,7 +336,7 @@ var (
 		apiserverDispatchWithNoAccommodation,
 	}.
 		Append(PriorityLevelExecutionSeatsGaugeVec.metrics()...).
-		Append(PriorityLevelConcurrencyPairVec.metrics()...).
+		Append(PriorityLevelConcurrencyGaugeVec.metrics()...).
 		Append(ReadWriteConcurrencyGaugeVec.metrics()...)
 )
 

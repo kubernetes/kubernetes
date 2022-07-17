@@ -491,7 +491,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 			DNSDone: func(info httptrace.DNSDoneInfo) {
 				reqInfo.muTrace.Lock()
 				defer reqInfo.muTrace.Unlock()
-				reqInfo.DNSLookup = time.Now().Sub(dnsStart)
+				reqInfo.DNSLookup = time.Since(dnsStart)
 				klog.Infof("HTTP Trace: DNS Lookup for %s resolved to %v", host, info.Addrs)
 			},
 			// Dial
@@ -503,7 +503,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 			ConnectDone: func(network, addr string, err error) {
 				reqInfo.muTrace.Lock()
 				defer reqInfo.muTrace.Unlock()
-				reqInfo.Dialing = time.Now().Sub(dialStart)
+				reqInfo.Dialing = time.Since(dialStart)
 				if err != nil {
 					klog.Infof("HTTP Trace: Dial to %s:%s failed: %v", network, addr, err)
 				} else {
@@ -517,7 +517,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 			TLSHandshakeDone: func(_ tls.ConnectionState, _ error) {
 				reqInfo.muTrace.Lock()
 				defer reqInfo.muTrace.Unlock()
-				reqInfo.TLSHandshake = time.Now().Sub(tlsStart)
+				reqInfo.TLSHandshake = time.Since(tlsStart)
 			},
 			// Connection (it can be DNS + Dial or just the time to get one from the connection pool)
 			GetConn: func(hostPort string) {
@@ -526,7 +526,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 			GotConn: func(info httptrace.GotConnInfo) {
 				reqInfo.muTrace.Lock()
 				defer reqInfo.muTrace.Unlock()
-				reqInfo.GetConnection = time.Now().Sub(getConn)
+				reqInfo.GetConnection = time.Since(getConn)
 				reqInfo.ConnectionReused = info.Reused
 			},
 			// Server Processing (time since we wrote the request until first byte is received)
@@ -538,7 +538,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 			GotFirstResponseByte: func() {
 				reqInfo.muTrace.Lock()
 				defer reqInfo.muTrace.Unlock()
-				reqInfo.ServerProcessing = time.Now().Sub(serverStart)
+				reqInfo.ServerProcessing = time.Since(serverStart)
 			},
 		}
 		req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))

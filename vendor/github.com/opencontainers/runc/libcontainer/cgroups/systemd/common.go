@@ -289,7 +289,13 @@ func generateDeviceProperties(r *configs.Resources) ([]systemdDbus.Property, err
 				entry.Path = fmt.Sprintf("/dev/char/%d:%d", rule.Major, rule.Minor)
 			}
 		}
-		deviceAllowList = append(deviceAllowList, entry)
+		// systemd will issue a warning if the path we give here doesn't exist.
+		// Since all of this logic is best-effort anyway (we manually set these
+		// rules separately to systemd) we can safely skip entries that don't
+		// have a corresponding path.
+		if _, err := os.Stat(entry.Path); err == nil {
+			deviceAllowList = append(deviceAllowList, entry)
+		}
 	}
 
 	properties = append(properties, newProp("DeviceAllow", deviceAllowList))

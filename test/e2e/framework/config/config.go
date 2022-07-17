@@ -135,7 +135,7 @@ func AddOptionsToSet(flags *flag.FlagSet, options interface{}, prefix string) bo
 	if optionsType == nil {
 		panic("options parameter without a type - nil?!")
 	}
-	if optionsType.Kind() != reflect.Ptr || optionsType.Elem().Kind() != reflect.Struct {
+	if optionsType.Kind() != reflect.Pointer || optionsType.Elem().Kind() != reflect.Struct {
 		panic(fmt.Sprintf("need a pointer to a struct, got instead: %T", options))
 	}
 	addStructFields(flags, optionsType.Elem(), reflect.Indirect(reflect.ValueOf(options)), prefix)

@@ -241,7 +241,7 @@ func ValueToRefValue(adapter ref.TypeAdapter, v *exprpb.Value) (ref.Val, error) 
 		if err != nil {
 			return nil, err
 		}
-		return adapter.NativeToValue(msg.(proto.Message)), nil
+		return adapter.NativeToValue(msg), nil
 	case *exprpb.Value_MapValue:
 		m := v.GetMapValue()
 		entries := make(map[ref.Val]ref.Val)

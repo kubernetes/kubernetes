@@ -11,7 +11,7 @@ The Kubernetes Community is active on Stack Overflow, you can post your question
 * [Kubernetes on Stack Overflow](https://stackoverflow.com/questions/tagged/kubernetes)
 
   * Here are some tips for [about how to ask good questions](https://stackoverflow.com/help/how-to-ask).
-  * Don't forget to check to see [what's on topic](http://stackoverflow.com/help/on-topic).
+  * Don't forget to check to see [what's on topic](https://stackoverflow.com/help/on-topic).
 
 ### Documentation
 
@@ -20,7 +20,7 @@ The Kubernetes Community is active on Stack Overflow, you can post your question
 
 ### Real-time Chat
 
-* [Slack](https://kubernetes.slack.com) ([registration](http://slack.k8s.io)):
+* [Slack](https://kubernetes.slack.com) ([registration](https://slack.k8s.io)):
 The `#kubernetes-users` and `#kubernetes-novice` channels are usual places where
 people offer support.
 

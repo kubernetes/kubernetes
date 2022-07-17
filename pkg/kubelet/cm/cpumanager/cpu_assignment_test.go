@@ -656,7 +656,7 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			result, err := takeByTopologyNUMAPacked(tc.topo, tc.availableCPUs, tc.numCPUs)
-			if tc.expErr != "" && err.Error() != tc.expErr {
+			if tc.expErr != "" && err != nil && err.Error() != tc.expErr {
 				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
 			}
 			if !result.Equals(tc.expResult) {

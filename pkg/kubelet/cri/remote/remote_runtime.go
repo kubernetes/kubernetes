@@ -32,7 +32,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimeapiV1alpha2 "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe/exec"
 	utilexec "k8s.io/utils/exec"
 )
@@ -1147,5 +1147,60 @@ func (r *remoteRuntimeService) ReopenContainerLog(containerID string) (err error
 	}
 
 	klog.V(10).InfoS("[RemoteRuntimeService] ReopenContainerLog Response", "containerID", containerID)
+	return nil
+}
+
+// CheckpointContainer triggers a checkpoint of the given CheckpointContainerRequest
+func (r *remoteRuntimeService) CheckpointContainer(options *runtimeapi.CheckpointContainerRequest) error {
+	klog.V(10).InfoS(
+		"[RemoteRuntimeService] CheckpointContainer",
+		"options",
+		options,
+	)
+	if options == nil {
+		return errors.New("CheckpointContainer requires non-nil CheckpointRestoreOptions parameter")
+	}
+	if !r.useV1API() {
+		return errors.New("CheckpointContainer is only supported in the CRI v1 runtime API")
+	}
+
+	if options.Timeout < 0 {
+		return errors.New("CheckpointContainer requires the timeout value to be > 0")
+	}
+
+	ctx, cancel := func() (context.Context, context.CancelFunc) {
+		defaultTimeout := int64(r.timeout / time.Second)
+		if options.Timeout > defaultTimeout {
+			// The user requested a specific timeout, let's use that if it
+			// is larger than the CRI default.
+			return getContextWithTimeout(time.Duration(options.Timeout) * time.Second)
+		}
+		// If the user requested a timeout less than the
+		// CRI default, let's use the CRI default.
+		options.Timeout = defaultTimeout
+		return getContextWithTimeout(r.timeout)
+	}()
+	defer cancel()
+
+	_, err := r.runtimeClient.CheckpointContainer(
+		ctx,
+		options,
+	)
+
+	if err != nil {
+		klog.ErrorS(
+			err,
+			"CheckpointContainer from runtime service failed",
+			"containerID",
+			options.ContainerId,
+		)
+		return err
+	}
+	klog.V(10).InfoS(
+		"[RemoteRuntimeService] CheckpointContainer Response",
+		"containerID",
+		options.ContainerId,
+	)
+
 	return nil
 }

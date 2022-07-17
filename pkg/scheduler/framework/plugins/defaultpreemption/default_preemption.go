@@ -43,10 +43,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-const (
-	// Name of the plugin used in the plugin registry and configurations.
-	Name = names.DefaultPreemption
-)
+// Name of the plugin used in the plugin registry and configurations.
+const Name = names.DefaultPreemption
 
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {

@@ -25,7 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	"go.uber.org/zap/zapcore"
 
-	"k8s.io/component-base/config"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	logsjson "k8s.io/component-base/logs/json"
 	"k8s.io/klog/v2/test"
 )
@@ -37,7 +37,7 @@ func init() {
 // TestJsonOutput tests the JSON logger, directly and as backend for klog.
 func TestJSONOutput(t *testing.T) {
 	newLogger := func(out io.Writer, v int, vmodule string) logr.Logger {
-		logger, _ := logsjson.NewJSONLogger(config.VerbosityLevel(v), logsjson.AddNopSync(out), nil,
+		logger, _ := logsjson.NewJSONLogger(logsapi.VerbosityLevel(v), logsjson.AddNopSync(out), nil,
 			&zapcore.EncoderConfig{
 				MessageKey:     "msg",
 				CallerKey:      "caller",

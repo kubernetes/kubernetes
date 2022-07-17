@@ -142,7 +142,7 @@ func (rc *resourceMetricsCollector) CollectWithStability(ch chan<- metrics.Metri
 }
 
 func (rc *resourceMetricsCollector) collectNodeCPUMetrics(ch chan<- metrics.Metric, s summary.NodeStats) {
-	if s.CPU == nil {
+	if s.CPU == nil || s.CPU.UsageCoreNanoSeconds == nil {
 		return
 	}
 
@@ -151,7 +151,7 @@ func (rc *resourceMetricsCollector) collectNodeCPUMetrics(ch chan<- metrics.Metr
 }
 
 func (rc *resourceMetricsCollector) collectNodeMemoryMetrics(ch chan<- metrics.Metric, s summary.NodeStats) {
-	if s.Memory == nil {
+	if s.Memory == nil || s.Memory.WorkingSetBytes == nil {
 		return
 	}
 
@@ -160,7 +160,7 @@ func (rc *resourceMetricsCollector) collectNodeMemoryMetrics(ch chan<- metrics.M
 }
 
 func (rc *resourceMetricsCollector) collectContainerStartTime(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
-	if s.StartTime.Unix() == 0 {
+	if s.StartTime.Unix() <= 0 {
 		return
 	}
 
@@ -169,7 +169,7 @@ func (rc *resourceMetricsCollector) collectContainerStartTime(ch chan<- metrics.
 }
 
 func (rc *resourceMetricsCollector) collectContainerCPUMetrics(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
-	if s.CPU == nil {
+	if s.CPU == nil || s.CPU.UsageCoreNanoSeconds == nil {
 		return
 	}
 
@@ -179,7 +179,7 @@ func (rc *resourceMetricsCollector) collectContainerCPUMetrics(ch chan<- metrics
 }
 
 func (rc *resourceMetricsCollector) collectContainerMemoryMetrics(ch chan<- metrics.Metric, pod summary.PodStats, s summary.ContainerStats) {
-	if s.Memory == nil {
+	if s.Memory == nil || s.Memory.WorkingSetBytes == nil {
 		return
 	}
 
@@ -189,7 +189,7 @@ func (rc *resourceMetricsCollector) collectContainerMemoryMetrics(ch chan<- metr
 }
 
 func (rc *resourceMetricsCollector) collectPodCPUMetrics(ch chan<- metrics.Metric, pod summary.PodStats) {
-	if pod.CPU == nil {
+	if pod.CPU == nil || pod.CPU.UsageCoreNanoSeconds == nil {
 		return
 	}
 
@@ -199,7 +199,7 @@ func (rc *resourceMetricsCollector) collectPodCPUMetrics(ch chan<- metrics.Metri
 }
 
 func (rc *resourceMetricsCollector) collectPodMemoryMetrics(ch chan<- metrics.Metric, pod summary.PodStats) {
-	if pod.Memory == nil {
+	if pod.Memory == nil || pod.Memory.WorkingSetBytes == nil {
 		return
 	}
 

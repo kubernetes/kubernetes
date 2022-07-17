@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -219,7 +219,7 @@ var _ = common.SIGDescribe("Netpol API", func() {
 		- EndPort field cannot be defined if the Port field is defined as a named (string) port.
 		- EndPort field must be equal or greater than port.
 	*/
-	ginkgo.It("should support creating NetworkPolicy API with endport field [Feature:NetworkPolicyEndPort]", func() {
+	ginkgo.It("should support creating NetworkPolicy API with endport field", func() {
 		ns := f.Namespace.Name
 		npClient := f.ClientSet.NetworkingV1().NetworkPolicies(ns)
 

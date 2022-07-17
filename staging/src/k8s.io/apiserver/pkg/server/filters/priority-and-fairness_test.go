@@ -158,6 +158,8 @@ func newApfServerWithHooks(t *testing.T, decision mockDecision, onExecute, postE
 }
 
 func newApfServerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func()) *httptest.Server {
+	epmetrics.Register()
+	fcmetrics.Register()
 	apfServer := httptest.NewServer(newApfHandlerWithFilter(t, flowControlFilter, onExecute, postExecute))
 	return apfServer
 }
@@ -185,8 +187,6 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 }
 
 func TestApfSkipLongRunningRequest(t *testing.T) {
-	epmetrics.Register()
-
 	server := newApfServerWithSingleRequest(t, decisionSkipFilter)
 	defer server.Close()
 
@@ -202,8 +202,6 @@ func TestApfSkipLongRunningRequest(t *testing.T) {
 }
 
 func TestApfRejectRequest(t *testing.T) {
-	epmetrics.Register()
-
 	server := newApfServerWithSingleRequest(t, decisionReject)
 	defer server.Close()
 
@@ -222,13 +220,6 @@ func TestApfRejectRequest(t *testing.T) {
 }
 
 func TestApfExemptRequest(t *testing.T) {
-	epmetrics.Register()
-	fcmetrics.Register()
-
-	// Wait for at least one sampling window to pass since creation of metrics.ReadWriteConcurrencyObserverPairGenerator,
-	// so that an observation will cause some data to go into the Prometheus metrics.
-	time.Sleep(time.Millisecond * 50)
-
 	server := newApfServerWithSingleRequest(t, decisionNoQueuingExecute)
 	defer server.Close()
 
@@ -242,19 +233,11 @@ func TestApfExemptRequest(t *testing.T) {
 
 	checkForExpectedMetrics(t, []string{
 		"apiserver_current_inflight_requests",
-		"apiserver_flowcontrol_read_vs_write_request_count_watermarks",
-		"apiserver_flowcontrol_read_vs_write_request_count_samples",
+		"apiserver_flowcontrol_read_vs_write_current_requests",
 	})
 }
 
 func TestApfExecuteRequest(t *testing.T) {
-	epmetrics.Register()
-	fcmetrics.Register()
-
-	// Wait for at least one sampling window to pass since creation of metrics.ReadWriteConcurrencyObserverPairGenerator,
-	// so that an observation will cause some data to go into the Prometheus metrics.
-	time.Sleep(time.Millisecond * 50)
-
 	server := newApfServerWithSingleRequest(t, decisionQueuingExecute)
 	defer server.Close()
 
@@ -269,19 +252,11 @@ func TestApfExecuteRequest(t *testing.T) {
 	checkForExpectedMetrics(t, []string{
 		"apiserver_current_inflight_requests",
 		"apiserver_current_inqueue_requests",
-		"apiserver_flowcontrol_read_vs_write_request_count_watermarks",
-		"apiserver_flowcontrol_read_vs_write_request_count_samples",
+		"apiserver_flowcontrol_read_vs_write_current_requests",
 	})
 }
 
 func TestApfExecuteMultipleRequests(t *testing.T) {
-	epmetrics.Register()
-	fcmetrics.Register()
-
-	// Wait for at least one sampling window to pass since creation of metrics.ReadWriteConcurrencyObserverPairGenerator,
-	// so that an observation will cause some data to go into the Prometheus metrics.
-	time.Sleep(time.Millisecond * 50)
-
 	concurrentRequests := 5
 	preStartExecute, postStartExecute := &sync.WaitGroup{}, &sync.WaitGroup{}
 	preEnqueue, postEnqueue := &sync.WaitGroup{}, &sync.WaitGroup{}
@@ -349,14 +324,11 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 	checkForExpectedMetrics(t, []string{
 		"apiserver_current_inflight_requests",
 		"apiserver_current_inqueue_requests",
-		"apiserver_flowcontrol_read_vs_write_request_count_watermarks",
-		"apiserver_flowcontrol_read_vs_write_request_count_samples",
+		"apiserver_flowcontrol_read_vs_write_current_requests",
 	})
 }
 
 func TestApfCancelWaitRequest(t *testing.T) {
-	epmetrics.Register()
-
 	server := newApfServerWithSingleRequest(t, decisionCancelWait)
 	defer server.Close()
 
@@ -536,6 +508,9 @@ func TestApfRejectWatchRequestsWithInitializationSignal(t *testing.T) {
 }
 
 func TestApfWatchPanic(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
+
 	fakeFilter := newFakeWatchApfFilter(1)
 
 	onExecuteFunc := func() {
@@ -561,6 +536,8 @@ func TestApfWatchPanic(t *testing.T) {
 }
 
 func TestApfWatchHandlePanic(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
 	preExecutePanicingFilter := newFakeWatchApfFilter(1)
 	preExecutePanicingFilter.preExecutePanic = true
 
@@ -614,6 +591,8 @@ func TestApfWatchHandlePanic(t *testing.T) {
 // Even though in production we are not using httptest.Server, this logic is shared
 // across these two.
 func TestContextClosesOnRequestProcessed(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -652,6 +631,8 @@ func (f *fakeFilterRequestDigest) Handle(ctx context.Context,
 }
 
 func TestApfWithRequestDigest(t *testing.T) {
+	epmetrics.Register()
+	fcmetrics.Register()
 	longRunningFunc := func(_ *http.Request, _ *apirequest.RequestInfo) bool { return false }
 	fakeFilter := &fakeFilterRequestDigest{}
 
@@ -690,6 +671,7 @@ func TestApfWithRequestDigest(t *testing.T) {
 }
 
 func TestPriorityAndFairnessWithPanicRecoveryAndTimeoutFilter(t *testing.T) {
+	epmetrics.Register()
 	fcmetrics.Register()
 
 	t.Run("priority level concurrency is set to 1, request handler panics, next request should not be rejected", func(t *testing.T) {

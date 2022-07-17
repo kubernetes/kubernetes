@@ -168,7 +168,7 @@ func tokenizePath(path string) []string {
 }
 
 // for debugging
-func (r Route) String() string {
+func (r *Route) String() string {
 	return r.Method + " " + r.Path
 }
 

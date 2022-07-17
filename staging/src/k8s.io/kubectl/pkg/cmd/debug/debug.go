@@ -802,7 +802,7 @@ func (o *DebugOptions) handleAttachPod(ctx context.Context, f cmdutil.Factory, n
 	}
 
 	if err := opts.Run(); err != nil {
-		fmt.Fprintf(opts.ErrOut, "Error attaching, falling back to logs: %v\n", err)
+		fmt.Fprintf(opts.ErrOut, "warning: couldn't attach to pod/%s, falling back to streaming logs: %v\n", podName, err)
 		return logOpts(f, pod, opts)
 	}
 	return nil

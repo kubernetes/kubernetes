@@ -27,7 +27,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -145,7 +145,7 @@ func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, vol
 	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, writecmd...)
 	framework.ExpectEqual(stderr, "Access is denied.")
 
-	ginkgo.By("verifying that pod can read from the the volume that is readonly")
+	ginkgo.By("verifying that pod can read from a volume that is readonly")
 	readcmd := []string{"cmd", "/c", "type", filePath}
 	readout, readerr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, readcmd...)
 	readmsg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", readcmd, readout, readerr)

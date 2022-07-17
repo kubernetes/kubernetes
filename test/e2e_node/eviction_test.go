@@ -42,12 +42,12 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 // Eviction Policy is described here:
-// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-eviction.md
+// https://github.com/kubernetes/design-proposals-archive/blob/main/node/kubelet-eviction.md
 
 const (
 	postTestConditionMonitoringPeriod = 1 * time.Minute
@@ -644,7 +644,7 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				},
 			})
 
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				if framework.TestContext.DumpLogsOnFailure {
 					logPodEvents(f)
 					logNodeEvents(f)
