@@ -45,23 +45,23 @@ func (a *cpuAccumulator) tryMaskUncoreCacheCPUs() {
 		return // TODO remove this when feature gate is default true... or not
 	}
 	if a.numCPUsNeeded <= 1 {
-		fmt.Println("UCC IGNORE SINGLE NUM CPUS") // FIXME
-		return                                    // zero?? or one cpu is already aligned, let the next cpu manager allocate it better
+		// zero, or one cpu is already uncore cache aligned let it be
+		return
 	}
 	ua := newUncoreAccumulator(a)
-	fmt.Println("")                                   // FIXME
-	fmt.Println("numCpus: ", a.numCPUsNeeded)         // FIXME
-	fmt.Println("availcpus:", ua.AvailableCpuIdArray) // FIXME
-	fmt.Println("ucc2count:", ua.Ucc2Count)           // FIXME
+	//fmt.Println("")
+	//fmt.Println("numCpus: ", a.numCPUsNeeded)
+	//fmt.Println("availcpus:", ua.AvailableCpuIdArray)
+	//fmt.Println("ucc2count:", ua.Ucc2Count)
 	if ua.numberAvailableCaches() <= 1 {
 		// all remaining free cpus have same uncore cache already
-		fmt.Println("UCC SINGLE CACHE ALREADY") // FIXME
+		//fmt.Println("UCC SINGLE CACHE ALREADY")
 		return
 	}
 	uccPick := ua.pickCache()
 	if uccPick == -1 {
 		// no available ucc big enough for numCpus
-		fmt.Println("UCC NO CACHE BIG ENOUGH") // FIXME
+		//fmt.Println("UCC NO CACHE BIG ENOUGH")
 		return
 	}
 	ua.maskUncoreCacheCpus(uccPick)

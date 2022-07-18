@@ -15,9 +15,10 @@ import (
 
 func cpusetForCPUTopology(topo *topology.CPUTopology) cpuset.CPUSet {
 	// Many of the test cases use cpuset.CPUSet based on the topology
-	elems := makeRange(0, topo.NumCPUs)
-	result := cpuset.NewCPUSet(elems...)
+	//elems := makeRange(0, topo.NumCPUs-1)
+	//result := cpuset.NewCPUSet(elems...)
 	// TODO filters and masks?
+	result := topo.CPUDetails.CPUs()
 	return result
 }
 
@@ -1026,7 +1027,7 @@ func TestTakeTopologyIterate(t *testing.T) {
 			"gold_5218_topology",
 			gold_5218_topology,
 			[]int{1, 2, 3, 4},
-			"map[1:0 2:1,4 3:5,8-9 4:12-15]",
+			"map[1:0 2:4-5 3:8-9,12 4:10-11,14-15]",
 		},
 		{
 			"epyc_7402p_topology",
@@ -1067,7 +1068,7 @@ func TestTakeTopologyIterate(t *testing.T) {
 			}
 			result := fmt.Sprint(results)
 			if result != tc.expResult {
-				t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expResult)
+				t.Errorf("[%s]\nexpected %v\nresult   %v", tc.description, tc.expResult, result)
 			}
 		})
 	}
@@ -1490,7 +1491,7 @@ func TestMakeReverseRange(t *testing.T) {
 
 }
 
-func AllocationPermutation(number int) [][]int {
+func AllocationPermutations(number int) [][]int {
 	nMax := int(math.Pow(2, float64(number-1)))
 	returnListList := make([][]int, nMax)
 	counter := 0
@@ -1499,7 +1500,7 @@ func AllocationPermutation(number int) [][]int {
 	returnListList[counter] = takeAll
 	counter += 1
 	for _, n := range makeReverseRange(1, number-1) {
-		recurse := AllocationPermutation(number - n)
+		recurse := AllocationPermutations(number - n)
 		for _, rval := range recurse {
 			x := make([]int, 1+len(rval))
 			x[0] = n
@@ -1515,15 +1516,15 @@ func AllocationPermutation(number int) [][]int {
 	return returnListList
 }
 
-func TestAllocationPermutation(t *testing.T) {
-	number := 17
+func TestAllocationPermutations(t *testing.T) {
+	number := 5
 	then := time.Now()
-	listOfListOfInt := AllocationPermutation(number)
+	listOfListOfInt := AllocationPermutations(number)
 	now := time.Now()
 	fmt.Println(len(listOfListOfInt), now.Sub(then))
-	//for ndx, value := range listOfListOfInt {
-	//	fmt.Println(ndx, value)
-	//}
+	for ndx, value := range listOfListOfInt {
+		fmt.Println(ndx, value)
+	}
 	firstAllocation := listOfListOfInt[0]
 	fmt.Println(firstAllocation)
 	if len(firstAllocation) != 1 {
@@ -1545,5 +1546,127 @@ func TestAllocationPermutation(t *testing.T) {
 			t.Errorf("Expected result[%v], %v to equal %v", ndx, result, 1)
 			return
 		}
+	}
+}
+
+type TakeTally struct {
+	Take cpuset.CPUSet
+	Topo *topology.CPUTopology
+}
+
+func (tt *TakeTally) IsSplitAcrossUncoreCaches() bool {
+	lastUcc := -1
+	isSplit := false
+	for _, cpuid := range tt.Take.ToSliceNoSort() {
+		ucc := tt.Topo.CPUDetails[cpuid].UnCoreCacheID
+		if lastUcc == -1 {
+			lastUcc = ucc
+		} else {
+			if ucc != lastUcc {
+				isSplit = true
+				break
+			}
+		}
+	}
+	return isSplit
+}
+
+func TakePattern(topo *topology.CPUTopology, pattern []int, featureFlag bool, t *testing.T) string {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, featureFlag)()
+	retStr := ""
+	cpuSet := topo.CPUDetails.CPUs()
+	retTally := make(map[int]TakeTally)
+	patternNdx := 0
+	for { // cycle through the pattern until we run out of possible allocations
+		takeCpus := pattern[patternNdx%len(pattern)]
+		patternNdx += 1
+		if takeCpus > cpuSet.Size() {
+			break
+		}
+		// invoke the scheduler
+		take, err := takeByTopologyNUMAPacked(topo, cpuSet, takeCpus)
+		if err != nil {
+			t.Errorf("\nUNEXPECTED TAKE ERROR: %v", err)
+			return fmt.Sprint(err)
+		}
+		cpuSet = cpuSet.Difference(take)
+		tt := TakeTally{Take: take, Topo: topo}
+		retTally[len(retTally)] = tt
+		if tt.IsSplitAcrossUncoreCaches() {
+			retStr = retStr + "X"
+		} else {
+			retStr = retStr + "."
+		}
+	}
+	return retStr
+} // the above defer statement should be unwound here
+
+func TestTakeAllocationPermutations(t *testing.T) {
+	examples := []struct {
+		topo     *topology.CPUTopology
+		apNumber int
+		expOld   []string
+		expNew   []string
+	}{
+		{
+			// This topology has eight UCCs on one NUMA (8x8 UCCs)
+			AMD_EPYC_7502P_32_Core_Processor,
+			// This should be one more than the max number of cpus per uncore cache
+			5,
+			// The old scheduler splits the cpus across ucc
+			[]string{".X.XX.X..X.X",
+				"..X.........X.....X......",
+				"......X...X.X.........X..",
+				".........X........X..............X....",
+				"...X...X.X.........X...X.",
+				"......................................",
+				"......................................",
+				"...................................................",
+				"...X.....X.........X.....",
+				"....X..............X........X.........",
+				"......................................",
+				"...................................................",
+				".....X........X..............X........",
+				"...................................................",
+				"...................................................",
+				"................................................................",
+				""},
+			// The new scheduler prefers aligning, unless it is impossible
+			[]string{"........XXXX",
+				".........................",
+				"........................X",
+				"......................................",
+				"........................X",
+				"......................................",
+				"......................................",
+				"...................................................",
+				".........................",
+				"......................................",
+				"......................................",
+				"...................................................",
+				"......................................",
+				"...................................................",
+				"...................................................",
+				"................................................................",
+				""},
+		},
+	}
+	for _, tc := range examples {
+		aps := AllocationPermutations(tc.apNumber)
+		counter := 0
+		for _, perm := range aps {
+			oldResult := TakePattern(tc.topo, perm, false, t)
+			if oldResult != tc.expOld[counter] {
+				t.Errorf("\nexpOld[%v]: %v\n   result: %v", counter, tc.expOld[counter], oldResult)
+				return
+			}
+			newResult := TakePattern(tc.topo, perm, true, t)
+			if newResult != tc.expNew[counter] {
+				t.Errorf("\nexpNew[%v]: %v\n   result: %v", counter, tc.expNew[counter], newResult)
+				return
+			}
+			counter += 1
+		}
+
 	}
 }
