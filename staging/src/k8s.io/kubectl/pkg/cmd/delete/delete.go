@@ -378,7 +378,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	}
 
 	effectiveTimeout := o.Timeout
-	if effectiveTimeout == 0 {
+	if effectiveTimeout < 0 {
 		// if we requested to wait forever, set it to a week.
 		effectiveTimeout = 168 * time.Hour
 	}
