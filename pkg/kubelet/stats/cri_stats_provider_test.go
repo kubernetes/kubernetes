@@ -211,20 +211,20 @@ func TestCRIListPodStats(t *testing.T) {
 	defer ctrl.Finish()
 
 	fakeOS := &kubecontainertest.FakeOS{}
-	fakeOS.ReadDirFn = func(path string) ([]os.FileInfo, error) {
-		var fileInfos []os.FileInfo
-		mockFI := kubecontainertest.NewMockFileInfo(ctrl)
+	fakeOS.ReadDirFn = func(path string) ([]os.DirEntry, error) {
+		var dirEntries []os.DirEntry
+		mockDE := kubecontainertest.NewMockDirEntry(ctrl)
 		switch path {
 		case kuberuntime.BuildPodLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")):
-			mockFI.EXPECT().Name().Return(podLogName0)
+			mockDE.EXPECT().Name().Return(podLogName0)
 		case kuberuntime.BuildPodLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")):
-			mockFI.EXPECT().Name().Return(podLogName1)
+			mockDE.EXPECT().Name().Return(podLogName1)
 		default:
 			return nil, nil
 		}
-		mockFI.EXPECT().IsDir().Return(false)
-		fileInfos = append(fileInfos, mockFI)
-		return fileInfos, nil
+		mockDE.EXPECT().IsDir().Return(false)
+		dirEntries = append(dirEntries, mockDE)
+		return dirEntries, nil
 	}
 
 	provider := NewCRIStatsProvider(

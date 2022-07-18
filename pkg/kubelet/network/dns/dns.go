@@ -19,13 +19,12 @@ package dns
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -455,7 +454,7 @@ func (c *Configurer) SetupDNSinContainerizedMounter(mounterPath string) {
 			}
 		}
 	}
-	if err := ioutil.WriteFile(resolvePath, []byte(dnsString), 0600); err != nil {
+	if err := os.WriteFile(resolvePath, []byte(dnsString), 0600); err != nil {
 		klog.ErrorS(err, "Could not write dns nameserver in the file", "path", resolvePath)
 	}
 }

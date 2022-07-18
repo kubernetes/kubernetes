@@ -27,7 +27,7 @@ import (
 // of the real call.
 type FakeOS struct {
 	StatFn     func(string) (os.FileInfo, error)
-	ReadDirFn  func(string) ([]os.FileInfo, error)
+	ReadDirFn  func(string) ([]os.DirEntry, error)
 	MkdirAllFn func(string, os.FileMode) error
 	SymlinkFn  func(string, string) error
 	GlobFn     func(string, string) bool
@@ -109,7 +109,7 @@ func (FakeOS) Pipe() (r *os.File, w *os.File, err error) {
 }
 
 // ReadDir is a fake call that returns the files under the directory.
-func (f *FakeOS) ReadDir(dirname string) ([]os.FileInfo, error) {
+func (f *FakeOS) ReadDir(dirname string) ([]os.DirEntry, error) {
 	if f.ReadDirFn != nil {
 		return f.ReadDirFn(dirname)
 	}

@@ -20,7 +20,6 @@ limitations under the License.
 package util
 
 import (
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -102,7 +101,7 @@ func TestIsUnixDomainSocket(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, err := ioutil.TempFile("", "test-domain-socket")
+		f, err := os.CreateTemp("", "test-domain-socket")
 		require.NoErrorf(t, err, "Failed to create file for test purposes: %v while setting up: %s", err, test.label)
 		addr := f.Name()
 		f.Close()

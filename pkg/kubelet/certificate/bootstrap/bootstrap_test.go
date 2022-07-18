@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -101,11 +100,11 @@ users:
     client-key: mycertvalid.key
 
 `)
-	filevalid, err := ioutil.TempFile(fileDir, "kubeconfigvalid")
+	filevalid, err := os.CreateTemp(fileDir, "kubeconfigvalid")
 	if err != nil {
 		t.Fatal(err)
 	}
-	ioutil.WriteFile(filevalid.Name(), testDataValid, os.FileMode(0755))
+	os.WriteFile(filevalid.Name(), testDataValid, os.FileMode(0755))
 
 	testDataInvalid := []byte(`
 apiVersion: v1
@@ -141,11 +140,11 @@ users:
     client-key: mycertinvalid.key
 
 `)
-	fileinvalid, err := ioutil.TempFile(fileDir, "kubeconfiginvalid")
+	fileinvalid, err := os.CreateTemp(fileDir, "kubeconfiginvalid")
 	if err != nil {
 		t.Fatal(err)
 	}
-	ioutil.WriteFile(fileinvalid.Name(), testDataInvalid, os.FileMode(0755))
+	os.WriteFile(fileinvalid.Name(), testDataInvalid, os.FileMode(0755))
 
 	testDatabootstrap := []byte(`
 apiVersion: v1
@@ -178,13 +177,13 @@ users:
   user:
    token: mytoken-b
 `)
-	fileboot, err := ioutil.TempFile(fileDir, "kubeconfig")
+	fileboot, err := os.CreateTemp(fileDir, "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
-	ioutil.WriteFile(fileboot.Name(), testDatabootstrap, os.FileMode(0755))
+	os.WriteFile(fileboot.Name(), testDatabootstrap, os.FileMode(0755))
 
-	dir, err := ioutil.TempDir(fileDir, "k8s-test-certstore-current")
+	dir, err := os.MkdirTemp(fileDir, "k8s-test-certstore-current")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -316,12 +315,12 @@ users:
   user:
     token: mytoken-b
 `)
-	f, err := ioutil.TempFile("", "kubeconfig")
+	f, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(f.Name())
-	ioutil.WriteFile(f.Name(), testData, os.FileMode(0755))
+	os.WriteFile(f.Name(), testData, os.FileMode(0755))
 
 	config, err := loadRESTClientConfig(f.Name())
 	if err != nil {

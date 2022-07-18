@@ -91,7 +91,7 @@ func WriteTmpFile(fs utilfs.Filesystem, path string, data []byte) (tmpPath strin
 		}
 	}()
 
-	// Name() will be an absolute path when using utilfs.DefaultFS, because ioutil.TempFile passes
+	// Name() will be an absolute path when using utilfs.DefaultFS, because os.CreateTemp passes
 	// an absolute path to os.Open, and we ensure similar behavior in utilfs.FakeFS for testing.
 	tmpPath = tmpFile.Name()
 

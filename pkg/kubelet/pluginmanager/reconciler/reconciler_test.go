@@ -18,7 +18,6 @@ package reconciler
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -44,7 +43,7 @@ var (
 )
 
 func init() {
-	d, err := ioutil.TempDir("", "reconciler_test")
+	d, err := os.MkdirTemp("", "reconciler_test")
 	if err != nil {
 		panic(fmt.Sprintf("Could not create a temp directory: %s", d))
 	}

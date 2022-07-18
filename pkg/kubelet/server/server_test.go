@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -432,7 +431,7 @@ func TestServeRunInContainer(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		// copying the response body did not work
 		t.Errorf("Cannot copy resp: %#v", err)
@@ -475,7 +474,7 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		// copying the response body did not work
 		t.Errorf("Cannot copy resp: %#v", err)
@@ -745,7 +744,7 @@ func assertHealthIsOk(t *testing.T, httpURL string) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
 	}
-	body, readErr := ioutil.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
 	if readErr != nil {
 		// copying the response body did not work
 		t.Fatalf("Cannot copy resp: %#v", readErr)
@@ -821,7 +820,7 @@ func TestContainerLogs(t *testing.T) {
 			}
 			defer resp.Body.Close()
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Errorf("Error reading container logs: %v", err)
 			}
@@ -911,7 +910,7 @@ func TestCheckpointContainer(t *testing.T) {
 		}
 		defer resp.Body.Close()
 		assert.Equal(t, resp.StatusCode, 500)
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		assert.Equal(t, string(body), "checkpointing of other/foo/checkpointingFailure failed (Returning error for test)")
 	})
 	// Now test a successful checkpoint succeeds
@@ -1111,7 +1110,7 @@ func testExecAttach(t *testing.T, verb string) {
 			require.NoError(t, err, "POSTing")
 			defer resp.Body.Close()
 
-			_, err = ioutil.ReadAll(resp.Body)
+			_, err = io.ReadAll(resp.Body)
 			assert.NoError(t, err, "reading response body")
 
 			require.Equal(t, test.responseStatusCode, resp.StatusCode, "response status")
@@ -1453,7 +1452,7 @@ func TestFailedParseParamsSummaryHandler(t *testing.T) {
 	resp, err := http.Post(fw.testHTTPServer.URL+"/stats/summary", "invalid/content/type", nil)
 	assert.NoError(t, err)
 	defer resp.Body.Close()
-	v, err := ioutil.ReadAll(resp.Body)
+	v, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 	assert.Contains(t, string(v), "parse form failed")
@@ -1463,14 +1462,14 @@ func verifyEndpointResponse(t *testing.T, fw *serverTestFramework, path string, 
 	resp, err := http.Get(fw.testHTTPServer.URL + path)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Equal(t, expectedResponse, string(body))
 
 	resp, err = http.Post(fw.testHTTPServer.URL+path, "", nil)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-	body, err = ioutil.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Equal(t, expectedResponse, string(body))
 }

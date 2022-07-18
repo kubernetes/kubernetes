@@ -17,7 +17,6 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -440,11 +439,11 @@ func TestRestartCountByLogDir(t *testing.T) {
 			restartCount: 8,
 		},
 	} {
-		tempDirPath, err := ioutil.TempDir("", "test-restart-count-")
+		tempDirPath, err := os.MkdirTemp("", "test-restart-count-")
 		assert.NoError(t, err, "create tempdir error")
 		defer os.RemoveAll(tempDirPath)
 		for _, filename := range tc.filenames {
-			err = ioutil.WriteFile(filepath.Join(tempDirPath, filename), []byte("a log line"), 0600)
+			err = os.WriteFile(filepath.Join(tempDirPath, filename), []byte("a log line"), 0600)
 			assert.NoError(t, err, "could not write log file")
 		}
 		count, _ := calcRestartCountByLogDir(tempDirPath)
