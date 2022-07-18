@@ -1442,9 +1442,12 @@ func TestConnectionResetByPeerIsRetried(t *testing.T) {
 }
 
 func TestCheckRetryHandles429And5xx(t *testing.T) {
+	var rwlock sync.RWMutex
 	count := 0
 	ch := make(chan struct{})
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		rwlock.Lock()
+		defer rwlock.Unlock()
 		data, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			t.Fatalf("unable to read request body: %v", err)
