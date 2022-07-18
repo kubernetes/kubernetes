@@ -52,7 +52,6 @@ import (
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -62,7 +61,6 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storageversion"
-	"k8s.io/apiserver/pkg/util/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
@@ -323,7 +321,7 @@ type AuthorizationInfo struct {
 func NewConfig(codecs serializer.CodecFactory) *Config {
 	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
 	var id string
-	if feature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
 		id = "kube-apiserver-" + uuid.New().String()
 	}
 	lifecycleSignals := newLifecycleSignals()
@@ -890,7 +888,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
 	}
-	if c.FlowControl != nil && feature.DefaultFeatureGate.Enabled(features.APIPriorityAndFairness) {
+	if c.FlowControl != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
 		c.FlowControl.Install(s.Handler.NonGoRestfulMux)
 	}
 }

@@ -36,7 +36,6 @@ import (
 	"k8s.io/api/admission/v1beta1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -319,7 +318,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 			testCaseID := strconv.Itoa(i)
 			ns := "reinvoke-" + testCaseID
 			nsLabels := map[string]string{"test-case": testCaseID}
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns, Labels: nsLabels}}, metav1.CreateOptions{})
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns, Labels: nsLabels}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -327,7 +326,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 			// Write markers to a separate namespace to avoid cross-talk
 			markerNs := ns + "-markers"
 			markerNsLabels := map[string]string{"test-markers": testCaseID}
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs, Labels: markerNsLabels}}, metav1.CreateOptions{})
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs, Labels: markerNsLabels}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -414,7 +413,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 					Labels:    map[string]string{"x": "true"},
 				},
 				Spec: corev1.PodSpec{
-					Containers: []v1.Container{{
+					Containers: []corev1.Container{{
 						Name:  "fake-name",
 						Image: "fakeimage",
 					}},
@@ -637,7 +636,7 @@ func newReinvocationMarkerFixture(namespace string) *corev1.Pod {
 			},
 		},
 		Spec: corev1.PodSpec{
-			Containers: []v1.Container{{
+			Containers: []corev1.Container{{
 				Name:  "fake-name",
 				Image: "fakeimage",
 			}},

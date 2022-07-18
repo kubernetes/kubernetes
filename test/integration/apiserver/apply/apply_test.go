@@ -40,7 +40,6 @@ import (
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -2552,7 +2551,7 @@ func BenchmarkServerSideApply(b *testing.B) {
 	benchAll(b, client, decodePod(podBytesWhenEnabled))
 }
 
-func benchAll(b *testing.B, client kubernetes.Interface, pod v1.Pod) {
+func benchAll(b *testing.B, client clientset.Interface, pod v1.Pod) {
 	// Make sure pod is ready to post
 	pod.ObjectMeta.CreationTimestamp = metav1.Time{}
 	pod.ObjectMeta.ResourceVersion = ""
@@ -2580,7 +2579,7 @@ func benchAll(b *testing.B, client kubernetes.Interface, pod v1.Pod) {
 	b.Run("Post50", benchPostPod(client, pod, 50))
 }
 
-func benchPostPod(client kubernetes.Interface, pod v1.Pod, parallel int) func(*testing.B) {
+func benchPostPod(client clientset.Interface, pod v1.Pod, parallel int) func(*testing.B) {
 	return func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
@@ -2610,7 +2609,7 @@ func benchPostPod(client kubernetes.Interface, pod v1.Pod, parallel int) func(*t
 	}
 }
 
-func createNamespace(client kubernetes.Interface, name string) error {
+func createNamespace(client clientset.Interface, name string) error {
 	namespace := v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	namespaceBytes, err := yaml.Marshal(namespace)
 	if err != nil {
@@ -2626,7 +2625,7 @@ func createNamespace(client kubernetes.Interface, name string) error {
 	return nil
 }
 
-func benchListPod(client kubernetes.Interface, pod v1.Pod, num int) func(*testing.B) {
+func benchListPod(client clientset.Interface, pod v1.Pod, num int) func(*testing.B) {
 	return func(b *testing.B) {
 		namespace := fmt.Sprintf("get-%d-%d", num, b.N)
 		if err := createNamespace(client, namespace); err != nil {
@@ -2661,7 +2660,7 @@ func benchListPod(client kubernetes.Interface, pod v1.Pod, num int) func(*testin
 	}
 }
 
-func benchRepeatedUpdate(client kubernetes.Interface, podName string) func(*testing.B) {
+func benchRepeatedUpdate(client clientset.Interface, podName string) func(*testing.B) {
 	return func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()

@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -124,7 +123,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			// Build clientset and informers for controllers.
 			externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
 			externalClientConfig.QPS = -1
-			externalClientset := kubernetes.NewForConfigOrDie(externalClientConfig)
+			externalClientset := clientset.NewForConfigOrDie(externalClientConfig)
 			externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 			podTolerations.SetExternalKubeClientSet(externalClientset)
 			podTolerations.SetExternalKubeInformerFactory(externalInformers)

@@ -45,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	"k8s.io/kubernetes/pkg/volume"
-	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
 
@@ -226,7 +225,7 @@ func newTestController(kubeClient clientset.Interface, informerFactory informers
 	params := ControllerParameters{
 		KubeClient:                kubeClient,
 		SyncPeriod:                5 * time.Second,
-		VolumePlugins:             []vol.VolumePlugin{},
+		VolumePlugins:             []volume.VolumePlugin{},
 		VolumeInformer:            informerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             informerFactory.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             informerFactory.Storage().V1().StorageClasses(),
@@ -614,7 +613,7 @@ func wrapTestWithPluginCalls(expectedRecycleCalls, expectedDeleteCalls []error, 
 			deleteCalls:    expectedDeleteCalls,
 			provisionCalls: expectedProvisionCalls,
 		}
-		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, nil /* prober */, ctrl)
+		ctrl.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plugin}, nil /* prober */, ctrl)
 		return toWrap(ctrl, reactor, test)
 	}
 }
@@ -657,7 +656,7 @@ func (t fakeCSIMigratedPluginManager) IsMigrationEnabledForPlugin(pluginName str
 func wrapTestWithCSIMigrationProvisionCalls(toWrap testCall) testCall {
 	plugin := &mockVolumePlugin{}
 	return func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, nil /* prober */, ctrl)
+		ctrl.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plugin}, nil /* prober */, ctrl)
 		ctrl.translator = fakeCSINameTranslator{}
 		ctrl.csiMigratedPluginManager = fakeCSIMigratedPluginManager{}
 		return toWrap(ctrl, reactor, test)
@@ -924,7 +923,7 @@ type mockVolumePlugin struct {
 	deleteCallCounter    int
 	recycleCalls         []error
 	recycleCallCounter   int
-	provisionOptions     vol.VolumeOptions
+	provisionOptions     volume.VolumeOptions
 }
 
 type provisionCall struct {
@@ -932,12 +931,12 @@ type provisionCall struct {
 	ret                error
 }
 
-var _ vol.VolumePlugin = &mockVolumePlugin{}
-var _ vol.RecyclableVolumePlugin = &mockVolumePlugin{}
-var _ vol.DeletableVolumePlugin = &mockVolumePlugin{}
-var _ vol.ProvisionableVolumePlugin = &mockVolumePlugin{}
+var _ volume.VolumePlugin = &mockVolumePlugin{}
+var _ volume.RecyclableVolumePlugin = &mockVolumePlugin{}
+var _ volume.DeletableVolumePlugin = &mockVolumePlugin{}
+var _ volume.ProvisionableVolumePlugin = &mockVolumePlugin{}
 
-func (plugin *mockVolumePlugin) Init(host vol.VolumeHost) error {
+func (plugin *mockVolumePlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
@@ -945,11 +944,11 @@ func (plugin *mockVolumePlugin) GetPluginName() string {
 	return mockPluginName
 }
 
-func (plugin *mockVolumePlugin) GetVolumeName(spec *vol.Spec) (string, error) {
+func (plugin *mockVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	return spec.Name(), nil
 }
 
-func (plugin *mockVolumePlugin) CanSupport(spec *vol.Spec) bool {
+func (plugin *mockVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return true
 }
 
@@ -965,21 +964,21 @@ func (plugin *mockVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
-func (plugin *mockVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol.Spec, error) {
+func (plugin *mockVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	return nil, nil
 }
 
-func (plugin *mockVolumePlugin) NewMounter(spec *vol.Spec, podRef *v1.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {
+func (plugin *mockVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return nil, fmt.Errorf("Mounter is not supported by this plugin")
 }
 
-func (plugin *mockVolumePlugin) NewUnmounter(name string, podUID types.UID) (vol.Unmounter, error) {
+func (plugin *mockVolumePlugin) NewUnmounter(name string, podUID types.UID) (volume.Unmounter, error) {
 	return nil, fmt.Errorf("Unmounter is not supported by this plugin")
 }
 
 // Provisioner interfaces
 
-func (plugin *mockVolumePlugin) NewProvisioner(options vol.VolumeOptions) (vol.Provisioner, error) {
+func (plugin *mockVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
 	if len(plugin.provisionCalls) > 0 {
 		// mockVolumePlugin directly implements Provisioner interface
 		klog.V(4).Infof("mock plugin NewProvisioner called, returning mock provisioner")
@@ -1033,7 +1032,7 @@ func (plugin *mockVolumePlugin) Provision(selectedNode *v1.Node, allowedTopologi
 
 // Deleter interfaces
 
-func (plugin *mockVolumePlugin) NewDeleter(spec *vol.Spec) (vol.Deleter, error) {
+func (plugin *mockVolumePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	if len(plugin.deleteCalls) > 0 {
 		// mockVolumePlugin directly implements Deleter interface
 		klog.V(4).Infof("mock plugin NewDeleter called, returning mock deleter")
@@ -1059,13 +1058,13 @@ func (plugin *mockVolumePlugin) GetPath() string {
 	return ""
 }
 
-func (plugin *mockVolumePlugin) GetMetrics() (*vol.Metrics, error) {
+func (plugin *mockVolumePlugin) GetMetrics() (*volume.Metrics, error) {
 	return nil, nil
 }
 
 // Recycler interfaces
 
-func (plugin *mockVolumePlugin) Recycle(pvName string, spec *vol.Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
+func (plugin *mockVolumePlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
 	if len(plugin.recycleCalls) == 0 {
 		return fmt.Errorf("Mock plugin error: no recycleCalls configured")
 	}

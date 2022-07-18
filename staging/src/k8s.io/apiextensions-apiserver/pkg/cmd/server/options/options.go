@@ -31,7 +31,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/server/options"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -43,7 +42,7 @@ const defaultEtcdPathPrefix = "/registry/apiextensions.kubernetes.io"
 
 // CustomResourceDefinitionsServerOptions describes the runtime options of an apiextensions-apiserver.
 type CustomResourceDefinitionsServerOptions struct {
-	ServerRunOptions   *options.ServerRunOptions
+	ServerRunOptions   *genericoptions.ServerRunOptions
 	RecommendedOptions *genericoptions.RecommendedOptions
 	APIEnablement      *genericoptions.APIEnablementOptions
 
@@ -54,7 +53,7 @@ type CustomResourceDefinitionsServerOptions struct {
 // NewCustomResourceDefinitionsServerOptions creates default options of an apiextensions-apiserver.
 func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
 	o := &CustomResourceDefinitionsServerOptions{
-		ServerRunOptions: options.NewServerRunOptions(),
+		ServerRunOptions: genericoptions.NewServerRunOptions(),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
 			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion),
