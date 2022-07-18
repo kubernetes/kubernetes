@@ -346,6 +346,9 @@ func (s *Server) InstallDefaultHandlers() {
 	ws.Route(ws.GET("").
 		To(s.getPods).
 		Operation("getPods"))
+	ws.Route(ws.GET("/{podNamespace}/{podName}").
+		To(s.getPod).
+		Operation("getPod"))
 	s.restfulCont.Add(ws)
 
 	s.addMetricsBucketMatcher("stats")
@@ -705,6 +708,26 @@ func encodePods(pods []*v1.Pod) (data []byte, err error) {
 func (s *Server) getPods(request *restful.Request, response *restful.Response) {
 	pods := s.host.GetPods()
 	data, err := encodePods(pods)
+	if err != nil {
+		response.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+	writeJSONResponse(response, data)
+}
+
+// getPod returns a specified pod bound to the Kubelet and its spec.
+func (s *Server) getPod(request *restful.Request, response *restful.Response) {
+	podNamespace := request.PathParameter("podNamespace")
+	podName := request.PathParameter("podName")
+
+	pod, ok := s.host.GetPodByName(podNamespace, podName)
+	if !ok {
+		response.WriteError(http.StatusNotFound, fmt.Errorf("pod does not exist"))
+		return
+	}
+
+	codec := legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Group: v1.GroupName, Version: "v1"})
+	data, err := runtime.Encode(codec, pod)
 	if err != nil {
 		response.WriteError(http.StatusInternalServerError, err)
 		return
