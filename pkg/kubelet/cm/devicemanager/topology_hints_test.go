@@ -39,6 +39,10 @@ func (m *mockAffinityStore) GetAffinity(podUID string, containerName string) top
 	return m.hint
 }
 
+func (m *mockAffinityStore) GetPolicy() topologymanager.Policy {
+	return nil
+}
+
 func makeNUMADevice(id string, numa int) pluginapi.Device {
 	return pluginapi.Device{
 		ID:       id,

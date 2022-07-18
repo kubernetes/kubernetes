@@ -90,7 +90,7 @@ func (s *scope) GetAffinity(podUID string, containerName string) TopologyHint {
 }
 
 func (s *scope) GetPolicy() Policy {
-    return s.policy
+	return s.policy
 }
 
 func (s *scope) AddHintProvider(h HintProvider) {

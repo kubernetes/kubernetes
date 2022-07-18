@@ -73,7 +73,7 @@ type StaticPolicyOptions struct {
 	// Flag to evenly distribute CPUs across NUMA nodes in cases where more
 	// than one NUMA node is required to satisfy the allocation.
 	DistributeCPUsAcrossNUMA bool
-	// Flag to ensure CPU's are considered aligned at socket boundary rather than
+	// Flag to ensure CPUs are considered aligned at socket boundary rather than
 	// NUMA boundary
 	AlignBySocket bool
 }
@@ -114,12 +114,12 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 }
 
 func ValidateStaticPolicyOptions(opts StaticPolicyOptions, topology *topology.CPUTopology, topologyManager topologymanager.Store) error {
-	if opts.AlignBySocket == true {
-		//1. not compatible with topology manager single numa policy option
+	if opts.AlignBySocket {
+		// Not compatible with topology manager single-numa-node policy option.
 		if topologyManager.GetPolicy().Name() == topologymanager.PolicySingleNumaNode {
-			return fmt.Errorf("Topolgy manager Single numa policy is incompatible with CPUManager Align  by socket policy option")
+			return fmt.Errorf("Topolgy manager %s policy is incompatible with CPUManager %s policy option", topologymanager.PolicySingleNumaNode, AlignBySocketOption)
 		}
-		//2. not comptuble with topology when num_socets > num_numa
+		// Not compatible with topology when number of sockets are more than number of NUMA nodes.
 		if topology.NumSockets > topology.NumNUMANodes {
 			return fmt.Errorf("Align by socket is not compatible with hardware where number of sockets are more than number of NUMA")
 		}

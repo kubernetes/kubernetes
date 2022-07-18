@@ -572,7 +572,7 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 	// to the minAffinitySize. Only those with an equal number of bits set (and
 	// with a minimal set of numa nodes) will be considered preferred.
 	for i := range hints {
-		if p.options.AlignBySocket && p.isHintSocketAligned(hints[i].NUMANodeAffinity) {
+		if p.options.AlignBySocket && p.isHintSocketAligned(hints[i], minAffinitySize) {
 			hints[i].Preferred = true
 			continue
 		}
@@ -584,18 +584,24 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 	return hints
 }
 
-func (p *staticPolicy) isHintSocketAligned(hint bitmask.BitMask) bool {
-	numaNodes := hint.GetBits()
-	if p.topology.CPUDetails.SocketsInNUMANodes(numaNodes[:]...).Size() == 1 {
-		return true
+// isHintSocketAligned function return true if numa nodes in hint are socket aligned.
+func (p *staticPolicy) isHintSocketAligned(hint topologymanager.TopologyHint, minAffinitySize int) bool {
+	numaNodesBitMask := hint.NUMANodeAffinity.GetBits()
+	numaNodesPerSocket := p.topology.NumNUMANodes / p.topology.NumSockets
+	if numaNodesPerSocket == 0 {
+		return false
 	}
-	return false
+	// minSockets refers to minimum number of socket required to satify allocation.
+	// A hint is considered socket aligned if sockets across which numa nodes span is equal to minSockets
+	minSockets := (minAffinitySize + numaNodesPerSocket - 1) / numaNodesPerSocket
+	return p.topology.CPUDetails.SocketsInNUMANodes(numaNodesBitMask...).Size() == minSockets
 }
 
 // getAlignedCPUs return set of aligned CPUs based on numa affinity mask and configured policy options.
 func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableCPUs cpuset.CPUSet) cpuset.CPUSet {
 	alignedCPUs := cpuset.NewCPUSet()
 	numaBits := numaAffinity.GetBits()
+
 	// If align-by-socket policy option is enabled, NUMA based hint is expanded to
 	// socket aligned hint. It will ensure that first socket aligned available CPUs are
 	// allocated before we try to find CPUs across socket to satisfy allocation request.

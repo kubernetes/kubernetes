@@ -186,7 +186,7 @@ func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint 
 }
 
 func (m *manager) GetPolicy() Policy {
-       return m.scope.GetPolicy()
+	return m.scope.GetPolicy()
 }
 
 func (m *manager) AddHintProvider(h HintProvider) {
