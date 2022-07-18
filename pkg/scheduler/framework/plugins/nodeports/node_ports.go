@@ -113,7 +113,8 @@ func (pl *NodePorts) EventsToRegister() []framework.ClusterEvent {
 func (pl *NodePorts) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	wantPorts, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		// Fallback to calculate containerPorts here when PreFilter is disabled.
+		wantPorts = getContainerPorts(pod)
 	}
 
 	fits := fitsPorts(wantPorts, nodeInfo)

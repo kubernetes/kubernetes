@@ -156,16 +156,35 @@ func TestNodePorts(t *testing.T) {
 }
 
 func TestPreFilterDisabled(t *testing.T) {
-	pod := &v1.Pod{}
-	nodeInfo := framework.NewNodeInfo()
-	node := v1.Node{}
-	nodeInfo.SetNode(&node)
-	p, _ := New(nil, nil)
-	cycleState := framework.NewCycleState()
-	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
-	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterNodePorts" from cycleState: %w`, fmt.Errorf("not found")))
-	if !reflect.DeepEqual(gotStatus, wantStatus) {
-		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
+	tests := []struct {
+		pod        *v1.Pod
+		nodeInfo   *framework.NodeInfo
+		name       string
+		wantStatus *framework.Status
+	}{
+		{
+			pod: newPod("m1", "UDP/127.0.0.1/8080"),
+			nodeInfo: framework.NewNodeInfo(
+				newPod("m1", "UDP/127.0.0.1/9090")),
+			name: "other port",
+		},
+		{
+			pod: newPod("m1", "TCP/127.0.0.1/8080"),
+			nodeInfo: framework.NewNodeInfo(
+				newPod("m1", "TCP/127.0.0.1/8080")),
+			name:       "same tcp port",
+			wantStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			p, _ := New(nil, nil)
+			cycleState := framework.NewCycleState()
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, test.pod, test.nodeInfo)
+			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
+				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
+			}
+		})
 	}
 }
 
