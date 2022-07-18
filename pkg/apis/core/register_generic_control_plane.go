@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,52 +22,26 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// GroupName is the group name use in this package
-const GroupName = ""
-
-// SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
-
-// Kind takes an unqualified kind and returns a Group qualified GroupKind
-func Kind(kind string) schema.GroupKind {
-	return SchemeGroupVersion.WithKind(kind).GroupKind()
-}
-
-// Resource takes an unqualified resource and returns a Group qualified GroupResource
-func Resource(resource string) schema.GroupResource {
-	return SchemeGroupVersion.WithResource(resource).GroupResource()
-}
-
 var (
-	// SchemeBuilder object to register various known types
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	// GenericControlPlaneGroupName is the name of the group when installed in the generic control plane
+	GenericControlPlaneGroupName = "core"
 
-	// AddToScheme represents a func that can be used to apply all the registered
+	// GenericControlPlaneSchemeGroupVersion is group version used to register these objects
+	GenericControlPlaneSchemeGroupVersion = schema.GroupVersion{Group: GenericControlPlaneGroupName, Version: "v1"}
+
+	// GenericControlPlaneSchemeBuilder object to register various known types for the control plane
+	GenericControlPlaneSchemeBuilder = runtime.NewSchemeBuilder(addGenericControlPlaneKnownTypes)
+
+	// AddToGenericControlPlaneScheme represents a func that can be used to apply all the registered
 	// funcs in a scheme
-	AddToScheme = SchemeBuilder.AddToScheme
+	AddToGenericControlPlaneScheme = GenericControlPlaneSchemeBuilder.AddToScheme
 )
 
-func addKnownTypes(scheme *runtime.Scheme) error {
+func addGenericControlPlaneKnownTypes(scheme *runtime.Scheme) error {
 	if err := scheme.AddIgnoredConversionType(&metav1.TypeMeta{}, &metav1.TypeMeta{}); err != nil {
 		return err
 	}
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Pod{},
-		&PodList{},
-		&PodStatusResult{},
-		&PodTemplate{},
-		&PodTemplateList{},
-		&ReplicationControllerList{},
-		&ReplicationController{},
-		&ServiceList{},
-		&Service{},
-		&ServiceProxyOptions{},
-		&NodeList{},
-		&Node{},
-		&NodeProxyOptions{},
-		&Endpoints{},
-		&EndpointsList{},
-		&Binding{},
 		&Event{},
 		&EventList{},
 		&List{},
@@ -81,17 +55,26 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ServiceAccountList{},
 		&Secret{},
 		&SecretList{},
-		&PersistentVolume{},
-		&PersistentVolumeList{},
-		&PersistentVolumeClaim{},
-		&PersistentVolumeClaimList{},
-		&PodAttachOptions{},
-		&PodLogOptions{},
-		&PodExecOptions{},
-		&PodPortForwardOptions{},
-		&PodProxyOptions{},
-		&ComponentStatus{},
-		&ComponentStatusList{},
+		&SerializedReference{},
+		&RangeAllocation{},
+		&ConfigMap{},
+		&ConfigMapList{},
+	)
+
+	scheme.AddKnownTypes(GenericControlPlaneSchemeGroupVersion,
+		&Event{},
+		&EventList{},
+		&List{},
+		&LimitRange{},
+		&LimitRangeList{},
+		&ResourceQuota{},
+		&ResourceQuotaList{},
+		&Namespace{},
+		&NamespaceList{},
+		&ServiceAccount{},
+		&ServiceAccountList{},
+		&Secret{},
+		&SecretList{},
 		&SerializedReference{},
 		&RangeAllocation{},
 		&ConfigMap{},

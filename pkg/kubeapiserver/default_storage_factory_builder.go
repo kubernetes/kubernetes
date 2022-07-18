@@ -36,27 +36,6 @@ import (
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
 )
 
-// SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
-var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
-	{Group: "", Resource: "replicationcontrollers"}:        "controllers",
-	{Group: "", Resource: "endpoints"}:                     "services/endpoints",
-	{Group: "", Resource: "nodes"}:                         "minions",
-	{Group: "", Resource: "services"}:                      "services/specs",
-	{Group: "extensions", Resource: "ingresses"}:           "ingress",
-	{Group: "networking.k8s.io", Resource: "ingresses"}:    "ingress",
-	{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
-	{Group: "policy", Resource: "podsecuritypolicies"}:     "podsecuritypolicy",
-}
-
-// DefaultWatchCacheSizes defines default resources for which watchcache
-// should be disabled.
-func DefaultWatchCacheSizes() map[schema.GroupResource]int {
-	return map[schema.GroupResource]int{
-		{Resource: "events"}:                         0,
-		{Group: "events.k8s.io", Resource: "events"}: 0,
-	}
-}
-
 // NewStorageFactoryConfig returns a new StorageFactoryConfig set up with necessary resource overrides.
 func NewStorageFactoryConfig() *StorageFactoryConfig {
 

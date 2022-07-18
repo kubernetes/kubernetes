@@ -17,20 +17,11 @@ limitations under the License.
 package admission
 
 import (
-	"io/ioutil"
-	"net/http"
 	"time"
-
-	"k8s.io/klog/v2"
-
-	"go.opentelemetry.io/otel/trace"
 
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	webhookinit "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	egressselector "k8s.io/apiserver/pkg/server/egressselector"
-	"k8s.io/apiserver/pkg/util/webhook"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	externalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -47,18 +38,7 @@ type Config struct {
 }
 
 // New sets up the plugins and admission start hooks needed for admission
-func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselector.EgressSelector, serviceResolver webhook.ServiceResolver, tp *trace.TracerProvider) ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
-	webhookAuthResolverWrapper := webhook.NewDefaultAuthenticationInfoResolverWrapper(proxyTransport, egressSelector, c.LoopbackClientConfig, tp)
-	webhookPluginInitializer := webhookinit.NewPluginInitializer(webhookAuthResolverWrapper, serviceResolver)
-
-	var cloudConfig []byte
-	if c.CloudConfigFile != "" {
-		var err error
-		cloudConfig, err = ioutil.ReadFile(c.CloudConfigFile)
-		if err != nil {
-			klog.Fatalf("Error reading from cloud configuration file %s: %#v", c.CloudConfigFile, err)
-		}
-	}
+func (c *Config) New() ([]admission.PluginInitializer, genericapiserver.PostStartHookFunc, error) {
 	clientset, err := kubernetes.NewForConfig(c.LoopbackClientConfig)
 	if err != nil {
 		return nil, nil, err
@@ -67,7 +47,6 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 	discoveryClient := cacheddiscovery.NewMemCacheClient(clientset.Discovery())
 	discoveryRESTMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
 	kubePluginInitializer := NewPluginInitializer(
-		cloudConfig,
 		discoveryRESTMapper,
 		quotainstall.NewQuotaConfigurationForAdmission(),
 	)
@@ -78,5 +57,5 @@ func (c *Config) New(proxyTransport *http.Transport, egressSelector *egressselec
 		return nil
 	}
 
-	return []admission.PluginInitializer{webhookPluginInitializer, kubePluginInitializer}, admissionPostStartHook, nil
+	return []admission.PluginInitializer{kubePluginInitializer}, admissionPostStartHook, nil
 }

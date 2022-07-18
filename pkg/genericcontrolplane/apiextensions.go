@@ -14,10 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package app does all of the work necessary to create a Kubernetes
-// APIServer by binding together the API, master and APIServer infrastructure.
-// It can be configured and called directly or via the hyperkube framework.
-package app
+package genericcontrolplane
 
 import (
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -34,15 +31,15 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	kubeexternalinformers "k8s.io/client-go/informers"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+
+	"k8s.io/kubernetes/pkg/genericcontrolplane/options"
 )
 
-func createAPIExtensionsConfig(
+func CreateAPIExtensionsConfig(
 	kubeAPIServerConfig genericapiserver.Config,
 	externalInformers kubeexternalinformers.SharedInformerFactory,
 	pluginInitializers []admission.PluginInitializer,
-	commandOptions *options.ServerRunOptions,
-	masterCount int,
+	commandOptions options.CompletedServerRunOptions,
 	serviceResolver webhook.ServiceResolver,
 	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
 ) (*apiextensionsapiserver.Config, error) {
@@ -88,7 +85,7 @@ func createAPIExtensionsConfig(
 		},
 		ExtraConfig: apiextensionsapiserver.ExtraConfig{
 			CRDRESTOptionsGetter: apiextensionsoptions.NewCRDRESTOptionsGetter(etcdOptions),
-			MasterCount:          masterCount,
+			MasterCount:          1, // TODO: pass this in correctly
 			AuthResolverWrapper:  authResolverWrapper,
 			ServiceResolver:      serviceResolver,
 		},
@@ -98,8 +95,4 @@ func createAPIExtensionsConfig(
 	apiextensionsConfig.GenericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
 
 	return apiextensionsConfig, nil
-}
-
-func createAPIExtensionsServer(apiextensionsConfig *apiextensionsapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget) (*apiextensionsapiserver.CustomResourceDefinitions, error) {
-	return apiextensionsConfig.Complete().New(delegateAPIServer)
 }
