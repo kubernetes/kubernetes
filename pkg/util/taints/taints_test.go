@@ -33,31 +33,77 @@ func TestAddOrUpdateTaint(t *testing.T) {
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	checkResult := func(testCaseName string, newNode *v1.Node, expectedTaint *v1.Taint, result, expectedResult bool, err error) {
+	checkResult := func(testCaseName string, newNode *v1.Node, expectedTaints []v1.Taint, result, expectedResult bool, err error) {
 		if err != nil {
 			t.Errorf("[%s] should not raise error but got %v", testCaseName, err)
 		}
 		if result != expectedResult {
 			t.Errorf("[%s] should return %t, but got: %t", testCaseName, expectedResult, result)
 		}
-		if len(newNode.Spec.Taints) != 1 || !reflect.DeepEqual(newNode.Spec.Taints[0], *expectedTaint) {
-			t.Errorf("[%s] node should only have one taint: %v, but got: %v", testCaseName, *expectedTaint, newNode.Spec.Taints)
+		if !reflect.DeepEqual(newNode.Spec.Taints, expectedTaints) {
+			t.Errorf("[%s] node should only have one taint: %v, but got: %v", testCaseName, expectedTaints, newNode.Spec.Taints)
 		}
 	}
 
 	// Add a new Taint.
 	newNode, result, err := AddOrUpdateTaint(node, taint)
-	checkResult("Add New Taint", newNode, taint, result, true, err)
+	checkResult("Add New Taint", newNode, []v1.Taint{{
+		Key:       taint.Key,
+		Value:     taint.Value,
+		Effect:    taint.Effect,
+		TimeAdded: taint.TimeAdded,
+	}}, result, true, err)
 
 	// Update a Taint.
 	taint.Value = "bar_1"
 	newNode, result, err = AddOrUpdateTaint(node, taint)
-	checkResult("Update Taint", newNode, taint, result, true, err)
+	checkResult("Update Taint", newNode, []v1.Taint{{
+		Key:       taint.Key,
+		Value:     taint.Value,
+		Effect:    taint.Effect,
+		TimeAdded: taint.TimeAdded,
+	}}, result, true, err)
 
 	// Add a duplicate Taint.
 	node = newNode
 	newNode, result, err = AddOrUpdateTaint(node, taint)
-	checkResult("Add Duplicate Taint", newNode, taint, result, false, err)
+	checkResult("Add Duplicate Taint", newNode, []v1.Taint{{
+		Key:       taint.Key,
+		Value:     taint.Value,
+		Effect:    taint.Effect,
+		TimeAdded: taint.TimeAdded,
+	}}, result, false, err)
+
+	// Update a Taint.
+	node = newNode
+	node.Spec.Taints[0].Value = "bar"
+	newNode, result, err = AddOrUpdateTaint(node, taint)
+	checkResult("Add Duplicate Taint", newNode, []v1.Taint{{
+		Key:       taint.Key,
+		Value:     taint.Value,
+		Effect:    taint.Effect,
+		TimeAdded: taint.TimeAdded,
+	}}, result, true, err)
+
+	// no match Taint.
+	node = newNode
+	node.Spec.Taints[0].Value = "bar_1"
+	taint.Effect = v1.TaintEffectNoExecute
+	newNode, result, err = AddOrUpdateTaint(node, taint)
+	checkResult("Add Duplicate Taint", newNode, []v1.Taint{
+		{
+			Key:       node.Spec.Taints[0].Key,
+			Value:     node.Spec.Taints[0].Value,
+			Effect:    node.Spec.Taints[0].Effect,
+			TimeAdded: node.Spec.Taints[0].TimeAdded,
+		},
+		{
+			Key:       taint.Key,
+			Value:     taint.Value,
+			Effect:    taint.Effect,
+			TimeAdded: taint.TimeAdded,
+		},
+	}, result, true, err)
 }
 
 func TestTaintExists(t *testing.T) {
@@ -513,6 +559,25 @@ func TestReorganizeTaints(t *testing.T) {
 			expectedOperation: MODIFIED,
 			expectedErr:       false,
 		},
+		{
+			name:      "don't update set of taints",
+			overwrite: false,
+			taintsToAdd: []v1.Taint{
+				{
+					Key:    "foo",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			taintsToDelete: []v1.Taint{
+				{
+					Key:    "foo",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			expectedTaints:    []v1.Taint{},
+			expectedOperation: UNTAINTED,
+			expectedErr:       false,
+		},
 	}
 
 	for _, c := range cases {
@@ -676,6 +741,20 @@ func TestParseTaints(t *testing.T) {
 				},
 			},
 			expectedErr: false,
+		},
+		{
+			name:                   "taint is not unique",
+			spec:                   []string{"foo=abc:NoSchedule", "foo=abc:NoSchedule"},
+			expectedTaints:         nil,
+			expectedTaintsToRemove: nil,
+			expectedErr:            true,
+		},
+		{
+			name:                   "is invalid label value",
+			spec:                   []string{"foo=abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabc:NoSchedule"},
+			expectedTaints:         nil,
+			expectedTaintsToRemove: nil,
+			expectedErr:            true,
 		},
 	}
 
