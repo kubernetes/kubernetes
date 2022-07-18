@@ -34,6 +34,8 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+
+	"k8s.io/klog/v2"
 )
 
 // TearDownFunc is to be called to tear down a test server.
@@ -71,11 +73,22 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 // 		 enough time to remove temporary files.
 func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
 	stopCh := make(chan struct{})
+	var errCh chan error
 	tearDown := func() {
 		// Closing stopCh is stopping apiextensions apiserver and its
 		// delegates, which itself is cleaning up after itself,
 		// including shutting down its storage layer.
 		close(stopCh)
+
+		// If the apiextensions apiserver was started, let's wait for
+		// it to shutdown clearly.
+		if errCh != nil {
+			err, ok := <-errCh
+			if ok && err != nil {
+				klog.Errorf("Failed to shutdown test server clearly: %v", err)
+			}
+		}
+
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
 		}
@@ -135,8 +148,10 @@ func StartTestServer(t Logger, _ *TestServerInstanceOptions, customFlags []strin
 		return result, fmt.Errorf("failed to create server: %v", err)
 	}
 
-	errCh := make(chan error)
+	errCh = make(chan error)
 	go func(stopCh <-chan struct{}) {
+		defer close(errCh)
+
 		if err := server.GenericAPIServer.PrepareRun().Run(stopCh); err != nil {
 			errCh <- err
 		}
