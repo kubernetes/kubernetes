@@ -189,7 +189,7 @@ const (
 	// system:nodes group subject is removed if present.
 	NodesClusterRoleBinding = "system:node"
 
-	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
+	// KubeletBaseConfigMapRole defines the base kubelet configuration ConfigMap.
 	KubeletBaseConfigMapRole = "kubeadm:kubelet-config"
 	// KubeProxyClusterRoleBindingName sets the name for the kube-proxy CluterRoleBinding
 	KubeProxyClusterRoleBindingName = "kubeadm:node-proxier"
