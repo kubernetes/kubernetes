@@ -251,6 +251,9 @@ func (rc *reconciler) reconcile() {
 			if err != nil {
 				// Skip detaching this volume if unable to update node status
 				klog.ErrorS(err, "UpdateNodeStatusForNode failed while attempting to report volume as attached", "volume", attachedVolume)
+				// Add volume back to ReportAsAttached if UpdateNodeStatusForNode call failed so that node status updater will add it back to VolumeAttached list.
+				// It is needed here too because DetachVolume is not call actually and we keep the data consistency for every reconcile.
+				rc.actualStateOfWorld.AddVolumeToReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
 				continue
 			}
 
