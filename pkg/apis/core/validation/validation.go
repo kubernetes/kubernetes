@@ -3396,8 +3396,6 @@ type PodValidationOptions struct {
 	AllowWindowsHostProcessField bool
 	// Allow more DNSSearchPaths and longer DNSSearchListChars
 	AllowExpandedDNSConfig bool
-	// Allow OSField to be set in the pod spec
-	AllowOSField bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -6344,9 +6342,6 @@ func validateOS(podSpec *core.PodSpec, fldPath *field.Path, opts PodValidationOp
 	os := podSpec.OS
 	if os == nil {
 		return allErrs
-	}
-	if !opts.AllowOSField {
-		return append(allErrs, field.Forbidden(fldPath, "cannot be set when IdentifyPodOS feature is not enabled"))
 	}
 	if len(os.Name) == 0 {
 		return append(allErrs, field.Required(fldPath.Child("name"), "cannot be empty"))

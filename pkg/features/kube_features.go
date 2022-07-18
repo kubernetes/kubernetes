@@ -374,6 +374,7 @@ const (
 	// owner: @ravig
 	// alpha: v1.23
 	// beta: v1.24
+	// GA: v1.25
 	// IdentifyPodOS allows user to specify OS on which they'd like the Pod run. The user should still set the nodeSelector
 	// with appropriate `kubernetes.io/os` label for scheduler to identify appropriate node for the pod to run.
 	IdentifyPodOS featuregate.Feature = "IdentifyPodOS"
@@ -904,7 +905,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	HonorPVReclaimPolicy: {Default: false, PreRelease: featuregate.Alpha},
 
-	IdentifyPodOS: {Default: true, PreRelease: featuregate.Beta},
+	IdentifyPodOS: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
 	InTreePluginAWSUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
