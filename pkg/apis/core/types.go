@@ -2992,7 +2992,6 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.runAsUser
 	// - spec.containers[*].securityContext.runAsGroup
 	// +optional
-	// This is a beta field and requires the IdentifyPodOS feature
 	OS *PodOS
 }
 
