@@ -120,7 +120,6 @@ resources:
        cachesize: 1000
        endpoint: unix:///@kms-provider.sock
 `
-
 	providerName := "kms-provider"
 	pluginMock, err := mock.NewBase64Plugin("@kms-provider.sock")
 	if err != nil {
