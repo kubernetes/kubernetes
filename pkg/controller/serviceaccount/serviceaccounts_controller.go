@@ -202,13 +202,14 @@ func (c *ServiceAccountsController) syncNamespace(ctx context.Context, key strin
 
 	createFailures := []error{}
 	for _, sa := range c.serviceAccountsToEnsure {
-		switch _, err := c.saLister.ServiceAccounts(ns.Name).Get(sa.Name); {
-		case err == nil:
+		_, err := c.saLister.ServiceAccounts(ns.Name).Get(sa.Name)
+		if err == nil {
 			continue
-		case apierrors.IsNotFound(err):
-		case err != nil:
+		}
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
+
 		// this is only safe because we never read it and we always write it
 		// TODO eliminate this once the fake client can handle creation without NS
 		sa.Namespace = ns.Name
