@@ -203,7 +203,7 @@ func writeConfigMap(configMapClient corev1client.ConfigMapsGetter, required *cor
 	// We return the original error which causes the controller to re-queue.
 	// Too big means
 	//   1. request is so big the generic request catcher finds it
-	//   2. the content is so large that that the server sends a validation error "Too long: must have at most 1048576 characters"
+	//   2. the content is so large that the server sends a validation error "Too long: must have at most 1048576 characters"
 	if apierrors.IsRequestEntityTooLargeError(err) || (apierrors.IsInvalid(err) && strings.Contains(err.Error(), "Too long")) {
 		if deleteErr := configMapClient.ConfigMaps(required.Namespace).Delete(context.TODO(), required.Name, metav1.DeleteOptions{}); deleteErr != nil {
 			return deleteErr
