@@ -238,7 +238,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 		if !ignoreNotReady {
 			return errorBadPodsStates(badPods, desiredPods, ns, "RUNNING and READY", timeout, lastAPIError)
 		}
-		e2elog.Logf("Number of not-ready pods (%d) is below the allowed threshold (%d).", notReady, allowedNotReadyPods)
+		e2elog.Logf("Number of not-ready pods (%d) is above the allowed threshold (%d).", notReady, allowedNotReadyPods)
 	}
 	return nil
 }
