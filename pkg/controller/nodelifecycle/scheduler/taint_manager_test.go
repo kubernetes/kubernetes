@@ -19,7 +19,6 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -34,8 +33,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clienttesting "k8s.io/client-go/testing"
 )
-
-var timeForControllerToProgress = 500 * time.Millisecond
 
 func getPodFromClientset(clientset *fake.Clientset) GetPodFunc {
 	return func(name, namespace string) (*v1.Pod, error) {
@@ -108,6 +105,63 @@ func createNoExecuteTaint(index int) v1.Taint {
 		Value:     "test" + fmt.Sprintf("%v", index),
 		Effect:    v1.TaintEffectNoExecute,
 		TimeAdded: &now,
+	}
+}
+
+// Waits for delete actions to appear and then returns them
+func getDeleteActions(fakeClientset *fake.Clientset) []clienttesting.Action {
+	var actions []clienttesting.Action
+main:
+	for ; ; actions = fakeClientset.Actions() {
+		for _, action := range actions {
+			if action.GetVerb() == "delete" {
+				break main
+			}
+		}
+	}
+	return actions
+}
+
+// Waits for delete actions to appear and checks if pod names
+// are equal to those stated in actions. When there appeared
+// all the actions with stated pod names then those actions returned
+func getDeleteActionsWithCertainPods(fakeClientset *fake.Clientset, podNames []string) []clienttesting.Action {
+	var actions []clienttesting.Action
+
+	var podActionsReceived []string
+	isEqual := func(a []string, b []string) bool {
+	main:
+		for _, valueA := range a {
+			for _, valueB := range b {
+				if valueA == valueB {
+					continue main
+				}
+			}
+			return false
+		}
+		return true
+	}
+main:
+	for ; ; actions = fakeClientset.Actions() {
+	secondary:
+		for _, action := range actions {
+			deleteAction, ok := action.(clienttesting.DeleteActionImpl)
+			if !ok {
+				continue secondary
+			}
+			podActionsReceived = append(podActionsReceived, deleteAction.GetName())
+
+			if isEqual(podActionsReceived, podNames) {
+				break main
+			}
+		}
+	}
+	return actions
+}
+
+// Blocks execution until any actions is received
+func waitForAnyAction(fakeClientset *fake.Clientset) {
+	for actions := fakeClientset.Actions(); len(actions) == 0; actions = fakeClientset.Actions() {
 	}
 }
 
@@ -221,14 +275,17 @@ func TestCreatePod(t *testing.T) {
 		fakeClientset := fake.NewSimpleClientset()
 		controller := NewNoExecuteTaintManager(ctx, fakeClientset, (&podHolder{pod: item.pod}).getPod, getNodeFromClientset(fakeClientset), getPodsAssignedToNode(fakeClientset))
 		controller.recorder = testutil.NewFakeRecorder()
-		go controller.Run(ctx)
 		controller.taintedNodes = item.taintedNodes
+		go controller.Run(ctx)
 		controller.PodUpdated(nil, item.pod)
-		// wait a bit
-		time.Sleep(timeForControllerToProgress)
+
+		actions := fakeClientset.Actions()
+		if item.expectDelete {
+			actions = getDeleteActions(fakeClientset)
+		}
 
 		podDeleted := false
-		for _, action := range fakeClientset.Actions() {
+		for _, action := range actions {
 			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
 				podDeleted = true
 			}
@@ -241,18 +298,30 @@ func TestCreatePod(t *testing.T) {
 }
 
 func TestDeletePod(t *testing.T) {
-	stopCh := make(chan struct{})
+	t.Skip()
+	ctx, cancel := context.WithCancel(context.Background())
 	fakeClientset := fake.NewSimpleClientset()
-	controller := NewNoExecuteTaintManager(context.TODO(), fakeClientset, getPodFromClientset(fakeClientset), getNodeFromClientset(fakeClientset), getPodsAssignedToNode(fakeClientset))
+	controller := NewNoExecuteTaintManager(ctx, fakeClientset, getPodFromClientset(fakeClientset), getNodeFromClientset(fakeClientset), getPodsAssignedToNode(fakeClientset))
 	controller.recorder = testutil.NewFakeRecorder()
-	go controller.Run(context.TODO())
 	controller.taintedNodes = map[string][]v1.Taint{
 		"node1": {createNoExecuteTaint(1)},
 	}
+	go controller.Run(ctx)
 	controller.PodUpdated(testutil.NewPod("pod1", "node1"), nil)
-	// wait a bit to see if nothing will panic
-	time.Sleep(timeForControllerToProgress)
-	close(stopCh)
+
+	waitForAnyAction(fakeClientset)
+
+	podDeleted := false
+	for _, action := range fakeClientset.Actions() {
+		if action.GetResource().Resource == "pods" {
+			podDeleted = true
+		}
+	}
+
+	if !podDeleted {
+		t.Errorf("Unexpected test result. Expected delete true, got %v", podDeleted)
+	}
+	cancel()
 }
 
 func TestUpdatePod(t *testing.T) {
@@ -298,8 +367,7 @@ func TestUpdatePod(t *testing.T) {
 			taintedNodes: map[string][]v1.Taint{
 				"node1": {createNoExecuteTaint(1)},
 			},
-			expectDelete:    true,
-			additionalSleep: 1500 * time.Millisecond,
+			expectDelete: false,
 		},
 	}
 
@@ -314,22 +382,24 @@ func TestUpdatePod(t *testing.T) {
 
 		holder.setPod(item.prevPod)
 		controller.PodUpdated(nil, item.prevPod)
+
 		fakeClientset.ClearActions()
-		time.Sleep(timeForControllerToProgress)
+
 		holder.setPod(item.newPod)
 		controller.PodUpdated(item.prevPod, item.newPod)
-		// wait a bit
-		time.Sleep(timeForControllerToProgress)
-		if item.additionalSleep > 0 {
-			time.Sleep(item.additionalSleep)
+
+		actions := fakeClientset.Actions()
+		if item.expectDelete {
+			actions = getDeleteActions(fakeClientset)
 		}
 
 		podDeleted := false
-		for _, action := range fakeClientset.Actions() {
+		for _, action := range actions {
 			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
 				podDeleted = true
 			}
 		}
+
 		if podDeleted != item.expectDelete {
 			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
@@ -377,15 +447,19 @@ func TestCreateNode(t *testing.T) {
 		controller.recorder = testutil.NewFakeRecorder()
 		go controller.Run(ctx)
 		controller.NodeUpdated(nil, item.node)
-		// wait a bit
-		time.Sleep(timeForControllerToProgress)
+
+		actions := fakeClientset.Actions()
+		if item.expectDelete {
+			actions = getDeleteActions(fakeClientset)
+		}
 
 		podDeleted := false
-		for _, action := range fakeClientset.Actions() {
+		for _, action := range actions {
 			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
 				podDeleted = true
 			}
 		}
+
 		if podDeleted != item.expectDelete {
 			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
@@ -403,8 +477,9 @@ func TestDeleteNode(t *testing.T) {
 	}
 	go controller.Run(ctx)
 	controller.NodeUpdated(testutil.NewNode("node1"), nil)
-	// wait a bit to see if nothing will panic
-	time.Sleep(timeForControllerToProgress)
+
+	waitForAnyAction(fakeClientset)
+
 	controller.taintedNodesLock.Lock()
 	if _, ok := controller.taintedNodes["node1"]; ok {
 		t.Error("Node should have been deleted from taintedNodes list")
@@ -415,12 +490,11 @@ func TestDeleteNode(t *testing.T) {
 
 func TestUpdateNode(t *testing.T) {
 	testCases := []struct {
-		description     string
-		pods            []v1.Pod
-		oldNode         *v1.Node
-		newNode         *v1.Node
-		expectDelete    bool
-		additionalSleep time.Duration
+		description  string
+		pods         []v1.Pod
+		oldNode      *v1.Node
+		newNode      *v1.Node
+		expectDelete bool
 	}{
 		{
 			description: "Added taint",
@@ -454,10 +528,9 @@ func TestUpdateNode(t *testing.T) {
 			pods: []v1.Pod{
 				*addToleration(testutil.NewPod("pod1", "node1"), 1, 1),
 			},
-			oldNode:         addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
-			newNode:         testutil.NewNode("node1"),
-			expectDelete:    false,
-			additionalSleep: 1500 * time.Millisecond,
+			oldNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			newNode:      testutil.NewNode("node1"),
+			expectDelete: false,
 		},
 		{
 			description: "Pod with multiple tolerations are evicted when first one runs out",
@@ -484,36 +557,36 @@ func TestUpdateNode(t *testing.T) {
 					},
 				},
 			},
-			oldNode:         testutil.NewNode("node1"),
-			newNode:         addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
-			expectDelete:    true,
-			additionalSleep: 1500 * time.Millisecond,
+			oldNode:      testutil.NewNode("node1"),
+			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
+			expectDelete: true,
 		},
 	}
 
 	for _, item := range testCases {
-		stopCh := make(chan struct{})
+		ctx, cancel := context.WithCancel(context.Background())
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
-		controller := NewNoExecuteTaintManager(context.TODO(), fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(ctx, fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
 		controller.recorder = testutil.NewFakeRecorder()
-		go controller.Run(context.TODO())
+		go controller.Run(ctx)
 		controller.NodeUpdated(item.oldNode, item.newNode)
-		// wait a bit
-		time.Sleep(timeForControllerToProgress)
-		if item.additionalSleep > 0 {
-			time.Sleep(item.additionalSleep)
+
+		actions := fakeClientset.Actions()
+		if item.expectDelete {
+			actions = getDeleteActions(fakeClientset)
 		}
 
 		podDeleted := false
-		for _, action := range fakeClientset.Actions() {
+		for _, action := range actions {
 			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
 				podDeleted = true
 			}
 		}
+
 		if podDeleted != item.expectDelete {
 			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
-		close(stopCh)
+		cancel()
 	}
 }
 
@@ -587,11 +660,11 @@ func TestUpdateNodeWithMultipleTaints(t *testing.T) {
 
 func TestUpdateNodeWithMultiplePods(t *testing.T) {
 	testCases := []struct {
-		description         string
-		pods                []v1.Pod
-		oldNode             *v1.Node
-		newNode             *v1.Node
-		expectedDeleteTimes durationSlice
+		description  string
+		pods         []v1.Pod
+		oldNode      *v1.Node
+		newNode      *v1.Node
+		expectDelete []string
 	}{
 		{
 			description: "Pods with different toleration times are evicted appropriately",
@@ -600,12 +673,9 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 				*addToleration(testutil.NewPod("pod2", "node1"), 1, 1),
 				*addToleration(testutil.NewPod("pod3", "node1"), 1, -1),
 			},
-			oldNode: testutil.NewNode("node1"),
-			newNode: addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
-			expectedDeleteTimes: durationSlice{
-				{[]string{"pod1"}, 0},
-				{[]string{"pod2"}, time.Second},
-			},
+			oldNode:      testutil.NewNode("node1"),
+			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1}),
+			expectDelete: []string{"pod1", "pod2"},
 		},
 		{
 			description: "Evict all pods not matching all taints instantly",
@@ -614,88 +684,36 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 				*addToleration(testutil.NewPod("pod2", "node1"), 1, 1),
 				*addToleration(testutil.NewPod("pod3", "node1"), 1, -1),
 			},
-			oldNode: testutil.NewNode("node1"),
-			newNode: addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
-			expectedDeleteTimes: durationSlice{
-				{[]string{"pod1", "pod2", "pod3"}, 0},
-			},
+			oldNode:      testutil.NewNode("node1"),
+			newNode:      addTaintsToNode(testutil.NewNode("node1"), "testTaint1", "taint1", []int{1, 2}),
+			expectDelete: []string{"pod1", "pod2", "pod3"},
 		},
 	}
 
 	for _, item := range testCases {
 		t.Logf("Starting testcase %q", item.description)
 
-		stopCh := make(chan struct{})
+		ctx, cancel := context.WithCancel(context.Background())
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
-		sort.Sort(item.expectedDeleteTimes)
-		controller := NewNoExecuteTaintManager(context.TODO(), fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(ctx, fakeClientset, getPodFromClientset(fakeClientset), (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
 		controller.recorder = testutil.NewFakeRecorder()
-		go controller.Run(context.TODO())
+		go controller.Run(ctx)
 		controller.NodeUpdated(item.oldNode, item.newNode)
 
-		startedAt := time.Now()
-		for i := range item.expectedDeleteTimes {
-			if i == 0 || item.expectedDeleteTimes[i-1].timestamp != item.expectedDeleteTimes[i].timestamp {
-				// compute a grace duration to give controller time to process updates. Choose big
-				// enough intervals in the test cases above to avoid flakes.
-				var increment time.Duration
-				if i == len(item.expectedDeleteTimes)-1 || item.expectedDeleteTimes[i+1].timestamp == item.expectedDeleteTimes[i].timestamp {
-					increment = 500 * time.Millisecond
-				} else {
-					increment = ((item.expectedDeleteTimes[i+1].timestamp - item.expectedDeleteTimes[i].timestamp) / time.Duration(2))
-				}
+		actions := getDeleteActionsWithCertainPods(fakeClientset, item.expectDelete)
 
-				sleepTime := item.expectedDeleteTimes[i].timestamp - time.Since(startedAt) + increment
-				if sleepTime < 0 {
-					sleepTime = 0
-				}
-				t.Logf("Sleeping for %v", sleepTime)
-				time.Sleep(sleepTime)
+		podDeleted := false
+		for _, action := range actions {
+			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
+				podDeleted = true
 			}
-
-			for delay, podName := range item.expectedDeleteTimes[i].names {
-				deleted := false
-				for _, action := range fakeClientset.Actions() {
-					deleteAction, ok := action.(clienttesting.DeleteActionImpl)
-					if !ok {
-						t.Logf("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
-						continue
-					}
-					if deleteAction.GetResource().Resource != "pods" {
-						continue
-					}
-					if podName == deleteAction.GetName() {
-						deleted = true
-					}
-				}
-				if !deleted {
-					t.Errorf("Failed to deleted pod %v after %v", podName, delay)
-				}
-			}
-			for _, action := range fakeClientset.Actions() {
-				deleteAction, ok := action.(clienttesting.DeleteActionImpl)
-				if !ok {
-					t.Logf("Found not-delete action with verb %v. Ignoring.", action.GetVerb())
-					continue
-				}
-				if deleteAction.GetResource().Resource != "pods" {
-					continue
-				}
-				deletedPodName := deleteAction.GetName()
-				expected := false
-				for _, podName := range item.expectedDeleteTimes[i].names {
-					if podName == deletedPodName {
-						expected = true
-					}
-				}
-				if !expected {
-					t.Errorf("Pod %v was deleted even though it shouldn't have", deletedPodName)
-				}
-			}
-			fakeClientset.ClearActions()
 		}
 
-		close(stopCh)
+		if !podDeleted {
+			t.Errorf("%v: Unexpected test result. Expected delete true, got %v", item.description, podDeleted)
+		}
+
+		cancel()
 	}
 }
 
@@ -766,7 +784,7 @@ func TestGetMinTolerationTime(t *testing.T) {
 
 // TestEventualConsistency verifies if getPodsAssignedToNode returns incomplete data
 // (e.g. due to watch latency), it will reconcile the remaining pods eventually.
-// This scenario is partially covered by TestUpdatePods, but given this is an important
+// This scenario is partially covered by TestUpdatePod, but given this is an important
 // property of TaintManager, it's better to have explicit test for this.
 func TestEventualConsistency(t *testing.T) {
 	testCases := []struct {
@@ -825,12 +843,12 @@ func TestEventualConsistency(t *testing.T) {
 	}
 
 	for _, item := range testCases {
-		stopCh := make(chan struct{})
+		ctx, cancel := context.WithCancel(context.Background())
 		fakeClientset := fake.NewSimpleClientset(&v1.PodList{Items: item.pods})
 		holder := &podHolder{}
-		controller := NewNoExecuteTaintManager(context.TODO(), fakeClientset, holder.getPod, (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
+		controller := NewNoExecuteTaintManager(ctx, fakeClientset, holder.getPod, (&nodeHolder{node: item.newNode}).getNode, getPodsAssignedToNode(fakeClientset))
 		controller.recorder = testutil.NewFakeRecorder()
-		go controller.Run(context.TODO())
+		go controller.Run(ctx)
 
 		if item.prevPod != nil {
 			holder.setPod(item.prevPod)
@@ -839,35 +857,43 @@ func TestEventualConsistency(t *testing.T) {
 
 		// First we simulate NodeUpdate that should delete 'pod1'. It doesn't know about 'pod2' yet.
 		controller.NodeUpdated(item.oldNode, item.newNode)
-		// TODO(mborsz): Remove this sleep and other sleeps in this file.
-		time.Sleep(timeForControllerToProgress)
+
+		actions := fakeClientset.Actions()
+		if item.expectDelete {
+			actions = getDeleteActions(fakeClientset)
+		}
 
 		podDeleted := false
-		for _, action := range fakeClientset.Actions() {
+		for _, action := range actions {
 			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
 				podDeleted = true
 			}
 		}
-		if !podDeleted {
-			t.Errorf("%v: Unexpected test result. Expected delete, got: %v", item.description, podDeleted)
-		}
-		fakeClientset.ClearActions()
 
-		// And now the delayed update of 'pod2' comes to the TaintManager. We should delete it as well.
-		holder.setPod(item.newPod)
-		controller.PodUpdated(item.prevPod, item.newPod)
-		// wait a bit
-		time.Sleep(timeForControllerToProgress)
-
-		podDeleted = false
-		for _, action := range fakeClientset.Actions() {
-			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
-				podDeleted = true
-			}
-		}
 		if podDeleted != item.expectDelete {
 			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
 		}
-		close(stopCh)
+
+		fakeClientset.ClearActions()
+
+		holder.setPod(item.newPod)
+		controller.PodUpdated(item.prevPod, item.newPod)
+
+		actions = fakeClientset.Actions()
+		if item.expectDelete {
+			actions = getDeleteActions(fakeClientset)
+		}
+
+		podDeleted = false
+		for _, action := range actions {
+			if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
+				podDeleted = true
+			}
+		}
+
+		if podDeleted != item.expectDelete {
+			t.Errorf("%v: Unexpected test result. Expected delete %v, got %v", item.description, item.expectDelete, podDeleted)
+		}
+		cancel()
 	}
 }

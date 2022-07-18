@@ -252,12 +252,12 @@ func (tc *NoExecuteTaintManager) Run(ctx context.Context) {
 }
 
 func (tc *NoExecuteTaintManager) worker(ctx context.Context, worker int, done func(), stopCh <-chan struct{}) {
-	defer done()
-
 	// When processing events we want to prioritize Node updates over Pod updates,
 	// as NodeUpdates that interest NoExecuteTaintManager should be handled as soon as possible -
 	// we don't want user (or system) to wait until PodUpdate queue is drained before it can
 	// start evicting Pods from tainted Nodes.
+	defer done()
+
 	for {
 		select {
 		case <-stopCh:
@@ -267,6 +267,7 @@ func (tc *NoExecuteTaintManager) worker(ctx context.Context, worker int, done fu
 			tc.nodeUpdateQueue.Done(nodeUpdate)
 		case podUpdate := <-tc.podUpdateChannels[worker]:
 			// If we found a Pod update we need to empty Node queue first.
+
 		priority:
 			for {
 				select {
@@ -307,6 +308,7 @@ func (tc *NoExecuteTaintManager) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
 	if oldPod != nil && newPod != nil && helper.Semantic.DeepEqual(oldTolerations, newTolerations) && oldPod.Spec.NodeName == newPod.Spec.NodeName {
 		return
 	}
+
 	updateItem := podUpdateItem{
 		podName:      podName,
 		podNamespace: podNamespace,
@@ -314,6 +316,7 @@ func (tc *NoExecuteTaintManager) PodUpdated(oldPod *v1.Pod, newPod *v1.Pod) {
 	}
 
 	tc.podUpdateQueue.Add(updateItem)
+
 }
 
 // NodeUpdated is used to notify NoExecuteTaintManager about Node changes.
@@ -384,6 +387,7 @@ func (tc *NoExecuteTaintManager) processPodOnNode(
 		}
 		tc.cancelWorkWithEvent(podNamespacedName)
 	}
+
 	tc.taintEvictionQueue.AddWork(ctx, NewWorkArgs(podNamespacedName.Name, podNamespacedName.Namespace), startTime, triggerTime)
 }
 
@@ -410,9 +414,11 @@ func (tc *NoExecuteTaintManager) handlePodUpdate(ctx context.Context, podUpdate 
 	podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 	klog.V(4).InfoS("Noticed pod update", "pod", podNamespacedName)
 	nodeName := pod.Spec.NodeName
+
 	if nodeName == "" {
 		return
 	}
+
 	taints, ok := func() ([]v1.Taint, bool) {
 		tc.taintedNodesLock.Lock()
 		defer tc.taintedNodesLock.Unlock()
@@ -421,9 +427,11 @@ func (tc *NoExecuteTaintManager) handlePodUpdate(ctx context.Context, podUpdate 
 	}()
 	// It's possible that Node was deleted, or Taints were removed before, which triggered
 	// eviction cancelling if it was needed.
+
 	if !ok {
 		return
 	}
+
 	tc.processPodOnNode(ctx, podNamespacedName, nodeName, pod.Spec.Tolerations, taints, time.Now())
 }
 
