@@ -651,11 +651,11 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 				shutdownGracePeriodByPodPriority: []kubeletconfig.ShutdownGracePeriodByPodPriority{
 					{
 						Priority:                   1,
-						ShutdownGracePeriodSeconds: 10,
+						ShutdownGracePeriodSeconds: 1,
 					},
 					{
 						Priority:                   2,
-						ShutdownGracePeriodSeconds: 20,
+						ShutdownGracePeriodSeconds: 2,
 					},
 				},
 				getPods: func() []*v1.Pod {
