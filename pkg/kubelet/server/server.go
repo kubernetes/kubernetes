@@ -37,6 +37,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/metrics"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
@@ -63,7 +64,6 @@ import (
 	"k8s.io/component-base/logs"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	tracing "k8s.io/component-base/tracing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	podresourcesapiv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
@@ -129,15 +129,11 @@ type containerInterface interface {
 // so we can ensure restful.FilterFunctions are used for all handlers
 type filteringContainer struct {
 	*restful.Container
-	oteltrace.TracerProvider
 
 	registeredHandlePaths []string
 }
 
 func (a *filteringContainer) Handle(path string, handler http.Handler) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
-		handler = tracing.WithTracing(handler, a.TracerProvider, "kubelet")
-	}
 	a.HandleWithFilter(path, handler)
 	a.registeredHandlePaths = append(a.registeredHandlePaths, path)
 }
@@ -257,18 +253,20 @@ func NewServer(
 	auth AuthInterface,
 	tp oteltrace.TracerProvider,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration) Server {
-	rc := &filteringContainer{Container: restful.NewContainer(), TracerProvider: tp}
 
 	server := Server{
 		host:                 host,
 		resourceAnalyzer:     resourceAnalyzer,
 		auth:                 auth,
-		restfulCont:          rc,
+		restfulCont:          &filteringContainer{Container: restful.NewContainer()},
 		metricsBuckets:       sets.NewString(),
 		metricsMethodBuckets: sets.NewString("OPTIONS", "GET", "HEAD", "POST", "PUT", "DELETE", "TRACE", "CONNECT"),
 	}
 	if auth != nil {
 		server.InstallAuthFilter()
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+		server.InstallTracingFilter(tp)
 	}
 	server.InstallDefaultHandlers()
 	if kubeCfg != nil && kubeCfg.EnableDebuggingHandlers {
@@ -320,6 +318,11 @@ func (s *Server) InstallAuthFilter() {
 		// Continue
 		chain.ProcessFilter(req, resp)
 	})
+}
+
+// InstallTracingFilter installs OpenTelemetry tracing filter with the restful Container.
+func (s *Server) InstallTracingFilter(tp oteltrace.TracerProvider) {
+	s.restfulCont.Filter(otelrestful.OTelFilter("kubelet", otelrestful.WithTracerProvider(tp)))
 }
 
 // addMetricsBucketMatcher adds a regexp matcher and the relevant bucket to use when
