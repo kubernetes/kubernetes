@@ -45,6 +45,12 @@ func TestGetHostname(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
+			desc:        "hostname contains spaces",
+			hostname:    " OVERRIDDEN ",
+			result:      "overridden",
+			expectedErr: nil,
+		},
+		{
 			desc:        "hostname contains only spaces",
 			hostname:    " ",
 			result:      "",
