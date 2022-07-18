@@ -51,10 +51,10 @@ if [[ "${MASTER_OS_DISTRIBUTION}" == "gci" ]]; then
     if [[ "${GCI_VERSION}" == "cos"* ]]; then
         DEFAULT_GCI_PROJECT=cos-cloud
     fi
-    export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-${DEFAULT_GCI_PROJECT}}
+    export MASTER_IMAGE_PROJECT="ubuntu-os-cloud"
     # If the master image is not set, we use the latest GCI image.
     # Otherwise, we respect whatever is set by the user.
-    export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-${GCI_VERSION}}
+    export MASTER_IMAGE="ubuntu-2204-jammy-v20220712a"
 fi
 
 # Sets node image based on the specified os distro. Currently this function only
@@ -75,8 +75,8 @@ function set-linux-node-image() {
 
     # If the node image is not set, we use the latest GCI image.
     # Otherwise, we respect whatever is set by the user.
-    NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
-    NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-${DEFAULT_GCI_PROJECT}}
+    NODE_IMAGE="ubuntu-2204-jammy-v20220712a"
+    NODE_IMAGE_PROJECT="ubuntu-os-cloud"
   fi
 }
 

@@ -100,10 +100,10 @@ ALLOWED_NOTREADY_NODES=${ALLOWED_NOTREADY_NODES:-$(($(get-num-nodes) / 100))}
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
 GCI_VERSION=${KUBE_GCI_VERSION:-cos-85-13310-1308-1}
-export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
-export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
-export NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
-export NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
+export MASTER_IMAGE="ubuntu-2204-jammy-v20220712a"
+export MASTER_IMAGE_PROJECT="ubuntu-os-cloud"
+export NODE_IMAGE="ubuntu-2204-jammy-v20220712a"
+export NODE_IMAGE_PROJECT="ubuntu-os-cloud"
 export NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 
 export CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
