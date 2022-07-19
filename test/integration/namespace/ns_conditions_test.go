@@ -183,8 +183,9 @@ func namespaceLifecycleSetup(t *testing.T) (framework.CloseFunc, *namespace.Name
 		panic(err)
 	}
 
-	discoverResourcesFn := clientSet.Discovery().ServerPreferredNamespacedResources
-
+	discoverResourcesFn := func(clusterName string) ([]*metav1.APIResourceList, error) {
+		return clientSet.Discovery().ServerPreferredNamespacedResources()
+	}
 	controller := namespace.NewNamespaceController(
 		clientSet,
 		metadataClient,

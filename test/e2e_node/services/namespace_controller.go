@@ -19,7 +19,9 @@ package services
 import (
 	"time"
 
+	"github.com/kcp-dev/logicalcluster/v2"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
@@ -70,7 +72,9 @@ func (n *NamespaceController) Start() error {
 	if err != nil {
 		return err
 	}
-	discoverResourcesFn := client.Discovery().ServerPreferredNamespacedResources
+	discoverResourcesFn := func(clusterName logicalcluster.Name) ([]*metav1.APIResourceList, error) {
+		return client.Discovery().ServerPreferredNamespacedResources()
+	}
 	informerFactory := informers.NewSharedInformerFactory(client, ncResyncPeriod)
 	nc := namespacecontroller.NewNamespaceController(
 		client,
