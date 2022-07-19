@@ -1046,7 +1046,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.ServerSideApply: {Default: true, PreRelease: featuregate.GA},
 
-	genericfeatures.ServerSideFieldValidation: {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.ServerSideFieldValidation: {Default: true, PreRelease: featuregate.Beta},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
