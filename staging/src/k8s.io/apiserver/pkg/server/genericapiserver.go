@@ -26,6 +26,7 @@ import (
 
 	systemd "github.com/coreos/go-systemd/v22/daemon"
 
+	"github.com/kcp-dev/logicalcluster/v2"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,7 +52,6 @@ import (
 	"k8s.io/klog/v2"
 	openapibuilder2 "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
-	"k8s.io/kube-openapi/pkg/handler"
 	"k8s.io/kube-openapi/pkg/handler3"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
@@ -154,7 +154,7 @@ type GenericAPIServer struct {
 
 	// OpenAPIVersionedService controls the /openapi/v2 endpoint, and can be used to update the served spec.
 	// It is set during PrepareRun if `openAPIConfig` is non-nil unless `skipOpenAPIInstallation` is true.
-	OpenAPIVersionedService *handler.OpenAPIService
+	OpenAPIVersionedService routes.OpenAPIServiceProvider
 
 	// OpenAPIV3VersionedService controls the /openapi/v3 endpoint and can be used to update the served spec.
 	// It is set during PrepareRun if `openAPIConfig` is non-nil unless `skipOpenAPIInstallation` is true.
@@ -265,7 +265,7 @@ type DelegationTarget interface {
 	HealthzChecks() []healthz.HealthChecker
 
 	// ListedPaths returns the paths for supporting an index
-	ListedPaths() []string
+	ListedPaths(clusterName logicalcluster.Name) []string
 
 	// NextDelegate returns the next delegationTarget in the chain of delegations
 	NextDelegate() DelegationTarget
@@ -295,8 +295,8 @@ func (s *GenericAPIServer) PreShutdownHooks() map[string]preShutdownHookEntry {
 func (s *GenericAPIServer) HealthzChecks() []healthz.HealthChecker {
 	return s.healthzChecks
 }
-func (s *GenericAPIServer) ListedPaths() []string {
-	return s.listedPathProvider.ListedPaths()
+func (s *GenericAPIServer) ListedPaths(clusterName logicalcluster.Name) []string {
+	return s.listedPathProvider.ListedPaths(clusterName)
 }
 
 func (s *GenericAPIServer) NextDelegate() DelegationTarget {
@@ -356,7 +356,7 @@ func (s emptyDelegate) PreShutdownHooks() map[string]preShutdownHookEntry {
 func (s emptyDelegate) HealthzChecks() []healthz.HealthChecker {
 	return []healthz.HealthChecker{}
 }
-func (s emptyDelegate) ListedPaths() []string {
+func (s emptyDelegate) ListedPaths(clusterName logicalcluster.Name) []string {
 	return []string{}
 }
 func (s emptyDelegate) NextDelegate() DelegationTarget {

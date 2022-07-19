@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"github.com/kcp-dev/logicalcluster/v2"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -95,7 +96,7 @@ func NewPathRecorderMux(name string) *PathRecorderMux {
 }
 
 // ListedPaths returns the registered handler exposedPaths.
-func (m *PathRecorderMux) ListedPaths() []string {
+func (m *PathRecorderMux) ListedPaths(clusterName logicalcluster.Name) []string {
 	handledPaths := append([]string{}, m.exposedPaths...)
 	sort.Strings(handledPaths)
 

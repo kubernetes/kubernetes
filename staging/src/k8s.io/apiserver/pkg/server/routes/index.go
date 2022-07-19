@@ -19,26 +19,30 @@ package routes
 import (
 	"net/http"
 
+	"github.com/kcp-dev/logicalcluster/v2"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/mux"
 )
 
 // ListedPathProvider is an interface for providing paths that should be reported at /.
 type ListedPathProvider interface {
 	// ListedPaths is an alphabetically sorted list of paths to be reported at /.
-	ListedPaths() []string
+	ListedPaths(clusterName logicalcluster.Name) []string
 }
 
 // ListedPathProviders is a convenient way to combine multiple ListedPathProviders
 type ListedPathProviders []ListedPathProvider
 
 // ListedPaths unions and sorts the included paths.
-func (p ListedPathProviders) ListedPaths() []string {
+func (p ListedPathProviders) ListedPaths(clusterName logicalcluster.Name) []string {
 	ret := sets.String{}
 	for _, provider := range p {
-		for _, path := range provider.ListedPaths() {
+		for _, path := range provider.ListedPaths(clusterName) {
 			ret.Insert(path)
 		}
 	}
@@ -65,5 +69,10 @@ type IndexLister struct {
 
 // ServeHTTP serves the available paths.
 func (i IndexLister) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	responsewriters.WriteRawJSON(i.StatusCode, metav1.RootPaths{Paths: i.PathProvider.ListedPaths()}, w)
+	clusterName, err := genericapirequest.ClusterNameFrom(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	responsewriters.WriteRawJSON(i.StatusCode, metav1.RootPaths{Paths: i.PathProvider.ListedPaths(clusterName)}, w)
 }
