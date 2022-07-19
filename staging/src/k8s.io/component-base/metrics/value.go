@@ -50,7 +50,8 @@ func NewLazyConstMetric(desc *Desc, valueType ValueType, value float64, labelVal
 // NewLazyMetricWithTimestamp is a helper of NewMetricWithTimestamp.
 //
 // Warning: the Metric 'm' must be the one created by NewLazyConstMetric(),
-//          otherwise, no stability guarantees would be offered.
+//
+//	otherwise, no stability guarantees would be offered.
 func NewLazyMetricWithTimestamp(t time.Time, m Metric) Metric {
 	if m == nil {
 		return nil

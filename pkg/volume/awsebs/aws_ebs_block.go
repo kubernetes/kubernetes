@@ -151,7 +151,8 @@ var _ volume.BlockVolumeMapper = &awsElasticBlockStoreMapper{}
 
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/volumeID
-//       plugins/kubernetes.io/aws-ebs/volumeDevices/vol-XXXXXX
+//
+//	plugins/kubernetes.io/aws-ebs/volumeDevices/vol-XXXXXX
 func (ebs *awsElasticBlockStore) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {

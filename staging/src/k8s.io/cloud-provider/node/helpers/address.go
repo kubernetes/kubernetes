@@ -51,10 +51,10 @@ func AddToNodeAddresses(addresses *[]v1.NodeAddress, addAddresses ...v1.NodeAddr
 //
 // If nodeIP is a specific IP, either IPv4 or IPv6, we will return node
 // addresses filtered such that:
-// * Any address matching nodeIP will be listed first.
-// * If nodeIP matches an address of a particular type (internal or external),
-//   that will be the *only* address of that type returned.
-// * All remaining addresses are listed after.
+//   - Any address matching nodeIP will be listed first.
+//   - If nodeIP matches an address of a particular type (internal or external),
+//     that will be the *only* address of that type returned.
+//   - All remaining addresses are listed after.
 func PreferNodeIP(nodeIP net.IP, cloudNodeAddresses []v1.NodeAddress) ([]v1.NodeAddress, error) {
 	// If nodeIP is unset, just use the addresses provided by the cloud provider as-is
 	if nodeIP == nil {

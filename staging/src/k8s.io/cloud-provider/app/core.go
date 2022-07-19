@@ -17,7 +17,6 @@ limitations under the License.
 // Package app implements a server that runs a set of active
 // components.  This includes node controllers, service and
 // route controller, and so on.
-//
 package app
 
 import (

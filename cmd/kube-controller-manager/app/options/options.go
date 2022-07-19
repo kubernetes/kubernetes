@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 // Package options provides the flags used for the controller manager.
-//
 package options
 
 import (

@@ -260,12 +260,12 @@ func (b *flockerVolumeMounter) newFlockerClient() (*flockerapi.Client, error) {
 SetUpAt will setup a Flocker volume following this flow of calls to the Flocker
 control service:
 
-1. Get the dataset id for the given volume name/dir
-2. It should already be there, if it's not the user needs to manually create it
-3. Check the current Primary UUID
-4. If it doesn't match with the Primary UUID that we got on 2, then we will
-   need to update the Primary UUID for this volume.
-5. Wait until the Primary UUID was updated or timeout.
+ 1. Get the dataset id for the given volume name/dir
+ 2. It should already be there, if it's not the user needs to manually create it
+ 3. Check the current Primary UUID
+ 4. If it doesn't match with the Primary UUID that we got on 2, then we will
+    need to update the Primary UUID for this volume.
+ 5. Wait until the Primary UUID was updated or timeout.
 */
 func (b *flockerVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	var err error

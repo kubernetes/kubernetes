@@ -38,19 +38,19 @@ import (
 )
 
 /*
-	Test to verify that a volume remains attached through vpxd restart.
+Test to verify that a volume remains attached through vpxd restart.
 
-	For the number of schedulable nodes:
-	1. Create a Volume with default options.
-	2. Create a Pod with the created Volume.
-	3. Verify that the Volume is attached.
-	4. Create a file with random contents under the Volume's mount point on the Pod.
-	5. Stop the vpxd service on the vCenter host.
-	6. Verify that the file is accessible on the Pod and that it's contents match.
-	7. Start the vpxd service on the vCenter host.
-	8. Verify that the Volume remains attached, the file is accessible on the Pod, and that it's contents match.
-	9. Delete the Pod and wait for the Volume to be detached.
-	10. Delete the Volume.
+For the number of schedulable nodes:
+1. Create a Volume with default options.
+2. Create a Pod with the created Volume.
+3. Verify that the Volume is attached.
+4. Create a file with random contents under the Volume's mount point on the Pod.
+5. Stop the vpxd service on the vCenter host.
+6. Verify that the file is accessible on the Pod and that it's contents match.
+7. Start the vpxd service on the vCenter host.
+8. Verify that the Volume remains attached, the file is accessible on the Pod, and that it's contents match.
+9. Delete the Pod and wait for the Volume to be detached.
+10. Delete the Volume.
 */
 var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vsphere][Serial][Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart-vpxd")

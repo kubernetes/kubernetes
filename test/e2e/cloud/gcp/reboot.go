@@ -229,12 +229,12 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 }
 
 // rebootNode takes node name on provider through the following steps using c:
-//  - ensures the node is ready
-//  - ensures all pods on the node are running and ready
-//  - reboots the node (by executing rebootCmd over ssh)
-//  - ensures the node reaches some non-ready state
-//  - ensures the node becomes ready again
-//  - ensures all pods on the node become running and ready again
+//   - ensures the node is ready
+//   - ensures all pods on the node are running and ready
+//   - reboots the node (by executing rebootCmd over ssh)
+//   - ensures the node reaches some non-ready state
+//   - ensures the node becomes ready again
+//   - ensures all pods on the node become running and ready again
 //
 // It returns true through result only if all of the steps pass; at the first
 // failed step, it will return false through result and not run the rest.

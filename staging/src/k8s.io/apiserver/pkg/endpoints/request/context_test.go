@@ -41,7 +41,7 @@ func TestNamespaceContext(t *testing.T) {
 	}
 }
 
-//TestUserContext validates that a userinfo can be get/set on a context object
+// TestUserContext validates that a userinfo can be get/set on a context object
 func TestUserContext(t *testing.T) {
 	ctx := NewContext()
 	_, ok := UserFrom(ctx)

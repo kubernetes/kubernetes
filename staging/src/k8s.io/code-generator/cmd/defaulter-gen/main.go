@@ -24,18 +24,18 @@ limitations under the License.
 // request defaulter generation by including one or more comment tags at
 // the package comment level:
 //
-//   // +k8s:defaulter-gen=<field-name-to-flag>
+//	// +k8s:defaulter-gen=<field-name-to-flag>
 //
 // which will create defaulters for any type that contains the provided
 // field name (if the type has defaulters). Any type may request explicit
 // defaulting by providing the comment tag:
 //
-//   // +k8s:defaulter-gen=true|false
+//	// +k8s:defaulter-gen=true|false
 //
 // An existing defaulter method (`SetDefaults_TYPE`) can provide the
 // comment tag:
 //
-//   // +k8s:defaulter-gen=covers
+//	// +k8s:defaulter-gen=covers
 //
 // to indicate that the defaulter does not or should not call any nested
 // defaulters.

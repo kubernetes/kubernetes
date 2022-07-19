@@ -28,7 +28,6 @@ import (
 )
 
 // These tests don't seem to be running properly in parallel: issue: #20338.
-//
 var _ = SIGDescribe("[Feature:HPA] Horizontal pod autoscaling (scale resource: CPU)", func() {
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 	f.NamespacePodSecurityEnforceLevel = api.LevelBaseline

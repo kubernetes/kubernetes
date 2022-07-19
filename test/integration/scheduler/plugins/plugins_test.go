@@ -2092,6 +2092,7 @@ func TestPreScorePlugin(t *testing.T) {
 // - when waitingPods get preempted
 //   - they should be removed from internal waitingPods map, but not physically deleted
 //   - it'd trigger moving unschedulable Pods, but not the waitingPods themselves
+//
 // - when waitingPods get deleted externally, it'd trigger moving unschedulable Pods
 func TestPreemptWithPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register a permit and a filter plugin.
@@ -2342,9 +2343,9 @@ func (j *JobPlugin) PostBind(_ context.Context, state *framework.CycleState, p *
 }
 
 // This test simulates a typical spark job workflow.
-// - N executor pods are created, but kept pending due to missing the driver pod
-// - when the driver pod gets created and scheduled, proactively move the executors to activeQ
-//   and thus accelerate the entire job workflow.
+//   - N executor pods are created, but kept pending due to missing the driver pod
+//   - when the driver pod gets created and scheduled, proactively move the executors to activeQ
+//     and thus accelerate the entire job workflow.
 func TestActivatePods(t *testing.T) {
 	var jobPlugin *JobPlugin
 	// Create a plugin registry for testing. Register a Job plugin.
