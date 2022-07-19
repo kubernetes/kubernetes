@@ -166,6 +166,7 @@ type PersistentVolumeController struct {
 	NodeListerSynced   cache.InformerSynced
 
 	kubeClient                clientset.Interface
+	eventBroadcaster          record.EventBroadcaster
 	eventRecorder             record.EventRecorder
 	cloud                     cloudprovider.Interface
 	volumePluginMgr           vol.VolumePluginMgr
