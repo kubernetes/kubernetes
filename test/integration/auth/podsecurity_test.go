@@ -199,6 +199,7 @@ func startPodSecurityWebhook(t *testing.T, testServer *kubeapiservertesting.Test
 		if err != nil {
 			return false, err
 		}
+		defer resp.Body.Close()
 		return resp.StatusCode == 200, nil
 	}); err != nil {
 		return "", err
