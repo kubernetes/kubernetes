@@ -6928,40 +6928,24 @@ func TestValidateWindowsPodSecurityContext(t *testing.T) {
 	validWindowsSC := &core.PodSecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}
 	invalidWindowsSC := &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummyRole"}}
 	cases := map[string]struct {
-		podSec         *core.PodSpec
-		expectErr      bool
-		errorType      field.ErrorType
-		errorDetail    string
-		featureEnabled bool
+		podSec      *core.PodSpec
+		expectErr   bool
+		errorType   field.ErrorType
+		errorDetail string
 	}{
 		"valid SC, windows, no error": {
-			podSec:         &core.PodSpec{SecurityContext: validWindowsSC},
-			expectErr:      false,
-			featureEnabled: true,
+			podSec:    &core.PodSpec{SecurityContext: validWindowsSC},
+			expectErr: false,
 		},
 		"invalid SC, windows, error": {
-			podSec:         &core.PodSpec{SecurityContext: invalidWindowsSC},
-			errorType:      "FieldValueForbidden",
-			errorDetail:    "cannot be set for a windows pod",
-			expectErr:      true,
-			featureEnabled: true,
-		},
-		"valid SC, windows, no error, no IdentifyPodOS featuregate": {
-			podSec:         &core.PodSpec{SecurityContext: validWindowsSC},
-			expectErr:      false,
-			featureEnabled: false,
-		},
-		"invalid SC, windows, error, no IdentifyPodOS featuregate": {
-			podSec:         &core.PodSpec{SecurityContext: invalidWindowsSC},
-			errorType:      "FieldValueForbidden",
-			errorDetail:    "cannot be set for a windows pod",
-			expectErr:      true,
-			featureEnabled: false,
+			podSec:      &core.PodSpec{SecurityContext: invalidWindowsSC},
+			errorType:   "FieldValueForbidden",
+			errorDetail: "cannot be set for a windows pod",
+			expectErr:   true,
 		},
 	}
 	for k, v := range cases {
 		t.Run(k, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, v.featureEnabled)()
 			errs := validateWindows(v.podSec, field.NewPath("field"))
 			if v.expectErr && len(errs) > 0 {
 				if errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
@@ -6993,40 +6977,24 @@ func TestValidateLinuxPodSecurityContext(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		podSpec        *core.PodSpec
-		expectErr      bool
-		errorType      field.ErrorType
-		errorDetail    string
-		featureEnabled bool
+		podSpec     *core.PodSpec
+		expectErr   bool
+		errorType   field.ErrorType
+		errorDetail string
 	}{
 		"valid SC, linux, no error": {
-			podSpec:        &core.PodSpec{SecurityContext: validLinuxSC},
-			expectErr:      false,
-			featureEnabled: true,
+			podSpec:   &core.PodSpec{SecurityContext: validLinuxSC},
+			expectErr: false,
 		},
 		"invalid SC, linux, error": {
-			podSpec:        &core.PodSpec{SecurityContext: invalidLinuxSC},
-			errorType:      "FieldValueForbidden",
-			errorDetail:    "windows options cannot be set for a linux pod",
-			expectErr:      true,
-			featureEnabled: true,
-		},
-		"valid SC, linux, no error, no IdentifyPodOS featuregate": {
-			podSpec:        &core.PodSpec{SecurityContext: validLinuxSC},
-			expectErr:      false,
-			featureEnabled: false,
-		},
-		"invalid SC, linux, error, no IdentifyPodOS featuregate": {
-			podSpec:        &core.PodSpec{SecurityContext: invalidLinuxSC},
-			errorType:      "FieldValueForbidden",
-			errorDetail:    "windows options cannot be set for a linux pod",
-			expectErr:      true,
-			featureEnabled: false,
+			podSpec:     &core.PodSpec{SecurityContext: invalidLinuxSC},
+			errorType:   "FieldValueForbidden",
+			errorDetail: "windows options cannot be set for a linux pod",
+			expectErr:   true,
 		},
 	}
 	for k, v := range cases {
 		t.Run(k, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, v.featureEnabled)()
 			errs := validateLinux(v.podSpec, field.NewPath("field"))
 			if v.expectErr && len(errs) > 0 {
 				if errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
@@ -10041,11 +10009,10 @@ func TestValidatePodUpdate(t *testing.T) {
 	)
 
 	tests := []struct {
-		new         core.Pod
-		old         core.Pod
-		err         string
-		test        string
-		enablePodOS bool
+		new  core.Pod
+		old  core.Pod
+		err  string
+		test string
 	}{
 		{new: core.Pod{}, old: core.Pod{}, err: "", test: "nothing"},
 		{
@@ -10869,9 +10836,8 @@ func TestValidatePodUpdate(t *testing.T) {
 					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
 				},
 			},
-			err:         "Forbidden: pod updates may not change fields other than `spec.containers[*].image`,",
-			test:        "pod OS changing from Linux to Windows, no IdentifyPodOS featuregate set, no validation done",
-			enablePodOS: false,
+			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+			test: "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set",
 		},
 		{
 			new: core.Pod{
@@ -10892,32 +10858,8 @@ func TestValidatePodUpdate(t *testing.T) {
 					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
 				},
 			},
-			err:         "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
-			test:        "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set",
-			enablePodOS: true,
-		},
-		{
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					OS:              &core.PodOS{Name: core.Windows},
-					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					OS:              &core.PodOS{Name: core.Linux},
-					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
-				},
-			},
-			err:         "spec.securityContext.seLinuxOptions: Forbidden",
-			test:        "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set, we'd get SELinux errors as well",
-			enablePodOS: true,
+			err:  "spec.securityContext.seLinuxOptions: Forbidden",
+			test: "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set, we'd get SELinux errors as well",
 		},
 		{
 			new: core.Pod{
@@ -10934,28 +10876,8 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 				Spec: core.PodSpec{},
 			},
-			err:         "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
-			test:        "invalid PodOS update, IdentifyPodOS featuregate set",
-			enablePodOS: true,
-		},
-		{
-			new: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{
-					OS: &core.PodOS{Name: core.Windows},
-				},
-			},
-			old: core.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: core.PodSpec{},
-			},
-			err:         "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
-			test:        "no pod spec OS to a valid value, no featuregate",
-			enablePodOS: false,
+			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+			test: "invalid PodOS update, IdentifyPodOS featuregate set",
 		},
 		{
 			new: core.Pod{
@@ -11004,7 +10926,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			test.old.Spec.RestartPolicy = "Always"
 		}
 
-		errs := ValidatePodUpdate(&test.new, &test.old, PodValidationOptions{AllowOSField: test.enablePodOS})
+		errs := ValidatePodUpdate(&test.new, &test.old, PodValidationOptions{})
 		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
@@ -17581,61 +17503,34 @@ func TestValidateEndpointsUpdate(t *testing.T) {
 
 func TestValidateWindowsSecurityContext(t *testing.T) {
 	tests := []struct {
-		name           string
-		sc             *core.PodSpec
-		expectError    bool
-		errorMsg       string
-		errorType      field.ErrorType
-		featureEnabled bool
+		name        string
+		sc          *core.PodSpec
+		expectError bool
+		errorMsg    string
+		errorType   field.ErrorType
 	}{
 		{
-			name:           "pod with SELinux Options",
-			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}}}},
-			expectError:    true,
-			errorMsg:       "cannot be set for a windows pod",
-			errorType:      "FieldValueForbidden",
-			featureEnabled: true,
+			name:        "pod with SELinux Options",
+			sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}}}},
+			expectError: true,
+			errorMsg:    "cannot be set for a windows pod",
+			errorType:   "FieldValueForbidden",
 		},
 		{
-			name:           "pod with SeccompProfile",
-			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SeccompProfile: &core.SeccompProfile{LocalhostProfile: utilpointer.String("dummy")}}}}},
-			expectError:    true,
-			errorMsg:       "cannot be set for a windows pod",
-			errorType:      "FieldValueForbidden",
-			featureEnabled: true,
+			name:        "pod with SeccompProfile",
+			sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SeccompProfile: &core.SeccompProfile{LocalhostProfile: utilpointer.String("dummy")}}}}},
+			expectError: true,
+			errorMsg:    "cannot be set for a windows pod",
+			errorType:   "FieldValueForbidden",
 		},
 		{
-			name:           "pod with WindowsOptions, no error",
-			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}}}},
-			expectError:    false,
-			featureEnabled: true,
-		},
-		{
-			name:           "pod with SELinux Options,  no IdentifyPodOS enabled",
-			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}}}},
-			expectError:    true,
-			errorMsg:       "cannot be set for a windows pod",
-			errorType:      "FieldValueForbidden",
-			featureEnabled: false,
-		},
-		{
-			name:           "pod with SeccompProfile, no IdentifyPodOS enabled",
-			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SeccompProfile: &core.SeccompProfile{LocalhostProfile: utilpointer.String("dummy")}}}}},
-			expectError:    true,
-			errorMsg:       "cannot be set for a windows pod",
-			errorType:      "FieldValueForbidden",
-			featureEnabled: false,
-		},
-		{
-			name:           "pod with WindowsOptions, no error,  no IdentifyPodOS enabled",
-			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}}}},
-			expectError:    false,
-			featureEnabled: false,
+			name:        "pod with WindowsOptions, no error",
+			sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}}}},
+			expectError: false,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, test.featureEnabled)()
 			errs := validateWindows(test.sc, field.NewPath("field"))
 			if test.expectError && len(errs) > 0 {
 				if errs[0].Type != test.errorType {
@@ -17920,40 +17815,24 @@ func TestValidateLinuxSecurityContext(t *testing.T) {
 		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("myUser")},
 	}
 	cases := map[string]struct {
-		sc             *core.PodSpec
-		expectErr      bool
-		errorType      field.ErrorType
-		errorDetail    string
-		featureEnabled bool
+		sc          *core.PodSpec
+		expectErr   bool
+		errorType   field.ErrorType
+		errorDetail string
 	}{
 		"valid SC, linux, no error": {
-			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: validLinuxSC}}},
-			expectErr:      false,
-			featureEnabled: true,
+			sc:        &core.PodSpec{Containers: []core.Container{{SecurityContext: validLinuxSC}}},
+			expectErr: false,
 		},
 		"invalid SC, linux, error": {
-			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: invalidLinuxSC}}},
-			errorType:      "FieldValueForbidden",
-			errorDetail:    "windows options cannot be set for a linux pod",
-			expectErr:      true,
-			featureEnabled: true,
-		},
-		"valid SC, linux, no error, no IdentifyPodOS featuregate": {
-			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: validLinuxSC}}},
-			expectErr:      false,
-			featureEnabled: false,
-		},
-		"invalid SC, linux, error, no IdentifyPodOS featuregate": {
-			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: invalidLinuxSC}}},
-			errorType:      "FieldValueForbidden",
-			errorDetail:    "windows options cannot be set for a linux pod",
-			expectErr:      true,
-			featureEnabled: false,
+			sc:          &core.PodSpec{Containers: []core.Container{{SecurityContext: invalidLinuxSC}}},
+			errorType:   "FieldValueForbidden",
+			errorDetail: "windows options cannot be set for a linux pod",
+			expectErr:   true,
 		},
 	}
 	for k, v := range cases {
 		t.Run(k, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, v.featureEnabled)()
 			errs := validateLinux(v.sc, field.NewPath("field"))
 			if v.expectErr && len(errs) > 0 {
 				if errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
@@ -20454,83 +20333,44 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 
 func TestValidateOS(t *testing.T) {
 	testCases := []struct {
-		name           string
-		expectError    bool
-		featureEnabled bool
-		podSpec        *core.PodSpec
+		name        string
+		expectError bool
+		podSpec     *core.PodSpec
 	}{
 		{
-			name:           "no OS field, featuregate",
-			expectError:    false,
-			featureEnabled: true,
-			podSpec:        &core.PodSpec{OS: nil},
+			name:        "no OS field, featuregate",
+			expectError: false,
+			podSpec:     &core.PodSpec{OS: nil},
 		},
 		{
-			name:           "empty OS field, featuregate",
-			expectError:    true,
-			featureEnabled: true,
-			podSpec:        &core.PodSpec{OS: &core.PodOS{}},
+			name:        "empty OS field, featuregate",
+			expectError: true,
+			podSpec:     &core.PodSpec{OS: &core.PodOS{}},
 		},
 		{
-			name:           "no OS field, no featuregate",
-			expectError:    false,
-			featureEnabled: false,
-			podSpec:        &core.PodSpec{OS: nil},
+			name:        "OS field, featuregate, valid OS",
+			expectError: false,
+			podSpec:     &core.PodSpec{OS: &core.PodOS{Name: core.Linux}},
 		},
 		{
-			name:           "empty OS field, no featuregate",
-			expectError:    true,
-			featureEnabled: false,
-			podSpec:        &core.PodSpec{OS: &core.PodOS{}},
+			name:        "OS field, featuregate, valid OS",
+			expectError: false,
+			podSpec:     &core.PodSpec{OS: &core.PodOS{Name: core.Windows}},
 		},
 		{
-			name:           "OS field, featuregate, valid OS",
-			expectError:    false,
-			featureEnabled: true,
-			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: core.Linux}},
+			name:        "OS field, featuregate, empty OS",
+			expectError: true,
+			podSpec:     &core.PodSpec{OS: &core.PodOS{Name: ""}},
 		},
 		{
-			name:           "OS field, featuregate, valid OS",
-			expectError:    false,
-			featureEnabled: true,
-			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: core.Windows}},
-		},
-		{
-			name:           "OS field, featuregate, empty OS",
-			expectError:    true,
-			featureEnabled: true,
-			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: ""}},
-		},
-		{
-			name:           "OS field, no featuregate, empty OS",
-			expectError:    true,
-			featureEnabled: false,
-			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: ""}},
-		},
-		{
-			name:           "OS field, featuregate, invalid OS",
-			expectError:    true,
-			featureEnabled: true,
-			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: "dummyOS"}},
-		},
-		{
-			name:           "OS field, no featuregate, valid OS",
-			expectError:    true,
-			featureEnabled: false,
-			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: core.Linux}},
-		},
-		{
-			name:           "OS field, no featuregate, invalid OS",
-			expectError:    true,
-			featureEnabled: false,
-			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: "dummyOS"}},
+			name:        "OS field, featuregate, invalid OS",
+			expectError: true,
+			podSpec:     &core.PodSpec{OS: &core.PodOS{Name: "dummyOS"}},
 		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, testCase.featureEnabled)()
-
-			errs := validateOS(testCase.podSpec, field.NewPath("spec"), PodValidationOptions{AllowOSField: testCase.featureEnabled})
+			errs := validateOS(testCase.podSpec, field.NewPath("spec"), PodValidationOptions{})
 			if testCase.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}

@@ -418,8 +418,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowWindowsHostProcessField:    utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers),
 		// Allow pod spec with expanded DNS configuration
 		AllowExpandedDNSConfig: utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
-		// Allow pod spec to use OS field
-		AllowOSField: utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS),
 	}
 
 	if oldPodSpec != nil {
@@ -434,9 +432,6 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		}
 		// if old spec has Windows Host Process fields set, we must allow it
 		opts.AllowWindowsHostProcessField = opts.AllowWindowsHostProcessField || setsWindowsHostProcess(oldPodSpec)
-
-		// if old spec has OS field set, we must allow it
-		opts.AllowOSField = opts.AllowOSField || oldPodSpec.OS != nil
 
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
@@ -556,10 +551,6 @@ func dropDisabledFields(
 
 	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS) && !podOSInUse(oldPodSpec) {
-		podSpec.OS = nil
-	}
-
 	dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec)
 	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
 }
@@ -587,17 +578,6 @@ func minDomainsInUse(podSpec *api.PodSpec) bool {
 		if c.MinDomains != nil {
 			return true
 		}
-	}
-	return false
-}
-
-// podOSInUse returns true if the pod spec is non-nil and has OS field set
-func podOSInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.OS != nil {
-		return true
 	}
 	return false
 }

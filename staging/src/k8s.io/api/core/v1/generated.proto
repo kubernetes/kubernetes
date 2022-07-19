@@ -3728,7 +3728,6 @@ message PodSpec {
   // - spec.containers[*].securityContext.runAsUser
   // - spec.containers[*].securityContext.runAsGroup
   // +optional
-  // This is a beta field and requires the IdentifyPodOS feature
   optional PodOS os = 36;
 }
 
