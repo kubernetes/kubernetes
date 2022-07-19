@@ -24,6 +24,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 )
 
@@ -38,7 +39,7 @@ func NewEtcdStorageForResource(t *testing.T, resource schema.GroupResource) (*st
 	server, config := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 
 	options := options.NewEtcdOptions(config)
-	completedConfig, err := kubeapiserver.NewStorageFactoryConfig().Complete(options)
+	completedConfig, err := kubeapiserver.NewStorageFactoryConfig(legacyscheme.Scheme, legacyscheme.Codecs).Complete(options)
 	if err != nil {
 		t.Fatal(err)
 	}

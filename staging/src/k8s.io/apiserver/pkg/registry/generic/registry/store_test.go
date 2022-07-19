@@ -29,7 +29,7 @@ import (
 	"time"
 
 	fuzz "github.com/google/gofuzz"
-	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -2320,11 +2320,13 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 			Storage:        s,
 			Versioner:      etcd3.APIObjectVersioner{},
 			ResourcePrefix: podPrefix,
-			KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
-			GetAttrsFunc:   getPodAttrs,
-			NewFunc:        newFunc,
-			NewListFunc:    newListFunc,
-			Codec:          sc.Codec,
+			KeyFunc: func(ctx context.Context, obj runtime.Object) (string, error) {
+				return storage.NoNamespaceKeyFunc(podPrefix, obj)
+			},
+			GetAttrsFunc: getPodAttrs,
+			NewFunc:      newFunc,
+			NewListFunc:  newListFunc,
+			Codec:        sc.Codec,
 		}
 		cacher, err := cacherstorage.NewCacherFromConfig(config)
 		if err != nil {

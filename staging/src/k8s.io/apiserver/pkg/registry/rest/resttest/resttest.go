@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kcp-dev/logicalcluster/v2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -102,10 +103,14 @@ func (t *Tester) TestNamespace() string {
 	return "test"
 }
 
+func (t *Tester) TestCluster() logicalcluster.Name {
+	return logicalcluster.New("root")
+}
+
 // TestContext returns a namespaced context that will be used when making storage calls.
 // Namespace is determined by TestNamespace()
 func (t *Tester) TestContext() context.Context {
-	return genericapirequest.WithNamespace(genericapirequest.NewContext(), t.TestNamespace())
+	return genericapirequest.WithCluster(genericapirequest.WithNamespace(genericapirequest.NewContext(), t.TestNamespace()), genericapirequest.Cluster{Name: t.TestCluster()})
 }
 
 func (t *Tester) getObjectMetaOrFail(obj runtime.Object) metav1.Object {
@@ -168,8 +173,6 @@ func (t *Tester) TestCreate(valid runtime.Object, createFn CreateFunc, getFn Get
 	t.testCreateInvokesValidation(opts, invalid...)
 	t.testCreateValidatesNames(valid.DeepCopyObject(), dryRunOpts)
 	t.testCreateValidatesNames(valid.DeepCopyObject(), opts)
-	t.testCreateIgnoreZZZ_DeprecatedClusterName(valid.DeepCopyObject(), dryRunOpts)
-	t.testCreateIgnoreZZZ_DeprecatedClusterName(valid.DeepCopyObject(), opts)
 }
 
 // Test updating an object.
@@ -317,6 +320,7 @@ func (t *Tester) testCreateDryRunEquals(obj runtime.Object) {
 	createdFakeMeta.SetResourceVersion("")
 	createdMeta.SetResourceVersion("")
 	createdMeta.SetUID(createdFakeMeta.GetUID())
+	createdMeta.SetZZZ_DeprecatedClusterName(createdFakeMeta.GetZZZ_DeprecatedClusterName())
 
 	if e, a := created, createdFake; !apiequality.Semantic.DeepEqual(e, a) {
 		t.Errorf("unexpected obj: %#v, expected %#v", e, a)
@@ -344,6 +348,7 @@ func (t *Tester) testCreateEquals(obj runtime.Object, getFn GetFunc) {
 	createdMeta := t.getObjectMetaOrFail(created)
 	gotMeta := t.getObjectMetaOrFail(got)
 	createdMeta.SetResourceVersion(gotMeta.GetResourceVersion())
+	createdMeta.SetZZZ_DeprecatedClusterName(gotMeta.GetZZZ_DeprecatedClusterName())
 
 	if e, a := created, got; !apiequality.Semantic.DeepEqual(e, a) {
 		t.Errorf("unexpected obj: %#v, expected %#v", e, a)
@@ -405,7 +410,7 @@ func (t *Tester) testCreateHasMetadata(valid runtime.Object) {
 
 func (t *Tester) testCreateIgnoresContextNamespace(valid runtime.Object, opts metav1.CreateOptions) {
 	// Ignore non-empty namespace in context
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "not-default2")
+	ctx := genericapirequest.WithNamespace(genericapirequest.WithCluster(genericapirequest.NewContext(), genericapirequest.Cluster{Name: t.TestCluster()}), "not-default2")
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
 	created, err := t.storage.(rest.Creater).Create(ctx, valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &opts)
@@ -424,7 +429,7 @@ func (t *Tester) testCreateIgnoresMismatchedNamespace(valid runtime.Object, opts
 
 	// Ignore non-empty namespace in object meta
 	objectMeta.SetNamespace("not-default")
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "not-default2")
+	ctx := genericapirequest.WithNamespace(genericapirequest.WithCluster(genericapirequest.NewContext(), genericapirequest.Cluster{Name: t.TestCluster()}), "not-default2")
 
 	// Ideally, we'd get an error back here, but at least verify the namespace wasn't persisted
 	created, err := t.storage.(rest.Creater).Create(ctx, valid.DeepCopyObject(), rest.ValidateAllObjectFunc, &opts)
@@ -1218,14 +1223,14 @@ func (t *Tester) testGetDifferentNamespace(obj runtime.Object) {
 	objMeta := t.getObjectMetaOrFail(obj)
 	objMeta.SetName(t.namer(5))
 
-	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar3")
+	ctx1 := genericapirequest.WithNamespace(genericapirequest.WithCluster(genericapirequest.NewContext(), genericapirequest.Cluster{Name: t.TestCluster()}), "bar3")
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx1))
 	_, err := t.storage.(rest.Creater).Create(ctx1, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar4")
+	ctx2 := genericapirequest.WithNamespace(genericapirequest.WithCluster(genericapirequest.NewContext(), genericapirequest.Cluster{Name: t.TestCluster()}), "bar4")
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx2))
 	_, err = t.storage.(rest.Creater).Create(ctx2, obj, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -1279,8 +1284,8 @@ func (t *Tester) testGetFound(obj runtime.Object) {
 }
 
 func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
-	ctx1 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar1")
-	ctx2 := genericapirequest.WithNamespace(genericapirequest.NewContext(), "bar2")
+	ctx1 := genericapirequest.WithNamespace(genericapirequest.WithCluster(genericapirequest.NewContext(), genericapirequest.Cluster{Name: t.TestCluster()}), "bar1")
+	ctx2 := genericapirequest.WithNamespace(genericapirequest.WithCluster(genericapirequest.NewContext(), genericapirequest.Cluster{Name: t.TestCluster()}), "bar2")
 	objMeta := t.getObjectMetaOrFail(obj)
 	objMeta.SetName(t.namer(4))
 	objMeta.SetNamespace(genericapirequest.NamespaceValue(ctx1))
@@ -1373,7 +1378,7 @@ func (t *Tester) testListMatchLabels(obj runtime.Object, assignFn AssignFunc) {
 	foo4Meta.SetNamespace(genericapirequest.NamespaceValue(ctx))
 	foo4Meta.SetLabels(testLabels)
 
-	objs := ([]runtime.Object{foo3, foo4})
+	objs := []runtime.Object{foo3, foo4}
 
 	assignFn(objs)
 	filtered := []runtime.Object{objs[1]}
@@ -1427,7 +1432,7 @@ func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc
 	foo4Meta.SetNamespace(genericapirequest.NamespaceValue(ctx))
 	foo4Meta.SetLabels(testLabels)
 
-	objs := ([]runtime.Object{foo3, foo4})
+	objs := []runtime.Object{foo3, foo4}
 
 	assignFn(objs)
 

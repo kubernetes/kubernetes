@@ -520,7 +520,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 		t.Fatal(err)
 	}
 
-	crdInfo, err := handler.getOrCreateServingInfoFor(crd.UID, crd.Name, "")
+	crdInfo, err := handler.getOrCreateServingInfoFor(crd)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -88,16 +88,16 @@ func TestCreateClusterAwareContext(t *testing.T) {
 func makePod(name, clusterName, ns string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:   ns,
-			Name:        name,
-			ClusterName: clusterName,
+			Namespace:                 ns,
+			Name:                      name,
+			ZZZ_DeprecatedClusterName: clusterName,
 		},
 	}
 }
 
 func makeUnstructured(clusterName, ns string) *unstructured.Unstructured {
 	obj := &unstructured.Unstructured{}
-	obj.SetClusterName(clusterName)
+	obj.SetZZZ_DeprecatedClusterName(clusterName)
 	obj.SetNamespace(ns)
 	return obj
 }

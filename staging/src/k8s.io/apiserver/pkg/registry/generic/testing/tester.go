@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/registry/rest/resttest"
@@ -143,11 +144,11 @@ func (t *Tester) TestWatch(valid runtime.Object, labelsPass, labelsFail []labels
 // Helper functions
 
 func (t *Tester) getObject(ctx context.Context, obj runtime.Object) (runtime.Object, error) {
+	ctx = genericapirequest.WithCluster(ctx, genericapirequest.Cluster{Name: t.tester.TestCluster()})
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
 	}
-
 	result, err := t.storage.Get(ctx, accessor.GetName(), &metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -156,6 +157,7 @@ func (t *Tester) getObject(ctx context.Context, obj runtime.Object) (runtime.Obj
 }
 
 func (t *Tester) createObject(ctx context.Context, obj runtime.Object) error {
+	ctx = genericapirequest.WithCluster(ctx, genericapirequest.Cluster{Name: t.tester.TestCluster()})
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
