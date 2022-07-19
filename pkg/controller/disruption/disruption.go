@@ -768,7 +768,6 @@ func (dc *DisruptionController) syncStalePodDisruption(ctx context.Context, key 
 }
 
 func (dc *DisruptionController) getExpectedPodCount(ctx context.Context, pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount, desiredHealthy int32, unmanagedPods []string, err error) {
-	err = nil
 	// TODO(davidopp): consider making the way expectedCount and rules about
 	// permitted controller configurations (specifically, considering it an error
 	// if a pod covered by a PDB has 0 controllers or > 1 controller) should be
@@ -952,7 +951,6 @@ func (dc *DisruptionController) failSafe(ctx context.Context, pdb *policy.PodDis
 
 func (dc *DisruptionController) updatePdbStatus(ctx context.Context, pdb *policy.PodDisruptionBudget, currentHealthy, desiredHealthy, expectedCount int32,
 	disruptedPods map[string]metav1.Time) error {
-
 	// We require expectedCount to be > 0 so that PDBs which currently match no
 	// pods are in a safe state when their first pods appear but this controller
 	// has not updated their status yet.  This isn't the only race, but it's a

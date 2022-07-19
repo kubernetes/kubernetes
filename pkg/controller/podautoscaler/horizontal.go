@@ -729,19 +729,14 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		metricName            string
 	)
 
-	desiredReplicas := int32(0)
-	rescaleReason := ""
-
-	var minReplicas int32
-
+	minReplicas := int32(1)
 	if hpa.Spec.MinReplicas != nil {
 		minReplicas = *hpa.Spec.MinReplicas
-	} else {
-		// Default value
-		minReplicas = 1
 	}
 
+	rescaleReason := ""
 	rescale := true
+	desiredReplicas := int32(0)
 	logger := klog.FromContext(ctx)
 
 	if scale.Spec.Replicas == 0 && minReplicas != 0 {
