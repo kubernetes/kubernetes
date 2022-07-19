@@ -23,10 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -43,6 +40,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -216,7 +214,7 @@ func (rq *Controller) addQuota(obj interface{}) {
 	resourceQuota := obj.(*v1.ResourceQuota)
 
 	// if we declared an intent that is not yet captured in status (prioritize it)
-	if !apiequality.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard) {
+	if !quota.Equals(resourceQuota.Spec.Hard, resourceQuota.Status.Hard) {
 		rq.missingUsageQueue.Add(key)
 		return
 	}
@@ -325,7 +323,7 @@ func (rq *Controller) syncResourceQuotaFromKey(ctx context.Context, key string) 
 // syncResourceQuota runs a complete sync of resource quota status across all known kinds
 func (rq *Controller) syncResourceQuota(ctx context.Context, resourceQuota *v1.ResourceQuota) (err error) {
 	// quota is dirty if any part of spec hard limits differs from the status hard limits
-	statusLimitsDirty := !apiequality.Semantic.DeepEqual(resourceQuota.Spec.Hard, resourceQuota.Status.Hard)
+	statusLimitsDirty := !quota.Equals(resourceQuota.Spec.Hard, resourceQuota.Status.Hard)
 
 	// dirty tracks if the usage status differs from the previous sync,
 	// if so, we send a new usage with latest status
@@ -508,7 +506,7 @@ func (rq *Controller) resyncMonitors(resources map[schema.GroupVersionResource]s
 }
 
 // GetQuotableResources returns all resources that the quota system should recognize.
-// It requires a resource supports the following verbs: 'create','list','delete'
+// It requires a resource supports the following verbs: 'create','list','watch','delete'
 // This function may return both results and an error.  If that happens, it means that the discovery calls were only
 // partially successful.  A decision about whether to proceed or not is left to the caller.
 func GetQuotableResources(discoveryFunc NamespacedResourcesFunc) (map[schema.GroupVersionResource]struct{}, error) {
