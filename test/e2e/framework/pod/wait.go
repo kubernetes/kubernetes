@@ -591,6 +591,12 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 	return WaitForAllPodsCondition(c, ns, opts, 1, "running and ready", podListTimeout, testutils.PodRunningReady)
 }
 
+// WaitForPodsWithListOptionsRunningReady waits for exact amount of matching pods as per list options to become running and ready.
+// Return the list of matching pods.
+func WaitForPodsWithListOptionsRunningReady(c clientset.Interface, opts metav1.ListOptions, ns string, minPod int) (pods *v1.PodList, err error) {
+	return WaitForAllPodsCondition(c, ns, opts, minPod, "running and ready", podListTimeout, testutils.PodRunningReady)
+}
+
 // WaitForNRestartablePods tries to list restarting pods using ps until it finds expect of them,
 // returning their names if it can do so before timeout.
 func WaitForNRestartablePods(ps *testutils.PodStore, expect int, timeout time.Duration) ([]string, error) {
