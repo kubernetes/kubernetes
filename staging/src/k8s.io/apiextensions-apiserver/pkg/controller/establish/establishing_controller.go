@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kcp-dev/logicalcluster/v2"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -34,6 +36,7 @@ import (
 	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
+	"k8s.io/client-go/tools/clusters"
 )
 
 // EstablishingController controls how and when CRD is established.
@@ -64,8 +67,8 @@ func NewEstablishingController(crdInformer informers.CustomResourceDefinitionInf
 }
 
 // QueueCRD adds CRD into the establishing queue.
-func (ec *EstablishingController) QueueCRD(key string, timeout time.Duration) {
-	ec.queue.AddAfter(key, timeout)
+func (ec *EstablishingController) QueueCRD(name string, clusterName logicalcluster.Name, timeout time.Duration) {
+	ec.queue.AddAfter(clusters.ToClusterAwareKey(clusterName, name), timeout)
 }
 
 // Run starts the EstablishingController.

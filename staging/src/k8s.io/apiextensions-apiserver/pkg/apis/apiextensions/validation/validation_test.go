@@ -6232,7 +6232,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		name           string
 		input          apiextensions.CustomResourceValidation
 		statusEnabled  bool
-		opts           validationOptions
+		opts           ValidationOptions
 		expectedErrors []validationMatch
 	}{
 		{
@@ -6360,7 +6360,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{},
 			},
-			opts: validationOptions{requireStructuralSchema: true},
+			opts: ValidationOptions{RequireStructuralSchema: true},
 			expectedErrors: []validationMatch{
 				required("spec.validation.openAPIV3Schema.type"),
 			},
@@ -6372,7 +6372,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "object",
 				},
 			},
-			opts: validationOptions{requireStructuralSchema: true},
+			opts: ValidationOptions{RequireStructuralSchema: true},
 		},
 		{
 			name: "require valid types, valid",
@@ -6381,7 +6381,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "object",
 				},
 			},
-			opts: validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
+			opts: ValidationOptions{RequireValidPropertyType: true, RequireStructuralSchema: true},
 		},
 		{
 			name: "require valid types, invalid",
@@ -6390,7 +6390,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "null",
 				},
 			},
-			opts: validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
+			opts: ValidationOptions{RequireValidPropertyType: true, RequireStructuralSchema: true},
 			expectedErrors: []validationMatch{
 				// Invalid value: "null": must be object at the root
 				unsupported("spec.validation.openAPIV3Schema.type"),
@@ -6407,7 +6407,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					Type: "bogus",
 				},
 			},
-			opts: validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
+			opts: ValidationOptions{RequireValidPropertyType: true, RequireStructuralSchema: true},
 			expectedErrors: []validationMatch{
 				unsupported("spec.validation.openAPIV3Schema.type"),
 				invalid("spec.validation.openAPIV3Schema.type"),
@@ -6704,7 +6704,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{requireAtomicSetType: true},
+			opts: ValidationOptions{RequireAtomicSetType: true},
 			expectedErrors: []validationMatch{
 				invalid("spec.validation.openAPIV3Schema.items.x-kubernetes-map-type"),
 			},
@@ -6725,7 +6725,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{requireAtomicSetType: true},
+			opts: ValidationOptions{RequireAtomicSetType: true},
 			expectedErrors: []validationMatch{
 				invalid("spec.validation.openAPIV3Schema.items.x-kubernetes-map-type"),
 			},
@@ -6788,7 +6788,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{requireAtomicSetType: true},
+			opts: ValidationOptions{RequireAtomicSetType: true},
 			expectedErrors: []validationMatch{
 				invalid("spec.validation.openAPIV3Schema.items.x-kubernetes-list-type"),
 			},
@@ -6888,8 +6888,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireMapListKeysMapSetValidation: true,
+			opts: ValidationOptions{
+				RequireMapListKeysMapSetValidation: true,
 			},
 			expectedErrors: []validationMatch{
 				required("spec.validation.openAPIV3Schema.items.properties[key].default"),
@@ -6915,8 +6915,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireMapListKeysMapSetValidation: true,
+			opts: ValidationOptions{
+				RequireMapListKeysMapSetValidation: true,
 			},
 		},
 		{
@@ -6939,9 +6939,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				allowDefaults:                      true,
-				requireMapListKeysMapSetValidation: true,
+			opts: ValidationOptions{
+				AllowDefaults:                      true,
+				RequireMapListKeysMapSetValidation: true,
 			},
 		},
 		{
@@ -6964,8 +6964,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireMapListKeysMapSetValidation: true,
+			opts: ValidationOptions{
+				RequireMapListKeysMapSetValidation: true,
 			},
 			expectedErrors: []validationMatch{
 				required("spec.validation.openAPIV3Schema.items.properties[key].default"),
@@ -6992,8 +6992,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireMapListKeysMapSetValidation: true,
+			opts: ValidationOptions{
+				RequireMapListKeysMapSetValidation: true,
 			},
 			expectedErrors: []validationMatch{
 				forbidden("spec.validation.openAPIV3Schema.items.nullable"),
@@ -7030,8 +7030,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireMapListKeysMapSetValidation: true,
+			opts: ValidationOptions{
+				RequireMapListKeysMapSetValidation: true,
 			},
 			expectedErrors: []validationMatch{
 				forbidden("spec.validation.openAPIV3Schema.items.properties[b].default"),
@@ -7050,8 +7050,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireMapListKeysMapSetValidation: true,
+			opts: ValidationOptions{
+				RequireMapListKeysMapSetValidation: true,
 			},
 			expectedErrors: []validationMatch{
 				forbidden("spec.validation.openAPIV3Schema.items.nullable"),
@@ -7070,8 +7070,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireMapListKeysMapSetValidation: true,
+			opts: ValidationOptions{
+				RequireMapListKeysMapSetValidation: true,
 			},
 		},
 		{
@@ -7096,8 +7096,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
 			},
 		},
 		{
@@ -7121,8 +7121,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
 			},
 		},
 		{
@@ -7138,8 +7138,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			expectedErrors: []validationMatch{
 				required("spec.validation.openAPIV3Schema.x-kubernetes-validations[0].rule"),
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
 			},
 		},
 		{
@@ -7150,8 +7150,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					XValidations: apiextensions.ValidationRules{},
 				},
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
 			},
 		},
 		{
@@ -7179,8 +7179,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			expectedErrors: []validationMatch{
 				invalid("spec.validation.openAPIV3Schema.properties[subRoot].x-kubernetes-validations[0].rule"),
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
 			},
 		},
 		{
@@ -7218,8 +7218,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
 			},
 		},
 		{
@@ -7250,8 +7250,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
 			},
 		},
 		{
@@ -7277,8 +7277,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
 			},
 		},
 		{
@@ -7314,8 +7314,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
 			},
 		},
 		{
@@ -7353,8 +7353,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
 			},
 		},
 		{
@@ -7388,8 +7388,8 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[1].rule"),
 				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[2].rule"),
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
 			},
 		},
 		{
@@ -7447,9 +7447,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 					},
 				},
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
-				allowDefaults:           true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
+				AllowDefaults:           true,
 			},
 		},
 		{
@@ -7512,9 +7512,9 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				invalid("spec.validation.openAPIV3Schema.properties[value].default"),
 				invalid("spec.validation.openAPIV3Schema.properties[object].default"),
 			},
-			opts: validationOptions{
-				requireStructuralSchema: true,
-				allowDefaults:           true,
+			opts: ValidationOptions{
+				RequireStructuralSchema: true,
+				AllowDefaults:           true,
 			},
 		},
 		{
@@ -8155,7 +8155,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
-			got := validateCustomResourceDefinitionValidation(ctx, &tt.input, tt.statusEnabled, tt.opts, field.NewPath("spec", "validation"))
+			got := ValidateCustomResourceDefinitionValidation(ctx, &tt.input, tt.statusEnabled, tt.opts, field.NewPath("spec", "validation"))
 
 			seenErrs := make([]bool, len(got))
 
@@ -8385,7 +8385,7 @@ func Test_validateDeprecationWarning(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := validateDeprecationWarning(tt.deprecated, tt.warning); !reflect.DeepEqual(got, tt.want) {
+			if got := ValidateDeprecationWarning(tt.deprecated, tt.warning); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("validateDeprecationWarning() = %v, want %v", got, tt.want)
 			}
 		})

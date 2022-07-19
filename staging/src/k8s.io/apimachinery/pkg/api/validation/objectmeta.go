@@ -261,7 +261,13 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetCreationTimestamp(), oldMeta.GetCreationTimestamp(), fldPath.Child("creationTimestamp"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetDeletionTimestamp(), oldMeta.GetDeletionTimestamp(), fldPath.Child("deletionTimestamp"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetDeletionGracePeriodSeconds(), oldMeta.GetDeletionGracePeriodSeconds(), fldPath.Child("deletionGracePeriodSeconds"))...)
-	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetZZZ_DeprecatedClusterName(), oldMeta.GetZZZ_DeprecatedClusterName(), fldPath.Child("clusterName"))...)
+
+	// HACK: Since the ClusterName is not stored in etcd, but is set when reading from etcd based on the etcd object key,
+	// we have to disable this validation when a newObject has no `ClusterName` defined (which is completely acceptable because
+	// the logical cluster associated to an etcd object is in fact determined by the current request context)
+	if newMeta.GetZZZ_DeprecatedClusterName() != "" {
+		allErrs = append(allErrs, ValidateImmutableField(newMeta.GetZZZ_DeprecatedClusterName(), oldMeta.GetZZZ_DeprecatedClusterName(), fldPath.Child("clusterName"))...)
+	}
 
 	allErrs = append(allErrs, v1validation.ValidateLabels(newMeta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(newMeta.GetAnnotations(), fldPath.Child("annotations"))...)

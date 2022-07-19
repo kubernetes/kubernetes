@@ -22,14 +22,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kcp-dev/logicalcluster/v2"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-openapi/pkg/handler"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
@@ -37,6 +40,7 @@ import (
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
+	"k8s.io/client-go/tools/clusters"
 )
 
 // Controller watches CustomResourceDefinitions and publishes validation schema
@@ -49,12 +53,12 @@ type Controller struct {
 
 	queue workqueue.RateLimitingInterface
 
-	staticSpec     *spec.Swagger
-	openAPIService *handler.OpenAPIService
+	staticSpec             *spec.Swagger
+	openAPIServiceProvider routes.OpenAPIServiceProvider
 
-	// specs per version and per CRD name
+	// specs per cluster and per version and per CRD name
 	lock     sync.Mutex
-	crdSpecs map[string]map[string]*spec.Swagger
+	crdSpecs map[logicalcluster.Name]map[string]map[string]*spec.Swagger
 }
 
 // NewController creates a new Controller with input CustomResourceDefinition informer
@@ -63,7 +67,7 @@ func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Cont
 		crdLister:  crdInformer.Lister(),
 		crdsSynced: crdInformer.Informer().HasSynced,
 		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_openapi_controller"),
-		crdSpecs:   map[string]map[string]*spec.Swagger{},
+		crdSpecs:   map[logicalcluster.Name]map[string]map[string]*spec.Swagger{},
 	}
 
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -76,8 +80,51 @@ func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Cont
 	return c
 }
 
+// HACK:
+//  Everything regarding OpenAPI and resource discovery is managed through controllers currently
+// (a number of controllers highly coupled with the corresponding http handlers).
+// The following code is an attempt at provising CRD tenancy while accommodating the current design without being too much invasive,
+// because doing differently would have meant too much refactoring..
+// But in the long run the "do this dynamically, not as part of a controller" is probably going to be important.
+// openapi/crd generation is expensive, so doing on a controller means that CPU and memory scale O(crds),
+// when we really want them to scale O(active_clusters).
+
+func (c *Controller) setClusterCrdSpecs(clusterName logicalcluster.Name, crdName string, newSpecs map[string]*spec.Swagger) {
+	_, found := c.crdSpecs[clusterName]
+	if !found {
+		c.crdSpecs[clusterName] = map[string]map[string]*spec.Swagger{}
+	}
+	c.crdSpecs[clusterName][crdName] = newSpecs
+	c.openAPIServiceProvider.AddCuster(clusterName)
+}
+
+func (c *Controller) removeClusterCrdSpecs(clusterName logicalcluster.Name, crdName string) bool {
+	_, crdsForClusterFound := c.crdSpecs[clusterName]
+	if !crdsForClusterFound {
+		return false
+	}
+	if _, found := c.crdSpecs[clusterName][crdName]; !found {
+		return false
+	}
+	delete(c.crdSpecs[clusterName], crdName)
+	if len(c.crdSpecs[clusterName]) == 0 {
+		delete(c.crdSpecs, clusterName)
+		c.openAPIServiceProvider.RemoveCuster(clusterName)
+	}
+	return true
+}
+
+func (c *Controller) getClusterCrdSpecs(clusterName logicalcluster.Name, crdName string) (map[string]*spec.Swagger, bool) {
+	_, specsFoundForCluster := c.crdSpecs[clusterName]
+	if !specsFoundForCluster {
+		return map[string]*spec.Swagger{}, false
+	}
+	crdSpecs, found := c.crdSpecs[clusterName][crdName]
+	return crdSpecs, found
+}
+
 // Run sets openAPIAggregationManager and starts workers
-func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenAPIService, stopCh <-chan struct{}) {
+func (c *Controller) Run(staticSpec *spec.Swagger, openAPIServiceProvider routes.OpenAPIServiceProvider, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 	defer klog.Infof("Shutting down OpenAPI controller")
@@ -85,7 +132,7 @@ func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenA
 	klog.Infof("Starting OpenAPI controller")
 
 	c.staticSpec = staticSpec
-	c.openAPIService = openAPIService
+	c.openAPIServiceProvider = openAPIServiceProvider
 
 	if !cache.WaitForCacheSync(stopCh, c.crdsSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
@@ -108,7 +155,7 @@ func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenA
 		} else if !changed {
 			continue
 		}
-		c.crdSpecs[crd.Name] = newSpecs
+		c.setClusterCrdSpecs(logicalcluster.From(crd), crd.Name, newSpecs)
 	}
 	if err := c.updateSpecLocked(); err != nil {
 		utilruntime.HandleError(fmt.Errorf("failed to initially create OpenAPI spec for CRDs: %v", err))
@@ -153,28 +200,35 @@ func (c *Controller) processNextWorkItem() bool {
 	return true
 }
 
-func (c *Controller) sync(name string) error {
+func (c *Controller) sync(clusterAndName string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	crd, err := c.crdLister.Get(name)
+	crd, err := c.crdLister.Get(clusterAndName)
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
 	// do we have to remove all specs of this CRD?
 	if errors.IsNotFound(err) || !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
-		if _, found := c.crdSpecs[name]; !found {
+		var clusterName logicalcluster.Name
+		crdName := clusterAndName
+		if crd != nil {
+			clusterName = logicalcluster.From(crd)
+			crdName = crd.Name
+		} else {
+			clusterName, crdName = clusters.SplitClusterAwareKey(clusterAndName)
+		}
+		if !c.removeClusterCrdSpecs(clusterName, crdName) {
 			return nil
 		}
-		delete(c.crdSpecs, name)
-		klog.V(2).Infof("Updating CRD OpenAPI spec because %s was removed", name)
-		regenerationCounter.With(map[string]string{"crd": name, "reason": "remove"})
+		klog.V(2).Infof("Updating CRD OpenAPI spec because %s was removed", crdName)
+		regenerationCounter.With(map[string]string{"crd": crdName, "reason": "remove"})
 		return c.updateSpecLocked()
 	}
 
 	// compute CRD spec and see whether it changed
-	oldSpecs, updated := c.crdSpecs[crd.Name]
+	oldSpecs, updated := c.getClusterCrdSpecs(logicalcluster.From(crd), crd.Name)
 	newSpecs, changed, err := buildVersionSpecs(crd, oldSpecs)
 	if err != nil {
 		return err
@@ -184,13 +238,13 @@ func (c *Controller) sync(name string) error {
 	}
 
 	// update specs of this CRD
-	c.crdSpecs[crd.Name] = newSpecs
-	klog.V(2).Infof("Updating CRD OpenAPI spec because %s changed", name)
+	c.setClusterCrdSpecs(logicalcluster.From(crd), crd.Name, newSpecs)
+	klog.V(2).Infof("Updating CRD OpenAPI spec because %s changed", crd.Name)
 	reason := "add"
 	if updated {
 		reason = "update"
 	}
-	regenerationCounter.With(map[string]string{"crd": name, "reason": reason})
+	regenerationCounter.With(map[string]string{"crd": crd.Name, "reason": reason})
 	return c.updateSpecLocked()
 }
 
@@ -221,17 +275,24 @@ func buildVersionSpecs(crd *apiextensionsv1.CustomResourceDefinition, oldSpecs m
 // updateSpecLocked aggregates all OpenAPI specs and updates openAPIService.
 // It is not thread-safe. The caller is responsible to hold proper lock (Controller.lock).
 func (c *Controller) updateSpecLocked() error {
-	crdSpecs := []*spec.Swagger{}
-	for _, versionSpecs := range c.crdSpecs {
-		for _, s := range versionSpecs {
-			crdSpecs = append(crdSpecs, s)
+	var errs []error
+	for clusterName, clusterCrdSpecs := range c.crdSpecs {
+		crdSpecs := []*spec.Swagger{}
+		for _, versionSpecs := range clusterCrdSpecs {
+			for _, s := range versionSpecs {
+				crdSpecs = append(crdSpecs, s)
+			}
+		}
+		mergedSpec, err := builder.MergeSpecs(c.staticSpec, crdSpecs...)
+		if err != nil {
+			return fmt.Errorf("failed to merge specs: %v", err)
+		}
+		if err := c.openAPIServiceProvider.ForCluster(clusterName).UpdateSpec(mergedSpec); err != nil {
+			errs = append(errs, err)
 		}
 	}
-	mergedSpec, err := builder.MergeSpecs(c.staticSpec, crdSpecs...)
-	if err != nil {
-		return fmt.Errorf("failed to merge specs: %v", err)
-	}
-	return c.openAPIService.UpdateSpec(mergedSpec)
+
+	return utilerrors.NewAggregate(errs)
 }
 
 func (c *Controller) addCustomResourceDefinition(obj interface{}) {
@@ -265,5 +326,6 @@ func (c *Controller) deleteCustomResourceDefinition(obj interface{}) {
 }
 
 func (c *Controller) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
-	c.queue.Add(obj.Name)
+	key, _ := cache.MetaNamespaceKeyFunc(obj)
+	c.queue.Add(key)
 }

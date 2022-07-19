@@ -17,7 +17,9 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"sort"
 	"strings"
@@ -25,8 +27,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
+	"github.com/kcp-dev/logicalcluster/v2"
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -42,9 +46,9 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
 	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
+	"k8s.io/apiextensions-apiserver/pkg/kcp"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -68,10 +72,13 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	kcpapi "k8s.io/apiserver/pkg/kcp"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/registry/rest"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -79,6 +86,7 @@ import (
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
@@ -102,7 +110,8 @@ type crdHandler struct {
 	// which is suited for most read and rarely write cases
 	customStorage atomic.Value
 
-	crdLister listers.CustomResourceDefinitionLister
+	crdLister             listers.CustomResourceDefinitionLister
+	clusterAwareCRDLister kcp.ClusterAwareCRDLister
 
 	delegate          http.Handler
 	restOptionsGetter generic.RESTOptionsGetter
@@ -133,6 +142,8 @@ type crdHandler struct {
 	// The limit on the request size that would be accepted and decoded in a write request
 	// 0 means no limit.
 	maxRequestBodyBytes int64
+
+	tableConverterProvider TableConverterProvider
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -256,8 +267,14 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	crdName := requestInfo.Resource + "." + requestInfo.APIGroup
-	crd, err := r.crdLister.Get(crdName)
+	group := requestInfo.APIGroup
+	if group == "" {
+		group = "core"
+	}
+
+	crdName := requestInfo.Resource + "." + group
+
+	crd, err := r.clusterAwareCRDLister.Get(req.Context(), crdName)
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -265,7 +282,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		utilruntime.HandleError(err)
 		responsewriters.ErrorNegotiated(
-			apierrors.NewInternalError(fmt.Errorf("error resolving resource")),
+			apierrors.NewInternalError(fmt.Errorf("error resolving resource: %v", err)),
 			Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
 		)
 		return
@@ -298,9 +315,15 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// kcp: wrap the context with a custom resource indicator. This is required for the storage code to handle
+	// partial metadata wildcard requests correctly (the number of path segments varies whether the resource is
+	// a built-in type (e.g. configmaps) or a custom resource.
+	req = utilnet.CloneRequest(req)
+	req = req.WithContext(kcpapi.WithCustomResourceIndicator(req.Context()))
+
 	terminating := apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating)
 
-	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	crdInfo, err := r.getOrCreateServingInfoFor(crd)
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -331,6 +354,29 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		string(types.JSONPatchType),
 		string(types.MergePatchType),
 	}
+
+	// HACK: Support resources of the client-go scheme the way existing clients expect it:
+	//   - Support Strategic Merge Patch (used by default on these resources by kubectl)
+	//   - Support the Protobuf content type on Create / Update resources
+	//     (by simply converting the request to the json content type),
+	//     since protobuf content type is expected to be supported in a number of client
+	//     contexts (like controller-runtime for example)
+	if clientgoscheme.Scheme.IsGroupRegistered(requestInfo.APIGroup) {
+		supportedTypes = append(supportedTypes, string(types.StrategicMergePatchType))
+		req, err := ConvertProtobufRequestsToJson(verb, req, schema.GroupVersionKind{
+			Group:   requestInfo.APIGroup,
+			Version: requestInfo.APIVersion,
+			Kind:    crd.Spec.Names.Kind,
+		})
+		if err != nil {
+			responsewriters.ErrorNegotiated(
+				apierrors.NewInternalError(err),
+				Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req,
+			)
+			return
+		}
+	}
+
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
 	}
@@ -365,6 +411,51 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		handler.ServeHTTP(w, req)
 		return
 	}
+}
+
+// HACK: In some contexts, like the controller-runtime library used by the Operator SDK, all the resources of the
+// client-go scheme are created / updated using the protobuf content type.
+// However when these resources are in fact added as CRDs, in the KCP minimal API server scenario, these resources cannot
+// be created / updated since the protobuf (de)serialization is not supported for CRDs.
+// So in this case we just convert the protobuf request to a Json one (using the `client-go` scheme decoder/encoder),
+// before letting the CRD handler serve it.
+//
+// A real, long-term and non-hacky, fix for this problem would be as follows:
+// When a request for an unsupported serialization is returned, the server should reject it with a 406
+// and provide a list of supported content types.
+// client-go should then examine whether it can satisfy such a request by encoding the object with a different scheme.
+// This would require a KEP but is in keeping with content negotiation on GET / WATCH in Kube
+func ConvertProtobufRequestsToJson(verb string, req *http.Request, gvk schema.GroupVersionKind) (*http.Request, error) {
+	if (verb == "CREATE" || verb == "UPDATE") &&
+		req.Header.Get("Content-Type") == runtime.ContentTypeProtobuf {
+		resource, err := clientgoscheme.Scheme.New(gvk)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("Error when converting a protobuf request to a json request on a client-go resource added as a CRD")
+		}
+		reader, err := req.Body, nil
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("Error when converting a protobuf request to a json request on a client-go resource added as a CRD")
+		}
+		defer reader.Close()
+		buf := new(bytes.Buffer)
+		_, err = buf.ReadFrom(reader)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("Error when converting a protobuf request to a json request on a client-go resource added as a CRD")
+		}
+
+		// get bytes through IO operations
+		protobuf.NewSerializer(clientgoscheme.Scheme, clientgoscheme.Scheme).Decode(buf.Bytes(), &gvk, resource)
+		buf = new(bytes.Buffer)
+		json.NewSerializerWithOptions(json.DefaultMetaFactory, clientgoscheme.Scheme, clientgoscheme.Scheme, json.SerializerOptions{Yaml: false, Pretty: false, Strict: true}).
+			Encode(resource, buf)
+		req.Body = ioutil.NopCloser(buf)
+		req.ContentLength = int64(buf.Len())
+		req.Header.Set("Content-Type", runtime.ContentTypeJSON)
+	}
+	return req, nil
 }
 
 func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, requestInfo *apirequest.RequestInfo, crdInfo *crdInfo, crd *apiextensionsv1.CustomResourceDefinition, terminating bool, supportedTypes []string) http.HandlerFunc {
@@ -488,9 +579,9 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 	if !apiextensionshelpers.IsCRDConditionTrue(newCRD, apiextensionsv1.Established) &&
 		apiextensionshelpers.IsCRDConditionTrue(newCRD, apiextensionsv1.NamesAccepted) {
 		if r.masterCount > 1 {
-			r.establishingController.QueueCRD(newCRD.Name, 5*time.Second)
+			r.establishingController.QueueCRD(newCRD.Name, logicalcluster.From(newCRD), 5*time.Second)
 		} else {
-			r.establishingController.QueueCRD(newCRD.Name, 0)
+			r.establishingController.QueueCRD(newCRD.Name, logicalcluster.From(newCRD), 0)
 		}
 	}
 
@@ -579,25 +670,25 @@ func (r *crdHandler) tearDown(oldInfo *crdInfo) {
 
 	for _, storage := range oldInfo.storages {
 		// destroy only the main storage. Those for the subresources share cacher and etcd clients.
-		storage.CustomResource.DestroyFunc()
+		storage.CustomResource.Store.(*genericregistry.Store).DestroyFunc()
 	}
 }
 
 // GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter of
 // the given crd.
 func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensionsv1.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
-	info, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	info, err := r.getOrCreateServingInfoFor(crd)
 	if err != nil {
 		return nil, err
 	}
 	return info.storages[info.storageVersion].CustomResource, nil
 }
 
-// getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
-// Otherwise the function fetches the up-to-date CRD using the given CRD name and creates CRD serving info.
-func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crdInfo, error) {
+// getOrCreateServingInfoFor gets the CRD serving info for the given CRD (by its UID) if the key exists in the storage map.
+// Otherwise the function creates CRD serving info.
+func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensionsv1.CustomResourceDefinition) (*crdInfo, error) {
 	storageMap := r.customStorage.Load().(crdStorageMap)
-	if ret, ok := storageMap[uid]; ok {
+	if ret, ok := storageMap[crd.UID]; ok {
 		return ret, nil
 	}
 
@@ -608,10 +699,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	// If updateCustomResourceDefinition sees an update and happens later, the storage will be deleted and
 	// we will re-create the updated storage on demand. If updateCustomResourceDefinition happens before,
 	// we make sure that we observe the same up-to-date CRD.
-	crd, err := r.crdLister.Get(name)
+	crd, err := r.clusterAwareCRDLister.Refresh(crd)
 	if err != nil {
 		return nil, err
 	}
+
 	storageMap = r.customStorage.Load().(crdStorageMap)
 	if ret, ok := storageMap[crd.UID]; ok {
 		return ret, nil
@@ -667,9 +759,17 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 	}
 
 	openAPIModels, err := buildOpenAPIModelsForApply(r.staticOpenAPISpec, crd)
+	var modelsByGKV openapi.ModelsByGKV
+
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error building openapi models for %s: %v", crd.Name, err))
 		openAPIModels = nil
+	} else {
+		modelsByGKV, err = openapi.GetModelsByGKV(openAPIModels)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("error gathering openapi models by GKV for %s: %v", crd.Name, err))
+			modelsByGKV = nil
+		}
 	}
 
 	var typeConverter fieldmanager.TypeConverter = fieldmanager.DeducedTypeConverter{}
@@ -775,14 +875,21 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			}
 		}
 
-		columns, err := getColumnsForVersion(crd, v.Name)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return nil, fmt.Errorf("the server could not properly serve the CR columns")
+		var table rest.TableConvertor
+		if r.tableConverterProvider != nil {
+			table = r.tableConverterProvider.GetTableConverter(crd.Spec.Group, crd.Status.AcceptedNames.Kind, crd.Status.AcceptedNames.ListKind)
 		}
-		table, err := tableconvertor.New(columns)
-		if err != nil {
-			klog.V(2).Infof("The CRD for %v has an invalid printer specification, falling back to default printing: %v", kind, err)
+
+		if table == nil {
+			columns, err := getColumnsForVersion(crd, v.Name)
+			if err != nil {
+				utilruntime.HandleError(err)
+				return nil, fmt.Errorf("the server could not properly serve the CR columns")
+			}
+			table, err = tableconvertor.New(columns)
+			if err != nil {
+				klog.V(2).Infof("The CRD for %v has an invalid printer specification, falling back to default printing: %v", kind, err)
+			}
 		}
 
 		storages[v.Name] = customresource.NewStorage(
@@ -799,14 +906,17 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				statusSpec,
 				scaleSpec,
 			),
-			crdConversionRESTOptionsGetter{
-				RESTOptionsGetter:     r.restOptionsGetter,
-				converter:             safeConverter,
-				decoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name},
-				encoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion},
-				structuralSchemas:     structuralSchemas,
-				structuralSchemaGK:    kind.GroupKind(),
-				preserveUnknownFields: crd.Spec.PreserveUnknownFields,
+			apiBindingAwareCRDRESTOptionsGetter{
+				delegate: crdConversionRESTOptionsGetter{
+					RESTOptionsGetter:     r.restOptionsGetter,
+					converter:             safeConverter,
+					decoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name},
+					encoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion},
+					structuralSchemas:     structuralSchemas,
+					structuralSchemaGK:    kind.GroupKind(),
+					preserveUnknownFields: crd.Spec.PreserveUnknownFields,
+				},
+				crd: crd,
 			},
 			crd.Status.AcceptedNames.Categories,
 			table,
@@ -862,6 +972,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			Authorizer: r.authorizer,
 
 			MaxRequestBodyBytes: r.maxRequestBodyBytes,
+
+			OpenapiModels: modelsByGKV,
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 			resetFields := storages[v.Name].CustomResource.GetResetFields()

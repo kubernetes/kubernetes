@@ -135,7 +135,12 @@ func (a customResourceValidator) ValidateTypeMeta(ctx context.Context, obj *unst
 	if typeAccessor.GetKind() != a.kind.Kind {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("kind"), typeAccessor.GetKind(), fmt.Sprintf("must be %v", a.kind.Kind)))
 	}
-	if typeAccessor.GetAPIVersion() != a.kind.Group+"/"+a.kind.Version {
+	// HACK: support the case when we add core resources through CRDs (KCP scenario)
+	expectedAPIVersion := a.kind.Group + "/" + a.kind.Version
+	if a.kind.Group == "" {
+		expectedAPIVersion = a.kind.Version
+	}
+	if typeAccessor.GetAPIVersion() != expectedAPIVersion {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("apiVersion"), typeAccessor.GetAPIVersion(), fmt.Sprintf("must be %v", a.kind.Group+"/"+a.kind.Version)))
 	}
 	return allErrs

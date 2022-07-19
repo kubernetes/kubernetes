@@ -72,6 +72,9 @@ type MetadataAccessor interface {
 	Continue(obj runtime.Object) (string, error)
 	SetContinue(obj runtime.Object, c string) error
 
+	ZZZ_DeprecatedClusterName(obj runtime.Object) (string, error)
+	SetZZZ_DeprecatedClusterName(obj runtime.Object, clusterName string) error
+
 	runtime.ResourceVersioner
 }
 
