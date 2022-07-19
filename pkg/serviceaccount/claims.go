@@ -22,8 +22,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kcp-dev/logicalcluster/v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/client-go/tools/clusters"
 	"k8s.io/klog/v2"
 
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -46,6 +48,8 @@ type privateClaims struct {
 }
 
 type kubernetes struct {
+	ClusterName logicalcluster.Name `json:"clusterName,omitempty"`
+
 	Namespace string          `json:"namespace,omitempty"`
 	Svcacct   ref             `json:"serviceaccount,omitempty"`
 	Pod       *ref            `json:"pod,omitempty"`
@@ -69,7 +73,8 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirati
 	}
 	pc := &privateClaims{
 		Kubernetes: kubernetes{
-			Namespace: sa.Namespace,
+			ClusterName: logicalcluster.From(&sa),
+			Namespace:   sa.Namespace,
 			Svcacct: ref{
 				Name: sa.Name,
 				UID:  string(sa.UID),
@@ -145,7 +150,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	podref := private.Kubernetes.Pod
 	secref := private.Kubernetes.Secret
 	// Make sure service account still exists (name and UID)
-	serviceAccount, err := v.getter.GetServiceAccount(namespace, saref.Name)
+	serviceAccount, err := v.getter.GetServiceAccount(namespace, clusters.ToClusterAwareKey(private.Kubernetes.ClusterName, saref.Name))
 	if err != nil {
 		klog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, saref.Name, err)
 		return nil, err
@@ -161,7 +166,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 
 	if secref != nil {
 		// Make sure token hasn't been invalidated by deletion of the secret
-		secret, err := v.getter.GetSecret(namespace, secref.Name)
+		secret, err := v.getter.GetSecret(namespace, clusters.ToClusterAwareKey(private.Kubernetes.ClusterName, secref.Name))
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve bound secret %s/%s for service account %s/%s: %v", namespace, secref.Name, namespace, saref.Name, err)
 			return nil, errors.New("service account token has been invalidated")
@@ -179,7 +184,7 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	var podName, podUID string
 	if podref != nil {
 		// Make sure token hasn't been invalidated by deletion of the pod
-		pod, err := v.getter.GetPod(namespace, podref.Name)
+		pod, err := v.getter.GetPod(namespace, clusters.ToClusterAwareKey(private.Kubernetes.ClusterName, podref.Name))
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve bound pod %s/%s for service account %s/%s: %v", namespace, podref.Name, namespace, saref.Name, err)
 			return nil, errors.New("service account token has been invalidated")
@@ -210,11 +215,12 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 	}
 
 	return &apiserverserviceaccount.ServiceAccountInfo{
-		Namespace: private.Kubernetes.Namespace,
-		Name:      private.Kubernetes.Svcacct.Name,
-		UID:       private.Kubernetes.Svcacct.UID,
-		PodName:   podName,
-		PodUID:    podUID,
+		ClusterName: private.Kubernetes.ClusterName,
+		Namespace:   private.Kubernetes.Namespace,
+		Name:        private.Kubernetes.Svcacct.Name,
+		UID:         private.Kubernetes.Svcacct.UID,
+		PodName:     podName,
+		PodUID:      podUID,
 	}, nil
 }
 

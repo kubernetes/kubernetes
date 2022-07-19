@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/klog/v2"
+	"github.com/kcp-dev/logicalcluster/v2"
 
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -211,7 +212,7 @@ func (p *Plugin) computeSecurityContext(ctx context.Context, a admission.Attribu
 	klog.V(4).Infof("getting pod security policies for pod %s (generate: %s)", pod.Name, pod.GenerateName)
 	var saInfo user.Info
 	if len(pod.Spec.ServiceAccountName) > 0 {
-		saInfo = serviceaccount.UserInfo(a.GetNamespace(), pod.Spec.ServiceAccountName, "")
+		saInfo = serviceaccount.UserInfo(logicalcluster.From(pod), a.GetNamespace(), pod.Spec.ServiceAccountName, "")
 	}
 
 	policies, err := p.lister.List(labels.Everything())

@@ -20,8 +20,10 @@ import (
 	"context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	clientset "k8s.io/client-go/kubernetes"
 	v1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/clusters"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -45,19 +47,25 @@ func (c clientGetter) GetServiceAccount(namespace, name string) (*v1.ServiceAcco
 	if serviceAccount, err := c.serviceAccountLister.ServiceAccounts(namespace).Get(name); err == nil {
 		return serviceAccount, nil
 	}
-	return c.client.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	clusterName, name := clusters.SplitClusterAwareKey(name)
+	clusterCtx := genericapirequest.WithCluster(context.TODO(), genericapirequest.Cluster{Name: clusterName})
+	return c.client.CoreV1().ServiceAccounts(namespace).Get(clusterCtx, name, metav1.GetOptions{})
 }
 
 func (c clientGetter) GetPod(namespace, name string) (*v1.Pod, error) {
 	if pod, err := c.podLister.Pods(namespace).Get(name); err == nil {
 		return pod, nil
 	}
-	return c.client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	clusterName, name := clusters.SplitClusterAwareKey(name)
+	clusterCtx := genericapirequest.WithCluster(context.TODO(), genericapirequest.Cluster{Name: clusterName})
+	return c.client.CoreV1().Pods(namespace).Get(clusterCtx, name, metav1.GetOptions{})
 }
 
 func (c clientGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
 	if secret, err := c.secretLister.Secrets(namespace).Get(name); err == nil {
 		return secret, nil
 	}
-	return c.client.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	clusterName, name := clusters.SplitClusterAwareKey(name)
+	clusterCtx := genericapirequest.WithCluster(context.TODO(), genericapirequest.Cluster{Name: clusterName})
+	return c.client.CoreV1().Secrets(namespace).Get(clusterCtx, name, metav1.GetOptions{})
 }
