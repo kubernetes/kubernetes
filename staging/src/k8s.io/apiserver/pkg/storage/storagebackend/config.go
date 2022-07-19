@@ -99,6 +99,11 @@ type ConfigForResource struct {
 
 	// GroupResource is the relevant one
 	GroupResource schema.GroupResource
+
+	// The following fields hold config required/specific to KCP
+	//
+	// KcpExtraStorageMetadata holds metadata used by the watchCache's reflector to instruct the storage layer how to assign/extract the cluster name
+	KcpExtraStorageMetadata *KcpStorageMetadata
 }
 
 // ForResource specializes to the given resource

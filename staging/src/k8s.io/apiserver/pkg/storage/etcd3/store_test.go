@@ -34,8 +34,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/kcp-dev/logicalcluster/v2"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc/grpclog"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -174,6 +176,10 @@ func TestCreateWithTTL(t *testing.T) {
 	if err := store.Create(ctx, key, input, out, 1); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
+
+	ctx = genericapirequest.WithCluster(ctx, genericapirequest.Cluster{
+		Name: logicalcluster.New("foo"),
+	})
 
 	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: out.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {

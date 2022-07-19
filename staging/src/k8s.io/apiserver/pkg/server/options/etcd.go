@@ -246,12 +246,16 @@ type SimpleRestOptionsFactory struct {
 }
 
 func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+	groupName := resource.Group
+	if groupName == "" {
+		groupName = "core"
+	}
 	ret := generic.RESTOptions{
 		StorageConfig:             f.Options.StorageConfig.ForResource(resource),
 		Decorator:                 generic.UndecoratedStorage,
 		EnableGarbageCollection:   f.Options.EnableGarbageCollection,
 		DeleteCollectionWorkers:   f.Options.DeleteCollectionWorkers,
-		ResourcePrefix:            resource.Group + "/" + resource.Resource,
+		ResourcePrefix:            groupName + "/" + resource.Resource,
 		CountMetricPollPeriod:     f.Options.StorageConfig.CountMetricPollPeriod,
 		StorageObjectCountTracker: f.Options.StorageConfig.StorageObjectCountTracker,
 	}
