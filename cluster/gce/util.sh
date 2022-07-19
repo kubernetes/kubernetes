@@ -1074,6 +1074,8 @@ function build-linux-kube-env {
     kube_manifests_tar_url=$(split_csv "${KUBE_MANIFESTS_TAR_URL}")
   fi
 
+  echo "porterdavid: build-linux-kube-env isMaster=$1 NODE_OS_DISTRIBUTION=${NODE_OS_DISTRIBUTION} ENABLE_NODE_PROBLEM_DETECTOR=${ENABLE_NODE_PROBLEM_DETECTOR}"
+
   rm -f "$file"
   cat >"$file" <<EOF
 CLUSTER_NAME: $(yaml-quote "${CLUSTER_NAME}")
