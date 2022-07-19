@@ -70,7 +70,6 @@ var _ = SIGDescribe("RuntimeClass", func() {
 	})
 
 	// This test requires that the PreconfiguredRuntimeClassHandler has already been set up on nodes.
-	// The test CANNOT be made a Conformance as it depends on a container runtime to have a specific handler installed and working.
 	ginkgo.It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]", func() {
 		// The built-in docker runtime does not support configuring runtime handlers.
 		handler := e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime)
