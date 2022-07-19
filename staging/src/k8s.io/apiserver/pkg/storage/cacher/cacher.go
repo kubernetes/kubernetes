@@ -34,6 +34,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
@@ -645,7 +646,9 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
-	trace := utiltrace.New("cacher list", utiltrace.Field{Key: "type", Value: c.objectType.String()})
+	trace := utiltrace.New("cacher list",
+		utiltrace.Field{"audit-id", endpointsrequest.GetAuditIDTruncated(ctx)},
+		utiltrace.Field{Key: "type", Value: c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	if err := c.ready.wait(); err != nil {
