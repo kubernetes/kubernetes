@@ -23,10 +23,8 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -120,7 +118,7 @@ func FSGroupCompleteHook(plugin volume.VolumePlugin, spec *volume.Spec) func(typ
 // CSI plugin drivers.
 func GetFullQualifiedPluginNameForVolume(pluginName string, spec *volume.Spec) string {
 	if spec != nil {
-		if spec.Volume != nil && spec.Volume.CSI != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+		if spec.Volume != nil && spec.Volume.CSI != nil {
 			return fmt.Sprintf("%s:%s", pluginName, spec.Volume.CSI.Driver)
 		}
 		if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil {

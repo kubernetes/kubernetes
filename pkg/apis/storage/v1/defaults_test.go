@@ -80,8 +80,6 @@ func TestSetDefaultVolumeBindingMode(t *testing.T) {
 }
 
 func TestSetDefaultCSIDriver(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-
 	enabled := true
 	disabled := false
 	tests := []struct {

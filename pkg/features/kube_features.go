@@ -97,6 +97,7 @@ const (
 	// owner: @pohly
 	// alpha: v1.14
 	// beta: v1.16
+	// GA: v1.25
 	//
 	// Enables CSI Inline volumes support for pods
 	CSIInlineVolume featuregate.Feature = "CSIInlineVolume"
@@ -895,7 +896,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CPUManagerPolicyOptions: {Default: true, PreRelease: featuregate.Beta},
 
-	CSIInlineVolume: {Default: true, PreRelease: featuregate.Beta},
+	CSIInlineVolume: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
 	CSIMigration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 

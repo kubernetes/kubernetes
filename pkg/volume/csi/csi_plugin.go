@@ -334,12 +334,8 @@ func (p *csiPlugin) CanSupport(spec *volume.Spec) bool {
 	if spec == nil {
 		return false
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil) ||
-			(spec.Volume != nil && spec.Volume.CSI != nil)
-	}
-
-	return spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil
+	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CSI != nil) ||
+		(spec.Volume != nil && spec.Volume.CSI != nil)
 }
 
 func (p *csiPlugin) RequiresRemount(spec *volume.Spec) bool {
@@ -376,7 +372,7 @@ func (p *csiPlugin) NewMounter(
 	)
 
 	switch {
-	case volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume):
+	case volSrc != nil:
 		volumeHandle = makeVolumeHandle(string(pod.UID), spec.Name())
 		driverName = volSrc.Driver
 		if volSrc.ReadOnly != nil {
@@ -520,13 +516,10 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.S
 	klog.V(4).Info(log("plugin.ConstructVolumeSpec extracted [%#v]", volData))
 
 	var spec *volume.Spec
-	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
-
-	// If inlineEnabled is true and mode is VolumeLifecycleEphemeral,
-	// use constructVolSourceSpec to construct volume source spec.
-	// If inlineEnabled is false or mode is VolumeLifecyclePersistent,
+	// If mode is VolumeLifecycleEphemeral, use constructVolSourceSpec
+	// to construct volume source spec. If mode is VolumeLifecyclePersistent,
 	// use constructPVSourceSpec to construct volume construct pv source spec.
-	if inlineEnabled && storage.VolumeLifecycleMode(volData[volDataKey.volumeLifecycleMode]) == storage.VolumeLifecycleEphemeral {
+	if storage.VolumeLifecycleMode(volData[volDataKey.volumeLifecycleMode]) == storage.VolumeLifecycleEphemeral {
 		spec = p.constructVolSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName])
 		return spec, nil
 	}
@@ -617,17 +610,14 @@ func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
 }
 
 func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
-	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
-	if inlineEnabled {
-		volumeLifecycleMode, err := p.getVolumeLifecycleMode(spec)
-		if err != nil {
-			return false, err
-		}
+	volumeLifecycleMode, err := p.getVolumeLifecycleMode(spec)
+	if err != nil {
+		return false, err
+	}
 
-		if volumeLifecycleMode == storage.VolumeLifecycleEphemeral {
-			klog.V(5).Info(log("plugin.CanAttach = false, ephemeral mode detected for spec %v", spec.Name()))
-			return false, nil
-		}
+	if volumeLifecycleMode == storage.VolumeLifecycleEphemeral {
+		klog.V(5).Info(log("plugin.CanAttach = false, ephemeral mode detected for spec %v", spec.Name()))
+		return false, nil
 	}
 
 	pvSrc, err := getCSISourceFromSpec(spec)
@@ -647,12 +637,6 @@ func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
 
 // CanDeviceMount returns true if the spec supports device mount
 func (p *csiPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
-	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
-	if !inlineEnabled {
-		// No need to check anything, we assume it is a persistent volume.
-		return true, nil
-	}
-
 	volumeLifecycleMode, err := p.getVolumeLifecycleMode(spec)
 	if err != nil {
 		return false, err
@@ -841,14 +825,6 @@ func (p *csiPlugin) getCSIDriver(driver string) (*storage.CSIDriver, error) {
 // supportsVolumeMode checks whether the CSI driver supports a volume in the given mode.
 // An error indicates that it isn't supported and explains why.
 func (p *csiPlugin) supportsVolumeLifecycleMode(driver string, volumeMode storage.VolumeLifecycleMode) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		// Feature disabled, therefore only "persistent" volumes are supported.
-		if volumeMode != storage.VolumeLifecyclePersistent {
-			return fmt.Errorf("CSIInlineVolume feature not enabled, %q volumes not supported", volumeMode)
-		}
-		return nil
-	}
-
 	// Retrieve CSIDriver. It's not an error if that isn't
 	// possible (we don't have the lister if CSIDriverRegistry is
 	// disabled) or the driver isn't found (CSIDriver is
@@ -901,7 +877,7 @@ func (p *csiPlugin) getVolumeLifecycleMode(spec *volume.Spec) (storage.VolumeLif
 		return "", err
 	}
 
-	if volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+	if volSrc != nil {
 		return storage.VolumeLifecycleEphemeral, nil
 	}
 	return storage.VolumeLifecyclePersistent, nil
