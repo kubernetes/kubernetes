@@ -17,6 +17,8 @@ limitations under the License.
 package generic
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -29,7 +31,7 @@ import (
 type StorageDecorator func(
 	config *storagebackend.ConfigForResource,
 	resourcePrefix string,
-	keyFunc func(obj runtime.Object) (string, error),
+	keyFunc func(ctx context.Context, obj runtime.Object) (string, error),
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,
@@ -41,7 +43,7 @@ type StorageDecorator func(
 func UndecoratedStorage(
 	config *storagebackend.ConfigForResource,
 	resourcePrefix string,
-	keyFunc func(obj runtime.Object) (string, error),
+	keyFunc func(ctx context.Context, obj runtime.Object) (string, error),
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,

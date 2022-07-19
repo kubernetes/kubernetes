@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kcp-dev/logicalcluster/v2"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -42,6 +44,8 @@ const (
 	// PodUIDKey is the key used in a user's "extra" to specify the pod UID of
 	// the authenticating request.
 	PodUIDKey = "authentication.kubernetes.io/pod-uid"
+	// ClusterNameKey is the logical cluster name this service-account comes from.
+	ClusterNameKey = "authentication.kubernetes.io/cluster-name"
 )
 
 // MakeUsername generates a username from the given namespace and ServiceAccount name.
@@ -108,15 +112,17 @@ func MakeNamespaceGroupName(namespace string) string {
 }
 
 // UserInfo returns a user.Info interface for the given namespace, service account name and UID
-func UserInfo(namespace, name, uid string) user.Info {
+func UserInfo(clusterName logicalcluster.Name, namespace, name, uid string) user.Info {
 	return (&ServiceAccountInfo{
-		Name:      name,
-		Namespace: namespace,
-		UID:       uid,
+		ClusterName: clusterName,
+		Name:        name,
+		Namespace:   namespace,
+		UID:         uid,
 	}).UserInfo()
 }
 
 type ServiceAccountInfo struct {
+	ClusterName          logicalcluster.Name
 	Name, Namespace, UID string
 	PodName, PodUID      string
 }
@@ -133,6 +139,10 @@ func (sa *ServiceAccountInfo) UserInfo() user.Info {
 			PodUIDKey:  {sa.PodUID},
 		}
 	}
+	if info.Extra == nil {
+		info.Extra = map[string][]string{}
+	}
+	info.Extra[ClusterNameKey] = []string{sa.ClusterName.String()}
 	return info
 }
 

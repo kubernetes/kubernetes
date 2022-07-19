@@ -234,10 +234,25 @@ const (
 	resourceCountPollPeriodJitter = 1.2
 )
 
+// NoNamespaceKeyRootFunc is the default function for constructing storage paths
+// to resource directories enforcing namespace rules.
+func NoNamespaceKeyRootFunc(ctx context.Context, prefix string) string {
+	key := prefix
+	cluster, err := genericapirequest.ValidClusterFrom(ctx)
+	if err != nil {
+		klog.Errorf("invalid context cluster value: %v", err)
+		return key
+	}
+	if cluster.Wildcard {
+		return key
+	}
+	return key + "/" + cluster.Name.String()
+}
+
 // NamespaceKeyRootFunc is the default function for constructing storage paths
 // to resource directories enforcing namespace rules.
 func NamespaceKeyRootFunc(ctx context.Context, prefix string) string {
-	key := prefix
+	key := NoNamespaceKeyRootFunc(ctx, prefix)
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
 	if ok && len(ns) > 0 {
 		key = key + "/" + ns
@@ -249,7 +264,6 @@ func NamespaceKeyRootFunc(ctx context.Context, prefix string) string {
 // a resource relative to the given prefix enforcing namespace rules. If the
 // context does not contain a namespace, it errors.
 func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, error) {
-	key := NamespaceKeyRootFunc(ctx, prefix)
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
 	if !ok || len(ns) == 0 {
 		return "", apierrors.NewBadRequest("Namespace parameter required.")
@@ -260,8 +274,7 @@ func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, 
 	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", apierrors.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
 	}
-	key = key + "/" + name
-	return key, nil
+	return NoNamespaceKeyRootFunc(ctx, prefix) + "/" + ns + "/" + name, nil
 }
 
 // NoNamespaceKeyFunc is the default function for constructing storage paths
@@ -273,8 +286,7 @@ func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string
 	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", apierrors.NewBadRequest(fmt.Sprintf("Name parameter invalid: %q: %s", name, strings.Join(msgs, ";")))
 	}
-	key := prefix + "/" + name
-	return key, nil
+	return NoNamespaceKeyRootFunc(ctx, prefix) + "/" + name, nil
 }
 
 // New implements RESTStorage.New.
@@ -1312,6 +1324,9 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if (e.KeyRootFunc == nil) != (e.KeyFunc == nil) {
 		return fmt.Errorf("store for %s must set both KeyRootFunc and KeyFunc or neither", e.DefaultQualifiedResource.String())
 	}
+	if e.KeyFunc != nil || e.KeyFunc != nil {
+		return fmt.Errorf("DEBUG: keyfunc must be non-nil for all resources", e.DefaultQualifiedResource.String())
+	}
 
 	if e.TableConvertor == nil {
 		return fmt.Errorf("store for %s must set TableConvertor; rest.NewDefaultTableConvertor(e.DefaultQualifiedResource) can be used to output just name/creation time", e.DefaultQualifiedResource.String())
@@ -1372,6 +1387,13 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		return fmt.Errorf("store for %s has an invalid prefix %q", e.DefaultQualifiedResource.String(), opts.ResourcePrefix)
 	}
 
+	if e.KeyFunc != nil {
+		panic(fmt.Sprintf("KeyFunc is illegal for %v: %T", e.DefaultQualifiedResource, e.KeyFunc))
+	}
+	if e.KeyRootFunc != nil {
+		panic(fmt.Sprintf("KeyRootFunc is illegal for %v: %T", e.DefaultQualifiedResource, e.KeyRootFunc))
+	}
+
 	// Set the default behavior for storage key generation
 	if e.KeyRootFunc == nil && e.KeyFunc == nil {
 		if isNamespaced {
@@ -1383,7 +1405,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			}
 		} else {
 			e.KeyRootFunc = func(ctx context.Context) string {
-				return prefix
+				return NoNamespaceKeyRootFunc(ctx, prefix)
 			}
 			e.KeyFunc = func(ctx context.Context, name string) (string, error) {
 				return NoNamespaceKeyFunc(ctx, prefix, name)
@@ -1393,17 +1415,17 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 
 	// We adapt the store's keyFunc so that we can use it with the StorageDecorator
 	// without making any assumptions about where objects are stored in etcd
-	keyFunc := func(obj runtime.Object) (string, error) {
+	keyFunc := func(ctx context.Context, obj runtime.Object) (string, error) {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
 			return "", err
 		}
 
 		if isNamespaced {
-			return e.KeyFunc(genericapirequest.WithNamespace(genericapirequest.NewContext(), accessor.GetNamespace()), accessor.GetName())
+			return e.KeyFunc(genericapirequest.WithNamespace(ctx, accessor.GetNamespace()), accessor.GetName())
 		}
 
-		return e.KeyFunc(genericapirequest.NewContext(), accessor.GetName())
+		return e.KeyFunc(ctx, accessor.GetName())
 	}
 
 	if e.DeleteCollectionWorkers == 0 {
@@ -1460,7 +1482,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 
 // startObservingCount starts monitoring given prefix and periodically updating metrics. It returns a function to stop collection.
 func (e *Store) startObservingCount(period time.Duration, objectCountTracker flowcontrolrequest.StorageObjectCountTracker) func() {
-	prefix := e.KeyRootFunc(genericapirequest.NewContext())
+	prefix := e.KeyRootFunc(genericapirequest.WithCluster(genericapirequest.NewContext(), genericapirequest.Cluster{Wildcard: true}))
 	resourceName := e.DefaultQualifiedResource.String()
 	klog.V(2).InfoS("Monitoring resource count at path", "resource", resourceName, "path", "<storage-prefix>/"+prefix)
 	stopCh := make(chan struct{})

@@ -21,6 +21,8 @@ import (
 	"sort"
 	"sync/atomic"
 
+	logicalcluster "github.com/kcp-dev/logicalcluster/v2"
+
 	"k8s.io/api/admissionregistration/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -118,7 +120,7 @@ func mergeValidatingWebhookConfigurations(configurations []*v1.ValidatingWebhook
 			n := c.Webhooks[i].Name
 			uid := fmt.Sprintf("%s/%s/%d", c.Name, n, names[n])
 			names[n]++
-			accessors = append(accessors, webhook.NewValidatingWebhookAccessor(uid, c.Name, &c.Webhooks[i]))
+			accessors = append(accessors, webhookClusterAccessorWrapper{webhook.NewValidatingWebhookAccessor(uid, c.Name, &c.Webhooks[i]), logicalcluster.From(c)})
 		}
 	}
 	return accessors

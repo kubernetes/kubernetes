@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/kcp-dev/logicalcluster/v2"
 	"k8s.io/klog/v2"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -287,7 +288,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, registration autoregister.AutoAPIServiceRegistration) []*v1.APIService {
 	apiServices := []*v1.APIService{}
 
-	for _, curr := range delegateAPIServer.ListedPaths() {
+	for _, curr := range delegateAPIServer.ListedPaths(logicalcluster.New("")) {
 		if curr == "/api/v1" {
 			apiService := makeAPIService(schema.GroupVersion{Group: "", Version: "v1"})
 			registration.AddAPIServiceToSyncOnStart(apiService)

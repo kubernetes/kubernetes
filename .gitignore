@@ -103,6 +103,9 @@ network_closure.sh
 # Downloaded kubernetes binary release tar ball
 kubernetes.tar.gz
 
+# HACK: Needed for short term dependencies on core openapi docs, will need to be refactored
+#       out of api dependencies in order to vendor a "pure" Kube API
+# zz_generated.openapi.go
 # Phony test files used as part of coverage generation
 zz_generated_*_test.go
 

@@ -21,33 +21,25 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/events"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/networking"
-	"k8s.io/kubernetes/pkg/apis/policy"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
 )
 
 // NewStorageFactoryConfig returns a new StorageFactoryConfig set up with necessary resource overrides.
-func NewStorageFactoryConfig() *StorageFactoryConfig {
-
+func NewStorageFactoryConfig(scheme *runtime.Scheme, codecs serializer.CodecFactory) *StorageFactoryConfig {
 	resources := []schema.GroupVersionResource{
 		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in
 		// 1.25.
 		apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
 	}
-
 	return &StorageFactoryConfig{
-		Serializer:                legacyscheme.Codecs,
-		DefaultResourceEncoding:   serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme),
+		Serializer:                codecs,
+		DefaultResourceEncoding:   serverstorage.NewDefaultResourceEncodingConfig(scheme),
 		ResourceEncodingOverrides: resources,
 	}
 }
@@ -90,16 +82,7 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 		c.Serializer,
 		resourceEncodingConfig,
 		c.APIResourceConfig,
-		SpecialDefaultResourcePrefixes)
-
-	storageFactory.AddCohabitatingResources(networking.Resource("networkpolicies"), extensions.Resource("networkpolicies"))
-	storageFactory.AddCohabitatingResources(apps.Resource("deployments"), extensions.Resource("deployments"))
-	storageFactory.AddCohabitatingResources(apps.Resource("daemonsets"), extensions.Resource("daemonsets"))
-	storageFactory.AddCohabitatingResources(apps.Resource("replicasets"), extensions.Resource("replicasets"))
-	storageFactory.AddCohabitatingResources(api.Resource("events"), events.Resource("events"))
-	storageFactory.AddCohabitatingResources(api.Resource("replicationcontrollers"), extensions.Resource("replicationcontrollers")) // to make scale subresources equivalent
-	storageFactory.AddCohabitatingResources(policy.Resource("podsecuritypolicies"), extensions.Resource("podsecuritypolicies"))
-	storageFactory.AddCohabitatingResources(networking.Resource("ingresses"), extensions.Resource("ingresses"))
+		nil)
 
 	for _, override := range c.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")

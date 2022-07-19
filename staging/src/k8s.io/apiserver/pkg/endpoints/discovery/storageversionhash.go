@@ -19,14 +19,16 @@ package discovery
 import (
 	"crypto/sha256"
 	"encoding/base64"
+
+	"github.com/kcp-dev/logicalcluster/v2"
 )
 
 // StorageVersionHash calculates the storage version hash for a
 // <group/version/kind> tuple.
 // WARNING: this function is subject to change. Clients shouldn't depend on
 // this function.
-func StorageVersionHash(group, version, kind string) string {
-	gvk := group + "/" + version + "/" + kind
+func StorageVersionHash(clusterName logicalcluster.Name, group, version, kind string) string {
+	gvk := clusterName.String() + "/" + group + "/" + version + "/" + kind
 	if gvk == "" {
 		return ""
 	}

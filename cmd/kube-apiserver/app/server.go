@@ -402,7 +402,7 @@ func buildGenericConfig(
 	kubeVersion := version.Get()
 	genericConfig.Version = &kubeVersion
 
-	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig()
+	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfig(legacyscheme.Scheme, legacyscheme.Codecs)
 	storageFactoryConfig.APIResourceConfig = genericConfig.MergedResourceConfig
 	completedStorageFactoryConfig, err := storageFactoryConfig.Complete(s.Etcd)
 	if err != nil {
