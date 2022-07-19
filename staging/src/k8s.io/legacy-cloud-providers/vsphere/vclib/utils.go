@@ -201,8 +201,9 @@ func VerifyVolumePathsForVMDevices(vmDevices object.VirtualDeviceList, volPaths 
 
 }
 
-// isvCenterDeprecated takes vCenter version and vCenter API version as input and return true if vCenter is deprecated
-func isvCenterDeprecated(vCenterVersion string, vCenterAPIVersion string) (bool, error) {
+// isvCenterNotSupported takes vCenter version and vCenter API version as input and return true if vCenter is no longer
+// supported by VMware for in-tree vSphere volume plugin
+func isvCenterNotSupported(vCenterVersion string, vCenterAPIVersion string) (bool, error) {
 	var vcversion, vcapiversion, minvcversion vcVersion
 	var err error
 	err = vcversion.parse(vCenterVersion)
