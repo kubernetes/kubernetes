@@ -41,7 +41,7 @@ type AutoAPIServiceRegistration interface {
 	// AddAPIServiceToSync adds an API service to auto-register.
 	AddAPIServiceToSync(in *v1.APIService)
 	// RemoveAPIServiceToSync removes an API service to auto-register.
-	RemoveAPIServiceToSync(name string)
+	RemoveAPIServiceToSync(clusterAndName string)
 }
 
 type crdRegistrationController struct {
@@ -122,7 +122,10 @@ func (c *crdRegistrationController) Run(workers int, stopCh <-chan struct{}) {
 	} else {
 		for _, crd := range crds {
 			for _, version := range crd.Spec.Versions {
-				if err := c.syncHandler(schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name}); err != nil {
+				if err := c.syncHandler(schema.GroupVersion{
+					Group:   crd.Spec.Group,
+					Version: version.Name,
+				}); err != nil {
 					utilruntime.HandleError(err)
 				}
 			}
@@ -186,7 +189,10 @@ func (c *crdRegistrationController) processNextWorkItem() bool {
 
 func (c *crdRegistrationController) enqueueCRD(crd *apiextensionsv1.CustomResourceDefinition) {
 	for _, version := range crd.Spec.Versions {
-		c.queue.Add(schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name})
+		c.queue.Add(schema.GroupVersion{
+			Group:   crd.Spec.Group,
+			Version: version.Name,
+		})
 	}
 }
 
@@ -208,7 +214,9 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 			}
 
 			c.apiServiceRegistration.AddAPIServiceToSync(&v1.APIService{
-				ObjectMeta: metav1.ObjectMeta{Name: apiServiceName},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: apiServiceName,
+				},
 				Spec: v1.APIServiceSpec{
 					Group:                groupVersion.Group,
 					Version:              groupVersion.Version,
