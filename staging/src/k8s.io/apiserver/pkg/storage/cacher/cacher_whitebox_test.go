@@ -265,12 +265,14 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 		Storage:        s,
 		Versioner:      testVersioner{},
 		ResourcePrefix: prefix,
-		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
-		GetAttrsFunc:   storage.DefaultNamespaceScopedAttr,
-		NewFunc:        func() runtime.Object { return &example.Pod{} },
-		NewListFunc:    func() runtime.Object { return &example.PodList{} },
-		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
-		Clock:          clock.RealClock{},
+		KeyFunc: func(ctx context.Context, obj runtime.Object) (string, error) {
+			return storage.NamespaceKeyFunc(prefix, obj)
+		},
+		GetAttrsFunc: storage.DefaultNamespaceScopedAttr,
+		NewFunc:      func() runtime.Object { return &example.Pod{} },
+		NewListFunc:  func() runtime.Object { return &example.PodList{} },
+		Codec:        codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:        clock.RealClock{},
 	}
 	cacher, err := NewCacherFromConfig(config)
 	return cacher, testVersioner{}, err

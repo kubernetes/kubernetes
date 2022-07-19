@@ -359,7 +359,7 @@ func (s *DefaultStorageFactory) ResourcePrefix(groupResource schema.GroupResourc
 		}
 	}
 
-	klog.V(6).Infof("DEBUG: prefix for %s=%s", groupResource, etcdResourcePrefix)
+	klog.V(6).Infof("prefix for %s=%s", groupResource, etcdResourcePrefix)
 
 	return etcdResourcePrefix
 }
