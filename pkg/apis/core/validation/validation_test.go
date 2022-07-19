@@ -759,7 +759,7 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerExpand"),
 		},
 		"csi-expansion-enabled-from-longSecretRef-to-longSecretRef": {
-			isExpectedFailure: true,
+			isExpectedFailure: false,
 			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerExpand"),
 			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerExpand"),
 		},
@@ -784,7 +784,7 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerPublish"),
 		},
 		"csi-cntrlpublish-enabled-from-longSecretRef-to-longSecretRef": {
-			isExpectedFailure: true,
+			isExpectedFailure: false,
 			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerPublish"),
 			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "controllerPublish"),
 		},
@@ -809,7 +809,7 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodePublish"),
 		},
 		"csi-nodepublish-enabled-from-longSecretRef-to-longSecretRef": {
-			isExpectedFailure: true,
+			isExpectedFailure: false,
 			oldVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodePublish"),
 			newVolume:         getCSIVolumeWithSecret(validCSIVolume, longSecretRef, "nodePublish"),
 		},
@@ -2745,10 +2745,11 @@ func TestValidateCSIVolumeSource(t *testing.T) {
 
 func TestValidateCSIPersistentVolumeSource(t *testing.T) {
 	testCases := []struct {
-		name     string
-		csi      *core.CSIPersistentVolumeSource
-		errtype  field.ErrorType
-		errfield string
+		name                        string
+		csi                         *core.CSIPersistentVolumeSource
+		errtype                     field.ErrorType
+		errfield                    string
+		allowDNSSubDomainSecretName bool
 	}{
 		{
 			name: "all required fields ok",
@@ -2906,10 +2907,88 @@ func TestValidateCSIPersistentVolumeSource(t *testing.T) {
 			name: "valid nodeExpandSecretRef",
 			csi:  &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodeExpandSecretRef: &core.SecretReference{Name: "foobar", Namespace: "default"}},
 		},
+		{
+			name: "Invalid nodePublishSecretRef",
+			csi:  &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodePublishSecretRef: &core.SecretReference{Name: "foobar", Namespace: "default"}},
+		},
+
+		// tests with allowDNSSubDomainSecretName flag on/off
+		{
+			name:                        "valid nodeExpandSecretRef with allow flag off",
+			csi:                         &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodeExpandSecretRef: &core.SecretReference{Name: strings.Repeat("g", 63), Namespace: "default"}},
+			allowDNSSubDomainSecretName: false,
+		},
+		{
+			name:                        "Invalid nodeExpandSecretRef with allow flag off",
+			csi:                         &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodeExpandSecretRef: &core.SecretReference{Name: strings.Repeat("g", 65), Namespace: "default"}},
+			allowDNSSubDomainSecretName: false,
+			errtype:                     field.ErrorTypeInvalid,
+			errfield:                    "nodeExpandSecretRef.name",
+		},
+		{
+			name:                        "valid nodeExpandSecretRef with allow flag on",
+			csi:                         &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodeExpandSecretRef: &core.SecretReference{Name: strings.Repeat("g", 65), Namespace: "default"}},
+			allowDNSSubDomainSecretName: true,
+		},
+		{
+			name:                        "Invalid nodeExpandSecretRef with allow flag on",
+			csi:                         &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodeExpandSecretRef: &core.SecretReference{Name: strings.Repeat("g", 255), Namespace: "default"}},
+			allowDNSSubDomainSecretName: true,
+			errtype:                     field.ErrorTypeInvalid,
+			errfield:                    "nodeExpandSecretRef.name",
+		},
+		{
+			name:                        "valid nodePublishSecretRef with allow flag off",
+			csi:                         &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodePublishSecretRef: &core.SecretReference{Name: strings.Repeat("g", 63), Namespace: "default"}},
+			allowDNSSubDomainSecretName: false,
+		},
+		{
+			name:                        "Invalid nodePublishSecretRef with allow flag off",
+			csi:                         &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodePublishSecretRef: &core.SecretReference{Name: strings.Repeat("g", 65), Namespace: "default"}},
+			allowDNSSubDomainSecretName: false,
+			errtype:                     field.ErrorTypeInvalid,
+			errfield:                    "nodePublishSecretRef.name",
+		},
+		{
+			name:                        "valid nodePublishSecretRef with allow flag on",
+			csi:                         &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodePublishSecretRef: &core.SecretReference{Name: strings.Repeat("g", 65), Namespace: "default"}},
+			allowDNSSubDomainSecretName: true,
+		},
+		{
+			name:                        "Invalid nodePublishSecretRef with allow flag on",
+			csi:                         &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", NodePublishSecretRef: &core.SecretReference{Name: strings.Repeat("g", 255), Namespace: "default"}},
+			allowDNSSubDomainSecretName: true,
+			errtype:                     field.ErrorTypeInvalid,
+			errfield:                    "nodePublishSecretRef.name",
+		},
+		{
+			name:                        "valid ControllerExpandSecretRef with allow flag off",
+			csi:                         &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerExpandSecretRef: &core.SecretReference{Name: strings.Repeat("g", 63), Namespace: "default"}},
+			allowDNSSubDomainSecretName: false,
+		},
+		{
+			name:                        "Invalid ControllerExpandSecretRef with allow flag off",
+			csi:                         &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerExpandSecretRef: &core.SecretReference{Name: strings.Repeat("g", 65), Namespace: "default"}},
+			allowDNSSubDomainSecretName: false,
+			errtype:                     field.ErrorTypeInvalid,
+			errfield:                    "controllerExpandSecretRef.name",
+		},
+		{
+			name:                        "valid ControllerExpandSecretRef with allow flag on",
+			csi:                         &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerExpandSecretRef: &core.SecretReference{Name: strings.Repeat("g", 65), Namespace: "default"}},
+			allowDNSSubDomainSecretName: true,
+		},
+		{
+			name:                        "Invalid ControllerExpandSecretRef with allow flag on",
+			csi:                         &core.CSIPersistentVolumeSource{Driver: "com.google.gcepd", VolumeHandle: "foobar", ControllerExpandSecretRef: &core.SecretReference{Name: strings.Repeat("g", 255), Namespace: "default"}},
+			allowDNSSubDomainSecretName: true,
+			errtype:                     field.ErrorTypeInvalid,
+			errfield:                    "controllerExpandSecretRef.name",
+		},
 	}
 
 	for i, tc := range testCases {
-		errs := validateCSIPersistentVolumeSource(tc.csi, field.NewPath("field"))
+		errs := validateCSIPersistentVolumeSource(tc.csi, tc.allowDNSSubDomainSecretName, field.NewPath("field"))
 
 		if len(errs) > 0 && tc.errtype == "" {
 			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
@@ -20559,7 +20638,7 @@ func TestValidatePVSecretReference(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			errs := validatePVSecretReference(tt.args.secretRef, tt.args.fldPath)
+			errs := validatePVSecretReference(tt.args.secretRef, false, tt.args.fldPath)
 			if tt.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}
