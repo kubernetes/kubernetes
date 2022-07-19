@@ -65,6 +65,8 @@ func BoilerplatePath() string {
 	// set up paths to check
 	paths := []string{
 		// works when run from root of $GOPATH containing k8s.io/code-generator
+		filepath.Join(reflect.TypeOf(empty{}).PkgPath(), "/../../hack/boilerplate.go.txt"),
+		// works when run outside of $GOPATH
 		filepath.Join(args.DefaultSourceTree(), reflect.TypeOf(empty{}).PkgPath(), "/../../hack/boilerplate.go.txt"),
 		// works when run from root of module vendoring k8s.io/code-generator
 		"vendor/k8s.io/code-generator/hack/boilerplate.go.txt",
