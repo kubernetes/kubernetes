@@ -539,7 +539,17 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#the-resourceversion-parameter
 	isLegacyExact := opts.Limit > 0 && opts.ResourceVersionMatch == ""
 
-	if opts.ResourceVersion == compactedRv && (isExact || isLegacyExact) {
+	// Cacher.GetList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
+	// the limit is respected when testing here.
+	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
+	hasContinuation := pagingEnabled && len(opts.Continue) > 0
+	hasLimit := pagingEnabled && opts.Limit > 0 && opts.ResourceVersion != "0"
+	skipWatchCache := opts.ResourceVersion == "" || hasContinuation || hasLimit || isExact
+	usingWatchCache := watchCacheEnabled && !skipWatchCache
+
+	// Since we trigger a compaction for testing purposes, validating this error makes sense only
+	// if we are serving the LIST request from etcd and not the watch cache.
+	if !usingWatchCache && opts.ResourceVersion == compactedRv && (isExact || isLegacyExact) {
 		if err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
 			t.Fatalf("expected too old error, but got: %v", err)
 		}
@@ -555,14 +565,6 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 		t.Fatalf("Failed to extract list from %v", listObj)
 	}
 	count := int64(len(items))
-
-	// Cacher.GetList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
-	// the limit is respected when testing here.
-	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	hasContinuation := pagingEnabled && len(opts.Continue) > 0
-	hasLimit := pagingEnabled && opts.Limit > 0 && opts.ResourceVersion != "0"
-	skipWatchCache := opts.ResourceVersion == "" || hasContinuation || hasLimit || isExact
-	usingWatchCache := watchCacheEnabled && !skipWatchCache
 
 	if usingWatchCache { // watch cache does not respect limit and is not used for continue
 		if count != 10 {
