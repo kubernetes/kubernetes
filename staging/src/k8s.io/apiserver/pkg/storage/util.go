@@ -22,7 +22,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation/path"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 type SimpleUpdateFunc func(runtime.Object) (runtime.Object, error)
@@ -78,4 +81,22 @@ func (hwm *HighWaterMark) Update(current int64) bool {
 			return true
 		}
 	}
+}
+
+// ShouldDelegateList decides if the LIST request will be served from the underlying storage
+// or from the cache itself.
+func ShouldDelegateList(opts ListOptions) bool {
+	resourceVersion := opts.ResourceVersion
+	pred := opts.Predicate
+	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
+	hasContinuation := pagingEnabled && len(pred.Continue) > 0
+	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
+
+	// If resourceVersion is not specified, serve it from underlying
+	// storage (for backward compatibility). If a continuation is
+	// requested, serve it from the underlying storage as well.
+	// Limits are only sent to storage when resourceVersion is non-zero
+	// since the watch cache isn't able to perform continuations, and
+	// limits are ignored when resource version is zero
+	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
 }

@@ -35,10 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -593,24 +591,6 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	return nil
 }
 
-// NOTICE: Keep in sync with shouldListFromStorage function in
-//  staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
-func shouldDelegateList(opts storage.ListOptions) bool {
-	resourceVersion := opts.ResourceVersion
-	pred := opts.Predicate
-	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	hasContinuation := pagingEnabled && len(pred.Continue) > 0
-	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
-
-	// If resourceVersion is not specified, serve it from underlying
-	// storage (for backward compatibility). If a continuation is
-	// requested, serve it from the underlying storage as well.
-	// Limits are only sent to storage when resourceVersion is non-zero
-	// since the watch cache isn't able to perform continuations, and
-	// limits are ignored when resource version is zero
-	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
-}
-
 func (c *Cacher) listItems(listRV uint64, key string, pred storage.SelectionPredicate, trace *utiltrace.Trace, recursive bool) ([]interface{}, uint64, string, error) {
 	if !recursive {
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(listRV, key, trace)
@@ -630,7 +610,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	recursive := opts.Recursive
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
-	if shouldDelegateList(opts) {
+	if storage.ShouldDelegateList(opts) {
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
