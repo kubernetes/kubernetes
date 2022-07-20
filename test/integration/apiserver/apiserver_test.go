@@ -54,6 +54,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
@@ -556,12 +557,16 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 	}
 	count := int64(len(items))
 
-	// Cacher.GetList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
+	// Cacher.GetList uses this for logic to decide if the watch cache is skipped. We need to know it to know if
 	// the limit is respected when testing here.
-	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	hasContinuation := pagingEnabled && len(opts.Continue) > 0
-	hasLimit := pagingEnabled && opts.Limit > 0 && opts.ResourceVersion != "0"
-	skipWatchCache := opts.ResourceVersion == "" || hasContinuation || hasLimit || isExact
+	skipWatchCache := storage.ShouldDelegateList(storage.ListOptions{
+		Predicate: storage.SelectionPredicate{
+			Limit:    opts.Limit,
+			Continue: opts.Continue,
+		},
+		ResourceVersion:      opts.ResourceVersion,
+		ResourceVersionMatch: opts.ResourceVersionMatch,
+	})
 	usingWatchCache := watchCacheEnabled && !skipWatchCache
 
 	if usingWatchCache { // watch cache does not respect limit and is not used for continue

@@ -19,12 +19,12 @@ package request
 import (
 	"math"
 	"net/http"
-	"net/url"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
@@ -57,7 +57,14 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		// return maximumSeats for this request to be consistent.
 		return WorkEstimate{InitialSeats: maximumSeats}
 	}
-	isListFromCache := !shouldListFromStorage(query, &listOptions)
+	isListFromCache := !storage.ShouldDelegateList(storage.ListOptions{
+		Predicate: storage.SelectionPredicate{
+			Limit:    listOptions.Limit,
+			Continue: listOptions.Continue,
+		},
+		ResourceVersion:      listOptions.ResourceVersion,
+		ResourceVersionMatch: listOptions.ResourceVersionMatch,
+	})
 
 	numStored, err := e.countGetterFn(key(requestInfo))
 	switch {
@@ -129,14 +136,4 @@ func key(requestInfo *apirequest.RequestInfo) string {
 		Resource: requestInfo.Resource,
 	}
 	return groupResource.String()
-}
-
-// NOTICE: Keep in sync with shouldDelegateList function in
-//  staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
-func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
-	resourceVersion := opts.ResourceVersion
-	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	hasContinuation := pagingEnabled && len(opts.Continue) > 0
-	hasLimit := pagingEnabled && opts.Limit > 0 && resourceVersion != "0"
-	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
 }
