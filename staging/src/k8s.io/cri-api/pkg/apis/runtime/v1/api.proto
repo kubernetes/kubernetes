@@ -115,6 +115,9 @@ service RuntimeService {
     // Status returns the status of the runtime.
     rpc Status(StatusRequest) returns (StatusResponse) {}
 
+    // MetricsEndpoints returns the metrics endpoints the runtime would like broadcasted by the Kubelet.
+    rpc MetricsEndpoints(MetricsEndpointsRequest) returns (MetricsEndpointsResponse) {}
+
     // CheckpointContainer checkpoints a container
     rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
 }
@@ -1408,11 +1411,27 @@ message StatusRequest {
 message StatusResponse {
     // Status of the Runtime.
     RuntimeStatus status = 1;
+
     // Info is extra information of the Runtime. The key could be arbitrary string, and
     // value should be in json format. The information could include anything useful for
     // debug, e.g. plugins used by the container runtime.
     // It should only be returned non-empty when Verbose is true.
     map<string, string> info = 2;
+}
+
+message MetricsEndpointsRequest {}
+
+message MetricsEndpointsResponse {
+	repeated MetricsEndpoint endpoints = 1;
+}
+
+message MetricsEndpoint {
+	// host or host:port
+	string host = 1;
+	// Path the Kubelet will register to pull from the source.
+	string forward_path = 2;
+	// Path the runtime will register as the source.
+	string origin_path = 3;
 }
 
 message ImageFsInfoRequest {}

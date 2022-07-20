@@ -107,6 +107,7 @@ type RuntimeService interface {
 	UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeConfig) error
 	// Status returns the status of the runtime.
 	Status(verbose bool) (*runtimeapi.StatusResponse, error)
+	MetricsEndpoints() (*runtimeapi.MetricsEndpointsResponse, error)
 }
 
 // ImageManagerService interface should be implemented by a container image

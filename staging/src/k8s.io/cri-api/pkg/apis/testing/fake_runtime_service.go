@@ -64,6 +64,7 @@ type FakeRuntimeService struct {
 	Errors map[string][]error
 
 	FakeStatus          *runtimeapi.RuntimeStatus
+	FakeEndpoints       []*runtimeapi.MetricsEndpoint
 	Containers          map[string]*FakeContainer
 	Sandboxes           map[string]*FakePodSandbox
 	FakeContainerStats  map[string]*runtimeapi.ContainerStats
@@ -190,6 +191,19 @@ func (r *FakeRuntimeService) Status(verbose bool) (*runtimeapi.StatusResponse, e
 	}
 
 	return &runtimeapi.StatusResponse{Status: r.FakeStatus}, nil
+}
+
+// MetricsEndpoints returns the metrics endpoints the runtime would like broadcasted by the Kubelet.
+func (r *FakeRuntimeService) MetricsEndpoints() (*runtimeapi.MetricsEndpointsResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "MetricsEndpoints")
+	if err := r.popError("MetricsEndpoints"); err != nil {
+		return nil, err
+	}
+
+	return &runtimeapi.MetricsEndpointsResponse{Endpoints: r.FakeEndpoints}, nil
 }
 
 // RunPodSandbox emulates the run of the pod sandbox in the FakeRuntimeService.
