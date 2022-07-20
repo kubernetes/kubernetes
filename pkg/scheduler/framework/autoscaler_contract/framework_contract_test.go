@@ -42,16 +42,15 @@ func TestFrameworkContract(t *testing.T) {
 }
 
 func TestNewFramework(t *testing.T) {
-	stopCh := make(<-chan struct{})
 	var f interface{}
-	if f, _ = runtime.NewFramework(nil, nil, stopCh); f != nil {
+	if f, _ = runtime.NewFramework(nil, nil, nil); f != nil {
 		_, ok := f.(framework.Framework)
-		assert.Equal(t, true, ok)
+		assert.True(t, ok)
 	}
 }
 
 func TestNewCycleState(t *testing.T) {
 	var state interface{} = framework.NewCycleState()
 	_, ok := state.(*framework.CycleState)
-	assert.Equal(t, true, ok)
+	assert.True(t, ok)
 }
