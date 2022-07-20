@@ -323,7 +323,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerNode bool,
 	registerWithTaints []v1.Taint,
 	allowedUnsafeSysctls []string,
-	experimentalMounterPath string,
 	kernelMemcgNotification bool,
 	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
 	minimumGCAge metav1.Duration,
@@ -744,14 +743,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.getPluginsRegistrationDir(), /* sockDir */
 		kubeDeps.Recorder,
 	)
-
-	// If the experimentalMounterPathFlag is set, we do not want to
-	// check node capabilities since the mount path is not the default
-	if len(experimentalMounterPath) != 0 {
-		// Replace the nameserver in containerized-mounter's rootfs/etc/resolv.conf with kubelet.ClusterDNS
-		// so that service name could be resolved
-		klet.dnsConfigurer.SetupDNSinContainerizedMounter(experimentalMounterPath)
-	}
 
 	// setup volumeManager
 	klet.volumeManager = volumemanager.NewVolumeManager(

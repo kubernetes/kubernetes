@@ -365,7 +365,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 		return nil, err
 	}
 
-	mounter := mount.New(s.ExperimentalMounterPath)
+	mounter := mount.New("" /* default mount path */)
 	subpather := subpath.New(mounter)
 	hu := hostutil.NewHostUtil()
 	var pluginRunner = exec.New()
@@ -1144,7 +1144,6 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeServer.RegisterNode,
 		kubeServer.RegisterWithTaints,
 		kubeServer.AllowedUnsafeSysctls,
-		kubeServer.ExperimentalMounterPath,
 		kubeServer.KernelMemcgNotification,
 		kubeServer.ExperimentalNodeAllocatableIgnoreEvictionThreshold,
 		kubeServer.MinimumGCAge,
@@ -1217,7 +1216,6 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerNode bool,
 	registerWithTaints []v1.Taint,
 	allowedUnsafeSysctls []string,
-	experimentalMounterPath string,
 	kernelMemcgNotification bool,
 	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
 	minimumGCAge metav1.Duration,
@@ -1249,7 +1247,6 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		registerNode,
 		registerWithTaints,
 		allowedUnsafeSysctls,
-		experimentalMounterPath,
 		kernelMemcgNotification,
 		experimentalNodeAllocatableIgnoreEvictionThreshold,
 		minimumGCAge,

@@ -100,8 +100,6 @@ type KubeletFlags struct {
 	RemoteRuntimeEndpoint string
 	// remoteImageEndpoint is the endpoint of remote image service
 	RemoteImageEndpoint string
-	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
-	ExperimentalMounterPath string
 	// This flag, if set, will avoid including `EvictionHard` limits while computing Node Allocatable.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	ExperimentalNodeAllocatableIgnoreEvictionThreshold bool
@@ -322,8 +320,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("register-schedulable", "will be removed in a future version")
 	fs.BoolVar(&f.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", f.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
 	fs.MarkDeprecated("keep-terminated-pod-volumes", "will be removed in a future version")
-	fs.StringVar(&f.ExperimentalMounterPath, "experimental-mounter-path", f.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
-	fs.MarkDeprecated("experimental-mounter-path", "will be removed in 1.25 or later. in favor of using CSI.")
 	fs.StringVar(&f.CloudProvider, "cloud-provider", f.CloudProvider, "The provider for cloud services. Set to empty string for running with no cloud provider. If set, the cloud provider determines the name of the node (consult cloud provider documentation to determine if and how the hostname is used).")
 	fs.MarkDeprecated("cloud-provider", "will be removed in 1.25 or later, in favor of removing cloud provider code from Kubelet.")
 	fs.StringVar(&f.CloudConfigFile, "cloud-config", f.CloudConfigFile, "The path to the cloud provider configuration file. Empty string for no configuration file.")

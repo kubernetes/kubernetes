@@ -749,8 +749,6 @@ function construct-linux-kubelet-flags {
   local node_type="$1"
   local flags
   flags="$(construct-common-kubelet-flags)"
-  # Keep in sync with CONTAINERIZED_MOUNTER_HOME in configure-helper.sh
-  flags+=" --experimental-mounter-path=/home/kubernetes/containerized_mounter/mounter"
   # Keep in sync with the mkdir command in configure-helper.sh (until the TODO is resolved)
   flags+=" --cert-dir=/var/lib/kubelet/pki/"
 
