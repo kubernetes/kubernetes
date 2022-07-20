@@ -75,3 +75,60 @@ func TestPortRange(t *testing.T) {
 		}
 	}
 }
+
+func TestSet(t *testing.T) {
+	testCases := []struct {
+		title       string
+		portRange   PortRange
+		value       string
+		expectError bool
+		error       string
+	}{
+		{
+			title:       "hyphenIndex not equal -1",
+			portRange:   PortRange{Base: 10, Size: 20},
+			value:       "100-200",
+			expectError: false,
+		},
+		{
+			title:       "plusIndex not equal -1",
+			portRange:   PortRange{Base: 10, Size: 20},
+			value:       "700+800",
+			expectError: false,
+		},
+		{
+			title:       "plusIndex and hyphenIndex equal -1",
+			portRange:   PortRange{Base: 10, Size: 20},
+			value:       "234",
+			expectError: false,
+		},
+		{
+			title:       "value is empty string",
+			portRange:   PortRange{Base: 10, Size: 20},
+			value:       "",
+			expectError: false,
+		},
+		{
+			title:       "the port range more than 65535",
+			portRange:   PortRange{Base: 10, Size: 20},
+			value:       "70000+80000",
+			expectError: true,
+		},
+		{
+			title:       "unable to parse port range",
+			portRange:   PortRange{Base: 10, Size: 20},
+			value:       "1+-1",
+			expectError: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		error := testCase.portRange.Set(testCase.value)
+		if !testCase.expectError && error != nil {
+			t.Errorf("test case %v has error: %v", testCase.title, error)
+		}
+		if testCase.expectError && error == nil {
+			t.Errorf("test case %v expects error: %v, but now does not have error", testCase.title, testCase.error)
+		}
+	}
+}
