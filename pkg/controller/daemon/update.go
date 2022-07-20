@@ -367,7 +367,7 @@ func (dsc *DaemonSetsController) dedupCurHistories(ctx context.Context, ds *apps
 			return nil, err
 		}
 		for _, pod := range pods {
-			if pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] != keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey] {
+			if pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] == cur.Labels[apps.DefaultDaemonSetUniqueLabelKey] {
 				patchRaw := map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"labels": map[string]interface{}{
