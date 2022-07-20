@@ -33,12 +33,12 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func determineIgnoreNonSemanticUpdatesEnabled() bool {
-	if ignoreNonSemanticUpdatesString, exists := os.LookupEnv("KUBE_APISERVER_IGNORE_NON_SEMANTIC_UPDATES"); exists {
-		if ret, err := strconv.ParseBool(ignoreNonSemanticUpdatesString); err == nil {
+func determineAvoidNoopTimestampUpdatesEnabled() bool {
+	if avoidNoopTimestampUpdatesString, exists := os.LookupEnv("KUBE_APISERVER_AVOID_NOOP_SSA_TIMESTAMP_UPDATES"); exists {
+		if ret, err := strconv.ParseBool(avoidNoopTimestampUpdatesString); err == nil {
 			return ret
 		} else {
-			klog.Errorf("failed to parse envar KUBE_APISERVER_IGNORE_NON_SEMANTIC_UPDATES: %v", err)
+			klog.Errorf("failed to parse envar KUBE_APISERVER_AVOID_NOOP_SSA_TIMESTAMP_UPDATES: %v", err)
 		}
 	}
 
@@ -47,10 +47,10 @@ func determineIgnoreNonSemanticUpdatesEnabled() bool {
 }
 
 var (
-	ignoreNonSemanticUpdatesEnabled = determineIgnoreNonSemanticUpdatesEnabled()
+	avoidNoopTimestampUpdatesEnabled = determineAvoidNoopTimestampUpdatesEnabled()
 )
 
-var ignoreTimestampEqualities = func() conversion.Equalities {
+var avoidTimestampEqualities = func() conversion.Equalities {
 	var eqs = equality.Semantic.Copy()
 
 	err := eqs.AddFunc(
@@ -77,7 +77,7 @@ func IgnoreManagedFieldsTimestampsTransformer(
 	newObj runtime.Object,
 	oldObj runtime.Object,
 ) (res runtime.Object, err error) {
-	if !ignoreNonSemanticUpdatesEnabled {
+	if !avoidNoopTimestampUpdatesEnabled {
 		return newObj, nil
 	}
 
@@ -154,11 +154,11 @@ func IgnoreManagedFieldsTimestampsTransformer(
 	// This condition ensures the managed fields are always compared first. If
 	//	this check fails, the if statement will short circuit. If the check
 	// 	succeeds the slow path is taken which compares entire objects.
-	if !ignoreTimestampEqualities.DeepEqualWithNilDifferentFromEmpty(oldManagedFields, newManagedFields) {
+	if !avoidTimestampEqualities.DeepEqualWithNilDifferentFromEmpty(oldManagedFields, newManagedFields) {
 		return newObj, nil
 	}
 
-	if ignoreTimestampEqualities.DeepEqualWithNilDifferentFromEmpty(newObj, oldObj) {
+	if avoidTimestampEqualities.DeepEqualWithNilDifferentFromEmpty(newObj, oldObj) {
 		// Remove any changed timestamps, so that timestamp is not the only
 		// change seen by etcd.
 		//
