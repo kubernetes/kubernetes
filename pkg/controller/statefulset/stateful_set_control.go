@@ -471,10 +471,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// Enforce the StatefulSet invariants
 		retentionMatch := true
 		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
-			var err error
-			retentionMatch, err = ssc.podControl.ClaimsMatchRetentionPolicy(updateSet, replicas[i])
 			// An error is expected if the pod is not yet fully updated, and so return is treated as matching.
-			if err != nil {
+			if retentionMatch, err = ssc.podControl.ClaimsMatchRetentionPolicy(updateSet, replicas[i]); err != nil {
 				retentionMatch = true
 			}
 		}
@@ -568,7 +566,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 	// we terminate the Pod with the largest ordinal that does not match the update revision.
 	for target := len(replicas) - 1; target >= updateMin; target-- {
-
 		// delete the Pod if it is not already terminating and does not match the update revision.
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
 			klog.V(2).InfoS("Pod of StatefulSet is terminating for update",
@@ -584,8 +581,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[target]))
 			return &status, nil
 		}
-
 	}
+
 	return &status, nil
 }
 
@@ -597,7 +594,6 @@ func updateStatefulSetAfterInvariantEstablished(
 	updateRevision *apps.ControllerRevision,
 	status apps.StatefulSetStatus,
 ) (*apps.StatefulSetStatus, error) {
-
 	replicaCount := int(*set.Spec.Replicas)
 
 	// we compute the minimum ordinal of the target sequence for a destructive update based on the strategy.
@@ -642,23 +638,23 @@ func updateStatefulSetAfterInvariantEstablished(
 
 	deletedPods := 0
 	for target := len(replicas) - 1; target >= updateMin && deletedPods < podsToDelete; target-- {
+		// delete the Pod if it is healthy and the revision doesnt match the target
+		if getPodRevision(replicas[target]) == updateRevision.Name || isTerminating(replicas[target]) {
+			continue
+		}
 
 		// delete the Pod if it is healthy and the revision doesnt match the target
-		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
-			// delete the Pod if it is healthy and the revision doesnt match the target
-			klog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for update",
-				set.Namespace,
-				set.Name,
-				replicas[target].Name)
-			if err := ssc.podControl.DeleteStatefulPod(set, replicas[target]); err != nil {
-				if !errors.IsNotFound(err) {
-					return &status, err
-				}
-			}
-			deletedPods++
-			status.CurrentReplicas--
+		klog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for update",
+			set.Namespace,
+			set.Name,
+			replicas[target].Name)
+		if err := ssc.podControl.DeleteStatefulPod(set, replicas[target]); err != nil && !errors.IsNotFound(err) {
+			return nil, err
 		}
+		deletedPods++
+		status.CurrentReplicas--
 	}
+
 	return &status, nil
 }
 
