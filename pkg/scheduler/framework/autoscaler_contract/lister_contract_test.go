@@ -28,8 +28,7 @@ var _ framework.NodeInfoLister = &nodeInfoListerContract{}
 var _ framework.StorageInfoLister = &storageInfoListerContract{}
 var _ framework.SharedLister = &shareListerContract{}
 
-type nodeInfoListerContract struct {
-}
+type nodeInfoListerContract struct{}
 
 func (c *nodeInfoListerContract) List() ([]*framework.NodeInfo, error) {
 	return nil, nil
