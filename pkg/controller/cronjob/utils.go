@@ -76,14 +76,6 @@ func getNextScheduleTime(cj batchv1.CronJob, now time.Time, schedule cron.Schedu
 		// CronJob as last known start time.
 		earliestTime = cj.ObjectMeta.CreationTimestamp.Time
 	}
-	if cj.Spec.StartingDeadlineSeconds != nil {
-		// Controller is not going to schedule anything below this point
-		schedulingDeadline := now.Add(-time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds))
-
-		if schedulingDeadline.After(earliestTime) {
-			earliestTime = schedulingDeadline
-		}
-	}
 	if earliestTime.After(now) {
 		return nil, nil
 	}
@@ -111,6 +103,7 @@ func getNextScheduleTime(cj batchv1.CronJob, now time.Time, schedule cron.Schedu
 		recorder.Eventf(&cj, corev1.EventTypeWarning, "TooManyMissedTimes", "too many missed start times: %d. Set or decrease .spec.startingDeadlineSeconds or check clock skew", numberOfMissedSchedules)
 		klog.InfoS("too many missed times", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "missed times", numberOfMissedSchedules)
 	}
+
 	return t, err
 }
 
