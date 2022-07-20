@@ -208,6 +208,18 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			if v1.IsNil() != v2.IsNil() {
 				return false
 			}
+
+			// Optimize nil and empty cases
+			// Two lists that are BOTH nil are equal
+			// No need to check v2 is nil since v1.IsNil == v2.IsNil from above
+			if v1.IsNil() {
+				return true
+			}
+
+			// Two lists that are both empty and both non nil are equal
+			if v1.Len() == 0 || v2.Len() == 0 {
+				return true
+			}
 		}
 		if v1.Len() != v2.Len() {
 			return false
