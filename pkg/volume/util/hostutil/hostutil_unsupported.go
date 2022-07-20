@@ -93,7 +93,7 @@ func (hu *HostUtil) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errUnsupported
 }
 
-//GetMode always returns an error on unsupported platforms
+// GetMode always returns an error on unsupported platforms
 func (hu *HostUtil) GetMode(pathname string) (os.FileMode, error) {
 	return 0, errUnsupported
 }

@@ -92,9 +92,10 @@ func getBaseEnv() (*cel.Env, error) {
 // CompilationResult for each ValidationRule, or an error. declType is expected to be a CEL DeclType corresponding
 // to the structural schema.
 // Each CompilationResult may contain:
-/// - non-nil Program, nil Error: The program was compiled successfully
-//  - nil Program, non-nil Error: Compilation resulted in an error
-//  - nil Program, nil Error: The provided rule was empty so compilation was not attempted
+// / - non-nil Program, nil Error: The program was compiled successfully
+//   - nil Program, non-nil Error: Compilation resulted in an error
+//   - nil Program, nil Error: The provided rule was empty so compilation was not attempted
+//
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit as input.
 func Compile(s *schema.Structural, declType *celmodel.DeclType, perCallLimit uint64) ([]CompilationResult, error) {
 	t := time.Now()

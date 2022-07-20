@@ -127,11 +127,11 @@ func NominatedNodeName(pod *v1.Pod) string {
 // The head of PriorityQueue is the highest priority pending pod. This structure
 // has two sub queues and a additional data structure, namely: activeQ,
 // backoffQ and unschedulablePods.
-// - activeQ holds pods that are being considered for scheduling.
-// - backoffQ holds pods that moved from unschedulablePods and will move to
-//   activeQ when their backoff periods complete.
-// - unschedulablePods holds pods that were already attempted for scheduling and
-//   are currently determined to be unschedulable.
+//   - activeQ holds pods that are being considered for scheduling.
+//   - backoffQ holds pods that moved from unschedulablePods and will move to
+//     activeQ when their backoff periods complete.
+//   - unschedulablePods holds pods that were already attempted for scheduling and
+//     are currently determined to be unschedulable.
 type PriorityQueue struct {
 	// PodNominator abstracts the operations to maintain nominated Pods.
 	framework.PodNominator

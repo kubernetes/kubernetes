@@ -36,7 +36,9 @@ import (
 //
 // ```
 // <quantity>        ::= <signedNumber><suffix>
-//   (Note that <suffix> may be empty, from the "" case in <decimalSI>.)
+//
+//	(Note that <suffix> may be empty, from the "" case in <decimalSI>.)
+//
 // <digit>           ::= 0 | 1 | ... | 9
 // <digits>          ::= <digit> | <digit><digits>
 // <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits>
@@ -44,9 +46,13 @@ import (
 // <signedNumber>    ::= <number> | <sign><number>
 // <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI>
 // <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei
-//   (International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)
+//
+//	(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)
+//
 // <decimalSI>       ::= m | "" | k | M | G | T | P | E
-//   (Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
+//
+//	(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)
+//
 // <decimalExponent> ::= "e" <signedNumber> | "E" <signedNumber>
 // ```
 //
@@ -409,10 +415,10 @@ func (Quantity) OpenAPIV3OneOfTypes() []string { return []string{"string", "numb
 // CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
 //
 // Note about BinarySI:
-// * If q.Format is set to BinarySI and q.Amount represents a non-zero value between
-//   -1 and +1, it will be emitted as if q.Format were DecimalSI.
-// * Otherwise, if q.Format is set to BinarySI, fractional parts of q.Amount will be
-//   rounded up. (1.1i becomes 2i.)
+//   - If q.Format is set to BinarySI and q.Amount represents a non-zero value between
+//     -1 and +1, it will be emitted as if q.Format were DecimalSI.
+//   - Otherwise, if q.Format is set to BinarySI, fractional parts of q.Amount will be
+//     rounded up. (1.1i becomes 2i.)
 func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	if q.IsZero() {
 		return zeroBytes, nil

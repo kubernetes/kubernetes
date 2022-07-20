@@ -215,16 +215,16 @@ func (e *quotaEvaluator) checkAttributes(ns string, admissionAttributes []*admis
 
 // checkQuotas checks the admission attributes against the passed quotas.  If a quota applies, it will attempt to update it
 // AFTER it has checked all the admissionAttributes.  The method breaks down into phase like this:
-// 0. make a copy of the quotas to act as a "running" quota so we know what we need to update and can still compare against the
-//    originals
-// 1. check each admission attribute to see if it fits within *all* the quotas.  If it doesn't fit, mark the waiter as failed
-//    and the running quota don't change.  If it did fit, check to see if any quota was changed.  It there was no quota change
-//    mark the waiter as succeeded.  If some quota did change, update the running quotas
-// 2. If no running quota was changed, return now since no updates are needed.
-// 3. for each quota that has changed, attempt an update.  If all updates succeeded, update all unset waiters to success status and return.  If the some
-//    updates failed on conflict errors and we have retries left, re-get the failed quota from our cache for the latest version
-//    and recurse into this method with the subset.  It's safe for us to evaluate ONLY the subset, because the other quota
-//    documents for these waiters have already been evaluated.  Step 1, will mark all the ones that should already have succeeded.
+//  0. make a copy of the quotas to act as a "running" quota so we know what we need to update and can still compare against the
+//     originals
+//  1. check each admission attribute to see if it fits within *all* the quotas.  If it doesn't fit, mark the waiter as failed
+//     and the running quota don't change.  If it did fit, check to see if any quota was changed.  It there was no quota change
+//     mark the waiter as succeeded.  If some quota did change, update the running quotas
+//  2. If no running quota was changed, return now since no updates are needed.
+//  3. for each quota that has changed, attempt an update.  If all updates succeeded, update all unset waiters to success status and return.  If the some
+//     updates failed on conflict errors and we have retries left, re-get the failed quota from our cache for the latest version
+//     and recurse into this method with the subset.  It's safe for us to evaluate ONLY the subset, because the other quota
+//     documents for these waiters have already been evaluated.  Step 1, will mark all the ones that should already have succeeded.
 func (e *quotaEvaluator) checkQuotas(quotas []corev1.ResourceQuota, admissionAttributes []*admissionWaiter, remainingRetries int) {
 	// yet another copy to compare against originals to see if we actually have deltas
 	originalQuotas, err := copyQuotas(quotas)

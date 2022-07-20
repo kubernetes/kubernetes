@@ -131,15 +131,15 @@ func extractFieldPathAsString(obj interface{}, fieldPath string) (string, error)
 
 // splitMaybeSubscriptedPath checks whether the specified fieldPath is
 // subscripted, and
-//  - if yes, this function splits the fieldPath into path and subscript, and
-//    returns (path, subscript, true).
-//  - if no, this function returns (fieldPath, "", false).
+//   - if yes, this function splits the fieldPath into path and subscript, and
+//     returns (path, subscript, true).
+//   - if no, this function returns (fieldPath, "", false).
 //
 // Example inputs and outputs:
-//  - "metadata.annotations['myKey']" --> ("metadata.annotations", "myKey", true)
-//  - "metadata.annotations['a[b]c']" --> ("metadata.annotations", "a[b]c", true)
-//  - "metadata.labels['']"           --> ("metadata.labels", "", true)
-//  - "metadata.labels"               --> ("metadata.labels", "", false)
+//   - "metadata.annotations['myKey']" --> ("metadata.annotations", "myKey", true)
+//   - "metadata.annotations['a[b]c']" --> ("metadata.annotations", "a[b]c", true)
+//   - "metadata.labels[”]"           --> ("metadata.labels", "", true)
+//   - "metadata.labels"               --> ("metadata.labels", "", false)
 func splitMaybeSubscriptedPath(fieldPath string) (string, string, bool) {
 	if !strings.HasSuffix(fieldPath, "']") {
 		return fieldPath, "", false

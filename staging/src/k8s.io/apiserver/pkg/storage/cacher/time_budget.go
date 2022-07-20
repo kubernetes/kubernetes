@@ -30,13 +30,14 @@ const (
 
 // timeBudget implements a budget of time that you can use and is
 // periodically being refreshed. The pattern to use it is:
-//   budget := newTimeBudget(...)
-//   ...
-//   timeout := budget.takeAvailable()
-//   // Now you can spend at most timeout on doing stuff
-//   ...
-//   // If you didn't use all timeout, return what you didn't use
-//   budget.returnUnused(<unused part of timeout>)
+//
+//	budget := newTimeBudget(...)
+//	...
+//	timeout := budget.takeAvailable()
+//	// Now you can spend at most timeout on doing stuff
+//	...
+//	// If you didn't use all timeout, return what you didn't use
+//	budget.returnUnused(<unused part of timeout>)
 //
 // NOTE: It's not recommended to be used concurrently from multiple threads -
 // if first user takes the whole timeout, the second one will get 0 timeout

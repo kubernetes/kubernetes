@@ -197,10 +197,11 @@ func (m *ListAndWatchResponse) GetDevices() []*Device {
 }
 
 // E.g:
-// struct Device {
-//    ID: "GPU-fef8089b-4820-abfc-e83e-94318197576e",
-//    Health: "Healthy",
-//}
+//
+//	struct Device {
+//	   ID: "GPU-fef8089b-4820-abfc-e83e-94318197576e",
+//	   Health: "Healthy",
+//	}
 type Device struct {
 	// A unique ID assigned by the device plugin used
 	// to identify devices during the communication
@@ -258,12 +259,12 @@ func (m *Device) GetHealth() string {
 	return ""
 }
 
-// - Allocate is expected to be called during pod creation since allocation
-//   failures for any container would result in pod startup failure.
-// - Allocate allows kubelet to exposes additional artifacts in a pod's
-//   environment as directed by the plugin.
-// - Allocate allows Device Plugin to run device specific operations on
-//   the Devices requested
+//   - Allocate is expected to be called during pod creation since allocation
+//     failures for any container would result in pod startup failure.
+//   - Allocate allows kubelet to exposes additional artifacts in a pod's
+//     environment as directed by the plugin.
+//   - Allocate allows Device Plugin to run device specific operations on
+//     the Devices requested
 type AllocateRequest struct {
 	DevicesIDs           []string `protobuf:"bytes,1,rep,name=devicesIDs,proto3" json:"devicesIDs,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`

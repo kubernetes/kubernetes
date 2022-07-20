@@ -4083,8 +4083,9 @@ var sysctlContainSlashRegexp = regexp.MustCompile("^" + SysctlContainSlashFmt + 
 // IsValidSysctlName checks that the given string is a valid sysctl name,
 // i.e. matches SysctlContainSlashFmt.
 // More info:
-//   https://man7.org/linux/man-pages/man8/sysctl.8.html
-//   https://man7.org/linux/man-pages/man5/sysctl.d.5.html
+//
+//	https://man7.org/linux/man-pages/man8/sysctl.8.html
+//	https://man7.org/linux/man-pages/man5/sysctl.d.5.html
 func IsValidSysctlName(name string) bool {
 	if len(name) > SysctlMaxLength {
 		return false

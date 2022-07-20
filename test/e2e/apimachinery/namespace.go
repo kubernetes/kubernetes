@@ -203,9 +203,10 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 // This test must run [Serial] due to the impact of running other parallel
 // tests can have on its performance.  Each test that follows the common
 // test framework follows this pattern:
-//   1. Create a Namespace
-//   2. Do work that generates content in that namespace
-//   3. Delete a Namespace
+//  1. Create a Namespace
+//  2. Do work that generates content in that namespace
+//  3. Delete a Namespace
+//
 // Creation of a Namespace is non-trivial since it requires waiting for a
 // ServiceAccount to be generated.
 // Deletion of a Namespace is non-trivial and performance intensive since

@@ -75,13 +75,13 @@ func withFakeUser(handler http.Handler) http.Handler {
 }
 
 // Tests that MaxInFlightLimit works, i.e.
-// - "long" requests such as proxy or watch, identified by regexp are not accounted despite
-//   hanging for the long time,
-// - "short" requests are correctly accounted, i.e. there can be only size of channel passed to the
-//   constructor in flight at any given moment,
-// - subsequent "short" requests are rejected instantly with appropriate error,
-// - subsequent "long" requests are handled normally,
-// - we correctly recover after some "short" requests finish, i.e. we can process new ones.
+//   - "long" requests such as proxy or watch, identified by regexp are not accounted despite
+//     hanging for the long time,
+//   - "short" requests are correctly accounted, i.e. there can be only size of channel passed to the
+//     constructor in flight at any given moment,
+//   - subsequent "short" requests are rejected instantly with appropriate error,
+//   - subsequent "long" requests are handled normally,
+//   - we correctly recover after some "short" requests finish, i.e. we can process new ones.
 func TestMaxInFlightNonMutating(t *testing.T) {
 	const AllowedNonMutatingInflightRequestsNo = 3
 

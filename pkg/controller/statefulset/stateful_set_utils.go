@@ -79,7 +79,7 @@ func getParentName(pod *v1.Pod) string {
 	return parent
 }
 
-//  getOrdinal gets pod's ordinal. If pod has no ordinal, -1 is returned.
+// getOrdinal gets pod's ordinal. If pod has no ordinal, -1 is returned.
 func getOrdinal(pod *v1.Pod) int {
 	_, ordinal := getParentNameAndOrdinal(pod)
 	return ordinal

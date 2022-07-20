@@ -71,8 +71,8 @@ func WriteKubeletDynamicEnvFile(cfg *kubeadmapi.ClusterConfiguration, nodeReg *k
 	return writeKubeletFlagBytesToDisk([]byte(envFileContent), kubeletDir)
 }
 
-//buildKubeletArgMapCommon takes a kubeletFlagsOpts object and builds based on that a string-string map with flags
-//that are common to both Linux and Windows
+// buildKubeletArgMapCommon takes a kubeletFlagsOpts object and builds based on that a string-string map with flags
+// that are common to both Linux and Windows
 func buildKubeletArgMapCommon(opts kubeletFlagsOpts) map[string]string {
 	kubeletFlags := map[string]string{}
 	kubeletFlags["container-runtime-endpoint"] = opts.nodeRegOpts.CRISocket

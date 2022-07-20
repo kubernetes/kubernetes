@@ -54,8 +54,8 @@ func (m *BaseControllerRefManager) CanAdopt(ctx context.Context) error {
 // ClaimObject tries to take ownership of an object for this controller.
 //
 // It will reconcile the following:
-//   * Adopt orphans if the match function returns true.
-//   * Release owned objects if the match function returns false.
+//   - Adopt orphans if the match function returns true.
+//   - Release owned objects if the match function returns false.
 //
 // A non-nil error is returned if some form of reconciliation was attempted and
 // failed. Usually, controllers should try again later in case reconciliation
@@ -143,8 +143,9 @@ type PodControllerRefManager struct {
 // If CanAdopt() returns a non-nil error, all adoptions will fail.
 //
 // NOTE: Once CanAdopt() is called, it will not be called again by the same
-//       PodControllerRefManager instance. Create a new instance if it makes
-//       sense to check CanAdopt() again (e.g. in a different sync pass).
+//
+//	PodControllerRefManager instance. Create a new instance if it makes
+//	sense to check CanAdopt() again (e.g. in a different sync pass).
 func NewPodControllerRefManager(
 	podControl PodControlInterface,
 	controller metav1.Object,
@@ -168,8 +169,8 @@ func NewPodControllerRefManager(
 // ClaimPods tries to take ownership of a list of Pods.
 //
 // It will reconcile the following:
-//   * Adopt orphans if the selector matches.
-//   * Release owned objects if the selector no longer matches.
+//   - Adopt orphans if the selector matches.
+//   - Release owned objects if the selector no longer matches.
 //
 // Optional: If one or more filters are specified, a Pod will only be claimed if
 // all filters return true.
@@ -283,8 +284,9 @@ type ReplicaSetControllerRefManager struct {
 // If CanAdopt() returns a non-nil error, all adoptions will fail.
 //
 // NOTE: Once CanAdopt() is called, it will not be called again by the same
-//       ReplicaSetControllerRefManager instance. Create a new instance if it
-//       makes sense to check CanAdopt() again (e.g. in a different sync pass).
+//
+//	ReplicaSetControllerRefManager instance. Create a new instance if it
+//	makes sense to check CanAdopt() again (e.g. in a different sync pass).
 func NewReplicaSetControllerRefManager(
 	rsControl RSControlInterface,
 	controller metav1.Object,
@@ -306,8 +308,8 @@ func NewReplicaSetControllerRefManager(
 // ClaimReplicaSets tries to take ownership of a list of ReplicaSets.
 //
 // It will reconcile the following:
-//   * Adopt orphans if the selector matches.
-//   * Release owned objects if the selector no longer matches.
+//   - Adopt orphans if the selector matches.
+//   - Release owned objects if the selector no longer matches.
 //
 // A non-nil error is returned if some form of reconciliation was attempted and
 // failed. Usually, controllers should try again later in case reconciliation
@@ -421,8 +423,9 @@ type ControllerRevisionControllerRefManager struct {
 // If canAdopt() returns a non-nil error, all adoptions will fail.
 //
 // NOTE: Once canAdopt() is called, it will not be called again by the same
-//       ControllerRevisionControllerRefManager instance. Create a new instance if it
-//       makes sense to check canAdopt() again (e.g. in a different sync pass).
+//
+//	ControllerRevisionControllerRefManager instance. Create a new instance if it
+//	makes sense to check canAdopt() again (e.g. in a different sync pass).
 func NewControllerRevisionControllerRefManager(
 	crControl ControllerRevisionControlInterface,
 	controller metav1.Object,
@@ -444,8 +447,8 @@ func NewControllerRevisionControllerRefManager(
 // ClaimControllerRevisions tries to take ownership of a list of ControllerRevisions.
 //
 // It will reconcile the following:
-//   * Adopt orphans if the selector matches.
-//   * Release owned objects if the selector no longer matches.
+//   - Adopt orphans if the selector matches.
+//   - Release owned objects if the selector no longer matches.
 //
 // A non-nil error is returned if some form of reconciliation was attempted and
 // failed. Usually, controllers should try again later in case reconciliation

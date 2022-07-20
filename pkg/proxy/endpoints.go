@@ -202,8 +202,10 @@ func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc
 // if items changed, otherwise return false.  Update can be used to add/update/delete items of EndpointsChangeMap.  For example,
 // Add item
 //   - pass <nil, endpoints> as the <previous, current> pair.
+//
 // Update item
 //   - pass <oldEndpoints, endpoints> as the <previous, current> pair.
+//
 // Delete item
 //   - pass <endpoints, nil> as the <previous, current> pair.
 func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {

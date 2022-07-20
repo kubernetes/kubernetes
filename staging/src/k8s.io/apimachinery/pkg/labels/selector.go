@@ -149,7 +149,8 @@ type Requirement struct {
 // (4) If the operator is Exists or DoesNotExist, the value set must be empty.
 // (5) If the operator is Gt or Lt, the values set must contain only one value, which will be interpreted as an integer.
 // (6) The key is invalid due to its length, or sequence
-//     of characters. See validateLabelKey for more details.
+//
+//	of characters. See validateLabelKey for more details.
 //
 // The empty string is a valid value in the input values set.
 // Returned error, if not nil, is guaranteed to be an aggregated field.ErrorList
@@ -208,13 +209,20 @@ func (r *Requirement) hasValue(value string) bool {
 // There is a match in the following cases:
 // (1) The operator is Exists and Labels has the Requirement's key.
 // (2) The operator is In, Labels has the Requirement's key and Labels'
-//     value for that key is in Requirement's value set.
+//
+//	value for that key is in Requirement's value set.
+//
 // (3) The operator is NotIn, Labels has the Requirement's key and
-//     Labels' value for that key is not in Requirement's value set.
+//
+//	Labels' value for that key is not in Requirement's value set.
+//
 // (4) The operator is DoesNotExist or NotIn and Labels does not have the
-//     Requirement's key.
+//
+//	Requirement's key.
+//
 // (5) The operator is GreaterThanOperator or LessThanOperator, and Labels has
-//     the Requirement's key and the corresponding value satisfies mathematical inequality.
+//
+//	the Requirement's key and the corresponding value satisfies mathematical inequality.
 func (r *Requirement) Matches(ls Labels) bool {
 	switch r.operator {
 	case selection.In, selection.Equals, selection.DoubleEquals:
@@ -840,32 +848,33 @@ func (p *Parser) parseExactValue() (sets.String, error) {
 // as they parse different selectors with different syntaxes.
 // The input will cause an error if it does not follow this form:
 //
-//  <selector-syntax>         ::= <requirement> | <requirement> "," <selector-syntax>
-//  <requirement>             ::= [!] KEY [ <set-based-restriction> | <exact-match-restriction> ]
-//  <set-based-restriction>   ::= "" | <inclusion-exclusion> <value-set>
-//  <inclusion-exclusion>     ::= <inclusion> | <exclusion>
-//  <exclusion>               ::= "notin"
-//  <inclusion>               ::= "in"
-//  <value-set>               ::= "(" <values> ")"
-//  <values>                  ::= VALUE | VALUE "," <values>
-//  <exact-match-restriction> ::= ["="|"=="|"!="] VALUE
+//	<selector-syntax>         ::= <requirement> | <requirement> "," <selector-syntax>
+//	<requirement>             ::= [!] KEY [ <set-based-restriction> | <exact-match-restriction> ]
+//	<set-based-restriction>   ::= "" | <inclusion-exclusion> <value-set>
+//	<inclusion-exclusion>     ::= <inclusion> | <exclusion>
+//	<exclusion>               ::= "notin"
+//	<inclusion>               ::= "in"
+//	<value-set>               ::= "(" <values> ")"
+//	<values>                  ::= VALUE | VALUE "," <values>
+//	<exact-match-restriction> ::= ["="|"=="|"!="] VALUE
 //
 // KEY is a sequence of one or more characters following [ DNS_SUBDOMAIN "/" ] DNS_LABEL. Max length is 63 characters.
 // VALUE is a sequence of zero or more characters "([A-Za-z0-9_-\.])". Max length is 63 characters.
 // Delimiter is white space: (' ', '\t')
 // Example of valid syntax:
-//  "x in (foo,,baz),y,z notin ()"
+//
+//	"x in (foo,,baz),y,z notin ()"
 //
 // Note:
-//  (1) Inclusion - " in " - denotes that the KEY exists and is equal to any of the
-//      VALUEs in its requirement
-//  (2) Exclusion - " notin " - denotes that the KEY is not equal to any
-//      of the VALUEs in its requirement or does not exist
-//  (3) The empty string is a valid VALUE
-//  (4) A requirement with just a KEY - as in "y" above - denotes that
-//      the KEY exists and can be any VALUE.
-//  (5) A requirement with just !KEY requires that the KEY not exist.
 //
+//	(1) Inclusion - " in " - denotes that the KEY exists and is equal to any of the
+//	    VALUEs in its requirement
+//	(2) Exclusion - " notin " - denotes that the KEY is not equal to any
+//	    of the VALUEs in its requirement or does not exist
+//	(3) The empty string is a valid VALUE
+//	(4) A requirement with just a KEY - as in "y" above - denotes that
+//	    the KEY exists and can be any VALUE.
+//	(5) A requirement with just !KEY requires that the KEY not exist.
 func Parse(selector string, opts ...field.PathOption) (Selector, error) {
 	parsedSelector, err := parse(selector, field.ToPath(opts...))
 	if err == nil {

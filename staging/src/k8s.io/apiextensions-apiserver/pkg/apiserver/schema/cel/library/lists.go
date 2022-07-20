@@ -32,65 +32,61 @@ import (
 //
 // Returns true if the provided list of comparable elements is sorted, else returns false.
 //
-//     <list<T>>.isSorted() <bool>, T must be a comparable type
+//	<list<T>>.isSorted() <bool>, T must be a comparable type
 //
 // Examples:
 //
-//     [1, 2, 3].isSorted()  // return true
-//     ['a', 'b', 'b', 'c'].isSorted()  // return true
-//     [2.0, 1.0].isSorted()  // return false
-//     [1].isSorted()  // return true
-//     [].isSorted()  // return true
-//
+//	[1, 2, 3].isSorted()  // return true
+//	['a', 'b', 'b', 'c'].isSorted()  // return true
+//	[2.0, 1.0].isSorted()  // return false
+//	[1].isSorted()  // return true
+//	[].isSorted()  // return true
 //
 // sum
 //
 // Returns the sum of the elements of the provided list. Supports CEL number (int, uint, double) and duration types.
 //
-//     <list<T>>.sum() <T>, T must be a numeric type or a duration
+//	<list<T>>.sum() <T>, T must be a numeric type or a duration
 //
 // Examples:
 //
-//     [1, 3].sum() // returns 4
-//     [1.0, 3.0].sum() // returns 4.0
-//     ['1m', '1s'].sum() // returns '1m1s'
-//     emptyIntList.sum() // returns 0
-//     emptyDoubleList.sum() // returns 0.0
-//     [].sum() // returns 0
-//
+//	[1, 3].sum() // returns 4
+//	[1.0, 3.0].sum() // returns 4.0
+//	['1m', '1s'].sum() // returns '1m1s'
+//	emptyIntList.sum() // returns 0
+//	emptyDoubleList.sum() // returns 0.0
+//	[].sum() // returns 0
 //
 // min / max
 //
 // Returns the minimum/maximum valued element of the provided list. Supports all comparable types.
 // If the list is empty, an error is returned.
 //
-//     <list<T>>.min() <T>, T must be a comparable type
-//     <list<T>>.max() <T>, T must be a comparable type
+//	<list<T>>.min() <T>, T must be a comparable type
+//	<list<T>>.max() <T>, T must be a comparable type
 //
 // Examples:
 //
-//     [1, 3].min() // returns 1
-//     [1, 3].max() // returns 3
-//     [].min() // error
-//     [1].min() // returns 1
-//     ([0] + emptyList).min() // returns 0
-//
+//	[1, 3].min() // returns 1
+//	[1, 3].max() // returns 3
+//	[].min() // error
+//	[1].min() // returns 1
+//	([0] + emptyList).min() // returns 0
 //
 // indexOf / lastIndexOf
 //
 // Returns either the first or last positional index of the provided element in the list.
 // If the element is not found, -1 is returned. Supports all equatable types.
 //
-//     <list<T>>.indexOf(<T>) <int>, T must be an equatable type
-//     <list<T>>.lastIndexOf(<T>) <int>, T must be an equatable type
+//	<list<T>>.indexOf(<T>) <int>, T must be an equatable type
+//	<list<T>>.lastIndexOf(<T>) <int>, T must be an equatable type
 //
 // Examples:
 //
-//     [1, 2, 2, 3].indexOf(2) // returns 1
-//     ['a', 'b', 'b', 'c'].lastIndexOf('b') // returns 2
-//     [1.0].indexOf(1.1) // returns -1
-//     [].indexOf('string') // returns -1
-//
+//	[1, 2, 2, 3].indexOf(2) // returns 1
+//	['a', 'b', 'b', 'c'].lastIndexOf('b') // returns 2
+//	[1.0].indexOf(1.1) // returns -1
+//	[].indexOf('string') // returns -1
 func Lists() cel.EnvOption {
 	return cel.Lib(listsLib)
 }

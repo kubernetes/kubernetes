@@ -36,7 +36,9 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-/* This test calculates latency numbers for volume lifecycle operations
+/*
+	This test calculates latency numbers for volume lifecycle operations
+
 1. Create 4 type of storage classes
 2. Read the total number of volumes to be created and volumes per pod
 3. Create total PVCs (number of volumes)

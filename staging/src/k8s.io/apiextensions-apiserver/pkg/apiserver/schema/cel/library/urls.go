@@ -32,41 +32,46 @@ import (
 // Converts a string to a URL or results in an error if the string is not a valid URL. The URL must be an absolute URI
 // or an absolute path.
 //
-//     url(<string>) <URL>
+//	url(<string>) <URL>
 //
 // Examples:
 //
-//     url('https://user:pass@example.com:80/path?query=val#fragment') // returns a URL
-//     url('/absolute-path') // returns a URL
-//     url('https://a:b:c/') // error
-//     url('../relative-path') // error
+//	url('https://user:pass@example.com:80/path?query=val#fragment') // returns a URL
+//	url('/absolute-path') // returns a URL
+//	url('https://a:b:c/') // error
+//	url('../relative-path') // error
 //
 // isURL
 //
 // Returns true if a string is a valid URL. The URL must be an absolute URI or an absolute path.
 //
-//    isURL( <string>) <bool>
+//	isURL( <string>) <bool>
 //
 // Examples:
 //
-//     isURL('https://user:pass@example.com:80/path?query=val#fragment') // returns true
-//     isURL('/absolute-path') // returns true
-//     isURL('https://a:b:c/') // returns false
-//     isURL('../relative-path') // returns false
-//
+//	isURL('https://user:pass@example.com:80/path?query=val#fragment') // returns true
+//	isURL('/absolute-path') // returns true
+//	isURL('https://a:b:c/') // returns false
+//	isURL('../relative-path') // returns false
 //
 // getScheme / getHost / getHostname / getPort / getEscapedPath / getQuery
 //
 // Return the parsed components of a URL.
-// - getScheme: If absent in the URL, returns an empty string.
-// - getHostname: IPv6 addresses are returned with braces, e.g. "[::1]". If absent in the URL, returns an empty string.
-// - getHost: IPv6 addresses are returned without braces, e.g. "::1". If absent in the URL, returns an empty string.
-// - getEscapedPath: The string returned by getEscapedPath is URL escaped, e.g. "with space" becomes "with%20space".
-//                   If absent in the URL, returns an empty string.
-// - getPort: If absent in the URL, returns an empty string.
-// - getQuery: Returns the query parameters in "matrix" form where a repeated query key is interpreted to
-//             mean that there are multiple values for that key. The keys and values are returned unescaped.
-//             If absent in the URL, returns an empty map.
+//
+//   - getScheme: If absent in the URL, returns an empty string.
+//
+//   - getHostname: IPv6 addresses are returned with braces, e.g. "[::1]". If absent in the URL, returns an empty string.
+//
+//   - getHost: IPv6 addresses are returned without braces, e.g. "::1". If absent in the URL, returns an empty string.
+//
+//   - getEscapedPath: The string returned by getEscapedPath is URL escaped, e.g. "with space" becomes "with%20space".
+//     If absent in the URL, returns an empty string.
+//
+//   - getPort: If absent in the URL, returns an empty string.
+//
+//   - getQuery: Returns the query parameters in "matrix" form where a repeated query key is interpreted to
+//     mean that there are multiple values for that key. The keys and values are returned unescaped.
+//     If absent in the URL, returns an empty map.
 //
 //     <URL>.getScheme() <string>
 //     <URL>.getHost() <string>
@@ -77,28 +82,27 @@ import (
 //
 // Examples:
 //
-//     url('/path').getScheme() // returns ''
-//     url('https://example.com/').getScheme() // returns 'https'
-//     url('https://example.com:80/').getHost() // returns 'example.com:80'
-//     url('https://example.com/').getHost() // returns 'example.com'
-//     url('https://[::1]:80/').getHost() // returns '[::1]:80'
-//     url('https://[::1]/').getHost() // returns '[::1]'
-//     url('/path').getHost() // returns ''
-//     url('https://example.com:80/').getHostname() // returns 'example.com'
-//     url('https://127.0.0.1:80/').getHostname() // returns '127.0.0.1'
-//     url('https://[::1]:80/').getHostname() // returns '::1'
-//     url('/path').getHostname() // returns ''
-//     url('https://example.com:80/').getPort() // returns '80'
-//     url('https://example.com/').getPort() // returns ''
-//     url('/path').getPort() // returns ''
-//     url('https://example.com/path').getEscapedPath() // returns '/path'
-//     url('https://example.com/path with spaces/').getEscapedPath() // returns '/path%20with%20spaces/'
-//     url('https://example.com').getEscapedPath() // returns ''
-//     url('https://example.com/path?k1=a&k2=b&k2=c').getQuery() // returns { 'k1': ['a'], 'k2': ['b', 'c']}
-//     url('https://example.com/path?key with spaces=value with spaces').getQuery() // returns { 'key with spaces': ['value with spaces']}
-//     url('https://example.com/path?').getQuery() // returns {}
-//     url('https://example.com/path').getQuery() // returns {}
-//
+//	url('/path').getScheme() // returns ''
+//	url('https://example.com/').getScheme() // returns 'https'
+//	url('https://example.com:80/').getHost() // returns 'example.com:80'
+//	url('https://example.com/').getHost() // returns 'example.com'
+//	url('https://[::1]:80/').getHost() // returns '[::1]:80'
+//	url('https://[::1]/').getHost() // returns '[::1]'
+//	url('/path').getHost() // returns ''
+//	url('https://example.com:80/').getHostname() // returns 'example.com'
+//	url('https://127.0.0.1:80/').getHostname() // returns '127.0.0.1'
+//	url('https://[::1]:80/').getHostname() // returns '::1'
+//	url('/path').getHostname() // returns ''
+//	url('https://example.com:80/').getPort() // returns '80'
+//	url('https://example.com/').getPort() // returns ''
+//	url('/path').getPort() // returns ''
+//	url('https://example.com/path').getEscapedPath() // returns '/path'
+//	url('https://example.com/path with spaces/').getEscapedPath() // returns '/path%20with%20spaces/'
+//	url('https://example.com').getEscapedPath() // returns ''
+//	url('https://example.com/path?k1=a&k2=b&k2=c').getQuery() // returns { 'k1': ['a'], 'k2': ['b', 'c']}
+//	url('https://example.com/path?key with spaces=value with spaces').getQuery() // returns { 'key with spaces': ['value with spaces']}
+//	url('https://example.com/path?').getQuery() // returns {}
+//	url('https://example.com/path').getQuery() // returns {}
 func URLs() cel.EnvOption {
 	return cel.Lib(urlsLib)
 }

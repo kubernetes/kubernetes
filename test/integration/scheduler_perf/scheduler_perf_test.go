@@ -147,12 +147,14 @@ type params struct {
 // UnmarshalJSON is a custom unmarshaler for params.
 //
 // from(json):
-// 	{
-// 		"initNodes": 500,
-// 		"initPods": 50
-// 	}
+//
+//	{
+//		"initNodes": 500,
+//		"initPods": 50
+//	}
 //
 // to:
+//
 //	params{
 //		params: map[string]int{
 //			"intNodes": 500,
@@ -160,7 +162,6 @@ type params struct {
 //		},
 //		isUsed: map[string]bool{}, // empty map
 //	}
-//
 func (p *params) UnmarshalJSON(b []byte) error {
 	aux := map[string]int{}
 

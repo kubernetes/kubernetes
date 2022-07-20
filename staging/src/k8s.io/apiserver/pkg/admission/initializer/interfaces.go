@@ -60,9 +60,10 @@ type WantsDrainedNotification interface {
 // WantsFeatureGate defines a function which passes the featureGates for inspection by an admission plugin.
 // Admission plugins should not hold a reference to the featureGates.  Instead, they should query a particular one
 // and assign it to a simple bool in the admission plugin struct.
-// func (a *admissionPlugin) InspectFeatureGates(features featuregate.FeatureGate){
-//     a.myFeatureIsOn = features.Enabled("my-feature")
-// }
+//
+//	func (a *admissionPlugin) InspectFeatureGates(features featuregate.FeatureGate){
+//	    a.myFeatureIsOn = features.Enabled("my-feature")
+//	}
 type WantsFeatures interface {
 	InspectFeatureGates(featuregate.FeatureGate)
 	admission.InitializationValidator
