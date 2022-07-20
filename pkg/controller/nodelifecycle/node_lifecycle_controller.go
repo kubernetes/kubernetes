@@ -1385,22 +1385,24 @@ func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	zone := nodetopology.GetZoneKey(node)
-	if _, found := nc.zoneStates[zone]; !found {
-		nc.zoneStates[zone] = stateInitial
-		if !nc.runTaintManager {
-			nc.zonePodEvictor[zone] =
-				scheduler.NewRateLimitedTimedQueue(
-					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
-		} else {
-			nc.zoneNoExecuteTainter[zone] =
-				scheduler.NewRateLimitedTimedQueue(
-					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
-		}
-		// Init the metric for the new zone.
-		klog.Infof("Initializing eviction metric for zone: %v", zone)
-		evictionsNumber.WithLabelValues(zone).Add(0)
-		evictionsTotal.WithLabelValues(zone).Add(0)
+	if _, found := nc.zoneStates[zone]; found {
+		return
 	}
+
+	nc.zoneStates[zone] = stateInitial
+	if !nc.runTaintManager {
+		nc.zonePodEvictor[zone] =
+			scheduler.NewRateLimitedTimedQueue(
+				flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
+	} else {
+		nc.zoneNoExecuteTainter[zone] =
+			scheduler.NewRateLimitedTimedQueue(
+				flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
+	}
+	// Init the metric for the new zone.
+	klog.Infof("Initializing eviction metric for zone: %v", zone)
+	evictionsNumber.WithLabelValues(zone).Add(0)
+	evictionsTotal.WithLabelValues(zone).Add(0)
 }
 
 // cancelPodEviction removes any queued evictions, typically because the node is available again. It
