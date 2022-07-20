@@ -282,61 +282,9 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		volumeName = util.GetUniqueVolumeNameFromSpecWithPod(podName, volumePlugin, volumeSpec)
 	}
 
-	var seLinuxFileLabel string
-	// Volume plugin supports SELinux context mount for all its volumes.
-	var pluginSupportsSELinuxContextMount bool
-	// The volume is ReadWriteOncePod. We don't support other volume types in SELinuxMountReadWriteOncePod feature.
-	// Don't use mount option to apply the SELinux context, still, track the context and report metrics of things
-	// that would break if the feature was for all volume access modes.
-	var isRWOP bool
-
-	if feature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
-		pluginSupportsSELinuxContextMount, err = dsw.getSELinuxMountSupport(volumeSpec)
-		if err != nil {
-			return "", err
-		}
-		isRWOP = util.IsRWOP(volumeSpec)
-		if pluginSupportsSELinuxContextMount {
-			// Ensure that a volume that can be mounted with "-o context=XYZ" is
-			// used only by containers with the same SELinux contexts.
-			for _, containerContext := range seLinuxContainerContexts {
-				newLabel, err := util.SELinuxOptionsToFileLabel(containerContext)
-				if err != nil {
-					fullErr := fmt.Errorf("failed to construct SELinux label from context %q: %s", containerContext, err)
-					if isRWOP {
-						// Cannot mount with -o context if the context can't be composed.
-						seLinuxContainerContextErrors.Add(1.0)
-						return "", fullErr
-					} else {
-						// This is not an error yet, but it will be when support for RWO and RWX volumes is added
-						seLinuxContainerContextWarnings.Add(1.0)
-						klog.V(4).ErrorS(err, "Please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file")
-						break
-					}
-				}
-				if seLinuxFileLabel == "" {
-					seLinuxFileLabel = newLabel
-					continue
-				}
-				if seLinuxFileLabel != newLabel {
-					fullErr := fmt.Errorf("volume %s is used with two different SELinux contexts in the same pod: %q, %q", volumeSpec.Name(), seLinuxFileLabel, newLabel)
-					if isRWOP {
-						seLinuxPodContextMismatchErrors.Add(1.0)
-						return "", fullErr
-					} else {
-						// This is not an error yet, but it will be when support for RWO and RWX volumes is added
-						seLinuxPodContextMismatchWarnings.Add(1.0)
-						klog.V(4).ErrorS(err, "Please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file")
-						break
-					}
-				}
-			}
-		} else {
-			// Volume plugin does not support SELinux context mount.
-			// DSW will track this volume with SELinux label "", i.e. no mount with
-			// -o context.
-			seLinuxFileLabel = ""
-		}
+	seLinuxFileLabel, pluginSupportsSELinuxContextMount, err := dsw.getSELinuxLabel(volumeSpec, seLinuxContainerContexts)
+	if err != nil {
+		return "", err
 	}
 	klog.V(4).InfoS("volume final SELinux label decided", "volume", volumeSpec.Name(), "label", seLinuxFileLabel)
 
@@ -383,6 +331,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			if seLinuxFileLabel != vol.seLinuxFileLabel {
 				// TODO: update the error message after tests, e.g. add at least the conflicting pod names.
 				fullErr := fmt.Errorf("conflicting SELinux labels of volume %s: %q and %q", volumeSpec.Name(), vol.seLinuxFileLabel, seLinuxFileLabel)
+				isRWOP := util.IsRWOP(volumeSpec)
 				if isRWOP {
 					seLinuxVolumeContextMismatchErrors.Add(1.0)
 					return "", fullErr
@@ -416,6 +365,62 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		mountRequestTime:    mountRequestTime,
 	}
 	return volumeName, nil
+}
+
+func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinuxContainerContexts []*v1.SELinuxOptions) (string, bool, error) {
+	var seLinuxFileLabel string
+	var pluginSupportsSELinuxContextMount bool
+
+	if feature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		var err error
+		pluginSupportsSELinuxContextMount, err = dsw.getSELinuxMountSupport(volumeSpec)
+		if err != nil {
+			return "", false, err
+		}
+		isRWOP := util.IsRWOP(volumeSpec)
+		if pluginSupportsSELinuxContextMount {
+			// Ensure that a volume that can be mounted with "-o context=XYZ" is
+			// used only by containers with the same SELinux contexts.
+			for _, containerContext := range seLinuxContainerContexts {
+				newLabel, err := util.SELinuxOptionsToFileLabel(containerContext)
+				if err != nil {
+					fullErr := fmt.Errorf("failed to construct SELinux label from context %q: %s", containerContext, err)
+					if isRWOP {
+						// Cannot mount with -o context if the context can't be composed.
+						seLinuxContainerContextErrors.Add(1.0)
+						return "", false, fullErr
+					} else {
+						// This is not an error yet, but it will be when support for RWO and RWX volumes is added
+						seLinuxContainerContextWarnings.Add(1.0)
+						klog.V(4).ErrorS(err, "Please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file")
+						break
+					}
+				}
+				if seLinuxFileLabel == "" {
+					seLinuxFileLabel = newLabel
+					continue
+				}
+				if seLinuxFileLabel != newLabel {
+					fullErr := fmt.Errorf("volume %s is used with two different SELinux contexts in the same pod: %q, %q", volumeSpec.Name(), seLinuxFileLabel, newLabel)
+					if isRWOP {
+						seLinuxPodContextMismatchErrors.Add(1.0)
+						return "", false, fullErr
+					} else {
+						// This is not an error yet, but it will be when support for RWO and RWX volumes is added
+						seLinuxPodContextMismatchWarnings.Add(1.0)
+						klog.V(4).ErrorS(err, "Please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file")
+						break
+					}
+				}
+			}
+		} else {
+			// Volume plugin does not support SELinux context mount.
+			// DSW will track this volume with SELinux label "", i.e. no mount with
+			// -o context.
+			seLinuxFileLabel = ""
+		}
+	}
+	return seLinuxFileLabel, pluginSupportsSELinuxContextMount, nil
 }
 
 func (dsw *desiredStateOfWorld) MarkVolumesReportedInUse(
