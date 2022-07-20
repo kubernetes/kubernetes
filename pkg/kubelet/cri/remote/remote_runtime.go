@@ -1204,3 +1204,24 @@ func (r *remoteRuntimeService) CheckpointContainer(options *runtimeapi.Checkpoin
 
 	return nil
 }
+
+// MetricsEndpoints returns the metrics endpoints the runtime would like broadcasted by the Kubelet.
+func (r *remoteRuntimeService) MetricsEndpoints() (*runtimeapi.MetricsEndpointsResponse, error) {
+	klog.V(10).InfoS("[RemoteRuntimeService] MetricsEndpoints", "timeout", r.timeout)
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	if !r.useV1API() {
+		return nil, errors.New("MetricsEndpoints is only supported in the CRI v1 runtime API")
+	}
+
+	resp, err := r.runtimeClient.MetricsEndpoints(ctx, &runtimeapi.MetricsEndpointsRequest{})
+	if err != nil {
+		klog.ErrorS(err, "MetricsEndpoints from runtime service failed")
+		return nil, err
+	}
+
+	klog.V(10).InfoS("[RemoteRuntimeService] MetricsEndpoints Response", "endpoints", resp.Endpoints)
+
+	return resp, nil
+}

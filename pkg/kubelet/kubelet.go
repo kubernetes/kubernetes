@@ -2485,6 +2485,15 @@ func (kl *Kubelet) CheckpointContainer(
 	return nil
 }
 
+func (kl *Kubelet) MetricsEndpoints() ([]*runtimeapi.MetricsEndpoint, error) {
+	endpoints, err := kl.containerRuntime.MetricsEndpoints()
+	if err != nil {
+		return nil, err
+	}
+
+	return endpoints, nil
+}
+
 // isSyncPodWorthy filters out events that are not worthy of pod syncing
 func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 	// ContainerRemoved doesn't affect pod state

@@ -303,6 +303,11 @@ func (f *RemoteRuntime) Status(ctx context.Context, req *kubeapi.StatusRequest) 
 	return resp, nil
 }
 
+// MetricsEndpoints returns the metrics endpoints the runtime would like broadcasted by the Kubelet.
+func (f *RemoteRuntime) MetricsEndpoints(ctx context.Context, req *kubeapi.MetricsEndpointsRequest) (*kubeapi.MetricsEndpointsResponse, error) {
+	return f.RuntimeService.MetricsEndpoints()
+}
+
 // UpdateContainerResources updates ContainerConfig of the container.
 func (f *RemoteRuntime) UpdateContainerResources(ctx context.Context, req *kubeapi.UpdateContainerResourcesRequest) (*kubeapi.UpdateContainerResourcesResponse, error) {
 	err := f.RuntimeService.UpdateContainerResources(req.ContainerId, req.Linux)

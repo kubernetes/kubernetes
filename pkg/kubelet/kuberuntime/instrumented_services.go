@@ -77,6 +77,15 @@ func (in instrumentedRuntimeService) Status(verbose bool) (*runtimeapi.StatusRes
 	return out, err
 }
 
+func (in instrumentedRuntimeService) MetricsEndpoints() (*runtimeapi.MetricsEndpointsResponse, error) {
+	const operation = "metrics_endpoints"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.MetricsEndpoints()
+	recordError(operation, err)
+	return out, err
+}
+
 func (in instrumentedRuntimeService) CreateContainer(podSandboxID string, config *runtimeapi.ContainerConfig, sandboxConfig *runtimeapi.PodSandboxConfig) (string, error) {
 	const operation = "create_container"
 	defer recordOperation(operation, time.Now())

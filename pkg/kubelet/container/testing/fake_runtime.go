@@ -203,6 +203,14 @@ func (f *FakeRuntime) Status() (*kubecontainer.RuntimeStatus, error) {
 	return f.RuntimeStatus, f.StatusErr
 }
 
+func (f *FakeRuntime) MetricsEndpoints() ([]*runtimeapi.MetricsEndpoint, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "MetricsEndpoints")
+	return []*runtimeapi.MetricsEndpoint{}, f.StatusErr
+}
+
 func (f *FakeRuntime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	f.Lock()
 	defer f.Unlock()

@@ -271,6 +271,21 @@ func (mr *MockRuntimeMockRecorder) ListImages() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListImages", reflect.TypeOf((*MockRuntime)(nil).ListImages))
 }
 
+// MetricsEndpoints mocks base method.
+func (m *MockRuntime) MetricsEndpoints() ([]*v10.MetricsEndpoint, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MetricsEndpoints")
+	ret0, _ := ret[0].([]*v10.MetricsEndpoint)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MetricsEndpoints indicates an expected call of MetricsEndpoints.
+func (mr *MockRuntimeMockRecorder) MetricsEndpoints() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MetricsEndpoints", reflect.TypeOf((*MockRuntime)(nil).MetricsEndpoints))
+}
+
 // PullImage mocks base method.
 func (m *MockRuntime) PullImage(image container.ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *v10.PodSandboxConfig) (string, error) {
 	m.ctrl.T.Helper()

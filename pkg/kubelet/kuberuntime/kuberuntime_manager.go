@@ -340,6 +340,16 @@ func (m *kubeGenericRuntimeManager) Status() (*kubecontainer.RuntimeStatus, erro
 	return toKubeRuntimeStatus(resp.GetStatus()), nil
 }
 
+// MetricsEndpoints returns the metrics endpoints the runtime would like
+// broadcasted by the Kubelet.
+func (m *kubeGenericRuntimeManager) MetricsEndpoints() ([]*runtimeapi.MetricsEndpoint, error) {
+	resp, err := m.runtimeService.MetricsEndpoints()
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetEndpoints(), nil
+}
+
 // GetPods returns a list of containers grouped by pods. The boolean parameter
 // specifies whether the runtime returns all containers including those already
 // exited and dead containers (used for garbage collection).

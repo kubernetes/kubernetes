@@ -72,6 +72,10 @@ type Runtime interface {
 	// Version returns the version information of the container runtime.
 	Version() (Version, error)
 
+	// MetricsEndpoints returns the metrics endpoints the runtime would like
+	// broadcasted by the Kubelet.
+	MetricsEndpoints() ([]*runtimeapi.MetricsEndpoint, error)
+
 	// APIVersion returns the cached API version information of the container
 	// runtime. Implementation is expected to update this cache periodically.
 	// This may be different from the runtime engine's version.
