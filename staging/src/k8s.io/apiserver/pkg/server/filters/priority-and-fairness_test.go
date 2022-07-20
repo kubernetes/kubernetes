@@ -70,8 +70,18 @@ const (
 	decisionSkipFilter
 )
 
-var defaultRequestWorkEstimator = func(req *http.Request, fsName, plName string) fcrequest.WorkEstimate {
-	return fcrequest.WorkEstimate{InitialSeats: 1}
+var defaultRequestWorkEstimate = fcrequest.WorkEstimate{InitialSeats: 1}
+
+type defaultRequestWorkEstimator struct {
+	estimate fcrequest.WorkEstimate
+}
+
+func (e defaultRequestWorkEstimator) Estimate(_ *http.Request, _, _ string) fcrequest.WorkEstimate {
+	return e.estimate
+}
+
+func (e defaultRequestWorkEstimator) RelativeMaximumSeats(_ fcrequest.WorkEstimate) float64 {
+	return float64(e.estimate.MaxSeats()) / 10.0
 }
 
 type fakeApfFilter struct {
@@ -167,7 +177,7 @@ func newApfHandlerWithFilter(t *testing.T, flowControlFilter utilflowcontrol.Int
 
 	apfHandler := WithPriorityAndFairness(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		onExecute()
-	}), longRunningRequestCheck, flowControlFilter, defaultRequestWorkEstimator)
+	}), longRunningRequestCheck, flowControlFilter, defaultRequestWorkEstimator{estimate: defaultRequestWorkEstimate})
 
 	handler := apifilters.WithRequestInfo(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(apirequest.WithUser(r.Context(), &user.DefaultInfo{
@@ -278,7 +288,6 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 		preEnqueue.Wait()
 		if int(atomicReadOnlyWaiting) != concurrentRequests {
 			t.Errorf("Wanted %d requests in queue, got %d", 1, atomicReadOnlyWaiting)
-
 		}
 		postEnqueue.Done()
 		postEnqueue.Wait()
@@ -643,7 +652,7 @@ func TestApfWithRequestDigest(t *testing.T) {
 	handler := WithPriorityAndFairness(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {}),
 		longRunningFunc,
 		fakeFilter,
-		func(_ *http.Request, _, _ string) fcrequest.WorkEstimate { return workExpected },
+		defaultRequestWorkEstimator{estimate: workExpected},
 	)
 
 	w := httptest.NewRecorder()
@@ -1086,7 +1095,8 @@ func fmtError(err error) string {
 }
 
 func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration []runtime.Object, serverConcurrency int,
-	requestWaitLimit time.Duration, plName string, plConcurrency int) (utilflowcontrol.Interface, <-chan error) {
+	requestWaitLimit time.Duration, plName string, plConcurrency int,
+) (utilflowcontrol.Interface, <-chan error) {
 	clientset := newClientset(t, apfConfiguration...)
 	// this test does not rely on resync, so resync period is set to zero
 	factory := informers.NewSharedInformerFactory(clientset, 0)
@@ -1180,7 +1190,7 @@ func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
-	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, defaultRequestWorkEstimator)
+	apfHandler := WithPriorityAndFairness(handler, longRunningRequestCheck, filter, defaultRequestWorkEstimator{estimate: defaultRequestWorkEstimate})
 
 	// add the handler in the chain that adds the specified user to the request context
 	handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

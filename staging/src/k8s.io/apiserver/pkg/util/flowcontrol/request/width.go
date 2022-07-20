@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 )
@@ -64,14 +65,14 @@ type watchCountGetterFunc func(*apirequest.RequestInfo) int
 // NewWorkEstimator estimates the work that will be done by a given request,
 // if no WorkEstimatorFunc matches the given request then the default
 // work estimate of 1 seat is allocated to the request.
-func NewWorkEstimator(objectCountFn objectCountGetterFunc, watchCountFn watchCountGetterFunc, config *WorkEstimatorConfig) WorkEstimatorFunc {
-	estimator := &workEstimator{
-		minimumSeats:          config.MinimumSeats,
+func NewWorkEstimator(
+	objectCountFn objectCountGetterFunc, watchCountFn watchCountGetterFunc, config *apiserver.WorkEstimatorConfiguration,
+) WorkEstimator {
+	return &workEstimator{
 		maximumSeats:          config.MaximumSeats,
 		listWorkEstimator:     newListWorkEstimator(objectCountFn, config),
 		mutatingWorkEstimator: newMutatingWorkEstimator(watchCountFn, config),
 	}
-	return estimator.estimate
 }
 
 // WorkEstimatorFunc returns the estimated work of a given request.
@@ -83,9 +84,18 @@ func (e WorkEstimatorFunc) EstimateWork(r *http.Request, flowSchemaName, priorit
 	return e(r, flowSchemaName, priorityLevelName)
 }
 
+// WorkEstimator is a wrapper around WorkEstimatorFunc that also contains a function for calculating
+// ratio of maximum (of initial and final) estimate divided by the configured bound on the number of
+// seats associated with a request.
+type WorkEstimator interface {
+	// Estimate returns the estimated work of a given request.
+	Estimate(*http.Request, string, string) WorkEstimate
+	// RelativeMaximumSeats calculates a ratio of maximum (of initial and final) estimate divided by
+	// the configured bound on the number of seats associated with a request.
+	RelativeMaximumSeats(WorkEstimate) float64
+}
+
 type workEstimator struct {
-	// the minimum number of seats a request must occupy
-	minimumSeats uint64
 	// the maximum number of seats a request can occupy
 	maximumSeats uint64
 	// listWorkEstimator estimates work for list request(s)
@@ -94,7 +104,8 @@ type workEstimator struct {
 	mutatingWorkEstimator WorkEstimatorFunc
 }
 
-func (e *workEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate {
+// Estimate returns the estimated work of a given request.
+func (e *workEstimator) Estimate(r *http.Request, flowSchemaName, priorityLevelName string) WorkEstimate {
 	requestInfo, ok := apirequest.RequestInfoFrom(r.Context())
 	if !ok {
 		klog.ErrorS(fmt.Errorf("no RequestInfo found in context"), "Failed to estimate work for the request", "URI", r.RequestURI)
@@ -109,5 +120,12 @@ func (e *workEstimator) estimate(r *http.Request, flowSchemaName, priorityLevelN
 		return e.mutatingWorkEstimator.EstimateWork(r, flowSchemaName, priorityLevelName)
 	}
 
-	return WorkEstimate{InitialSeats: e.minimumSeats}
+	return WorkEstimate{InitialSeats: minimumSeats}
+}
+
+// MaximumSeatRatio calculates a ratio of estimated and maximum number of seats
+// associated with a request. The estimated number of seats is a maximum of
+// initial and final seats.
+func (e *workEstimator) RelativeMaximumSeats(estimate WorkEstimate) float64 {
+	return float64(estimate.MaxSeats()) / float64(e.maximumSeats)
 }

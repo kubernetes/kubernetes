@@ -37,13 +37,14 @@ import (
 // If you add something to this list, it should be in a logical grouping.
 // Each of them can be nil to leave the feature unconfigured on ApplyTo.
 type RecommendedOptions struct {
-	Etcd           *EtcdOptions
-	SecureServing  *SecureServingOptionsWithLoopback
-	Authentication *DelegatingAuthenticationOptions
-	Authorization  *DelegatingAuthorizationOptions
-	Audit          *AuditOptions
-	Features       *FeatureOptions
-	CoreAPI        *CoreAPIOptions
+	Etcd                       *EtcdOptions
+	SecureServing              *SecureServingOptionsWithLoopback
+	Authentication             *DelegatingAuthenticationOptions
+	Authorization              *DelegatingAuthorizationOptions
+	Audit                      *AuditOptions
+	Features                   *FeatureOptions
+	CoreAPI                    *CoreAPIOptions
+	PriorityAndFairnessOptions *PriorityAndFairnessOptions
 
 	// FeatureGate is a way to plumb feature gate through if you have them.
 	FeatureGate featuregate.FeatureGate
@@ -67,13 +68,14 @@ func NewRecommendedOptions(prefix string, codec runtime.Codec) *RecommendedOptio
 	sso.HTTP2MaxStreamsPerConnection = 1000
 
 	return &RecommendedOptions{
-		Etcd:           NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, codec)),
-		SecureServing:  sso.WithLoopback(),
-		Authentication: NewDelegatingAuthenticationOptions(),
-		Authorization:  NewDelegatingAuthorizationOptions(),
-		Audit:          NewAuditOptions(),
-		Features:       NewFeatureOptions(),
-		CoreAPI:        NewCoreAPIOptions(),
+		Etcd:                       NewEtcdOptions(storagebackend.NewDefaultConfig(prefix, codec)),
+		SecureServing:              sso.WithLoopback(),
+		Authentication:             NewDelegatingAuthenticationOptions(),
+		Authorization:              NewDelegatingAuthorizationOptions(),
+		Audit:                      NewAuditOptions(),
+		Features:                   NewFeatureOptions(),
+		CoreAPI:                    NewCoreAPIOptions(),
+		PriorityAndFairnessOptions: NewPriorityAndFairnessOptions(),
 		// Wired a global by default that sadly people will abuse to have different meanings in different repos.
 		// Please consider creating your own FeatureGate so you can have a consistent meaning for what a variable contains
 		// across different repos.  Future you will thank you.
@@ -93,6 +95,7 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 	o.Audit.AddFlags(fs)
 	o.Features.AddFlags(fs)
 	o.CoreAPI.AddFlags(fs)
+	o.PriorityAndFairnessOptions.AddFlags(fs)
 	o.Admission.AddFlags(fs)
 	o.EgressSelector.AddFlags(fs)
 	o.Traces.AddFlags(fs)
@@ -130,6 +133,9 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
 		return err
 	}
+	if err := o.PriorityAndFairnessOptions.ApplyTo(&config.PriorityAndFairnessConfig); err != nil {
+		return err
+	}
 	if initializers, err := o.ExtraAdmissionInitializers(config); err != nil {
 		return err
 	} else if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, config.ClientConfig, o.FeatureGate, initializers...); err != nil {
@@ -139,9 +145,8 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 		if config.ClientConfig != nil {
 			if config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight <= 0 {
 				return fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", config.MaxRequestsInFlight, config.MaxMutatingRequestsInFlight)
-
 			}
-			config.FlowControl = utilflowcontrol.New(
+			config.PriorityAndFairness = utilflowcontrol.New(
 				config.SharedInformerFactory,
 				kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta2(),
 				config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,

@@ -26,9 +26,7 @@ import (
 )
 
 func TestWorkEstimator(t *testing.T) {
-	defaultCfg := DefaultWorkEstimatorConfig()
-	minimumSeats := defaultCfg.MinimumSeats
-	maximumSeats := defaultCfg.MaximumSeats
+	defaultCfg := DefaultWorkEstimatorConfiguration()
 
 	tests := []struct {
 		name                      string
@@ -45,7 +43,7 @@ func TestWorkEstimator(t *testing.T) {
 			name:                 "request has no RequestInfo",
 			requestURI:           "http://server/apis/",
 			requestInfo:          nil,
-			initialSeatsExpected: maximumSeats,
+			initialSeatsExpected: defaultCfg.MaximumSeats,
 		},
 		{
 			name:       "request verb is not list",
@@ -66,7 +64,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 799,
 			},
-			initialSeatsExpected: maximumSeats,
+			initialSeatsExpected: defaultCfg.MaximumSeats,
 		},
 		{
 			name:       "request verb is list, has limit and resource version is 1",
@@ -207,7 +205,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 1999,
 			},
-			initialSeatsExpected: maximumSeats,
+			initialSeatsExpected: defaultCfg.MaximumSeats,
 		},
 		{
 			name:       "request verb is list, list from cache, count not known",
@@ -232,7 +230,7 @@ func TestWorkEstimator(t *testing.T) {
 				"events.foo.bar": 799,
 			},
 			countErr:             ObjectCountStaleErr,
-			initialSeatsExpected: maximumSeats,
+			initialSeatsExpected: defaultCfg.MaximumSeats,
 		},
 		{
 			name:       "request verb is list, object count is not found",
@@ -254,7 +252,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			countErr:             errors.New("unknown error"),
-			initialSeatsExpected: maximumSeats,
+			initialSeatsExpected: defaultCfg.MaximumSeats,
 		},
 		{
 			name:       "request verb is create, no watches",
@@ -408,7 +406,7 @@ func TestWorkEstimator(t *testing.T) {
 				req = req.WithContext(apirequest.WithRequestInfo(req.Context(), test.requestInfo))
 			}
 
-			workestimateGot := estimator.EstimateWork(req, "testFS", "testPL")
+			workestimateGot := estimator.Estimate(req, "testFS", "testPL")
 			if test.initialSeatsExpected != workestimateGot.InitialSeats {
 				t.Errorf("Expected work estimate to match: %d initial seats, but got: %d", test.initialSeatsExpected, workestimateGot.InitialSeats)
 			}

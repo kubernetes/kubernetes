@@ -39,6 +39,7 @@ import (
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
@@ -114,8 +115,9 @@ type Config struct {
 	AdmissionControl      admission.Interface
 	CorsAllowedOriginList []string
 	HSTSDirectives        []string
-	// FlowControl, if not nil, gives priority and fairness to request handling
-	FlowControl utilflowcontrol.Interface
+	// PriorityAndFairness, if nil, disables priority and fairness for request handling
+	PriorityAndFairness       utilflowcontrol.Interface
+	PriorityAndFairnessConfig apiserver.PriorityAndFairnessConfiguration
 
 	EnableIndex     bool
 	EnableProfiling bool
@@ -369,6 +371,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		LongRunningFunc:           genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
 		lifecycleSignals:          lifecycleSignals,
 		StorageObjectCountTracker: flowcontrolrequest.NewStorageObjectCountTracker(),
+		PriorityAndFairnessConfig: utilflowcontrol.DefaultConfig(),
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
@@ -717,9 +720,9 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 	const priorityAndFairnessConfigConsumerHookName = "priority-and-fairness-config-consumer"
 	if s.isPostStartHookRegistered(priorityAndFairnessConfigConsumerHookName) {
-	} else if c.FlowControl != nil {
+	} else if c.PriorityAndFairness != nil {
 		err := s.AddPostStartHook(priorityAndFairnessConfigConsumerHookName, func(context PostStartHookContext) error {
-			go c.FlowControl.Run(context.StopCh)
+			go c.PriorityAndFairness.Run(context.StopCh)
 			return nil
 		})
 		if err != nil {
@@ -731,7 +734,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	}
 
 	// Add PostStartHooks for maintaining the watermarks for the Priority-and-Fairness and the Max-in-Flight filters.
-	if c.FlowControl != nil {
+	if c.PriorityAndFairness != nil {
 		const priorityAndFairnessFilterHookName = "priority-and-fairness-filter"
 		if !s.isPostStartHookRegistered(priorityAndFairnessFilterHookName) {
 			err := s.AddPostStartHook(priorityAndFairnessFilterHookName, func(context PostStartHookContext) error {
@@ -809,12 +812,11 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
 	handler = filterlatency.TrackStarted(handler, "authorization")
 
-	if c.FlowControl != nil {
-		workEstimatorCfg := flowcontrolrequest.DefaultWorkEstimatorConfig()
+	if c.PriorityAndFairness != nil {
 		requestWorkEstimator := flowcontrolrequest.NewWorkEstimator(
-			c.StorageObjectCountTracker.Get, c.FlowControl.GetInterestedWatchCount, workEstimatorCfg)
+			c.StorageObjectCountTracker.Get, c.PriorityAndFairness.GetInterestedWatchCount, c.PriorityAndFairnessConfig.WorkEstimator)
 		handler = filterlatency.TrackCompleted(handler)
-		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.FlowControl, requestWorkEstimator)
+		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.PriorityAndFairness, requestWorkEstimator)
 		handler = filterlatency.TrackStarted(handler, "priorityandfairness")
 	} else {
 		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
@@ -893,8 +895,8 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
 	}
-	if c.FlowControl != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
-		c.FlowControl.Install(s.Handler.NonGoRestfulMux)
+	if c.PriorityAndFairness != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
+		c.PriorityAndFairness.Install(s.Handler.NonGoRestfulMux)
 	}
 }
 
@@ -946,7 +948,7 @@ func AuthorizeClientBearerToken(loopback *restclient.Config, authn *Authenticati
 	}
 
 	privilegedLoopbackToken := loopback.BearerToken
-	var uid = uuid.New().String()
+	uid := uuid.New().String()
 	tokens := make(map[string]*user.DefaultInfo)
 	tokens[privilegedLoopbackToken] = &user.DefaultInfo{
 		Name:   user.APIServerUser,

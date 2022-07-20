@@ -295,13 +295,11 @@ var (
 	)
 	apiserverWorkEstimatedSeats = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "work_estimated_seats",
-			Help:      "Number of estimated seats (maximum of initial and final seats) associated with requests in API Priority and Fairness",
-			// the upper bound comes from the maximum number of seats a request
-			// can occupy which is currently set at 10.
-			Buckets:        []float64{1, 2, 4, 10},
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "work_estimated_seats_ratio",
+			Help:           "Ratio of maximum (of initial and final) divided by configured bound on seats associated with requests in API Priority and Fairness",
+			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{priorityLevel, flowSchema},
@@ -355,10 +353,12 @@ func (io *indexOnce) getGauge() RatioedGauge {
 	return io.gauge
 }
 
-var waitingReadonly = indexOnce{labelValues: []string{LabelValueWaiting, epmetrics.ReadOnlyKind}}
-var executingReadonly = indexOnce{labelValues: []string{LabelValueExecuting, epmetrics.ReadOnlyKind}}
-var waitingMutating = indexOnce{labelValues: []string{LabelValueWaiting, epmetrics.MutatingKind}}
-var executingMutating = indexOnce{labelValues: []string{LabelValueExecuting, epmetrics.MutatingKind}}
+var (
+	waitingReadonly   = indexOnce{labelValues: []string{LabelValueWaiting, epmetrics.ReadOnlyKind}}
+	executingReadonly = indexOnce{labelValues: []string{LabelValueExecuting, epmetrics.ReadOnlyKind}}
+	waitingMutating   = indexOnce{labelValues: []string{LabelValueWaiting, epmetrics.MutatingKind}}
+	executingMutating = indexOnce{labelValues: []string{LabelValueExecuting, epmetrics.MutatingKind}}
+)
 
 // GetWaitingReadonlyConcurrency returns the gauge of number of readonly requests waiting / limit on those.
 var GetWaitingReadonlyConcurrency = waitingReadonly.getGauge
@@ -448,8 +448,8 @@ func AddEpochAdvance(ctx context.Context, priorityLevel string, success bool) {
 }
 
 // ObserveWorkEstimatedSeats notes a sampling of estimated seats associated with a request
-func ObserveWorkEstimatedSeats(priorityLevel, flowSchema string, seats int) {
-	apiserverWorkEstimatedSeats.WithLabelValues(priorityLevel, flowSchema).Observe(float64(seats))
+func ObserveWorkEstimatedSeats(priorityLevel, flowSchema string, seatRatio float64) {
+	apiserverWorkEstimatedSeats.WithLabelValues(priorityLevel, flowSchema).Observe(seatRatio)
 }
 
 // AddDispatchWithNoAccommodation keeps track of number of times dispatch attempt results

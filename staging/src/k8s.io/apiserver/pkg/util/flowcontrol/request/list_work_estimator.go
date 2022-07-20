@@ -23,13 +23,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 )
 
-func newListWorkEstimator(countFn objectCountGetterFunc, config *WorkEstimatorConfig) WorkEstimatorFunc {
+func newListWorkEstimator(countFn objectCountGetterFunc, config *apiserver.WorkEstimatorConfiguration) WorkEstimatorFunc {
 	estimator := &listWorkEstimator{
 		config:        config,
 		countGetterFn: countFn,
@@ -38,7 +39,7 @@ func newListWorkEstimator(countFn objectCountGetterFunc, config *WorkEstimatorCo
 }
 
 type listWorkEstimator struct {
-	config        *WorkEstimatorConfig
+	config        *apiserver.WorkEstimatorConfiguration
 	countGetterFn objectCountGetterFunc
 }
 
@@ -82,7 +83,7 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		// when aggregated API calls are overestimated, we allocate the minimum
 		// possible seats (see #109106 as an example when being more conservative
 		// led to problems).
-		return WorkEstimate{InitialSeats: e.config.MinimumSeats}
+		return WorkEstimate{InitialSeats: minimumSeats}
 	case err != nil:
 		// we should never be here since Get returns either ObjectCountStaleErr or
 		// ObjectCountNotFoundErr, return maximumSeats to be on the safe side.
@@ -113,11 +114,11 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 	// will be processed by the list request.
 	// we will come up with a different formula for the transformation function and/or
 	// fine tune this number in future iteratons.
-	seats := uint64(math.Ceil(float64(estimatedObjectsToBeProcessed) / e.config.ObjectsPerSeat))
+	seats := uint64(math.Ceil(float64(estimatedObjectsToBeProcessed) / e.config.ListWorkEstimator.ObjectsPerSeat))
 
 	// make sure we never return a seat of zero
-	if seats < e.config.MinimumSeats {
-		seats = e.config.MinimumSeats
+	if seats < minimumSeats {
+		seats = minimumSeats
 	}
 	if seats > e.config.MaximumSeats {
 		seats = e.config.MaximumSeats

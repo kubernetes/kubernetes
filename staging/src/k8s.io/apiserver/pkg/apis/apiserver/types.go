@@ -166,3 +166,53 @@ type TracingConfiguration struct {
 	// Defaults to 0.
 	SamplingRatePerMillion *int32
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// PriorityAndFairnessConfiguration holds API Priority and Fairness parameters.
+type PriorityAndFairnessConfiguration struct {
+	metav1.TypeMeta
+
+	// WorkEstimatorConfig holds work estimator parameters.
+	// +optional
+	WorkEstimator *WorkEstimatorConfiguration
+}
+
+// WorkEstimatorConfiguration holds work estimator parameters.
+type WorkEstimatorConfiguration struct {
+	// ListWorkEstimator holds work estimator parameters related to list requests.
+	// +optional
+	ListWorkEstimator *ListWorkEstimatorConfiguration
+	// MutatingWorkEstimator holds work estimator parameters
+	// related to requests that mutate watched objects.
+	// +optional
+	MutatingWorkEstimator *MutatingWorkEstimatorConfiguration
+
+	// MaximumSeats is the maximum number of seats a request can occupy
+	// +optional
+	MaximumSeats uint64
+}
+
+// ListWorkEstimatorConfiguration holds work estimator parameters related to list requests.
+type ListWorkEstimatorConfiguration struct {
+	// ObjectsPerSeat is a number of objects from a single list request per seat.
+	// +optional
+	ObjectsPerSeat float64
+}
+
+// MutatingWorkEstimatorConfiguration holds work estimator
+// parameters related to watches of mutating objects.
+type MutatingWorkEstimatorConfiguration struct {
+	// EventAdditionalDuration is the additional amount of time that a mutating request occupies seats
+	// to account for the work involved in sending the corresponding WATCH notifications. Setting its
+	// value to 0 effectively disables this behavior but a request may still occupy seats.
+	// +optional
+	EventAdditionalDuration metav1.Duration
+	// WatchesPerSeat is the ratio between the number of WATCHes that will get notified and
+	// the number of seats occupied for EventAdditionalDuration to account for the work of
+	// sending those notifications. Setting its value to 0 disables mutating work estimator.
+	// Setting its value to a number higher than any number of watches disables this behavior but
+	// a request may still occupy a seat as per EventAdditionalDuration.
+	// +optional
+	WatchesPerSeat float64
+}

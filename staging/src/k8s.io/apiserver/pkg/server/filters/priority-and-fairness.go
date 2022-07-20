@@ -50,8 +50,10 @@ var waitingMark = &requestWatermark{
 	phase: epmetrics.WaitingPhase,
 }
 
-var atomicMutatingExecuting, atomicReadOnlyExecuting int32
-var atomicMutatingWaiting, atomicReadOnlyWaiting int32
+var (
+	atomicMutatingExecuting, atomicReadOnlyExecuting int32
+	atomicMutatingWaiting, atomicReadOnlyWaiting     int32
+)
 
 // newInitializationSignal is defined for testing purposes.
 var newInitializationSignal = utilflowcontrol.NewInitializationSignal
@@ -73,7 +75,7 @@ func WithPriorityAndFairness(
 	handler http.Handler,
 	longRunningRequestCheck apirequest.LongRunningRequestCheck,
 	fcIfc utilflowcontrol.Interface,
-	workEstimator flowcontrolrequest.WorkEstimatorFunc,
+	workEstimator flowcontrolrequest.WorkEstimator,
 ) http.Handler {
 	if fcIfc == nil {
 		klog.Warningf("priority and fairness support not found, skipping")
@@ -114,7 +116,8 @@ func WithPriorityAndFairness(
 				FlowSchemaName:    fs.Name,
 				FlowSchemaUID:     fs.UID,
 				PriorityLevelName: pl.Name,
-				PriorityLevelUID:  pl.UID}
+				PriorityLevelUID:  pl.UID,
+			}
 
 			httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
 			httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))
@@ -127,12 +130,12 @@ func WithPriorityAndFairness(
 				klog.ErrorS(fmt.Errorf("workEstimator is being invoked before classification of the request has completed"),
 					"Using empty FlowSchema and PriorityLevelConfiguration name", "verb", r.Method, "URI", r.RequestURI)
 
-				return workEstimator(r, "", "")
+				return workEstimator.Estimate(r, "", "")
 			}
 
-			workEstimate := workEstimator(r, classification.FlowSchemaName, classification.PriorityLevelName)
+			workEstimate := workEstimator.Estimate(r, classification.FlowSchemaName, classification.PriorityLevelName)
 
-			fcmetrics.ObserveWorkEstimatedSeats(classification.PriorityLevelName, classification.FlowSchemaName, workEstimate.MaxSeats())
+			fcmetrics.ObserveWorkEstimatedSeats(classification.PriorityLevelName, classification.FlowSchemaName, workEstimator.RelativeMaximumSeats(workEstimate))
 			httplog.AddKeyValue(ctx, "apf_iseats", workEstimate.InitialSeats)
 			httplog.AddKeyValue(ctx, "apf_fseats", workEstimate.FinalSeats)
 			httplog.AddKeyValue(ctx, "apf_additionalLatency", workEstimate.AdditionalLatency)

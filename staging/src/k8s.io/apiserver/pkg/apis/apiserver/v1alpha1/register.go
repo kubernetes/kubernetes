@@ -54,6 +54,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	)
 	scheme.AddKnownTypes(ConfigSchemeGroupVersion,
 		&TracingConfiguration{},
+		&PriorityAndFairnessConfiguration{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	metav1.AddToGroupVersion(scheme, ConfigSchemeGroupVersion)

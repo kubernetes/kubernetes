@@ -45,6 +45,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AdmissionConfiguration{},
 		&EgressSelectorConfiguration{},
 		&TracingConfiguration{},
+		&PriorityAndFairnessConfiguration{},
 	)
 	return nil
 }
