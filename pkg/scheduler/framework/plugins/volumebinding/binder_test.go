@@ -33,19 +33,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -94,8 +91,9 @@ var (
 	pvBoundImmediateNode2      = makeTestPV("pv-bound-immediate", "node2", "1G", "1", immediateBoundPVC, immediateClass)
 
 	// PVs for CSI migration
-	migrationPVBound          = makeTestPVForCSIMigration(zone1Labels, boundMigrationPVC)
-	migrationPVBoundToUnbound = makeTestPVForCSIMigration(zone1Labels, unboundPVC)
+	migrationPVBound             = makeTestPVForCSIMigration(zone1Labels, boundMigrationPVC, true)
+	migrationPVBoundToUnbound    = makeTestPVForCSIMigration(zone1Labels, unboundPVC, true)
+	nonmigrationPVBoundToUnbound = makeTestPVForCSIMigration(zone1Labels, unboundPVC, false)
 
 	// storage class names
 	waitClass                = "waitClass"
@@ -693,17 +691,29 @@ func makeTestPV(name, node, capacity, version string, boundToPVC *v1.PersistentV
 	return pv
 }
 
-func makeTestPVForCSIMigration(labels map[string]string, pvc *v1.PersistentVolumeClaim) *v1.PersistentVolume {
+func makeTestPVForCSIMigration(labels map[string]string, pvc *v1.PersistentVolumeClaim, migrationEnabled bool) *v1.PersistentVolume {
 	pv := makeTestPV("pv-migration-bound", "node1", "1G", "1", pvc, waitClass)
 	pv.Spec.NodeAffinity = nil // Will be written by the CSI translation lib
 	pv.ObjectMeta.Labels = labels
-	pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
-		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-			PDName:    "test-disk",
-			FSType:    "ext4",
-			Partition: 0,
-			ReadOnly:  false,
-		},
+	// GCEPersistentDisk is used when migration is enabled, as its featuregate is locked to GA.
+	// RBD is used for the nonmigrated case, as its featuregate is still alpha. When RBD migration goes GA,
+	// a different nonmigrated plugin should be used instead. If there are no other plugins, then the
+	// nonmigrated test case is no longer relevant and can be removed.
+	if migrationEnabled {
+		pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName:    "test-disk",
+				FSType:    "ext4",
+				Partition: 0,
+				ReadOnly:  false,
+			},
+		}
+	} else {
+		pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
+			RBD: &v1.RBDPersistentVolumeSource{
+				RBDImage: "test-disk",
+			},
+		}
 	}
 	return pv
 }
@@ -1216,8 +1226,6 @@ func TestFindPodVolumesWithCSIMigration(t *testing.T) {
 	run := func(t *testing.T, scenario scenarioType) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, true)()
 
 		// Setup
 		testEnv := newTestBinder(t, ctx.Done())
@@ -1775,9 +1783,8 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 		apiPVCs []*v1.PersistentVolumeClaim
 
 		// Expected return values
-		shouldFail       bool
-		expectedBound    bool
-		migrationEnabled bool
+		shouldFail    bool
+		expectedBound bool
 	}
 	scenarios := map[string]scenarioType{
 		"provisioning-pvc-bound": {
@@ -1791,58 +1798,51 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 			expectedBound:   true,
 		},
 		"binding-node-pv-same-zone": {
-			bindings:         []*BindingInfo{makeBinding(unboundPVC, migrationPVBoundToUnbound)},
-			provisionedPVCs:  []*v1.PersistentVolumeClaim{},
-			initPVs:          []*v1.PersistentVolume{migrationPVBoundToUnbound},
-			initPVCs:         []*v1.PersistentVolumeClaim{unboundPVC},
-			initNodes:        []*v1.Node{node1Zone1},
-			initCSINodes:     []*storagev1.CSINode{csiNode1Migrated},
-			migrationEnabled: true,
+			bindings:        []*BindingInfo{makeBinding(unboundPVC, migrationPVBoundToUnbound)},
+			provisionedPVCs: []*v1.PersistentVolumeClaim{},
+			initPVs:         []*v1.PersistentVolume{migrationPVBoundToUnbound},
+			initPVCs:        []*v1.PersistentVolumeClaim{unboundPVC},
+			initNodes:       []*v1.Node{node1Zone1},
+			initCSINodes:    []*storagev1.CSINode{csiNode1Migrated},
 		},
 		"binding-without-csinode": {
-			bindings:         []*BindingInfo{makeBinding(unboundPVC, migrationPVBoundToUnbound)},
-			provisionedPVCs:  []*v1.PersistentVolumeClaim{},
-			initPVs:          []*v1.PersistentVolume{migrationPVBoundToUnbound},
-			initPVCs:         []*v1.PersistentVolumeClaim{unboundPVC},
-			initNodes:        []*v1.Node{node1Zone1},
-			initCSINodes:     []*storagev1.CSINode{},
-			migrationEnabled: true,
+			bindings:        []*BindingInfo{makeBinding(unboundPVC, migrationPVBoundToUnbound)},
+			provisionedPVCs: []*v1.PersistentVolumeClaim{},
+			initPVs:         []*v1.PersistentVolume{migrationPVBoundToUnbound},
+			initPVCs:        []*v1.PersistentVolumeClaim{unboundPVC},
+			initNodes:       []*v1.Node{node1Zone1},
+			initCSINodes:    []*storagev1.CSINode{},
 		},
 		"binding-non-migrated-plugin": {
-			bindings:         []*BindingInfo{makeBinding(unboundPVC, migrationPVBoundToUnbound)},
-			provisionedPVCs:  []*v1.PersistentVolumeClaim{},
-			initPVs:          []*v1.PersistentVolume{migrationPVBoundToUnbound},
-			initPVCs:         []*v1.PersistentVolumeClaim{unboundPVC},
-			initNodes:        []*v1.Node{node1Zone1},
-			initCSINodes:     []*storagev1.CSINode{csiNode1NotMigrated},
-			migrationEnabled: true,
+			bindings:        []*BindingInfo{makeBinding(unboundPVC, migrationPVBoundToUnbound)},
+			provisionedPVCs: []*v1.PersistentVolumeClaim{},
+			initPVs:         []*v1.PersistentVolume{migrationPVBoundToUnbound},
+			initPVCs:        []*v1.PersistentVolumeClaim{unboundPVC},
+			initNodes:       []*v1.Node{node1Zone1},
+			initCSINodes:    []*storagev1.CSINode{csiNode1NotMigrated},
 		},
 		"binding-node-pv-in-different-zones": {
-			bindings:         []*BindingInfo{makeBinding(unboundPVC, migrationPVBoundToUnbound)},
-			provisionedPVCs:  []*v1.PersistentVolumeClaim{},
-			initPVs:          []*v1.PersistentVolume{migrationPVBoundToUnbound},
-			initPVCs:         []*v1.PersistentVolumeClaim{unboundPVC},
-			initNodes:        []*v1.Node{node1Zone2},
-			initCSINodes:     []*storagev1.CSINode{csiNode1Migrated},
-			migrationEnabled: true,
-			shouldFail:       true,
+			bindings:        []*BindingInfo{makeBinding(unboundPVC, migrationPVBoundToUnbound)},
+			provisionedPVCs: []*v1.PersistentVolumeClaim{},
+			initPVs:         []*v1.PersistentVolume{migrationPVBoundToUnbound},
+			initPVCs:        []*v1.PersistentVolumeClaim{unboundPVC},
+			initNodes:       []*v1.Node{node1Zone2},
+			initCSINodes:    []*storagev1.CSINode{csiNode1Migrated},
+			shouldFail:      true,
 		},
 		"binding-node-pv-different-zones-migration-off": {
-			bindings:         []*BindingInfo{makeBinding(unboundPVC, migrationPVBoundToUnbound)},
-			provisionedPVCs:  []*v1.PersistentVolumeClaim{},
-			initPVs:          []*v1.PersistentVolume{migrationPVBoundToUnbound},
-			initPVCs:         []*v1.PersistentVolumeClaim{unboundPVC},
-			initNodes:        []*v1.Node{node1Zone2},
-			initCSINodes:     []*storagev1.CSINode{csiNode1Migrated},
-			migrationEnabled: false,
+			bindings:        []*BindingInfo{makeBinding(unboundPVC, nonmigrationPVBoundToUnbound)},
+			provisionedPVCs: []*v1.PersistentVolumeClaim{},
+			initPVs:         []*v1.PersistentVolume{nonmigrationPVBoundToUnbound},
+			initPVCs:        []*v1.PersistentVolumeClaim{unboundPVC},
+			initNodes:       []*v1.Node{node1Zone2},
+			initCSINodes:    []*storagev1.CSINode{csiNode1Migrated},
 		},
 	}
 
 	run := func(t *testing.T, scenario scenarioType) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, scenario.migrationEnabled)()
 
 		// Setup
 		pod := makePod("test-pod").

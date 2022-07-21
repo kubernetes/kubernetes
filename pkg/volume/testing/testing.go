@@ -250,9 +250,14 @@ func (plugin *FakeVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error)
 	var volumeName string
 	if spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil {
 		volumeName = spec.Volume.GCEPersistentDisk.PDName
+	} else if spec.Volume != nil && spec.Volume.RBD != nil {
+		volumeName = spec.Volume.RBD.RBDImage
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.GCEPersistentDisk != nil {
 		volumeName = spec.PersistentVolume.Spec.GCEPersistentDisk.PDName
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.RBD != nil {
+		volumeName = spec.PersistentVolume.Spec.RBD.RBDImage
 	} else if spec.Volume != nil && spec.Volume.CSI != nil {
 		volumeName = spec.Volume.CSI.Driver
 	}
@@ -671,9 +676,14 @@ func getUniqueVolumeName(spec *volume.Spec) (string, error) {
 	var volumeName string
 	if spec.Volume != nil && spec.Volume.GCEPersistentDisk != nil {
 		volumeName = spec.Volume.GCEPersistentDisk.PDName
+	} else if spec.Volume != nil && spec.Volume.RBD != nil {
+		volumeName = spec.Volume.RBD.RBDImage
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.GCEPersistentDisk != nil {
 		volumeName = spec.PersistentVolume.Spec.GCEPersistentDisk.PDName
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.RBD != nil {
+		volumeName = spec.PersistentVolume.Spec.RBD.RBDImage
 	}
 	if volumeName == "" {
 		volumeName = spec.Name()
