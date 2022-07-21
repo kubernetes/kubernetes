@@ -1605,8 +1605,7 @@ func TestValidationExpressions(t *testing.T) {
 				"dyn([1, 2]).sum() == 3",
 				"dyn([1.0, 2.0]).sum() == 3.0",
 
-				// TODO: enable once type system fix it made to CEL
-				//"[].sum() == 0", // An empty list returns an 0 int
+				"[].sum() == 0", // An empty list returns an 0 int
 			},
 			errors: map[string]string{
 				// return an error for min/max on empty list

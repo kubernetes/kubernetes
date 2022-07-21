@@ -107,8 +107,16 @@ func TestSchemaDeclTypes(t *testing.T) {
 			t.Errorf("missing type in rule types: %s", exp)
 			continue
 		}
-		if !proto.Equal(expType.ExprType(), actType.ExprType()) {
-			t.Errorf("incompatible CEL types. got=%v, wanted=%v", actType.ExprType(), expType.ExprType())
+		expT, err := expType.ExprType()
+		if err != nil {
+			t.Errorf("fail to get cel type: %s", err)
+		}
+		actT, err := actType.ExprType()
+		if err != nil {
+			t.Errorf("fail to get cel type: %s", err)
+		}
+		if !proto.Equal(expT, actT) {
+			t.Errorf("incompatible CEL types. got=%v, wanted=%v", expT, actT)
 		}
 	}
 }
