@@ -393,9 +393,7 @@ func getMatchedLimitedScopes(evaluator quota.Evaluator, inputObject runtime.Obje
 			klog.ErrorS(err, "Error while matching limited Scopes")
 			return []corev1.ScopedResourceSelectorRequirement{}, err
 		}
-		for _, scope := range matched {
-			scopes = append(scopes, scope)
-		}
+		scopes = append(scopes, matched...)
 	}
 	return scopes, nil
 }
@@ -455,9 +453,7 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		if err != nil {
 			return nil, fmt.Errorf("error matching scopes of quota %s, err: %v", resourceQuota.Name, err)
 		}
-		for _, scope := range localRestrictedScopes {
-			restrictedScopes = append(restrictedScopes, scope)
-		}
+		restrictedScopes = append(restrictedScopes, localRestrictedScopes...)
 
 		match, err := evaluator.Matches(&resourceQuota, inputObject)
 		if err != nil {
@@ -595,9 +591,7 @@ func getScopeSelectorsFromQuota(quota corev1.ResourceQuota) []corev1.ScopedResou
 			Operator:  corev1.ScopeSelectorOpExists})
 	}
 	if quota.Spec.ScopeSelector != nil {
-		for _, scopeSelector := range quota.Spec.ScopeSelector.MatchExpressions {
-			selectors = append(selectors, scopeSelector)
-		}
+		selectors = append(selectors, quota.Spec.ScopeSelector.MatchExpressions...)
 	}
 	return selectors
 }
