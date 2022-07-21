@@ -44,6 +44,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
+
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
@@ -60,6 +61,20 @@ func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Serv
 		},
 		Spec: v1.ServiceSpec{
 			Type: serviceType,
+		},
+	}
+}
+
+func newETPLocalService(name string, serviceType v1.ServiceType) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "default",
+			UID:       "777",
+		},
+		Spec: v1.ServiceSpec{
+			Type:                  serviceType,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	}
 }
@@ -96,6 +111,7 @@ func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
 		nodeSyncCh:       make(chan interface{}, 1),
+		lastSyncedNodes:  []*v1.Node{},
 	}
 
 	balancer, _ := cloud.LoadBalancer()
@@ -555,6 +571,193 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				t.Errorf("for case %q, unexpected servicesToRetry: %v", item.desc, servicesToRetry)
 			}
 			compareUpdateCalls(t, item.expectedUpdateCalls, cloud.UpdateCalls)
+		})
+	}
+}
+
+func TestNodeChangesForExternalTrafficPolicyLocalServices(t *testing.T) {
+	node1 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node0"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2NotReady := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}}
+	node2Tainted := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Spec: v1.NodeSpec{Taints: []v1.Taint{{Key: ToBeDeletedTaint}}}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}}
+	node2Unschedulable := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Spec: v1.NodeSpec{Unschedulable: true}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2SpuriousChange := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Phase: v1.NodeTerminated, Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node2Exclude := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: map[string]string{v1.LabelNodeExcludeBalancers: ""}}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+	node3 := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node73"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}}
+
+	type stateChanges struct {
+		nodes       []*v1.Node
+		syncCallErr bool
+	}
+
+	etpLocalservice1 := newETPLocalService("s0", v1.ServiceTypeLoadBalancer)
+	etpLocalservice2 := newETPLocalService("s1", v1.ServiceTypeLoadBalancer)
+	service3 := defaultExternalService()
+
+	services := []*v1.Service{etpLocalservice1, etpLocalservice2, service3}
+
+	for _, tc := range []struct {
+		desc                string
+		expectedUpdateCalls []fakecloud.UpdateBalancerCall
+		stateChanges        []stateChanges
+		initialState        []*v1.Node
+	}{
+		{
+			desc:         "No node changes",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+		},
+		{
+			desc:         "1 new node gets added",
+			initialState: []*v1.Node{node1, node2},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
+				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+			},
+		},
+		{
+			desc:         "1 new node gets added - with retries",
+			initialState: []*v1.Node{node1, node2},
+			stateChanges: []stateChanges{
+				{
+					nodes:       []*v1.Node{node1, node2, node3},
+					syncCallErr: true,
+				},
+				{
+					nodes: []*v1.Node{node1, node2, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2, node3}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2, node3}},
+				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+			},
+		},
+		{
+			desc:         "1 node goes NotReady",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2NotReady, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: service3, Hosts: []*v1.Node{node1, node3}},
+			},
+		},
+		{
+			desc:         "1 node gets Tainted",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2Tainted, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
+				{Service: service3, Hosts: []*v1.Node{node1, node3}},
+			},
+		},
+		{
+			desc:         "1 node goes unschedulable",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2Unschedulable, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
+				{Service: service3, Hosts: []*v1.Node{node1, node3}},
+			},
+		},
+		{
+			desc:         "1 node goes Ready",
+			initialState: []*v1.Node{node1, node2NotReady, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: service3, Hosts: []*v1.Node{node1, node2, node3}},
+			},
+		},
+		{
+			desc:         "1 node get excluded",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2Exclude, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node3}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node3}},
+				{Service: service3, Hosts: []*v1.Node{node1, node3}},
+			},
+		},
+		{
+			desc:         "1 old node gets deleted",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
+				{Service: etpLocalservice1, Hosts: []*v1.Node{node1, node2}},
+				{Service: etpLocalservice2, Hosts: []*v1.Node{node1, node2}},
+				{Service: service3, Hosts: []*v1.Node{node1, node2}},
+			},
+		},
+		{
+			desc:         "1 spurious node update",
+			initialState: []*v1.Node{node1, node2, node3},
+			stateChanges: []stateChanges{
+				{
+					nodes: []*v1.Node{node1, node2SpuriousChange, node3},
+				},
+			},
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{},
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			controller, cloud, _ := newController()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			controller.lastSyncedNodes = tc.initialState
+
+			for _, state := range tc.stateChanges {
+				setupState := func() {
+					controller.nodeLister = newFakeNodeLister(nil, state.nodes...)
+					if state.syncCallErr {
+						cloud.Err = fmt.Errorf("error please")
+					}
+				}
+				cleanupState := func() {
+					cloud.Err = nil
+				}
+				setupState()
+				controller.updateLoadBalancerHosts(ctx, services, 3)
+				cleanupState()
+			}
+
+			compareUpdateCalls(t, tc.expectedUpdateCalls, cloud.UpdateCalls)
 		})
 	}
 }
@@ -2782,7 +2985,7 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 					},
 				},
 			},
-			shouldSync: false,
+			shouldSync: true,
 		},
 		{
 			name: "unschedable T, excluded F->T",
@@ -2822,7 +3025,7 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 					},
 				},
 			},
-			shouldSync: false,
+			shouldSync: true,
 		},
 		{
 			name: "unschedable T, ready F->T",
@@ -3034,7 +3237,7 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 					},
 				},
 			},
-			shouldSync: false,
+			shouldSync: true,
 		},
 		{
 			name: "tainted T, excluded T->F",
@@ -3082,7 +3285,7 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 					},
 				},
 			},
-			shouldSync: false,
+			shouldSync: true,
 		},
 		{
 			name: "tainted T, ready F->T",
@@ -3604,7 +3807,7 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 					},
 				},
 			},
-			shouldSync: false,
+			shouldSync: true,
 		},
 		{
 			name: "ready F, excluded T->F",
@@ -3638,7 +3841,7 @@ func Test_shouldSyncUpdatedNode_compoundedPredicates(t *testing.T) {
 					},
 				},
 			},
-			shouldSync: false,
+			shouldSync: true,
 		},
 	}
 	for _, testcase := range testcases {
