@@ -290,6 +290,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	unhealthy := 0
 	var firstUnhealthyPod *v1.Pod
 
+	recordRetentionPolicyMetrics(set)
+
 	// First we partition pods into two lists valid replicas and condemned Pods
 	for i := range pods {
 		status.Replicas++
@@ -359,6 +361,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// find the first unhealthy Pod
 	for i := range replicas {
 		if !isHealthy(replicas[i]) {
+			unhealthyPodsCounter.WithLabelValues().Inc()
 			unhealthy++
 			if firstUnhealthyPod == nil {
 				firstUnhealthyPod = replicas[i]

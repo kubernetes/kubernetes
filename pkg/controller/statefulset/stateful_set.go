@@ -46,6 +46,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
+func init() {
+	registerMetrics()
+}
+
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
 
@@ -437,7 +441,9 @@ func (ssc *StatefulSetController) worker(ctx context.Context) {
 func (ssc *StatefulSetController) sync(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing statefulset %q (%v)", key, time.Since(startTime))
+		duration := time.Since(startTime)
+		klog.V(4).Infof("Finished syncing statefulset %q (%v)", key, duration)
+		reconcileSeconds.WithLabelValues().Observe(duration.Seconds())
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
