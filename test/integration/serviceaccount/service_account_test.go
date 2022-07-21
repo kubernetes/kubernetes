@@ -25,15 +25,12 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -44,12 +41,13 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
+	clientinformers "k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	"k8s.io/kubernetes/pkg/controlplane"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
@@ -275,7 +273,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Secret not created: %v", err)
 	}
-	roClientConfig := config
+	roClientConfig := *config
 	roClientConfig.BearerToken = string(secret.Data[v1.ServiceAccountTokenKey])
 	roClient := clientset.NewForConfigOrDie(&roClientConfig)
 	doServiceAccountAPIRequests(t, roClient, myns, true, true, false)
@@ -312,7 +310,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Secret not created: %v", err)
 	}
-	rwClientConfig := config
+	rwClientConfig := *config
 	rwClientConfig.BearerToken = string(secret.Data[v1.ServiceAccountTokenKey])
 	rwClient := clientset.NewForConfigOrDie(&rwClientConfig)
 	doServiceAccountAPIRequests(t, rwClient, myns, true, true, true)
@@ -321,27 +319,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 
 // startServiceAccountTestServerAndWaitForCaches returns a started server
 // It is the responsibility of the caller to ensure the returned stopFunc is called
-func startServiceAccountTestServerAndWaitForCaches(t *testing.T) (*clientset.Clientset, restclient.Config, func(), error) {
-	// Listener
-	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
-	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
-	}))
-
-	// Anonymous client config
-	clientConfig := restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}}
-	// Root client
-	// TODO: remove rootClient after we refactor pkg/admission to use the clientset.
-	rootClientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}, BearerToken: rootToken})
-	externalRootClientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}, BearerToken: rootToken})
-
-	externalInformers := informers.NewSharedInformerFactory(externalRootClientset, controller.NoResyncPeriodFunc())
-	informers := informers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())
-
-	// Set up two authenticators:
-	// 1. A token authenticator that maps the rootToken to the "root" user
-	// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens
+func startServiceAccountTestServerAndWaitForCaches(t *testing.T) (*clientset.Clientset, *restclient.Config, func(), error) {
 	rootTokenAuth := authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		if token == rootToken {
 			return &authenticator.Response{User: &user.DefaultInfo{Name: rootUserName}}, true, nil
@@ -349,73 +327,96 @@ func startServiceAccountTestServerAndWaitForCaches(t *testing.T) (*clientset.Cli
 		return nil, false, nil
 	})
 	serviceAccountKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-	serviceAccountTokenGetter := serviceaccountcontroller.NewGetterFromClient(
-		rootClientset,
-		externalInformers.Core().V1().Secrets().Lister(),
-		externalInformers.Core().V1().ServiceAccounts().Lister(),
-		externalInformers.Core().V1().Pods().Lister(),
-	)
-	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer}, []interface{}{&serviceAccountKey.PublicKey}, nil, serviceaccount.NewLegacyValidator(true, serviceAccountTokenGetter))
-	authenticator := group.NewAuthenticatedGroupAdder(union.New(
-		bearertoken.New(rootTokenAuth),
-		bearertoken.New(serviceAccountTokenAuth),
-	))
 
-	// Set up a stub authorizer:
-	// 1. The "root" user is allowed to do anything
-	// 2. ServiceAccounts named "ro" are allowed read-only operations in their namespace
-	// 3. ServiceAccounts named "rw" are allowed any operation in their namespace
-	authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
-		username := ""
-		if user := attrs.GetUser(); user != nil {
-			username = user.GetName()
-		}
-		ns := attrs.GetNamespace()
+	var informers clientinformers.SharedInformerFactory
+	var externalInformers clientinformers.SharedInformerFactory
+	var rootClientset *clientset.Clientset
 
-		// If the user is "root"...
-		if username == rootUserName {
-			// allow them to do anything
-			return authorizer.DecisionAllow, "", nil
-		}
+	// Set up a API server
+	_, clientConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			rootConfig := restclient.CopyConfig(config.GenericConfig.LoopbackClientConfig)
+			rootConfig.BearerToken = rootToken
+			rootClientset = clientset.NewForConfigOrDie(rootConfig)
+			externalRootClientset := clientset.NewForConfigOrDie(rootConfig)
 
-		// If the user is a service account...
-		if serviceAccountNamespace, serviceAccountName, err := serviceaccountapiserver.SplitUsername(username); err == nil {
-			// Limit them to their own namespace
-			if serviceAccountNamespace == ns {
-				switch serviceAccountName {
-				case readOnlyServiceAccountName:
-					if attrs.IsReadOnly() {
-						return authorizer.DecisionAllow, "", nil
-					}
-				case readWriteServiceAccountName:
+			externalInformers = clientinformers.NewSharedInformerFactory(externalRootClientset, controller.NoResyncPeriodFunc())
+			informers = clientinformers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())
+
+			// Set up two authenticators:
+			// 1. A token authenticator that maps the rootToken to the "root" user
+			// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens
+			serviceAccountTokenGetter := serviceaccountcontroller.NewGetterFromClient(
+				rootClientset,
+				externalInformers.Core().V1().Secrets().Lister(),
+				externalInformers.Core().V1().ServiceAccounts().Lister(),
+				externalInformers.Core().V1().Pods().Lister(),
+			)
+			serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator(
+				[]string{serviceaccount.LegacyIssuer},
+				[]interface{}{&serviceAccountKey.PublicKey},
+				nil,
+				serviceaccount.NewLegacyValidator(true, serviceAccountTokenGetter),
+			)
+			authenticator := group.NewAuthenticatedGroupAdder(union.New(
+				bearertoken.New(rootTokenAuth),
+				bearertoken.New(serviceAccountTokenAuth),
+			))
+
+			// Set up a stub authorizer:
+			// 1. The "root" user is allowed to do anything
+			// 2. ServiceAccounts named "ro" are allowed read-only operations in their namespace
+			// 3. ServiceAccounts named "rw" are allowed any operation in their namespace
+			authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+				username := ""
+				if user := attrs.GetUser(); user != nil {
+					username = user.GetName()
+				}
+				ns := attrs.GetNamespace()
+
+				// If the user is "root"...
+				if username == rootUserName {
+					// allow them to do anything
 					return authorizer.DecisionAllow, "", nil
 				}
-			}
-		}
 
-		return authorizer.DecisionNoOpinion, fmt.Sprintf("User %s is denied (ns=%s, readonly=%v, resource=%s)", username, ns, attrs.IsReadOnly(), attrs.GetResource()), nil
+				// If the user is a service account...
+				if serviceAccountNamespace, serviceAccountName, err := serviceaccountapiserver.SplitUsername(username); err == nil {
+					// Limit them to their own namespace
+					if serviceAccountNamespace == ns {
+						switch serviceAccountName {
+						case readOnlyServiceAccountName:
+							if attrs.IsReadOnly() {
+								return authorizer.DecisionAllow, "", nil
+							}
+						case readWriteServiceAccountName:
+							return authorizer.DecisionAllow, "", nil
+						}
+					}
+				}
+
+				return authorizer.DecisionNoOpinion, fmt.Sprintf("User %s is denied (ns=%s, readonly=%v, resource=%s)", username, ns, attrs.IsReadOnly(), attrs.GetResource()), nil
+			})
+
+			// Set up admission plugin to auto-assign serviceaccounts to pods
+			serviceAccountAdmission := serviceaccountadmission.NewServiceAccount()
+			serviceAccountAdmission.SetExternalKubeClientSet(externalRootClientset)
+			serviceAccountAdmission.SetExternalKubeInformerFactory(externalInformers)
+
+			config.GenericConfig.EnableIndex = true
+			config.GenericConfig.Authentication.Authenticator = authenticator
+			config.GenericConfig.Authorization.Authorizer = authorizer
+			config.GenericConfig.AdmissionControl = serviceAccountAdmission
+		},
 	})
 
-	// Set up admission plugin to auto-assign serviceaccounts to pods
-	serviceAccountAdmission := serviceaccountadmission.NewServiceAccount()
-	serviceAccountAdmission.SetExternalKubeClientSet(externalRootClientset)
-	serviceAccountAdmission.SetExternalKubeInformerFactory(externalInformers)
-
-	controlPlaneConfig := framework.NewControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.EnableIndex = true
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = authenticator
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizer
-	controlPlaneConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
-	_, _, kubeAPIServerCloseFn := framework.RunAnAPIServerUsingServer(controlPlaneConfig, apiServer, h)
-
-	// Start the service account and service account token controllers
 	ctx, cancel := context.WithCancel(context.Background())
 	stop := func() {
 		cancel()
-		kubeAPIServerCloseFn()
-		apiServer.Close()
+		tearDownFn()
 	}
 
+	// Start the service account and service account token controllers
 	tokenGenerator, err := serviceaccount.JWTTokenGenerator(serviceaccount.LegacyIssuer, serviceAccountKey)
 	if err != nil {
 		return rootClientset, clientConfig, stop, err
