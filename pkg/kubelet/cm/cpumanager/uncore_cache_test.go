@@ -8,87 +8,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"math"
-	"reflect"
 	"testing"
 	"time"
 )
-
-func cpusetForCPUTopology(topo *topology.CPUTopology) cpuset.CPUSet {
-	// Many of the test cases use cpuset.CPUSet based on the topology
-	//elems := makeRange(0, topo.NumCPUs-1)
-	//result := cpuset.NewCPUSet(elems...)
-	// TODO filters and masks?
-	result := topo.CPUDetails.CPUs()
-	return result
-}
-
-func makeRange(min, max int) []int {
-	// from Stack Overflow:
-	// There is no equivalent to PHP's range in the Go standard library.
-	// You have to create one yourself.                               <-- NEAT!
-	// The simplest is to use a for loop:
-	a := make([]int, max-min+1)
-	for i := range a {
-		a[i] = min + i
-	}
-	return a
-}
-
-func TestCPUAccumulatorFreeCPUsUncoreCacheEnabledLegacy(t *testing.T) {
-	testCases := []struct {
-		description   string
-		topo          *topology.CPUTopology
-		availableCPUs cpuset.CPUSet
-		expect        []int
-	}{
-		{
-			"single socket HT, 8 cpus free",
-			topoSingleSocketHT,
-			cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
-			[]int{0, 4, 1, 5, 2, 6, 3, 7},
-		},
-		{
-			"single socket HT, 5 cpus free",
-			topoSingleSocketHT,
-			cpuset.NewCPUSet(3, 4, 5, 6, 7),
-			[]int{4, 5, 6, 3, 7},
-		},
-		{
-			"dual socket HT, 12 cpus free",
-			topoDualSocketHT,
-			cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
-			[]int{0, 6, 2, 8, 4, 10, 1, 7, 3, 9, 5, 11},
-		},
-		{
-			"dual socket HT, 11 cpus free",
-			topoDualSocketHT,
-			cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
-			[]int{6, 2, 8, 4, 10, 1, 7, 3, 9, 5, 11},
-		},
-		{
-			"dual socket HT, 10 cpus free",
-			topoDualSocketHT,
-			cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
-			[]int{2, 8, 4, 10, 1, 7, 3, 9, 5, 11},
-		},
-		{
-			"dual socket HT, 10 cpus free",
-			topoDualSocketHT,
-			cpuset.NewCPUSet(0, 1, 2, 3, 4, 6, 7, 8, 9, 10),
-			[]int{1, 7, 3, 9, 0, 6, 2, 8, 4, 10},
-		},
-	}
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			acc := newCPUAccumulator(tc.topo, tc.availableCPUs, 0)
-			result := acc.freeCPUs()
-			if !reflect.DeepEqual(result, tc.expect) {
-				t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expect)
-			}
-		})
-	}
-}
 
 func TestTakeByTopologyUncoreCacheEnabledLegacy(t *testing.T) {
 	testCases := []struct {
@@ -177,7 +99,6 @@ func TestTakeByTopologyUncoreCacheEnabledLegacy(t *testing.T) {
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
 	for _, tc := range testCases {
-		// Apply t.Run() test pattern
 		t.Run(tc.description, func(t *testing.T) {
 			result, err := takeByTopologyNUMAPacked(tc.topo, tc.availableCPUs, tc.numCPUs)
 			if tc.expErr != "" && err.Error() != tc.expErr {
@@ -191,68 +112,6 @@ func TestTakeByTopologyUncoreCacheEnabledLegacy(t *testing.T) {
 }
 
 var (
-	topoDualUncoreCacheSingleSocketHT = &topology.CPUTopology{
-		NumCPUs:    16,
-		NumSockets: 1,
-		NumCores:   8,
-		CPUDetails: map[int]topology.CPUInfo{
-			0:  {CoreID: 0, SocketID: 0, UnCoreCacheID: 0},
-			1:  {CoreID: 0, SocketID: 0, UnCoreCacheID: 0},
-			2:  {CoreID: 1, SocketID: 0, UnCoreCacheID: 0},
-			3:  {CoreID: 1, SocketID: 0, UnCoreCacheID: 0},
-			4:  {CoreID: 2, SocketID: 0, UnCoreCacheID: 0},
-			5:  {CoreID: 2, SocketID: 0, UnCoreCacheID: 0},
-			6:  {CoreID: 3, SocketID: 0, UnCoreCacheID: 0},
-			7:  {CoreID: 3, SocketID: 0, UnCoreCacheID: 0},
-			8:  {CoreID: 4, SocketID: 0, UnCoreCacheID: 1},
-			9:  {CoreID: 4, SocketID: 0, UnCoreCacheID: 1},
-			10: {CoreID: 5, SocketID: 0, UnCoreCacheID: 1},
-			11: {CoreID: 5, SocketID: 0, UnCoreCacheID: 1},
-			12: {CoreID: 6, SocketID: 0, UnCoreCacheID: 1},
-			13: {CoreID: 6, SocketID: 0, UnCoreCacheID: 1},
-			14: {CoreID: 7, SocketID: 0, UnCoreCacheID: 1},
-			15: {CoreID: 7, SocketID: 0, UnCoreCacheID: 1},
-		},
-	}
-
-	// FIXME comment from jfbai: topoDualUncoreCacheSingleSocketHT = &topology.CPUTopology{
-	// NumCPUs: 12,
-	// NumSockets: 2,
-	// NumCores: 6,
-	// NumUnCoreCaches: 4,
-	// CPUDetails: map[int]topology.CPUInfo{
-	//  0: {CoreID: 0, SocketID: 0, UnCoreCacheID: 0},
-	//  1: {CoreID: 0, SocketID: 0, UnCoreCacheID: 0},
-	//  2: {CoreID: 1, SocketID: 0, UnCoreCacheID: 0},
-	//  3: {CoreID: 1, SocketID: 0, UnCoreCacheID: 0},
-	//  4: {CoreID: 2, SocketID: 0, UnCoreCacheID: 1},
-	//  5: {CoreID: 2, SocketID: 0, UnCoreCacheID: 1},
-	//  6: {CoreID: 3, SocketID: 1, UnCoreCacheID: 8},
-	//  7: {CoreID: 3, SocketID: 1, UnCoreCacheID: 8},
-	//  8: {CoreID: 4, SocketID: 1, UnCoreCacheID: 8},
-	//  9: {CoreID: 4, SocketID: 1, UnCoreCacheID: 8},
-	// 10: {CoreID: 5, SocketID: 1, UnCoreCacheID: 9},
-	// 11: {CoreID: 5, SocketID: 1, UnCoreCacheID: 9}, }, }
-
-	topoFROMjfbai = &topology.CPUTopology{
-		NumCPUs:    12,
-		NumSockets: 2,
-		NumCores:   6,
-		CPUDetails: map[int]topology.CPUInfo{
-			0:  {CoreID: 0, SocketID: 0, UnCoreCacheID: 0},
-			1:  {CoreID: 0, SocketID: 0, UnCoreCacheID: 0},
-			2:  {CoreID: 1, SocketID: 0, UnCoreCacheID: 0},
-			3:  {CoreID: 1, SocketID: 0, UnCoreCacheID: 0},
-			4:  {CoreID: 2, SocketID: 0, UnCoreCacheID: 1},
-			5:  {CoreID: 2, SocketID: 0, UnCoreCacheID: 1},
-			6:  {CoreID: 3, SocketID: 1, UnCoreCacheID: 8},
-			7:  {CoreID: 3, SocketID: 1, UnCoreCacheID: 8},
-			8:  {CoreID: 4, SocketID: 1, UnCoreCacheID: 8},
-			9:  {CoreID: 4, SocketID: 1, UnCoreCacheID: 8},
-			10: {CoreID: 5, SocketID: 1, UnCoreCacheID: 9},
-			11: {CoreID: 5, SocketID: 1, UnCoreCacheID: 9},
-		},
-	}
 	// Intel(R) Xeon(R) Gold 5218 CPU @ 2.30GHz
 	gold_5218_topology = &topology.CPUTopology{
 		NumCPUs:    64,
@@ -381,78 +240,7 @@ var (
 			47: {CoreID: 30, SocketID: 0, UnCoreCacheID: 1},
 		},
 	}
-	// EPYC 7502P 32
-	epyc_7502p_32_topology = &topology.CPUTopology{
-		NumCPUs:    64,
-		NumSockets: 1,
-		NumCores:   32,
-		CPUDetails: map[int]topology.CPUInfo{
-			0:  {CoreID: 0, SocketID: 0, UnCoreCacheID: 0},
-			1:  {CoreID: 1, SocketID: 0, UnCoreCacheID: 0},
-			2:  {CoreID: 2, SocketID: 0, UnCoreCacheID: 0},
-			3:  {CoreID: 3, SocketID: 0, UnCoreCacheID: 0},
-			4:  {CoreID: 4, SocketID: 0, UnCoreCacheID: 1},
-			5:  {CoreID: 5, SocketID: 0, UnCoreCacheID: 1},
-			6:  {CoreID: 6, SocketID: 0, UnCoreCacheID: 1},
-			7:  {CoreID: 7, SocketID: 0, UnCoreCacheID: 1},
-			8:  {CoreID: 8, SocketID: 0, UnCoreCacheID: 2},
-			9:  {CoreID: 9, SocketID: 0, UnCoreCacheID: 2},
-			10: {CoreID: 10, SocketID: 0, UnCoreCacheID: 2},
-			11: {CoreID: 11, SocketID: 0, UnCoreCacheID: 2},
-			12: {CoreID: 12, SocketID: 0, UnCoreCacheID: 3},
-			13: {CoreID: 13, SocketID: 0, UnCoreCacheID: 3},
-			14: {CoreID: 14, SocketID: 0, UnCoreCacheID: 3},
-			15: {CoreID: 15, SocketID: 0, UnCoreCacheID: 3},
-			16: {CoreID: 16, SocketID: 0, UnCoreCacheID: 4},
-			17: {CoreID: 17, SocketID: 0, UnCoreCacheID: 4},
-			18: {CoreID: 18, SocketID: 0, UnCoreCacheID: 4},
-			19: {CoreID: 19, SocketID: 0, UnCoreCacheID: 4},
-			20: {CoreID: 20, SocketID: 0, UnCoreCacheID: 5},
-			21: {CoreID: 21, SocketID: 0, UnCoreCacheID: 5},
-			22: {CoreID: 22, SocketID: 0, UnCoreCacheID: 5},
-			23: {CoreID: 23, SocketID: 0, UnCoreCacheID: 5},
-			24: {CoreID: 24, SocketID: 0, UnCoreCacheID: 6},
-			25: {CoreID: 25, SocketID: 0, UnCoreCacheID: 6},
-			26: {CoreID: 26, SocketID: 0, UnCoreCacheID: 6},
-			27: {CoreID: 27, SocketID: 0, UnCoreCacheID: 6},
-			28: {CoreID: 28, SocketID: 0, UnCoreCacheID: 7},
-			29: {CoreID: 29, SocketID: 0, UnCoreCacheID: 7},
-			30: {CoreID: 30, SocketID: 0, UnCoreCacheID: 7},
-			31: {CoreID: 31, SocketID: 0, UnCoreCacheID: 7},
-			32: {CoreID: 0, SocketID: 0, UnCoreCacheID: 1},
-			33: {CoreID: 1, SocketID: 0, UnCoreCacheID: 1},
-			34: {CoreID: 2, SocketID: 0, UnCoreCacheID: 1},
-			35: {CoreID: 3, SocketID: 0, UnCoreCacheID: 1},
-			36: {CoreID: 4, SocketID: 0, UnCoreCacheID: 1},
-			37: {CoreID: 5, SocketID: 0, UnCoreCacheID: 1},
-			38: {CoreID: 6, SocketID: 0, UnCoreCacheID: 1},
-			39: {CoreID: 7, SocketID: 0, UnCoreCacheID: 1},
-			40: {CoreID: 8, SocketID: 0, UnCoreCacheID: 1},
-			41: {CoreID: 9, SocketID: 0, UnCoreCacheID: 1},
-			42: {CoreID: 10, SocketID: 0, UnCoreCacheID: 1},
-			43: {CoreID: 11, SocketID: 0, UnCoreCacheID: 1},
-			44: {CoreID: 12, SocketID: 0, UnCoreCacheID: 1},
-			45: {CoreID: 13, SocketID: 0, UnCoreCacheID: 1},
-			46: {CoreID: 14, SocketID: 0, UnCoreCacheID: 1},
-			47: {CoreID: 15, SocketID: 0, UnCoreCacheID: 1},
-			48: {CoreID: 16, SocketID: 0, UnCoreCacheID: 1},
-			49: {CoreID: 17, SocketID: 0, UnCoreCacheID: 1},
-			50: {CoreID: 18, SocketID: 0, UnCoreCacheID: 1},
-			51: {CoreID: 19, SocketID: 0, UnCoreCacheID: 1},
-			52: {CoreID: 20, SocketID: 0, UnCoreCacheID: 1},
-			53: {CoreID: 21, SocketID: 0, UnCoreCacheID: 1},
-			54: {CoreID: 22, SocketID: 0, UnCoreCacheID: 1},
-			55: {CoreID: 23, SocketID: 0, UnCoreCacheID: 1},
-			56: {CoreID: 24, SocketID: 0, UnCoreCacheID: 1},
-			57: {CoreID: 25, SocketID: 0, UnCoreCacheID: 1},
-			58: {CoreID: 26, SocketID: 0, UnCoreCacheID: 1},
-			59: {CoreID: 27, SocketID: 0, UnCoreCacheID: 1},
-			60: {CoreID: 28, SocketID: 0, UnCoreCacheID: 1},
-			61: {CoreID: 29, SocketID: 0, UnCoreCacheID: 1},
-			62: {CoreID: 30, SocketID: 0, UnCoreCacheID: 1},
-			63: {CoreID: 31, SocketID: 0, UnCoreCacheID: 1},
-		},
-	}
+
 	epyc_7513 = &topology.CPUTopology{
 		NumCPUs:      64,
 		NumSockets:   1,
@@ -656,235 +444,6 @@ var (
 		},
 	}
 
-	Intel_R__Xeon_R__E_2278G_CPU___3_40GHz = &topology.CPUTopology{
-		NumCPUs:      8,
-		NumCores:     8,
-		NumSockets:   1,
-		NumNUMANodes: 1,
-		CPUDetails: map[int]topology.CPUInfo{
-			0: {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			1: {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			2: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			3: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			4: {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			5: {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			6: {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			7: {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-		},
-	}
-
-	Intel_R__Xeon_R__Silver_4214_CPU___2_20GHz = &topology.CPUTopology{
-		NumCPUs:      48,
-		NumCores:     24,
-		NumSockets:   2,
-		NumNUMANodes: 2,
-		CPUDetails: map[int]topology.CPUInfo{
-			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			24: {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			1:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			25: {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			26: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			3:  {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			27: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			28: {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			5:  {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			29: {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			30: {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			7:  {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			31: {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			8:  {CoreID: 8, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			32: {CoreID: 8, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			9:  {CoreID: 9, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			33: {CoreID: 9, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			10: {CoreID: 10, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			34: {CoreID: 10, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			11: {CoreID: 11, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			35: {CoreID: 11, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			12: {CoreID: 12, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			36: {CoreID: 12, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			13: {CoreID: 13, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			37: {CoreID: 13, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			14: {CoreID: 14, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			38: {CoreID: 14, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			15: {CoreID: 15, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			39: {CoreID: 15, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			16: {CoreID: 16, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			40: {CoreID: 16, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			17: {CoreID: 17, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			41: {CoreID: 17, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			18: {CoreID: 18, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			42: {CoreID: 18, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			19: {CoreID: 19, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			43: {CoreID: 19, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			20: {CoreID: 20, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			44: {CoreID: 20, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			21: {CoreID: 21, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			45: {CoreID: 21, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			22: {CoreID: 22, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			46: {CoreID: 22, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			23: {CoreID: 23, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-			47: {CoreID: 23, SocketID: 1, NUMANodeID: 1, UnCoreCacheID: 0},
-		},
-	}
-
-	AMD_EPYC_7513_32_Core_Processor = &topology.CPUTopology{
-		NumCPUs:      64,
-		NumCores:     32,
-		NumSockets:   1,
-		NumNUMANodes: 1,
-		CPUDetails: map[int]topology.CPUInfo{
-			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			32: {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			1:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			33: {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			34: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			3:  {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			35: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			36: {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			5:  {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			37: {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			38: {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			7:  {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			39: {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			8:  {CoreID: 8, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			40: {CoreID: 8, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			9:  {CoreID: 9, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			41: {CoreID: 9, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			10: {CoreID: 10, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			42: {CoreID: 10, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			11: {CoreID: 11, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			43: {CoreID: 11, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			12: {CoreID: 12, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			44: {CoreID: 12, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			13: {CoreID: 13, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			45: {CoreID: 13, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			14: {CoreID: 14, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			46: {CoreID: 14, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			15: {CoreID: 15, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			47: {CoreID: 15, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			16: {CoreID: 16, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			48: {CoreID: 16, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			17: {CoreID: 17, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			49: {CoreID: 17, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			18: {CoreID: 18, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			50: {CoreID: 18, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			19: {CoreID: 19, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			51: {CoreID: 19, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			20: {CoreID: 20, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			52: {CoreID: 20, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			21: {CoreID: 21, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			53: {CoreID: 21, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			22: {CoreID: 22, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			54: {CoreID: 22, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			23: {CoreID: 23, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			55: {CoreID: 23, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			24: {CoreID: 24, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			56: {CoreID: 24, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			25: {CoreID: 25, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			57: {CoreID: 25, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			26: {CoreID: 26, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			58: {CoreID: 26, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			27: {CoreID: 27, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			59: {CoreID: 27, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			28: {CoreID: 28, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			60: {CoreID: 28, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			29: {CoreID: 29, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			61: {CoreID: 29, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			30: {CoreID: 30, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			62: {CoreID: 30, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			31: {CoreID: 31, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			63: {CoreID: 31, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-		},
-	}
-
-	AMD_EPYC_7443P_24_Core_Processor = &topology.CPUTopology{
-		NumCPUs:      48,
-		NumCores:     24,
-		NumSockets:   1,
-		NumNUMANodes: 1,
-		CPUDetails: map[int]topology.CPUInfo{
-			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			24: {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			1:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			25: {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			26: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			3:  {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			27: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			28: {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			5:  {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			29: {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			30: {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			7:  {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			31: {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			8:  {CoreID: 8, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			32: {CoreID: 8, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			9:  {CoreID: 9, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			33: {CoreID: 9, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			10: {CoreID: 10, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			34: {CoreID: 10, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			11: {CoreID: 11, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			35: {CoreID: 11, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			12: {CoreID: 12, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			36: {CoreID: 12, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			13: {CoreID: 13, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			37: {CoreID: 13, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			14: {CoreID: 14, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			38: {CoreID: 14, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			15: {CoreID: 15, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			39: {CoreID: 15, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			16: {CoreID: 16, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			40: {CoreID: 16, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			17: {CoreID: 17, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			41: {CoreID: 17, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			18: {CoreID: 18, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			42: {CoreID: 18, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			19: {CoreID: 19, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			43: {CoreID: 19, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			20: {CoreID: 20, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			44: {CoreID: 20, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			21: {CoreID: 21, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			45: {CoreID: 21, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			22: {CoreID: 22, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			46: {CoreID: 22, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			23: {CoreID: 23, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			47: {CoreID: 23, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-		},
-	}
-
-	Intel_R__Xeon_R__E_2378G_CPU___2_80GHz = &topology.CPUTopology{
-		NumCPUs:      16,
-		NumCores:     8,
-		NumSockets:   1,
-		NumNUMANodes: 1,
-		CPUDetails: map[int]topology.CPUInfo{
-			0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			8:  {CoreID: 0, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			1:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			9:  {CoreID: 1, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			2:  {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			10: {CoreID: 2, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			3:  {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			11: {CoreID: 3, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			4:  {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			12: {CoreID: 4, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			5:  {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			13: {CoreID: 5, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			6:  {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			14: {CoreID: 6, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			7:  {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-			15: {CoreID: 7, SocketID: 0, NUMANodeID: 0, UnCoreCacheID: 0},
-		},
-	}
-
 	Intel_R__Xeon_R__Gold_5120_CPU___2_20GHz = &topology.CPUTopology{
 		NumCPUs:      56,
 		NumCores:     28,
@@ -951,453 +510,11 @@ var (
 	}
 )
 
-func TestTakeTopology(t *testing.T) {
-	testCases := []struct {
-		description string
-		topo        *topology.CPUTopology
-		numCpus     int
-		expResult   string
-	}{
-		{
-			"topoDualUncoreCacheSingleSocketHT",
-			topoDualUncoreCacheSingleSocketHT,
-			3, // 2 is non-deterministic
-			"map[1:0-2 2:3-5 3:8-10 4:11-13 5:6-7,14]",
-		},
-		{
-			"topoFROMjfbai",
-			topoFROMjfbai,
-			3, // 2 is non-deterministic
-			"map[1:0-2 2:6-8 3:3-5 4:9-11]",
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
-	for _, tc := range testCases {
-		t.Run(tc.description+fmt.Sprintf("_BY_%d_numCpus", tc.numCpus), func(t *testing.T) {
-			results := make(map[int]cpuset.CPUSet)
-			cpuSet := cpusetForCPUTopology(tc.topo)
-			counter := 0
-			for len(cpuSet.ToSliceNoSort()) >= tc.numCpus {
-				took, err := takeByTopologyNUMAPacked(tc.topo, cpuSet, tc.numCpus)
-				if err != nil {
-					t.Errorf("[%s] ERROR: %v", tc.description, err.Error())
-					break
-				}
-				counter += 1
-				results[counter] = took
-				// fmt.Println(counter, took)
-				cpuSet = cpuSet.Difference(took)
-			}
-			result := fmt.Sprint(results)
-			if result != tc.expResult {
-				t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expResult)
-			}
-		})
-	}
-}
-
-func TestTakeTopologyIterate(t *testing.T) {
-	testCases := []struct {
-		description string
-		topo        *topology.CPUTopology
-		//numCpus     int
-		takeNumCpus []int
-		expResult   string
-	}{
-		{
-			"topoDualUncoreCacheSingleSocketHT",
-			topoDualUncoreCacheSingleSocketHT,
-			[]int{1, 1, 1, 1, 5, 4},
-			"map[1:0 2:1 3:2 4:3 5:8-12 6:4-7]",
-		},
-		{
-			"topoFROMjfbai",
-			topoFROMjfbai,
-			[]int{1, 4, 3},
-			"map[1:0 2:6-9 3:1-3]",
-		},
-		{
-			"topoQuadSocketFourWayHT",
-			topoQuadSocketFourWayHT,
-			[]int{1, 2, 3},
-			"map[1:0 2:109,169 3:50,110,229]",
-		},
-		{
-			"gold_5218_topology",
-			gold_5218_topology,
-			[]int{1, 2, 3, 4},
-			"map[1:0 2:4-5 3:8-9,12 4:10-11,14-15]",
-		},
-		{
-			"epyc_7402p_topology",
-			epyc_7402p_topology,
-			[]int{1, 2, 3, 4},
-			"map[1:0 2:1-2 3:3-5 4:6-9]",
-		},
-		{
-			"epyc_7502p_32_topology",
-			epyc_7502p_32_topology,
-			[]int{2, 2, 2, 2},
-			"map[1:0-1 2:2-3 3:8-9 4:10-11]",
-		},
-		{
-			"epyc_7502p_32_topology_TAKE_BY_3",
-			epyc_7502p_32_topology,
-			[]int{3, 3, 3, 3},
-			"map[1:0-2 2:8-10 3:12-14 4:16-18]",
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			results := make(map[int]cpuset.CPUSet)
-			cpuSet := cpusetForCPUTopology(tc.topo)
-			counter := 0
-			for _, takeCpus := range tc.takeNumCpus {
-				took, err := takeByTopologyNUMAPacked(tc.topo, cpuSet, takeCpus)
-				if err != nil {
-					t.Errorf("[%s] ERROR: %v", tc.description, err.Error())
-					break
-				}
-				counter += 1
-				results[counter] = took
-				// fmt.Println(counter, took)
-				cpuSet = cpuSet.Difference(took)
-			}
-			result := fmt.Sprint(results)
-			if result != tc.expResult {
-				t.Errorf("[%s]\nexpected %v\nresult   %v", tc.description, tc.expResult, result)
-			}
-		})
-	}
-}
-
-func TestTakeEpyc7513(t *testing.T) {
-	testCases := []struct {
-		description string
-		topo        *topology.CPUTopology
-		//numCpus     int
-		takeNumCpus []int
-		expResult   string
-	}{
-		{
-			"epyc_7513",
-			epyc_7513,
-			[]int{2, 4, 8},
-			"map[1:0,32 2:1-2,33-34 3:3-6,35-38]",
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			results := make(map[int]cpuset.CPUSet)
-			cpuSet := cpusetForCPUTopology(tc.topo)
-			counter := 0
-			for _, takeCpus := range tc.takeNumCpus {
-				took, err := takeByTopologyNUMAPacked(tc.topo, cpuSet, takeCpus)
-				if err != nil {
-					t.Errorf("[%s] ERROR: %v", tc.description, err.Error())
-					break
-				}
-				counter += 1
-				results[counter] = took
-				// fmt.Println(counter, took)
-				fmt.Println("     TOOK:", took) // FIXME
-				cpuSet = cpuSet.Difference(took)
-			}
-			result := fmt.Sprint(results)
-			if result != tc.expResult {
-				t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expResult)
-			}
-		})
-	}
-}
-
-func TestTake_AMD_EPYC_7402P_24_Core_Processor(t *testing.T) {
-	testCases := []struct {
-		description string
-		topo        *topology.CPUTopology
-		//numCpus     int
-		takeNumCpus []int
-		expResult   string
-	}{
-		{
-			"AMD_EPYC_7402P_24_Core_Processor",
-			AMD_EPYC_7402P_24_Core_Processor,
-			[]int{2, 4, 8},
-			"map[1:0,24 2:1-2,25-26 3:3-6,27-30]",
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			results := make(map[int]cpuset.CPUSet)
-			cpuSet := cpusetForCPUTopology(tc.topo)
-			counter := 0
-			for _, takeCpus := range tc.takeNumCpus {
-				took, err := takeByTopologyNUMAPacked(tc.topo, cpuSet, takeCpus)
-				if err != nil {
-					t.Errorf("[%s] ERROR: %v", tc.description, err.Error())
-					break
-				}
-				counter += 1
-				results[counter] = took
-				// fmt.Println(counter, took)
-				fmt.Println("     TOOK:", took) // FIXME
-				cpuSet = cpuSet.Difference(took)
-			}
-			result := fmt.Sprint(results)
-			if result != tc.expResult {
-				t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expResult)
-			}
-		})
-	}
-}
-
-func TestTake_AMD_EPYC_7502P_32_Core_Processor(t *testing.T) {
-	testCases := []struct {
-		description string
-		topo        *topology.CPUTopology
-		//numCpus     int
-		takeNumCpus []int
-		expResult   string
-	}{
-		{
-			"AMD_EPYC_7502P_32_Core_Processor",
-			AMD_EPYC_7502P_32_Core_Processor,
-			[]int{2, 4, 8},
-			"map[1:0,32 2:1-2,33-34 3:4-7,36-39]",
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			results := make(map[int]cpuset.CPUSet)
-			cpuSet := cpusetForCPUTopology(tc.topo)
-			counter := 0
-			for _, takeCpus := range tc.takeNumCpus {
-				took, err := takeByTopologyNUMAPacked(tc.topo, cpuSet, takeCpus)
-				if err != nil {
-					t.Errorf("[%s] ERROR: %v", tc.description, err.Error())
-					break
-				}
-				counter += 1
-				results[counter] = took
-				// fmt.Println(counter, took)
-				fmt.Println("     TOOK:", took) // FIXME
-				cpuSet = cpuSet.Difference(took)
-			}
-			result := fmt.Sprint(results)
-			if result != tc.expResult {
-				t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expResult)
-			}
-		})
-	}
-}
-
-func TestTake_Intel_R__Xeon_R__E_2278G_CPU___3_40GHz(t *testing.T) {
-	testCases := []struct {
-		description string
-		topo        *topology.CPUTopology
-		//numCpus     int
-		takeNumCpus []int
-		expResult   string
-	}{
-		{
-			"Intel_R__Xeon_R__E_2278G_CPU___3_40GHz",
-			Intel_R__Xeon_R__E_2278G_CPU___3_40GHz,
-			[]int{2, 4},
-			"map[1:0-1 2:2-5]",
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			results := make(map[int]cpuset.CPUSet)
-			cpuSet := cpusetForCPUTopology(tc.topo)
-			counter := 0
-			for _, takeCpus := range tc.takeNumCpus {
-				took, err := takeByTopologyNUMAPacked(tc.topo, cpuSet, takeCpus)
-				if err != nil {
-					t.Errorf("[%s] ERROR: %v", tc.description, err.Error())
-					break
-				}
-				counter += 1
-				results[counter] = took
-				// fmt.Println(counter, took)
-				fmt.Println("     TOOK:", took) // FIXME
-				cpuSet = cpuSet.Difference(took)
-			}
-			result := fmt.Sprint(results)
-			if result != tc.expResult {
-				t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expResult)
-			}
-		})
-	}
-}
-
-func TestTake_Intel_R__Xeon_R__Silver_4214_CPU___2_20GHz(t *testing.T) {
-	testCases := []struct {
-		description string
-		topo        *topology.CPUTopology
-		//numCpus     int
-		takeNumCpus []int
-		expResult   string
-	}{
-		{
-			"Intel_R__Xeon_R__Silver_4214_CPU___2_20GHz",
-			Intel_R__Xeon_R__Silver_4214_CPU___2_20GHz,
-			[]int{2, 4, 8},
-			"map[1:0,24 2:1-2,25-26 3:3-6,27-30]",
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			results := make(map[int]cpuset.CPUSet)
-			cpuSet := cpusetForCPUTopology(tc.topo)
-			counter := 0
-			for _, takeCpus := range tc.takeNumCpus {
-				took, err := takeByTopologyNUMAPacked(tc.topo, cpuSet, takeCpus)
-				if err != nil {
-					t.Errorf("[%s] ERROR: %v", tc.description, err.Error())
-					break
-				}
-				counter += 1
-				results[counter] = took
-				// fmt.Println(counter, took)
-				fmt.Println("     TOOK:", took) // FIXME
-				cpuSet = cpuSet.Difference(took)
-			}
-			result := fmt.Sprint(results)
-			if result != tc.expResult {
-				t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expResult)
-			}
-		})
-	}
-}
-
-func TestTake_AMD_EPYC_7513_32_Core_Processor(t *testing.T) {
-	testCases := []struct {
-		description string
-		topo        *topology.CPUTopology
-		//numCpus     int
-		takeNumCpus []int
-		expResult   string
-	}{
-		{
-			"AMD_EPYC_7513_32_Core_Processor",
-			AMD_EPYC_7513_32_Core_Processor,
-			[]int{2, 4, 8},
-			"map[1:0,32 2:1-2,33-34 3:3-6,35-38]",
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			results := make(map[int]cpuset.CPUSet)
-			cpuSet := cpusetForCPUTopology(tc.topo)
-			counter := 0
-			for _, takeCpus := range tc.takeNumCpus {
-				took, err := takeByTopologyNUMAPacked(tc.topo, cpuSet, takeCpus)
-				if err != nil {
-					t.Errorf("[%s] ERROR: %v", tc.description, err.Error())
-					break
-				}
-				counter += 1
-				results[counter] = took
-				// fmt.Println(counter, took)
-				fmt.Println("     TOOK:", took) // FIXME
-				cpuSet = cpuSet.Difference(took)
-			}
-			result := fmt.Sprint(results)
-			if result != tc.expResult {
-				t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expResult)
-			}
-		})
-	}
-}
-
-func TestTake_AMD_EPYC_7443P_24_Core_Processor(t *testing.T) {
-	testCases := []struct {
-		description string
-		topo        *topology.CPUTopology
-		//numCpus     int
-		takeNumCpus []int
-		expResult   string
-	}{
-		{
-			"AMD_EPYC_7443P_24_Core_Processor",
-			AMD_EPYC_7443P_24_Core_Processor,
-			[]int{2, 4, 8},
-			"map[1:0,24 2:1-2,25-26 3:3-6,27-30]",
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			results := make(map[int]cpuset.CPUSet)
-			cpuSet := cpusetForCPUTopology(tc.topo)
-			counter := 0
-			for _, takeCpus := range tc.takeNumCpus {
-				took, err := takeByTopologyNUMAPacked(tc.topo, cpuSet, takeCpus)
-				if err != nil {
-					t.Errorf("[%s] ERROR: %v", tc.description, err.Error())
-					break
-				}
-				counter += 1
-				results[counter] = took
-				// fmt.Println(counter, took)
-				fmt.Println("     TOOK:", took) // FIXME
-				cpuSet = cpuSet.Difference(took)
-			}
-			result := fmt.Sprint(results)
-			if result != tc.expResult {
-				t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expResult)
-			}
-		})
-	}
-}
-
-func TestTake_Intel_R__Xeon_R__E_2378G_CPU___2_80GHz(t *testing.T) {
-	examples := []struct {
-		takeNumCpus []int
-		expResult   string
-	}{
-		{
-			[]int{1, 2, 3},
-			"map[1:0 2:1,9 3:2,8,10]",
-		},
-		{
-			[]int{2, 4, 8},
-			"map[1:0,8 2:1-2,9-10 3:3-6,11-14]",
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, true)()
-	for _, tc := range examples {
-		result := takeIterator(Intel_R__Xeon_R__E_2378G_CPU___2_80GHz, tc.takeNumCpus, true, t)
-		if result != tc.expResult {
-			t.Errorf("\nEXPECTED: %v\nTO EQUAL: %v", result, tc.expResult)
-			return
-		}
-	}
-}
-
 func takeIterator(topo *topology.CPUTopology, takeNumCpus []int, featureFlag bool, t *testing.T) string {
 	// Isolate the take operations ensuring the feature flag is dis/enabled
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUManagerUncoreCacheAlign, featureFlag)()
 	results := make(map[int]cpuset.CPUSet)
-	cpuSet := cpusetForCPUTopology(topo)
+	cpuSet := topo.CPUDetails.CPUs()
 	counter := 0
 	for _, takeCpus := range takeNumCpus {
 		took, err := takeByTopologyNUMAPacked(topo, cpuSet, takeCpus)
@@ -1406,7 +523,7 @@ func takeIterator(topo *topology.CPUTopology, takeNumCpus []int, featureFlag boo
 		}
 		counter += 1
 		results[counter] = took
-		fmt.Println("     TOOK:", took) // FIXME
+		//fmt.Println("     TOOK:", took)
 		cpuSet = cpuSet.Difference(took)
 	}
 	result := fmt.Sprint(results)
@@ -1441,13 +558,14 @@ func TestTakeOldVsNew(t *testing.T) {
 			"map[1:0,2,28,30 2:4,6,8,32,34 3:10,12,14,38,40,42 4:16,18,20,36,44,46,48 5:1,3,5,7,29,31,33,35]",
 		},
 		{
-			gold_5218_topology, // FIXME this topology is hard to understand??
+			// Also has two uncore cahces
+			gold_5218_topology,
 			[]int{1, 2, 3, 4, 5, 6},
 			"map[1:0 2:1,32 3:4-5,36 4:8-9,40-41 5:12-14,44-45 6:10-11,15,42-43,46]",
 			"map[1:0 2:4-5 3:8-9,12 4:10-11,14-15 5:2-3,6-7,16 6:20-21,24-25,28-29]",
 		},
 		{
-			gold_5218_topology, // FIXME this topology is hard to understand??
+			gold_5218_topology,
 			[]int{4, 5, 6, 7},
 			"map[1:0-1,32-33 2:4-5,8,36-37 3:9,12-13,40,44-45 4:10-11,14-15,42,46-47]",
 			"map[1:0-1,4-5 2:8-9,12-14 3:2-3,6-7,10-11 4:16-17,20-21,24-25,28]",
@@ -1467,10 +585,6 @@ func TestTakeOldVsNew(t *testing.T) {
 }
 
 func makeReverseRange(min, max int) []int {
-	// like above but reverse order
-	// There is no equivalent to PHP's range in the Go standard library.
-	// You have to create one yourself.                               <-- NEAT!
-	// The simplest is to use a for loop:
 	a := make([]int, max-min+1)
 	for i := range a {
 		a[i] = max - i
@@ -1479,7 +593,7 @@ func makeReverseRange(min, max int) []int {
 }
 
 func TestMakeReverseRange(t *testing.T) {
-	number := 6
+	number := 5
 	result := makeReverseRange(0, number-1)
 	for ndx, result := range result {
 		fmt.Println(ndx, result)
@@ -1488,7 +602,6 @@ func TestMakeReverseRange(t *testing.T) {
 			break
 		}
 	}
-
 }
 
 func AllocationPermutations(number int) [][]int {
@@ -1611,7 +724,7 @@ func TestTakeAllocationPermutations(t *testing.T) {
 		{
 			// This topology has eight UCCs on one NUMA (8x8 UCCs)
 			AMD_EPYC_7502P_32_Core_Processor,
-			// This should be one more than the max number of cpus per uncore cache
+			// This should be one more than half the number of cpus per uncore cache
 			5,
 			// The old scheduler splits the cpus across ucc
 			[]string{".X.XX.X..X.X",
@@ -1657,16 +770,15 @@ func TestTakeAllocationPermutations(t *testing.T) {
 		for _, perm := range aps {
 			oldResult := TakePattern(tc.topo, perm, false, t)
 			if oldResult != tc.expOld[counter] {
-				t.Errorf("\nexpOld[%v]: %v\n   result: %v", counter, tc.expOld[counter], oldResult)
+				t.Errorf("\nexpOld[%v]: %v\n    result: %v", counter, tc.expOld[counter], oldResult)
 				return
 			}
 			newResult := TakePattern(tc.topo, perm, true, t)
 			if newResult != tc.expNew[counter] {
-				t.Errorf("\nexpNew[%v]: %v\n   result: %v", counter, tc.expNew[counter], newResult)
+				t.Errorf("\nexpNew[%v]: %v\n    result: %v", counter, tc.expNew[counter], newResult)
 				return
 			}
 			counter += 1
 		}
-
 	}
 }
