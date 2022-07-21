@@ -64,6 +64,7 @@ func NewDynamicServingContentFromFiles(purpose, certFile, keyFile string) (*Dyna
 		name:     name,
 		certFile: certFile,
 		keyFile:  keyFile,
+		// FIXME: This queue is not being shutdown.
 		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("DynamicCABundle-%s", purpose)),
 	}
 	if err := ret.loadCertKeyPair(); err != nil {
