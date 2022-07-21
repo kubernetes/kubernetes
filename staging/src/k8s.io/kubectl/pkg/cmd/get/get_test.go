@@ -111,7 +111,8 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"type", "foo"})
 
 	expected := []runtime.Object{cmdtesting.NewInternalType("", "", "foo")}
@@ -178,7 +179,8 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set(useOpenAPIPrintColumnFlagLabel, "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
 
@@ -231,7 +233,8 @@ func TestGetObjects(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"pods", "foo"})
 
 	expected := `NAME   AGE
@@ -256,7 +259,8 @@ func TestGetObjectSubresourceStatus(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("subresource", "status")
 	cmd.Run(cmd, []string{"replicationcontrollers", "rc1"})
 
@@ -283,7 +287,8 @@ func TestGetObjectSubresourceScale(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("subresource", "scale")
 	cmd.Run(cmd, []string{"replicationcontrollers", "rc1"})
 
@@ -310,7 +315,8 @@ func TestGetTableObjects(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"pods", "foo"})
 
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
@@ -335,7 +341,8 @@ func TestGetV1TableObjects(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"pods", "foo"})
 
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
@@ -360,7 +367,8 @@ func TestGetObjectsShowKind(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("show-kind", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
 
@@ -386,7 +394,8 @@ func TestGetTableObjectsShowKind(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("show-kind", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
 
@@ -439,7 +448,8 @@ func TestGetMultipleResourceTypesShowKinds(t *testing.T) {
 
 	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"all"})
 
 	expected := `NAME      AGE
@@ -500,7 +510,8 @@ func TestGetMultipleTableResourceTypesShowKinds(t *testing.T) {
 
 	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"all"})
 
 	expected := `NAME      READY   STATUS   RESTARTS   AGE
@@ -561,7 +572,8 @@ func TestNoBlankLinesForGetMultipleTableResource(t *testing.T) {
 
 	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	expected := `NAME      READY   STATUS   RESTARTS   AGE
 pod/foo   0/0              0          <unknown>
@@ -630,7 +642,8 @@ func TestNoBlankLinesForGetAll(t *testing.T) {
 
 	streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"all"})
 
 	expected := ``
@@ -656,7 +669,8 @@ func TestNotFoundMessageForGetNonNamespacedResources(t *testing.T) {
 
 	streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"persistentvolumes"})
 
 	expected := ``
@@ -684,7 +698,8 @@ func TestGetObjectsShowLabels(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("show-labels", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
 
@@ -710,7 +725,8 @@ func TestGetTableObjectsShowLabels(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("show-labels", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
 
@@ -745,7 +761,8 @@ func TestGetEmptyTable(t *testing.T) {
 
 	streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"pods"})
 
 	expected := ``
@@ -795,7 +812,8 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("ignore-not-found", "true")
 	cmd.Flags().Set("output", "yaml")
 	cmd.Run(cmd, []string{"pods", "nonexistentpod"})
@@ -910,7 +928,8 @@ func TestGetSortedObjects(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	// sorting with metadata.name
 	cmd.Flags().Set("sort-by", ".metadata.name")
@@ -949,7 +968,8 @@ func TestGetSortedObjectsUnstructuredTable(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	// sorting with metadata.name
 	cmd.Flags().Set("sort-by", ".metadata.name")
@@ -1181,7 +1201,8 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("filename", "../../../testdata/controller.yaml")
 	cmd.Run(cmd, []string{})
 
@@ -1207,7 +1228,8 @@ func TestGetTableObjectsIdentifiedByFile(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("filename", "../../../testdata/controller.yaml")
 	cmd.Run(cmd, []string{})
 
@@ -1233,7 +1255,8 @@ func TestGetListObjects(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"pods"})
 
 	expected := `NAME   AGE
@@ -1259,7 +1282,8 @@ func TestGetListTableObjects(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"pods"})
 
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
@@ -1285,7 +1309,8 @@ func TestGetListComponentStatus(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"componentstatuses"})
 
 	expected := `NAME            STATUS      MESSAGE   ERROR
@@ -1334,7 +1359,8 @@ func TestGetMixedGenericObjects(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Flags().Set("output", "json")
 	cmd.Run(cmd, []string{"pods"})
 
@@ -1383,7 +1409,8 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"pods,services"})
 
 	expected := `NAME      AGE
@@ -1422,7 +1449,8 @@ func TestGetMultipleTypeTableObjects(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 	cmd.Run(cmd, []string{"pods,services"})
 
 	expected := `NAME      READY   STATUS   RESTARTS   AGE
@@ -1462,7 +1490,8 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("output", "json")
 	cmd.Run(cmd, []string{"pods,services"})
@@ -1564,7 +1593,8 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
@@ -1608,7 +1638,8 @@ func TestGetMultipleTypeTableObjectsWithLabelSelector(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
@@ -1652,7 +1683,8 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("field-selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
@@ -1696,7 +1728,8 @@ func TestGetMultipleTypeTableObjectsWithFieldSelector(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("field-selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
@@ -1742,7 +1775,8 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Run(cmd, []string{"services/bar", "node/foo"})
 
@@ -1786,7 +1820,8 @@ func TestGetMultipleTypeTableObjectsWithDirectReference(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Run(cmd, []string{"services/bar", "node/foo"})
 
@@ -1941,7 +1976,8 @@ func TestWatchLabelSelector(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Flags().Set("selector", "a=b")
@@ -1992,7 +2028,8 @@ func TestWatchTableLabelSelector(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Flags().Set("selector", "a=b")
@@ -2043,7 +2080,8 @@ func TestWatchFieldSelector(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Flags().Set("field-selector", "a=b")
@@ -2094,7 +2132,8 @@ func TestWatchTableFieldSelector(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Flags().Set("field-selector", "a=b")
@@ -2139,7 +2178,8 @@ func TestWatchResource(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
@@ -2183,7 +2223,8 @@ func TestWatchStatus(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
@@ -2229,7 +2270,8 @@ func TestWatchTableResource(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
@@ -2335,7 +2377,8 @@ func TestWatchResourceTable(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Run(cmd, []string{"pods"})
@@ -2547,7 +2590,8 @@ pod/foo
 
 			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdGet("kubectl", tf, streams)
-			cmd.SetOutput(buf)
+			cmd.SetOut(buf)
+			cmd.SetErr(buf)
 
 			cmd.Flags().Set("watch", "true")
 			cmd.Flags().Set("all-namespaces", "true")
@@ -2593,7 +2637,8 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch", "true")
 	cmd.Flags().Set("filename", "../../../testdata/controller.yaml")
@@ -2637,7 +2682,8 @@ func TestWatchOnlyResource(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch-only", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
@@ -2679,7 +2725,8 @@ func TestWatchOnlyTableResource(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch-only", "true")
 	cmd.Run(cmd, []string{"pods", "foo"})
@@ -2724,7 +2771,8 @@ func TestWatchOnlyList(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch-only", "true")
 	cmd.Run(cmd, []string{"pods"})
@@ -2769,7 +2817,8 @@ func TestWatchOnlyTableList(t *testing.T) {
 
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
 
 	cmd.Flags().Set("watch-only", "true")
 	cmd.Run(cmd, []string{"pods"})

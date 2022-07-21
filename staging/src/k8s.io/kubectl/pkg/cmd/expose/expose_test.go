@@ -660,7 +660,8 @@ func TestRunExposeService(t *testing.T) {
 
 			ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 			cmd := NewCmdExposeService(tf, ioStreams)
-			cmd.SetOutput(buf)
+			cmd.SetOut(buf)
+			cmd.SetErr(buf)
 			for flag, value := range test.flags {
 				cmd.Flags().Set(flag, value)
 			}
