@@ -378,8 +378,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
 	pathParam := ws.PathParameter("path", "path to the resource").DataType("string")
 
-	params := []*restful.Parameter{}
-	actions := []action{}
+	var params []*restful.Parameter
+	var actions []action
 
 	var resourceKind string
 	kindProvider, ok := storage.(rest.KindProvider)
@@ -517,7 +517,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, nil, err
 		}
-		decodableVersions := []schema.GroupVersion{}
+		var decodableVersions []schema.GroupVersion
 		if a.group.ConvertabilityChecker != nil {
 			decodableVersions = a.group.ConvertabilityChecker.VersionsForGroupKind(fqKindToRegister.GroupKind())
 		}
@@ -649,7 +649,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, nil, fmt.Errorf("unknown action verb for discovery: %s", action.Verb)
 		}
 
-		routes := []*restful.RouteBuilder{}
+		var routes []*restful.RouteBuilder
 
 		// If there is a subresource, kind should be the parent's kind.
 		if isSubresource {
