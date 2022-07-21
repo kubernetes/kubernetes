@@ -930,6 +930,93 @@ var _ = common.SIGDescribe("Services", func() {
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{})
 	})
 
+	ginkgo.It("should be updated after adding or deleting ports ", func() {
+		serviceName := "edit-port-test"
+		ns := f.Namespace.Name
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
+
+		svc1port := "svc1"
+		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
+		svc, err := jig.CreateTCPService(func(service *v1.Service) {
+			service.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "portname1",
+					Port:       80,
+					TargetPort: intstr.FromString(svc1port),
+				},
+			}
+		})
+		framework.ExpectNoError(err)
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{})
+
+		podname1 := "pod1"
+		port1 := 100
+		containerPorts1 := []v1.ContainerPort{
+			{
+				Name:          svc1port,
+				ContainerPort: int32(port1),
+			},
+		}
+		createPodOrFail(f, ns, podname1, jig.Labels, containerPorts1, "netexec", "--http-port", strconv.Itoa(port1))
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podname1: {port1}})
+
+		ginkgo.By("Checking if the Service " + serviceName + " forwards traffic to " + podname1)
+		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
+		err = jig.CheckServiceReachability(svc, execPod)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Adding a new port to service " + serviceName)
+		svc2port := "svc2"
+		svc, err = jig.UpdateService(func(s *v1.Service) {
+			s.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "portname1",
+					Port:       80,
+					TargetPort: intstr.FromString(svc1port),
+				},
+				{
+					Name:       "portname2",
+					Port:       81,
+					TargetPort: intstr.FromString(svc2port),
+				},
+			}
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Adding a new endpoint to the new port ")
+		podname2 := "pod2"
+		port2 := 101
+		containerPorts2 := []v1.ContainerPort{
+			{
+				Name:          svc2port,
+				ContainerPort: int32(port2),
+			},
+		}
+		createPodOrFail(f, ns, podname2, jig.Labels, containerPorts2, "netexec", "--http-port", strconv.Itoa(port2))
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podname1: {port1}, podname2: {port2}})
+
+		ginkgo.By("Checking if the Service forwards traffic to " + podname1 + " and " + podname2)
+		err = jig.CheckServiceReachability(svc, execPod)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Deleting a port from service " + serviceName)
+		svc, err = jig.UpdateService(func(s *v1.Service) {
+			s.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "portname1",
+					Port:       80,
+					TargetPort: intstr.FromString(svc1port),
+				},
+			}
+		})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Checking if the Service forwards traffic to " + podname1 + " and not forwards to " + podname2)
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podname1: {port1}})
+		err = jig.CheckServiceReachability(svc, execPod)
+		framework.ExpectNoError(err)
+	})
+
 	ginkgo.It("should preserve source pod IP for traffic thru service cluster IP [LinuxOnly]", func() {
 		// this test is creating a pod with HostNetwork=true, which is not supported on Windows.
 		e2eskipper.SkipIfNodeOSDistroIs("windows")
