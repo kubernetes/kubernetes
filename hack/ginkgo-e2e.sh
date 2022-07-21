@@ -175,6 +175,7 @@ fi
   --ginkgo.flake-attempts="${FLAKE_ATTEMPTS}" \
   --ginkgo.timeout="24h" \
   --ginkgo.output-interceptor-mode=none \
+  --ginkgo.always-emit-ginkgo-writer \
   --host="${KUBE_MASTER_URL}" \
   --provider="${KUBERNETES_PROVIDER}" \
   --gce-project="${PROJECT:-}" \
