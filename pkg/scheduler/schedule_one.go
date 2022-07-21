@@ -812,14 +812,18 @@ func getAttemptsLabel(p *framework.QueuedPodInfo) string {
 // pod has failed to schedule. Also, update the pod condition and nominated node name if set.
 func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framework.Framework, podInfo *framework.QueuedPodInfo, err error, reason string, nominatingInfo *framework.NominatingInfo) {
 	pod := podInfo.Pod
+	var errMsg string
+	if err != nil {
+		errMsg = err.Error()
+	}
 	if err == ErrNoNodesAvailable {
 		klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
 	} else if fitError, ok := err.(*framework.FitError); ok {
 		// Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
 		podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
-		klog.V(2).InfoS("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", err)
+		klog.V(2).InfoS("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", errMsg)
 	} else if apierrors.IsNotFound(err) {
-		klog.V(2).InfoS("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", err)
+		klog.V(2).InfoS("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", errMsg)
 		if errStatus, ok := err.(apierrors.APIStatus); ok && errStatus.Status().Details.Kind == "node" {
 			nodeName := errStatus.Status().Details.Name
 			// when node is not found, We do not remove the node right away. Trying again to get
@@ -868,13 +872,13 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 		return
 	}
 
-	msg := truncateMessage(err.Error())
+	msg := truncateMessage(errMsg)
 	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 	if err := updatePod(ctx, sched.client, pod, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  reason,
-		Message: err.Error(),
+		Message: errMsg,
 	}, nominatingInfo); err != nil {
 		klog.ErrorS(err, "Error updating pod", "pod", klog.KObj(pod))
 	}
