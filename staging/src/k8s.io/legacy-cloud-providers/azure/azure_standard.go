@@ -954,18 +954,20 @@ func (as *availabilitySet) EnsureBackendPoolDeleted(service *v1.Service, backend
 
 	ipConfigurationIDs := []string{}
 	for _, backendPool := range *backendAddressPools {
-		if strings.EqualFold(to.String(backendPool.ID), backendPoolID) &&
-			backendPool.BackendAddressPoolPropertiesFormat != nil &&
-			backendPool.BackendIPConfigurations != nil {
-			for _, ipConf := range *backendPool.BackendIPConfigurations {
-				if ipConf.ID == nil {
-					continue
-				}
+		if !strings.EqualFold(to.String(backendPool.ID), backendPoolID) ||
+			backendPool.BackendAddressPoolPropertiesFormat == nil ||
+			backendPool.BackendIPConfigurations == nil {
+			continue
+		}
 
-				ipConfigurationIDs = append(ipConfigurationIDs, *ipConf.ID)
+		for _, ipConf := range *backendPool.BackendIPConfigurations {
+			if ipConf.ID == nil {
+				continue
 			}
+			ipConfigurationIDs = append(ipConfigurationIDs, *ipConf.ID)
 		}
 	}
+
 	nicUpdaters := make([]func() error, 0)
 	allErrs := make([]error, 0)
 	for i := range ipConfigurationIDs {
@@ -1006,41 +1008,45 @@ func (as *availabilitySet) EnsureBackendPoolDeleted(service *v1.Service, backend
 			return nil
 		}
 
-		if nic.InterfacePropertiesFormat != nil && nic.InterfacePropertiesFormat.IPConfigurations != nil {
-			newIPConfigs := *nic.IPConfigurations
-			for j, ipConf := range newIPConfigs {
-				if !to.Bool(ipConf.Primary) {
-					continue
-				}
-				// found primary ip configuration
-				if ipConf.LoadBalancerBackendAddressPools != nil {
-					newLBAddressPools := *ipConf.LoadBalancerBackendAddressPools
-					for k := len(newLBAddressPools) - 1; k >= 0; k-- {
-						pool := newLBAddressPools[k]
-						if strings.EqualFold(to.String(pool.ID), backendPoolID) {
-							newLBAddressPools = append(newLBAddressPools[:k], newLBAddressPools[k+1:]...)
-							break
-						}
-					}
-					newIPConfigs[j].LoadBalancerBackendAddressPools = &newLBAddressPools
+		if nic.InterfacePropertiesFormat == nil || nic.InterfacePropertiesFormat.IPConfigurations == nil {
+			continue
+		}
+
+		newIPConfigs := *nic.IPConfigurations
+		for j, ipConf := range newIPConfigs {
+			if !to.Bool(ipConf.Primary) {
+				continue
+			}
+
+			if ipConf.LoadBalancerBackendAddressPools == nil {
+				continue
+			}
+
+			// found primary ip configuration
+			newLBAddressPools := *ipConf.LoadBalancerBackendAddressPools
+			for k := len(newLBAddressPools) - 1; k >= 0; k-- {
+				pool := newLBAddressPools[k]
+				if strings.EqualFold(to.String(pool.ID), backendPoolID) {
+					newLBAddressPools = append(newLBAddressPools[:k], newLBAddressPools[k+1:]...)
+					break
 				}
 			}
-			nic.IPConfigurations = &newIPConfigs
-			nicUpdaters = append(nicUpdaters, func() error {
-				ctx, cancel := getContextWithCancel()
-				defer cancel()
-				klog.V(2).Infof("EnsureBackendPoolDeleted begins to CreateOrUpdate for NIC(%s, %s) with backendPoolID %s", as.resourceGroup, to.String(nic.Name), backendPoolID)
-				rerr := as.InterfacesClient.CreateOrUpdate(ctx, as.ResourceGroup, to.String(nic.Name), nic)
-				if rerr != nil {
-					klog.Errorf("EnsureBackendPoolDeleted CreateOrUpdate for NIC(%s, %s) failed with error %v", as.resourceGroup, to.String(nic.Name), rerr.Error())
-					return rerr.Error()
-				}
-				return nil
-			})
+			newIPConfigs[j].LoadBalancerBackendAddressPools = &newLBAddressPools
 		}
+		nic.IPConfigurations = &newIPConfigs
+		nicUpdaters = append(nicUpdaters, func() error {
+			ctx, cancel := getContextWithCancel()
+			defer cancel()
+			klog.V(2).Infof("EnsureBackendPoolDeleted begins to CreateOrUpdate for NIC(%s, %s) with backendPoolID %s", as.resourceGroup, to.String(nic.Name), backendPoolID)
+			if rerr := as.InterfacesClient.CreateOrUpdate(ctx, as.ResourceGroup, to.String(nic.Name), nic); rerr != nil {
+				klog.Errorf("EnsureBackendPoolDeleted CreateOrUpdate for NIC(%s, %s) failed with error %v", as.resourceGroup, to.String(nic.Name), rerr.Error())
+				return rerr.Error()
+			}
+			return nil
+		})
 	}
-	errs := utilerrors.AggregateGoroutines(nicUpdaters...)
-	if errs != nil {
+
+	if errs := utilerrors.AggregateGoroutines(nicUpdaters...); errs != nil {
 		return utilerrors.Flatten(errs)
 	}
 	// Fail if there are other allErrs.

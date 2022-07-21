@@ -429,14 +429,12 @@ func (s *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
 	}
 
-	if err := s.patchStatus(service, previousStatus, newStatus); err != nil {
+	if err := s.patchStatus(service, previousStatus, newStatus); err != nil && !errors.IsNotFound(err) {
 		// Only retry error that isn't not found:
 		// - Not found error mostly happens when service disappears right after
 		//   we remove the finalizer.
 		// - We can't patch status on non-exist service anyway.
-		if !errors.IsNotFound(err) {
-			return op, fmt.Errorf("failed to update load balancer status: %v", err)
-		}
+		return op, fmt.Errorf("failed to update load balancer status: %v", err)
 	}
 
 	return op, nil

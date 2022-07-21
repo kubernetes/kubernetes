@@ -311,12 +311,11 @@ func (az *Cloud) CreateOrUpdatePIP(service *v1.Service, pipResourceGroup string,
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	rerr := az.PublicIPAddressesClient.CreateOrUpdate(ctx, pipResourceGroup, to.String(pip.Name), pip)
 	klog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%s, %s): end", pipResourceGroup, to.String(pip.Name))
-	if rerr != nil {
+	if err := az.PublicIPAddressesClient.CreateOrUpdate(ctx, pipResourceGroup, to.String(pip.Name), pip); err != nil {
 		klog.Errorf("PublicIPAddressesClient.CreateOrUpdate(%s, %s) failed: %s", pipResourceGroup, to.String(pip.Name), rerr.Error().Error())
-		az.Event(service, v1.EventTypeWarning, "CreateOrUpdatePublicIPAddress", rerr.Error().Error())
-		return rerr.Error()
+		az.Event(service, v1.EventTypeWarning, "CreateOrUpdatePublicIPAddress", err.Error().Error())
+		return err.Error()
 	}
 
 	return nil
@@ -327,12 +326,11 @@ func (az *Cloud) CreateOrUpdateInterface(service *v1.Service, nic network.Interf
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	rerr := az.InterfacesClient.CreateOrUpdate(ctx, az.ResourceGroup, *nic.Name, nic)
 	klog.V(10).Infof("InterfacesClient.CreateOrUpdate(%s): end", *nic.Name)
-	if rerr != nil {
-		klog.Errorf("InterfacesClient.CreateOrUpdate(%s) failed: %s", *nic.Name, rerr.Error().Error())
-		az.Event(service, v1.EventTypeWarning, "CreateOrUpdateInterface", rerr.Error().Error())
-		return rerr.Error()
+	if err := az.InterfacesClient.CreateOrUpdate(ctx, az.ResourceGroup, *nic.Name, nic); err != nil {
+		klog.Errorf("InterfacesClient.CreateOrUpdate(%s) failed: %s", *nic.Name, err.Error().Error())
+		az.Event(service, v1.EventTypeWarning, "CreateOrUpdateInterface", err.Error().Error())
+		return err.Error()
 	}
 
 	return nil
@@ -343,16 +341,15 @@ func (az *Cloud) DeletePublicIP(service *v1.Service, pipResourceGroup string, pi
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
-	rerr := az.PublicIPAddressesClient.Delete(ctx, pipResourceGroup, pipName)
-	if rerr != nil {
-		klog.Errorf("PublicIPAddressesClient.Delete(%s) failed: %s", pipName, rerr.Error().Error())
-		az.Event(service, v1.EventTypeWarning, "DeletePublicIPAddress", rerr.Error().Error())
+	if err := az.PublicIPAddressesClient.Delete(ctx, pipResourceGroup, pipName); err != nil {
+		klog.Errorf("PublicIPAddressesClient.Delete(%s) failed: %s", pipName, err.Error().Error())
+		az.Event(service, v1.EventTypeWarning, "DeletePublicIPAddress", err.Error().Error())
 
-		if strings.Contains(rerr.Error().Error(), cannotDeletePublicIPErrorMessageCode) {
+		if strings.Contains(err.Error().Error(), cannotDeletePublicIPErrorMessageCode) {
 			klog.Warningf("DeletePublicIP for public IP %s failed with error %v, this is because other resources are referencing the public IP. The deletion of the service will continue.", pipName, rerr.Error())
 			return nil
 		}
-		return rerr.Error()
+		return err.Error()
 	}
 
 	return nil
