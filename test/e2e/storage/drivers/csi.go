@@ -992,11 +992,6 @@ func generateDriverCleanupFunc(
 	// Cleanup CSI driver and namespaces. This function needs to be idempotent and can be
 	// concurrently called from defer (or AfterEach) and AfterSuite action hooks.
 	cleanupFunc := func() {
-		ginkgo.By(fmt.Sprintf("deleting the test namespace: %s", testns))
-		// Delete the primary namespace but it's okay to fail here because this namespace will
-		// also be deleted by framework.Aftereach hook
-		tryFunc(func() { f.DeleteNamespace(testns) })
-
 		ginkgo.By(fmt.Sprintf("uninstalling csi %s driver", driverName))
 		tryFunc(driverCleanup)
 		tryFunc(cancelLogging)
