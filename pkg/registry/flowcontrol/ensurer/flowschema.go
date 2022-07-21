@@ -17,7 +17,6 @@ limitations under the License.
 package ensurer
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
@@ -29,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta2"
+	"k8s.io/client-go/tools/clusters"
 	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 )
 
@@ -153,7 +153,7 @@ func (fs *flowSchemaWrapper) Create(object runtime.Object) (runtime.Object, erro
 		return nil, errObjectNotFlowSchema
 	}
 
-	return fs.client.Create(context.TODO(), fsObject, metav1.CreateOptions{FieldManager: fieldManager})
+	return fs.client.Create(ctx(), fsObject, metav1.CreateOptions{FieldManager: fieldManager})
 }
 
 func (fs *flowSchemaWrapper) Update(object runtime.Object) (runtime.Object, error) {
@@ -162,15 +162,15 @@ func (fs *flowSchemaWrapper) Update(object runtime.Object) (runtime.Object, erro
 		return nil, errObjectNotFlowSchema
 	}
 
-	return fs.client.Update(context.TODO(), fsObject, metav1.UpdateOptions{FieldManager: fieldManager})
+	return fs.client.Update(ctx(), fsObject, metav1.UpdateOptions{FieldManager: fieldManager})
 }
 
 func (fs *flowSchemaWrapper) Get(name string) (configurationObject, error) {
-	return fs.lister.Get(name)
+	return fs.lister.Get(clusters.ToClusterAwareKey(cluster(), name))
 }
 
 func (fs *flowSchemaWrapper) Delete(name string) error {
-	return fs.client.Delete(context.TODO(), name, metav1.DeleteOptions{})
+	return fs.client.Delete(ctx(), name, metav1.DeleteOptions{})
 }
 
 func (fs *flowSchemaWrapper) CopySpec(bootstrap, current runtime.Object) error {

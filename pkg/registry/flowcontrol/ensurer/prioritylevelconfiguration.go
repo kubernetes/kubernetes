@@ -21,14 +21,17 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/kcp-dev/logicalcluster/v2"
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta2"
+	"k8s.io/client-go/tools/clusters"
 	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 )
 
@@ -148,13 +151,21 @@ func (fs *priorityLevelConfigurationWrapper) TypeName() string {
 	return "PriorityLevelConfiguration"
 }
 
+func cluster() logicalcluster.Name {
+	return logicalcluster.New("system:admin")
+}
+
+func ctx() context.Context {
+	return genericapirequest.WithCluster(context.TODO(), genericapirequest.Cluster{Name: cluster()})
+}
+
 func (fs *priorityLevelConfigurationWrapper) Create(object runtime.Object) (runtime.Object, error) {
 	plObject, ok := object.(*flowcontrolv1beta2.PriorityLevelConfiguration)
 	if !ok {
 		return nil, errObjectNotPriorityLevel
 	}
 
-	return fs.client.Create(context.TODO(), plObject, metav1.CreateOptions{FieldManager: fieldManager})
+	return fs.client.Create(ctx(), plObject, metav1.CreateOptions{FieldManager: fieldManager})
 }
 
 func (fs *priorityLevelConfigurationWrapper) Update(object runtime.Object) (runtime.Object, error) {
@@ -163,15 +174,15 @@ func (fs *priorityLevelConfigurationWrapper) Update(object runtime.Object) (runt
 		return nil, errObjectNotPriorityLevel
 	}
 
-	return fs.client.Update(context.TODO(), fsObject, metav1.UpdateOptions{FieldManager: fieldManager})
+	return fs.client.Update(ctx(), fsObject, metav1.UpdateOptions{FieldManager: fieldManager})
 }
 
 func (fs *priorityLevelConfigurationWrapper) Get(name string) (configurationObject, error) {
-	return fs.lister.Get(name)
+	return fs.lister.Get(clusters.ToClusterAwareKey(cluster(), name))
 }
 
 func (fs *priorityLevelConfigurationWrapper) Delete(name string) error {
-	return fs.client.Delete(context.TODO(), name, metav1.DeleteOptions{})
+	return fs.client.Delete(ctx(), name, metav1.DeleteOptions{})
 }
 
 func (fs *priorityLevelConfigurationWrapper) CopySpec(bootstrap, current runtime.Object) error {
