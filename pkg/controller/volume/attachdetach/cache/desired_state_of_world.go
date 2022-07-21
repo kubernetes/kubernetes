@@ -254,7 +254,14 @@ func (dsw *desiredStateOfWorld) AddPod(
 		}
 		dsw.nodesManaged[nodeName].volumesToAttach[volumeName] = volumeObj
 	}
-	if _, podExists := volumeObj.scheduledPods[podName]; !podExists {
+	// A Pod delete event followed by an immediate Pod add event may be merged
+	// into a Pod update event (from the shared informer). See
+	// https://github.com/kubernetes/client-go/blob/master/tools/cache/shared_informer.go#L114
+	// If the pod does not exist: add it
+	// If the pod exists, and the UIDs don't match, this indicates a pod
+	// delete/add that was merged into an update, so reflect the update in dsw.
+	scheduledPod, podExists := volumeObj.scheduledPods[podName]
+	if !podExists || scheduledPod.podObj.UID != podToAdd.UID {
 		dsw.nodesManaged[nodeName].volumesToAttach[volumeName].scheduledPods[podName] =
 			pod{
 				podName: podName,

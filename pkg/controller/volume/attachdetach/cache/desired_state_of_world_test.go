@@ -206,12 +206,14 @@ func Test_AddPod_Positive_NewPodNodeExistsVolumeExists(t *testing.T) {
 // Calls AddPod() with the same node and new pod/volume.
 // Verifies node/volume exists.
 // Calls AddPod() with the same node, volume, and pod.
+// Verifies the pod has not been updated in the cache.
 // Verifies the same node/volume exists, and 1 volumes to attach.
 func Test_AddPod_Positive_PodExistsNodeExistsVolumeExists(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := NewDesiredStateOfWorld(volumePluginMgr)
-	podName := "pod-uid"
+	podName := "pod-name"
+	podUid := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
 	nodeName := k8stypes.NodeName("node-name")
@@ -225,7 +227,8 @@ func Test_AddPod_Positive_PodExistsNodeExistsVolumeExists(t *testing.T) {
 	}
 
 	// Act
-	generatedVolumeName, podErr := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
+	expectedPod := controllervolumetesting.NewPod(podUid, podName)
+	generatedVolumeName, podErr := dsw.AddPod(types.UniquePodName(podName), expectedPod, volumeSpec, nodeName)
 
 	// Assert
 	if podErr != nil {
@@ -244,14 +247,115 @@ func Test_AddPod_Positive_PodExistsNodeExistsVolumeExists(t *testing.T) {
 			nodeName)
 	}
 
-	// Act
-	generatedVolumeName, podErr = dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
+	// Act: Re-add a new pod that has the same podUid
+	generatedVolumeName, podErr = dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podUid, podName), volumeSpec, nodeName)
 
 	// Assert
 	if podErr != nil {
 		t.Fatalf("AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
 			podName,
 			podErr)
+	}
+
+	podToAdd, podExists := dsw.GetPodToAdd()[types.UniquePodName(podName)]
+	if !podExists {
+		t.Fatalf(
+			"Added pod %q to volume %q/node %q. Pod does not exist, it should.",
+			podName,
+			generatedVolumeName,
+			nodeName)
+	}
+
+	if podToAdd.Pod != expectedPod {
+		t.Fatalf("Expected pod %q to be unchanged with AddPod call. Expected %q. Actual %q.", podName, expectedPod, podToAdd.Pod)
+	}
+
+	volumeExists = dsw.VolumeExists(generatedVolumeName, nodeName)
+	if !volumeExists {
+		t.Fatalf(
+			"Added pod %q to volume %q/node %q. Volume does not exist, it should.",
+			podName,
+			generatedVolumeName,
+			nodeName)
+	}
+
+	volumesToAttach := dsw.GetVolumesToAttach()
+	if len(volumesToAttach) != 1 {
+		t.Fatalf("len(volumesToAttach) Expected: <1> Actual: <%v>", len(volumesToAttach))
+	}
+
+	verifyVolumeToAttach(t, volumesToAttach, nodeName, generatedVolumeName, string(volumeName))
+}
+
+// Populates data struct with a single node no volume.
+// Calls AddPod() with the same node and new pod/volume.
+// Verifies node/volume exists.
+// Calls AddPod() with the same node, volume, and new pod (updated UID).
+// Verifies the pod has been updated.
+// Verifies the same node/volume exists, and 1 volumes to attach.
+func Test_AddPod_Positive_PodExistsNodeExistsVolumeExistsUpdatedPodUid(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	podName := "pod-name"
+	podUid := "pod-uid"
+	updatedPodUid := "updated-pod-uid"
+	volumeName := v1.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	nodeName := k8stypes.NodeName("node-name")
+	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
+	volumeExists := dsw.VolumeExists(volumeName, nodeName)
+	if volumeExists {
+		t.Fatalf(
+			"Volume %q/node %q should not exist, but it does.",
+			volumeName,
+			nodeName)
+	}
+
+	// Act
+	generatedVolumeName, podErr := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podUid, podName), volumeSpec, nodeName)
+
+	// Assert
+	if podErr != nil {
+		t.Fatalf(
+			"AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
+			podName,
+			podErr)
+	}
+
+	volumeExists = dsw.VolumeExists(generatedVolumeName, nodeName)
+	if !volumeExists {
+		t.Fatalf(
+			"Added pod %q to volume %q/node %q. Volume does not exist, it should.",
+			podName,
+			generatedVolumeName,
+			nodeName)
+	}
+
+	// Act: Add the same podName, but with an updated UID.
+	// This simulates a pod add/delete folded into an update, and should trigger
+	// an updated pod in the DSW.
+	expectedPod := controllervolumetesting.NewPod(updatedPodUid, podName)
+	generatedVolumeName, podErr = dsw.AddPod(types.UniquePodName(podName), expectedPod, volumeSpec, nodeName)
+
+	// Assert
+	if podErr != nil {
+		t.Fatalf("AddPod failed for pod %q. Expected: <no error> Actual: <%v>",
+			podName,
+			podErr)
+	}
+
+	podToAdd, podExists := dsw.GetPodToAdd()[types.UniquePodName(podName)]
+	if !podExists {
+		t.Fatalf(
+			"Added pod %q to volume %q/node %q. Pod does not exist, it should.",
+			podName,
+			generatedVolumeName,
+			nodeName)
+	}
+
+	if podToAdd.Pod != expectedPod {
+		t.Fatalf("Expected pod %q to be changed with AddPod call. Expected %q. Actual %q.", podName, expectedPod, podToAdd.Pod)
 	}
 
 	volumeExists = dsw.VolumeExists(generatedVolumeName, nodeName)
