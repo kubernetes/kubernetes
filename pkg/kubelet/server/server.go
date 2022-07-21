@@ -234,6 +234,7 @@ type HostInterface interface {
 	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
+	MetricsEndpoints() ([]*runtimeapi.MetricsEndpoint, error)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -415,6 +416,35 @@ func (s *Server) InstallDefaultHandlers() {
 			To(s.checkpoint).
 			Operation("checkpoint"))
 		s.restfulCont.Add(ws)
+	}
+
+	endpoints, err := s.host.MetricsEndpoints()
+	if err != nil {
+		klog.InfoS("Failed to read metrics from runtime " + err.Error())
+		return
+	}
+
+	// The server will panic if an endpoint is double registered.
+	endpointsUsed := map[string]struct{}{}
+	for _, endpoint := range s.restfulCont.RegisteredHandlePaths() {
+		endpointsUsed[endpoint] = struct{}{}
+	}
+	s.registerMetricsEndpointsFromCRI(endpointsUsed, endpoints)
+}
+
+func (s *Server) registerMetricsEndpointsFromCRI(endpointsUsed map[string]struct{}, criEndpoints []*runtimeapi.MetricsEndpoint) {
+	for _, endpoint := range criEndpoints {
+		if _, ok := endpointsUsed[endpoint.ForwardPath]; ok {
+			klog.ErrorS(nil, "Runtime specified endpoint already reserved for the Kubelet. Skipping registration", "endpoint", endpoint.ForwardPath)
+			continue
+		}
+		location := &url.URL{
+			Host: endpoint.Host,
+			Path: endpoint.OriginPath,
+		}
+		s.restfulCont.Handle(endpoint.ForwardPath,
+			proxy.NewUpgradeAwareHandler(location, nil /*transport*/, false /*wrapTransport*/, false /*upgradeRequired*/, &responder{}),
+		)
 	}
 }
 

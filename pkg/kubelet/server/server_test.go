@@ -287,6 +287,10 @@ func (*fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bo
 	return nil, nil
 }
 
+func (*fakeKubelet) MetricsEndpoints() ([]*runtimeapi.MetricsEndpoint, error) {
+	return nil, nil
+}
+
 type fakeAuth struct {
 	authenticateFunc func(*http.Request) (*authenticator.Response, bool, error)
 	attributesFunc   func(user.Info, *http.Request) authorizer.Attributes
@@ -1493,5 +1497,53 @@ func TestTrimURLPath(t *testing.T) {
 
 	for _, test := range tests {
 		assert.Equal(t, test.expected, getURLRootPath(test.path), fmt.Sprintf("path is: %s", test.path))
+	}
+}
+
+func TestRegisterMetricsEndpoints(t *testing.T) {
+	tests := []struct {
+		endpointsUsed map[string]struct{}
+		criEndpoints  []*runtimeapi.MetricsEndpoint
+		addedLength   int
+	}{
+		{
+			endpointsUsed: map[string]struct{}{"/bogus": {}},
+			criEndpoints: []*runtimeapi.MetricsEndpoint{
+				{
+					Host:        "localhost",
+					OriginPath:  "/cri",
+					ForwardPath: "/bogus",
+				},
+			},
+			addedLength: 0,
+		},
+		{
+			endpointsUsed: map[string]struct{}{"/metrics": {}},
+			criEndpoints: []*runtimeapi.MetricsEndpoint{
+				{
+					Host:        "localhost",
+					OriginPath:  "/cri",
+					ForwardPath: "/bogus",
+				},
+			},
+			addedLength: 1,
+		},
+		{
+			endpointsUsed: map[string]struct{}{"/metrics": {}},
+			criEndpoints:  []*runtimeapi.MetricsEndpoint{},
+			addedLength:   0,
+		},
+	}
+
+	for _, test := range tests {
+		// inner function so defer works as expected
+		func() {
+			fw := newServerTest()
+			defer fw.testHTTPServer.Close()
+			prevPaths := fw.serverUnderTest.restfulCont.RegisteredHandlePaths()
+			fw.serverUnderTest.registerMetricsEndpointsFromCRI(test.endpointsUsed, test.criEndpoints)
+			paths := fw.serverUnderTest.restfulCont.RegisteredHandlePaths()
+			assert.Equal(t, test.addedLength+len(prevPaths), len(paths), fmt.Sprintf("registered handle paths incorrectly have: %+v", paths))
+		}()
 	}
 }
