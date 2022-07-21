@@ -38,6 +38,8 @@ const (
 	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
 	containerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
 	containerPortsLabel                    = "io.kubernetes.container.ports"
+	containerNetworkIOIngress              = "intel.com/network-ingress"
+	containerNetworkIOEgress               = "intel.com/network-egress"
 )
 
 type labeledPodSandboxInfo struct {
@@ -117,6 +119,12 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 	annotations[containerTerminationMessagePathLabel] = container.TerminationMessagePath
 	annotations[containerTerminationMessagePolicyLabel] = string(container.TerminationMessagePolicy)
 
+	if val, ok := container.Resources.Limits[containerNetworkIOIngress]; ok {
+		annotations[containerNetworkIOIngress] = val.String()
+	}
+	if val, ok := container.Resources.Limits[containerNetworkIOEgress]; ok {
+		annotations[containerNetworkIOEgress] = val.String()
+	}
 	if pod.DeletionGracePeriodSeconds != nil {
 		annotations[podDeletionGracePeriodLabel] = strconv.FormatInt(*pod.DeletionGracePeriodSeconds, 10)
 	}
