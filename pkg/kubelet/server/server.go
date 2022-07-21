@@ -253,7 +253,7 @@ func NewServer(
 	if auth != nil {
 		server.InstallAuthFilter()
 	}
-	server.InstallDefaultHandlers()
+	server.InstallDefaultHandlers(kubeCfg)
 	if kubeCfg != nil && kubeCfg.EnableDebuggingHandlers {
 		server.InstallDebuggingHandlers()
 		// To maintain backward compatibility serve logs and pprof only when enableDebuggingHandlers is also enabled
@@ -330,7 +330,7 @@ func (s *Server) getMetricMethodBucket(method string) string {
 
 // InstallDefaultHandlers registers the default set of supported HTTP request
 // patterns with the restful Container.
-func (s *Server) InstallDefaultHandlers() {
+func (s *Server) InstallDefaultHandlers(kubeCfg *kubeletconfiginternal.KubeletConfiguration) {
 	s.addMetricsBucketMatcher("healthz")
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
@@ -415,6 +415,37 @@ func (s *Server) InstallDefaultHandlers() {
 			To(s.checkpoint).
 			Operation("checkpoint"))
 		s.restfulCont.Add(ws)
+	}
+
+	if kubeCfg == nil {
+		return
+	}
+
+	// The server will panic if an endpoint is double registered.
+	endpointsUsed := map[string]struct{}{}
+	for _, endpoint := range s.restfulCont.RegisteredHandlePaths() {
+		endpointsUsed[endpoint] = struct{}{}
+	}
+	s.registerProxiedEndpointsFromConfig(endpointsUsed, kubeCfg.ProxiedEndpoints)
+}
+
+func (s *Server) registerProxiedEndpointsFromConfig(endpointsUsed map[string]struct{}, configEndpoints []kubeletconfiginternal.ProxiedEndpoint) {
+	for _, endpoint := range configEndpoints {
+		if _, ok := endpointsUsed[endpoint.ForwardPath]; ok {
+			klog.ErrorS(nil, "Config specified endpoint already reserved for the Kubelet. Skipping registration", "endpoint", endpoint.ForwardPath)
+			continue
+		}
+		// OriginPath is allowed to be empty, and will be set to the ForwardPath if it is.
+		if endpoint.OriginPath == "" {
+			endpoint.OriginPath = endpoint.ForwardPath
+		}
+		location := &url.URL{
+			Host: endpoint.Host,
+			Path: endpoint.OriginPath,
+		}
+		s.restfulCont.Handle(endpoint.ForwardPath,
+			proxy.NewUpgradeAwareHandler(location, nil /*transport*/, false /*wrapTransport*/, false /*upgradeRequired*/, &responder{}),
+		)
 	}
 }
 

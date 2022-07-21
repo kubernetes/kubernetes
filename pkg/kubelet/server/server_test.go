@@ -1495,3 +1495,61 @@ func TestTrimURLPath(t *testing.T) {
 		assert.Equal(t, test.expected, getURLRootPath(test.path), fmt.Sprintf("path is: %s", test.path))
 	}
 }
+
+func TestRegisterProxiedEndpoints(t *testing.T) {
+	tests := []struct {
+		endpointsUsed   map[string]struct{}
+		configEndpoints []kubeletconfiginternal.ProxiedEndpoint
+		addedLength     int
+	}{
+		{
+			endpointsUsed: map[string]struct{}{"/bogus": {}},
+			configEndpoints: []kubeletconfiginternal.ProxiedEndpoint{
+				{
+					Host:        "localhost",
+					OriginPath:  "/metrics/config",
+					ForwardPath: "/bogus",
+				},
+			},
+			addedLength: 0,
+		},
+		{
+			endpointsUsed: map[string]struct{}{},
+			configEndpoints: []kubeletconfiginternal.ProxiedEndpoint{
+				{
+					Host:        "localhost",
+					OriginPath:  "/metrics/config",
+					ForwardPath: "/metrics/config",
+				},
+			},
+			addedLength: 1,
+		},
+		{
+			endpointsUsed: map[string]struct{}{},
+			configEndpoints: []kubeletconfiginternal.ProxiedEndpoint{
+				{
+					Host:        "localhost",
+					ForwardPath: "/metrics/config",
+				},
+			},
+			addedLength: 1,
+		},
+		{
+			endpointsUsed:   map[string]struct{}{},
+			configEndpoints: []kubeletconfiginternal.ProxiedEndpoint{},
+			addedLength:     0,
+		},
+	}
+
+	for _, test := range tests {
+		// inner function so defer works as expected
+		func() {
+			fw := newServerTest()
+			defer fw.testHTTPServer.Close()
+			prevPaths := fw.serverUnderTest.restfulCont.RegisteredHandlePaths()
+			fw.serverUnderTest.registerProxiedEndpointsFromConfig(test.endpointsUsed, test.configEndpoints)
+			paths := fw.serverUnderTest.restfulCont.RegisteredHandlePaths()
+			assert.Equal(t, test.addedLength+len(prevPaths), len(paths), fmt.Sprintf("registered handle paths incorrectly have: %+v", paths))
+		}()
+	}
+}
