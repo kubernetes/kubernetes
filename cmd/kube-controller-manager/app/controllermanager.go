@@ -56,6 +56,7 @@ import (
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -360,6 +361,9 @@ type ControllerContext struct {
 	// multiple controllers don't get into lock-step and all hammer the apiserver
 	// with list requests simultaneously.
 	ResyncPeriod func() time.Duration
+
+	// ControllerManagerMetrics provides a proxy to set controller manager specific metrics.
+	ControllerManagerMetrics *controllersmetrics.ControllerManagerMetrics
 }
 
 // IsControllerEnabled checks if the context's controllers enabled or not
@@ -534,6 +538,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		LoopMode:                        loopMode,
 		InformersStarted:                make(chan struct{}),
 		ResyncPeriod:                    ResyncPeriod(s),
+		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics("kube-controller-manager"),
 	}
 	return ctx, nil
 }

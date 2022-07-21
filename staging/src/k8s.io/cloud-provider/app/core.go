@@ -32,6 +32,7 @@ import (
 	cloudnodelifecyclecontroller "k8s.io/cloud-provider/controllers/nodelifecycle"
 	routecontroller "k8s.io/cloud-provider/controllers/route"
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
+	controllermanagerapp "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
@@ -59,7 +60,7 @@ func startCloudNodeController(ctx context.Context, initContext ControllerInitCon
 	return nil, true, nil
 }
 
-func startCloudNodeLifecycleController(ctx context.Context, initContext ControllerInitContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
+func startCloudNodeLifecycleController(ctx context.Context, initContext ControllerInitContext, controlexContext controllermanagerapp.ControllerContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
 	// Start the cloudNodeLifecycleController
 	cloudNodeLifecycleController, err := cloudnodelifecyclecontroller.NewCloudNodeLifecycleController(
 		completedConfig.SharedInformers.Core().V1().Nodes(),
@@ -73,7 +74,7 @@ func startCloudNodeLifecycleController(ctx context.Context, initContext Controll
 		return nil, false, nil
 	}
 
-	go cloudNodeLifecycleController.Run(ctx)
+	go cloudNodeLifecycleController.Run(ctx, controlexContext.ControllerManagerMetrics)
 
 	return nil, true, nil
 }
