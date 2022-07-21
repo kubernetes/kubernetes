@@ -213,7 +213,7 @@ func CleanupTest(t *testing.T, testCtx *TestContext) {
 	testCtx.CancelFn()
 	// Cleanup nodes.
 	testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
-	framework.DeleteTestingNamespace(testCtx.NS, t)
+	framework.DeleteNamespaceOrDie(testCtx.ClientSet, testCtx.NS, t)
 	testCtx.CloseFn()
 }
 
