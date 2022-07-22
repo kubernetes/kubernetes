@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/events"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 )
@@ -609,7 +609,7 @@ type Handle interface {
 	KubeConfig() *restclient.Config
 
 	// EventRecorder returns an event recorder.
-	EventRecorder() events.EventRecorder
+	EventRecorder() record.EventRecorder
 
 	SharedInformerFactory() informers.SharedInformerFactory
 

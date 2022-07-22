@@ -26,6 +26,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -40,8 +41,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/events"
+	clientgokubescheme "k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
@@ -157,7 +160,8 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	}
 
 	// Start events processing pipeline.
-	cc.EventBroadcaster.StartRecordingToSink(ctx.Done())
+	cc.EventBroadcaster.StartStructuredLogging(0)
+	cc.EventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cc.EventClient.CoreV1().Events("")})
 	defer cc.EventBroadcaster.Shutdown()
 
 	// Setup healthz checks.
@@ -283,8 +287,8 @@ func newHealthzAndMetricsHandler(config *kubeschedulerconfig.KubeSchedulerConfig
 }
 
 func getRecorderFactory(cc *schedulerserverconfig.CompletedConfig) profile.RecorderFactory {
-	return func(name string) events.EventRecorder {
-		return cc.EventBroadcaster.NewRecorder(name)
+	return func(name string) record.EventRecorder {
+		return cc.EventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: name})
 	}
 }
 

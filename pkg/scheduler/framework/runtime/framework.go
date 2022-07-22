@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/events"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -89,7 +89,7 @@ type frameworkImpl struct {
 
 	clientSet       clientset.Interface
 	kubeConfig      *restclient.Config
-	eventRecorder   events.EventRecorder
+	eventRecorder   record.EventRecorder
 	informerFactory informers.SharedInformerFactory
 
 	metricsRecorder *metricsRecorder
@@ -137,7 +137,7 @@ type frameworkOptions struct {
 	componentConfigVersion string
 	clientSet              clientset.Interface
 	kubeConfig             *restclient.Config
-	eventRecorder          events.EventRecorder
+	eventRecorder          record.EventRecorder
 	informerFactory        informers.SharedInformerFactory
 	snapshotSharedLister   framework.SharedLister
 	metricsRecorder        *metricsRecorder
@@ -176,7 +176,7 @@ func WithKubeConfig(kubeConfig *restclient.Config) Option {
 }
 
 // WithEventRecorder sets clientSet for the scheduling frameworkImpl.
-func WithEventRecorder(recorder events.EventRecorder) Option {
+func WithEventRecorder(recorder record.EventRecorder) Option {
 	return func(o *frameworkOptions) {
 		o.eventRecorder = recorder
 	}
@@ -1293,7 +1293,7 @@ func (f *frameworkImpl) KubeConfig() *restclient.Config {
 }
 
 // EventRecorder returns an event recorder.
-func (f *frameworkImpl) EventRecorder() events.EventRecorder {
+func (f *frameworkImpl) EventRecorder() record.EventRecorder {
 	return f.eventRecorder
 }
 

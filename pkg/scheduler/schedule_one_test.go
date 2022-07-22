@@ -30,7 +30,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	eventsv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,7 +41,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	clienttesting "k8s.io/client-go/testing"
 	clientcache "k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/events"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/component-helpers/storage/volume"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -349,7 +348,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 	objs := append([]runtime.Object{
 		&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}, nodes...)
 	client := clientsetfake.NewSimpleClientset(objs...)
-	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	broadcaster := record.NewBroadcaster()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -411,15 +410,14 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		return true, binding, nil
 	})
 	controllers := make(map[string]string)
-	stopFn := broadcaster.StartEventWatcher(func(obj runtime.Object) {
-		e, ok := obj.(*eventsv1.Event)
-		if !ok || e.Reason != "Scheduled" {
+	watcher := broadcaster.StartEventWatcher(func(e *v1.Event) {
+		if e.Reason != "Scheduled" {
 			return
 		}
-		controllers[e.Regarding.Name] = e.ReportingController
+		controllers[e.InvolvedObject.Name] = e.Source.Component
 		wg.Done()
 	})
-	defer stopFn()
+	defer watcher.Stop()
 
 	// Run scheduler.
 	informerFactory.Start(ctx.Done())
@@ -446,8 +444,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 
 func TestSchedulerScheduleOne(t *testing.T) {
 	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
-	client := clientsetfake.NewSimpleClientset(&testNode)
-	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	eventBroadcaster := record.NewBroadcaster()
 	errS := errors.New("scheduler")
 	errB := errors.New("binder")
 	preBindErr := errors.New("on PreBind")
@@ -576,7 +573,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			fwk, err := st.NewFramework(registerPluginFuncs,
 				testSchedulerName,
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)))
+				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: testSchedulerName})))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -606,11 +603,10 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				gotError = err
 
 				msg := truncateMessage(err.Error())
-				fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+				fwk.EventRecorder().Eventf(p.Pod, v1.EventTypeWarning, "FailedScheduling", msg)
 			}
 			called := make(chan struct{})
-			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
-				e, _ := obj.(*eventsv1.Event)
+			watcher := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
 				if e.Reason != item.eventReason {
 					t.Errorf("got event %v, want %v", e.Reason, item.eventReason)
 				}
@@ -633,7 +629,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 			if diff := cmp.Diff(item.expectBind, gotBinding); diff != "" {
 				t.Errorf("got binding diff (-want, +got): %s", diff)
 			}
-			stopFunc()
+			watcher.Stop()
 		})
 	}
 }
@@ -858,9 +854,8 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 	findErr := fmt.Errorf("find err")
 	assumeErr := fmt.Errorf("assume err")
 	bindErr := fmt.Errorf("bind err")
-	client := clientsetfake.NewSimpleClientset()
 
-	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	eventBroadcaster := record.NewBroadcaster()
 
 	// This can be small because we wait for pod to finish scheduling first
 	chanTimeout := 2 * time.Second
@@ -952,8 +947,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 			fakeVolumeBinder := volumebinding.NewFakeVolumeBinder(item.volumeBinderConfig)
 			s, bindingChan, errChan := setupTestSchedulerWithVolumeBinding(ctx, fakeVolumeBinder, eventBroadcaster)
 			eventChan := make(chan struct{})
-			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
-				e, _ := obj.(*eventsv1.Event)
+			watcher := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
 				if e, a := item.eventReason, e.Reason; e != a {
 					t.Errorf("expected %v, got %v", e, a)
 				}
@@ -966,7 +960,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 			case <-time.After(wait.ForeverTestTimeout):
 				t.Fatalf("scheduling timeout after %v", wait.ForeverTestTimeout)
 			}
-			stopFunc()
+			watcher.Stop()
 			// Wait for scheduling to return an error or succeed binding.
 			var (
 				gotErr  error
@@ -1049,7 +1043,7 @@ func TestSchedulerBinding(t *testing.T) {
 			fwk, err := st.NewFramework([]st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			}, "", frameworkruntime.WithClientSet(client), frameworkruntime.WithEventRecorder(&events.FakeRecorder{}))
+			}, "", frameworkruntime.WithClientSet(client), frameworkruntime.WithEventRecorder(&record.FakeRecorder{}))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2630,7 +2624,7 @@ func setupTestSchedulerWithOnePodOnNode(ctx context.Context, t *testing.T, queue
 
 // queuedPodStore: pods queued before processing.
 // scache: scheduler cache that might contain assumed pods.
-func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, cache internalcache.Cache, informerFactory informers.SharedInformerFactory, broadcaster events.EventBroadcaster, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
+func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, cache internalcache.Cache, informerFactory informers.SharedInformerFactory, broadcaster record.EventBroadcaster, fns ...st.RegisterPluginFunc) (*Scheduler, chan *v1.Binding, chan error) {
 	bindingChan := make(chan *v1.Binding, 1)
 	client := clientsetfake.NewSimpleClientset()
 	client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
@@ -2642,11 +2636,11 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 		return true, b, nil
 	})
 
-	var recorder events.EventRecorder
+	var recorder record.EventRecorder
 	if broadcaster != nil {
-		recorder = broadcaster.NewRecorder(scheme.Scheme, testSchedulerName)
+		recorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: testSchedulerName})
 	} else {
-		recorder = &events.FakeRecorder{}
+		recorder = &record.FakeRecorder{}
 	}
 
 	if informerFactory == nil {
@@ -2682,12 +2676,12 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 		errChan <- err
 
 		msg := truncateMessage(err.Error())
-		fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+		fwk.EventRecorder().Eventf(p.Pod, v1.EventTypeWarning, "FailedScheduling", msg)
 	}
 	return sched, bindingChan, errChan
 }
 
-func setupTestSchedulerWithVolumeBinding(ctx context.Context, volumeBinder volumebinding.SchedulerVolumeBinder, broadcaster events.EventBroadcaster) (*Scheduler, chan *v1.Binding, chan error) {
+func setupTestSchedulerWithVolumeBinding(ctx context.Context, volumeBinder volumebinding.SchedulerVolumeBinder, broadcaster record.EventBroadcaster) (*Scheduler, chan *v1.Binding, chan error) {
 	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", UID: types.UID("node1")}}
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	pod := podWithID("foo", "")

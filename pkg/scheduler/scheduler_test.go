@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/events"
+	"k8s.io/client-go/tools/record"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
@@ -170,7 +170,7 @@ func TestSchedulerCreation(t *testing.T) {
 			client := fake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+			eventBroadcaster := record.NewBroadcaster()
 
 			stopCh := make(chan struct{})
 			defer close(stopCh)
@@ -448,12 +448,12 @@ func initScheduler(stop <-chan struct{}, cache internalcache.Cache, queue intern
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 	}
-	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	eventBroadcaster := record.NewBroadcaster()
 	fwk, err := st.NewFramework(registerPluginFuncs,
 		testSchedulerName,
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithInformerFactory(informerFactory),
-		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
+		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: testSchedulerName})),
 	)
 	if err != nil {
 		return nil, nil, err

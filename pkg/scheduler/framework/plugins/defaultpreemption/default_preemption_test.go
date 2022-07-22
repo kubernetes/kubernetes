@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/events"
+	"k8s.io/client-go/tools/record"
 	kubeschedulerconfigv1beta2 "k8s.io/kube-scheduler/config/v1beta2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -353,7 +353,7 @@ func TestPostFilter(t *testing.T) {
 			}
 			f, err := st.NewFramework(registeredPlugins, "",
 				frameworkruntime.WithClientSet(cs),
-				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
+				frameworkruntime.WithEventRecorder(&record.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithExtenders(extenders),
@@ -1679,7 +1679,7 @@ func TestPreempt(t *testing.T) {
 				},
 				"",
 				frameworkruntime.WithClientSet(client),
-				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
+				frameworkruntime.WithEventRecorder(&record.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),

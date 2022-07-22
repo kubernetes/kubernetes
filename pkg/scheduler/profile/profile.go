@@ -22,16 +22,17 @@ import (
 	"fmt"
 
 	"github.com/google/go-cmp/cmp"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/events"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
 // RecorderFactory builds an EventRecorder for a given scheduler name.
-type RecorderFactory func(string) events.EventRecorder
+type RecorderFactory func(string) record.EventRecorder
 
 // newProfile builds a Profile for the given configuration.
 func newProfile(cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
@@ -70,9 +71,9 @@ func (m Map) HandlesSchedulerName(name string) bool {
 }
 
 // NewRecorderFactory returns a RecorderFactory for the broadcaster.
-func NewRecorderFactory(b events.EventBroadcaster) RecorderFactory {
-	return func(name string) events.EventRecorder {
-		return b.NewRecorder(scheme.Scheme, name)
+func NewRecorderFactory(b record.EventBroadcaster) RecorderFactory {
+	return func(name string) record.EventRecorder {
+		return b.NewRecorder(scheme.Scheme, v1.EventSource{Component: name})
 	}
 }
 

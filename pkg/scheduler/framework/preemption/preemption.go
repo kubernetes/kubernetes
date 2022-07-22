@@ -340,7 +340,7 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 			klog.ErrorS(err, "Preempting pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
 			return framework.AsStatus(err)
 		}
-		fh.EventRecorder().Eventf(victim, pod, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v",
+		fh.EventRecorder().Eventf(victim, v1.EventTypeNormal, "Preempted", "Preempted by %v/%v on node %v",
 			pod.Namespace, pod.Name, c.Name())
 	}
 	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))

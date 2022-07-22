@@ -23,6 +23,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -30,9 +31,9 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	clientset "k8s.io/client-go/kubernetes"
+	clientgokubescheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
@@ -283,7 +284,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 		return nil, err
 	}
 
-	c.EventBroadcaster = events.NewEventBroadcasterAdapter(eventClient)
+	c.EventBroadcaster = record.NewBroadcaster()
 
 	// Set up leader election if enabled.
 	var leaderElectionConfig *leaderelection.LeaderElectionConfig
@@ -293,7 +294,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 		if len(c.ComponentConfig.Profiles) != 0 {
 			schedulerName = c.ComponentConfig.Profiles[0].SchedulerName
 		}
-		coreRecorder := c.EventBroadcaster.DeprecatedNewLegacyRecorder(schedulerName)
+		coreRecorder := c.EventBroadcaster.NewRecorder(clientgokubescheme.Scheme, v1.EventSource{Component: schedulerName})
 		leaderElectionConfig, err = makeLeaderElectionConfig(c.ComponentConfig.LeaderElection, kubeConfig, coreRecorder)
 		if err != nil {
 			return nil, err
@@ -301,6 +302,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	}
 
 	c.Client = client
+	c.EventClient = eventClient
 	c.KubeConfig = kubeConfig
 	c.InformerFactory = scheduler.NewInformerFactory(client, 0)
 	dynClient := dynamic.NewForConfigOrDie(kubeConfig)

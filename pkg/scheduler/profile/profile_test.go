@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/events"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -284,7 +284,7 @@ func newFakePlugin(name string) func(object runtime.Object, handle framework.Han
 	}
 }
 
-func nilRecorderFactory(_ string) events.EventRecorder {
+func nilRecorderFactory(_ string) record.EventRecorder {
 	return nil
 }
 
