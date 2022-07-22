@@ -477,7 +477,7 @@ func NewNodeLifecycleController(
 	nc.nodeLister = nodeInformer.Lister()
 
 	if nc.runTaintManager {
-		nc.taintManager = scheduler.NewNoExecuteTaintManager(ctx, kubeClient, nc.podLister, nc.nodeLister, nc.getPodsAssignedToNode)
+		nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient, nc.podLister, nc.nodeLister, nc.getPodsAssignedToNode)
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
 				nc.taintManager.NodeUpdated(nil, node)
