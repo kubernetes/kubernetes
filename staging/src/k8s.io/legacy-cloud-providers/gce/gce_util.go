@@ -78,6 +78,7 @@ func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
 	mockGCE.MockRegionBackendServices.UpdateHook = mock.UpdateRegionBackendServiceHook
 	mockGCE.MockHealthChecks.UpdateHook = mock.UpdateHealthCheckHook
 	mockGCE.MockFirewalls.UpdateHook = mock.UpdateFirewallHook
+	mockGCE.MockFirewalls.PatchHook = mock.UpdateFirewallHook
 
 	keyGA := meta.GlobalKey("key-ga")
 	mockGCE.MockZones.Objects[*keyGA] = &cloud.MockZonesObj{
