@@ -445,6 +445,13 @@ type KubeletConfiguration struct {
 	// registerNode enables automatic registration with the apiserver.
 	// +optional
 	RegisterNode bool
+
+	// ProxiedEndpoints are endpoints that an admin can specify will be relayed by the Kubelet.
+	// This allows the endpoints to have the benefits of the Kubelet HTTP server (authentication, API proxy).
+	// +featureGate=PodAndContainerStatsFromCRI
+	// Default: nil
+	// +optional
+	ProxiedEndpoints []ProxiedEndpoint
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -621,4 +628,19 @@ type MemorySwapConfiguration struct {
 	// +featureGate=NodeSwap
 	// +optional
 	SwapBehavior string
+}
+
+// A ProxiedEndpoint is an endpoint that an admin can specify will be relayed by the Kubelet.
+// This allows the endpoints to have the benefits of the Kubelet HTTP server (authentication, API proxy).
+// This field can be used for the metrics from a CRI implementation to be reverse-proxied by the Kubelet,
+// in a similar way to how cadvisor's `/metrics/cadvisor` endpoint is.
+type ProxiedEndpoint struct {
+	// host or host:port
+	Host string
+	// Path the Kubelet will register to pull from the source.
+	ForwardPath string
+	// Path that will be registered as the source.
+	// If empty, ForwardPath will be used.
+	// +optional
+	OriginPath string
 }

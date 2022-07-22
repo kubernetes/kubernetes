@@ -780,6 +780,13 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	RegisterNode *bool `json:"registerNode,omitempty"`
+
+	// ProxiedEndpoints are endpoints that an admin can specify will be relayed by the Kubelet.
+	// This allows the endpoints to have the benefits of the Kubelet HTTP server (authentication, API proxy).
+	// +featureGate=PodAndContainerStatsFromCRI
+	// Default: nil
+	// +optional
+	ProxiedEndpoints []ProxiedEndpoint `json:"proxiedEndpoints,omitempty"`
 }
 
 type KubeletAuthorizationMode string
@@ -964,4 +971,18 @@ type CredentialProvider struct {
 type ExecEnvVar struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+// A ProxiedEndpoint is an endpoint that an admin can specify will be relayed by the Kubelet.
+// This allows the endpoints to have the benefits of the Kubelet HTTP server (authentication, API proxy).
+// This field can be used for the metrics from a CRI implementation to be reverse-proxied by the Kubelet,
+// in a similar way to how cadvisor's `/metrics/cadvisor` endpoint is.
+type ProxiedEndpoint struct {
+	// host or host:port
+	Host string `json:"host"`
+	// Path the Kubelet will register to pull from the source.
+	ForwardPath string `json:"fowardPath"`
+	// Path that will be registered as the source.
+	// +optional
+	OriginPath string `json:"originPath"`
 }

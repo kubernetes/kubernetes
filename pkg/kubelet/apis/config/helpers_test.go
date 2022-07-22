@@ -248,6 +248,7 @@ var (
 		"NodeStatusUpdateFrequency.Duration",
 		"NodeStatusReportFrequency.Duration",
 		"OOMScoreAdj",
+		"ProxiedEndpoints",
 		"PodCIDR",
 		"PodPidsLimit",
 		"PodsPerCore",
