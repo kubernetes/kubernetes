@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -173,13 +174,29 @@ func NewDefaultPluginHandler(validPrefixes []string) *DefaultPluginHandler {
 func (h *DefaultPluginHandler) Lookup(filename string) (string, bool) {
 	for _, prefix := range h.ValidPrefixes {
 		path, err := exec.LookPath(fmt.Sprintf("%s-%s", prefix, filename))
-		if err != nil || len(path) == 0 {
+		if shouldSkipOnLookPathErr(err) || len(path) == 0 {
 			continue
 		}
 		return path, true
 	}
-
 	return "", false
+}
+
+func Command(name string, arg ...string) *exec.Cmd {
+	cmd := &exec.Cmd{
+		Path: name,
+		Args: append([]string{name}, arg...),
+	}
+	if filepath.Base(name) == name {
+		lp, err := exec.LookPath(name)
+		if lp != "" && !shouldSkipOnLookPathErr(err) {
+			// Update cmd.Path even if err is non-nil.
+			// If err is ErrDot (especially on Windows), lp may include a resolved
+			// extension (like .exe or .bat) that should be preserved.
+			cmd.Path = lp
+		}
+	}
+	return cmd
 }
 
 // Execute implements PluginHandler
@@ -187,7 +204,7 @@ func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environme
 
 	// Windows does not support exec syscall.
 	if runtime.GOOS == "windows" {
-		cmd := exec.Command(executablePath, cmdArgs...)
+		cmd := Command(executablePath, cmdArgs...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
