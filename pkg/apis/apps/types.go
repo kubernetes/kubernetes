@@ -721,7 +721,12 @@ type DaemonSetStatus struct {
 // DaemonSetConditionType defines a daemon set condition.
 type DaemonSetConditionType string
 
-// TODO: Add valid condition types of a DaemonSet.
+// These are valid conditions of a daemon set.
+const (
+	// DaemonSetAvailable means the daemon set is available, ie. at least the minimum available
+	// replicas required are up and running for at least minReadySeconds.
+	DaemonSetAvailable DaemonSetConditionType = "Available"
+)
 
 // DaemonSetCondition describes the state of a DaemonSet at a certain point.
 type DaemonSetCondition struct {
