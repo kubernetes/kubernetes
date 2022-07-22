@@ -421,7 +421,7 @@ const (
 	ModeNode string = "Node"
 
 	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "3.7"
+	PauseVersion = "3.8"
 
 	// CgroupDriverSystemd holds the systemd driver type
 	CgroupDriverSystemd = "systemd"
