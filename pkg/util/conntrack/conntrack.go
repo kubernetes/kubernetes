@@ -86,7 +86,7 @@ func Exists(execer exec.Interface) bool {
 // https://github.com/kubernetes/kubernetes/issues/31983
 func ClearEntriesForPort(execer exec.Interface, port int, isIPv6 bool, protocol v1.Protocol) error {
 	if port <= 0 {
-		return fmt.Errorf("Wrong port number. The port number must be greater than zero")
+		return fmt.Errorf("wrong port number. The port number must be greater than zero")
 	}
 	parameters := parametersWithFamily(isIPv6, "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port))
 	err := Exec(execer, parameters...)
@@ -117,7 +117,7 @@ func ClearEntriesForNAT(execer exec.Interface, origin, dest string, protocol v1.
 // https://github.com/kubernetes/kubernetes/issues/59368
 func ClearEntriesForPortNAT(execer exec.Interface, dest string, port int, protocol v1.Protocol) error {
 	if port <= 0 {
-		return fmt.Errorf("Wrong port number. The port number must be greater than zero")
+		return fmt.Errorf("wrong port number. The port number must be greater than zero")
 	}
 	parameters := parametersWithFamily(utilnet.IsIPv6String(dest), "-D", "-p", protoStr(protocol), "--dport", strconv.Itoa(port), "--dst-nat", dest)
 	err := Exec(execer, parameters...)
