@@ -24,7 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // Write and other vars are slices of the allowed verbs.
@@ -214,13 +216,21 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				).RuleOrDie(),
 			},
 		},
+	}
+
+	basicUserRules := []rbacv1.PolicyRule{
+		rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews", "selfsubjectrulesreviews").RuleOrDie(),
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.APISelfSubjectReview) {
+		basicUserRules = append(basicUserRules, rbacv1helpers.NewRule("create").Groups(authenticationGroup).Resources("selfsubjectreviews").RuleOrDie())
+	}
+
+	roles = append(roles, []rbacv1.ClusterRole{
 		{
 			// a role which provides minimal resource access to allow a "normal" user to learn information about themselves
 			ObjectMeta: metav1.ObjectMeta{Name: "system:basic-user"},
-			Rules: []rbacv1.PolicyRule{
-				// TODO add future selfsubjectrulesreview, project request APIs, project listing APIs
-				rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("selfsubjectaccessreviews", "selfsubjectrulesreviews").RuleOrDie(),
-			},
+			Rules:      basicUserRules,
 		},
 		{
 			// a role which provides just enough power read insensitive cluster information
@@ -495,7 +505,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule("approve").Groups(certificatesGroup).Resources("signers").Names(capi.KubeAPIServerClientKubeletSignerName).RuleOrDie(),
 			},
 		},
-	}
+	}...)
 
 	// Add the cluster role for reading the ServiceAccountIssuerDiscovery endpoints
 	roles = append(roles, rbacv1.ClusterRole{

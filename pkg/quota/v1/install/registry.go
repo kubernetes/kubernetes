@@ -44,6 +44,7 @@ var ignoredResources = map[schema.GroupResource]struct{}{
 	{Group: "", Resource: "bindings"}:                                       {},
 	{Group: "", Resource: "componentstatuses"}:                              {},
 	{Group: authentication.GroupName, Resource: "tokenreviews"}:             {},
+	{Group: authentication.GroupName, Resource: "selfsubjectreviews"}:       {},
 	{Group: authorization.GroupName, Resource: "subjectaccessreviews"}:      {},
 	{Group: authorization.GroupName, Resource: "selfsubjectaccessreviews"}:  {},
 	{Group: authorization.GroupName, Resource: "localsubjectaccessreviews"}: {},
