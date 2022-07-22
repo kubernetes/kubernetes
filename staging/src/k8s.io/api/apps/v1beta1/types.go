@@ -323,7 +323,15 @@ type StatefulSetStatus struct {
 	AvailableReplicas int32 `json:"availableReplicas" protobuf:"varint,11,opt,name=availableReplicas"`
 }
 
+// StatefulSetConditionType describes the condition types of StatefulSets.
 type StatefulSetConditionType string
+
+// These are valid conditions of a stateful set.
+const (
+	// StatefulSetAvailable means the stateful set is available, ie. at least the minimum available
+	// replicas required are up and running for at least minReadySeconds.
+	StatefulSetAvailable StatefulSetConditionType = "Available"
+)
 
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetCondition struct {

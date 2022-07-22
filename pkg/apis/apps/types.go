@@ -262,7 +262,12 @@ type StatefulSetStatus struct {
 // StatefulSetConditionType describes the condition types of StatefulSets.
 type StatefulSetConditionType string
 
-// TODO: Add valid condition types for Statefulsets.
+// These are valid conditions of a stateful set.
+const (
+	// StatefulSetAvailable means the stateful set is available, ie. at least the minimum available
+	// replicas required are up and running for at least minReadySeconds.
+	StatefulSetAvailable StatefulSetConditionType = "Available"
+)
 
 // StatefulSetCondition describes the state of a statefulset at a certain point.
 type StatefulSetCondition struct {
