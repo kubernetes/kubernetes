@@ -998,6 +998,7 @@ go.opentelemetry.io/otel/sdk/instrumentation
 go.opentelemetry.io/otel/sdk/internal
 go.opentelemetry.io/otel/sdk/resource
 go.opentelemetry.io/otel/sdk/trace
+go.opentelemetry.io/otel/sdk/trace/tracetest
 # go.opentelemetry.io/otel/sdk/export/metric v0.20.0 => go.opentelemetry.io/otel/sdk/export/metric v0.20.0
 ## explicit; go 1.14
 go.opentelemetry.io/otel/sdk/export/metric
