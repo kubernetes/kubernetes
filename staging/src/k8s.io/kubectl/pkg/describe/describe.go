@@ -769,6 +769,9 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		if pod.Spec.RuntimeClassName != nil && len(*pod.Spec.RuntimeClassName) > 0 {
 			w.Write(LEVEL_0, "Runtime Class Name:\t%s\n", *pod.Spec.RuntimeClassName)
 		}
+		if len(pod.Spec.ServiceAccountName) > 0 {
+			w.Write(LEVEL_0, "Service Account:\t%s\n", pod.Spec.ServiceAccountName)
+		}
 		if pod.Spec.NodeName == "" {
 			w.Write(LEVEL_0, "Node:\t<none>\n")
 		} else {
