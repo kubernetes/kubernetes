@@ -450,11 +450,9 @@ type CompletedConfig struct {
 // of our configured apiserver. We should prefer this to adding healthChecks directly to
 // the config unless we explicitly want to add a healthcheck only to a specific health endpoint.
 func (c *Config) AddHealthChecks(healthChecks ...healthz.HealthChecker) {
-	for _, check := range healthChecks {
-		c.HealthzChecks = append(c.HealthzChecks, check)
-		c.LivezChecks = append(c.LivezChecks, check)
-		c.ReadyzChecks = append(c.ReadyzChecks, check)
-	}
+	c.HealthzChecks = append(c.HealthzChecks, healthChecks...)
+	c.LivezChecks = append(c.LivezChecks, healthChecks...)
+	c.ReadyzChecks = append(c.ReadyzChecks, healthChecks...)
 }
 
 // AddPostStartHook allows you to add a PostStartHook that will later be added to the server itself in a New call.
