@@ -108,7 +108,7 @@ var _ = SIGDescribe("Aggregator", func() {
 		TestSampleAPIServer(f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer))
 	})
 
-	ginkgo.It("should manage the lifecycle of an APIService", func() {
+	ginkgo.It("should manage the lifecycle of an APIService [Serial][Disruptive]", func() {
 
 		ns := f.Namespace.Name
 		framework.Logf("ns: %v", ns)
