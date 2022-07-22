@@ -54,10 +54,9 @@ func ActsAsRootCommand(cmd *cobra.Command, filters []string, groups ...CommandGr
 func UseOptionsTemplates(cmd *cobra.Command) {
 	templater := &templater{
 		UsageTemplate: OptionsUsageTemplate(),
-		HelpTemplate:  OptionsHelpTemplate(),
 	}
 	cmd.SetUsageFunc(templater.UsageFunc())
-	cmd.SetHelpFunc(templater.HelpFunc())
+	cmd.SetHelpFunc(cmd.Run)
 }
 
 type templater struct {

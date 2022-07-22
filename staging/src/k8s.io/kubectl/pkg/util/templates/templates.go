@@ -90,14 +90,9 @@ func MainUsageTemplate() string {
 	return strings.TrimRightFunc(strings.Join(sections, ""), unicode.IsSpace)
 }
 
-// OptionsHelpTemplate if the template for 'help' used by the 'options' command.
-func OptionsHelpTemplate() string {
-	return ""
-}
-
 // OptionsUsageTemplate if the template for 'usage' used by the 'options' command.
 func OptionsUsageTemplate() string {
-	return `{{ if .HasInheritedFlags}}The following options can be passed to any command:
+	return `{{ if .HasInheritedFlags}}The following options can be passed to any command.
 
 {{flagsUsages .InheritedFlags}}{{end}}`
 }
