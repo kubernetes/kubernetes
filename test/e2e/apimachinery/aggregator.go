@@ -108,19 +108,7 @@ var _ = SIGDescribe("Aggregator", func() {
 		TestSampleAPIServer(f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer))
 	})
 
-	/*
-		Release: v1.25
-		Testname: Aggregator, manage lifecycle of an APIService
-		Description: An APIService is created which MUST succeed. The
-		APIService status when replaced MUST succeed. Given the updating
-		of the APIService status, the fields MUST equal the new values.
-		The APIService status when patched MUST succeed. Given the patching
-		of the APIService status, the fields MUST equal the new values. The
-		APIService when replaced MUST succeed. Given the updating of the
-		APIService, the fields MUST equal the new values. It MUST succeed at
-		deleting a collection of APIServices via a label selector.
-	*/
-	framework.ConformanceIt("should manage the lifecycle of an APIService", func() {
+	ginkgo.It("should manage the lifecycle of an APIService [Serial][Disruptive]", func() {
 
 		ns := f.Namespace.Name
 		framework.Logf("ns: %v", ns)
