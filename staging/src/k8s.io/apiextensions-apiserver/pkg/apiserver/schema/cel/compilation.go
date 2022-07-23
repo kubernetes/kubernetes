@@ -89,16 +89,16 @@ func getBaseEnv() (*cel.Env, error) {
 }
 
 // Compile compiles all the XValidations rules (without recursing into the schema) and returns a slice containing a
-// CompilationResult for each ValidationRule, or an error.
+// CompilationResult for each ValidationRule, or an error. declType is expected to be a CEL DeclType corresponding
+// to the structural schema.
 // Each CompilationResult may contain:
 /// - non-nil Program, nil Error: The program was compiled successfully
 //  - nil Program, non-nil Error: Compilation resulted in an error
 //  - nil Program, nil Error: The provided rule was empty so compilation was not attempted
 // perCallLimit was added for testing purpose only. Callers should always use const PerCallLimit as input.
-func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]CompilationResult, error) {
+func Compile(s *schema.Structural, declType *celmodel.DeclType, perCallLimit uint64) ([]CompilationResult, error) {
 	t := time.Now()
 	defer metrics.Metrics.ObserveCompilation(time.Since(t))
-
 	if len(s.Extensions.XValidations) == 0 {
 		return nil, nil
 	}
@@ -113,7 +113,7 @@ func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]
 	}
 	reg := celmodel.NewRegistry(baseEnv)
 	scopedTypeName := generateUniqueSelfTypeName()
-	rt, err := celmodel.NewRuleTypes(scopedTypeName, s, isResourceRoot, reg)
+	rt, err := celmodel.NewRuleTypes(scopedTypeName, declType, reg)
 	if err != nil {
 		return nil, err
 	}
@@ -126,11 +126,10 @@ func Compile(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) ([]
 	}
 	root, ok = rt.FindDeclType(scopedTypeName)
 	if !ok {
-		rootDecl := celmodel.SchemaDeclType(s, isResourceRoot)
-		if rootDecl == nil {
+		if declType == nil {
 			return nil, fmt.Errorf("rule declared on schema that does not support validation rules type: '%s' x-kubernetes-preserve-unknown-fields: '%t'", s.Type, s.XPreserveUnknownFields)
 		}
-		root = rootDecl.MaybeAssignTypeName(scopedTypeName)
+		root = declType.MaybeAssignTypeName(scopedTypeName)
 	}
 	propDecls = append(propDecls, cel.Variable(ScopedVarName, root.CelType()))
 	propDecls = append(propDecls, cel.Variable(OldScopedVarName, root.CelType()))

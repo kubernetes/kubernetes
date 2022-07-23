@@ -65,27 +65,47 @@ type Validator struct {
 // Returns nil only if there no validator rules in the Structural schema. May return a validator containing
 // only errors.
 // Adding perCallLimit as input arg for testing purpose only. Callers should always use const PerCallLimit as input
-func NewValidator(s *schema.Structural, perCallLimit uint64) *Validator {
-	return validator(s, true, perCallLimit)
+func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *Validator {
+	return validator(s, true, model.SchemaDeclType(s, isResourceRoot), perCallLimit)
 }
 
-func validator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *Validator {
-	compiledRules, err := Compile(s, isResourceRoot, perCallLimit)
+// validator creates a Validator for all x-kubernetes-validations at the level of the provided schema and lower and
+// returns the Validator if any x-kubernetes-validations exist in the schema, or nil if no x-kubernetes-validations
+// exist. declType is expected to be a CEL DeclType corresponding to the structural schema.
+func validator(s *schema.Structural, isResourceRoot bool, declType *model.DeclType, perCallLimit uint64) *Validator {
+	compiledRules, err := Compile(s, declType, perCallLimit)
 	var itemsValidator, additionalPropertiesValidator *Validator
 	var propertiesValidators map[string]Validator
 	if s.Items != nil {
-		itemsValidator = validator(s.Items, s.Items.XEmbeddedResource, perCallLimit)
+		itemsValidator = validator(s.Items, s.Items.XEmbeddedResource, declType.ElemType, perCallLimit)
 	}
 	if len(s.Properties) > 0 {
 		propertiesValidators = make(map[string]Validator, len(s.Properties))
-		for k, prop := range s.Properties {
-			if p := validator(&prop, prop.XEmbeddedResource, perCallLimit); p != nil {
+		for k, p := range s.Properties {
+			prop := p
+			var fieldType *model.DeclType
+			if escapedPropName, ok := model.Escape(k); ok {
+				if f, ok := declType.Fields[escapedPropName]; ok {
+					fieldType = f.Type
+				} else {
+					// fields with unknown types are omitted from CEL validation entirely
+					continue
+				}
+			} else {
+				// field may be absent from declType if the property name is unescapable, in which case we should convert
+				// the field value type to a DeclType.
+				fieldType = model.SchemaDeclType(&prop, prop.XEmbeddedResource)
+				if fieldType == nil {
+					continue
+				}
+			}
+			if p := validator(&prop, prop.XEmbeddedResource, fieldType, perCallLimit); p != nil {
 				propertiesValidators[k] = *p
 			}
 		}
 	}
 	if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
-		additionalPropertiesValidator = validator(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource, perCallLimit)
+		additionalPropertiesValidator = validator(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource, declType.ElemType, perCallLimit)
 	}
 	if len(compiledRules) > 0 || err != nil || itemsValidator != nil || additionalPropertiesValidator != nil || len(propertiesValidators) > 0 {
 		var activationFactory func(*schema.Structural, interface{}, interface{}) interpreter.Activation = validationActivationWithoutOldSelf
