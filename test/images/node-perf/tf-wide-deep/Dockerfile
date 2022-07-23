@@ -28,11 +28,9 @@ RUN case $(uname -m) in \
       ;; \
     esac
 
-RUN wget https://github.com/tensorflow/models/archive/v1.9.0.tar.gz \
-&& tar xzf v1.9.0.tar.gz \
-&& rm -f v1.9.0.tar.gz
+ADD ./models-1.9.0/ ./models-1.9.0/
 
 WORKDIR $HOME/models-1.9.0/official/wide_deep
 ENV PYTHONPATH=$PYTHONPATH:$HOME/models-1.9.0
 
-ENTRYPOINT python ./data_download.py && python ./wide_deep.py
+ENTRYPOINT python ./wide_deep.py --data_dir ./census_data
