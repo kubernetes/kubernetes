@@ -315,7 +315,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 							Name:  "bar",
 							Image: image,
 							Command: []string{
-								"/bin/sh", "-c", "sleep 10; fallocate -l 10M file; sleep 10000",
+								"/bin/sh", "-c", "sleep 10; dd if=/dev/zero of=file bs=1M count=10; sleep 10000",
 							},
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
