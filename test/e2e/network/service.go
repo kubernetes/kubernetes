@@ -2408,7 +2408,7 @@ var _ = common.SIGDescribe("Services", func() {
 		// Create a pod in one node to get evicted
 		ginkgo.By("creating a client pod that is going to be evicted for the service " + serviceName)
 		evictedPod := e2epod.NewAgnhostPod(namespace, "evicted-pod", nil, nil, nil)
-		evictedPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "sleep 10; fallocate -l 10M file; sleep 10000"}
+		evictedPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", "sleep 10; dd if=/dev/zero of=file bs=1M count=10; sleep 10000"}
 		evictedPod.Spec.Containers[0].Name = "evicted-pod"
 		evictedPod.Spec.Containers[0].Resources = v1.ResourceRequirements{
 			Limits: v1.ResourceList{"ephemeral-storage": resource.MustParse("5Mi")},
