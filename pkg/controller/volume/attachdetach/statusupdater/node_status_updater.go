@@ -86,15 +86,16 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatusForNode(nodeName types.NodeName) e
 
 func (nsu *nodeStatusUpdater) processNodeVolumes(nodeName types.NodeName, attachedVolumes []v1.AttachedVolume) error {
 	nodeObj, err := nsu.nodeLister.Get(string(nodeName))
-	if errors.IsNotFound(err) {
-		// If node does not exist, its status cannot be updated.
-		// Do nothing so that there is no retry until node is created.
-		klog.V(2).Infof(
-			"Could not update node status. Failed to find node %q in NodeInformer cache. Error: '%v'",
-			nodeName,
-			err)
-		return nil
-	} else if err != nil {
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// If node does not exist, its status cannot be updated.
+			// Do nothing so that there is no retry until node is created.
+			klog.V(2).Infof(
+				"Could not update node status. Failed to find node %q in NodeInformer cache. Error: '%v'",
+				nodeName,
+				err)
+			return nil
+		}
 		// For all other errors, log error and reset flag statusUpdateNeeded
 		// back to true to indicate this node status needs to be updated again.
 		klog.V(2).Infof("Error retrieving nodes from node lister. Error: %v", err)
@@ -102,15 +103,15 @@ func (nsu *nodeStatusUpdater) processNodeVolumes(nodeName types.NodeName, attach
 		return err
 	}
 
-	err = nsu.updateNodeStatus(nodeName, nodeObj, attachedVolumes)
-	if errors.IsNotFound(err) {
-		// If node does not exist, its status cannot be updated.
-		// Do nothing so that there is no retry until node is created.
-		klog.V(2).Infof(
-			"Could not update node status for %q; node does not exist - skipping",
-			nodeName)
-		return nil
-	} else if err != nil {
+	if err = nsu.updateNodeStatus(nodeName, nodeObj, attachedVolumes); err != nil {
+		if errors.IsNotFound(err) {
+			// If node does not exist, its status cannot be updated.
+			// Do nothing so that there is no retry until node is created.
+			klog.V(2).Infof(
+				"Could not update node status for %q; node does not exist - skipping",
+				nodeName)
+			return nil
+		}
 		// If update node status fails, reset flag statusUpdateNeeded back to true
 		// to indicate this node status needs to be updated again
 		nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
@@ -122,6 +123,7 @@ func (nsu *nodeStatusUpdater) processNodeVolumes(nodeName types.NodeName, attach
 
 		return err
 	}
+
 	return nil
 }
 

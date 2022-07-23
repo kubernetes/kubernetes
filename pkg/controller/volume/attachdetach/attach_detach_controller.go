@@ -343,12 +343,11 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 		return
 	}
 
-	err := adc.populateActualStateOfWorld()
-	if err != nil {
+	if err := adc.populateActualStateOfWorld(); err != nil {
 		klog.Errorf("Error populating the actual state of world: %v", err)
 	}
-	err = adc.populateDesiredStateOfWorld()
-	if err != nil {
+
+	if err := adc.populateDesiredStateOfWorld(); err != nil {
 		klog.Errorf("Error populating the desired state of world: %v", err)
 	}
 	go adc.reconciler.Run(stopCh)
@@ -465,21 +464,22 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 					err)
 				continue
 			}
+
 			attachState := adc.actualStateOfWorld.GetAttachState(volumeName, nodeName)
-			if attachState == cache.AttachStateAttached {
-				klog.V(10).Infof("Volume %q is attached to node %q. Marking as attached in ActualStateOfWorld",
-					volumeName,
-					nodeName,
-				)
-				devicePath, err := adc.getNodeVolumeDevicePath(volumeName, nodeName)
-				if err != nil {
-					klog.Errorf("Failed to find device path: %v", err)
-					continue
-				}
-				err = adc.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, devicePath)
-				if err != nil {
-					klog.Errorf("Failed to update volume spec for node %s: %v", nodeName, err)
-				}
+			if attachState != cache.AttachStateAttached {
+				continue
+			}
+			klog.V(10).Infof("Volume %q is attached to node %q. Marking as attached in ActualStateOfWorld",
+				volumeName,
+				nodeName,
+			)
+			devicePath, err := adc.getNodeVolumeDevicePath(volumeName, nodeName)
+			if err != nil {
+				klog.Errorf("Failed to find device path: %v", err)
+				continue
+			}
+			if err = adc.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, devicePath); err != nil {
+				klog.Errorf("Failed to update volume spec for node %s: %v", nodeName, err)
 			}
 		}
 	}
@@ -627,11 +627,11 @@ func (adc *attachDetachController) syncPVCByKey(key string) error {
 		return nil
 	}
 	pvc, err := adc.pvcLister.PersistentVolumeClaims(namespace).Get(name)
-	if apierrors.IsNotFound(err) {
-		klog.V(4).Infof("error getting pvc %q from informer: %v", key, err)
-		return nil
-	}
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			klog.V(4).Infof("error getting pvc %q from informer: %v", key, err)
+			return nil
+		}
 		return err
 	}
 
@@ -724,21 +724,23 @@ func (adc *attachDetachController) processVolumeAttachments() error {
 		// In-tree plugins that provisioned PVs will not be registered anymore after migration to CSI, once the respective
 		// feature gate is enabled.
 		if inTreePluginName, err := adc.csiMigratedPluginManager.GetInTreePluginNameFromSpec(pv, nil); err == nil {
-			if adc.csiMigratedPluginManager.IsMigrationEnabledForPlugin(inTreePluginName) {
-				// PV is migrated and should be handled by the CSI plugin instead of the in-tree one
-				plugin, _ = adc.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
-				// podNamespace is not needed here for Azurefile as the volumeName generated will be the same with or without podNamespace
-				volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, "" /* podNamespace */, adc.intreeToCSITranslator)
-				if err != nil {
-					klog.Errorf(
-						"Failed to translate intree volumeSpec to CSI volumeSpec for volume:%q, va.Name:%q, nodeName:%q: %s. Error: %v",
-						*pvName,
-						va.Name,
-						nodeName,
-						inTreePluginName,
-						err)
-					continue
-				}
+			if !adc.csiMigratedPluginManager.IsMigrationEnabledForPlugin(inTreePluginName) {
+				continue
+			}
+
+			// PV is migrated and should be handled by the CSI plugin instead of the in-tree one
+			plugin, _ = adc.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
+			// podNamespace is not needed here for Azurefile as the volumeName generated will be the same with or without podNamespace
+			volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, "" /* podNamespace */, adc.intreeToCSITranslator)
+			if err != nil {
+				klog.Errorf(
+					"Failed to translate intree volumeSpec to CSI volumeSpec for volume:%q, va.Name:%q, nodeName:%q: %s. Error: %v",
+					*pvName,
+					va.Name,
+					nodeName,
+					inTreePluginName,
+					err)
+				continue
 			}
 		}
 
@@ -896,17 +898,19 @@ func (adc *attachDetachController) GetExec(pluginName string) utilexec.Interface
 }
 
 func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {
-	if _, exists := node.Annotations[volumeutil.ControllerManagedAttachAnnotation]; exists {
-		keepTerminatedPodVolumes := false
-
-		if t, ok := node.Annotations[volumeutil.KeepTerminatedPodVolumesAnnotation]; ok {
-			keepTerminatedPodVolumes = (t == "true")
-		}
-
-		// Node specifies annotation indicating it should be managed by attach
-		// detach controller. Add it to desired state of world.
-		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
+	if _, exists := node.Annotations[volumeutil.ControllerManagedAttachAnnotation]; !exists {
+		return
 	}
+
+	keepTerminatedPodVolumes := false
+
+	if t, ok := node.Annotations[volumeutil.KeepTerminatedPodVolumesAnnotation]; ok {
+		keepTerminatedPodVolumes = (t == "true")
+	}
+
+	// Node specifies annotation indicating it should be managed by attach
+	// detach controller. Add it to desired state of world.
+	adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
 }
 
 func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {

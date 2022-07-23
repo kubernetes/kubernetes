@@ -1247,7 +1247,6 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(volume *v1.Persis
 		if _, err = ctrl.updateVolumePhaseWithEvent(volume, v1.VolumeFailed, v1.EventTypeWarning, events.VolumeFailedRecycle, "No recycler plugin found for the volume!"); err != nil {
 			klog.V(4).Infof("recycleVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
 			// Save failed, retry on the next deletion attempt
-			return
 		}
 		// Despite the volume being Failed, the controller will retry recycling
 		// the volume in every syncVolume() call.
@@ -1263,7 +1262,6 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(volume *v1.Persis
 		if _, err = ctrl.updateVolumePhaseWithEvent(volume, v1.VolumeFailed, v1.EventTypeWarning, events.VolumeFailedRecycle, strerr); err != nil {
 			klog.V(4).Infof("recycleVolumeOperation [%s]: failed to mark volume as failed: %v", volume.Name, err)
 			// Save failed, retry on the next deletion attempt
-			return
 		}
 		// Despite the volume being Failed, the controller will retry recycling
 		// the volume in every syncVolume() call.

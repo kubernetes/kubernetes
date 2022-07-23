@@ -170,121 +170,120 @@ func (rc *reconciler) reconcile() {
 
 	// Ensure volumes that should be detached are detached.
 	for _, attachedVolume := range rc.actualStateOfWorld.GetAttachedVolumes() {
-		if !rc.desiredStateOfWorld.VolumeExists(
-			attachedVolume.VolumeName, attachedVolume.NodeName) {
+		if rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName, attachedVolume.NodeName) {
+			continue
+		}
 
-			// Check whether there already exist an operation pending, and don't even
-			// try to start an operation if there is already one running.
-			// This check must be done before we do any other checks, as otherwise the other checks
-			// may pass while at the same time the volume leaves the pending state, resulting in
-			// double detach attempts
-			// The operation key format is different depending on whether the volume
-			// allows multi attach across different nodes.
-			if util.IsMultiAttachAllowed(attachedVolume.VolumeSpec) {
-				if !rc.attacherDetacher.IsOperationSafeToRetry(attachedVolume.VolumeName, "" /* podName */, attachedVolume.NodeName, operationexecutor.DetachOperationName) {
-					klog.V(10).Infof("Operation for volume %q is already running or still in exponential backoff for node %q. Can't start detach", attachedVolume.VolumeName, attachedVolume.NodeName)
-					continue
-				}
+		// Check whether there already exist an operation pending, and don't even
+		// try to start an operation if there is already one running.
+		// This check must be done before we do any other checks, as otherwise the other checks
+		// may pass while at the same time the volume leaves the pending state, resulting in
+		// double detach attempts
+		// The operation key format is different depending on whether the volume
+		// allows multi attach across different nodes.
+		if util.IsMultiAttachAllowed(attachedVolume.VolumeSpec) {
+			if !rc.attacherDetacher.IsOperationSafeToRetry(attachedVolume.VolumeName, "" /* podName */, attachedVolume.NodeName, operationexecutor.DetachOperationName) {
+				klog.V(10).Infof("Operation for volume %q is already running or still in exponential backoff for node %q. Can't start detach", attachedVolume.VolumeName, attachedVolume.NodeName)
+				continue
+			}
+		} else {
+			if !rc.attacherDetacher.IsOperationSafeToRetry(attachedVolume.VolumeName, "" /* podName */, "" /* nodeName */, operationexecutor.DetachOperationName) {
+				klog.V(10).Infof("Operation for volume %q is already running or still in exponential backoff in the cluster. Can't start detach for %q", attachedVolume.VolumeName, attachedVolume.NodeName)
+				continue
+			}
+		}
+
+		// Because the detach operation updates the ActualStateOfWorld before
+		// marking itself complete, it's possible for the volume to be removed
+		// from the ActualStateOfWorld between the GetAttachedVolumes() check
+		// and the IsOperationPending() check above.
+		// Check the ActualStateOfWorld again to avoid issuing an unnecessary
+		// detach.
+		// See https://github.com/kubernetes/kubernetes/issues/93902
+		attachState := rc.actualStateOfWorld.GetAttachState(attachedVolume.VolumeName, attachedVolume.NodeName)
+		if attachState == cache.AttachStateDetached {
+			klog.V(5).InfoS("Volume detached--skipping", "volume", attachedVolume)
+			continue
+		}
+
+		// Set the detach request time
+		elapsedTime, err := rc.actualStateOfWorld.SetDetachRequestTime(attachedVolume.VolumeName, attachedVolume.NodeName)
+		if err != nil {
+			klog.Errorf("Cannot trigger detach because it fails to set detach request time with error %v", err)
+			continue
+		}
+		// Check whether timeout has reached the maximum waiting time
+		timeout := elapsedTime > rc.maxWaitForUnmountDuration
+
+		isHealthy, err := rc.nodeIsHealthy(attachedVolume.NodeName)
+		if err != nil {
+			klog.Errorf("failed to get health of node %s: %s", attachedVolume.NodeName, err.Error())
+		}
+
+		// Force detach volumes from unhealthy nodes after maxWaitForUnmountDuration.
+		forceDetach := !isHealthy && timeout
+
+		hasOutOfServiceTaint, err := rc.hasOutOfServiceTaint(attachedVolume.NodeName)
+		if err != nil {
+			klog.Errorf("failed to get taint specs for node %s: %s", attachedVolume.NodeName, err.Error())
+		}
+
+		// Check whether volume is still mounted. Skip detach if it is still mounted unless force detach timeout
+		// or the node has `node.kubernetes.io/out-of-service` taint.
+		if attachedVolume.MountedByNode && !forceDetach && !hasOutOfServiceTaint {
+			klog.V(5).InfoS("Cannot detach volume because it is still mounted", "volume", attachedVolume)
+			continue
+		}
+
+		// Before triggering volume detach, mark volume as detached and update the node status
+		// If it fails to update node status, skip detach volume
+		// If volume detach operation fails, the volume needs to be added back to report as attached so that node status
+		// has the correct volume attachment information.
+		if err = rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName); err != nil {
+			klog.V(5).Infof("RemoveVolumeFromReportAsAttached failed while removing volume %q from node %q with: %v",
+				attachedVolume.VolumeName,
+				attachedVolume.NodeName,
+				err)
+		}
+
+		// Update Node Status to indicate volume is no longer safe to mount.
+		err = rc.nodeStatusUpdater.UpdateNodeStatusForNode(attachedVolume.NodeName)
+		if err != nil {
+			// Skip detaching this volume if unable to update node status
+			klog.ErrorS(err, "UpdateNodeStatusForNode failed while attempting to report volume as attached", "volume", attachedVolume)
+			// Add volume back to ReportAsAttached if UpdateNodeStatusForNode call failed so that node status updater will add it back to VolumeAttached list.
+			// It is needed here too because DetachVolume is not call actually and we keep the data consistency for every reconcile.
+			rc.actualStateOfWorld.AddVolumeToReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
+			continue
+		}
+
+		// Trigger detach volume which requires verifying safe to detach step
+		// If timeout is true, skip verifySafeToDetach check
+		// If the node has node.kubernetes.io/out-of-service taint with NoExecute effect, skip verifySafeToDetach check
+		klog.V(5).InfoS("Starting attacherDetacher.DetachVolume", "volume", attachedVolume)
+		if hasOutOfServiceTaint {
+			klog.V(4).Infof("node %q has out-of-service taint", attachedVolume.NodeName)
+		}
+		verifySafeToDetach := !(timeout || hasOutOfServiceTaint)
+		err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
+		if err == nil {
+			if !timeout {
+				klog.InfoS("attacherDetacher.DetachVolume started", "volume", attachedVolume)
 			} else {
-				if !rc.attacherDetacher.IsOperationSafeToRetry(attachedVolume.VolumeName, "" /* podName */, "" /* nodeName */, operationexecutor.DetachOperationName) {
-					klog.V(10).Infof("Operation for volume %q is already running or still in exponential backoff in the cluster. Can't start detach for %q", attachedVolume.VolumeName, attachedVolume.NodeName)
-					continue
-				}
+				metrics.RecordForcedDetachMetric()
+				klog.InfoS("attacherDetacher.DetachVolume started: this volume is not safe to detach, but maxWaitForUnmountDuration expired, force detaching", "duration", rc.maxWaitForUnmountDuration, "volume", attachedVolume)
 			}
+		}
+		if err != nil {
+			// Add volume back to ReportAsAttached if DetachVolume call failed so that node status updater will add it back to VolumeAttached list.
+			// This function is also called during executing the volume detach operation in operation_generoator.
+			// It is needed here too because DetachVolume call might fail before executing the actual operation in operation_executor (e.g., cannot find volume plugin etc.)
+			rc.actualStateOfWorld.AddVolumeToReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
 
-			// Because the detach operation updates the ActualStateOfWorld before
-			// marking itself complete, it's possible for the volume to be removed
-			// from the ActualStateOfWorld between the GetAttachedVolumes() check
-			// and the IsOperationPending() check above.
-			// Check the ActualStateOfWorld again to avoid issuing an unnecessary
-			// detach.
-			// See https://github.com/kubernetes/kubernetes/issues/93902
-			attachState := rc.actualStateOfWorld.GetAttachState(attachedVolume.VolumeName, attachedVolume.NodeName)
-			if attachState == cache.AttachStateDetached {
-				klog.V(5).InfoS("Volume detached--skipping", "volume", attachedVolume)
-				continue
-			}
-
-			// Set the detach request time
-			elapsedTime, err := rc.actualStateOfWorld.SetDetachRequestTime(attachedVolume.VolumeName, attachedVolume.NodeName)
-			if err != nil {
-				klog.Errorf("Cannot trigger detach because it fails to set detach request time with error %v", err)
-				continue
-			}
-			// Check whether timeout has reached the maximum waiting time
-			timeout := elapsedTime > rc.maxWaitForUnmountDuration
-
-			isHealthy, err := rc.nodeIsHealthy(attachedVolume.NodeName)
-			if err != nil {
-				klog.Errorf("failed to get health of node %s: %s", attachedVolume.NodeName, err.Error())
-			}
-
-			// Force detach volumes from unhealthy nodes after maxWaitForUnmountDuration.
-			forceDetach := !isHealthy && timeout
-
-			hasOutOfServiceTaint, err := rc.hasOutOfServiceTaint(attachedVolume.NodeName)
-			if err != nil {
-				klog.Errorf("failed to get taint specs for node %s: %s", attachedVolume.NodeName, err.Error())
-			}
-
-			// Check whether volume is still mounted. Skip detach if it is still mounted unless force detach timeout
-			// or the node has `node.kubernetes.io/out-of-service` taint.
-			if attachedVolume.MountedByNode && !forceDetach && !hasOutOfServiceTaint {
-				klog.V(5).InfoS("Cannot detach volume because it is still mounted", "volume", attachedVolume)
-				continue
-			}
-
-			// Before triggering volume detach, mark volume as detached and update the node status
-			// If it fails to update node status, skip detach volume
-			// If volume detach operation fails, the volume needs to be added back to report as attached so that node status
-			// has the correct volume attachment information.
-			err = rc.actualStateOfWorld.RemoveVolumeFromReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
-			if err != nil {
-				klog.V(5).Infof("RemoveVolumeFromReportAsAttached failed while removing volume %q from node %q with: %v",
-					attachedVolume.VolumeName,
-					attachedVolume.NodeName,
-					err)
-			}
-
-			// Update Node Status to indicate volume is no longer safe to mount.
-			err = rc.nodeStatusUpdater.UpdateNodeStatusForNode(attachedVolume.NodeName)
-			if err != nil {
-				// Skip detaching this volume if unable to update node status
-				klog.ErrorS(err, "UpdateNodeStatusForNode failed while attempting to report volume as attached", "volume", attachedVolume)
-				// Add volume back to ReportAsAttached if UpdateNodeStatusForNode call failed so that node status updater will add it back to VolumeAttached list.
-				// It is needed here too because DetachVolume is not call actually and we keep the data consistency for every reconcile.
-				rc.actualStateOfWorld.AddVolumeToReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
-				continue
-			}
-
-			// Trigger detach volume which requires verifying safe to detach step
-			// If timeout is true, skip verifySafeToDetach check
-			// If the node has node.kubernetes.io/out-of-service taint with NoExecute effect, skip verifySafeToDetach check
-			klog.V(5).InfoS("Starting attacherDetacher.DetachVolume", "volume", attachedVolume)
-			if hasOutOfServiceTaint {
-				klog.V(4).Infof("node %q has out-of-service taint", attachedVolume.NodeName)
-			}
-			verifySafeToDetach := !(timeout || hasOutOfServiceTaint)
-			err = rc.attacherDetacher.DetachVolume(attachedVolume.AttachedVolume, verifySafeToDetach, rc.actualStateOfWorld)
-			if err == nil {
-				if !timeout {
-					klog.InfoS("attacherDetacher.DetachVolume started", "volume", attachedVolume)
-				} else {
-					metrics.RecordForcedDetachMetric()
-					klog.InfoS("attacherDetacher.DetachVolume started: this volume is not safe to detach, but maxWaitForUnmountDuration expired, force detaching", "duration", rc.maxWaitForUnmountDuration, "volume", attachedVolume)
-				}
-			}
-			if err != nil {
-				// Add volume back to ReportAsAttached if DetachVolume call failed so that node status updater will add it back to VolumeAttached list.
-				// This function is also called during executing the volume detach operation in operation_generoator.
-				// It is needed here too because DetachVolume call might fail before executing the actual operation in operation_executor (e.g., cannot find volume plugin etc.)
-				rc.actualStateOfWorld.AddVolumeToReportAsAttached(attachedVolume.VolumeName, attachedVolume.NodeName)
-
-				if !exponentialbackoff.IsExponentialBackoff(err) {
-					// Ignore exponentialbackoff.IsExponentialBackoff errors, they are expected.
-					// Log all other errors.
-					klog.ErrorS(err, "attacherDetacher.DetachVolume failed to start", "volume", attachedVolume)
-				}
+			if !exponentialbackoff.IsExponentialBackoff(err) {
+				// Ignore exponentialbackoff.IsExponentialBackoff errors, they are expected.
+				// Log all other errors.
+				klog.ErrorS(err, "attacherDetacher.DetachVolume failed to start", "volume", attachedVolume)
 			}
 		}
 	}
