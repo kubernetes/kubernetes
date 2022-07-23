@@ -132,7 +132,7 @@ func TestWithVerificationWithoutCaCertOrThumbprint(t *testing.T) {
 
 	_, err := connection.NewClient(context.Background())
 
-	verifyWrappedX509UnkownAuthorityErr(t, err)
+	verifyWrappedX509UnknownAuthorityErr(t, err)
 }
 
 func TestWithValidThumbprint(t *testing.T) {
@@ -182,7 +182,7 @@ func TestInvalidCaCert(t *testing.T) {
 	}
 }
 
-func verifyWrappedX509UnkownAuthorityErr(t *testing.T, err error) {
+func verifyWrappedX509UnknownAuthorityErr(t *testing.T, err error) {
 	urlErr, ok := err.(*url.Error)
 	if !ok {
 		t.Fatalf("Expected to receive an url.Error, got '%s' (%#v)", err.Error(), err)
