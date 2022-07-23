@@ -101,7 +101,7 @@ func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
 func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAttachOptions(streams)
 	cmd := &cobra.Command{
-		Use:                   "attach (POD | TYPE/NAME) -c CONTAINER",
+		Use:                   "attach (POD | TYPE/NAME) [--container=NAME]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Attach to a running container"),
 		Long:                  i18n.T("Attach to a process that is already running inside an existing container."),
@@ -203,7 +203,7 @@ func (o *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 // Validate checks that the provided attach options are specified.
 func (o *AttachOptions) Validate() error {
 	if len(o.Resources) == 0 {
-		return fmt.Errorf("at least 1 argument is required for attach")
+		return fmt.Errorf("at least 1 argument is required for attach. Expected POD, TYPE/NAME, or TYPE NAME")
 	}
 	if len(o.Resources) > 2 {
 		return fmt.Errorf("expected POD, TYPE/NAME, or TYPE NAME, (at most 2 arguments) saw %d: %v", len(o.Resources), o.Resources)
