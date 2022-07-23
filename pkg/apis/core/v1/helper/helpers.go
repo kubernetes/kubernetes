@@ -72,6 +72,24 @@ func HugePageResourceName(pageSize resource.Quantity) v1.ResourceName {
 	return v1.ResourceName(fmt.Sprintf("%s%s", v1.ResourceHugePagesPrefix, pageSize.String()))
 }
 
+func IsNetworkIOResourceName(name v1.ResourceName) bool {
+	return strings.HasPrefix(string(name), v1.ResourceNetworkIOPrefix)
+}
+
+func NetworkIngressResourceName(index int) v1.ResourceName {
+	if index == 0 {
+		return v1.ResourceName(fmt.Sprintf("%s-ingress", v1.ResourceNetworkIOPrefix))
+	}
+	return v1.ResourceName(fmt.Sprintf("%s%d-ingress", v1.ResourceNetworkIOPrefix, index))
+}
+
+func NetworkEgressResourceName(index int) v1.ResourceName {
+	if index == 0 {
+		return v1.ResourceName(fmt.Sprintf("%s-egress", v1.ResourceNetworkIOPrefix))
+	}
+	return v1.ResourceName(fmt.Sprintf("%s%d-egress", v1.ResourceNetworkIOPrefix, index))
+}
+
 // HugePageSizeFromResourceName returns the page size for the specified huge page
 // resource name.  If the specified input is not a valid huge page resource name
 // an error is returned.

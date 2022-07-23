@@ -114,6 +114,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
 	requiresUpdate = kl.reconcileExtendedResource(node, existingNode) || requiresUpdate
 	requiresUpdate = kl.reconcileHugePageResource(node, existingNode) || requiresUpdate
+	requiresUpdate = kl.reconcileNetworkIOResource(node, existingNode) || requiresUpdate
 	if requiresUpdate {
 		if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
 			klog.ErrorS(err, "Unable to reconcile node with API server,error updating node", "node", klog.KObj(node))
@@ -122,6 +123,53 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	}
 
 	return true
+}
+
+// reconcileNetworkIOResource will update network capacity for each nic and remove nic no longer supported
+func (kl *Kubelet) reconcileNetworkIOResource(initialNode, existingNode *v1.Node) bool {
+	requiresUpdate := updateDefaultResources(initialNode, existingNode)
+	supportedNetworkIOResources := sets.String{}
+
+	for resourceName := range initialNode.Status.Capacity {
+		if !v1helper.IsNetworkIOResourceName(resourceName) {
+			continue
+		}
+		supportedNetworkIOResources.Insert(string(resourceName))
+
+		initialCapacity := initialNode.Status.Capacity[resourceName]
+		initialAllocatable := initialNode.Status.Allocatable[resourceName]
+
+		capacity, resourceIsSupported := existingNode.Status.Capacity[resourceName]
+		allocatable := existingNode.Status.Allocatable[resourceName]
+
+		// Add or update capacity if it the size was previously unsupported or has changed
+		if !resourceIsSupported || capacity.Cmp(initialCapacity) != 0 {
+			existingNode.Status.Capacity[resourceName] = initialCapacity.DeepCopy()
+			requiresUpdate = true
+		}
+
+		// Add or update allocatable if it the size was previously unsupported or has changed
+		if !resourceIsSupported || allocatable.Cmp(initialAllocatable) != 0 {
+			existingNode.Status.Allocatable[resourceName] = initialAllocatable.DeepCopy()
+			requiresUpdate = true
+		}
+
+	}
+
+	for resourceName := range existingNode.Status.Capacity {
+		if !v1helper.IsNetworkIOResourceName(resourceName) {
+			continue
+		}
+
+		// If huge page size no longer is supported, we remove it from the node
+		if !supportedNetworkIOResources.Has(string(resourceName)) {
+			delete(existingNode.Status.Capacity, resourceName)
+			delete(existingNode.Status.Allocatable, resourceName)
+			klog.InfoS("Removing network resource which is no longer supported", "resourceName", resourceName)
+			requiresUpdate = true
+		}
+	}
+	return requiresUpdate
 }
 
 // reconcileHugePageResource will update huge page capacity for each page size and remove huge page sizes no longer supported

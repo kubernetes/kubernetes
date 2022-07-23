@@ -262,7 +262,9 @@ func MachineInfo(nodeName string,
 
 			for rName, rCap := range cadvisor.CapacityFromMachineInfo(info) {
 				node.Status.Capacity[rName] = rCap
+				//klog.InfoS("Capacity from machine info", "name", rName, "capacity", rCap.Value())
 			}
+			klog.InfoS("Capacity from machine info", "net device", info.NetworkDevices)
 
 			if podsPerCore > 0 {
 				node.Status.Capacity[v1.ResourcePods] = *resource.NewQuantity(

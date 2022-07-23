@@ -19,7 +19,7 @@ package cadvisor
 import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
@@ -48,6 +48,16 @@ func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
 		hugePagesBytes := pageSizeBytes * int64(hugepagesInfo.NumPages)
 		pageSizeQuantity := resource.NewQuantity(pageSizeBytes, resource.BinarySI)
 		c[v1helper.HugePageResourceName(*pageSizeQuantity)] = *resource.NewQuantity(hugePagesBytes, resource.BinarySI)
+	}
+
+	// if network io are enabled, we report them as two schedulable resource on the node
+	for i, netInfo := range info.NetworkDevices {
+		if i > 0 {
+			continue
+		}
+		networkSpeed := int64(netInfo.Speed)
+		c[v1helper.NetworkIngressResourceName(i)] = *resource.NewQuantity(networkSpeed, resource.BinarySI)
+		c[v1helper.NetworkEgressResourceName(i)] = *resource.NewQuantity(networkSpeed, resource.BinarySI)
 	}
 
 	return c

@@ -5196,6 +5196,8 @@ const (
 	ResourceHugePagesPrefix = "hugepages-"
 	// Name prefix for storage resource limits
 	ResourceAttachableVolumesPrefix = "attachable-volumes-"
+	// Name prefix for network io
+	ResourceNetworkIOPrefix = "intel.com/network"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
