@@ -1430,14 +1430,12 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 // internal pod status. This method should only be called from within sync*Pod methods.
 func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodStatus {
 	klog.V(3).InfoS("Generating pod status", "pod", klog.KObj(pod))
-
 	// use the previous pod status, or the api status, as the basis for this pod
 	oldPodStatus, found := kl.statusManager.GetPodStatus(pod.UID)
 	if !found {
 		oldPodStatus = pod.Status
 	}
 	s := kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
-
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(&pod.Spec, allStatus)
@@ -1499,6 +1497,9 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		}
 	}
 	// set all Kubelet-owned conditions
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodHasNetworkCondition) {
+		s.Conditions = append(s.Conditions, status.GeneratePodHasNetworkCondition(pod, podStatus))
+	}
 	s.Conditions = append(s.Conditions, status.GeneratePodInitializedCondition(&pod.Spec, s.InitContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, status.GeneratePodReadyCondition(&pod.Spec, s.Conditions, s.ContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, status.GenerateContainersReadyCondition(&pod.Spec, s.ContainerStatuses, s.Phase))
@@ -1506,7 +1507,6 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		Type:   v1.PodScheduled,
 		Status: v1.ConditionTrue,
 	})
-
 	// set HostIP and initialize PodIP/PodIPs for host network pods
 	if kl.kubeClient != nil {
 		hostIPs, err := kl.getHostIPsAnyWay()

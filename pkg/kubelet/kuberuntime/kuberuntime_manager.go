@@ -47,6 +47,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -462,48 +463,6 @@ type podActions struct {
 	EphemeralContainersToStart []int
 }
 
-// podSandboxChanged checks whether the spec of the pod is changed and returns
-// (changed, new attempt, original sandboxID if exist).
-func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, uint32, string) {
-	if len(podStatus.SandboxStatuses) == 0 {
-		klog.V(2).InfoS("No sandbox for pod can be found. Need to start a new one", "pod", klog.KObj(pod))
-		return true, 0, ""
-	}
-
-	readySandboxCount := 0
-	for _, s := range podStatus.SandboxStatuses {
-		if s.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			readySandboxCount++
-		}
-	}
-
-	// Needs to create a new sandbox when readySandboxCount > 1 or the ready sandbox is not the latest one.
-	sandboxStatus := podStatus.SandboxStatuses[0]
-	if readySandboxCount > 1 {
-		klog.V(2).InfoS("Multiple sandboxes are ready for Pod. Need to reconcile them", "pod", klog.KObj(pod))
-
-		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
-	}
-	if sandboxStatus.State != runtimeapi.PodSandboxState_SANDBOX_READY {
-		klog.V(2).InfoS("No ready sandbox for pod can be found. Need to start a new one", "pod", klog.KObj(pod))
-		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
-	}
-
-	// Needs to create a new sandbox when network namespace changed.
-	if sandboxStatus.GetLinux().GetNamespaces().GetOptions().GetNetwork() != networkNamespaceForPod(pod) {
-		klog.V(2).InfoS("Sandbox for pod has changed. Need to start a new one", "pod", klog.KObj(pod))
-		return true, sandboxStatus.Metadata.Attempt + 1, ""
-	}
-
-	// Needs to create a new sandbox when the sandbox does not have an IP address.
-	if !kubecontainer.IsHostNetworkPod(pod) && sandboxStatus.Network != nil && sandboxStatus.Network.Ip == "" {
-		klog.V(2).InfoS("Sandbox for pod has no IP address. Need to start a new one", "pod", klog.KObj(pod))
-		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
-	}
-
-	return false, sandboxStatus.Metadata.Attempt, sandboxStatus.Id
-}
-
 func containerChanged(container *v1.Container, containerStatus *kubecontainer.Status) (uint64, uint64, bool) {
 	expectedHash := kubecontainer.HashContainer(container)
 	return expectedHash, containerStatus.Hash, containerStatus.Hash != expectedHash
@@ -525,7 +484,7 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	klog.V(5).InfoS("Syncing Pod", "pod", klog.KObj(pod))
 
-	createPodSandbox, attempt, sandboxID := m.podSandboxChanged(pod, podStatus)
+	createPodSandbox, attempt, sandboxID := runtimeutil.PodSandboxChanged(pod, podStatus)
 	changes := podActions{
 		KillPod:           createPodSandbox,
 		CreateSandbox:     createPodSandbox,
