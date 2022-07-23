@@ -41,7 +41,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/informers"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
@@ -181,8 +180,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	klog.InfoS("Golang settings", "GOGC", os.Getenv("GOGC"), "GOMAXPROCS", os.Getenv("GOMAXPROCS"), "GOTRACEBACK", os.Getenv("GOTRACEBACK"))
 
 	// Start events processing pipeline.
-	c.EventBroadcaster.StartStructuredLogging(0)
-	c.EventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.Client.CoreV1().Events("")})
+	c.EventBroadcaster.StartRecordingToSink(stopCh)
 	defer c.EventBroadcaster.Shutdown()
 
 	if cfgz, err := configz.New(ConfigzName); err == nil {
@@ -705,7 +703,7 @@ func leaderElectAndRun(c *config.CompletedConfig, lockIdentity string, electionC
 		leaseName,
 		resourcelock.ResourceLockConfig{
 			Identity:      lockIdentity,
-			EventRecorder: c.EventRecorder,
+			EventRecorder: c.EventBroadcaster.DeprecatedNewLegacyRecorder(options.KubeControllerManagerUserAgent),
 		},
 		c.Kubeconfig,
 		c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration)
