@@ -103,6 +103,80 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func TestApplyFlagValidation(t *testing.T) {
+	f := cmdtesting.NewTestFactory()
+	defer f.Cleanup()
+
+	tests := []struct {
+		args        [][]string
+		expectedErr string
+	}{
+		{
+			args: [][]string {
+				{"force-conflicts", "true"},
+			},
+			expectedErr: "--force-conflicts only works with --server-side",
+		},
+		{
+			args: [][]string {
+				{"server-side", "true"},
+				{"dry-run", "client"},
+			},
+			expectedErr: "--dry-run=client doesn't work with --server-side (did you mean --dry-run=server instead?)",
+		},
+		{
+			args: [][]string {
+				{"force", "true"},
+				{"server-side", "true"},
+			},
+			expectedErr: "--force cannot be used with --server-side",
+		},
+		{
+			args: [][]string {
+				{"force", "true"},
+				{"dry-run", "server"},
+			},
+			expectedErr: "--dry-run=server cannot be used with --force",
+		},
+		{
+			args: [][]string {
+				{"all", "true"},
+				{"selector", "unused"},
+			},
+			expectedErr: "cannot set --all and --selector at the same time",
+		},
+		{
+			args: [][]string {
+				{"force", "true"},
+				{"prune", "true"},
+				{"all", "true"},
+			},
+			expectedErr: "--force cannot be used with --prune",
+		},
+	}
+
+	for _, test := range tests {
+		cmd := &cobra.Command{}
+		flags := NewApplyFlags(f, genericclioptions.NewTestIOStreamsDiscard())
+		flags.AddFlags(cmd)
+		cmd.Flags().Set("filename", "unused")
+		for _, arg := range test.args {
+			cmd.Flags().Set(arg[0], arg[1])
+		}
+		o, err := flags.ToOptions(cmd, "kubectl", []string{})
+		if err != nil {
+			t.Fatalf("unexpected error creating apply options: %s", err)
+		}
+		err = o.Validate()
+		if err == nil {
+			t.Fatalf("missing expected error")
+		}
+		if test.expectedErr != err.Error() {
+			t.Errorf("expected error %s, got %s", test.expectedErr, err)
+		}
+	}
+}
+
 const (
 	filenameCM                = "../../../testdata/apply/cm.yaml"
 	filenameRC                = "../../../testdata/apply/rc.yaml"
