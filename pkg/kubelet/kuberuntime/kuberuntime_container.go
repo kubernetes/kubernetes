@@ -46,9 +46,7 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -120,7 +118,7 @@ func ephemeralContainerStartSpec(ec *v1.EphemeralContainer) *startSpec {
 // usually isn't a problem since ephemeral containers aren't allowed at pod creation time.
 // This always returns nil when the EphemeralContainers feature is disabled.
 func (s *startSpec) getTargetID(podStatus *kubecontainer.PodStatus) (*kubecontainer.ContainerID, error) {
-	if s.ephemeralContainer == nil || s.ephemeralContainer.TargetContainerName == "" || !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if s.ephemeralContainer == nil || s.ephemeralContainer.TargetContainerName == "" {
 		return nil, nil
 	}
 

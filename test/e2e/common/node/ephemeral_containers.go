@@ -20,12 +20,10 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -69,11 +67,6 @@ var _ = SIGDescribe("Ephemeral Containers [NodeConformance]", func() {
 			},
 		}
 		err := podClient.AddEphemeralContainerSync(pod, ec, time.Minute)
-		// BEGIN TODO: Remove when EphemeralContainers feature gate is retired.
-		if apierrors.IsNotFound(err) {
-			e2eskipper.Skipf("Skipping test because EphemeralContainers feature disabled (error: %q)", err)
-		}
-		// END TODO: Remove when EphemeralContainers feature gate is retired.
 		framework.ExpectNoError(err, "Failed to patch ephemeral containers in pod %q", format.Pod(pod))
 
 		ginkgo.By("checking pod container endpoints")

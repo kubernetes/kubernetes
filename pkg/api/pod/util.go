@@ -46,11 +46,7 @@ const AllContainers ContainerType = (InitContainers | Containers | EphemeralCont
 // AllFeatureEnabledContainers returns a ContainerType mask which includes all container
 // types except for the ones guarded by feature gate.
 func AllFeatureEnabledContainers() ContainerType {
-	containerType := AllContainers
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		containerType &= ^EphemeralContainers
-	}
-	return containerType
+	return AllContainers
 }
 
 // ContainerVisitor is called with each container spec, and returns true
@@ -529,10 +525,6 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) && !ephemeralContainersInUse(oldPodSpec) {
-		podSpec.EphemeralContainers = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ProbeTerminationGracePeriod) && !probeGracePeriodInUse(oldPodSpec) {
 		// Set pod-level terminationGracePeriodSeconds to nil if the feature is disabled and it is not used
 		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
@@ -652,13 +644,6 @@ func nodeTaintsPolicyInUse(podSpec *api.PodSpec) bool {
 		}
 	}
 	return false
-}
-
-func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	return len(podSpec.EphemeralContainers) > 0
 }
 
 // procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value

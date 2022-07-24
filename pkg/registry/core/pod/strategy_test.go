@@ -35,12 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	utilpointer "k8s.io/utils/pointer"
 
@@ -355,7 +352,6 @@ func (g mockPodGetter) Get(context.Context, string, *metav1.GetOptions) (runtime
 }
 
 func TestCheckLogLocation(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 	ctx := genericapirequest.NewDefaultContext()
 	fakePodName := "test"
 	tcs := []struct {
