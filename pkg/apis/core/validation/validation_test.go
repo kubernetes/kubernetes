@@ -6747,28 +6747,28 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			[]core.EphemeralContainer{
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{}},
 			},
-			field.Error{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0]"},
+			field.Error{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0].name"},
 		},
 		{
 			"empty Container Name",
 			[]core.EphemeralContainer{
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
-			field.Error{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0]"},
+			field.Error{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0].name"},
 		},
 		{
 			"whitespace padded image name",
 			[]core.EphemeralContainer{
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: " image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
-			field.Error{Type: field.ErrorTypeInvalid, Field: "ephemeralContainers[0][0].image"},
+			field.Error{Type: field.ErrorTypeInvalid, Field: "ephemeralContainers[0].image"},
 		},
 		{
 			"invalid image pull policy",
 			[]core.EphemeralContainer{
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "PullThreeTimes", TerminationMessagePolicy: "File"}},
 			},
-			field.Error{Type: field.ErrorTypeNotSupported, Field: "ephemeralContainers[0][0].imagePullPolicy"},
+			field.Error{Type: field.ErrorTypeNotSupported, Field: "ephemeralContainers[0].imagePullPolicy"},
 		},
 		{
 			"TargetContainerName doesn't exist",
@@ -7218,7 +7218,7 @@ func TestValidateContainers(t *testing.T) {
 			TerminationMessagePolicy: "File",
 		},
 	}
-	if errs := validateContainers(successCase, false, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
+	if errs := validateContainers(successCase, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -7704,7 +7704,7 @@ func TestValidateContainers(t *testing.T) {
 	}
 	for _, tc := range errorCases {
 		t.Run(tc.title, func(t *testing.T) {
-			errs := validateContainers(tc.containers, false, volumeDevices, field.NewPath("containers"), PodValidationOptions{})
+			errs := validateContainers(tc.containers, volumeDevices, field.NewPath("containers"), PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Fatalf("expected error but received none")
 			}
@@ -7798,27 +7798,24 @@ func TestValidateInitContainers(t *testing.T) {
 			},
 			field.Error{Type: field.ErrorTypeInvalid, Field: "initContainers[0].terminationMessagePolicy"},
 		},
-		/*
-			TODO: Validation incorrectly returns duplicate errors for duplicate names.
+		{
+			"duplicate names",
+			[]core.Container{
 				{
-					"duplicate names",
-					[]core.Container{
-						{
-							Name:                     "init",
-							Image:                    "image",
-							ImagePullPolicy:          "IfNotPresent",
-							TerminationMessagePolicy: "File",
-						},
-						{
-							Name:                     "init",
-							Image:                    "image",
-							ImagePullPolicy:          "IfNotPresent",
-							TerminationMessagePolicy: "File",
-						},
-					},
-					field.Error{Type: field.ErrorTypeDuplicate, Field: "initContainers[1].name"},
+					Name:                     "init",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
 				},
-		*/
+				{
+					Name:                     "init",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+			field.Error{Type: field.ErrorTypeDuplicate, Field: "initContainers[1].name"},
+		},
 		{
 			"duplicate ports",
 			[]core.Container{

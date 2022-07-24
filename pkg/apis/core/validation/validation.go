@@ -2930,18 +2930,14 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		}
 
 		if ec.Name == "" {
-			allErrs = append(allErrs, field.Required(idxPath, "ephemeralContainer requires a name"))
+			allErrs = append(allErrs, field.Required(idxPath.Child("name"), "ephemeralContainer requires a name"))
 			continue
 		}
 
-		// Using validateContainers() here isn't ideal because it adds an index to the error message that
-		// doesn't really exist for EphemeralContainers (i.e. ephemeralContainers[0].spec[0].name instead
-		// of ephemeralContainers[0].spec.name)
-		// TODO(verb): factor a validateContainer() out of validateContainers() to be used here
-		c := core.Container(ec.EphemeralContainerCommon)
-		allErrs = append(allErrs, validateContainers([]core.Container{c}, false, volumes, idxPath, opts)...)
+		c := (*core.Container)(&ec.EphemeralContainerCommon)
+		allErrs = append(allErrs, validateContainer(c, volumes, idxPath, opts)...)
 		// EphemeralContainers don't require the backwards-compatibility distinction between pod/podTemplate validation
-		allErrs = append(allErrs, validateContainersOnlyForPod([]core.Container{c}, idxPath)...)
+		allErrs = append(allErrs, validateContainerOnlyForPod(c, idxPath)...)
 
 		if allNames.Has(ec.Name) {
 			allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), ec.Name))
@@ -2993,11 +2989,8 @@ func validateFieldAllowList(value interface{}, allowedFields map[string]bool, er
 	return allErrs
 }
 
-func validateInitContainers(containers []core.Container, otherContainers []core.Container, deviceVolumes map[string]core.VolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateInitContainers(containers []core.Container, otherContainers []core.Container, volumes map[string]core.VolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
-	if len(containers) > 0 {
-		allErrs = append(allErrs, validateContainers(containers, true, deviceVolumes, fldPath, opts)...)
-	}
 
 	allNames := sets.String{}
 	for _, ctr := range otherContainers {
@@ -3007,10 +3000,15 @@ func validateInitContainers(containers []core.Container, otherContainers []core.
 		idxPath := fldPath.Index(i)
 		if allNames.Has(ctr.Name) {
 			allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), ctr.Name))
-		}
-		if len(ctr.Name) > 0 {
+		} else if len(ctr.Name) > 0 {
 			allNames.Insert(ctr.Name)
 		}
+
+		allErrs = append(allErrs, validateContainer(&ctr, volumes, idxPath, opts)...)
+
+		// Check for port conflicts in init containers individually since init containers run one-by-one.
+		allErrs = append(allErrs, checkHostPortConflicts([]core.Container{ctr}, fldPath)...)
+
 		if ctr.Lifecycle != nil {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("lifecycle"), ctr.Lifecycle, "must not be set for init containers"))
 		}
@@ -3024,10 +3022,70 @@ func validateInitContainers(containers []core.Container, otherContainers []core.
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("startupProbe"), ctr.StartupProbe, "must not be set for init containers"))
 		}
 	}
+
 	return allErrs
 }
 
-func validateContainers(containers []core.Container, isInitContainers bool, volumes map[string]core.VolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateContainer(ctr *core.Container, volumes map[string]core.VolumeSource, path *field.Path, opts PodValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	namePath := path.Child("name")
+	if len(ctr.Name) == 0 {
+		allErrs = append(allErrs, field.Required(namePath, ""))
+	} else {
+		allErrs = append(allErrs, ValidateDNS1123Label(ctr.Name, namePath)...)
+	}
+
+	// TODO: do not validate leading and trailing whitespace to preserve backward compatibility.
+	// for example: https://github.com/openshift/origin/issues/14659 image = " " is special token in pod template
+	// others may have done similar
+	if len(ctr.Image) == 0 {
+		allErrs = append(allErrs, field.Required(path.Child("image"), ""))
+	}
+	if ctr.Lifecycle != nil {
+		allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, path.Child("lifecycle"))...)
+	}
+
+	allErrs = append(allErrs, validateProbe(ctr.LivenessProbe, path.Child("livenessProbe"))...)
+	// Readiness-specific validation
+	if ctr.ReadinessProbe != nil && ctr.ReadinessProbe.TerminationGracePeriodSeconds != nil {
+		allErrs = append(allErrs, field.Invalid(path.Child("readinessProbe", "terminationGracePeriodSeconds"), ctr.ReadinessProbe.TerminationGracePeriodSeconds, "must not be set for readinessProbes"))
+	}
+	allErrs = append(allErrs, validateProbe(ctr.StartupProbe, path.Child("startupProbe"))...)
+	// Liveness-specific validation
+	if ctr.LivenessProbe != nil && ctr.LivenessProbe.SuccessThreshold != 1 {
+		allErrs = append(allErrs, field.Invalid(path.Child("livenessProbe", "successThreshold"), ctr.LivenessProbe.SuccessThreshold, "must be 1"))
+	}
+	allErrs = append(allErrs, validateProbe(ctr.StartupProbe, path.Child("startupProbe"))...)
+	// Startup-specific validation
+	if ctr.StartupProbe != nil && ctr.StartupProbe.SuccessThreshold != 1 {
+		allErrs = append(allErrs, field.Invalid(path.Child("startupProbe", "successThreshold"), ctr.StartupProbe.SuccessThreshold, "must be 1"))
+	}
+
+	switch ctr.TerminationMessagePolicy {
+	case core.TerminationMessageReadFile, core.TerminationMessageFallbackToLogsOnError:
+	case "":
+		allErrs = append(allErrs, field.Required(path.Child("terminationMessagePolicy"), "must be 'File' or 'FallbackToLogsOnError'"))
+	default:
+		allErrs = append(allErrs, field.Invalid(path.Child("terminationMessagePolicy"), ctr.TerminationMessagePolicy, "must be 'File' or 'FallbackToLogsOnError'"))
+	}
+
+	volMounts := GetVolumeMountMap(ctr.VolumeMounts)
+	volDevices := GetVolumeDeviceMap(ctr.VolumeDevices)
+	allErrs = append(allErrs, validateProbe(ctr.ReadinessProbe, path.Child("readinessProbe"))...)
+	allErrs = append(allErrs, validateContainerPorts(ctr.Ports, path.Child("ports"))...)
+	allErrs = append(allErrs, ValidateEnv(ctr.Env, path.Child("env"), opts)...)
+	allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, path.Child("envFrom"))...)
+	allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, ctr, path.Child("volumeMounts"))...)
+	allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volMounts, volumes, path.Child("volumeDevices"))...)
+	allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, path.Child("imagePullPolicy"))...)
+	allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, path.Child("resources"), opts)...)
+	allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, path.Child("securityContext"))...)
+
+	return allErrs
+}
+
+func validateContainers(containers []core.Container, volumes map[string]core.VolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(containers) == 0 {
@@ -3037,73 +3095,18 @@ func validateContainers(containers []core.Container, isInitContainers bool, volu
 	allNames := sets.String{}
 	for i, ctr := range containers {
 		idxPath := fldPath.Index(i)
-		namePath := idxPath.Child("name")
-		volMounts := GetVolumeMountMap(ctr.VolumeMounts)
-		volDevices := GetVolumeDeviceMap(ctr.VolumeDevices)
 
-		if len(ctr.Name) == 0 {
-			allErrs = append(allErrs, field.Required(namePath, ""))
-		} else {
-			allErrs = append(allErrs, ValidateDNS1123Label(ctr.Name, namePath)...)
-		}
 		if allNames.Has(ctr.Name) {
-			allErrs = append(allErrs, field.Duplicate(namePath, ctr.Name))
+			allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), ctr.Name))
 		} else {
 			allNames.Insert(ctr.Name)
 		}
-		// TODO: do not validate leading and trailing whitespace to preserve backward compatibility.
-		// for example: https://github.com/openshift/origin/issues/14659 image = " " is special token in pod template
-		// others may have done similar
-		if len(ctr.Image) == 0 {
-			allErrs = append(allErrs, field.Required(idxPath.Child("image"), ""))
-		}
-		if ctr.Lifecycle != nil {
-			allErrs = append(allErrs, validateLifecycle(ctr.Lifecycle, idxPath.Child("lifecycle"))...)
-		}
-		allErrs = append(allErrs, validateProbe(ctr.LivenessProbe, idxPath.Child("livenessProbe"))...)
-		// Readiness-specific validation
-		if ctr.ReadinessProbe != nil && ctr.ReadinessProbe.TerminationGracePeriodSeconds != nil {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("readinessProbe", "terminationGracePeriodSeconds"), ctr.ReadinessProbe.TerminationGracePeriodSeconds, "must not be set for readinessProbes"))
-		}
-		allErrs = append(allErrs, validateProbe(ctr.StartupProbe, idxPath.Child("startupProbe"))...)
-		// Liveness-specific validation
-		if ctr.LivenessProbe != nil && ctr.LivenessProbe.SuccessThreshold != 1 {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("livenessProbe", "successThreshold"), ctr.LivenessProbe.SuccessThreshold, "must be 1"))
-		}
-		allErrs = append(allErrs, validateProbe(ctr.StartupProbe, idxPath.Child("startupProbe"))...)
-		// Startup-specific validation
-		if ctr.StartupProbe != nil && ctr.StartupProbe.SuccessThreshold != 1 {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("startupProbe", "successThreshold"), ctr.StartupProbe.SuccessThreshold, "must be 1"))
-		}
 
-		switch ctr.TerminationMessagePolicy {
-		case core.TerminationMessageReadFile, core.TerminationMessageFallbackToLogsOnError:
-		case "":
-			allErrs = append(allErrs, field.Required(idxPath.Child("terminationMessagePolicy"), "must be 'File' or 'FallbackToLogsOnError'"))
-		default:
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("terminationMessagePolicy"), ctr.TerminationMessagePolicy, "must be 'File' or 'FallbackToLogsOnError'"))
-		}
-
-		allErrs = append(allErrs, validateProbe(ctr.ReadinessProbe, idxPath.Child("readinessProbe"))...)
-		allErrs = append(allErrs, validateContainerPorts(ctr.Ports, idxPath.Child("ports"))...)
-		allErrs = append(allErrs, ValidateEnv(ctr.Env, idxPath.Child("env"), opts)...)
-		allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, idxPath.Child("envFrom"))...)
-		allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volDevices, volumes, &ctr, idxPath.Child("volumeMounts"))...)
-		allErrs = append(allErrs, ValidateVolumeDevices(ctr.VolumeDevices, volMounts, volumes, idxPath.Child("volumeDevices"))...)
-		allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, idxPath.Child("imagePullPolicy"))...)
-		allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"), opts)...)
-		allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, idxPath.Child("securityContext"))...)
+		allErrs = append(allErrs, validateContainer(&ctr, volumes, idxPath, opts)...)
 	}
 
-	if isInitContainers {
-		// check initContainers one by one since they are running in sequential order.
-		for _, initContainer := range containers {
-			allErrs = append(allErrs, checkHostPortConflicts([]core.Container{initContainer}, fldPath)...)
-		}
-	} else {
-		// Check for colliding ports across all containers.
-		allErrs = append(allErrs, checkHostPortConflicts(containers, fldPath)...)
-	}
+	// Check for colliding ports across all containers.
+	allErrs = append(allErrs, checkHostPortConflicts(containers, fldPath)...)
 
 	return allErrs
 }
@@ -3393,10 +3396,15 @@ func ValidateTolerations(tolerations []core.Toleration, fldPath *field.Path) fie
 func validateContainersOnlyForPod(containers []core.Container, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, ctr := range containers {
-		idxPath := fldPath.Index(i)
-		if len(ctr.Image) != len(strings.TrimSpace(ctr.Image)) {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("image"), ctr.Image, "must not have leading or trailing whitespace"))
-		}
+		allErrs = append(allErrs, validateContainerOnlyForPod(&ctr, fldPath.Index(i))...)
+	}
+	return allErrs
+}
+
+func validateContainerOnlyForPod(ctr *core.Container, path *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(ctr.Image) != len(strings.TrimSpace(ctr.Image)) {
+		allErrs = append(allErrs, field.Invalid(path.Child("image"), ctr.Image, "must not have leading or trailing whitespace"))
 	}
 	return allErrs
 }
@@ -3503,7 +3511,7 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 
 	vols, vErrs := ValidateVolumes(spec.Volumes, podMeta, fldPath.Child("volumes"), opts)
 	allErrs = append(allErrs, vErrs...)
-	allErrs = append(allErrs, validateContainers(spec.Containers, false, vols, fldPath.Child("containers"), opts)...)
+	allErrs = append(allErrs, validateContainers(spec.Containers, vols, fldPath.Child("containers"), opts)...)
 	allErrs = append(allErrs, validateInitContainers(spec.InitContainers, spec.Containers, vols, fldPath.Child("initContainers"), opts)...)
 	allErrs = append(allErrs, validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, fldPath.Child("ephemeralContainers"), opts)...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy, fldPath.Child("restartPolicy"))...)
