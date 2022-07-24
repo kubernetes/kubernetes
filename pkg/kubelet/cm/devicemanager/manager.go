@@ -203,7 +203,7 @@ func (m *ManagerImpl) CleanupPluginDirectory(dir string) error {
 }
 
 func (m *ManagerImpl) PluginConnected(resourceName string, p plugin.DevicePlugin) error {
-	options, err := p.Api().GetDevicePluginOptions(context.Background(), &pluginapi.Empty{})
+	options, err := p.API().GetDevicePluginOptions(context.Background(), &pluginapi.Empty{})
 	if err != nil {
 		return fmt.Errorf("failed to get device plugin options: %v", err)
 	}

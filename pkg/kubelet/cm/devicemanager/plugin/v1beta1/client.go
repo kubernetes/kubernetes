@@ -30,7 +30,7 @@ import (
 )
 
 type DevicePlugin interface {
-	Api() api.DevicePluginClient
+	API() api.DevicePluginClient
 	Resource() string
 	SocketPath() string
 }
@@ -104,7 +104,7 @@ func (c *client) Resource() string {
 	return c.resource
 }
 
-func (c *client) Api() api.DevicePluginClient {
+func (c *client) API() api.DevicePluginClient {
 	return c.client
 }
 
