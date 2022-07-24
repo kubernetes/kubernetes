@@ -90,7 +90,7 @@ type TimerConfig struct {
 
 // DefaultTimerConfig is the default configuration of Attach/Detach controller
 // timers.
-var DefaultTimerConfig TimerConfig = TimerConfig{
+var DefaultTimerConfig = TimerConfig{
 	ReconcilerLoopPeriod:                              100 * time.Millisecond,
 	ReconcilerMaxWaitForUnmountDuration:               6 * time.Minute,
 	DesiredStateOfWorldPopulatorLoopSleepPeriod:       1 * time.Minute,
@@ -895,7 +895,7 @@ func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.N
 		keepTerminatedPodVolumes := false
 
 		if t, ok := node.Annotations[volumeutil.KeepTerminatedPodVolumesAnnotation]; ok {
-			keepTerminatedPodVolumes = (t == "true")
+			keepTerminatedPodVolumes = t == "true"
 		}
 
 		// Node specifies annotation indicating it should be managed by attach

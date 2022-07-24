@@ -267,7 +267,7 @@ var _ = SIGDescribe("Addon update", func() {
 		svcAddonEnsureExists := "addon-ensure-exists-service.yaml"
 		svcAddonEnsureExistsUpdated := "addon-ensure-exists-service-updated.yaml"
 
-		var remoteFiles []stringPair = []stringPair{
+		var remoteFiles = []stringPair{
 			{fmt.Sprintf(reconcileAddonController, addonNsName, serveHostnameImage), rcAddonReconcile},
 			{fmt.Sprintf(reconcileAddonControllerUpdated, addonNsName, serveHostnameImage), rcAddonReconcileUpdated},
 			{fmt.Sprintf(deprecatedLabelAddonService, addonNsName), svcAddonDeprecatedLabel},
