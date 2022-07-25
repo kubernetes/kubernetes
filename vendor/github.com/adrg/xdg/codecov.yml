@@ -1,0 +1,11 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 90%
+        threshold: 1%
+    patch:
+      default:
+        target: 100%
+ignore:
+  - "paths_plan9.go"
