@@ -18,6 +18,7 @@ package images
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	dockerref "github.com/docker/distribution/reference"
@@ -29,6 +30,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // imageManager provides the functionalities for image pulling.
@@ -37,7 +39,8 @@ type imageManager struct {
 	imageService kubecontainer.ImageService
 	backOff      *flowcontrol.Backoff
 	// It will check the presence of the image, and report the 'image pulling', image pulled' events correspondingly.
-	puller imagePuller
+	puller            imagePuller
+	imagePullingCount int64
 }
 
 var _ ImageManager = &imageManager{}
@@ -141,21 +144,33 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 	m.logIt(ref, v1.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("Pulling image %q", container.Image), klog.Info)
 	startTime := time.Now()
 	pullChan := make(chan pullResult)
-	m.puller.pullImage(spec, pullSecrets, pullChan, podSandboxConfig)
-	imagePullResult := <-pullChan
-	if imagePullResult.err != nil {
-		m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)
-		m.backOff.Next(backOffKey, m.backOff.Clock.Now())
-		if imagePullResult.err == ErrRegistryUnavailable {
-			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
-			return "", msg, imagePullResult.err
-		}
+	pullFn := func() (string, string, error) {
+		defer metrics.ImagePullingCount.Set(float64(m.imagePullingCount))
+		defer atomic.AddInt64(&m.imagePullingCount, -1)
 
-		return "", imagePullResult.err.Error(), ErrImagePull
+		atomic.AddInt64(&m.imagePullingCount, 1)
+		metrics.ImagePullingCount.Set(float64(m.imagePullingCount))
+		m.puller.pullImage(spec, pullSecrets, pullChan, podSandboxConfig)
+		imagePullResult := <-pullChan
+		if imagePullResult.err != nil {
+			m.logIt(ref, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, imagePullResult.err), klog.Warning)
+			m.backOff.Next(backOffKey, m.backOff.Clock.Now())
+			if imagePullResult.err == ErrRegistryUnavailable {
+				msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
+				return "", msg, imagePullResult.err
+			}
+
+			return "", imagePullResult.err.Error(), ErrImagePull
+		}
+		return imagePullResult.imageRef, "", nil
+	}
+	imageRef, message, err := pullFn()
+	if err != nil {
+		return imageRef, message, err
 	}
 	m.logIt(ref, v1.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q in %v", container.Image, time.Since(startTime)), klog.Info)
 	m.backOff.GC()
-	return imagePullResult.imageRef, "", nil
+	return imageRef, "", nil
 }
 
 // applyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,

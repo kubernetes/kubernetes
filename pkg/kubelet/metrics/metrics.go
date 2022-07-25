@@ -483,6 +483,16 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// ImagePullingCount is a gauge that tracks the number of Images currently pulling
+	ImagePullingCount = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "image_pulling_count",
+			Help:           "Number of images currently pulling.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -531,6 +541,7 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.MustRegister(GracefulShutdownStartTime)
 			legacyregistry.MustRegister(GracefulShutdownEndTime)
 		}
+		legacyregistry.MustRegister(ImagePullingCount)
 
 	})
 }
