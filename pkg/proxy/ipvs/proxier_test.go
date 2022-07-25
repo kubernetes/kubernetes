@@ -5022,7 +5022,7 @@ func Test_EndpointSliceReadyAndTerminatingCluster(t *testing.T) {
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
 	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 1 virtual server")
+	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
 		if virtualServer.Address.String() == "172.20.1.1" {
@@ -5198,7 +5198,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
 	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 1 virtual server")
+	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
 		if virtualServer.Address.String() == "172.20.1.1" {
@@ -5374,7 +5374,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingCluster(t *testing.T) {
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
 	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 1 virtual server")
+	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
 		if virtualServer.Address.String() == "172.20.1.1" {
@@ -5547,7 +5547,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
 	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 1 virtual server")
+	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
 		if virtualServer.Address.String() == "172.20.1.1" {
@@ -5719,7 +5719,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocalWithFeatureGateDisabled(t *te
 
 	virtualServers, vsErr = ipvs.GetVirtualServers()
 	assert.Nil(t, vsErr, "Expected no error getting virtual servers")
-	assert.Len(t, virtualServers, 2, "Expected 1 virtual server")
+	assert.Len(t, virtualServers, 2, "Expected 2 virtual server")
 
 	for _, virtualServer := range virtualServers {
 		if virtualServer.Address.String() == "172.20.1.1" {
