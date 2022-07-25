@@ -988,12 +988,6 @@ func removeQueueAndUpdateIndexes(queues []*queue, index int) []*queue {
 	return keptQueues
 }
 
-func (qs *queueSet) UpdateObservations() {
-	qs.reqsGaugePair.RequestsWaiting.Add(0)
-	qs.reqsGaugePair.RequestsExecuting.Add(0)
-	qs.execSeatsGauge.Add(0)
-}
-
 func (qs *queueSet) Dump(includeRequestDetails bool) debug.QueueSetDump {
 	qs.lock.Lock()
 	defer qs.lock.Unlock()

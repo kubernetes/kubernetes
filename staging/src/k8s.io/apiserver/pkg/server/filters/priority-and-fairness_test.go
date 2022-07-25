@@ -82,9 +82,6 @@ type fakeApfFilter struct {
 	utilflowcontrol.WatchTracker
 }
 
-func (t fakeApfFilter) MaintainObservations(stopCh <-chan struct{}) {
-}
-
 func (t fakeApfFilter) Handle(ctx context.Context,
 	requestDigest utilflowcontrol.RequestDigest,
 	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
@@ -392,9 +389,6 @@ func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.inflight--
-}
-
-func (f *fakeWatchApfFilter) MaintainObservations(stopCh <-chan struct{}) {
 }
 
 func (f *fakeWatchApfFilter) Run(stopCh <-chan struct{}) error {

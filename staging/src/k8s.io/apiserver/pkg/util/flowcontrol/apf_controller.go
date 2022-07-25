@@ -291,23 +291,6 @@ func newTestableController(config TestableConfig) *configController {
 	return cfgCtlr
 }
 
-// MaintainObservations keeps the observers from
-// metrics.PriorityLevelConcurrencyPairVec from falling
-// too far behind
-func (cfgCtlr *configController) MaintainObservations(stopCh <-chan struct{}) {
-	wait.Until(cfgCtlr.updateObservations, 10*time.Second, stopCh)
-}
-
-func (cfgCtlr *configController) updateObservations() {
-	cfgCtlr.lock.RLock()
-	defer cfgCtlr.lock.RUnlock()
-	for _, plc := range cfgCtlr.priorityLevelStates {
-		if plc.queues != nil {
-			plc.queues.UpdateObservations()
-		}
-	}
-}
-
 func (cfgCtlr *configController) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 
