@@ -90,30 +90,34 @@ func Run(options options.CompletedServerRunOptions, stopCh <-chan struct{}) erro
 	}
 	versionedInformers := clientgoinformers.NewSharedInformerFactory(client, 10*time.Minute)
 
-	config, err := CreateKubeAPIServerConfig(genericConfig, options, versionedInformers, nil, storageFactory)
+	apisConfig, err := CreateKubeAPIServerConfig(genericConfig, options, versionedInformers, nil, storageFactory)
 	if err != nil {
 		return err
 	}
 
 	// If additional API servers are added, they should be gated.
 	apiExtensionsConfig, err := CreateAPIExtensionsConfig(
-		*config.GenericConfig,
-		config.ExtraConfig.VersionedInformers,
+		*apisConfig.GenericConfig,
+		apisConfig.ExtraConfig.VersionedInformers,
 		nil, // pluginInitializer
 		options,
 		&unimplementedServiceResolver{},
 		webhook.NewDefaultAuthenticationInfoResolverWrapper(
 			nil,
-			config.GenericConfig.EgressSelector,
-			config.GenericConfig.LoopbackClientConfig,
-			config.GenericConfig.TracerProvider,
+			apisConfig.GenericConfig.EgressSelector,
+			apisConfig.GenericConfig.LoopbackClientConfig,
+			apisConfig.GenericConfig.TracerProvider,
 		),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create apiextensions-apiserver config: %v", err)
 	}
 
-	serverChain, err := CreateServerChain(config.Complete(), apiExtensionsConfig.Complete())
+	miniAggregatorConfig := &aggregator.MiniAggregatorConfig{
+		GenericConfig: apisConfig.GenericConfig,
+	}
+
+	serverChain, err := CreateServerChain(miniAggregatorConfig.Complete(apisConfig.ExtraConfig.VersionedInformers), apisConfig.Complete(), apiExtensionsConfig.Complete())
 	if err != nil {
 		return err
 	}
@@ -128,23 +132,19 @@ type ServerChain struct {
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
-func CreateServerChain(config apis.CompletedConfig, apiExtensionConfig apiextensionsapiserver.CompletedConfig) (*ServerChain, error) {
-	notFoundHandler := notfoundhandler.New(config.GenericConfig.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
+func CreateServerChain(miniAggregatorConfig aggregator.CompletedMiniAggregatorConfig, apisConfig apis.CompletedConfig, apiExtensionConfig apiextensionsapiserver.CompletedConfig) (*ServerChain, error) {
+	notFoundHandler := notfoundhandler.New(apisConfig.GenericConfig.Serializer, genericapifilters.NoMuxAndDiscoveryIncompleteKey)
 	apiExtensionsServer, err := apiExtensionConfig.New(genericapiserver.NewEmptyDelegateWithCustomHandler(notFoundHandler))
 	if err != nil {
 		return nil, fmt.Errorf("create api extensions: %v", err)
 	}
 
-	kubeAPIServer, err := config.New(apiExtensionsServer.GenericAPIServer)
+	kubeAPIServer, err := apisConfig.New(apiExtensionsServer.GenericAPIServer)
 	if err != nil {
 		return nil, err
 	}
 
-	miniAggregatorConfig := &aggregator.MiniAggregatorConfig{
-		GenericConfig: config.GenericConfig.Config,
-	}
-
-	miniAggregatorServer, err := miniAggregatorConfig.Complete(config.ExtraConfig.VersionedInformers).New(kubeAPIServer.GenericAPIServer, kubeAPIServer, apiExtensionsServer)
+	miniAggregatorServer, err := miniAggregatorConfig.New(kubeAPIServer.GenericAPIServer, kubeAPIServer, apiExtensionsServer)
 	if err != nil {
 		return nil, err
 	}
