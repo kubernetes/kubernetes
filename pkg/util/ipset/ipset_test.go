@@ -41,9 +41,9 @@ func TestCheckIPSetVersion(t *testing.T) {
 
 	for i := range testCases {
 		fcmd := fakeexec.FakeCmd{
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			CombinedOutputScript: []fakeexec.FakeAction{
 				// ipset version response
-				func() ([]byte, error) { return []byte(testCases[i].vstring), nil },
+				func() ([]byte, []byte, error) { return []byte(testCases[i].vstring), nil, nil },
 			},
 		}
 
@@ -67,11 +67,11 @@ func TestCheckIPSetVersion(t *testing.T) {
 
 func TestFlushSet(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Success
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Success
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -101,12 +101,12 @@ func TestFlushSet(t *testing.T) {
 
 func TestDestroySet(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Success
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Failure
-			func() ([]byte, error) {
-				return []byte("ipset v6.19: The set with the given name does not exist"), &fakeexec.FakeExitError{Status: 1}
+			func() ([]byte, []byte, error) {
+				return []byte("ipset v6.19: The set with the given name does not exist"), nil, &fakeexec.FakeExitError{Status: 1}
 			},
 		},
 	}
@@ -137,11 +137,11 @@ func TestDestroySet(t *testing.T) {
 
 func TestDestroyAllSets(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Success
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Success
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -177,14 +177,14 @@ func TestCreateSet(t *testing.T) {
 	}
 
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Success
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Success
-			func() ([]byte, error) { return []byte{}, nil },
+			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 			// Failure
-			func() ([]byte, error) {
-				return []byte("ipset v6.19: Set cannot be created: set with the same name already exists"), &fakeexec.FakeExitError{Status: 1}
+			func() ([]byte, []byte, error) {
+				return []byte("ipset v6.19: Set cannot be created: set with the same name already exists"), nil, &fakeexec.FakeExitError{Status: 1}
 			},
 		},
 	}
@@ -367,14 +367,14 @@ var testCases = []struct {
 func TestAddEntry(t *testing.T) {
 	for i := range testCases {
 		fcmd := fakeexec.FakeCmd{
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			CombinedOutputScript: []fakeexec.FakeAction{
 				// Success
-				func() ([]byte, error) { return []byte{}, nil },
+				func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 				// Success
-				func() ([]byte, error) { return []byte{}, nil },
+				func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 				// Failure
-				func() ([]byte, error) {
-					return []byte("ipset v6.19: Set cannot be created: set with the same name already exists"), &fakeexec.FakeExitError{Status: 1}
+				func() ([]byte, []byte, error) {
+					return []byte("ipset v6.19: Set cannot be created: set with the same name already exists"), nil, &fakeexec.FakeExitError{Status: 1}
 				},
 			},
 		}
@@ -419,12 +419,12 @@ func TestAddEntry(t *testing.T) {
 func TestDelEntry(t *testing.T) {
 	for i := range testCases {
 		fcmd := fakeexec.FakeCmd{
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			CombinedOutputScript: []fakeexec.FakeAction{
 				// Success
-				func() ([]byte, error) { return []byte{}, nil },
+				func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 				// Failure
-				func() ([]byte, error) {
-					return []byte("ipset v6.19: Element cannot be deleted from the set: it's not added"), &fakeexec.FakeExitError{Status: 1}
+				func() ([]byte, []byte, error) {
+					return []byte("ipset v6.19: Element cannot be deleted from the set: it's not added"), nil, &fakeexec.FakeExitError{Status: 1}
 				},
 			},
 		}
@@ -454,21 +454,22 @@ func TestDelEntry(t *testing.T) {
 }
 
 func TestTestEntry(t *testing.T) {
-	// TODO: IPv6?
 	testEntry := &Entry{
 		IP:       "10.120.7.100",
 		Port:     8080,
 		Protocol: ProtocolTCP,
 		SetType:  HashIPPort,
 	}
-
+	setName := "NOT"
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Success
-			func() ([]byte, error) { return []byte("10.120.7.100,tcp:8080 is in set FOOBAR."), nil },
+			func() ([]byte, []byte, error) {
+				return []byte("10.120.7.100,tcp:8080 is in set " + setName + "."), nil, nil
+			},
 			// Failure
-			func() ([]byte, error) {
-				return []byte("192.168.1.3,tcp:8080 is NOT in set FOOBAR."), &fakeexec.FakeExitError{Status: 1}
+			func() ([]byte, []byte, error) {
+				return []byte("192.168.1.3,tcp:8080 is NOT in set " + setName + "."), nil, &fakeexec.FakeExitError{Status: 1}
 			},
 		},
 	}
@@ -480,14 +481,62 @@ func TestTestEntry(t *testing.T) {
 	}
 	runner := New(&fexec)
 	// Success
-	ok, err := runner.TestEntry(testEntry.String(), "FOOBAR")
+	ok, err := runner.TestEntry(testEntry.String(), setName)
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
 	if fcmd.CombinedOutputCalls != 1 {
 		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "test", "FOOBAR", "10.120.7.100,tcp:8080") {
+	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "test", setName, "10.120.7.100,tcp:8080") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+	}
+	if !ok {
+		t.Errorf("expect entry exists in test set, got not")
+	}
+	// Failure
+	ok, err = runner.TestEntry(testEntry.String(), "FOOBAR")
+	if err == nil || ok {
+		t.Errorf("expect entry doesn't exist in test set")
+	}
+}
+
+func TestTestEntryIPv6(t *testing.T) {
+	testEntry := &Entry{
+		IP:       "fd00:1234:5678:dead:beaf::1",
+		Port:     8080,
+		Protocol: ProtocolTCP,
+		SetType:  HashIPPort,
+	}
+	setName := "NOT"
+	fcmd := fakeexec.FakeCmd{
+		CombinedOutputScript: []fakeexec.FakeAction{
+			// Success
+			func() ([]byte, []byte, error) {
+				return []byte("fd00:1234:5678:dead:beaf::1,tcp:8080 is in set " + setName + "."), nil, nil
+			},
+			// Failure
+			func() ([]byte, []byte, error) {
+				return []byte("fd00::2,tcp:8080 is NOT in set FOOBAR."), nil, &fakeexec.FakeExitError{Status: 1}
+			},
+		},
+	}
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	runner := New(&fexec)
+	// Success
+	ok, err := runner.TestEntry(testEntry.String(), setName)
+	if err != nil {
+		t.Errorf("expected success, got %v", err)
+	}
+	if fcmd.CombinedOutputCalls != 1 {
+		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	}
+	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "test", setName, "fd00:1234:5678:dead:beaf::1,tcp:8080") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
 	}
 	if !ok {
@@ -538,10 +587,10 @@ Members:
 
 	for i := range testCases {
 		fcmd := fakeexec.FakeCmd{
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+			CombinedOutputScript: []fakeexec.FakeAction{
 				// Success
-				func() ([]byte, error) {
-					return []byte(testCases[i].output), nil
+				func() ([]byte, []byte, error) {
+					return []byte(testCases[i].output), nil, nil
 				},
 			},
 		}
@@ -581,9 +630,9 @@ baz`
 	expected := []string{"foo", "bar", "baz"}
 
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Success
-			func() ([]byte, error) { return []byte(output), nil },
+			func() ([]byte, []byte, error) { return []byte(output), nil, nil },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -613,38 +662,41 @@ baz`
 
 func Test_validIPSetType(t *testing.T) {
 	testCases := []struct {
-		setType Type
-		valid   bool
+		setType   Type
+		expectErr bool
 	}{
 		{ // case[0]
-			setType: Type("foo"),
-			valid:   false,
+			setType:   Type("foo"),
+			expectErr: true,
 		},
 		{ // case[1]
-			setType: HashIPPortNet,
-			valid:   true,
+			setType:   HashIPPortNet,
+			expectErr: false,
 		},
 		{ // case[2]
-			setType: HashIPPort,
-			valid:   true,
+			setType:   HashIPPort,
+			expectErr: false,
 		},
 		{ // case[3]
-			setType: HashIPPortIP,
-			valid:   true,
+			setType:   HashIPPortIP,
+			expectErr: false,
 		},
 		{ // case[4]
-			setType: BitmapPort,
-			valid:   true,
+			setType:   BitmapPort,
+			expectErr: false,
 		},
 		{ // case[5]
-			setType: Type(""),
-			valid:   false,
+			setType:   Type(""),
+			expectErr: true,
 		},
 	}
 	for i := range testCases {
-		valid := validateIPSetType(testCases[i].setType)
-		if valid != testCases[i].valid {
-			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v]", i, testCases[i].valid, valid)
+		err := validateIPSetType(testCases[i].setType)
+		if err != nil {
+			if !testCases[i].expectErr {
+				t.Errorf("case [%d]: unexpected mismatch, expect error[%v], got error[%v]", i, testCases[i].expectErr, err)
+			}
+			continue
 		}
 	}
 }
@@ -652,134 +704,140 @@ func Test_validIPSetType(t *testing.T) {
 func Test_validatePortRange(t *testing.T) {
 	testCases := []struct {
 		portRange string
-		valid     bool
+		expectErr bool
 		desc      string
 	}{
 		{ // case[0]
 			portRange: "a-b",
-			valid:     false,
+			expectErr: true,
 			desc:      "invalid port number",
 		},
 		{ // case[1]
 			portRange: "1-2",
-			valid:     true,
+			expectErr: false,
 			desc:      "valid",
 		},
 		{ // case[2]
 			portRange: "90-1",
-			valid:     true,
+			expectErr: false,
 			desc:      "ipset util can accept the input of begin port number can be less than end port number",
 		},
 		{ // case[3]
 			portRange: DefaultPortRange,
-			valid:     true,
+			expectErr: false,
 			desc:      "default port range is valid, of course",
 		},
 		{ // case[4]
 			portRange: "12",
-			valid:     false,
+			expectErr: true,
 			desc:      "a single number is invalid",
 		},
 		{ // case[5]
 			portRange: "1-",
-			valid:     false,
+			expectErr: true,
 			desc:      "should specify end port",
 		},
 		{ // case[6]
 			portRange: "-100",
-			valid:     false,
+			expectErr: true,
 			desc:      "should specify begin port",
 		},
 		{ // case[7]
 			portRange: "1:100",
-			valid:     false,
+			expectErr: true,
 			desc:      "delimiter should be -",
 		},
 		{ // case[8]
 			portRange: "1~100",
-			valid:     false,
+			expectErr: true,
 			desc:      "delimiter should be -",
 		},
 		{ // case[9]
 			portRange: "1,100",
-			valid:     false,
+			expectErr: true,
 			desc:      "delimiter should be -",
 		},
 		{ // case[10]
 			portRange: "100-100",
-			valid:     true,
+			expectErr: false,
 			desc:      "begin port number can be equal to end port number",
 		},
 		{ // case[11]
 			portRange: "",
-			valid:     false,
+			expectErr: true,
 			desc:      "empty string is invalid",
 		},
 		{ // case[12]
 			portRange: "-1-12",
-			valid:     false,
+			expectErr: true,
 			desc:      "port number can not be negative value",
 		},
 		{ // case[13]
 			portRange: "-1--8",
-			valid:     false,
+			expectErr: true,
 			desc:      "port number can not be negative value",
 		},
 	}
 	for i := range testCases {
-		valid := validatePortRange(testCases[i].portRange)
-		if valid != testCases[i].valid {
-			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
+		err := validatePortRange(testCases[i].portRange)
+		if err != nil {
+			if !testCases[i].expectErr {
+				t.Errorf("case [%d]: unexpected mismatch, expect error[%v], got error[%v], desc: %s", i, testCases[i].expectErr, err, testCases[i].desc)
+			}
+			continue
 		}
 	}
 }
 
 func Test_validateFamily(t *testing.T) {
 	testCases := []struct {
-		family string
-		valid  bool
+		family    string
+		expectErr bool
 	}{
 		{ // case[0]
-			family: "foo",
-			valid:  false,
+			family:    "foo",
+			expectErr: true,
 		},
 		{ // case[1]
-			family: ProtocolFamilyIPV4,
-			valid:  true,
+			family:    ProtocolFamilyIPV4,
+			expectErr: false,
 		},
 		{ // case[2]
-			family: ProtocolFamilyIPV6,
-			valid:  true,
+			family:    ProtocolFamilyIPV6,
+			expectErr: false,
 		},
 		{ // case[3]
-			family: "ipv4",
-			valid:  false,
+			family:    "ipv4",
+			expectErr: true,
 		},
 		{ // case[4]
-			family: "ipv6",
-			valid:  false,
+			family:    "ipv6",
+			expectErr: true,
 		},
 		{ // case[5]
-			family: "tcp",
-			valid:  false,
+			family:    "tcp",
+			expectErr: true,
 		},
 		{ // case[6]
-			family: "udp",
-			valid:  false,
+			family:    "udp",
+			expectErr: true,
 		},
 		{ // case[7]
-			family: "",
-			valid:  false,
+			family:    "",
+			expectErr: true,
 		},
 		{ // case[8]
-			family: "sctp",
-			valid:  false,
+			family:    "sctp",
+			expectErr: true,
 		},
 	}
 	for i := range testCases {
-		valid := validateHashFamily(testCases[i].family)
-		if valid != testCases[i].valid {
-			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v]", i, testCases[i].valid, valid)
+		err := validateHashFamily(testCases[i].family)
+		if err != nil {
+			if !testCases[i].expectErr {
+				t.Errorf("case [%d]: unexpected err: %v, desc: %s", i, err, testCases[i].family)
+			}
+			continue
 		}
 	}
 }
@@ -839,9 +897,9 @@ func Test_validateProtocol(t *testing.T) {
 
 func TestValidateIPSet(t *testing.T) {
 	testCases := []struct {
-		ipset *IPSet
-		valid bool
-		desc  string
+		ipset     *IPSet
+		expectErr bool
+		desc      string
 	}{
 		{ // case[0]
 			ipset: &IPSet{
@@ -851,7 +909,8 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    1024,
 			},
-			valid: true,
+			expectErr: false,
+			desc:      "No Port range",
 		},
 		{ // case[1]
 			ipset: &IPSet{
@@ -862,7 +921,8 @@ func TestValidateIPSet(t *testing.T) {
 				MaxElem:    2048,
 				PortRange:  DefaultPortRange,
 			},
-			valid: true,
+			expectErr: false,
+			desc:      "control case",
 		},
 		{ // case[2]
 			ipset: &IPSet{
@@ -872,30 +932,30 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   65535,
 				MaxElem:    2048,
 			},
-			valid: false,
-			desc:  "should specify right port range for bitmap type set",
+			expectErr: true,
+			desc:      "should specify right port range for bitmap type set",
 		},
 		{ // case[3]
 			ipset: &IPSet{
 				Name:       "bar",
-				SetType:    BitmapPort,
+				SetType:    HashIPPort,
 				HashFamily: ProtocolFamilyIPV6,
 				HashSize:   0,
 				MaxElem:    2048,
 			},
-			valid: false,
-			desc:  "wrong hash size number",
+			expectErr: true,
+			desc:      "wrong hash size number",
 		},
 		{ // case[4]
 			ipset: &IPSet{
 				Name:       "baz",
-				SetType:    BitmapPort,
+				SetType:    HashIPPort,
 				HashFamily: ProtocolFamilyIPV6,
 				HashSize:   1024,
 				MaxElem:    -1,
 			},
-			valid: false,
-			desc:  "wrong hash max elem number",
+			expectErr: true,
+			desc:      "wrong hash max elem number",
 		},
 		{ // case[5]
 			ipset: &IPSet{
@@ -905,8 +965,8 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    1024,
 			},
-			valid: false,
-			desc:  "wrong protocol",
+			expectErr: true,
+			desc:      "wrong protocol",
 		},
 		{ // case[6]
 			ipset: &IPSet{
@@ -916,14 +976,17 @@ func TestValidateIPSet(t *testing.T) {
 				HashSize:   1024,
 				MaxElem:    1024,
 			},
-			valid: false,
-			desc:  "wrong set type",
+			expectErr: true,
+			desc:      "wrong set type",
 		},
 	}
 	for i := range testCases {
-		valid := testCases[i].ipset.Validate()
-		if valid != testCases[i].valid {
-			t.Errorf("case [%d]: unexpected mismatch, expect valid[%v], got valid[%v], desc: %s", i, testCases[i].valid, valid, testCases[i].desc)
+		err := testCases[i].ipset.Validate()
+		if err != nil {
+			if !testCases[i].expectErr {
+				t.Errorf("case [%d]: unexpected mismatch, expect error[%v], got error[%v], desc: %s", i, testCases[i].expectErr, err, testCases[i].desc)
+			}
+			continue
 		}
 	}
 }
@@ -1455,8 +1518,7 @@ func TestValidateEntry(t *testing.T) {
 				IP:       "10.20.30.40",
 				Protocol: ProtocolTCP,
 				Port:     53,
-				// TODO: CIDR /32 may not be valid
-				Net: "10.20.30.0/24",
+				Net:      "10.20.30.0/24",
 			},
 			set: &IPSet{
 				Name: "abc",
@@ -1565,6 +1627,58 @@ func TestValidateEntry(t *testing.T) {
 			},
 			set: &IPSet{
 				Name: "negative-port-number",
+			},
+			valid: false,
+		},
+		{ // case[30]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				Net:      "192.168.3.0/0",
+			},
+			set: &IPSet{
+				Name: "net mask boundary 0",
+			},
+			valid: true,
+		},
+		{ // case[31]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				Net:      "192.168.3.0/32",
+			},
+			set: &IPSet{
+				Name: "net mask boundary 32",
+			},
+			valid: true,
+		},
+		{ // case[32]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				Net:      "192.168.3.1/33",
+			},
+			set: &IPSet{
+				Name: "invalid net mask",
+			},
+			valid: false,
+		},
+		{ // case[33]
+			entry: &Entry{
+				SetType:  HashIPPortNet,
+				IP:       "10.20.30.40",
+				Protocol: ProtocolTCP,
+				Port:     53,
+				Net:      "192.168.3.1/-1",
+			},
+			set: &IPSet{
+				Name: "invalid net mask",
 			},
 			valid: false,
 		},

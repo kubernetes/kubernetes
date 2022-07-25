@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -25,11 +26,9 @@ import (
 	"strings"
 	"time"
 
-	"context"
-
-	clientv2 "github.com/coreos/etcd/client"
-	"github.com/coreos/etcd/clientv3"
-	"k8s.io/klog"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/grpc"
+	"k8s.io/klog/v2"
 )
 
 // CombinedEtcdClient provides an implementation of EtcdMigrateClient using a combination of the etcd v2 client, v3 client
@@ -57,14 +56,6 @@ func (e *CombinedEtcdClient) SetEtcdVersionKeyValue(version *EtcdVersion) error 
 
 // Put write a single key value pair to etcd.
 func (e *CombinedEtcdClient) Put(version *EtcdVersion, key, value string) error {
-	if version.Major == 2 {
-		v2client, err := e.clientV2()
-		if err != nil {
-			return err
-		}
-		_, err = v2client.Set(context.Background(), key, value, nil)
-		return err
-	}
 	v3client, err := e.clientV3()
 	if err != nil {
 		return err
@@ -76,17 +67,6 @@ func (e *CombinedEtcdClient) Put(version *EtcdVersion, key, value string) error 
 
 // Get reads a single value for a given key.
 func (e *CombinedEtcdClient) Get(version *EtcdVersion, key string) (string, error) {
-	if version.Major == 2 {
-		v2client, err := e.clientV2()
-		if err != nil {
-			return "", err
-		}
-		resp, err := v2client.Get(context.Background(), key, nil)
-		if err != nil {
-			return "", err
-		}
-		return resp.Node.Value, nil
-	}
 	v3client, err := e.clientV3()
 	if err != nil {
 		return "", err
@@ -104,16 +84,14 @@ func (e *CombinedEtcdClient) Get(version *EtcdVersion, key string) (string, erro
 	return string(kvs[0].Value), nil
 }
 
-func (e *CombinedEtcdClient) clientV2() (clientv2.KeysAPI, error) {
-	v2client, err := clientv2.New(clientv2.Config{Endpoints: []string{e.endpoint()}})
-	if err != nil {
-		return nil, err
-	}
-	return clientv2.NewKeysAPI(v2client), nil
-}
-
 func (e *CombinedEtcdClient) clientV3() (*clientv3.Client, error) {
-	return clientv3.New(clientv3.Config{Endpoints: []string{e.endpoint()}})
+	return clientv3.New(clientv3.Config{
+		Endpoints:   []string{e.endpoint()},
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+	})
 }
 
 // Backup creates a backup of an etcd2 data directory at the given backupDir.
@@ -195,12 +173,12 @@ func (e *CombinedEtcdClient) AttachLease(leaseDuration time.Duration) error {
 	defer v3client.Close()
 	objectsResp, err := v3client.KV.Get(ctx, ttlKeysPrefix, clientv3.WithPrefix())
 	if err != nil {
-		return fmt.Errorf("Error while getting objects to attach to the lease")
+		return fmt.Errorf("error while getting objects to attach to the lease")
 	}
 
 	lease, err := v3client.Lease.Grant(ctx, int64(leaseDuration/time.Second))
 	if err != nil {
-		return fmt.Errorf("Error while creating lease: %v", err)
+		return fmt.Errorf("error while creating lease: %v", err)
 	}
 	klog.Infof("Lease with TTL: %v created", lease.TTL)
 
@@ -210,7 +188,7 @@ func (e *CombinedEtcdClient) AttachLease(leaseDuration time.Duration) error {
 		if err != nil {
 			klog.Errorf("Error while attaching lease to: %s", string(kv.Key))
 		}
-		if bytes.Compare(putResp.PrevKv.Value, kv.Value) != 0 {
+		if !bytes.Equal(putResp.PrevKv.Value, kv.Value) {
 			return fmt.Errorf("concurrent access to key detected when setting lease on %s, expected previous value of %s but got %s",
 				kv.Key, kv.Value, putResp.PrevKv.Value)
 		}

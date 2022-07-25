@@ -22,12 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // storageClassStrategy implements behavior for StorageClass objects
@@ -46,18 +43,16 @@ func (storageClassStrategy) NamespaceScoped() bool {
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
 func (storageClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	class := obj.(*storage.StorageClass)
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		class.AllowVolumeExpansion = nil
-	}
-
-	storageutil.DropDisabledAlphaFields(class)
 }
 
 func (storageClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	storageClass := obj.(*storage.StorageClass)
 	return validation.ValidateStorageClass(storageClass)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (storageClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
 }
 
 // Canonicalize normalizes the object after validation.
@@ -70,20 +65,16 @@ func (storageClassStrategy) AllowCreateOnUpdate() bool {
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
 func (storageClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newClass := obj.(*storage.StorageClass)
-	oldClass := old.(*storage.StorageClass)
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		newClass.AllowVolumeExpansion = nil
-		oldClass.AllowVolumeExpansion = nil
-	}
-	storageutil.DropDisabledAlphaFields(oldClass)
-	storageutil.DropDisabledAlphaFields(newClass)
 }
 
 func (storageClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	errorList := validation.ValidateStorageClass(obj.(*storage.StorageClass))
 	return append(errorList, validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass))...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (storageClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (storageClassStrategy) AllowUnconditionalUpdate() bool {

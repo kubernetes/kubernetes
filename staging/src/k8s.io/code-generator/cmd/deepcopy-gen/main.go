@@ -44,12 +44,10 @@ package main
 
 import (
 	"flag"
-	"path/filepath"
 
 	"github.com/spf13/pflag"
-	"k8s.io/gengo/args"
 	"k8s.io/gengo/examples/deepcopy-gen/generators"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	generatorargs "k8s.io/code-generator/cmd/deepcopy-gen/args"
 	"k8s.io/code-generator/pkg/util"
@@ -61,7 +59,7 @@ func main() {
 
 	// Override defaults.
 	// TODO: move this out of deepcopy-gen
-	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
+	genericArgs.GoHeaderFilePath = util.BoilerplatePath()
 
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine)

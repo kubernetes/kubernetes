@@ -1,4 +1,0 @@
-language: go
-
-go:
-  - 1.x

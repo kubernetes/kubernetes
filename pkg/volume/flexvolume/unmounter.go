@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
+
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // FlexVolumeUnmounter is the disk that will be cleaned by this plugin.
@@ -42,15 +43,15 @@ func (f *flexVolumeUnmounter) TearDown() error {
 }
 
 func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
-
-	pathExists, pathErr := util.PathExists(dir)
-	if !pathExists {
-		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
-		return nil
-	}
-
-	if pathErr != nil && !util.IsCorruptedMnt(pathErr) {
-		return fmt.Errorf("Error checking path: %v", pathErr)
+	pathExists, pathErr := mount.PathExists(dir)
+	if pathErr != nil {
+		// only log warning here since plugins should anyways have to deal with errors
+		klog.Warningf("Error checking path: %v", pathErr)
+	} else {
+		if !pathExists {
+			klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+			return nil
+		}
 	}
 
 	call := f.plugin.NewDriverCall(unmountCmd)
@@ -64,8 +65,8 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 	}
 
 	// Flexvolume driver may remove the directory. Ignore if it does.
-	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
+		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
 		return nil
 	}

@@ -25,14 +25,14 @@ import (
 	"path"
 	"path/filepath"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/apis/apiserver"
-	apiserverv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
+	apiserverv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 )
 
 func makeAbs(path, base string) (string, error) {
@@ -87,7 +87,6 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 		}
 		return configProvider{
 			config: decodedConfig,
-			scheme: configScheme,
 		}, nil
 	}
 	// we got an error where the decode wasn't related to a missing type
@@ -111,11 +110,11 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 	// previously read input from a non-versioned file configuration to the
 	// current input file.
 	legacyPluginsWithUnversionedConfig := sets.NewString("ImagePolicyWebhook", "PodNodeSelector")
-	externalConfig := &apiserverv1alpha1.AdmissionConfiguration{}
+	externalConfig := &apiserverv1.AdmissionConfiguration{}
 	for _, pluginName := range pluginNames {
 		if legacyPluginsWithUnversionedConfig.Has(pluginName) {
 			externalConfig.Plugins = append(externalConfig.Plugins,
-				apiserverv1alpha1.AdmissionPluginConfiguration{
+				apiserverv1.AdmissionPluginConfiguration{
 					Name: pluginName,
 					Path: configFilePath})
 		}
@@ -127,13 +126,11 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 	}
 	return configProvider{
 		config: internalConfig,
-		scheme: configScheme,
 	}, nil
 }
 
 type configProvider struct {
 	config *apiserver.AdmissionConfiguration
-	scheme *runtime.Scheme
 }
 
 // GetAdmissionPluginConfigurationFor returns a reader that holds the admission plugin configuration.

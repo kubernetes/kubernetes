@@ -1,14 +1,17 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-- saad-ali
-- thockin
-- vishh
-- msau42
-- jingxu97
-- jsafrane
+  - saad-ali
+  - thockin
+  - msau42
+  - jingxu97
+  - jsafrane
+  - cofyc
 reviewers:
-- saad-ali
-- jsafrane
-- rootfs
-- jingxu97
-- msau42
-- vishh
+  - saad-ali
+  - jsafrane
+  - jingxu97
+  - msau42
+  - cofyc
+emeritus_approvers:
+  - vishh

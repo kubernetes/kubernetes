@@ -68,16 +68,25 @@ type ActionResult struct {
 	gophercloud.ErrResult
 }
 
-// RescueResult is the response from a Rescue operation. Call its ExtractErr
-// method to determine if the call succeeded or failed.
-type RescueResult struct {
-	ActionResult
-}
-
 // CreateImageResult is the response from a CreateImage operation. Call its
 // ExtractImageID method to retrieve the ID of the newly created image.
 type CreateImageResult struct {
 	gophercloud.Result
+}
+
+// ShowConsoleOutputResult represents the result of console output from a server
+type ShowConsoleOutputResult struct {
+	gophercloud.Result
+}
+
+// Extract will return the console output from a ShowConsoleOutput request.
+func (r ShowConsoleOutputResult) Extract() (string, error) {
+	var s struct {
+		Output string `json:"output"`
+	}
+
+	err := r.ExtractInto(&s)
+	return s.Output, err
 }
 
 // GetPasswordResult represent the result of a get os-server-password operation.
@@ -132,15 +141,6 @@ func (r CreateImageResult) ExtractImageID() (string, error) {
 		return "", fmt.Errorf("Failed to parse the ID of newly created image: %s", u)
 	}
 	return imageID, nil
-}
-
-// Extract interprets any RescueResult as an AdminPass, if possible.
-func (r RescueResult) Extract() (string, error) {
-	var s struct {
-		AdminPass string `json:"adminPass"`
-	}
-	err := r.ExtractInto(&s)
-	return s.AdminPass, err
 }
 
 // Server represents a server/instance in the OpenStack cloud.

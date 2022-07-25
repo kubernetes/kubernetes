@@ -17,7 +17,7 @@
 set -e
 
 # gencerts.sh generates the certificates for the webhook authz plugin tests.
-# 
+#
 # It is not expected to be run often (there is no go generate rule), and mainly
 # exists for documentation purposes.
 
@@ -83,12 +83,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This file was generated using openssl by the gencerts.sh script
+// and holds raw certificates for the webhook tests.
+
+package webhook
 EOF
 
-echo "// This file was generated using openssl by the gencerts.sh script" >> $outfile
-echo "// and holds raw certificates for the webhook tests." >> $outfile
-echo "" >> $outfile
-echo "package webhook" >> $outfile
 for file in caKey caCert badCAKey badCACert serverKey serverCert clientKey clientCert; do
 	data=$(cat ${file}.pem)
 	echo "" >> $outfile
@@ -96,7 +96,7 @@ for file in caKey caCert badCAKey badCACert serverKey serverCert clientKey clien
 done
 
 # Clean up after we're done.
-rm *.pem
-rm *.csr
-rm *.srl
-rm *.conf
+rm ./*.pem
+rm ./*.csr
+rm ./*.srl
+rm ./*.conf

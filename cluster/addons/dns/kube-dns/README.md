@@ -60,5 +60,3 @@ kube-dns.yaml.in
 ```
 kube-dns.yaml.sed
 ```
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/dns/README.md?pixel)]()

@@ -17,8 +17,8 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"time"
@@ -72,7 +72,7 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		}
 	}()
 
-	result.TmpDir, err = ioutil.TempDir("", "kube-controller-manager")
+	result.TmpDir, err = os.MkdirTemp("", "kube-controller-manager")
 	if err != nil {
 		return result, fmt.Errorf("failed to create temp dir: %v", err)
 	}
@@ -100,23 +100,15 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		t.Logf("kube-controller-manager will listen securely on port %d...", s.SecureServing.BindPort)
 	}
 
-	if s.InsecureServing.BindPort != 0 {
-		s.InsecureServing.Listener, s.InsecureServing.BindPort, err = createListenerOnFreePort()
-		if err != nil {
-			return result, fmt.Errorf("failed to create listener: %v", err)
-		}
-
-		t.Logf("kube-controller-manager will listen insecurely on port %d...", s.InsecureServing.BindPort)
-	}
-
 	config, err := s.Config(all, disabled)
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}
 
+	errCh := make(chan error)
 	go func(stopCh <-chan struct{}) {
 		if err := app.Run(config.Complete(), stopCh); err != nil {
-			t.Errorf("kube-apiserver failed run: %v", err)
+			errCh <- err
 		}
 	}(stopCh)
 
@@ -126,7 +118,13 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
 	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do()
+		select {
+		case err := <-errCh:
+			return false, err
+		default:
+		}
+
+		result := client.CoreV1().RESTClient().Get().AbsPath("/healthz").Do(context.TODO())
 		status := 0
 		result.StatusCode(&status)
 		if status == 200 {

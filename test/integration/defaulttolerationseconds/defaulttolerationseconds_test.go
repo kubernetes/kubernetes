@@ -17,30 +17,28 @@ limitations under the License.
 package defaulttolerationseconds
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestAdmission(t *testing.T) {
-	masterConfig := framework.NewMasterConfig()
-	masterConfig.GenericConfig.EnableProfiling = true
-	masterConfig.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
-	defer closeFn()
+	client, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerConfig: func(cfg *controlplane.Config) {
+			cfg.GenericConfig.EnableProfiling = true
+			cfg.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
+		},
+	})
+	defer tearDownFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-
-	ns := framework.CreateTestingNamespace("default-toleration-seconds", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(client, "default-toleration-seconds", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	pod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -57,21 +55,21 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
-	updatedPod, err := client.Core().Pods(pod.Namespace).Create(&pod)
+	updatedPod, err := client.CoreV1().Pods(pod.Namespace).Create(context.TODO(), &pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating pod: %v", err)
 	}
 
 	var defaultSeconds int64 = 300
 	nodeNotReady := v1.Toleration{
-		Key:               schedulerapi.TaintNodeNotReady,
+		Key:               v1.TaintNodeNotReady,
 		Operator:          v1.TolerationOpExists,
 		Effect:            v1.TaintEffectNoExecute,
 		TolerationSeconds: &defaultSeconds,
 	}
 
 	nodeUnreachable := v1.Toleration{
-		Key:               schedulerapi.TaintNodeUnreachable,
+		Key:               v1.TaintNodeUnreachable,
 		Operator:          v1.TolerationOpExists,
 		Effect:            v1.TaintEffectNoExecute,
 		TolerationSeconds: &defaultSeconds,

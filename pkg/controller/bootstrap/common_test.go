@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -34,6 +35,7 @@ func newTokenSecret(tokenID, tokenSecret string) *v1.Secret {
 			Namespace:       metav1.NamespaceSystem,
 			Name:            bootstrapapi.BootstrapTokenSecretPrefix + tokenID,
 			ResourceVersion: "1",
+			UID:             types.UID("uid" + tokenID),
 		},
 		Type: bootstrapapi.SecretTypeBootstrapToken,
 		Data: map[string][]byte{

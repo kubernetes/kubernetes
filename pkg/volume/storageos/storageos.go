@@ -20,19 +20,20 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	utilexec "k8s.io/utils/exec"
+	utilstrings "k8s.io/utils/strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -64,9 +65,9 @@ const (
 
 func getPath(uid types.UID, volNamespace string, volName string, pvName string, host volume.VolumeHost) string {
 	if len(volNamespace) != 0 && len(volName) != 0 && strings.Count(volName, ".") == 0 {
-		return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(storageosPluginName), pvName+"."+volNamespace+"."+volName)
+		return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(storageosPluginName), pvName+"."+volNamespace+"."+volName)
 	}
-	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(storageosPluginName), pvName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(storageosPluginName), pvName)
 }
 
 func (plugin *storageosPlugin) Init(host volume.VolumeHost) error {
@@ -91,7 +92,7 @@ func (plugin *storageosPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.StorageOS != nil)
 }
 
-func (plugin *storageosPlugin) RequiresRemount() bool {
+func (plugin *storageosPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -109,10 +110,10 @@ func (plugin *storageosPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volu
 		return nil, err
 	}
 
-	return plugin.newMounterInternal(spec, pod, apiCfg, &storageosUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
+	return plugin.newMounterInternal(spec, pod, apiCfg, &storageosUtil{host: plugin.host}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
-func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, apiCfg *storageosAPIConfig, manager storageosManager, mounter mount.Interface, exec mount.Exec) (volume.Mounter, error) {
+func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, apiCfg *storageosAPIConfig, manager storageosManager, mounter mount.Interface, exec utilexec.Interface) (volume.Mounter, error) {
 
 	volName, volNamespace, fsType, readOnly, err := getVolumeInfoFromSpec(spec)
 	if err != nil {
@@ -141,10 +142,10 @@ func (plugin *storageosPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod
 }
 
 func (plugin *storageosPlugin) NewUnmounter(pvName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(pvName, podUID, &storageosUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
+	return plugin.newUnmounterInternal(pvName, podUID, &storageosUtil{host: plugin.host}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
-func (plugin *storageosPlugin) newUnmounterInternal(pvName string, podUID types.UID, manager storageosManager, mounter mount.Interface, exec mount.Exec) (volume.Unmounter, error) {
+func (plugin *storageosPlugin) newUnmounterInternal(pvName string, podUID types.UID, manager storageosManager, mounter mount.Interface, exec utilexec.Interface) (volume.Unmounter, error) {
 
 	// Parse volume namespace & name from mountpoint if mounted
 	volNamespace, volName, err := getVolumeInfo(pvName, podUID, plugin.host)
@@ -193,7 +194,7 @@ func (plugin *storageosPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, er
 		return nil, fmt.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
 	}
 
-	return plugin.newDeleterInternal(spec, apiCfg, &storageosUtil{})
+	return plugin.newDeleterInternal(spec, apiCfg, &storageosUtil{host: plugin.host})
 }
 
 func (plugin *storageosPlugin) newDeleterInternal(spec *volume.Spec, apiCfg *storageosAPIConfig, manager storageosManager) (volume.Deleter, error) {
@@ -214,7 +215,7 @@ func (plugin *storageosPlugin) newDeleterInternal(spec *volume.Spec, apiCfg *sto
 }
 
 func (plugin *storageosPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
-	return plugin.newProvisionerInternal(options, &storageosUtil{})
+	return plugin.newProvisionerInternal(options, &storageosUtil{host: plugin.host})
 }
 
 func (plugin *storageosPlugin) newProvisionerInternal(options volume.VolumeOptions, manager storageosManager) (volume.Provisioner, error) {
@@ -277,6 +278,8 @@ type storageosManager interface {
 	CreateVolume(provisioner *storageosProvisioner) (*storageosVolume, error)
 	// Attaches the disk to the kubelet's host machine.
 	AttachVolume(mounter *storageosMounter) (string, error)
+	// Attaches the device to the host at a mount path.
+	AttachDevice(mounter *storageosMounter, deviceMountPath string) error
 	// Detaches the disk from the kubelet's host machine.
 	DetachVolume(unmounter *storageosUnmounter, dir string) error
 	// Mounts the disk on the Kubelet's host machine.
@@ -296,7 +299,6 @@ type storageos struct {
 	pvName       string
 	volName      string
 	volNamespace string
-	secretName   string
 	readOnly     bool
 	description  string
 	pool         string
@@ -306,7 +308,7 @@ type storageos struct {
 	apiCfg       *storageosAPIConfig
 	manager      storageosManager
 	mounter      mount.Interface
-	exec         mount.Exec
+	exec         utilexec.Interface
 	plugin       *storageosPlugin
 	volume.MetricsProvider
 }
@@ -326,25 +328,26 @@ var _ volume.Mounter = &storageosMounter{}
 
 func (b *storageosMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         !b.readOnly,
-		SupportsSELinux: true,
+		ReadOnly:       b.readOnly,
+		Managed:        !b.readOnly,
+		SELinuxRelabel: true,
 	}
 }
 
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *storageosMounter) CanMount() error {
-	return nil
-}
-
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *storageosMounter) SetUp(fsGroup *int64) error {
+func (b *storageosMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	// Need a namespace to find the volume, try pod's namespace if not set.
 	if b.volNamespace == "" {
 		klog.V(2).Infof("Setting StorageOS volume namespace to pod namespace: %s", b.podNamespace)
 		b.volNamespace = b.podNamespace
+	}
+
+	targetPath := makeGlobalPDName(b.plugin.host, b.pvName, b.volNamespace, b.volName)
+
+	// Attach the device to the host.
+	if err := b.manager.AttachDevice(b, targetPath); err != nil {
+		klog.Errorf("Failed to attach device at %s: %s", targetPath, err.Error())
+		return err
 	}
 
 	// Attach the StorageOS volume as a block device
@@ -355,19 +358,18 @@ func (b *storageosMounter) SetUp(fsGroup *int64) error {
 	}
 
 	// Mount the loop device into the plugin's disk global mount dir.
-	globalPDPath := makeGlobalPDName(b.plugin.host, b.pvName, b.podNamespace, b.volName)
-	err = b.manager.MountVolume(b, devicePath, globalPDPath)
+	err = b.manager.MountVolume(b, devicePath, targetPath)
 	if err != nil {
 		return err
 	}
 	klog.V(4).Infof("Successfully mounted StorageOS volume %s into global mount directory", b.volName)
 
 	// Bind mount the volume into the pod
-	return b.SetUpAt(b.GetPath(), fsGroup)
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
 // SetUp bind mounts the disk global mount to the give volume path.
-func (b *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *storageosMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	klog.V(4).Infof("StorageOS volume set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -393,7 +395,7 @@ func (b *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
 	globalPDPath := makeGlobalPDName(b.plugin.host, b.pvName, b.volNamespace, b.volName)
 	klog.V(4).Infof("Attempting to bind mount to pod volume at %s", dir)
 
-	err = b.mounter.Mount(globalPDPath, dir, "", mountOptions)
+	err = b.mounter.MountSensitiveWithoutSystemd(globalPDPath, dir, "", mountOptions, nil)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
@@ -421,14 +423,14 @@ func (b *storageosMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, fsGroup)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 	klog.V(4).Infof("StorageOS volume setup complete on %s", dir)
 	return nil
 }
 
 func makeGlobalPDName(host volume.VolumeHost, pvName, volNamespace, volName string) string {
-	return path.Join(host.GetPluginDir(kstrings.EscapeQualifiedNameForDisk(storageosPluginName)), mount.MountsInGlobalPDPath, pvName+"."+volNamespace+"."+volName)
+	return filepath.Join(host.GetPluginDir(utilstrings.EscapeQualifiedName(storageosPluginName)), util.MountsInGlobalPDPath, pvName+"."+volNamespace+"."+volName)
 }
 
 // Given the pod id and PV name, finds the volume's namespace and name from the
@@ -440,10 +442,10 @@ func getVolumeInfo(pvName string, podUID types.UID, host volume.VolumeHost) (str
 		return volNamespace, volName, nil
 	}
 
-	volumeDir := filepath.Dir(host.GetPodVolumeDir(podUID, kstrings.EscapeQualifiedNameForDisk(storageosPluginName), pvName))
+	volumeDir := filepath.Dir(host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(storageosPluginName), pvName))
 	files, err := ioutil.ReadDir(volumeDir)
 	if err != nil {
-		return "", "", fmt.Errorf("Could not read mounts from pod volume dir: %s", err)
+		return "", "", fmt.Errorf("could not read mounts from pod volume dir: %s", err)
 	}
 	for _, f := range files {
 		if f.Mode().IsDir() && strings.HasPrefix(f.Name(), pvName+".") {
@@ -452,7 +454,7 @@ func getVolumeInfo(pvName string, podUID types.UID, host volume.VolumeHost) (str
 			}
 		}
 	}
-	return "", "", fmt.Errorf("Could not get info from unmounted pv %q at %q", pvName, volumeDir)
+	return "", "", fmt.Errorf("could not get info from unmounted pv %q at %q", pvName, volumeDir)
 }
 
 // Splits the volume ref on "." to return the volNamespace and pvName.  Neither
@@ -529,7 +531,7 @@ func (b *storageosUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (b *storageosUnmounter) TearDownAt(dir string) error {
-	if err := util.UnmountPath(dir, b.mounter); err != nil {
+	if err := mount.CleanupMountPoint(dir, b.mounter, false); err != nil {
 		klog.V(4).Infof("Unmounted StorageOS volume %s failed with: %v", b.pvName, err)
 	}
 	if err := b.manager.UnmountVolume(b); err != nil {
@@ -561,7 +563,7 @@ type storageosProvisioner struct {
 var _ volume.Provisioner = &storageosProvisioner{}
 
 func (c *storageosProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
-	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
+	if !util.ContainsAllAccessModes(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 	if util.CheckPersistentVolumeClaimModeBlock(c.options.PVC) {
@@ -603,7 +605,7 @@ func (c *storageosProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	}
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	var err error
-	c.sizeGB, err = util.RoundUpToGiBInt(capacity)
+	c.sizeGB, err = volumehelpers.RoundUpToGiBInt(capacity)
 	if err != nil {
 		return nil, err
 	}

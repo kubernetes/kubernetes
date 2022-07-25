@@ -234,5 +234,43 @@ func (in *JSONSchemaProps) DeepCopy() *JSONSchemaProps {
 		}
 	}
 
+	if in.XPreserveUnknownFields != nil {
+		in, out := &in.XPreserveUnknownFields, &out.XPreserveUnknownFields
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
+
+	if in.XListMapKeys != nil {
+		in, out := &in.XListMapKeys, &out.XListMapKeys
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+
+	if in.XListType != nil {
+		in, out := &in.XListType, &out.XListType
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(string)
+			**out = **in
+		}
+	}
+
+	if in.XMapType != nil {
+		in, out := &in.XMapType, &out.XMapType
+		*out = new(string)
+		**out = **in
+	}
+
+	if in.XValidations != nil {
+		in, out := &in.XValidations, &out.XValidations
+		*out = make([]ValidationRule, len(*in))
+		copy(*out, *in)
+	}
+
 	return out
 }

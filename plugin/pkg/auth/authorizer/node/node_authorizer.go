@@ -17,20 +17,21 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	csiv1alpha1 "k8s.io/csi-api/pkg/apis/csi/v1alpha1"
+	"k8s.io/component-base/featuregate"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/traverse"
@@ -54,11 +55,14 @@ type NodeAuthorizer struct {
 	nodeRules  []rbacv1.PolicyRule
 
 	// allows overriding for testing
-	features utilfeature.FeatureGate
+	features featuregate.FeatureGate
 }
 
+var _ = authorizer.Authorizer(&NodeAuthorizer{})
+var _ = authorizer.RuleResolver(&NodeAuthorizer{})
+
 // NewAuthorizer returns a new node authorizer
-func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules []rbacv1.PolicyRule) authorizer.Authorizer {
+func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules []rbacv1.PolicyRule) *NodeAuthorizer {
 	return &NodeAuthorizer{
 		graph:      graph,
 		identifier: identifier,
@@ -68,17 +72,25 @@ func NewAuthorizer(graph *Graph, identifier nodeidentifier.NodeIdentifier, rules
 }
 
 var (
-	configMapResource   = api.Resource("configmaps")
-	secretResource      = api.Resource("secrets")
-	pvcResource         = api.Resource("persistentvolumeclaims")
-	pvResource          = api.Resource("persistentvolumes")
-	vaResource          = storageapi.Resource("volumeattachments")
-	svcAcctResource     = api.Resource("serviceaccounts")
-	leaseResource       = coordapi.Resource("leases")
-	csiNodeInfoResource = csiv1alpha1.Resource("csinodeinfos")
+	configMapResource = api.Resource("configmaps")
+	secretResource    = api.Resource("secrets")
+	pvcResource       = api.Resource("persistentvolumeclaims")
+	pvResource        = api.Resource("persistentvolumes")
+	vaResource        = storageapi.Resource("volumeattachments")
+	svcAcctResource   = api.Resource("serviceaccounts")
+	leaseResource     = coordapi.Resource("leases")
+	csiNodeResource   = storageapi.Resource("csinodes")
 )
 
-func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+func (r *NodeAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	if _, isNode := r.identifier.NodeIdentity(user); isNode {
+		// indicate nodes do not have fully enumerated permissions
+		return nil, nil, true, fmt.Errorf("node authorizer does not support user rule resolution")
+	}
+	return nil, nil, false, nil
+}
+
+func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
 	if !isNode {
 		// reject requests from non-nodes
@@ -99,34 +111,20 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 		case configMapResource:
 			return r.authorizeReadNamespacedObject(nodeName, configMapVertexType, attrs)
 		case pvcResource:
-			if r.features.Enabled(features.ExpandPersistentVolumes) {
-				if attrs.GetSubresource() == "status" {
-					return r.authorizeStatusUpdate(nodeName, pvcVertexType, attrs)
-				}
+			if attrs.GetSubresource() == "status" {
+				return r.authorizeStatusUpdate(nodeName, pvcVertexType, attrs)
 			}
 			return r.authorizeGet(nodeName, pvcVertexType, attrs)
 		case pvResource:
 			return r.authorizeGet(nodeName, pvVertexType, attrs)
 		case vaResource:
-			if r.features.Enabled(features.CSIPersistentVolume) {
-				return r.authorizeGet(nodeName, vaVertexType, attrs)
-			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.CSIPersistentVolume), nil
+			return r.authorizeGet(nodeName, vaVertexType, attrs)
 		case svcAcctResource:
-			if r.features.Enabled(features.TokenRequest) {
-				return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)
-			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.TokenRequest), nil
+			return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)
 		case leaseResource:
-			if r.features.Enabled(features.NodeLease) {
-				return r.authorizeLease(nodeName, attrs)
-			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.NodeLease), nil
-		case csiNodeInfoResource:
-			if r.features.Enabled(features.KubeletPluginsWatcher) && r.features.Enabled(features.CSINodeInfo) {
-				return r.authorizeCSINodeInfo(nodeName, attrs)
-			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gates %s and %s", features.KubeletPluginsWatcher, features.CSINodeInfo), nil
+			return r.authorizeLease(nodeName, attrs)
+		case csiNodeResource:
+			return r.authorizeCSINode(nodeName, attrs)
 		}
 
 	}
@@ -144,12 +142,12 @@ func (r *NodeAuthorizer) authorizeStatusUpdate(nodeName string, startingType ver
 	case "update", "patch":
 		// ok
 	default:
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only get/update/patch this type", nil
 	}
 
 	if attrs.GetSubresource() != "status" {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only update status subresource", nil
 	}
 
@@ -159,11 +157,11 @@ func (r *NodeAuthorizer) authorizeStatusUpdate(nodeName string, startingType ver
 // authorizeGet authorizes "get" requests to objects of the specified type if they are related to the specified node
 func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	if attrs.GetVerb() != "get" {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only get individual resources of this type", nil
 	}
 	if len(attrs.GetSubresource()) > 0 {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "cannot get subresource", nil
 	}
 	return r.authorize(nodeName, startingType, attrs)
@@ -172,16 +170,20 @@ func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, 
 // authorizeReadNamespacedObject authorizes "get", "list" and "watch" requests to single objects of a
 // specified types if they are related to the specified node.
 func (r *NodeAuthorizer) authorizeReadNamespacedObject(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
-	if attrs.GetVerb() != "get" && attrs.GetVerb() != "list" && attrs.GetVerb() != "watch" {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+	switch attrs.GetVerb() {
+	case "get", "list", "watch":
+		//ok
+	default:
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only read resources of this type", nil
 	}
+
 	if len(attrs.GetSubresource()) > 0 {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "cannot read subresource", nil
 	}
 	if len(attrs.GetNamespace()) == 0 {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only read namespaced object of this type", nil
 	}
 	return r.authorize(nodeName, startingType, attrs)
@@ -189,18 +191,18 @@ func (r *NodeAuthorizer) authorizeReadNamespacedObject(nodeName string, starting
 
 func (r *NodeAuthorizer) authorize(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	if len(attrs.GetName()) == 0 {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "No Object name found", nil
 	}
 
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
 	if err != nil {
-		klog.V(2).Infof("NODE DENY: %v", err)
-		return authorizer.DecisionNoOpinion, "no path found to object", nil
+		klog.V(2).InfoS("NODE DENY", "err", err)
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node '%s' and this object", nodeName), nil
 	}
 	if !ok {
-		klog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "no path found to object", nil
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node '%s' and this object", nodeName), nil
 	}
 	return authorizer.DecisionAllow, "", nil
 }
@@ -209,23 +211,23 @@ func (r *NodeAuthorizer) authorize(nodeName string, startingType vertexType, att
 // subresource of pods running on a node
 func (r *NodeAuthorizer) authorizeCreateToken(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	if attrs.GetVerb() != "create" || len(attrs.GetName()) == 0 {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only create tokens for individual service accounts", nil
 	}
 
 	if attrs.GetSubresource() != "token" {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only create token subresource of serviceaccount", nil
 	}
 
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
 	if err != nil {
 		klog.V(2).Infof("NODE DENY: %v", err)
-		return authorizer.DecisionNoOpinion, "no path found to object", nil
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node '%s' and this object", nodeName), nil
 	}
 	if !ok {
-		klog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "no path found to object", nil
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("no relationship found between node '%s' and this object", nodeName), nil
 	}
 	return authorizer.DecisionAllow, "", nil
 }
@@ -234,18 +236,17 @@ func (r *NodeAuthorizer) authorizeCreateToken(nodeName string, startingType vert
 func (r *NodeAuthorizer) authorizeLease(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	// allowed verbs: get, create, update, patch, delete
 	verb := attrs.GetVerb()
-	if verb != "get" &&
-		verb != "create" &&
-		verb != "update" &&
-		verb != "patch" &&
-		verb != "delete" {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+	switch verb {
+	case "get", "create", "update", "patch", "delete":
+		//ok
+	default:
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a node lease", nil
 	}
 
 	// the request must be against the system namespace reserved for node leases
 	if attrs.GetNamespace() != api.NamespaceNodeLease {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, fmt.Sprintf("can only access leases in the %q system namespace", api.NamespaceNodeLease), nil
 	}
 
@@ -253,37 +254,36 @@ func (r *NodeAuthorizer) authorizeLease(nodeName string, attrs authorizer.Attrib
 	// note we skip this check for create, since the authorizer doesn't know the name on create
 	// the noderestriction admission plugin is capable of performing this check at create time
 	if verb != "create" && attrs.GetName() != nodeName {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "can only access node lease with the same name as the requesting node", nil
 	}
 
 	return authorizer.DecisionAllow, "", nil
 }
 
-// authorizeCSINodeInfo authorizes node requests to CSINodeInfo csi.storage.k8s.io/csinodeinfos
-func (r *NodeAuthorizer) authorizeCSINodeInfo(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+// authorizeCSINode authorizes node requests to CSINode storage.k8s.io/csinodes
+func (r *NodeAuthorizer) authorizeCSINode(nodeName string, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	// allowed verbs: get, create, update, patch, delete
 	verb := attrs.GetVerb()
-	if verb != "get" &&
-		verb != "create" &&
-		verb != "update" &&
-		verb != "patch" &&
-		verb != "delete" {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a CSINodeInfo", nil
+	switch verb {
+	case "get", "create", "update", "patch", "delete":
+		//ok
+	default:
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only get, create, update, patch, or delete a CSINode", nil
 	}
 
 	if len(attrs.GetSubresource()) > 0 {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "cannot authorize CSINodeInfo subresources", nil
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "cannot authorize CSINode subresources", nil
 	}
 
-	// the request must come from a node with the same name as the CSINodeInfo
+	// the request must come from a node with the same name as the CSINode
 	// note we skip this check for create, since the authorizer doesn't know the name on create
 	// the noderestriction admission plugin is capable of performing this check at create time
 	if verb != "create" && attrs.GetName() != nodeName {
-		klog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "can only access CSINodeInfo with the same name as the requesting node", nil
+		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+		return authorizer.DecisionNoOpinion, "can only access CSINode with the same name as the requesting node", nil
 	}
 
 	return authorizer.DecisionAllow, "", nil
@@ -296,12 +296,12 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 
 	nodeVertex, exists := r.graph.getVertex_rlocked(nodeVertexType, "", nodeName)
 	if !exists {
-		return false, fmt.Errorf("unknown node %q cannot get %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+		return false, fmt.Errorf("unknown node '%s' cannot get %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 
 	startingVertex, exists := r.graph.getVertex_rlocked(startingType, startingNamespace, startingName)
 	if !exists {
-		return false, fmt.Errorf("node %q cannot get unknown %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+		return false, fmt.Errorf("node '%s' cannot get unknown %s %s/%s", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 
 	// Fast check to see if we know of a destination edge
@@ -333,7 +333,7 @@ func (r *NodeAuthorizer) hasPathFrom(nodeName string, startingType vertexType, s
 		return found
 	})
 	if !found {
-		return false, fmt.Errorf("node %q cannot get %s %s/%s, no path was found", nodeName, vertexTypes[startingType], startingNamespace, startingName)
+		return false, fmt.Errorf("node '%s' cannot get %s %s/%s, no relationship to this object was found in the node authorizer graph", nodeName, vertexTypes[startingType], startingNamespace, startingName)
 	}
 	return true, nil
 }

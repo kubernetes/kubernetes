@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/admission"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 // RESTDeleteStrategy defines deletion behavior on an object that follows Kubernetes
@@ -56,6 +58,8 @@ type GarbageCollectionDeleteStrategy interface {
 type RESTGracefulDeleteStrategy interface {
 	// CheckGracefulDelete should return true if the object can be gracefully deleted and set
 	// any default values on the DeleteOptions.
+	// NOTE: if return true, `options.GracePeriodSeconds` must be non-nil (nil will fail),
+	// that's what tells the deletion how "graceful" to be.
 	CheckGracefulDelete(ctx context.Context, obj runtime.Object, options *metav1.DeleteOptions) bool
 }
 
@@ -77,9 +81,23 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 		return false, false, errors.NewInvalid(schema.GroupKind{Group: metav1.GroupName, Kind: "DeleteOptions"}, "", errs)
 	}
 	// Checking the Preconditions here to fail early. They'll be enforced later on when we actually do the deletion, too.
-	if options.Preconditions != nil && options.Preconditions.UID != nil && *options.Preconditions.UID != objectMeta.GetUID() {
-		return false, false, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, objectMeta.GetName(), fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", *options.Preconditions.UID, objectMeta.GetUID()))
+	if options.Preconditions != nil {
+		if options.Preconditions.UID != nil && *options.Preconditions.UID != objectMeta.GetUID() {
+			return false, false, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, objectMeta.GetName(), fmt.Errorf("the UID in the precondition (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", *options.Preconditions.UID, objectMeta.GetUID()))
+		}
+		if options.Preconditions.ResourceVersion != nil && *options.Preconditions.ResourceVersion != objectMeta.GetResourceVersion() {
+			return false, false, errors.NewConflict(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, objectMeta.GetName(), fmt.Errorf("the ResourceVersion in the precondition (%s) does not match the ResourceVersion in record (%s). The object might have been modified", *options.Preconditions.ResourceVersion, objectMeta.GetResourceVersion()))
+		}
 	}
+
+	// Negative values will be treated as the value `1s` on the delete path.
+	if gracePeriodSeconds := options.GracePeriodSeconds; gracePeriodSeconds != nil && *gracePeriodSeconds < 0 {
+		options.GracePeriodSeconds = utilpointer.Int64(1)
+	}
+	if deletionGracePeriodSeconds := objectMeta.GetDeletionGracePeriodSeconds(); deletionGracePeriodSeconds != nil && *deletionGracePeriodSeconds < 0 {
+		objectMeta.SetDeletionGracePeriodSeconds(utilpointer.Int64(1))
+	}
+
 	gracefulStrategy, ok := strategy.(RESTGracefulDeleteStrategy)
 	if !ok {
 		// If we're not deleting gracefully there's no point in updating Generation, as we won't update
@@ -120,9 +138,15 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 		return false, true, nil
 	}
 
+	// `CheckGracefulDelete` will be implemented by specific strategy
 	if !gracefulStrategy.CheckGracefulDelete(ctx, obj, options) {
 		return false, false, nil
 	}
+
+	if options.GracePeriodSeconds == nil {
+		return false, false, errors.NewInternalError(fmt.Errorf("options.GracePeriodSeconds should not be nil"))
+	}
+
 	now := metav1.NewTime(metav1.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
 	objectMeta.SetDeletionTimestamp(&now)
 	objectMeta.SetDeletionGracePeriodSeconds(options.GracePeriodSeconds)
@@ -133,5 +157,46 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx context.Context, obj runtime.
 	if objectMeta.GetGeneration() > 0 {
 		objectMeta.SetGeneration(objectMeta.GetGeneration() + 1)
 	}
+
 	return true, false, nil
+}
+
+// AdmissionToValidateObjectDeleteFunc returns a admission validate func for object deletion
+func AdmissionToValidateObjectDeleteFunc(admit admission.Interface, staticAttributes admission.Attributes, objInterfaces admission.ObjectInterfaces) ValidateObjectFunc {
+	mutatingAdmission, isMutatingAdmission := admit.(admission.MutationInterface)
+	validatingAdmission, isValidatingAdmission := admit.(admission.ValidationInterface)
+
+	mutating := isMutatingAdmission && mutatingAdmission.Handles(staticAttributes.GetOperation())
+	validating := isValidatingAdmission && validatingAdmission.Handles(staticAttributes.GetOperation())
+
+	return func(ctx context.Context, old runtime.Object) error {
+		if !mutating && !validating {
+			return nil
+		}
+		finalAttributes := admission.NewAttributesRecord(
+			nil,
+			// Deep copy the object to avoid accidentally changing the object.
+			old.DeepCopyObject(),
+			staticAttributes.GetKind(),
+			staticAttributes.GetNamespace(),
+			staticAttributes.GetName(),
+			staticAttributes.GetResource(),
+			staticAttributes.GetSubresource(),
+			staticAttributes.GetOperation(),
+			staticAttributes.GetOperationOptions(),
+			staticAttributes.IsDryRun(),
+			staticAttributes.GetUserInfo(),
+		)
+		if mutating {
+			if err := mutatingAdmission.Admit(ctx, finalAttributes, objInterfaces); err != nil {
+				return err
+			}
+		}
+		if validating {
+			if err := validatingAdmission.Validate(ctx, finalAttributes, objInterfaces); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 }

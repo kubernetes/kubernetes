@@ -19,3 +19,9 @@ func UnmarshalDiscardBody(r *request.Request) {
 	io.Copy(ioutil.Discard, r.HTTPResponse.Body)
 	r.HTTPResponse.Body.Close()
 }
+
+// ResponseMetadata provides the SDK response metadata attributes.
+type ResponseMetadata struct {
+	StatusCode int
+	RequestID  string
+}

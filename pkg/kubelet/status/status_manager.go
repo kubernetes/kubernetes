@@ -14,29 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -source=status_manager.go -destination=testing/mock_pod_status_provider.go -package=testing PodStatusProvider
 package status
 
 import (
+	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	clientset "k8s.io/client-go/kubernetes"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
 )
 
@@ -79,10 +81,12 @@ type PodStatusProvider interface {
 	GetPodStatus(uid types.UID) (v1.PodStatus, bool)
 }
 
-// An object which provides guarantees that a pod can be safely deleted.
+// PodDeletionSafetyProvider provides guarantees that a pod can be safely deleted.
 type PodDeletionSafetyProvider interface {
-	// A function which returns true if the pod can safely be deleted
+	// PodResourcesAreReclaimed returns true if the pod can safely be deleted.
 	PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool
+	// PodCouldHaveRunningContainers returns true if the pod could have running containers.
+	PodCouldHaveRunningContainers(pod *v1.Pod) bool
 }
 
 // Manager is the Source of truth for kubelet pod status, and should be kept up-to-date with
@@ -100,6 +104,10 @@ type Manager interface {
 	// triggers a status update.
 	SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool)
 
+	// SetContainerStartup updates the cached container status with the given startup, and
+	// triggers a status update.
+	SetContainerStartup(podUID types.UID, containerID kubecontainer.ContainerID, started bool)
+
 	// TerminatePod resets the container status for the provided pod to terminated and triggers
 	// a status update.
 	TerminatePod(pod *v1.Pod)
@@ -111,6 +119,7 @@ type Manager interface {
 
 const syncPeriod = 10 * time.Second
 
+// NewManager returns a functional Manager.
 func NewManager(kubeClient clientset.Interface, podManager kubepod.Manager, podDeletionSafety PodDeletionSafetyProvider) Manager {
 	return &manager{
 		kubeClient:        kubeClient,
@@ -131,7 +140,7 @@ func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	for _, c := range status.Conditions {
 		if kubetypes.PodConditionByKubelet(c.Type) {
 			_, oc := podutil.GetPodCondition(oldCopy, c.Type)
-			if oc == nil || oc.Status != c.Status {
+			if oc == nil || oc.Status != c.Status || oc.Message != c.Message || oc.Reason != c.Reason {
 				return false
 			}
 		}
@@ -145,21 +154,33 @@ func (m *manager) Start() {
 	// on the master, where the kubelet is responsible for bootstrapping the pods
 	// of the master components.
 	if m.kubeClient == nil {
-		klog.Infof("Kubernetes client is nil, not starting status manager.")
+		klog.InfoS("Kubernetes client is nil, not starting status manager")
 		return
 	}
 
-	klog.Info("Starting to sync pod status with apiserver")
-	syncTicker := time.Tick(syncPeriod)
+	klog.InfoS("Starting to sync pod status with apiserver")
+
+	//nolint:staticcheck // SA1015 Ticker can leak since this is only called once and doesn't handle termination.
+	syncTicker := time.NewTicker(syncPeriod).C
+
 	// syncPod and syncBatch share the same go routine to avoid sync races.
 	go wait.Forever(func() {
-		select {
-		case syncRequest := <-m.podStatusChannel:
-			klog.V(5).Infof("Status Manager: syncing pod: %q, with status: (%d, %v) from podStatusChannel",
-				syncRequest.podUID, syncRequest.status.version, syncRequest.status.status)
-			m.syncPod(syncRequest.podUID, syncRequest.status)
-		case <-syncTicker:
-			m.syncBatch()
+		for {
+			select {
+			case syncRequest := <-m.podStatusChannel:
+				klog.V(5).InfoS("Status Manager: syncing pod with status from podStatusChannel",
+					"podUID", syncRequest.podUID,
+					"statusVersion", syncRequest.status.version,
+					"status", syncRequest.status.status)
+				m.syncPod(syncRequest.podUID, syncRequest.status)
+			case <-syncTicker:
+				klog.V(5).InfoS("Status Manager: syncing batch")
+				// remove any entries in the status channel since the batch will handle them
+				for i := len(m.podStatusChannel); i > 0; i-- {
+					<-m.podStatusChannel
+				}
+				m.syncBatch()
+			}
 		}
 	}, 0)
 }
@@ -175,12 +196,6 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
-	for _, c := range pod.Status.Conditions {
-		if !kubetypes.PodConditionByKubelet(c.Type) {
-			klog.Errorf("Kubelet is trying to update pod condition %q for pod %q. "+
-				"But it is not owned by kubelet.", string(c.Type), format.Pod(pod))
-		}
-	}
 	// Make sure we're caching a deep copy.
 	status = *status.DeepCopy()
 
@@ -196,28 +211,32 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 
 	pod, ok := m.podManager.GetPodByUID(podUID)
 	if !ok {
-		klog.V(4).Infof("Pod %q has been deleted, no need to update readiness", string(podUID))
+		klog.V(4).InfoS("Pod has been deleted, no need to update readiness", "podUID", string(podUID))
 		return
 	}
 
 	oldStatus, found := m.podStatuses[pod.UID]
 	if !found {
-		klog.Warningf("Container readiness changed before pod has synced: %q - %q",
-			format.Pod(pod), containerID.String())
+		klog.InfoS("Container readiness changed before pod has synced",
+			"pod", klog.KObj(pod),
+			"containerID", containerID.String())
 		return
 	}
 
 	// Find the container to update.
 	containerStatus, _, ok := findContainerStatus(&oldStatus.status, containerID.String())
 	if !ok {
-		klog.Warningf("Container readiness changed for unknown container: %q - %q",
-			format.Pod(pod), containerID.String())
+		klog.InfoS("Container readiness changed for unknown container",
+			"pod", klog.KObj(pod),
+			"containerID", containerID.String())
 		return
 	}
 
 	if containerStatus.Ready == ready {
-		klog.V(4).Infof("Container readiness unchanged (%v): %q - %q", ready,
-			format.Pod(pod), containerID.String())
+		klog.V(4).InfoS("Container readiness unchanged",
+			"ready", ready,
+			"pod", klog.KObj(pod),
+			"containerID", containerID.String())
 		return
 	}
 
@@ -238,12 +257,54 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 		if conditionIndex != -1 {
 			status.Conditions[conditionIndex] = condition
 		} else {
-			klog.Warningf("PodStatus missing %s type condition: %+v", conditionType, status)
+			klog.InfoS("PodStatus missing condition type", "conditionType", conditionType, "status", status)
 			status.Conditions = append(status.Conditions, condition)
 		}
 	}
 	updateConditionFunc(v1.PodReady, GeneratePodReadyCondition(&pod.Spec, status.Conditions, status.ContainerStatuses, status.Phase))
 	updateConditionFunc(v1.ContainersReady, GenerateContainersReadyCondition(&pod.Spec, status.ContainerStatuses, status.Phase))
+	m.updateStatusInternal(pod, status, false)
+}
+
+func (m *manager) SetContainerStartup(podUID types.UID, containerID kubecontainer.ContainerID, started bool) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	pod, ok := m.podManager.GetPodByUID(podUID)
+	if !ok {
+		klog.V(4).InfoS("Pod has been deleted, no need to update startup", "podUID", string(podUID))
+		return
+	}
+
+	oldStatus, found := m.podStatuses[pod.UID]
+	if !found {
+		klog.InfoS("Container startup changed before pod has synced",
+			"pod", klog.KObj(pod),
+			"containerID", containerID.String())
+		return
+	}
+
+	// Find the container to update.
+	containerStatus, _, ok := findContainerStatus(&oldStatus.status, containerID.String())
+	if !ok {
+		klog.InfoS("Container startup changed for unknown container",
+			"pod", klog.KObj(pod),
+			"containerID", containerID.String())
+		return
+	}
+
+	if containerStatus.Started != nil && *containerStatus.Started == started {
+		klog.V(4).InfoS("Container startup unchanged",
+			"pod", klog.KObj(pod),
+			"containerID", containerID.String())
+		return
+	}
+
+	// Make sure we're not updating the cached version.
+	status := *oldStatus.status.DeepCopy()
+	containerStatus, _, _ = findContainerStatus(&status, containerID.String())
+	containerStatus.Started = &started
+
 	m.updateStatusInternal(pod, status, false)
 }
 
@@ -265,25 +326,102 @@ func findContainerStatus(status *v1.PodStatus, containerID string) (containerSta
 
 }
 
+// TerminatePod ensures that the status of containers is properly defaulted at the end of the pod
+// lifecycle. As the Kubelet must reconcile with the container runtime to observe container status
+// there is always the possibility we are unable to retrieve one or more container statuses due to
+// garbage collection, admin action, or loss of temporary data on a restart. This method ensures
+// that any absent container status is treated as a failure so that we do not incorrectly describe
+// the pod as successful. If we have not yet initialized the pod in the presence of init containers,
+// the init container failure status is sufficient to describe the pod as failing, and we do not need
+// to override waiting containers (unless there is evidence the pod previously started those containers).
 func (m *manager) TerminatePod(pod *v1.Pod) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
+
+	// ensure that all containers have a terminated state - because we do not know whether the container
+	// was successful, always report an error
 	oldStatus := &pod.Status
 	if cachedStatus, ok := m.podStatuses[pod.UID]; ok {
 		oldStatus = &cachedStatus.status
 	}
 	status := *oldStatus.DeepCopy()
-	for i := range status.ContainerStatuses {
-		status.ContainerStatuses[i].State = v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{},
+
+	// once a pod has initialized, any missing status is treated as a failure
+	if hasPodInitialized(pod) {
+		for i := range status.ContainerStatuses {
+			if status.ContainerStatuses[i].State.Terminated != nil {
+				continue
+			}
+			status.ContainerStatuses[i].State = v1.ContainerState{
+				Terminated: &v1.ContainerStateTerminated{
+					Reason:   "ContainerStatusUnknown",
+					Message:  "The container could not be located when the pod was terminated",
+					ExitCode: 137,
+				},
+			}
 		}
 	}
-	for i := range status.InitContainerStatuses {
+
+	// all but the final suffix of init containers which have no evidence of a container start are
+	// marked as failed containers
+	for i := range initializedContainers(status.InitContainerStatuses) {
+		if status.InitContainerStatuses[i].State.Terminated != nil {
+			continue
+		}
 		status.InitContainerStatuses[i].State = v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{},
+			Terminated: &v1.ContainerStateTerminated{
+				Reason:   "ContainerStatusUnknown",
+				Message:  "The container could not be located when the pod was terminated",
+				ExitCode: 137,
+			},
 		}
 	}
+
+	klog.V(5).InfoS("TerminatePod calling updateStatusInternal", "pod", klog.KObj(pod), "podUID", pod.UID)
 	m.updateStatusInternal(pod, status, true)
+}
+
+// hasPodInitialized returns true if the pod has no evidence of ever starting a regular container, which
+// implies those containers should not be transitioned to terminated status.
+func hasPodInitialized(pod *v1.Pod) bool {
+	// a pod without init containers is always initialized
+	if len(pod.Spec.InitContainers) == 0 {
+		return true
+	}
+	// if any container has ever moved out of waiting state, the pod has initialized
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.LastTerminationState.Terminated != nil || status.State.Waiting == nil {
+			return true
+		}
+	}
+	// if the last init container has ever completed with a zero exit code, the pod is initialized
+	if l := len(pod.Status.InitContainerStatuses); l > 0 {
+		container := pod.Status.InitContainerStatuses[l-1]
+		if state := container.LastTerminationState; state.Terminated != nil && state.Terminated.ExitCode == 0 {
+			return true
+		}
+		if state := container.State; state.Terminated != nil && state.Terminated.ExitCode == 0 {
+			return true
+		}
+	}
+	// otherwise the pod has no record of being initialized
+	return false
+}
+
+// initializedContainers returns all status except for suffix of containers that are in Waiting
+// state, which is the set of containers that have attempted to start at least once. If all containers
+// are Watiing, the first container is always returned.
+func initializedContainers(containers []v1.ContainerStatus) []v1.ContainerStatus {
+	for i := len(containers) - 1; i >= 0; i-- {
+		if containers[i].State.Waiting == nil || containers[i].LastTerminationState.Terminated != nil {
+			return containers[0 : i+1]
+		}
+	}
+	// always return at least one container
+	if len(containers) > 0 {
+		return containers[0:1]
+	}
+	return nil
 }
 
 // checkContainerStateTransition ensures that no container is trying to transition
@@ -328,11 +466,11 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 
 	// Check for illegal state transition in containers
 	if err := checkContainerStateTransition(oldStatus.ContainerStatuses, status.ContainerStatuses, pod.Spec.RestartPolicy); err != nil {
-		klog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
+		klog.ErrorS(err, "Status update on pod aborted", "pod", klog.KObj(pod))
 		return false
 	}
 	if err := checkContainerStateTransition(oldStatus.InitContainerStatuses, status.InitContainerStatuses, pod.Spec.RestartPolicy); err != nil {
-		klog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
+		klog.ErrorS(err, "Status update on pod aborted", "pod", klog.KObj(pod))
 		return false
 	}
 
@@ -358,10 +496,43 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	normalizeStatus(pod, &status)
+
+	// Perform some more extensive logging of container termination state to assist in
+	// debugging production races (generally not needed).
+	if klogV := klog.V(5); klogV.Enabled() {
+		var containers []string
+		for _, s := range append(append([]v1.ContainerStatus(nil), status.InitContainerStatuses...), status.ContainerStatuses...) {
+			var current, previous string
+			switch {
+			case s.State.Running != nil:
+				current = "running"
+			case s.State.Waiting != nil:
+				current = "waiting"
+			case s.State.Terminated != nil:
+				current = fmt.Sprintf("terminated=%d", s.State.Terminated.ExitCode)
+			default:
+				current = "unknown"
+			}
+			switch {
+			case s.LastTerminationState.Running != nil:
+				previous = "running"
+			case s.LastTerminationState.Waiting != nil:
+				previous = "waiting"
+			case s.LastTerminationState.Terminated != nil:
+				previous = fmt.Sprintf("terminated=%d", s.LastTerminationState.Terminated.ExitCode)
+			default:
+				previous = "<none>"
+			}
+			containers = append(containers, fmt.Sprintf("(%s state=%s previous=%s)", s.Name, current, previous))
+		}
+		sort.Strings(containers)
+		klogV.InfoS("updateStatusInternal", "version", cachedStatus.version+1, "pod", klog.KObj(pod), "podUID", pod.UID, "containers", strings.Join(containers, " "))
+	}
+
 	// The intent here is to prevent concurrent updates to a pod's status from
 	// clobbering each other so the phase of a pod progresses monotonically.
 	if isCached && isPodStatusByKubeletEqual(&cachedStatus.status, &status) && !forceUpdate {
-		klog.V(3).Infof("Ignoring same status for pod %q, status: %+v", format.Pod(pod), status)
+		klog.V(3).InfoS("Ignoring same status for pod", "pod", klog.KObj(pod), "status", status)
 		return false // No new status.
 	}
 
@@ -375,14 +546,18 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 
 	select {
 	case m.podStatusChannel <- podStatusSyncRequest{pod.UID, newStatus}:
-		klog.V(5).Infof("Status Manager: adding pod: %q, with status: (%q, %v) to podStatusChannel",
-			pod.UID, newStatus.version, newStatus.status)
+		klog.V(5).InfoS("Status Manager: adding pod with new status to podStatusChannel",
+			"pod", klog.KObj(pod),
+			"podUID", pod.UID,
+			"statusVersion", newStatus.version,
+			"status", newStatus.status)
 		return true
 	default:
 		// Let the periodic syncBatch handle the update if the channel is full.
 		// We can't block, since we hold the mutex lock.
-		klog.V(4).Infof("Skipping the status update for pod %q for now because the channel is full; status: %+v",
-			format.Pod(pod), status)
+		klog.V(4).InfoS("Skipping the status update for pod for now because the channel is full",
+			"pod", klog.KObj(pod),
+			"status", status)
 		return false
 	}
 }
@@ -415,7 +590,7 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 	defer m.podStatusesLock.Unlock()
 	for key := range m.podStatuses {
 		if _, ok := podUIDs[key]; !ok {
-			klog.V(5).Infof("Removing %q from status map.", key)
+			klog.V(5).InfoS("Removing pod from status map.", "podUID", key)
 			delete(m.podStatuses, key)
 		}
 	}
@@ -442,7 +617,9 @@ func (m *manager) syncBatch() {
 			syncedUID := kubetypes.MirrorPodUID(uid)
 			if mirrorUID, ok := podToMirror[kubetypes.ResolvedPodUID(uid)]; ok {
 				if mirrorUID == "" {
-					klog.V(5).Infof("Static pod %q (%s/%s) does not have a corresponding mirror pod; skipping", uid, status.podName, status.podNamespace)
+					klog.V(5).InfoS("Static pod does not have a corresponding mirror pod; skipping",
+						"podUID", uid,
+						"pod", klog.KRef(status.podNamespace, status.podName))
 					continue
 				}
 				syncedUID = mirrorUID
@@ -461,7 +638,7 @@ func (m *manager) syncBatch() {
 	}()
 
 	for _, update := range updatedStatuses {
-		klog.V(5).Infof("Status Manager: syncPod in syncbatch. pod UID: %q", update.podUID)
+		klog.V(5).InfoS("Status Manager: syncPod in syncbatch", "podUID", update.podUID)
 		m.syncPod(update.podUID, update.status)
 	}
 }
@@ -469,54 +646,71 @@ func (m *manager) syncBatch() {
 // syncPod syncs the given status with the API server. The caller must not hold the lock.
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	if !m.needsUpdate(uid, status) {
-		klog.V(1).Infof("Status for pod %q is up-to-date; skipping", uid)
+		klog.V(1).InfoS("Status for pod is up-to-date; skipping", "podUID", uid)
 		return
 	}
 
 	// TODO: make me easier to express from client code
-	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(status.podName, metav1.GetOptions{})
+	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(context.TODO(), status.podName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		klog.V(3).Infof("Pod %q (%s) does not exist on the server", status.podName, uid)
+		klog.V(3).InfoS("Pod does not exist on the server",
+			"podUID", uid,
+			"pod", klog.KRef(status.podNamespace, status.podName))
 		// If the Pod is deleted the status will be cleared in
 		// RemoveOrphanedStatuses, so we just ignore the update here.
 		return
 	}
 	if err != nil {
-		klog.Warningf("Failed to get status for pod %q: %v", format.PodDesc(status.podName, status.podNamespace, uid), err)
+		klog.InfoS("Failed to get status for pod",
+			"podUID", uid,
+			"pod", klog.KRef(status.podNamespace, status.podName),
+			"err", err)
 		return
 	}
 
 	translatedUID := m.podManager.TranslatePodUID(pod.UID)
 	// Type convert original uid just for the purpose of comparison.
 	if len(translatedUID) > 0 && translatedUID != kubetypes.ResolvedPodUID(uid) {
-		klog.V(2).Infof("Pod %q was deleted and then recreated, skipping status update; old UID %q, new UID %q", format.Pod(pod), uid, translatedUID)
+		klog.V(2).InfoS("Pod was deleted and then recreated, skipping status update",
+			"pod", klog.KObj(pod),
+			"oldPodUID", uid,
+			"podUID", translatedUID)
 		m.deletePodStatus(uid)
 		return
 	}
 
-	oldStatus := pod.Status.DeepCopy()
-	newPod, patchBytes, err := statusutil.PatchPodStatus(m.kubeClient, pod.Namespace, pod.Name, *oldStatus, mergePodStatus(*oldStatus, status.status))
-	klog.V(3).Infof("Patch status for pod %q with %q", format.Pod(pod), patchBytes)
+	mergedStatus := mergePodStatus(pod.Status, status.status, m.podDeletionSafety.PodCouldHaveRunningContainers(pod))
+
+	newPod, patchBytes, unchanged, err := statusutil.PatchPodStatus(m.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, mergedStatus)
+	klog.V(3).InfoS("Patch status for pod", "pod", klog.KObj(pod), "patch", string(patchBytes))
+
 	if err != nil {
-		klog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
+		klog.InfoS("Failed to update status for pod", "pod", klog.KObj(pod), "err", err)
 		return
 	}
-	pod = newPod
+	if unchanged {
+		klog.V(3).InfoS("Status for pod is up-to-date", "pod", klog.KObj(pod), "statusVersion", status.version)
+	} else {
+		klog.V(3).InfoS("Status for pod updated successfully", "pod", klog.KObj(pod), "statusVersion", status.version, "status", mergedStatus)
+		pod = newPod
+	}
 
-	klog.V(3).Infof("Status for pod %q updated successfully: (%d, %+v)", format.Pod(pod), status.version, status.status)
 	m.apiStatusVersions[kubetypes.MirrorPodUID(pod.UID)] = status.version
 
 	// We don't handle graceful deletion of mirror pods.
 	if m.canBeDeleted(pod, status.status) {
-		deleteOptions := metav1.NewDeleteOptions(0)
-		// Use the pod UID as the precondition for deletion to prevent deleting a newly created pod with the same name and namespace.
-		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod.UID))
-		err = m.kubeClient.CoreV1().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
+		deleteOptions := metav1.DeleteOptions{
+			GracePeriodSeconds: new(int64),
+			// Use the pod UID as the precondition for deletion to prevent deleting a
+			// newly created pod with the same name and namespace.
+			Preconditions: metav1.NewUIDPreconditions(string(pod.UID)),
+		}
+		err = m.kubeClient.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, deleteOptions)
 		if err != nil {
-			klog.Warningf("Failed to delete status for pod %q: %v", format.Pod(pod), err)
+			klog.InfoS("Failed to delete status for pod", "pod", klog.KObj(pod), "err", err)
 			return
 		}
-		klog.V(3).Infof("Pod %q fully terminated and removed from etcd", format.Pod(pod))
+		klog.V(3).InfoS("Pod fully terminated and removed from etcd", "pod", klog.KObj(pod))
 		m.deletePodStatus(uid)
 	}
 }
@@ -536,7 +730,7 @@ func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 }
 
 func (m *manager) canBeDeleted(pod *v1.Pod, status v1.PodStatus) bool {
-	if pod.DeletionTimestamp == nil || kubepod.IsMirrorPod(pod) {
+	if pod.DeletionTimestamp == nil || kubetypes.IsMirrorPod(pod) {
 		return false
 	}
 	return m.podDeletionSafety.PodResourcesAreReclaimed(pod, status)
@@ -555,14 +749,14 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 	// The pod could be a static pod, so we should translate first.
 	pod, ok := m.podManager.GetPodByUID(uid)
 	if !ok {
-		klog.V(4).Infof("Pod %q has been deleted, no need to reconcile", string(uid))
+		klog.V(4).InfoS("Pod has been deleted, no need to reconcile", "podUID", string(uid))
 		return false
 	}
 	// If the pod is a static pod, we should check its mirror pod, because only status in mirror pod is meaningful to us.
-	if kubepod.IsStaticPod(pod) {
+	if kubetypes.IsStaticPod(pod) {
 		mirrorPod, ok := m.podManager.GetMirrorPodByPod(pod)
 		if !ok {
-			klog.V(4).Infof("Static pod %q has no corresponding mirror pod, no need to reconcile", format.Pod(pod))
+			klog.V(4).InfoS("Static pod has no corresponding mirror pod, no need to reconcile", "pod", klog.KObj(pod))
 			return false
 		}
 		pod = mirrorPod
@@ -576,19 +770,18 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 		// reconcile is not needed. Just return.
 		return false
 	}
-	klog.V(3).Infof("Pod status is inconsistent with cached status for pod %q, a reconciliation should be triggered:\n %+v", format.Pod(pod),
-		diff.ObjectDiff(podStatus, status))
+	klog.V(3).InfoS("Pod status is inconsistent with cached status for pod, a reconciliation should be triggered",
+		"pod", klog.KObj(pod),
+		"statusDiff", diff.ObjectDiff(podStatus, &status))
 
 	return true
 }
 
-// We add this function, because apiserver only supports *RFC3339* now, which means that the timestamp returned by
-// apiserver has no nanosecond information. However, the timestamp returned by metav1.Now() contains nanosecond,
-// so when we do comparison between status from apiserver and cached status, isPodStatusByKubeletEqual() will always return false.
-// There is related issue #15262 and PR #15263 about this.
-// In fact, the best way to solve this is to do it on api side. However, for now, we normalize the status locally in
-// kubelet temporarily.
-// TODO(random-liu): Remove timestamp related logic after apiserver supports nanosecond or makes it consistent.
+// normalizeStatus normalizes nanosecond precision timestamps in podStatus
+// down to second precision (*RFC339NANO* -> *RFC3339*). This must be done
+// before comparing podStatus to the status returned by apiserver because
+// apiserver does not support RFC339NANO.
+// Related issue #15262/PR #15263 to move apiserver to RFC339NANO is closed.
 func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	bytesPerStatus := kubecontainer.MaxPodTerminationMessageLogLength
 	if containers := len(pod.Spec.Containers) + len(pod.Spec.InitContainers); containers > 0 {
@@ -639,22 +832,55 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	return status
 }
 
-// mergePodStatus merges oldPodStatus and newPodStatus where pod conditions
-// not owned by kubelet is preserved from oldPodStatus
-func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus) v1.PodStatus {
-	podConditions := []v1.PodCondition{}
+// mergePodStatus merges oldPodStatus and newPodStatus to preserve where pod conditions
+// not owned by kubelet and to ensure terminal phase transition only happens after all
+// running containers have terminated. This method does not modify the old status.
+func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningContainers bool) v1.PodStatus {
+	podConditions := make([]v1.PodCondition, 0, len(oldPodStatus.Conditions)+len(newPodStatus.Conditions))
+
 	for _, c := range oldPodStatus.Conditions {
 		if !kubetypes.PodConditionByKubelet(c.Type) {
 			podConditions = append(podConditions, c)
 		}
 	}
-
 	for _, c := range newPodStatus.Conditions {
 		if kubetypes.PodConditionByKubelet(c.Type) {
 			podConditions = append(podConditions, c)
 		}
 	}
 	newPodStatus.Conditions = podConditions
+
+	// Delay transitioning a pod to a terminal status unless the pod is actually terminal.
+	// The Kubelet should never transition a pod to terminal status that could have running
+	// containers and thus actively be leveraging exclusive resources. Note that resources
+	// like volumes are reconciled by a subsystem in the Kubelet and will converge if a new
+	// pod reuses an exclusive resource (unmount -> free -> mount), which means we do not
+	// need wait for those resources to be detached by the Kubelet. In general, resources
+	// the Kubelet exclusively owns must be released prior to a pod being reported terminal,
+	// while resources that have participanting components above the API use the pod's
+	// transition to a terminal phase (or full deletion) to release those resources.
+	if !podutil.IsPodPhaseTerminal(oldPodStatus.Phase) && podutil.IsPodPhaseTerminal(newPodStatus.Phase) {
+		if couldHaveRunningContainers {
+			newPodStatus.Phase = oldPodStatus.Phase
+			newPodStatus.Reason = oldPodStatus.Reason
+			newPodStatus.Message = oldPodStatus.Message
+		}
+	}
+
+	// If the new phase is terminal, explicitly set the ready condition to false for v1.PodReady and v1.ContainersReady.
+	// It may take some time for kubelet to reconcile the ready condition, so explicitly set ready conditions to false if the phase is terminal.
+	// This is done to ensure kubelet does not report a status update with terminal pod phase and ready=true.
+	// See https://issues.k8s.io/108594 for more details.
+	if podutil.IsPodPhaseTerminal(newPodStatus.Phase) {
+		if podutil.IsPodReadyConditionTrue(newPodStatus) || podutil.IsContainersReadyConditionTrue(newPodStatus) {
+			containersReadyCondition := generateContainersReadyConditionForTerminalPhase(newPodStatus.Phase)
+			podutil.UpdatePodCondition(&newPodStatus, &containersReadyCondition)
+
+			podReadyCondition := generatePodReadyConditionForTerminalPhase(newPodStatus.Phase)
+			podutil.UpdatePodCondition(&newPodStatus, &podReadyCondition)
+		}
+	}
+
 	return newPodStatus
 }
 
@@ -665,8 +891,8 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 	}
 	podReadyCondition := GeneratePodReadyCondition(&pod.Spec, pod.Status.Conditions, pod.Status.ContainerStatuses, pod.Status.Phase)
 	i, curCondition := podutil.GetPodConditionFromList(pod.Status.Conditions, v1.PodReady)
-	// Only reconcile if "Ready" condition is present
-	if i >= 0 && curCondition.Status != podReadyCondition.Status {
+	// Only reconcile if "Ready" condition is present and Status or Message is not expected
+	if i >= 0 && (curCondition.Status != podReadyCondition.Status || curCondition.Message != podReadyCondition.Message) {
 		return true
 	}
 	return false

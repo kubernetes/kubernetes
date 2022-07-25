@@ -14,6 +14,8 @@
 package model
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -43,7 +45,7 @@ const (
 // (1970-01-01 00:00 UTC) excluding leap seconds.
 type Time int64
 
-// Interval describes and interval between two timestamps.
+// Interval describes an interval between two timestamps.
 type Interval struct {
 	Start, End Time
 }
@@ -150,7 +152,13 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 			return err
 		}
 
-		*t = Time(v + va)
+		// If the value was something like -0.1 the negative is lost in the
+		// parsing because of the leading zero, this ensures that we capture it.
+		if len(p[0]) > 0 && p[0][0] == '-' && v+va > 0 {
+			*t = Time(v+va) * -1
+		} else {
+			*t = Time(v + va)
+		}
 
 	default:
 		return fmt.Errorf("invalid time %q", string(b))
@@ -163,70 +171,130 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 // This type should not propagate beyond the scope of input/output processing.
 type Duration time.Duration
 
-var durationRE = regexp.MustCompile("^([0-9]+)(y|w|d|h|m|s|ms)$")
+// Set implements pflag/flag.Value
+func (d *Duration) Set(s string) error {
+	var err error
+	*d, err = ParseDuration(s)
+	return err
+}
 
-// StringToDuration parses a string into a time.Duration, assuming that a year
+// Type implements pflag.Value
+func (d *Duration) Type() string {
+	return "duration"
+}
+
+var durationRE = regexp.MustCompile("^(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?$")
+
+// ParseDuration parses a string into a time.Duration, assuming that a year
 // always has 365d, a week always has 7d, and a day always has 24h.
 func ParseDuration(durationStr string) (Duration, error) {
+	switch durationStr {
+	case "0":
+		// Allow 0 without a unit.
+		return 0, nil
+	case "":
+		return 0, fmt.Errorf("empty duration string")
+	}
 	matches := durationRE.FindStringSubmatch(durationStr)
-	if len(matches) != 3 {
+	if matches == nil {
 		return 0, fmt.Errorf("not a valid duration string: %q", durationStr)
 	}
-	var (
-		n, _ = strconv.Atoi(matches[1])
-		dur  = time.Duration(n) * time.Millisecond
-	)
-	switch unit := matches[2]; unit {
-	case "y":
-		dur *= 1000 * 60 * 60 * 24 * 365
-	case "w":
-		dur *= 1000 * 60 * 60 * 24 * 7
-	case "d":
-		dur *= 1000 * 60 * 60 * 24
-	case "h":
-		dur *= 1000 * 60 * 60
-	case "m":
-		dur *= 1000 * 60
-	case "s":
-		dur *= 1000
-	case "ms":
-		// Value already correct
-	default:
-		return 0, fmt.Errorf("invalid time unit in duration string: %q", unit)
+	var dur time.Duration
+
+	// Parse the match at pos `pos` in the regex and use `mult` to turn that
+	// into ms, then add that value to the total parsed duration.
+	var overflowErr error
+	m := func(pos int, mult time.Duration) {
+		if matches[pos] == "" {
+			return
+		}
+		n, _ := strconv.Atoi(matches[pos])
+
+		// Check if the provided duration overflows time.Duration (> ~ 290years).
+		if n > int((1<<63-1)/mult/time.Millisecond) {
+			overflowErr = errors.New("duration out of range")
+		}
+		d := time.Duration(n) * time.Millisecond
+		dur += d * mult
+
+		if dur < 0 {
+			overflowErr = errors.New("duration out of range")
+		}
 	}
-	return Duration(dur), nil
+
+	m(2, 1000*60*60*24*365) // y
+	m(4, 1000*60*60*24*7)   // w
+	m(6, 1000*60*60*24)     // d
+	m(8, 1000*60*60)        // h
+	m(10, 1000*60)          // m
+	m(12, 1000)             // s
+	m(14, 1)                // ms
+
+	return Duration(dur), overflowErr
 }
 
 func (d Duration) String() string {
 	var (
-		ms   = int64(time.Duration(d) / time.Millisecond)
-		unit = "ms"
+		ms = int64(time.Duration(d) / time.Millisecond)
+		r  = ""
 	)
-	factors := map[string]int64{
-		"y":  1000 * 60 * 60 * 24 * 365,
-		"w":  1000 * 60 * 60 * 24 * 7,
-		"d":  1000 * 60 * 60 * 24,
-		"h":  1000 * 60 * 60,
-		"m":  1000 * 60,
-		"s":  1000,
-		"ms": 1,
+	if ms == 0 {
+		return "0s"
 	}
 
-	switch int64(0) {
-	case ms % factors["y"]:
-		unit = "y"
-	case ms % factors["w"]:
-		unit = "w"
-	case ms % factors["d"]:
-		unit = "d"
-	case ms % factors["h"]:
-		unit = "h"
-	case ms % factors["m"]:
-		unit = "m"
-	case ms % factors["s"]:
-		unit = "s"
+	f := func(unit string, mult int64, exact bool) {
+		if exact && ms%mult != 0 {
+			return
+		}
+		if v := ms / mult; v > 0 {
+			r += fmt.Sprintf("%d%s", v, unit)
+			ms -= v * mult
+		}
 	}
-	return fmt.Sprintf("%v%v", ms/factors[unit], unit)
+
+	// Only format years and weeks if the remainder is zero, as it is often
+	// easier to read 90d than 12w6d.
+	f("y", 1000*60*60*24*365, true)
+	f("w", 1000*60*60*24*7, true)
+
+	f("d", 1000*60*60*24, false)
+	f("h", 1000*60*60, false)
+	f("m", 1000*60, false)
+	f("s", 1000, false)
+	f("ms", 1, false)
+
+	return r
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (d *Duration) UnmarshalJSON(bytes []byte) error {
+	var s string
+	if err := json.Unmarshal(bytes, &s); err != nil {
+		return err
+	}
+	dur, err := ParseDuration(s)
+	if err != nil {
+		return err
+	}
+	*d = dur
+	return nil
+}
+
+// MarshalText implements the encoding.TextMarshaler interface.
+func (d *Duration) MarshalText() ([]byte, error) {
+	return []byte(d.String()), nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+func (d *Duration) UnmarshalText(text []byte) error {
+	var err error
+	*d, err = ParseDuration(string(text))
+	return err
 }
 
 // MarshalYAML implements the yaml.Marshaler interface.

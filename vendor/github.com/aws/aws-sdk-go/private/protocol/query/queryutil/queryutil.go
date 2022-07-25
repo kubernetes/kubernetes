@@ -233,7 +233,12 @@ func (q *queryParser) parseScalar(v url.Values, r reflect.Value, name string, ta
 		v.Set(name, strconv.FormatFloat(float64(value), 'f', -1, 32))
 	case time.Time:
 		const ISO8601UTC = "2006-01-02T15:04:05Z"
-		v.Set(name, value.UTC().Format(ISO8601UTC))
+		format := tag.Get("timestampFormat")
+		if len(format) == 0 {
+			format = protocol.ISO8601TimeFormatName
+		}
+
+		v.Set(name, protocol.FormatTime(format, value))
 	default:
 		return fmt.Errorf("unsupported value for param %s: %v (%s)", name, r.Interface(), r.Type().Name())
 	}

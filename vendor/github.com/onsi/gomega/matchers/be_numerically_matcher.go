@@ -1,9 +1,12 @@
+// untested sections: 4
+
 package matchers
 
 import (
 	"fmt"
-	"github.com/onsi/gomega/format"
 	"math"
+
+	"github.com/onsi/gomega/format"
 )
 
 type BeNumericallyMatcher struct {
@@ -12,11 +15,23 @@ type BeNumericallyMatcher struct {
 }
 
 func (matcher *BeNumericallyMatcher) FailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, fmt.Sprintf("to be %s", matcher.Comparator), matcher.CompareTo[0])
+	return matcher.FormatFailureMessage(actual, false)
 }
 
 func (matcher *BeNumericallyMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return format.Message(actual, fmt.Sprintf("not to be %s", matcher.Comparator), matcher.CompareTo[0])
+	return matcher.FormatFailureMessage(actual, true)
+}
+
+func (matcher *BeNumericallyMatcher) FormatFailureMessage(actual interface{}, negated bool) (message string) {
+	if len(matcher.CompareTo) == 1 {
+		message = fmt.Sprintf("to be %s", matcher.Comparator)
+	} else {
+		message = fmt.Sprintf("to be within %v of %s", matcher.CompareTo[1], matcher.Comparator)
+	}
+	if negated {
+		message = "not " + message
+	}
+	return format.Message(actual, message, matcher.CompareTo[0])
 }
 
 func (matcher *BeNumericallyMatcher) Match(actual interface{}) (success bool, err error) {
@@ -30,7 +45,7 @@ func (matcher *BeNumericallyMatcher) Match(actual interface{}) (success bool, er
 		return false, fmt.Errorf("Expected a number.  Got:\n%s", format.Object(matcher.CompareTo[0], 1))
 	}
 	if len(matcher.CompareTo) == 2 && !isNumber(matcher.CompareTo[1]) {
-		return false, fmt.Errorf("Expected a number.  Got:\n%s", format.Object(matcher.CompareTo[0], 1))
+		return false, fmt.Errorf("Expected a number.  Got:\n%s", format.Object(matcher.CompareTo[1], 1))
 	}
 
 	switch matcher.Comparator {

@@ -19,8 +19,6 @@ package slice
 
 import (
 	"sort"
-
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
 )
 
 // CopyStrings copies the contents of the specified string slice
@@ -39,20 +37,6 @@ func CopyStrings(s []string) []string {
 func SortStrings(s []string) []string {
 	sort.Strings(s)
 	return s
-}
-
-// ShuffleStrings copies strings from the specified slice into a copy in random
-// order. It returns a new slice.
-func ShuffleStrings(s []string) []string {
-	if s == nil {
-		return nil
-	}
-	shuffled := make([]string, len(s))
-	perm := utilrand.Perm(len(s))
-	for i, j := range perm {
-		shuffled[j] = s[i]
-	}
-	return shuffled
 }
 
 // ContainsString checks if a given slice of strings contains the provided string.

@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -18,24 +21,24 @@ package gcepd
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	"k8s.io/utils/exec"
+	utilpath "k8s.io/utils/path"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/klog"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
+	cloudvolume "k8s.io/cloud-provider/volume"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/utils/exec"
+	gcecloud "k8s.io/legacy-cloud-providers/gce"
 )
 
 const (
@@ -99,7 +102,10 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 	name := volumeutil.GenerateVolumeName(c.options.ClusterName, c.options.PVName, 63) // GCE PD name can have up to 63 characters
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// GCE PDs are allocated in chunks of GiBs
-	requestGB := volumeutil.RoundUpToGiB(capacity)
+	requestGB, err := volumehelpers.RoundUpToGiB(capacity)
+	if err != nil {
+		return "", 0, nil, "", err
+	}
 
 	// Apply Parameters.
 	// Values for parameter "replication-type" are canonicalized to lower case.
@@ -121,16 +127,11 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 			configuredZone = v
 		case "zones":
 			zonesPresent = true
-			configuredZones, err = volumeutil.ZonesToSet(v)
+			configuredZones, err = volumehelpers.ZonesToSet(v)
 			if err != nil {
 				return "", 0, nil, "", err
 			}
 		case "replication-type":
-			if !utilfeature.DefaultFeatureGate.Enabled(features.GCERegionalPersistentDisk) {
-				return "", 0, nil, "",
-					fmt.Errorf("the %q option for volume plugin %v is only supported with the %q Kubernetes feature gate enabled",
-						k, c.plugin.GetPluginName(), features.GCERegionalPersistentDisk)
-			}
 			replicationType = strings.ToLower(v)
 		case volume.VolumeParameterFSType:
 			fstype = v
@@ -150,35 +151,38 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 		return "", 0, nil, "", err
 	}
 
+	var disk *gcecloud.Disk
 	switch replicationType {
 	case replicationTypeRegionalPD:
-		selectedZones, err := volumeutil.SelectZonesForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name, maxRegionalPDZones)
+		selectedZones, err := volumehelpers.SelectZonesForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name, maxRegionalPDZones)
 		if err != nil {
 			klog.V(2).Infof("Error selecting zones for regional GCE PD volume: %v", err)
 			return "", 0, nil, "", err
 		}
-		if err = cloud.CreateRegionalDisk(
+		disk, err = cloud.CreateRegionalDisk(
 			name,
 			diskType,
 			selectedZones,
-			int64(requestGB),
-			*c.options.CloudTags); err != nil {
+			requestGB,
+			*c.options.CloudTags)
+		if err != nil {
 			klog.V(2).Infof("Error creating regional GCE PD volume: %v", err)
 			return "", 0, nil, "", err
 		}
 		klog.V(2).Infof("Successfully created Regional GCE PD volume %s", name)
 
 	case replicationTypeNone:
-		selectedZone, err := volumeutil.SelectZoneForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name)
+		selectedZone, err := volumehelpers.SelectZoneForVolume(zonePresent, zonesPresent, configuredZone, configuredZones, activezones, node, allowedTopologies, c.options.PVC.Name)
 		if err != nil {
 			return "", 0, nil, "", err
 		}
-		if err := cloud.CreateDisk(
+		disk, err = cloud.CreateDisk(
 			name,
 			diskType,
 			selectedZone,
-			int64(requestGB),
-			*c.options.CloudTags); err != nil {
+			requestGB,
+			*c.options.CloudTags)
+		if err != nil {
 			klog.V(2).Infof("Error creating single-zone GCE PD volume: %v", err)
 			return "", 0, nil, "", err
 		}
@@ -188,7 +192,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 		return "", 0, nil, "", fmt.Errorf("replication-type of '%s' is not supported", replicationType)
 	}
 
-	labels, err := cloud.GetAutoLabelsForPD(name, "" /* zone */)
+	labels, err := cloud.GetAutoLabelsForPD(disk)
 	if err != nil {
 		// We don't really want to leak the volume here...
 		klog.Errorf("error getting labels for volume %q: %v", name, err)
@@ -207,8 +211,8 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName st
 	}
 
 	for _, path := range devicePaths {
-		if pathExists, err := volumeutil.PathExists(path); err != nil {
-			return "", fmt.Errorf("Error checking if path exists: %v", err)
+		if pathExists, err := mount.PathExists(path); err != nil {
+			return "", fmt.Errorf("error checking if path exists: %v", err)
 		} else if pathExists {
 			// validate that the path actually resolves to the correct disk
 			serial, err := getScsiSerial(path, diskName)
@@ -235,7 +239,7 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String, diskName st
 
 // Calls scsi_id on the given devicePath to get the serial number reported by that device.
 func getScsiSerial(devicePath, diskName string) (string, error) {
-	exists, err := utilfile.FileExists("/lib/udev/scsi_id")
+	exists, err := utilpath.Exists(utilpath.CheckFollowSymlink, "/lib/udev/scsi_id")
 	if err != nil {
 		return "", fmt.Errorf("failed to check scsi_id existence: %v", err)
 	}
@@ -270,8 +274,8 @@ func parseScsiSerial(output string) (string, error) {
 // Returns list of all /dev/disk/by-id/* paths for given PD.
 func getDiskByIDPaths(pdName string, partition string) []string {
 	devicePaths := []string{
-		path.Join(diskByIDPath, diskGooglePrefix+pdName),
-		path.Join(diskByIDPath, diskScsiGooglePrefix+pdName),
+		filepath.Join(diskByIDPath, diskGooglePrefix+pdName),
+		filepath.Join(diskByIDPath, diskScsiGooglePrefix+pdName),
 	}
 
 	if partition != "" {
@@ -298,7 +302,7 @@ func getCloudProvider(cloudProvider cloudprovider.Interface) (*gcecloud.Cloud, e
 		return gceCloudProvider, nil
 	}
 
-	return nil, fmt.Errorf("Failed to get GCE GCECloudProvider with error %v", err)
+	return nil, fmt.Errorf("failed to get GCE GCECloudProvider with error %v", err)
 }
 
 // Triggers the application of udev rules by calling "udevadm trigger
@@ -353,8 +357,11 @@ func udevadmChangeToDrive(drivePath string) error {
 // Checks whether the given GCE PD volume spec is associated with a regional PD.
 func isRegionalPD(spec *volume.Spec) bool {
 	if spec.PersistentVolume != nil {
-		zonesLabel := spec.PersistentVolume.Labels[kubeletapis.LabelZoneFailureDomain]
-		zones := strings.Split(zonesLabel, kubeletapis.LabelMultiZoneDelimiter)
+		zonesLabel := spec.PersistentVolume.Labels[v1.LabelTopologyZone]
+		if zonesLabel == "" {
+			zonesLabel = spec.PersistentVolume.Labels[v1.LabelFailureDomainBetaZone]
+		}
+		zones := strings.Split(zonesLabel, cloudvolume.LabelMultiZoneDelimiter)
 		return len(zones) > 1
 	}
 	return false

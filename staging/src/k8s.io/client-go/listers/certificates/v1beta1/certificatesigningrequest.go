@@ -26,10 +26,13 @@ import (
 )
 
 // CertificateSigningRequestLister helps list CertificateSigningRequests.
+// All objects returned here must be treated as read-only.
 type CertificateSigningRequestLister interface {
 	// List lists all CertificateSigningRequests in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.CertificateSigningRequest, err error)
 	// Get retrieves the CertificateSigningRequest from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1beta1.CertificateSigningRequest, error)
 	CertificateSigningRequestListerExpansion
 }

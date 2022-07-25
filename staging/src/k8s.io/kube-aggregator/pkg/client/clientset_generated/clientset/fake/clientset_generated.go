@@ -43,7 +43,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	cs := &Clientset{}
+	cs := &Clientset{tracker: o}
 	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
@@ -65,13 +65,21 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 type Clientset struct {
 	testing.Fake
 	discovery *fakediscovery.FakeDiscovery
+	tracker   testing.ObjectTracker
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.discovery
 }
 
-var _ clientset.Interface = &Clientset{}
+func (c *Clientset) Tracker() testing.ObjectTracker {
+	return c.tracker
+}
+
+var (
+	_ clientset.Interface = &Clientset{}
+	_ testing.FakeClient  = &Clientset{}
+)
 
 // ApiregistrationV1beta1 retrieves the ApiregistrationV1beta1Client
 func (c *Clientset) ApiregistrationV1beta1() apiregistrationv1beta1.ApiregistrationV1beta1Interface {
@@ -80,10 +88,5 @@ func (c *Clientset) ApiregistrationV1beta1() apiregistrationv1beta1.Apiregistrat
 
 // ApiregistrationV1 retrieves the ApiregistrationV1Client
 func (c *Clientset) ApiregistrationV1() apiregistrationv1.ApiregistrationV1Interface {
-	return &fakeapiregistrationv1.FakeApiregistrationV1{Fake: &c.Fake}
-}
-
-// Apiregistration retrieves the ApiregistrationV1Client
-func (c *Clientset) Apiregistration() apiregistrationv1.ApiregistrationV1Interface {
 	return &fakeapiregistrationv1.FakeApiregistrationV1{Fake: &c.Fake}
 }

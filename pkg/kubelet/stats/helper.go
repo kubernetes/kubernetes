@@ -20,12 +20,11 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog"
-
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/klog/v2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
@@ -41,10 +40,12 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 	}
 	var cpuStats *statsapi.CPUStats
 	var memoryStats *statsapi.MemoryStats
+	cpuStats = &statsapi.CPUStats{
+		Time:                 metav1.NewTime(cstat.Timestamp),
+		UsageNanoCores:       uint64Ptr(0),
+		UsageCoreNanoSeconds: uint64Ptr(0),
+	}
 	if info.Spec.HasCpu {
-		cpuStats = &statsapi.CPUStats{
-			Time: metav1.NewTime(cstat.Timestamp),
-		}
 		if cstat.CpuInst != nil {
 			cpuStats.UsageNanoCores = &cstat.CpuInst.Usage.Total
 		}
@@ -52,7 +53,7 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 			cpuStats.UsageCoreNanoSeconds = &cstat.Cpu.Usage.Total
 		}
 	}
-	if info.Spec.HasMemory {
+	if info.Spec.HasMemory && cstat.Memory != nil {
 		pageFaults := cstat.Memory.ContainerData.Pgfault
 		majorPageFaults := cstat.Memory.ContainerData.Pgmajfault
 		memoryStats = &statsapi.MemoryStats{
@@ -67,6 +68,11 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 		if !isMemoryUnlimited(info.Spec.Memory.Limit) {
 			availableBytes := info.Spec.Memory.Limit - cstat.Memory.WorkingSet
 			memoryStats.AvailableBytes = &availableBytes
+		}
+	} else {
+		memoryStats = &statsapi.MemoryStats{
+			Time:            metav1.NewTime(cstat.Timestamp),
+			WorkingSetBytes: uint64Ptr(0),
 		}
 	}
 	return cpuStats, memoryStats
@@ -88,6 +94,9 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 	result.CPU = cpu
 	result.Memory = memory
 
+	// NOTE: if they can be found, log stats will be overwritten
+	// by the caller, as it knows more information about the pod,
+	// which is needed to determine log size.
 	if rootFs != nil {
 		// The container logs live on the node rootfs device
 		result.Logs = buildLogsStats(cstat, rootFs)
@@ -147,14 +156,48 @@ func cadvisorInfoToContainerCPUAndMemoryStats(name string, info *cadvisorapiv2.C
 	return result
 }
 
+// cadvisorInfoToAcceleratorStats returns the statsapi.AcceleratorStats converted from
+// the container info from cadvisor.
+func cadvisorInfoToAcceleratorStats(info *cadvisorapiv2.ContainerInfo) []statsapi.AcceleratorStats {
+	cstat, found := latestContainerStats(info)
+	if !found || cstat.Accelerators == nil {
+		return nil
+	}
+	var result []statsapi.AcceleratorStats
+	for _, acc := range cstat.Accelerators {
+		result = append(result, statsapi.AcceleratorStats{
+			Make:        acc.Make,
+			Model:       acc.Model,
+			ID:          acc.ID,
+			MemoryTotal: acc.MemoryTotal,
+			MemoryUsed:  acc.MemoryUsed,
+			DutyCycle:   acc.DutyCycle,
+		})
+	}
+	return result
+}
+
+func cadvisorInfoToProcessStats(info *cadvisorapiv2.ContainerInfo) *statsapi.ProcessStats {
+	cstat, found := latestContainerStats(info)
+	if !found || cstat.Processes == nil {
+		return nil
+	}
+	num := cstat.Processes.ProcessCount
+	return &statsapi.ProcessStats{ProcessCount: uint64Ptr(num)}
+}
+
 // cadvisorInfoToNetworkStats returns the statsapi.NetworkStats converted from
 // the container info from cadvisor.
-func cadvisorInfoToNetworkStats(name string, info *cadvisorapiv2.ContainerInfo) *statsapi.NetworkStats {
+func cadvisorInfoToNetworkStats(info *cadvisorapiv2.ContainerInfo) *statsapi.NetworkStats {
 	if !info.Spec.HasNetwork {
 		return nil
 	}
 	cstat, found := latestContainerStats(info)
 	if !found {
+		return nil
+	}
+
+	if cstat.Network == nil {
 		return nil
 	}
 
@@ -206,7 +249,7 @@ func cadvisorInfoToUserDefinedMetrics(info *cadvisorapiv2.ContainerInfo) []stats
 		for name, values := range stat.CustomMetrics {
 			specVal, ok := udmMap[name]
 			if !ok {
-				klog.Warningf("spec for custom metric %q is missing from cAdvisor output. Spec: %+v, Metrics: %+v", name, info.Spec, stat.CustomMetrics)
+				klog.InfoS("Spec for custom metric is missing from cAdvisor output", "metric", name, "spec", info.Spec, "metrics", stat.CustomMetrics)
 				continue
 			}
 			for _, value := range values {
@@ -325,4 +368,71 @@ func getUint64Value(value *uint64) uint64 {
 	}
 
 	return *value
+}
+
+func uint64Ptr(i uint64) *uint64 {
+	return &i
+}
+
+func calcEphemeralStorage(containers []statsapi.ContainerStats, volumes []statsapi.VolumeStats, rootFsInfo *cadvisorapiv2.FsInfo,
+	podLogStats *statsapi.FsStats, etcHostsStats *statsapi.FsStats, isCRIStatsProvider bool) *statsapi.FsStats {
+	result := &statsapi.FsStats{
+		Time:           metav1.NewTime(rootFsInfo.Timestamp),
+		AvailableBytes: &rootFsInfo.Available,
+		CapacityBytes:  &rootFsInfo.Capacity,
+		InodesFree:     rootFsInfo.InodesFree,
+		Inodes:         rootFsInfo.Inodes,
+	}
+	for _, container := range containers {
+		addContainerUsage(result, &container, isCRIStatsProvider)
+	}
+	for _, volume := range volumes {
+		result.UsedBytes = addUsage(result.UsedBytes, volume.FsStats.UsedBytes)
+		result.InodesUsed = addUsage(result.InodesUsed, volume.InodesUsed)
+		result.Time = maxUpdateTime(&result.Time, &volume.FsStats.Time)
+	}
+	if podLogStats != nil {
+		result.UsedBytes = addUsage(result.UsedBytes, podLogStats.UsedBytes)
+		result.InodesUsed = addUsage(result.InodesUsed, podLogStats.InodesUsed)
+		result.Time = maxUpdateTime(&result.Time, &podLogStats.Time)
+	}
+	if etcHostsStats != nil {
+		result.UsedBytes = addUsage(result.UsedBytes, etcHostsStats.UsedBytes)
+		result.InodesUsed = addUsage(result.InodesUsed, etcHostsStats.InodesUsed)
+		result.Time = maxUpdateTime(&result.Time, &etcHostsStats.Time)
+	}
+	return result
+}
+
+func addContainerUsage(stat *statsapi.FsStats, container *statsapi.ContainerStats, isCRIStatsProvider bool) {
+	if rootFs := container.Rootfs; rootFs != nil {
+		stat.Time = maxUpdateTime(&stat.Time, &rootFs.Time)
+		stat.InodesUsed = addUsage(stat.InodesUsed, rootFs.InodesUsed)
+		stat.UsedBytes = addUsage(stat.UsedBytes, rootFs.UsedBytes)
+		if logs := container.Logs; logs != nil {
+			stat.UsedBytes = addUsage(stat.UsedBytes, logs.UsedBytes)
+			// We have accurate container log inode usage for CRI stats provider.
+			if isCRIStatsProvider {
+				stat.InodesUsed = addUsage(stat.InodesUsed, logs.InodesUsed)
+			}
+			stat.Time = maxUpdateTime(&stat.Time, &logs.Time)
+		}
+	}
+}
+
+func maxUpdateTime(first, second *metav1.Time) metav1.Time {
+	if first.Before(second) {
+		return *second
+	}
+	return *first
+}
+
+func addUsage(first, second *uint64) *uint64 {
+	if first == nil {
+		return second
+	} else if second == nil {
+		return first
+	}
+	total := *first + *second
+	return &total
 }

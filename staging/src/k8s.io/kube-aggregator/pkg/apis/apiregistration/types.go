@@ -34,15 +34,21 @@ type ServiceReference struct {
 	Namespace string
 	// Name is the name of the service
 	Name string
+	// If specified, the port on the service that hosting the service.
+	// Default to 443 for backward compatibility.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port int32
 }
 
 // APIServiceSpec contains information for locating and communicating with a server.
 // Only https is supported, though you are able to disable certificate verification.
 type APIServiceSpec struct {
 	// Service is a reference to the service for this API server.  It must communicate
-	// on port 443
+	// on port 443.
 	// If the Service is nil, that means the handling for the API groupversion is handled locally on this server.
 	// The call will simply delegate to the normal handler chain to be fulfilled.
+	// +optional
 	Service *ServiceReference
 	// Group is the API group name this server hosts
 	Group string
@@ -54,10 +60,11 @@ type APIServiceSpec struct {
 	InsecureSkipTLSVerify bool
 	// CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
 	// If unspecified, system trust roots on the apiserver are used.
+	// +listType=atomic
 	// +optional
 	CABundle []byte
 
-	// GroupPriorityMininum is the priority this group should have at least. Higher priority means that the group is preferred by clients over lower priority ones.
+	// GroupPriorityMinimum is the priority this group should have at least. Higher priority means that the group is preferred by clients over lower priority ones.
 	// Note that other versions of this group might specify even higher GroupPriorityMininum values such that the whole group gets a higher priority.
 	// The primary sort is based on GroupPriorityMinimum, ordered highest number to lowest (20 before 10).
 	// The secondary sort is based on the alphabetical comparison of the name of the object.  (v1.bar before v1.foo)
@@ -78,6 +85,7 @@ type APIServiceSpec struct {
 	VersionPriority int32
 }
 
+// ConditionStatus indicates the status of a condition (true, false, or unknown).
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition;
@@ -90,7 +98,7 @@ const (
 	ConditionUnknown ConditionStatus = "Unknown"
 )
 
-// APIConditionConditionType is a valid value for APIServiceCondition.Type
+// APIServiceConditionType is a valid value for APIServiceCondition.Type
 type APIServiceConditionType string
 
 const (
@@ -116,6 +124,8 @@ type APIServiceCondition struct {
 // APIServiceStatus contains derived information about an API server
 type APIServiceStatus struct {
 	// Current service state of apiService.
+	// +listType=map
+	// +listMapKey=type
 	Conditions []APIServiceCondition
 }
 

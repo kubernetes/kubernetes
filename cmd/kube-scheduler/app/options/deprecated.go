@@ -17,101 +17,39 @@ limitations under the License.
 package options
 
 import (
-	"fmt"
-	"github.com/spf13/pflag"
+	"time"
 
-	"k8s.io/apimachinery/pkg/util/validation/field"
-	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
+	"github.com/spf13/pflag"
+	componentbaseconfig "k8s.io/component-base/config"
 )
 
 // DeprecatedOptions contains deprecated options and their flags.
 // TODO remove these fields once the deprecated flags are removed.
 type DeprecatedOptions struct {
-	// The fields below here are placeholders for flags that can't be directly
-	// mapped into componentconfig.KubeSchedulerConfiguration.
-	PolicyConfigFile         string
-	PolicyConfigMapName      string
-	PolicyConfigMapNamespace string
-	UseLegacyPolicyConfig    bool
-	AlgorithmProvider        string
+	componentbaseconfig.DebuggingConfiguration
+	componentbaseconfig.ClientConnectionConfiguration
+	// Note that only the deprecated options (lock-object-name and lock-object-namespace) are populated here.
+	componentbaseconfig.LeaderElectionConfiguration
+	// PodMaxInUnschedulablePodsDuration is the maximum time a pod can stay in
+	// unschedulablePods. If a pod stays in unschedulablePods for longer than this
+	// value, the pod will be moved from unschedulablePods to backoffQ or activeQ.
+	// If this value is empty, the default value (5min) will be used.
+	PodMaxInUnschedulablePodsDuration time.Duration
 }
 
 // AddFlags adds flags for the deprecated options.
-func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) {
+func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
 
-	// TODO: unify deprecation mechanism, string prefix or MarkDeprecated (the latter hides the flag. We also don't want that).
-	fs.StringVar(&o.AlgorithmProvider, "algorithm-provider", o.AlgorithmProvider, "DEPRECATED: the scheduling algorithm provider to use, one of: "+factory.ListAlgorithmProviders())
-	fs.StringVar(&o.PolicyConfigFile, "policy-config-file", o.PolicyConfigFile, "DEPRECATED: file with scheduler policy configuration. This file is used if policy ConfigMap is not provided or --use-legacy-policy-config=true")
-	usage := fmt.Sprintf("DEPRECATED: name of the ConfigMap object that contains scheduler's policy configuration. It must exist in the system namespace before scheduler initialization if --use-legacy-policy-config=false. The config must be provided as the value of an element in 'Data' map with the key='%v'", kubeschedulerconfig.SchedulerPolicyConfigMapKey)
-	fs.StringVar(&o.PolicyConfigMapName, "policy-configmap", o.PolicyConfigMapName, usage)
-	fs.StringVar(&o.PolicyConfigMapNamespace, "policy-configmap-namespace", o.PolicyConfigMapNamespace, "DEPRECATED: the namespace where policy ConfigMap is located. The kube-system namespace will be used if this is not provided or is empty.")
-	fs.BoolVar(&o.UseLegacyPolicyConfig, "use-legacy-policy-config", o.UseLegacyPolicyConfig, "DEPRECATED: when set to true, scheduler will ignore policy ConfigMap and uses policy config file")
-
-	fs.BoolVar(&cfg.EnableProfiling, "profiling", cfg.EnableProfiling, "DEPRECATED: enable profiling via web interface host:port/debug/pprof/")
-	fs.BoolVar(&cfg.EnableContentionProfiling, "contention-profiling", cfg.EnableContentionProfiling, "DEPRECATED: enable lock contention profiling, if profiling is enabled")
-	fs.StringVar(&cfg.ClientConnection.Kubeconfig, "kubeconfig", cfg.ClientConnection.Kubeconfig, "DEPRECATED: path to kubeconfig file with authorization and master location information.")
-	fs.StringVar(&cfg.ClientConnection.ContentType, "kube-api-content-type", cfg.ClientConnection.ContentType, "DEPRECATED: content type of requests sent to apiserver.")
-	fs.Float32Var(&cfg.ClientConnection.QPS, "kube-api-qps", cfg.ClientConnection.QPS, "DEPRECATED: QPS to use while talking with kubernetes apiserver")
-	fs.Int32Var(&cfg.ClientConnection.Burst, "kube-api-burst", cfg.ClientConnection.Burst, "DEPRECATED: burst to use while talking with kubernetes apiserver")
-	fs.StringVar(&cfg.SchedulerName, "scheduler-name", cfg.SchedulerName, "DEPRECATED: name of the scheduler, used to select which pods will be processed by this scheduler, based on pod's \"spec.schedulerName\".")
-	fs.StringVar(&cfg.LeaderElection.LockObjectNamespace, "lock-object-namespace", cfg.LeaderElection.LockObjectNamespace, "DEPRECATED: define the namespace of the lock object.")
-	fs.StringVar(&cfg.LeaderElection.LockObjectName, "lock-object-name", cfg.LeaderElection.LockObjectName, "DEPRECATED: define the name of the lock object.")
-
-	fs.Int32Var(&cfg.HardPodAffinitySymmetricWeight, "hard-pod-affinity-symmetric-weight", cfg.HardPodAffinitySymmetricWeight,
-		"RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule corresponding "+
-			"to every RequiredDuringScheduling affinity rule. --hard-pod-affinity-symmetric-weight represents the weight of implicit PreferredDuringScheduling affinity rule. Must be in the range 0-100.")
-	fs.MarkDeprecated("hard-pod-affinity-symmetric-weight", "This option was moved to the policy configuration file")
-	fs.StringVar(&cfg.FailureDomains, "failure-domains", cfg.FailureDomains, "Indicate the \"all topologies\" set for an empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.")
-	fs.MarkDeprecated("failure-domains", "Doesn't have any effect. Will be removed in future version.")
-}
-
-// Validate validates the deprecated scheduler options.
-func (o *DeprecatedOptions) Validate() []error {
-	var errs []error
-
-	if o.UseLegacyPolicyConfig && len(o.PolicyConfigFile) == 0 {
-		errs = append(errs, field.Required(field.NewPath("policyConfigFile"), "required when --use-legacy-policy-config is true"))
-	}
-	return errs
-}
-
-// ApplyTo sets cfg.AlgorithmSource from flags passed on the command line in the following precedence order:
-//
-// 1. --use-legacy-policy-config to use a policy file.
-// 2. --policy-configmap to use a policy config map value.
-// 3. --algorithm-provider to use a named algorithm provider.
-func (o *DeprecatedOptions) ApplyTo(cfg *kubeschedulerconfig.KubeSchedulerConfiguration) error {
-	if o == nil {
-		return nil
-	}
-
-	switch {
-	case o.UseLegacyPolicyConfig || (len(o.PolicyConfigFile) > 0 && o.PolicyConfigMapName == ""):
-		cfg.AlgorithmSource = kubeschedulerconfig.SchedulerAlgorithmSource{
-			Policy: &kubeschedulerconfig.SchedulerPolicySource{
-				File: &kubeschedulerconfig.SchedulerPolicyFileSource{
-					Path: o.PolicyConfigFile,
-				},
-			},
-		}
-	case len(o.PolicyConfigMapName) > 0:
-		cfg.AlgorithmSource = kubeschedulerconfig.SchedulerAlgorithmSource{
-			Policy: &kubeschedulerconfig.SchedulerPolicySource{
-				ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
-					Name:      o.PolicyConfigMapName,
-					Namespace: o.PolicyConfigMapNamespace,
-				},
-			},
-		}
-	case len(o.AlgorithmProvider) > 0:
-		cfg.AlgorithmSource = kubeschedulerconfig.SchedulerAlgorithmSource{
-			Provider: &o.AlgorithmProvider,
-		}
-	}
-
-	return nil
+	fs.BoolVar(&o.EnableProfiling, "profiling", true, "DEPRECATED: enable profiling via web interface host:port/debug/pprof/. This parameter is ignored if a config file is specified in --config.")
+	fs.BoolVar(&o.EnableContentionProfiling, "contention-profiling", true, "DEPRECATED: enable lock contention profiling, if profiling is enabled. This parameter is ignored if a config file is specified in --config.")
+	fs.StringVar(&o.Kubeconfig, "kubeconfig", "", "DEPRECATED: path to kubeconfig file with authorization and master location information. This parameter is ignored if a config file is specified in --config.")
+	fs.StringVar(&o.ContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "DEPRECATED: content type of requests sent to apiserver. This parameter is ignored if a config file is specified in --config.")
+	fs.Float32Var(&o.QPS, "kube-api-qps", 50.0, "DEPRECATED: QPS to use while talking with kubernetes apiserver. This parameter is ignored if a config file is specified in --config.")
+	fs.Int32Var(&o.Burst, "kube-api-burst", 100, "DEPRECATED: burst to use while talking with kubernetes apiserver. This parameter is ignored if a config file is specified in --config.")
+	fs.StringVar(&o.ResourceNamespace, "lock-object-namespace", "kube-system", "DEPRECATED: define the namespace of the lock object. Will be removed in favor of leader-elect-resource-namespace. This parameter is ignored if a config file is specified in --config.")
+	fs.StringVar(&o.ResourceName, "lock-object-name", "kube-scheduler", "DEPRECATED: define the name of the lock object. Will be removed in favor of leader-elect-resource-name. This parameter is ignored if a config file is specified in --config.")
+	fs.DurationVar(&o.PodMaxInUnschedulablePodsDuration, "pod-max-in-unschedulable-pods-duration", 5*time.Minute, "DEPRECATED: the maximum time a pod can stay in unschedulablePods. If a pod stays in unschedulablePods for longer than this value, the pod will be moved from unschedulablePods to backoffQ or activeQ. This flag is deprecated and will be removed in 1.26")
 }

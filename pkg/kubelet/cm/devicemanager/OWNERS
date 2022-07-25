@@ -1,7 +1,8 @@
-approvers:
-- jiayingz
-- vishh
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers: []
 reviewers:
-- mindprince
-- RenaudWasTaken
-- vikaschoudhary16
+  - klueska
+emeritus_approvers:
+  - vishh
+  - jiayingz

@@ -14,8 +14,8 @@ import (
 // Dpbtf2 computes the Cholesky factorization of a symmetric positive banded
 // matrix ab. The matrix ab is n×n with kd diagonal bands. The Cholesky
 // factorization computed is
-//  A = U^T * U if ul == blas.Upper
-//  A = L * L^T if ul == blas.Lower
+//  A = Uᵀ * U  if ul == blas.Upper
+//  A = L * Lᵀ  if ul == blas.Lower
 // ul also specifies the storage of ab. If ul == blas.Upper, then
 // ab is stored as an upper-triangular banded matrix with kd super-diagonals,
 // and if ul == blas.Lower, ab is stored as a lower-triangular banded matrix
@@ -47,26 +47,41 @@ import (
 // version.
 //
 // Dpbtf2 is an internal routine, exported for testing purposes.
-func (Implementation) Dpbtf2(ul blas.Uplo, n, kd int, ab []float64, ldab int) (ok bool) {
-	if ul != blas.Upper && ul != blas.Lower {
+func (Implementation) Dpbtf2(uplo blas.Uplo, n, kd int, ab []float64, ldab int) (ok bool) {
+	switch {
+	case uplo != blas.Upper && uplo != blas.Lower:
 		panic(badUplo)
+	case n < 0:
+		panic(nLT0)
+	case kd < 0:
+		panic(kdLT0)
+	case ldab < kd+1:
+		panic(badLdA)
 	}
-	checkSymBanded(ab, n, kd, ldab)
+
+	// Quick return if possible.
 	if n == 0 {
-		return
+		return true
 	}
+
+	if len(ab) < (n-1)*ldab+kd+1 {
+		panic(shortAB)
+	}
+
 	bi := blas64.Implementation()
+
 	kld := max(1, ldab-1)
-	if ul == blas.Upper {
+	if uplo == blas.Upper {
+		// Compute the Cholesky factorization A = Uᵀ * U.
 		for j := 0; j < n; j++ {
-			// Compute U(J,J) and test for non positive-definiteness.
+			// Compute U(j,j) and test for non-positive-definiteness.
 			ajj := ab[j*ldab]
 			if ajj <= 0 {
 				return false
 			}
 			ajj = math.Sqrt(ajj)
 			ab[j*ldab] = ajj
-			// Compute elements j+1:j+kn of row J and update the trailing submatrix
+			// Compute elements j+1:j+kn of row j and update the trailing submatrix
 			// within the band.
 			kn := min(kd, n-j-1)
 			if kn > 0 {
@@ -76,16 +91,16 @@ func (Implementation) Dpbtf2(ul blas.Uplo, n, kd int, ab []float64, ldab int) (o
 		}
 		return true
 	}
+	// Compute the Cholesky factorization A = L * Lᵀ.
 	for j := 0; j < n; j++ {
-		// Compute L(J,J) and test for non positive-definiteness.
+		// Compute L(j,j) and test for non-positive-definiteness.
 		ajj := ab[j*ldab+kd]
 		if ajj <= 0 {
 			return false
 		}
 		ajj = math.Sqrt(ajj)
 		ab[j*ldab+kd] = ajj
-
-		// Compute elements J+1:J+KN of column J and update the trailing submatrix
+		// Compute elements j+1:j+kn of column j and update the trailing submatrix
 		// within the band.
 		kn := min(kd, n-j-1)
 		if kn > 0 {

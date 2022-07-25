@@ -1,94 +1,60 @@
 package hcsshim
 
+import (
+	"github.com/Microsoft/hcsshim/internal/hns"
+)
+
 // Type of Request Support in ModifySystem
-type PolicyType string
+type PolicyType = hns.PolicyType
 
 // RequestType const
 const (
-	Nat                  PolicyType = "NAT"
-	ACL                  PolicyType = "ACL"
-	PA                   PolicyType = "PA"
-	VLAN                 PolicyType = "VLAN"
-	VSID                 PolicyType = "VSID"
-	VNet                 PolicyType = "VNET"
-	L2Driver             PolicyType = "L2Driver"
-	Isolation            PolicyType = "Isolation"
-	QOS                  PolicyType = "QOS"
-	OutboundNat          PolicyType = "OutBoundNAT"
-	ExternalLoadBalancer PolicyType = "ELB"
-	Route                PolicyType = "ROUTE"
+	Nat                  = hns.Nat
+	ACL                  = hns.ACL
+	PA                   = hns.PA
+	VLAN                 = hns.VLAN
+	VSID                 = hns.VSID
+	VNet                 = hns.VNet
+	L2Driver             = hns.L2Driver
+	Isolation            = hns.Isolation
+	QOS                  = hns.QOS
+	OutboundNat          = hns.OutboundNat
+	ExternalLoadBalancer = hns.ExternalLoadBalancer
+	Route                = hns.Route
+	Proxy                = hns.Proxy
 )
 
-type NatPolicy struct {
-	Type         PolicyType `json:"Type"`
-	Protocol     string
-	InternalPort uint16
-	ExternalPort uint16
-}
+type ProxyPolicy = hns.ProxyPolicy
 
-type QosPolicy struct {
-	Type                            PolicyType `json:"Type"`
-	MaximumOutgoingBandwidthInBytes uint64
-}
+type NatPolicy = hns.NatPolicy
 
-type IsolationPolicy struct {
-	Type               PolicyType `json:"Type"`
-	VLAN               uint
-	VSID               uint
-	InDefaultIsolation bool
-}
+type QosPolicy = hns.QosPolicy
 
-type VlanPolicy struct {
-	Type PolicyType `json:"Type"`
-	VLAN uint
-}
+type IsolationPolicy = hns.IsolationPolicy
 
-type VsidPolicy struct {
-	Type PolicyType `json:"Type"`
-	VSID uint
-}
+type VlanPolicy = hns.VlanPolicy
 
-type PaPolicy struct {
-	Type PolicyType `json:"Type"`
-	PA   string     `json:"PA"`
-}
+type VsidPolicy = hns.VsidPolicy
 
-type OutboundNatPolicy struct {
-	Policy
-	VIP        string   `json:"VIP,omitempty"`
-	Exceptions []string `json:"ExceptionList,omitempty"`
-}
+type PaPolicy = hns.PaPolicy
 
-type ActionType string
-type DirectionType string
-type RuleType string
+type OutboundNatPolicy = hns.OutboundNatPolicy
+
+type ActionType = hns.ActionType
+type DirectionType = hns.DirectionType
+type RuleType = hns.RuleType
 
 const (
-	Allow ActionType = "Allow"
-	Block ActionType = "Block"
+	Allow = hns.Allow
+	Block = hns.Block
 
-	In  DirectionType = "In"
-	Out DirectionType = "Out"
+	In  = hns.In
+	Out = hns.Out
 
-	Host   RuleType = "Host"
-	Switch RuleType = "Switch"
+	Host   = hns.Host
+	Switch = hns.Switch
 )
 
-type ACLPolicy struct {
-	Type            PolicyType `json:"Type"`
-	Protocol        uint16
-	InternalPort    uint16
-	Action          ActionType
-	Direction       DirectionType
-	LocalAddresses  string
-	RemoteAddresses string
-	LocalPort       uint16
-	RemotePort      uint16
-	RuleType        RuleType `json:"RuleType,omitempty"`
-	Priority        uint16
-	ServiceName     string
-}
+type ACLPolicy = hns.ACLPolicy
 
-type Policy struct {
-	Type PolicyType `json:"Type"`
-}
+type Policy = hns.Policy

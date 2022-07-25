@@ -19,26 +19,23 @@ package gci
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 	"text/template"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 const (
-	envScriptFileName         = "kube-env"
-	configureHelperScriptName = "configure-helper.sh"
+	envScriptFileName = "kube-env"
 )
 
 type ManifestTestCase struct {
 	pod                 v1.Pod
-	envScriptPath       string
 	manifest            string
 	auxManifests        []string
 	kubeHome            string
@@ -58,13 +55,12 @@ func newManifestTestCase(t *testing.T, manifest, funcName string, auxManifests [
 		manifestFuncName: funcName,
 	}
 
-	d, err := ioutil.TempDir("", "configure-helper-test")
+	d, err := os.MkdirTemp("", "configure-helper-test")
 	if err != nil {
 		c.t.Fatalf("Failed to create temp directory: %v", err)
 	}
 
 	c.kubeHome = d
-	c.envScriptPath = filepath.Join(c.kubeHome, envScriptFileName)
 	c.manifestSources = filepath.Join(c.kubeHome, "kube-manifests", "kubernetes", "gci-trusty")
 
 	currentPath, err := os.Getwd()
@@ -109,35 +105,44 @@ func (c *ManifestTestCase) mustCreateManifestDstDir() {
 	}
 }
 
-func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) {
+func (c *ManifestTestCase) mustInvokeFunc(env interface{}, scriptNames []string, targetTemplate string, templates ...string) {
+	envScriptPath := c.mustCreateEnv(env, targetTemplate, templates...)
+	args := fmt.Sprintf("source %q ;", envScriptPath)
+	for _, script := range scriptNames {
+		args += fmt.Sprintf("source %q ;", script)
+	}
+	args += c.manifestFuncName
+	cmd := exec.Command("bash", "-c", args)
+
+	bs, err := cmd.CombinedOutput()
+	if err != nil {
+		c.t.Logf("%q", bs)
+		c.t.Fatalf("Failed to run %q: %v", cmd.Args, err)
+	}
+	c.t.Logf("%s", string(bs))
+}
+
+func (c *ManifestTestCase) mustCreateEnv(env interface{}, target string, templates ...string) string {
 	f, err := os.Create(filepath.Join(c.kubeHome, envScriptFileName))
 	if err != nil {
 		c.t.Fatalf("Failed to create envScript: %v", err)
 	}
 	defer f.Close()
 
-	t := template.Must(template.New("env").Parse(envTemplate))
-
-	if err = t.Execute(f, env); err != nil {
-		c.t.Fatalf("Failed to execute template: %v", err)
-	}
-}
-
-func (c *ManifestTestCase) mustInvokeFunc(envTemplate string, env interface{}) {
-	c.mustCreateEnv(envTemplate, env)
-	args := fmt.Sprintf("source %s ; source %s; %s", c.envScriptPath, configureHelperScriptName, c.manifestFuncName)
-	cmd := exec.Command("bash", "-c", args)
-
-	bs, err := cmd.CombinedOutput()
+	t, err := template.ParseFiles(templates...)
 	if err != nil {
-		c.t.Logf("%s", bs)
-		c.t.Fatalf("Failed to run configure-helper.sh: %v", err)
+		c.t.Fatalf("Failed to parse files %q, err: %v", templates, err)
 	}
-	c.t.Logf("%s", string(bs))
+
+	if err = t.ExecuteTemplate(f, target, env); err != nil {
+		c.t.Fatalf("Failed to execute template %s, err: %v", target, err)
+	}
+
+	return f.Name()
 }
 
 func (c *ManifestTestCase) mustLoadPodFromManifest() {
-	json, err := ioutil.ReadFile(c.manifestDestination)
+	json, err := os.ReadFile(c.manifestDestination)
 	if err != nil {
 		c.t.Fatalf("Failed to read manifest: %s, %v", c.manifestDestination, err)
 	}
@@ -148,7 +153,9 @@ func (c *ManifestTestCase) mustLoadPodFromManifest() {
 }
 
 func (c *ManifestTestCase) tearDown() {
-	os.RemoveAll(c.kubeHome)
+	if err := os.RemoveAll(c.kubeHome); err != nil {
+		c.t.Fatalf("Failed to teardown: %s", err)
+	}
 }
 
 func copyFile(src, dst string) (err error) {
@@ -163,7 +170,7 @@ func copyFile(src, dst string) (err error) {
 	}
 	defer func() {
 		cerr := out.Close()
-		if cerr == nil {
+		if err == nil {
 			err = cerr
 		}
 	}()

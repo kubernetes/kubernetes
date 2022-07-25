@@ -21,7 +21,7 @@ import (
 	"k8s.io/client-go/discovery"
 )
 
-// CategoryExpander maps category strings to GroupResouces.
+// CategoryExpander maps category strings to GroupResources.
 // Categories are classification or 'tag' of a group of resources.
 type CategoryExpander interface {
 	Expand(category string) ([]schema.GroupResource, bool)
@@ -58,7 +58,7 @@ func NewDiscoveryCategoryExpander(client discovery.DiscoveryInterface) CategoryE
 // Expand fulfills CategoryExpander
 func (e discoveryCategoryExpander) Expand(category string) ([]schema.GroupResource, bool) {
 	// Get all supported resources for groups and versions from server, if no resource found, fallback anyway.
-	apiResourceLists, _ := e.discoveryClient.ServerResources()
+	_, apiResourceLists, _ := e.discoveryClient.ServerGroupsAndResources()
 	if len(apiResourceLists) == 0 {
 		return nil, false
 	}

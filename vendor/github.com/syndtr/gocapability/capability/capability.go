@@ -60,13 +60,74 @@ type Capabilities interface {
 	Apply(kind CapType) error
 }
 
-// NewPid create new initialized Capabilities object for given pid when it
-// is nonzero, or for the current pid if pid is 0
+// NewPid initializes a new Capabilities object for given pid when
+// it is nonzero, or for the current process if pid is 0.
+//
+// Deprecated: Replace with NewPid2.  For example, replace:
+//
+//    c, err := NewPid(0)
+//    if err != nil {
+//      return err
+//    }
+//
+// with:
+//
+//    c, err := NewPid2(0)
+//    if err != nil {
+//      return err
+//    }
+//    err = c.Load()
+//    if err != nil {
+//      return err
+//    }
 func NewPid(pid int) (Capabilities, error) {
+	c, err := newPid(pid)
+	if err != nil {
+		return c, err
+	}
+	err = c.Load()
+	return c, err
+}
+
+// NewPid2 initializes a new Capabilities object for given pid when
+// it is nonzero, or for the current process if pid is 0.  This
+// does not load the process's current capabilities; to do that you
+// must call Load explicitly.
+func NewPid2(pid int) (Capabilities, error) {
 	return newPid(pid)
 }
 
-// NewFile create new initialized Capabilities object for given named file.
-func NewFile(name string) (Capabilities, error) {
-	return newFile(name)
+// NewFile initializes a new Capabilities object for given file path.
+//
+// Deprecated: Replace with NewFile2.  For example, replace:
+//
+//    c, err := NewFile(path)
+//    if err != nil {
+//      return err
+//    }
+//
+// with:
+//
+//    c, err := NewFile2(path)
+//    if err != nil {
+//      return err
+//    }
+//    err = c.Load()
+//    if err != nil {
+//      return err
+//    }
+func NewFile(path string) (Capabilities, error) {
+	c, err := newFile(path)
+	if err != nil {
+		return c, err
+	}
+	err = c.Load()
+	return c, err
+}
+
+// NewFile2 creates a new initialized Capabilities object for given
+// file path.  This does not load the process's current capabilities;
+// to do that you must call Load explicitly.
+func NewFile2(path string) (Capabilities, error) {
+	return newFile(path)
 }

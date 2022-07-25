@@ -10,11 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 )
 
-const (
-	// DefaultPort is used when no port is specified
-	DefaultPort = "31000"
-)
-
 // Reporter will gather metrics of API requests made and
 // send those metrics to the CSM endpoint.
 type Reporter struct {
@@ -71,7 +66,6 @@ func (rep *Reporter) sendAPICallAttemptMetric(r *request.Request) {
 
 		XAmzRequestID: aws.String(r.RequestID),
 
-		AttemptCount:   aws.Int(r.RetryCount + 1),
 		AttemptLatency: aws.Int(int(now.Sub(r.AttemptTime).Nanoseconds() / int64(time.Millisecond))),
 		AccessKey:      aws.String(creds.AccessKeyID),
 	}
@@ -82,27 +76,29 @@ func (rep *Reporter) sendAPICallAttemptMetric(r *request.Request) {
 
 	if r.Error != nil {
 		if awserr, ok := r.Error.(awserr.Error); ok {
-			setError(&m, awserr)
+			m.SetException(getMetricException(awserr))
 		}
 	}
 
+	m.TruncateFields()
 	rep.metricsCh.Push(m)
 }
 
-func setError(m *metric, err awserr.Error) {
-	msg := err.Message()
+func getMetricException(err awserr.Error) metricException {
+	msg := err.Error()
 	code := err.Code()
 
 	switch code {
-	case "RequestError",
-		"SerializationError",
+	case request.ErrCodeRequestError,
+		request.ErrCodeSerialization,
 		request.CanceledErrorCode:
-
-		m.SDKException = &code
-		m.SDKExceptionMessage = &msg
+		return sdkException{
+			requestException{exception: code, message: msg},
+		}
 	default:
-		m.AWSException = &code
-		m.AWSExceptionMessage = &msg
+		return awsException{
+			requestException{exception: code, message: msg},
+		}
 	}
 }
 
@@ -113,15 +109,30 @@ func (rep *Reporter) sendAPICallMetric(r *request.Request) {
 
 	now := time.Now()
 	m := metric{
-		ClientID:      aws.String(rep.clientID),
-		API:           aws.String(r.Operation.Name),
-		Service:       aws.String(r.ClientInfo.ServiceID),
-		Timestamp:     (*metricTime)(&now),
-		Type:          aws.String("ApiCall"),
-		AttemptCount:  aws.Int(r.RetryCount + 1),
-		Latency:       aws.Int(int(time.Now().Sub(r.Time) / time.Millisecond)),
-		XAmzRequestID: aws.String(r.RequestID),
+		ClientID:           aws.String(rep.clientID),
+		API:                aws.String(r.Operation.Name),
+		Service:            aws.String(r.ClientInfo.ServiceID),
+		Timestamp:          (*metricTime)(&now),
+		UserAgent:          aws.String(r.HTTPRequest.Header.Get("User-Agent")),
+		Type:               aws.String("ApiCall"),
+		AttemptCount:       aws.Int(r.RetryCount + 1),
+		Region:             r.Config.Region,
+		Latency:            aws.Int(int(time.Since(r.Time) / time.Millisecond)),
+		XAmzRequestID:      aws.String(r.RequestID),
+		MaxRetriesExceeded: aws.Int(boolIntValue(r.RetryCount >= r.MaxRetries())),
 	}
+
+	if r.HTTPResponse != nil {
+		m.FinalHTTPStatusCode = aws.Int(r.HTTPResponse.StatusCode)
+	}
+
+	if r.Error != nil {
+		if awserr, ok := r.Error.(awserr.Error); ok {
+			m.SetFinalException(getMetricException(awserr))
+		}
+	}
+
+	m.TruncateFields()
 
 	// TODO: Probably want to figure something out for logging dropped
 	// metrics
@@ -173,8 +184,9 @@ func (rep *Reporter) start() {
 	}
 }
 
-// Pause will pause the metric channel preventing any new metrics from
-// being added.
+// Pause will pause the metric channel preventing any new metrics from being
+// added. It is safe to call concurrently with other calls to Pause, but if
+// called concurently with Continue can lead to unexpected state.
 func (rep *Reporter) Pause() {
 	lock.Lock()
 	defer lock.Unlock()
@@ -186,8 +198,9 @@ func (rep *Reporter) Pause() {
 	rep.close()
 }
 
-// Continue will reopen the metric channel and allow for monitoring
-// to be resumed.
+// Continue will reopen the metric channel and allow for monitoring to be
+// resumed. It is safe to call concurrently with other calls to Continue, but
+// if called concurently with Pause can lead to unexpected state.
 func (rep *Reporter) Continue() {
 	lock.Lock()
 	defer lock.Unlock()
@@ -202,10 +215,18 @@ func (rep *Reporter) Continue() {
 	rep.metricsCh.Continue()
 }
 
+// Client side metric handler names
+const (
+	APICallMetricHandlerName        = "awscsm.SendAPICallMetric"
+	APICallAttemptMetricHandlerName = "awscsm.SendAPICallAttemptMetric"
+)
+
 // InjectHandlers will will enable client side metrics and inject the proper
 // handlers to handle how metrics are sent.
 //
-//	Example:
+// InjectHandlers is NOT safe to call concurrently. Calling InjectHandlers
+// multiple times may lead to unexpected behavior, (e.g. duplicate metrics).
+//
 //		// Start must be called in order to inject the correct handlers
 //		r, err := csm.Start("clientID", "127.0.0.1:8094")
 //		if err != nil {
@@ -222,9 +243,22 @@ func (rep *Reporter) InjectHandlers(handlers *request.Handlers) {
 		return
 	}
 
-	apiCallHandler := request.NamedHandler{Name: APICallMetricHandlerName, Fn: rep.sendAPICallMetric}
-	handlers.Complete.PushFrontNamed(apiCallHandler)
+	handlers.Complete.PushFrontNamed(request.NamedHandler{
+		Name: APICallMetricHandlerName,
+		Fn:   rep.sendAPICallMetric,
+	})
 
-	apiCallAttemptHandler := request.NamedHandler{Name: APICallAttemptMetricHandlerName, Fn: rep.sendAPICallAttemptMetric}
-	handlers.AfterRetry.PushFrontNamed(apiCallAttemptHandler)
+	handlers.CompleteAttempt.PushFrontNamed(request.NamedHandler{
+		Name: APICallAttemptMetricHandlerName,
+		Fn:   rep.sendAPICallAttemptMetric,
+	})
+}
+
+// boolIntValue return 1 for true and 0 for false.
+func boolIntValue(b bool) int {
+	if b {
+		return 1
+	}
+
+	return 0
 }

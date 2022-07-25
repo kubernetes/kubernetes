@@ -67,13 +67,13 @@ while getopts ":hdr:o:p:ca:k:n:m:l:" opt; do
   esac
 done
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../../
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../../
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-DIR_BASENAME=$(dirname "${BASH_SOURCE}")
-pushd ${DIR_BASENAME}
+DIR_BASENAME=$(dirname "${BASH_SOURCE[0]}")
+pushd "${DIR_BASENAME}"
 
 cleanup() {
   popd 2> /dev/null
@@ -87,5 +87,5 @@ kube::etcd::start
 
 # Running IPAM tests. It might take a long time.
 kube::log::status "performance test (IPAM) start"
-go test ${PROFILE_OPTS} -test.run=${RUN_PATTERN} -test.timeout=60m -test.short=false -v -args ${TEST_ARGS}
+go test "${PROFILE_OPTS}" -test.run="${RUN_PATTERN}" -test.timeout=60m -test.short=false -v -args "${TEST_ARGS}"
 kube::log::status "... IPAM tests finished."

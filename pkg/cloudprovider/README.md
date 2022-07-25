@@ -1,6 +1,18 @@
-##### Deprecation Notice: cloud providers in this directory are deprecated and will be removed in favor of external (a.k.a out-of-tree) providers. Existing providers in this directory (a.k.a in-tree providers) should only make small incremental changes as needed and avoid large refactors or new features. New providers seeking to support Kubernetes should follow the out-of-tree model as specified in the [Running Kubernetes Cloud Controller Manager docs](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/). For more information on the future of Kubernetes cloud providers see [KEP-0002](https://github.com/kubernetes/community/blob/master/keps/sig-cloud-provider/0002-cloud-controller-manager.md) and [KEP-0013](https://github.com/kubernetes/community/blob/master/keps/sig-cloud-provider/0013-build-deploy-ccm.md).
+### Deprecation Notice
 
-Cloud Providers in this directory will continue to be actively developed or maintained and supported at their current level of support as a longer-term solution evolves.
+Cloud providers in this directory are **deprecated** and will be **removed** in favor of external (a.k.a out-of-tree) providers. Existing providers in this directory (a.k.a in-tree providers) should only make small incremental changes as needed and avoid large refactors or new features. New providers seeking to support Kubernetes should follow the out-of-tree model as specified in the [Running Kubernetes Cloud Controller Manager docs](https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/). For more information on the future of Kubernetes cloud providers see [KEP-0002](https://git.k8s.io/enhancements/keps/sig-cloud-provider/20180530-cloud-controller-manager.md) and [KEP-0013](https://git.k8s.io/enhancements/keps/sig-cloud-provider/20190125-removing-in-tree-providers.md).
+
+Cloud Providers in this directory will continue to be actively developed or maintained and supported at their current level of support as a longer-term solution evolves. See the following enhancement issues to track the status of out-of-tree support for cloud providers in this repo:
+
+* AWS: https://github.com/kubernetes/enhancements/issues/631
+* Azure: https://github.com/kubernetes/enhancements/issues/667
+* CloudStack: https://github.com/kubernetes/enhancements/issues/672
+* GCE: https://github.com/kubernetes/enhancements/issues/668
+* IBM: https://github.com/kubernetes/enhancements/issues/671
+* OpenStack: https://github.com/kubernetes/enhancements/issues/669
+* oVirt: https://github.com/kubernetes/enhancements/issues/673
+* Photon: https://github.com/kubernetes/enhancements/issues/674
+* vSphere: https://github.com/kubernetes/enhancements/issues/670
 
 ## Overview:
 The mechanism for supporting cloud providers is currently in transition:  the original method of implementing cloud provider-specific functionality within the main kubernetes tree (here) is no longer advised; however, the proposed solution is still in development.

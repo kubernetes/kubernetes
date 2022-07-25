@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include  ../../hack/make-rules/Makefile.manifest
-
-REGISTRY ?= gcr.io/kubernetes-e2e-test-images
-GOARM=7
-QEMUVERSION=v2.9.1
-GOLANG_VERSION=1.11.2
+REGISTRY ?= registry.k8s.io/e2e-test-images
+GOARM ?= 7
+DOCKER_CERT_BASE_PATH ?=
+QEMUVERSION=v5.1.0-2
+GOLANG_VERSION=1.18.3
 export
 
 ifndef WHAT
@@ -30,13 +29,17 @@ endif
 #   WHAT: Directory names to build.
 #
 # Example:
-#   make all WHAT=clusterapi-tester
+#   make all WHAT=httpd
 all: all-container
 
 all-container:
-	./image-util.sh build $(WHAT)
+	./image-util.sh build $(WHAT) "docker"
 
-all-push: all-container
-	./image-util.sh push $(WHAT)
+all-push:
+	bash -x ./image-util.sh build $(WHAT) "registry"
+	bash -x ./image-util.sh push $(WHAT)
 
-.PHONY: all all-push all-container
+all-build-and-push:
+	./image-util.sh build_and_push ${WHAT}
+
+.PHONY: all all-build-and-push all-push all-container

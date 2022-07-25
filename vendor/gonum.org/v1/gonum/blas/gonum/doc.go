@@ -85,4 +85,4 @@ which is given to the BLAS routine as [∗ 1 2 3 4 ...].
 See http://www.crest.iu.edu/research/mtl/reference/html/banded.html
 for more information
 */
-package gonum
+package gonum // import "gonum.org/v1/gonum/blas/gonum"

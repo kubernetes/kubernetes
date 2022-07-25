@@ -23,10 +23,10 @@ import (
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
-// Data to be stored as checkpoint
+// Checksum is the data to be stored as checkpoint
 type Checksum uint64
 
-// VerifyChecksum verifies that passed checksum is same as calculated checksum
+// Verify verifies that passed checksum is same as calculated checksum
 func (cs Checksum) Verify(data interface{}) error {
 	if cs != New(data) {
 		return errors.ErrCorruptCheckpoint
@@ -34,6 +34,7 @@ func (cs Checksum) Verify(data interface{}) error {
 	return nil
 }
 
+// New returns the Checksum of checkpoint data
 func New(data interface{}) Checksum {
 	return Checksum(getChecksum(data))
 }

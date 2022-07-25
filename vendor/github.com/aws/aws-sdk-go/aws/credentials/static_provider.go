@@ -9,8 +9,6 @@ const StaticProviderName = "StaticProvider"
 
 var (
 	// ErrStaticCredentialsEmpty is emitted when static credentials are empty.
-	//
-	// @readonly
 	ErrStaticCredentialsEmpty = awserr.New("EmptyStaticCreds", "static credentials are empty", nil)
 )
 
@@ -21,7 +19,9 @@ type StaticProvider struct {
 }
 
 // NewStaticCredentials returns a pointer to a new Credentials object
-// wrapping a static credentials value provider.
+// wrapping a static credentials value provider. Token is only required
+// for temporary security credentials retrieved via STS, otherwise an empty
+// string can be passed for this parameter.
 func NewStaticCredentials(id, secret, token string) *Credentials {
 	return NewCredentials(&StaticProvider{Value: Value{
 		AccessKeyID:     id,

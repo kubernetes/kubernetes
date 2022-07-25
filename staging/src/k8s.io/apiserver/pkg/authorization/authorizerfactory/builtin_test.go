@@ -17,6 +17,7 @@ limitations under the License.
 package authorizerfactory
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -25,14 +26,14 @@ import (
 
 func TestNewAlwaysAllowAuthorizer(t *testing.T) {
 	aaa := NewAlwaysAllowAuthorizer()
-	if decision, _, _ := aaa.Authorize(nil); decision != authorizer.DecisionAllow {
+	if decision, _, _ := aaa.Authorize(context.Background(), nil); decision != authorizer.DecisionAllow {
 		t.Errorf("AlwaysAllowAuthorizer.Authorize did not authorize successfully.")
 	}
 }
 
 func TestNewAlwaysDenyAuthorizer(t *testing.T) {
 	ada := NewAlwaysDenyAuthorizer()
-	if decision, _, _ := ada.Authorize(nil); decision == authorizer.DecisionAllow {
+	if decision, _, _ := ada.Authorize(context.Background(), nil); decision == authorizer.DecisionAllow {
 		t.Errorf("AlwaysDenyAuthorizer.Authorize returned nil instead of error.")
 	}
 }
@@ -43,10 +44,10 @@ func TestPrivilegedGroupAuthorizer(t *testing.T) {
 	yes := authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"no", "allow-01"}}}
 	no := authorizer.AttributesRecord{User: &user.DefaultInfo{Groups: []string{"no", "deny-01"}}}
 
-	if authorized, _, _ := auth.Authorize(yes); authorized != authorizer.DecisionAllow {
+	if authorized, _, _ := auth.Authorize(context.Background(), yes); authorized != authorizer.DecisionAllow {
 		t.Errorf("failed")
 	}
-	if authorized, _, _ := auth.Authorize(no); authorized == authorizer.DecisionAllow {
+	if authorized, _, _ := auth.Authorize(context.Background(), no); authorized == authorizer.DecisionAllow {
 		t.Errorf("failed")
 	}
 }

@@ -16,10 +16,18 @@ limitations under the License.
 
 package testing
 
-import "k8s.io/api/core/v1"
+import v1 "k8s.io/api/core/v1"
 
-type FakePodDeletionSafetyProvider struct{}
+// FakePodDeletionSafetyProvider is a fake PodDeletionSafetyProvider for test.
+type FakePodDeletionSafetyProvider struct {
+	Reclaimed  bool
+	HasRunning bool
+}
 
 func (f *FakePodDeletionSafetyProvider) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool {
-	return true
+	return f.Reclaimed
+}
+
+func (f *FakePodDeletionSafetyProvider) PodCouldHaveRunningContainers(pod *v1.Pod) bool {
+	return f.HasRunning
 }

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build windows
 // +build windows
 
 // Package registry provides access to the Windows registry.
@@ -24,6 +25,7 @@ package registry
 
 import (
 	"io"
+	"runtime"
 	"syscall"
 	"time"
 )
@@ -113,12 +115,17 @@ func OpenRemoteKey(pcname string, k Key) (Key, error) {
 // The parameter n controls the number of returned names,
 // analogous to the way os.File.Readdirnames works.
 func (k Key) ReadSubKeyNames(n int) ([]string, error) {
-	ki, err := k.Stat()
-	if err != nil {
-		return nil, err
-	}
-	names := make([]string, 0, ki.SubKeyCount)
-	buf := make([]uint16, ki.MaxSubKeyLen+1) // extra room for terminating zero byte
+	// RegEnumKeyEx must be called repeatedly and to completion.
+	// During this time, this goroutine cannot migrate away from
+	// its current thread. See https://golang.org/issue/49320 and
+	// https://golang.org/issue/49466.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	names := make([]string, 0)
+	// Registry key size limit is 255 bytes and described there:
+	// https://msdn.microsoft.com/library/windows/desktop/ms724872.aspx
+	buf := make([]uint16, 256) //plus extra room for terminating zero byte
 loopItems:
 	for i := uint32(0); ; i++ {
 		if n > 0 {

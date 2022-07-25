@@ -21,18 +21,18 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-openapi/spec"
-	"k8s.io/klog"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	"k8s.io/klog/v2"
+	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 )
 
 const (
-	successfulUpdateDelay   = time.Minute
-	failedUpdateMaxExpDelay = time.Hour
+	successfulUpdateDelay      = time.Minute
+	successfulUpdateDelayLocal = time.Second
+	failedUpdateMaxExpDelay    = time.Hour
 )
 
 type syncAction int
@@ -43,35 +43,34 @@ const (
 	syncNothing
 )
 
-// AggregationManager is the interface between this controller and OpenAPI Aggregator service.
-type AggregationManager interface {
-	AddUpdateAPIService(handler http.Handler, apiService *apiregistration.APIService) error
-	UpdateAPIServiceSpec(apiServiceName string, spec *spec.Swagger, etag string) error
-	RemoveAPIServiceSpec(apiServiceName string) error
-	GetAPIServiceInfo(apiServiceName string) (handler http.Handler, etag string, exists bool)
-}
-
 // AggregationController periodically check for changes in OpenAPI specs of APIServices and update/remove
 // them if necessary.
 type AggregationController struct {
-	openAPIAggregationManager AggregationManager
+	openAPIAggregationManager aggregator.SpecAggregator
 	queue                     workqueue.RateLimitingInterface
-	downloader                *Downloader
+	downloader                *aggregator.Downloader
 
 	// To allow injection for testing.
 	syncHandler func(key string) (syncAction, error)
 }
 
 // NewAggregationController creates new OpenAPI aggregation controller.
-func NewAggregationController(downloader *Downloader, openAPIAggregationManager AggregationManager) *AggregationController {
+func NewAggregationController(downloader *aggregator.Downloader, openAPIAggregationManager aggregator.SpecAggregator) *AggregationController {
 	c := &AggregationController{
 		openAPIAggregationManager: openAPIAggregationManager,
 		queue: workqueue.NewNamedRateLimitingQueue(
-			workqueue.NewItemExponentialFailureRateLimiter(successfulUpdateDelay, failedUpdateMaxExpDelay), "APIServiceOpenAPIAggregationControllerQueue1"),
+			workqueue.NewItemExponentialFailureRateLimiter(successfulUpdateDelay, failedUpdateMaxExpDelay),
+			"open_api_aggregation_controller",
+		),
 		downloader: downloader,
 	}
 
 	c.syncHandler = c.sync
+
+	// update each service at least once, also those which are not coming from APIServices, namely local services
+	for _, name := range openAPIAggregationManager.GetAPIServiceNames() {
+		c.queue.AddAfter(name, time.Second)
+	}
 
 	return c
 }
@@ -81,8 +80,8 @@ func (c *AggregationController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting OpenAPI AggregationController")
-	defer klog.Infof("Shutting down OpenAPI AggregationController")
+	klog.Info("Starting OpenAPI AggregationController")
+	defer klog.Info("Shutting down OpenAPI AggregationController")
 
 	go wait.Until(c.runWorker, time.Second, stopCh)
 
@@ -102,7 +101,13 @@ func (c *AggregationController) processNextWorkItem() bool {
 		return false
 	}
 
-	klog.Infof("OpenAPI AggregationController: Processing item %s", key)
+	if aggregator.IsLocalAPIService(key.(string)) {
+		// for local delegation targets that are aggregated once per second, log at
+		// higher level to avoid flooding the log
+		klog.V(6).Infof("OpenAPI AggregationController: Processing item %s", key)
+	} else {
+		klog.V(4).Infof("OpenAPI AggregationController: Processing item %s", key)
+	}
 
 	action, err := c.syncHandler(key.(string))
 	if err == nil {
@@ -113,8 +118,13 @@ func (c *AggregationController) processNextWorkItem() bool {
 
 	switch action {
 	case syncRequeue:
-		klog.Infof("OpenAPI AggregationController: action for item %s: Requeue.", key)
-		c.queue.AddAfter(key, successfulUpdateDelay)
+		if aggregator.IsLocalAPIService(key.(string)) {
+			klog.V(7).Infof("OpenAPI AggregationController: action for local item %s: Requeue after %s.", key, successfulUpdateDelayLocal)
+			c.queue.AddAfter(key, successfulUpdateDelayLocal)
+		} else {
+			klog.V(7).Infof("OpenAPI AggregationController: action for item %s: Requeue.", key)
+			c.queue.AddAfter(key, successfulUpdateDelay)
+		}
 	case syncRequeueRateLimited:
 		klog.Infof("OpenAPI AggregationController: action for item %s: Rate Limited Requeue.", key)
 		c.queue.AddRateLimited(key)
@@ -136,7 +146,7 @@ func (c *AggregationController) sync(key string) (syncAction, error) {
 		return syncRequeueRateLimited, err
 	case httpStatus == http.StatusNotModified:
 	case httpStatus == http.StatusNotFound || returnSpec == nil:
-		return syncRequeueRateLimited, fmt.Errorf("OpenAPI spec does not exists")
+		return syncRequeueRateLimited, fmt.Errorf("OpenAPI spec does not exist")
 	case httpStatus == http.StatusOK:
 		if err := c.openAPIAggregationManager.UpdateAPIServiceSpec(key, returnSpec, newEtag); err != nil {
 			return syncRequeueRateLimited, err
@@ -146,7 +156,7 @@ func (c *AggregationController) sync(key string) (syncAction, error) {
 }
 
 // AddAPIService adds a new API Service to OpenAPI Aggregation.
-func (c *AggregationController) AddAPIService(handler http.Handler, apiService *apiregistration.APIService) {
+func (c *AggregationController) AddAPIService(handler http.Handler, apiService *v1.APIService) {
 	if apiService.Spec.Service == nil {
 		return
 	}
@@ -157,7 +167,7 @@ func (c *AggregationController) AddAPIService(handler http.Handler, apiService *
 }
 
 // UpdateAPIService updates API Service's info and handler.
-func (c *AggregationController) UpdateAPIService(handler http.Handler, apiService *apiregistration.APIService) {
+func (c *AggregationController) UpdateAPIService(handler http.Handler, apiService *v1.APIService) {
 	if apiService.Spec.Service == nil {
 		return
 	}

@@ -1,4 +1,4 @@
-# Copyright 2018 The Kubernetes Authors.
+# Copyright 2021 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE as build_node_perf_npb_is
+ARG BASEIMAGE
+FROM $BASEIMAGE as build_node_perf_npb_is
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
@@ -35,7 +36,7 @@ RUN make IS CLASS=D
 # main container in the second build stage.
 RUN mkdir -p /lib-copy && find /usr/lib -name "*.so.*" -exec cp {} /lib-copy \;
 
-FROM BASEIMAGE
+FROM $BASEIMAGE
 
 COPY --from=build_node_perf_npb_is /NPB3.3.1/NPB3.3-OMP/bin/is.D.x /
 COPY --from=build_node_perf_npb_is /lib-copy /lib-copy

@@ -1,9 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
-  - brendandburns
   - smarterclayton
   - thockin
 approvers:
-  - brendandburns
+  - sig-docs-approvers
   - smarterclayton
   - thockin
   - pwittrock
+emeritus_approvers:
+  - brendandburns

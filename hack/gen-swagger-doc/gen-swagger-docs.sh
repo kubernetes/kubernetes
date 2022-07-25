@@ -35,14 +35,14 @@ top_level_models=$(grep '&[A-Za-z]*{},' /register.go | sed 's/.*&//;s/{},//')
 # check if the top level models exist in the definitions.adoc. If they exist,
 # their name will be <version>.<model_name>
 VERSION="${1#*_}"
-for m in $top_level_models
+for m in ${top_level_models}
 do
-  if grep -xq "=== ${VERSION}.$m" ./definitions.adoc
+  if grep -xq "=== ${VERSION}.${m}" ./definitions.adoc
   then
-    buf+="* <<${VERSION}.$m>>\n"
+    buf+="* <<${VERSION}.${m}>>\n"
   fi
 done
-sed -i "1i $buf" ./definitions.adoc
+sed -i "1i ${buf}" ./definitions.adoc
 
 # fix the links in .adoc, replace <<x.y>> with link:definitions.html#_x_y[x.y], and lowercase the _x_y part
 sed -i -e 's|<<\(.*\)\.\(.*\)>>|link:#_\L\1_\2\E[\1.\2]|g' ./definitions.adoc

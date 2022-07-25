@@ -19,7 +19,7 @@ package restmapper
 import (
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +34,7 @@ type shortcutExpander struct {
 	discoveryClient discovery.DiscoveryInterface
 }
 
-var _ meta.RESTMapper = &shortcutExpander{}
+var _ meta.ResettableRESTMapper = shortcutExpander{}
 
 // NewShortcutExpander wraps a restmapper in a layer that expands shortcuts found via discovery
 func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface) meta.RESTMapper {
@@ -43,7 +43,18 @@ func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInt
 
 // KindFor fulfills meta.RESTMapper
 func (e shortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
-	return e.RESTMapper.KindFor(e.expandResourceShortcut(resource))
+	// expandResourceShortcut works with current API resources as read from discovery cache.
+	// In case of new CRDs this means we potentially don't have current state of discovery.
+	// In the current wiring in k8s.io/cli-runtime/pkg/genericclioptions/config_flags.go#toRESTMapper,
+	// we are using DeferredDiscoveryRESTMapper which on KindFor failure will clear the
+	// cache and fetch all data from a cluster (see vendor/k8s.io/client-go/restmapper/discovery.go#KindFor).
+	// Thus another call to expandResourceShortcut, after a NoMatchError should successfully
+	// read Kind to the user or an error.
+	gvk, err := e.RESTMapper.KindFor(e.expandResourceShortcut(resource))
+	if meta.IsNoMatchError(err) {
+		return e.RESTMapper.KindFor(e.expandResourceShortcut(resource))
+	}
+	return gvk, err
 }
 
 // KindsFor fulfills meta.RESTMapper
@@ -84,7 +95,7 @@ func (e shortcutExpander) getShortcutMappings() ([]*metav1.APIResourceList, []re
 	res := []resourceShortcuts{}
 	// get server resources
 	// This can return an error *and* the results it was able to find.  We don't need to fail on the error.
-	apiResList, err := e.discoveryClient.ServerResources()
+	_, apiResList, err := e.discoveryClient.ServerGroupsAndResources()
 	if err != nil {
 		klog.V(1).Infof("Error loading discovery information: %v", err)
 	}
@@ -162,6 +173,10 @@ func (e shortcutExpander) expandResourceShortcut(resource schema.GroupVersionRes
 	}
 
 	return resource
+}
+
+func (e shortcutExpander) Reset() {
+	meta.MaybeResetRESTMapper(e.RESTMapper)
 }
 
 // ResourceShortcuts represents a structure that holds the information how to

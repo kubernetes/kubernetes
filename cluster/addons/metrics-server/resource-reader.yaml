@@ -11,13 +11,14 @@ rules:
   resources:
   - pods
   - nodes
+  - nodes/stats
   - namespaces
   verbs:
   - get
   - list
   - watch
 - apiGroups:
-  - "extensions"
+  - "apps"
   resources:
   - deployments
   verbs:
@@ -25,6 +26,11 @@ rules:
   - list
   - update
   - watch
+  - patch
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

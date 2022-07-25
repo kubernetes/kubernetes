@@ -20,22 +20,24 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	"golang.org/x/time/rate"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/dynamic"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/namespace/deletion"
-	"k8s.io/kubernetes/pkg/util/metrics"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -63,7 +65,7 @@ type NamespaceController struct {
 // NewNamespaceController creates a new NamespaceController
 func NewNamespaceController(
 	kubeClient clientset.Interface,
-	dynamicClient dynamic.Interface,
+	metadataClient metadata.Interface,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	namespaceInformer coreinformers.NamespaceInformer,
 	resyncPeriod time.Duration,
@@ -71,12 +73,12 @@ func NewNamespaceController(
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
-		queue:                      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
-		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.CoreV1().Namespaces(), dynamicClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken, true),
+		queue:                      workqueue.NewNamedRateLimitingQueue(nsControllerRateLimiter(), "namespace"),
+		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.CoreV1().Namespaces(), metadataClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken),
 	}
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("namespace_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("namespace_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	// configure the namespace informer event handlers
@@ -97,6 +99,18 @@ func NewNamespaceController(
 	namespaceController.listerSynced = namespaceInformer.Informer().HasSynced
 
 	return namespaceController
+}
+
+// nsControllerRateLimiter is tuned for a faster than normal recycle time with default backoff speed and default overall
+// requeing speed.  We do this so that namespace cleanup is reliably faster and we know that the number of namespaces being
+// deleted is smaller than total number of other namespace scoped resources in a cluster.
+func nsControllerRateLimiter() workqueue.RateLimiter {
+	return workqueue.NewMaxOfRateLimiter(
+		// this ensures that we retry namespace deletion at least every minute, never longer.
+		workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 60*time.Second),
+		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
+		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+	)
 }
 
 // enqueueNamespace adds an object to the controller work queue
@@ -145,7 +159,7 @@ func (nm *NamespaceController) worker() {
 		} else {
 			// rather than wait for a full resync, re-add the namespace to the queue to be processed
 			nm.queue.AddRateLimited(key)
-			utilruntime.HandleError(err)
+			utilruntime.HandleError(fmt.Errorf("deletion of namespace %v failed: %v", key, err))
 		}
 		return false
 	}
@@ -186,7 +200,7 @@ func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting namespace controller")
 	defer klog.Infof("Shutting down namespace controller")
 
-	if !controller.WaitForCacheSync("namespace", stopCh, nm.listerSynced) {
+	if !cache.WaitForNamedCacheSync("namespace", stopCh, nm.listerSynced) {
 		return
 	}
 

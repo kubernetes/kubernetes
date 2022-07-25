@@ -1,18 +1,7 @@
 package storage
 
-// Copyright 2017 Microsoft Corporation
-//
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-//  Unless required by applicable law or agreed to in writing, software
-//  distributed under the License is distributed on an "AS IS" BASIS,
-//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  See the License for the specific language governing permissions and
-//  limitations under the License.
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
 
 import (
 	"bytes"
@@ -355,8 +344,12 @@ func (t *Table) queryEntities(uri string, headers map[string]string, ml Metadata
 			return nil, err
 		}
 		v := originalURI.Query()
-		v.Set(nextPartitionKeyQueryParameter, contToken.NextPartitionKey)
-		v.Set(nextRowKeyQueryParameter, contToken.NextRowKey)
+		if contToken.NextPartitionKey != "" {
+			v.Set(nextPartitionKeyQueryParameter, contToken.NextPartitionKey)
+		}
+		if contToken.NextRowKey != "" {
+			v.Set(nextRowKeyQueryParameter, contToken.NextRowKey)
+		}
 		newURI := t.tsc.client.getEndpoint(tableServiceName, t.buildPath(), v)
 		entities.NextLink = &newURI
 		entities.ml = ml
@@ -371,7 +364,7 @@ func extractContinuationTokenFromHeaders(h http.Header) *continuationToken {
 		NextRowKey:       h.Get(headerNextRowKey),
 	}
 
-	if ct.NextPartitionKey != "" && ct.NextRowKey != "" {
+	if ct.NextPartitionKey != "" || ct.NextRowKey != "" {
 		return &ct
 	}
 	return nil

@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
@@ -90,7 +91,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 			client:        &fake,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.reconcileNewReplicaSet(allRSs, newRS, deployment)
+		scaled, err := controller.reconcileNewReplicaSet(context.TODO(), allRSs, newRS, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -197,7 +198,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 			eventRecorder: &record.FakeRecorder{},
 		}
 
-		scaled, err := controller.reconcileOldReplicaSets(allRSs, oldRSs, newRS, deployment)
+		scaled, err := controller.reconcileOldReplicaSets(context.TODO(), allRSs, oldRSs, newRS, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -265,7 +266,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		_, cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, deployment, int32(test.maxCleanupCount))
+		_, cleanupCount, err := controller.cleanupUnhealthyReplicas(context.TODO(), oldRSs, deployment, int32(test.maxCleanupCount))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -339,7 +340,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			client:        &fakeClientset,
 			eventRecorder: &record.FakeRecorder{},
 		}
-		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, deployment)
+		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(context.TODO(), allRSs, oldRSs, deployment)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue

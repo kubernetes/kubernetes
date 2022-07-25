@@ -18,16 +18,13 @@ package services
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"testing"
 
-	"github.com/kardianos/osext"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -63,17 +60,24 @@ func NewE2EServices(monitorParent bool) *E2EServices {
 // namespace controller.
 // * kubelet: kubelet binary is outside. (We plan to move main kubelet start logic out when we have
 // standard kubelet launcher)
-func (e *E2EServices) Start() error {
+func (e *E2EServices) Start(featureGates map[string]bool) error {
 	var err error
-	if !framework.TestContext.NodeConformance {
+	if e.services, err = e.startInternalServices(); err != nil {
+		return fmt.Errorf("failed to start internal services: %v", err)
+	}
+	klog.Infof("Node services started.")
+	// running the kubelet depends on whether we are running conformance test-suite
+	if framework.TestContext.NodeConformance {
+		klog.Info("nothing to do in node-e2e-services, running conformance suite")
+	} else {
 		// Start kubelet
-		e.kubelet, err = e.startKubelet()
+		e.kubelet, err = e.startKubelet(featureGates)
 		if err != nil {
 			return fmt.Errorf("failed to start kubelet: %v", err)
 		}
+		klog.Infof("Kubelet started.")
 	}
-	e.services, err = e.startInternalServices()
-	return err
+	return nil
 }
 
 // Stop stops the e2e services.
@@ -94,12 +98,10 @@ func (e *E2EServices) Stop() {
 			klog.Errorf("Failed to stop kubelet: %v", err)
 		}
 	}
-	if e.rmDirs != nil {
-		for _, d := range e.rmDirs {
-			err := os.RemoveAll(d)
-			if err != nil {
-				klog.Errorf("Failed to delete directory %s: %v", d, err)
-			}
+	for _, d := range e.rmDirs {
+		err := os.RemoveAll(d)
+		if err != nil {
+			klog.Errorf("Failed to delete directory %s: %v", d, err)
 		}
 	}
 }
@@ -107,9 +109,6 @@ func (e *E2EServices) Stop() {
 // RunE2EServices actually start the e2e services. This function is used to
 // start e2e services in current process. This is only used in run-services-mode.
 func RunE2EServices(t *testing.T) {
-	// Populate global DefaultFeatureGate with value from TestContext.FeatureGates.
-	// This way, statically-linked components see the same feature gate config as the test context.
-	utilfeature.DefaultFeatureGate.SetFromMap(framework.TestContext.FeatureGates)
 	e := newE2EServices()
 	if err := e.run(t); err != nil {
 		klog.Fatalf("Failed to run e2e services: %v", err)
@@ -119,18 +118,22 @@ func RunE2EServices(t *testing.T) {
 const (
 	// services.log is the combined log of all services
 	servicesLogFile = "services.log"
-	// LOG_VERBOSITY_LEVEL is consistent with the level used in a cluster e2e test.
-	LOG_VERBOSITY_LEVEL = "4"
+	// LogVerbosityLevel is consistent with the level used in a cluster e2e test.
+	LogVerbosityLevel = "4"
 )
 
 // startInternalServices starts the internal services in a separate process.
 func (e *E2EServices) startInternalServices() (*server, error) {
-	testBin, err := osext.Executable()
+	testBin, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("can't get current binary: %v", err)
 	}
 	// Pass all flags into the child process, so that it will see the same flag set.
-	startCmd := exec.Command(testBin, append([]string{"--run-services-mode"}, os.Args[1:]...)...)
+	startCmd := exec.Command(testBin,
+		append(
+			[]string{"--run-services-mode", fmt.Sprintf("--bearer-token=%s", framework.TestContext.BearerToken)},
+			os.Args[1:]...,
+		)...)
 	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, e.monitorParent, false)
 	return server, server.start()
 }
@@ -157,7 +160,7 @@ func (e *E2EServices) collectLogFiles() {
 			if err != nil {
 				klog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
 			} else {
-				if err = ioutil.WriteFile(targetLink, out, 0644); err != nil {
+				if err = os.WriteFile(targetLink, out, 0644); err != nil {
 					klog.Errorf("failed to write logs to %q: %v", targetLink, err)
 				}
 			}

@@ -18,20 +18,24 @@ package cmd
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
+	outputapiv1alpha2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/v1alpha2"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 const (
@@ -56,20 +60,6 @@ users:
   user:
     client-certificate-data:
     client-key-data:
-`
-	testConfigTokenCertAuthorityData = "certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUN5RENDQWJDZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRFM01USXhOREUxTlRFek1Gb1hEVEkzTVRJeE1qRTFOVEV6TUZvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTlZrCnNkT0NjRDBIOG9ycXZ5djBEZ09jZEpjRGc4aTJPNGt3QVpPOWZUanJGRHJqbDZlVXRtdlMyZ1lZd0c4TGhPV2gKb0lkZ3AvbVkrbVlDakliUUJtTmE2Ums1V2JremhJRzM1c1lseE9NVUJJR0xXMzN0RTh4SlR1RVd3V0NmZnpLcQpyaU1UT1A3REF3MUxuM2xUNlpJNGRNM09NOE1IUk9Wd3lRMDVpbWo5eUx5R1lYdTlvSncwdTVXWVpFYmpUL3VpCjJBZ2QwVDMrZGFFb044aVBJOTlVQkQxMzRkc2VGSEJEY3hHcmsvVGlQdHBpSC9IOGoxRWZaYzRzTGlONzJmL2YKYUpacTROSHFiT2F5UkpITCtJejFNTW1DRkN3cjdHOHVENWVvWWp2dEdZN2xLc1pBTlUwK3VlUnJsTitxTzhQWQpxaTZNMDFBcmV1UzFVVHFuTkM4Q0F3RUFBYU1qTUNFd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFNbXo4Nm9LMmFLa0owMnlLSC9ZcTlzaDZZcDEKYmhLS25mMFJCaTA1clRacWdhTi9oTnROdmQxSzJxZGRLNzhIT2pVdkpNRGp3NERieXF0Wll2V01XVFRCQnQrSgpPMGNyWkg5NXlqUW42YzRlcU1FTjFhOUFKNXRlclNnTDVhREJsK0FMTWxaNVpxTzBUOUJDdTJtNXV3dGNWaFZuCnh6cGpTT3V5WVdOQ3A5bW9mV2VPUTljNXhEcElWeUlMUkFvNmZ5Z2c3N25TSDN4ckVmd0VKUHFMd1RPYVk1bTcKeEZWWWJoR3dxUGU5V0I5aTR5cnNrZUFBWlpUSzdVbklKMXFkRmlHQk9aZlRtaDhYQ3BOTHZZcFBLQW9hWWlsRwpjOW1acVhpWVlESTV6R1IxMElpc2FWNXJUY2hDenNQVWRhQzRVbnpTZG01cTdKYTAyb0poQlU1TE1FMD0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
-	testConfigTokenNoCluster         = `apiVersion: v1
-clusters:
-- cluster:
-    server:
-  name: prod
-contexts:
-- context:
-    namespace: default
-    user: default-service-account
-  name: default
-kind: Config
-preferences: {}
 `
 )
 
@@ -96,7 +86,7 @@ func TestRunCreateToken(t *testing.T) {
 	var buf bytes.Buffer
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("get", "secrets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, nil, errors.NewNotFound(v1.Resource("secrets"), "foo")
+		return true, nil, apierrors.NewNotFound(v1.Resource("secrets"), "foo")
 	})
 
 	testCases := []struct {
@@ -166,31 +156,30 @@ func TestRunCreateToken(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		bts, err := kubeadmapiv1beta1.NewBootstrapTokenString(tc.token)
-		if err != nil && len(tc.token) != 0 { // if tc.token is "" it's okay as it will be generated later at runtime
-			t.Fatalf("token couldn't be parsed for testing: %v", err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			bts, err := bootstraptokenv1.NewBootstrapTokenString(tc.token)
+			if err != nil && len(tc.token) != 0 { // if tc.token is "" it's okay as it will be generated later at runtime
+				t.Fatalf("token couldn't be parsed for testing: %v", err)
+			}
 
-		cfg := &kubeadmapiv1beta1.InitConfiguration{
-			ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-				// KubernetesVersion is not used, but we set this explicitly to avoid
-				// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
-				KubernetesVersion: "v1.11.0",
-			},
-			BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
-				{
-					Token:  bts,
-					TTL:    &metav1.Duration{Duration: 0},
-					Usages: tc.usages,
-					Groups: tc.extraGroups,
+			cfg := &kubeadmapiv1.InitConfiguration{
+				BootstrapTokens: []bootstraptokenv1.BootstrapToken{
+					{
+						Token:  bts,
+						TTL:    &metav1.Duration{Duration: 0},
+						Usages: tc.usages,
+						Groups: tc.extraGroups,
+					},
 				},
-			},
-		}
+			}
 
-		err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "")
-		if (err != nil) != tc.expectedError {
-			t.Errorf("Test case %s: RunCreateToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
-		}
+			err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "", "")
+			if tc.expectedError && err == nil {
+				t.Error("unexpected success")
+			} else if !tc.expectedError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
 	}
 }
 
@@ -198,7 +187,7 @@ func TestNewCmdTokenGenerate(t *testing.T) {
 	var buf bytes.Buffer
 	args := []string{}
 
-	cmd := NewCmdTokenGenerate(&buf)
+	cmd := newCmdTokenGenerate(&buf)
 	cmd.SetArgs(args)
 
 	if err := cmd.Execute(); err != nil {
@@ -210,7 +199,7 @@ func TestNewCmdToken(t *testing.T) {
 	var buf, bufErr bytes.Buffer
 	testConfigTokenFile := "test-config-file"
 
-	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -252,31 +241,33 @@ func TestNewCmdToken(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		// the command is created for each test so that the kubeConfigFile
-		// variable in NewCmdToken() is reset.
-		cmd := NewCmdToken(&buf, &bufErr)
-		if _, err = f.WriteString(tc.configToWrite); err != nil {
-			t.Errorf("Unable to write test file %q: %v", fullPath, err)
-		}
-		// store the current value of the environment variable.
-		storedEnv := os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
-		if tc.kubeConfigEnv != "" {
-			os.Setenv(clientcmd.RecommendedConfigPathEnvVar, tc.kubeConfigEnv)
-		}
-		cmd.SetArgs(tc.args)
-		err := cmd.Execute()
-		if (err != nil) != tc.expectedError {
-			t.Errorf("Test case %q: NewCmdToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
-		}
-		// restore the environment variable.
-		os.Setenv(clientcmd.RecommendedConfigPathEnvVar, storedEnv)
+		t.Run(tc.name, func(t *testing.T) {
+			// the command is created for each test so that the kubeConfigFile
+			// variable in newCmdToken() is reset.
+			cmd := newCmdToken(&buf, &bufErr)
+			if _, err = f.WriteString(tc.configToWrite); err != nil {
+				t.Errorf("Unable to write test file %q: %v", fullPath, err)
+			}
+			// store the current value of the environment variable.
+			storedEnv := os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
+			if tc.kubeConfigEnv != "" {
+				os.Setenv(clientcmd.RecommendedConfigPathEnvVar, tc.kubeConfigEnv)
+			}
+			cmd.SetArgs(tc.args)
+			err := cmd.Execute()
+			if (err != nil) != tc.expectedError {
+				t.Errorf("Test case %q: newCmdToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
+			}
+			// restore the environment variable.
+			os.Setenv(clientcmd.RecommendedConfigPathEnvVar, storedEnv)
+		})
 	}
 }
 
 func TestGetClientset(t *testing.T) {
 	testConfigTokenFile := "test-config-file"
 
-	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -309,10 +300,10 @@ func TestGetClientset(t *testing.T) {
 	}
 }
 
-func TestRunDeleteToken(t *testing.T) {
+func TestRunDeleteTokens(t *testing.T) {
 	var buf bytes.Buffer
 
-	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
+	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
 	if err != nil {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
@@ -336,12 +327,129 @@ func TestRunDeleteToken(t *testing.T) {
 
 	// test valid; should not fail
 	// for some reason Secrets().Delete() does not fail even for this dummy config
-	if err = RunDeleteToken(&buf, client, "abcdef.1234567890123456"); err != nil {
+	if err = RunDeleteTokens(&buf, client, []string{"abcdef.1234567890123456", "abcdef.2345678901234567"}); err != nil {
 		t.Errorf("RunDeleteToken() failed for a valid token: %v", err)
 	}
 
 	// test invalid token; should fail
-	if err = RunDeleteToken(&buf, client, "invalid-token"); err == nil {
+	if err = RunDeleteTokens(&buf, client, []string{"invalid-token"}); err == nil {
 		t.Errorf("RunDeleteToken() succeeded for an invalid token: %v", err)
+	}
+}
+
+func TestTokenOutput(t *testing.T) {
+	testCases := []struct {
+		name         string
+		id           string
+		secret       string
+		description  string
+		usages       []string
+		extraGroups  []string
+		outputFormat string
+		expected     string
+	}{
+		{
+			name:         "JSON output",
+			id:           "abcdef",
+			secret:       "1234567890123456",
+			description:  "valid bootstrap tooken",
+			usages:       []string{"signing", "authentication"},
+			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
+			outputFormat: "json",
+			expected: `{
+    "kind": "BootstrapToken",
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha2",
+    "token": "abcdef.1234567890123456",
+    "description": "valid bootstrap tooken",
+    "usages": [
+        "signing",
+        "authentication"
+    ],
+    "groups": [
+        "system:bootstrappers:kubeadm:default-node-token"
+    ]
+}
+`,
+		},
+		{
+			name:         "YAML output",
+			id:           "abcdef",
+			secret:       "1234567890123456",
+			description:  "valid bootstrap tooken",
+			usages:       []string{"signing", "authentication"},
+			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
+			outputFormat: "yaml",
+			expected: `apiVersion: output.kubeadm.k8s.io/v1alpha2
+description: valid bootstrap tooken
+groups:
+- system:bootstrappers:kubeadm:default-node-token
+kind: BootstrapToken
+token: abcdef.1234567890123456
+usages:
+- signing
+- authentication
+`,
+		},
+		{
+			name:         "Go template output",
+			id:           "abcdef",
+			secret:       "1234567890123456",
+			description:  "valid bootstrap tooken",
+			usages:       []string{"signing", "authentication"},
+			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
+			outputFormat: "go-template={{println .token .description .usages .groups}}",
+			expected: `abcdef.1234567890123456 valid bootstrap tooken [signing authentication] [system:bootstrappers:kubeadm:default-node-token]
+`,
+		},
+		{
+			name:         "text output",
+			id:           "abcdef",
+			secret:       "1234567890123456",
+			description:  "valid bootstrap tooken",
+			usages:       []string{"signing", "authentication"},
+			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
+			outputFormat: "text",
+			expected: `TOKEN                     TTL         EXPIRES   USAGES                   DESCRIPTION                                                EXTRA GROUPS
+abcdef.1234567890123456   <forever>   <never>   signing,authentication   valid bootstrap tooken                                     system:bootstrappers:kubeadm:default-node-token
+`,
+		},
+		{
+			name:         "jsonpath output",
+			id:           "abcdef",
+			secret:       "1234567890123456",
+			description:  "valid bootstrap tooken",
+			usages:       []string{"signing", "authentication"},
+			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
+			outputFormat: "jsonpath={.token} {.groups}",
+			expected:     "abcdef.1234567890123456 [\"system:bootstrappers:kubeadm:default-node-token\"]",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			token := outputapiv1alpha2.BootstrapToken{
+				BootstrapToken: bootstraptokenv1.BootstrapToken{
+					Token:       &bootstraptokenv1.BootstrapTokenString{ID: tc.id, Secret: tc.secret},
+					Description: tc.description,
+					Usages:      tc.usages,
+					Groups:      tc.extraGroups,
+				},
+			}
+			buf := bytes.Buffer{}
+			outputFlags := output.NewOutputFlags(&tokenTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(tc.outputFormat)
+			printer, err := outputFlags.ToPrinter()
+			if err != nil {
+				t.Errorf("can't create printer for output format %s: %+v", tc.outputFormat, err)
+			}
+
+			if err := printer.PrintObj(&token, &buf); err != nil {
+				t.Errorf("unable to print token %s: %+v", token.Token, err)
+			}
+
+			actual := buf.String()
+			if actual != tc.expected {
+				t.Errorf(
+					"failed TestTokenOutput:\n\nexpected:\n%s\n\nactual:\n%s", tc.expected, actual)
+			}
+		})
 	}
 }

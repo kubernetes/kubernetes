@@ -27,6 +27,9 @@ type SecGroup struct {
 
 	// ProjectID is the project owner of the security group.
 	ProjectID string `json:"project_id"`
+
+	// Tags optionally set via extensions/attributestags
+	Tags []string `json:"tags"`
 }
 
 // SecGroupPage is the page returned by a pager when traversing over a

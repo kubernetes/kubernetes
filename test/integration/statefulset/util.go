@@ -17,23 +17,27 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"fmt"
-	"net/http/httptest"
 	"testing"
 	"time"
 
-	"k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	typedv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
+	typedappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
+
 	//svc "k8s.io/kubernetes/pkg/api/v1/service"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -42,17 +46,7 @@ import (
 const (
 	pollInterval = 100 * time.Millisecond
 	pollTimeout  = 60 * time.Second
-
-	fakeImageName = "fake-name"
-	fakeImage     = "fakeimage"
 )
-
-type statefulsetTester struct {
-	t           *testing.T
-	c           clientset.Interface
-	service     *v1.Service
-	statefulset *v1beta1.StatefulSet
-}
 
 func labelMap() map[string]string {
 	return map[string]string{"foo": "bar"}
@@ -80,19 +74,19 @@ func newHeadlessService(namespace string) *v1.Service {
 }
 
 // newSTS returns a StatefulSet with a fake container image
-func newSTS(name, namespace string, replicas int) *v1beta1.StatefulSet {
+func newSTS(name, namespace string, replicas int) *appsv1.StatefulSet {
 	replicasCopy := int32(replicas)
-	return &v1beta1.StatefulSet{
+	return &appsv1.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
-			APIVersion: "apps/v1beta1",
+			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
-		Spec: v1beta1.StatefulSetSpec{
-			PodManagementPolicy: v1beta1.ParallelPodManagement,
+		Spec: appsv1.StatefulSetSpec{
+			PodManagementPolicy: appsv1.ParallelPodManagement,
 			Replicas:            &replicasCopy,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labelMap(),
@@ -116,8 +110,8 @@ func newSTS(name, namespace string, replicas int) *v1beta1.StatefulSet {
 						{
 							Name: "datadir",
 							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{
-									Path: fmt.Sprintf("/tmp/%v", "datadir"),
+								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+									ClaimName: "fake-pvc-name",
 								},
 							},
 						},
@@ -133,8 +127,8 @@ func newSTS(name, namespace string, replicas int) *v1beta1.StatefulSet {
 				},
 			},
 			ServiceName: "fake-service-name",
-			UpdateStrategy: v1beta1.StatefulSetUpdateStrategy{
-				Type: v1beta1.RollingUpdateStatefulSetStrategyType,
+			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 			},
 			VolumeClaimTemplates: []v1.PersistentVolumeClaim{
 				// for volume mount "datadir"
@@ -165,57 +159,57 @@ func newStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 	}
 }
 
-// scSetup sets up necessities for Statefulset integration test, including master, apiserver, informers, and clientset
-func scSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+// scSetup sets up necessities for Statefulset integration test, including control plane, apiserver, informers, and clientset
+func scSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
-	config := restclient.Config{Host: s.URL}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("error in create clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "statefulset-informers")), resyncPeriod)
+	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-informers")), resyncPeriod)
 
 	sc := statefulset.NewStatefulSetController(
 		informers.Core().V1().Pods(),
 		informers.Apps().V1().StatefulSets(),
 		informers.Core().V1().PersistentVolumeClaims(),
 		informers.Apps().V1().ControllerRevisions(),
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "statefulset-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "statefulset-controller")),
 	)
 
-	return s, closeFn, sc, informers, clientSet
+	return server.TearDownFn, sc, informers, clientSet
 }
 
 // Run STS controller and informers
-func runControllerAndInformers(sc *statefulset.StatefulSetController, informers informers.SharedInformerFactory) chan struct{} {
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
-	go sc.Run(5, stopCh)
-	return stopCh
+func runControllerAndInformers(sc *statefulset.StatefulSetController, informers informers.SharedInformerFactory) context.CancelFunc {
+	ctx, cancel := context.WithCancel(context.Background())
+	informers.Start(ctx.Done())
+	go sc.Run(ctx, 5)
+	return cancel
 }
 
 func createHeadlessService(t *testing.T, clientSet clientset.Interface, headlessService *v1.Service) {
-	_, err := clientSet.Core().Services(headlessService.Namespace).Create(headlessService)
+	_, err := clientSet.CoreV1().Services(headlessService.Namespace).Create(context.TODO(), headlessService, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed creating headless service: %v", err)
 	}
 }
 
-func createSTSsPods(t *testing.T, clientSet clientset.Interface, stss []*v1beta1.StatefulSet, pods []*v1.Pod) ([]*v1beta1.StatefulSet, []*v1.Pod) {
-	var createdSTSs []*v1beta1.StatefulSet
+func createSTSsPods(t *testing.T, clientSet clientset.Interface, stss []*appsv1.StatefulSet, pods []*v1.Pod) ([]*appsv1.StatefulSet, []*v1.Pod) {
+	var createdSTSs []*appsv1.StatefulSet
 	var createdPods []*v1.Pod
 	for _, sts := range stss {
-		createdSTS, err := clientSet.AppsV1beta1().StatefulSets(sts.Namespace).Create(sts)
+		createdSTS, err := clientSet.AppsV1().StatefulSets(sts.Namespace).Create(context.TODO(), sts, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("failed to create sts %s: %v", sts.Name, err)
 		}
 		createdSTSs = append(createdSTSs, createdSTS)
 	}
 	for _, pod := range pods {
-		createdPod, err := clientSet.Core().Pods(pod.Namespace).Create(pod)
+		createdPod, err := clientSet.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("failed to create pod %s: %v", pod.Name, err)
 		}
@@ -226,15 +220,15 @@ func createSTSsPods(t *testing.T, clientSet clientset.Interface, stss []*v1beta1
 }
 
 // Verify .Status.Replicas is equal to .Spec.Replicas
-func waitSTSStable(t *testing.T, clientSet clientset.Interface, sts *v1beta1.StatefulSet) {
-	stsClient := clientSet.AppsV1beta1().StatefulSets(sts.Namespace)
+func waitSTSStable(t *testing.T, clientSet clientset.Interface, sts *appsv1.StatefulSet) {
+	stsClient := clientSet.AppsV1().StatefulSets(sts.Namespace)
 	desiredGeneration := sts.Generation
 	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		newSTS, err := stsClient.Get(sts.Name, metav1.GetOptions{})
+		newSTS, err := stsClient.Get(context.TODO(), sts.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
-		return newSTS.Status.Replicas == *newSTS.Spec.Replicas && *newSTS.Status.ObservedGeneration >= desiredGeneration, nil
+		return newSTS.Status.Replicas == *newSTS.Spec.Replicas && newSTS.Status.ObservedGeneration >= desiredGeneration, nil
 	}); err != nil {
 		t.Fatalf("failed to verify .Status.Replicas is equal to .Spec.Replicas for sts %s: %v", sts.Name, err)
 	}
@@ -243,12 +237,12 @@ func waitSTSStable(t *testing.T, clientSet clientset.Interface, sts *v1beta1.Sta
 func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, updateFunc func(*v1.Pod)) *v1.Pod {
 	var pod *v1.Pod
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newPod, err := podClient.Get(podName, metav1.GetOptions{})
+		newPod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		updateFunc(newPod)
-		pod, err = podClient.Update(newPod)
+		pod, err = podClient.Update(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("failed to update pod %s: %v", podName, err)
@@ -259,12 +253,12 @@ func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, upd
 func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, podName string, updateStatusFunc func(*v1.Pod)) *v1.Pod {
 	var pod *v1.Pod
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newPod, err := podClient.Get(podName, metav1.GetOptions{})
+		newPod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		updateStatusFunc(newPod)
-		pod, err = podClient.UpdateStatus(newPod)
+		pod, err = podClient.UpdateStatus(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("failed to update status of pod %s: %v", podName, err)
@@ -275,7 +269,7 @@ func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, podName strin
 func getPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]string) *v1.PodList {
 	podSelector := labels.Set(labelMap).AsSelector()
 	options := metav1.ListOptions{LabelSelector: podSelector.String()}
-	pods, err := podClient.List(options)
+	pods, err := podClient.List(context.TODO(), options)
 	if err != nil {
 		t.Fatalf("failed obtaining a list of pods that match the pod labels %v: %v", labelMap, err)
 	}
@@ -285,15 +279,44 @@ func getPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]s
 	return pods
 }
 
-func updateSTS(t *testing.T, stsClient typedv1beta1.StatefulSetInterface, stsName string, updateFunc func(*v1beta1.StatefulSet)) *v1beta1.StatefulSet {
-	var sts *v1beta1.StatefulSet
+func getStatefulSetPVCs(t *testing.T, pvcClient typedv1.PersistentVolumeClaimInterface, sts *appsv1.StatefulSet) []*v1.PersistentVolumeClaim {
+	pvcs := []*v1.PersistentVolumeClaim{}
+	for i := int32(0); i < *sts.Spec.Replicas; i++ {
+		pvcName := fmt.Sprintf("%s-%s-%d", sts.Spec.VolumeClaimTemplates[0].Name, sts.Name, i)
+		pvc, err := pvcClient.Get(context.TODO(), pvcName, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("failed to get PVC %s: %v", pvcName, err)
+		}
+		pvcs = append(pvcs, pvc)
+	}
+	return pvcs
+}
+
+func verifyOwnerRef(t *testing.T, pvc *v1.PersistentVolumeClaim, kind string, expected bool) {
+	found := false
+	for _, ref := range pvc.GetOwnerReferences() {
+		if ref.Kind == kind {
+			if expected {
+				found = true
+			} else {
+				t.Fatalf("Found %s ref but expected none for PVC %s", kind, pvc.Name)
+			}
+		}
+	}
+	if expected && !found {
+		t.Fatalf("Expected %s ref but found none for PVC %s", kind, pvc.Name)
+	}
+}
+
+func updateSTS(t *testing.T, stsClient typedappsv1.StatefulSetInterface, stsName string, updateFunc func(*appsv1.StatefulSet)) *appsv1.StatefulSet {
+	var sts *appsv1.StatefulSet
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newSTS, err := stsClient.Get(stsName, metav1.GetOptions{})
+		newSTS, err := stsClient.Get(context.TODO(), stsName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		updateFunc(newSTS)
-		sts, err = stsClient.Update(newSTS)
+		sts, err = stsClient.Update(context.TODO(), newSTS, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("failed to update sts %s: %v", stsName, err)
@@ -302,18 +325,41 @@ func updateSTS(t *testing.T, stsClient typedv1beta1.StatefulSetInterface, stsNam
 }
 
 // Update .Spec.Replicas to replicas and verify .Status.Replicas is changed accordingly
-func scaleSTS(t *testing.T, c clientset.Interface, sts *v1beta1.StatefulSet, replicas int32) {
-	stsClient := c.AppsV1beta1().StatefulSets(sts.Namespace)
+func scaleSTS(t *testing.T, c clientset.Interface, sts *appsv1.StatefulSet, replicas int32) {
+	stsClient := c.AppsV1().StatefulSets(sts.Namespace)
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newSTS, err := stsClient.Get(sts.Name, metav1.GetOptions{})
+		newSTS, err := stsClient.Get(context.TODO(), sts.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		*newSTS.Spec.Replicas = replicas
-		sts, err = stsClient.Update(newSTS)
+		sts, err = stsClient.Update(context.TODO(), newSTS, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("failed to update .Spec.Replicas to %d for sts %s: %v", replicas, sts.Name, err)
 	}
 	waitSTSStable(t, c, sts)
+}
+
+var _ admission.ValidationInterface = &fakePodFailAdmission{}
+
+type fakePodFailAdmission struct {
+	limitedPodNumber int
+	succeedPodsCount int
+}
+
+func (f *fakePodFailAdmission) Handles(operation admission.Operation) bool {
+	return operation == admission.Create
+}
+
+func (f *fakePodFailAdmission) Validate(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	if attr.GetKind().GroupKind() != api.Kind("Pod") {
+		return nil
+	}
+
+	if f.succeedPodsCount >= f.limitedPodNumber {
+		return fmt.Errorf("fakePodFailAdmission error")
+	}
+	f.succeedPodsCount++
+	return nil
 }

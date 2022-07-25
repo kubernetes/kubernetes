@@ -14,15 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -source=types.go -destination=mock_threshold_notifier_test.go -package=eviction NotifierFactory,ThresholdNotifier
 package eviction
 
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
@@ -40,7 +41,7 @@ const (
 
 // Config holds information about how eviction is configured.
 type Config struct {
-	// PressureTransitionPeriod is duration the kubelet has to wait before transititioning out of a pressure condition.
+	// PressureTransitionPeriod is duration the kubelet has to wait before transitioning out of a pressure condition.
 	PressureTransitionPeriod time.Duration
 	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
 	MaxPodGracePeriodSeconds int64
@@ -92,7 +93,11 @@ type ContainerGC interface {
 // pod - the pod to kill
 // status - the desired status to associate with the pod (i.e. why its killed)
 // gracePeriodOverride - the grace period override to use instead of what is on the pod spec
-type KillPodFunc func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error
+type KillPodFunc func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error
+
+// MirrorPodFunc returns the mirror pod for the given static pod and
+// whether it was known to the pod manager.
+type MirrorPodFunc func(*v1.Pod) (*v1.Pod, bool)
 
 // ActivePodsFunc returns pods bound to the kubelet that are active (i.e. non-terminal state)
 type ActivePodsFunc func() []*v1.Pod

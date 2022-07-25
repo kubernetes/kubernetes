@@ -17,16 +17,16 @@ limitations under the License.
 package ttlafterfinished
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	batchinformers "k8s.io/client-go/informers/batch/v1"
@@ -36,10 +36,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubernetes/pkg/controller"
 	jobutil "k8s.io/kubernetes/pkg/controller/job"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/util/metrics"
+	"k8s.io/kubernetes/pkg/controller/ttlafterfinished/metrics"
+	"k8s.io/utils/clock"
 )
 
 // Controller watches for changes of Jobs API objects. Triggered by Job creation
@@ -71,12 +73,14 @@ type Controller struct {
 // New creates an instance of Controller
 func New(jobInformer batchinformers.JobInformer, client clientset.Interface) *Controller {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("ttl_after_finished_controller", client.CoreV1().RESTClient().GetRateLimiter())
+		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("ttl_after_finished_controller", client.CoreV1().RESTClient().GetRateLimiter())
 	}
+
+	metrics.Register()
 
 	tc := &Controller{
 		client:   client,
@@ -98,22 +102,22 @@ func New(jobInformer batchinformers.JobInformer, client clientset.Interface) *Co
 }
 
 // Run starts the workers to clean up Jobs.
-func (tc *Controller) Run(workers int, stopCh <-chan struct{}) {
+func (tc *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer tc.queue.ShutDown()
 
 	klog.Infof("Starting TTL after finished controller")
 	defer klog.Infof("Shutting down TTL after finished controller")
 
-	if !controller.WaitForCacheSync("TTL after finished", stopCh, tc.jListerSynced) {
+	if !cache.WaitForNamedCacheSync("TTL after finished", ctx.Done(), tc.jListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(tc.worker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, tc.worker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 func (tc *Controller) addJob(obj interface{}) {
@@ -155,19 +159,19 @@ func (tc *Controller) enqueueAfter(job *batch.Job, after time.Duration) {
 	tc.queue.AddAfter(key, after)
 }
 
-func (tc *Controller) worker() {
-	for tc.processNextWorkItem() {
+func (tc *Controller) worker(ctx context.Context) {
+	for tc.processNextWorkItem(ctx) {
 	}
 }
 
-func (tc *Controller) processNextWorkItem() bool {
+func (tc *Controller) processNextWorkItem(ctx context.Context) bool {
 	key, quit := tc.queue.Get()
 	if quit {
 		return false
 	}
 	defer tc.queue.Done(key)
 
-	err := tc.processJob(key.(string))
+	err := tc.processJob(ctx, key.(string))
 	tc.handleErr(err, key)
 
 	return true
@@ -188,7 +192,7 @@ func (tc *Controller) handleErr(err error, key interface{}) {
 // its TTL hasn't expired, it will be added to the queue after the TTL is expected
 // to expire.
 // This function is not meant to be invoked concurrently with the same key.
-func (tc *Controller) processJob(key string) error {
+func (tc *Controller) processJob(ctx context.Context, key string) error {
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
@@ -204,9 +208,9 @@ func (tc *Controller) processJob(key string) error {
 		return err
 	}
 
-	if expired, err := tc.processTTL(job); err != nil {
+	if expiredAt, err := tc.processTTL(job); err != nil {
 		return err
-	} else if !expired {
+	} else if expiredAt == nil {
 		return nil
 	}
 
@@ -214,7 +218,7 @@ func (tc *Controller) processJob(key string) error {
 	// Before deleting the Job, do a final sanity check.
 	// If TTL is modified before we do this check, we cannot be sure if the TTL truly expires.
 	// The latest Job may have a different UID, but it's fine because the checks will be run again.
-	fresh, err := tc.client.BatchV1().Jobs(namespace).Get(name, metav1.GetOptions{})
+	fresh, err := tc.client.BatchV1().Jobs(namespace).Get(ctx, name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return nil
 	}
@@ -222,42 +226,47 @@ func (tc *Controller) processJob(key string) error {
 		return err
 	}
 	// Use the latest Job TTL to see if the TTL truly expires.
-	if expired, err := tc.processTTL(fresh); err != nil {
+	expiredAt, err := tc.processTTL(fresh)
+	if err != nil {
 		return err
-	} else if !expired {
+	} else if expiredAt == nil {
 		return nil
 	}
 	// Cascade deletes the Jobs if TTL truly expires.
 	policy := metav1.DeletePropagationForeground
-	options := &metav1.DeleteOptions{
+	options := metav1.DeleteOptions{
 		PropagationPolicy: &policy,
 		Preconditions:     &metav1.Preconditions{UID: &fresh.UID},
 	}
 	klog.V(4).Infof("Cleaning up Job %s/%s", namespace, name)
-	return tc.client.BatchV1().Jobs(fresh.Namespace).Delete(fresh.Name, options)
+	if err := tc.client.BatchV1().Jobs(fresh.Namespace).Delete(ctx, fresh.Name, options); err != nil {
+		return err
+	}
+	metrics.JobDeletionDurationSeconds.Observe(time.Since(*expiredAt).Seconds())
+	return nil
 }
 
 // processTTL checks whether a given Job's TTL has expired, and add it to the queue after the TTL is expected to expire
 // if the TTL will expire later.
-func (tc *Controller) processTTL(job *batch.Job) (expired bool, err error) {
+func (tc *Controller) processTTL(job *batch.Job) (expiredAt *time.Time, err error) {
 	// We don't care about the Jobs that are going to be deleted, or the ones that don't need clean up.
 	if job.DeletionTimestamp != nil || !needsCleanup(job) {
-		return false, nil
+		return nil, nil
 	}
 
 	now := tc.clock.Now()
-	t, err := timeLeft(job, &now)
+	t, e, err := timeLeft(job, &now)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	// TTL has expired
 	if *t <= 0 {
-		return true, nil
+		return e, nil
 	}
 
 	tc.enqueueAfter(job, *t)
-	return false, nil
+	return nil, nil
 }
 
 // needsCleanup checks whether a Job has finished and has a TTL set.
@@ -267,28 +276,28 @@ func needsCleanup(j *batch.Job) bool {
 
 func getFinishAndExpireTime(j *batch.Job) (*time.Time, *time.Time, error) {
 	if !needsCleanup(j) {
-		return nil, nil, fmt.Errorf("Job %s/%s should not be cleaned up", j.Namespace, j.Name)
+		return nil, nil, fmt.Errorf("job %s/%s should not be cleaned up", j.Namespace, j.Name)
 	}
-	finishAt, err := jobFinishTime(j)
+	t, err := jobFinishTime(j)
 	if err != nil {
 		return nil, nil, err
 	}
-	finishAtUTC := finishAt.UTC()
-	expireAtUTC := finishAtUTC.Add(time.Duration(*j.Spec.TTLSecondsAfterFinished) * time.Second)
-	return &finishAtUTC, &expireAtUTC, nil
+	finishAt := t.Time
+	expireAt := finishAt.Add(time.Duration(*j.Spec.TTLSecondsAfterFinished) * time.Second)
+	return &finishAt, &expireAt, nil
 }
 
-func timeLeft(j *batch.Job, since *time.Time) (*time.Duration, error) {
+func timeLeft(j *batch.Job, since *time.Time) (*time.Duration, *time.Time, error) {
 	finishAt, expireAt, err := getFinishAndExpireTime(j)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if finishAt.UTC().After(since.UTC()) {
+	if finishAt.After(*since) {
 		klog.Warningf("Warning: Found Job %s/%s finished in the future. This is likely due to time skew in the cluster. Job cleanup will be deferred.", j.Namespace, j.Name)
 	}
-	remaining := expireAt.UTC().Sub(since.UTC())
+	remaining := expireAt.Sub(*since)
 	klog.V(4).Infof("Found Job %s/%s finished at %v, remaining TTL %v since %v, TTL will expire at %v", j.Namespace, j.Name, finishAt.UTC(), remaining, since.UTC(), expireAt.UTC())
-	return &remaining, nil
+	return &remaining, expireAt, nil
 }
 
 // jobFinishTime takes an already finished Job and returns the time it finishes.

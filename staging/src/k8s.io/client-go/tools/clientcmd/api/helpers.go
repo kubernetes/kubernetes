@@ -98,6 +98,9 @@ func ShortenConfig(config *Config) {
 		if len(authInfo.ClientCertificateData) > 0 {
 			authInfo.ClientCertificateData = redactedBytes
 		}
+		if len(authInfo.Token) > 0 {
+			authInfo.Token = "REDACTED"
+		}
 		config.AuthInfos[key] = authInfo
 	}
 	for key, cluster := range config.Clusters {

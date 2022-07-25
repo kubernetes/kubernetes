@@ -25,18 +25,18 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-helpers/auth/rbac/validation"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
-	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
@@ -100,7 +100,7 @@ func TestEditViewRelationship(t *testing.T) {
 
 	// confirm that the view role doesn't already have extra powers
 	for _, rule := range viewEscalatingNamespaceResources {
-		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.view.Rules, []rbacv1.PolicyRule{rule}); covers {
+		if covers, _ := validation.Covers(semanticRoles.view.Rules, []rbacv1.PolicyRule{rule}); covers {
 			t.Errorf("view has extra powers: %#v", rule)
 		}
 	}
@@ -108,7 +108,7 @@ func TestEditViewRelationship(t *testing.T) {
 
 	// confirm that the view role doesn't have ungettable resources
 	for _, rule := range ungettableResources {
-		if covers, _ := rbacregistryvalidation.Covers(semanticRoles.view.Rules, []rbacv1.PolicyRule{rule}); covers {
+		if covers, _ := validation.Covers(semanticRoles.view.Rules, []rbacv1.PolicyRule{rule}); covers {
 			t.Errorf("view has ungettable resource: %#v", rule)
 		}
 	}

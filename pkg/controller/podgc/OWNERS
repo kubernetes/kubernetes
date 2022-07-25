@@ -1,6 +1,7 @@
-approvers:
-- foxish
-- gmarek
-reviewers:
-- foxish
-- gmarek
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers: []
+reviewers: []
+emeritus_approvers:
+  - gmarek
+  - foxish

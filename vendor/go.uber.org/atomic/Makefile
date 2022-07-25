@@ -1,64 +1,78 @@
-PACKAGES := $(shell glide nv)
-# Many Go tools take file globs or directories as arguments instead of packages.
-PACKAGE_FILES ?= *.go
+# Directory to place `go install`ed binaries into.
+export GOBIN ?= $(shell pwd)/bin
 
+GOLINT = $(GOBIN)/golint
+GEN_ATOMICINT = $(GOBIN)/gen-atomicint
+GEN_ATOMICWRAPPER = $(GOBIN)/gen-atomicwrapper
+STATICCHECK = $(GOBIN)/staticcheck
 
-# The linting tools evolve with each Go version, so run them only on the latest
-# stable release.
-GO_VERSION := $(shell go version | cut -d " " -f 3)
-GO_MINOR_VERSION := $(word 2,$(subst ., ,$(GO_VERSION)))
-LINTABLE_MINOR_VERSIONS := 7 8
-ifneq ($(filter $(LINTABLE_MINOR_VERSIONS),$(GO_MINOR_VERSION)),)
-SHOULD_LINT := true
-endif
+GO_FILES ?= $(shell find . '(' -path .git -o -path vendor ')' -prune -o -name '*.go' -print)
 
-
-export GO15VENDOREXPERIMENT=1
-
+# Also update ignore section in .codecov.yml.
+COVER_IGNORE_PKGS = \
+	go.uber.org/atomic/internal/gen-atomicint \
+	go.uber.org/atomic/internal/gen-atomicwrapper
 
 .PHONY: build
 build:
-	go build -i $(PACKAGES)
-
-
-.PHONY: install
-install:
-	glide --version || go get github.com/Masterminds/glide
-	glide install
-
+	go build ./...
 
 .PHONY: test
 test:
-	go test -cover -race $(PACKAGES)
+	go test -race ./...
 
+.PHONY: gofmt
+gofmt:
+	$(eval FMT_LOG := $(shell mktemp -t gofmt.XXXXX))
+	gofmt -e -s -l $(GO_FILES) > $(FMT_LOG) || true
+	@[ ! -s "$(FMT_LOG)" ] || (echo "gofmt failed:" && cat $(FMT_LOG) && false)
 
-.PHONY: install_ci
-install_ci: install
-	go get github.com/wadey/gocovmerge
-	go get github.com/mattn/goveralls
-	go get golang.org/x/tools/cmd/cover
-ifdef SHOULD_LINT
-	go get github.com/golang/lint/golint
-endif
+$(GOLINT):
+	cd tools && go install golang.org/x/lint/golint
+
+$(STATICCHECK):
+	cd tools && go install honnef.co/go/tools/cmd/staticcheck
+
+$(GEN_ATOMICWRAPPER): $(wildcard ./internal/gen-atomicwrapper/*)
+	go build -o $@ ./internal/gen-atomicwrapper
+
+$(GEN_ATOMICINT): $(wildcard ./internal/gen-atomicint/*)
+	go build -o $@ ./internal/gen-atomicint
+
+.PHONY: golint
+golint: $(GOLINT)
+	$(GOLINT) ./...
+
+.PHONY: staticcheck
+staticcheck: $(STATICCHECK)
+	$(STATICCHECK) ./...
 
 .PHONY: lint
-lint:
-ifdef SHOULD_LINT
-	@rm -rf lint.log
-	@echo "Checking formatting..."
-	@gofmt -d -s $(PACKAGE_FILES) 2>&1 | tee lint.log
-	@echo "Checking vet..."
-	@$(foreach dir,$(PACKAGE_FILES),go tool vet $(dir) 2>&1 | tee -a lint.log;)
-	@echo "Checking lint..."
-	@$(foreach dir,$(PKGS),golint $(dir) 2>&1 | tee -a lint.log;)
-	@echo "Checking for unresolved FIXMEs..."
-	@git grep -i fixme | grep -v -e vendor -e Makefile | tee -a lint.log
-	@[ ! -s lint.log ]
-else
-	@echo "Skipping linters on" $(GO_VERSION)
-endif
+lint: gofmt golint staticcheck generatenodirty
 
+# comma separated list of packages to consider for code coverage.
+COVER_PKG = $(shell \
+	go list -find ./... | \
+	grep -v $(foreach pkg,$(COVER_IGNORE_PKGS),-e "^$(pkg)$$") | \
+	paste -sd, -)
 
-.PHONY: test_ci
-test_ci: install_ci build
-	./scripts/cover.sh $(shell go list $(PACKAGES))
+.PHONY: cover
+cover:
+	go test -coverprofile=cover.out -coverpkg  $(COVER_PKG) -v ./...
+	go tool cover -html=cover.out -o cover.html
+
+.PHONY: generate
+generate: $(GEN_ATOMICINT) $(GEN_ATOMICWRAPPER)
+	go generate ./...
+
+.PHONY: generatenodirty
+generatenodirty:
+	@[ -z "$$(git status --porcelain)" ] || ( \
+		echo "Working tree is dirty. Commit your changes first."; \
+		exit 1 )
+	@make generate
+	@status=$$(git status --porcelain); \
+		[ -z "$$status" ] || ( \
+		echo "Working tree is dirty after `make generate`:"; \
+		echo "$$status"; \
+		echo "Please ensure that the generated code is up-to-date." )

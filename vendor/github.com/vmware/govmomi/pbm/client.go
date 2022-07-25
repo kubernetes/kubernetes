@@ -29,7 +29,7 @@ import (
 
 const (
 	Namespace = "pbm"
-	Path      = "/pbm" + vim25.Path
+	Path      = "/pbm"
 )
 
 var (

@@ -80,9 +80,19 @@ func TestGetArticleForNoun(t *testing.T) {
 			padding: " ",
 			want:    " a ",
 		},
+		{
+			noun:    "S",
+			padding: " ",
+			want:    " a ",
+		},
+		{
+			noun:    "O",
+			padding: " ",
+			want:    " an ",
+		},
 	}
 	for _, tt := range tests {
-		if got := getArticleForNoun(tt.noun, tt.padding); got != tt.want {
+		if got := GetArticleForNoun(tt.noun, tt.padding); got != tt.want {
 			t.Errorf("%q. GetArticleForNoun() = %v, want %v", tt.noun, got, tt.want)
 		}
 	}

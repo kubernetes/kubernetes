@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -297,7 +297,7 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, emptydir.ProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(t, tempDir, clientset, emptydir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -308,7 +308,7 @@ func TestCanSupport(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plugin.GetPluginName() != configMapPluginName {
 		t.Errorf("Wrong name: %s", plugin.GetPluginName())
@@ -340,7 +340,7 @@ func TestPlugin(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -365,8 +365,10 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	var mounterArgs volume.MounterArgs
+	group := int64(1001)
+	mounterArgs.FsGroup = &group
+	err = mounter.SetUp(mounterArgs)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -404,7 +406,7 @@ func TestPluginReboot(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -423,8 +425,10 @@ func TestPluginReboot(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	var mounterArgs volume.MounterArgs
+	group := int64(1001)
+	mounterArgs.FsGroup = &group
+	err = mounter.SetUp(mounterArgs)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -460,7 +464,7 @@ func TestPluginOptional(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -485,8 +489,10 @@ func TestPluginOptional(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	var mounterArgs volume.MounterArgs
+	group := int64(1001)
+	mounterArgs.FsGroup = &group
+	err = mounter.SetUp(mounterArgs)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -498,14 +504,14 @@ func TestPluginOptional(t *testing.T) {
 		}
 	}
 
-	datadirSymlink := path.Join(volumePath, "..data")
+	datadirSymlink := filepath.Join(volumePath, "..data")
 	datadir, err := os.Readlink(datadirSymlink)
 	if err != nil && os.IsNotExist(err) {
 		t.Fatalf("couldn't find volume path's data dir, %s", datadirSymlink)
 	} else if err != nil {
 		t.Fatalf("couldn't read symlink, %s", datadirSymlink)
 	}
-	datadirPath := path.Join(volumePath, datadir)
+	datadirPath := filepath.Join(volumePath, datadir)
 
 	infos, err := ioutil.ReadDir(volumePath)
 	if err != nil {
@@ -557,7 +563,7 @@ func TestPluginKeysOptional(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -582,8 +588,10 @@ func TestPluginKeysOptional(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	var mounterArgs volume.MounterArgs
+	group := int64(1001)
+	mounterArgs.FsGroup = &group
+	err = mounter.SetUp(mounterArgs)
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -635,7 +643,7 @@ func TestInvalidConfigMapSetup(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -660,8 +668,10 @@ func TestInvalidConfigMapSetup(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	fsGroup := int64(1001)
-	err = mounter.SetUp(&fsGroup)
+	var mounterArgs volume.MounterArgs
+	group := int64(1001)
+	mounterArgs.FsGroup = &group
+	err = mounter.SetUp(mounterArgs)
 	if err == nil {
 		t.Errorf("Expected setup to fail")
 	}
@@ -689,7 +699,7 @@ func configMap(namespace, name string) v1.ConfigMap {
 
 func doTestConfigMapDataInVolume(volumePath string, configMap v1.ConfigMap, t *testing.T) {
 	for key, value := range configMap.Data {
-		configMapDataHostPath := path.Join(volumePath, key)
+		configMapDataHostPath := filepath.Join(volumePath, key)
 		if _, err := os.Stat(configMapDataHostPath); err != nil {
 			t.Fatalf("SetUp() failed, couldn't find configMap data on disk: %v", configMapDataHostPath)
 		} else {

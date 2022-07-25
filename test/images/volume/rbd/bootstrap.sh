@@ -25,10 +25,10 @@
 
 
 # Create /etc/ceph/ceph.conf
-sh ./ceph.conf.sh `hostname -i`
+sh ./ceph.conf.sh "$(hostname -i)"
 
 # Configure and start ceph-mon
-sh ./mon.sh `hostname -i`
+sh ./mon.sh "$(hostname -i)"
 
 # Configure and start 2x ceph-osd
 mkdir -p /var/lib/ceph/osd/ceph-0 /var/lib/ceph/osd/ceph-1
@@ -41,6 +41,15 @@ sh ./mds.sh
 # Prepare a RBD volume "foo" (only with layering feature, the others may
 # require newer clients).
 # NOTE: we need Ceph kernel modules on the host that runs the client!
+# As the default pool `rbd` might not be created on arm64 platform for ceph deployment,
+# should create it if it does not exist.
+arch=$(uname -m)
+if [[ ${arch} = 'aarch64' || ${arch} = 'arm64' ]]; then
+    if [[ $(ceph osd lspools) = "" ]]; then
+        ceph osd pool create rbd 8
+        rbd pool init rbd
+    fi
+fi
 rbd import --image-feature layering block foo
 
 # Prepare a cephfs volume
@@ -51,7 +60,7 @@ ceph fs new cephfs cephfs_metadata cephfs_data
 # It takes a while until the volume created above is mountable,
 # 1 second is usually enough, but try indefinetily.
 sleep 1
-while ! ceph-fuse -m `hostname -i`:6789 /mnt; do
+while ! ceph-fuse -m "$(hostname -i):6789" /mnt; do
     echo "Waiting for cephfs to be up"
     sleep 1
 done

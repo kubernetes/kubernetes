@@ -24,22 +24,18 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
-// maxUpdateRetries is the maximum number of retries used for update conflict resolution prior to failure
-const maxUpdateRetries = 10
-
-// updateConflictError is the error used to indicate that the maximum number of retries against the API server have
-// been attempted and we need to back off
-var updateConflictError = fmt.Errorf("aborting update after %d attempts", maxUpdateRetries)
 var patchCodec = scheme.Codecs.LegacyCodec(apps.SchemeGroupVersion)
 
 // overlappingStatefulSets sorts a list of StatefulSets by creation timestamp, using their names as a tie breaker.
@@ -138,6 +134,179 @@ func storageMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 	return true
 }
 
+// getPersistentVolumeClaimPolicy returns the PVC policy for a StatefulSet, returning a retain policy if the set policy is nil.
+func getPersistentVolumeClaimRetentionPolicy(set *apps.StatefulSet) apps.StatefulSetPersistentVolumeClaimRetentionPolicy {
+	policy := apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
+		WhenDeleted: apps.RetainPersistentVolumeClaimRetentionPolicyType,
+		WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+	}
+	if set.Spec.PersistentVolumeClaimRetentionPolicy != nil {
+		policy = *set.Spec.PersistentVolumeClaimRetentionPolicy
+	}
+	return policy
+}
+
+// claimOwnerMatchesSetAndPod returns false if the ownerRefs of the claim are not set consistently with the
+// PVC deletion policy for the StatefulSet.
+func claimOwnerMatchesSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
+	policy := set.Spec.PersistentVolumeClaimRetentionPolicy
+	const retain = apps.RetainPersistentVolumeClaimRetentionPolicyType
+	const delete = apps.DeletePersistentVolumeClaimRetentionPolicyType
+	switch {
+	default:
+		klog.Errorf("Unknown policy %v; treating as Retain", set.Spec.PersistentVolumeClaimRetentionPolicy)
+		fallthrough
+	case policy.WhenScaled == retain && policy.WhenDeleted == retain:
+		if hasOwnerRef(claim, set) ||
+			hasOwnerRef(claim, pod) {
+			return false
+		}
+	case policy.WhenScaled == retain && policy.WhenDeleted == delete:
+		if !hasOwnerRef(claim, set) ||
+			hasOwnerRef(claim, pod) {
+			return false
+		}
+	case policy.WhenScaled == delete && policy.WhenDeleted == retain:
+		if hasOwnerRef(claim, set) {
+			return false
+		}
+		podScaledDown := getOrdinal(pod) >= int(*set.Spec.Replicas)
+		if podScaledDown != hasOwnerRef(claim, pod) {
+			return false
+		}
+	case policy.WhenScaled == delete && policy.WhenDeleted == delete:
+		podScaledDown := getOrdinal(pod) >= int(*set.Spec.Replicas)
+		// If a pod is scaled down, there should be no set ref and a pod ref;
+		// if the pod is not scaled down it's the other way around.
+		if podScaledDown == hasOwnerRef(claim, set) {
+			return false
+		}
+		if podScaledDown != hasOwnerRef(claim, pod) {
+			return false
+		}
+	}
+	return true
+}
+
+// updateClaimOwnerRefForSetAndPod updates the ownerRefs for the claim according to the deletion policy of
+// the StatefulSet. Returns true if the claim was changed and should be updated and false otherwise.
+func updateClaimOwnerRefForSetAndPod(claim *v1.PersistentVolumeClaim, set *apps.StatefulSet, pod *v1.Pod) bool {
+	needsUpdate := false
+	// Sometimes the version and kind are not set {pod,set}.TypeMeta. These are necessary for the ownerRef.
+	// This is the case both in real clusters and the unittests.
+	// TODO: there must be a better way to do this other than hardcoding the pod version?
+	updateMeta := func(tm *metav1.TypeMeta, kind string) {
+		if tm.APIVersion == "" {
+			if kind == "StatefulSet" {
+				tm.APIVersion = "apps/v1"
+			} else {
+				tm.APIVersion = "v1"
+			}
+		}
+		if tm.Kind == "" {
+			tm.Kind = kind
+		}
+	}
+	podMeta := pod.TypeMeta
+	updateMeta(&podMeta, "Pod")
+	setMeta := set.TypeMeta
+	updateMeta(&setMeta, "StatefulSet")
+	policy := set.Spec.PersistentVolumeClaimRetentionPolicy
+	const retain = apps.RetainPersistentVolumeClaimRetentionPolicyType
+	const delete = apps.DeletePersistentVolumeClaimRetentionPolicyType
+	switch {
+	default:
+		klog.Errorf("Unknown policy %v, treating as Retain", set.Spec.PersistentVolumeClaimRetentionPolicy)
+		fallthrough
+	case policy.WhenScaled == retain && policy.WhenDeleted == retain:
+		needsUpdate = removeOwnerRef(claim, set) || needsUpdate
+		needsUpdate = removeOwnerRef(claim, pod) || needsUpdate
+	case policy.WhenScaled == retain && policy.WhenDeleted == delete:
+		needsUpdate = setOwnerRef(claim, set, &setMeta) || needsUpdate
+		needsUpdate = removeOwnerRef(claim, pod) || needsUpdate
+	case policy.WhenScaled == delete && policy.WhenDeleted == retain:
+		needsUpdate = removeOwnerRef(claim, set) || needsUpdate
+		podScaledDown := getOrdinal(pod) >= int(*set.Spec.Replicas)
+		if podScaledDown {
+			needsUpdate = setOwnerRef(claim, pod, &podMeta) || needsUpdate
+		}
+		if !podScaledDown {
+			needsUpdate = removeOwnerRef(claim, pod) || needsUpdate
+		}
+	case policy.WhenScaled == delete && policy.WhenDeleted == delete:
+		podScaledDown := getOrdinal(pod) >= int(*set.Spec.Replicas)
+		if podScaledDown {
+			needsUpdate = removeOwnerRef(claim, set) || needsUpdate
+			needsUpdate = setOwnerRef(claim, pod, &podMeta) || needsUpdate
+		}
+		if !podScaledDown {
+			needsUpdate = setOwnerRef(claim, set, &setMeta) || needsUpdate
+			needsUpdate = removeOwnerRef(claim, pod) || needsUpdate
+		}
+	}
+	return needsUpdate
+}
+
+// hasOwnerRef returns true if target has an ownerRef to owner.
+func hasOwnerRef(target, owner metav1.Object) bool {
+	ownerUID := owner.GetUID()
+	for _, ownerRef := range target.GetOwnerReferences() {
+		if ownerRef.UID == ownerUID {
+			return true
+		}
+	}
+	return false
+}
+
+// hasStaleOwnerRef returns true if target has a ref to owner that appears to be stale.
+func hasStaleOwnerRef(target, owner metav1.Object) bool {
+	for _, ownerRef := range target.GetOwnerReferences() {
+		if ownerRef.Name == owner.GetName() && ownerRef.UID != owner.GetUID() {
+			return true
+		}
+	}
+	return false
+}
+
+// setOwnerRef adds owner to the ownerRefs of target, if necessary. Returns true if target needs to be
+// updated and false otherwise.
+func setOwnerRef(target, owner metav1.Object, ownerType *metav1.TypeMeta) bool {
+	if hasOwnerRef(target, owner) {
+		return false
+	}
+	ownerRefs := append(
+		target.GetOwnerReferences(),
+		metav1.OwnerReference{
+			APIVersion: ownerType.APIVersion,
+			Kind:       ownerType.Kind,
+			Name:       owner.GetName(),
+			UID:        owner.GetUID(),
+		})
+	target.SetOwnerReferences(ownerRefs)
+	return true
+}
+
+// removeOwnerRef removes owner from the ownerRefs of target, if necessary. Returns true if target needs
+// to be updated and false otherwise.
+func removeOwnerRef(target, owner metav1.Object) bool {
+	if !hasOwnerRef(target, owner) {
+		return false
+	}
+	ownerUID := owner.GetUID()
+	oldRefs := target.GetOwnerReferences()
+	newRefs := make([]metav1.OwnerReference, len(oldRefs)-1)
+	skip := 0
+	for i := range oldRefs {
+		if oldRefs[i].UID == ownerUID {
+			skip = -1
+		} else {
+			newRefs[i+skip] = oldRefs[i]
+		}
+	}
+	target.SetOwnerReferences(newRefs)
+	return true
+}
+
 // getPersistentVolumeClaims gets a map of PersistentVolumeClaims to their template names, as defined in set. The
 // returned PersistentVolumeClaims are each constructed with a the name specific to the Pod. This name is determined
 // by getPersistentVolumeClaimName.
@@ -149,7 +318,13 @@ func getPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) map[string]v1
 		claim := templates[i]
 		claim.Name = getPersistentVolumeClaimName(set, &claim, ordinal)
 		claim.Namespace = set.Namespace
-		claim.Labels = set.Spec.Selector.MatchLabels
+		if claim.Labels != nil {
+			for key, value := range set.Spec.Selector.MatchLabels {
+				claim.Labels[key] = value
+			}
+		} else {
+			claim.Labels = set.Spec.Selector.MatchLabels
+		}
 		claims[templates[i].Name] = claim
 	}
 	return claims
@@ -202,6 +377,10 @@ func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 // isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
 func isRunningAndReady(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod)
+}
+
+func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
+	return podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
 // isCreated returns true if pod has been created and is maintained by the API server
@@ -274,7 +453,10 @@ func newVersionedStatefulSetPod(currentSet, updateSet *apps.StatefulSet, current
 
 // Match check if the given StatefulSet's template matches the template stored in the given history.
 func Match(ss *apps.StatefulSet, history *apps.ControllerRevision) (bool, error) {
-	patch, err := getPatch(ss)
+	// Encoding the set for the patch may update its GVK metadata, which causes data races if this
+	// set is in an informer cache.
+	clone := ss.DeepCopy()
+	patch, err := getPatch(clone)
 	if err != nil {
 		return false, err
 	}
@@ -286,12 +468,15 @@ func Match(ss *apps.StatefulSet, history *apps.ControllerRevision) (bool, error)
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
 func getPatch(set *apps.StatefulSet) ([]byte, error) {
-	str, err := runtime.Encode(patchCodec, set)
+	data, err := runtime.Encode(patchCodec, set)
 	if err != nil {
 		return nil, err
 	}
 	var raw map[string]interface{}
-	json.Unmarshal([]byte(str), &raw)
+	err = json.Unmarshal(data, &raw)
+	if err != nil {
+		return nil, err
+	}
 	objCopy := make(map[string]interface{})
 	specCopy := make(map[string]interface{})
 	spec := raw["spec"].(map[string]interface{})
@@ -338,11 +523,12 @@ func ApplyRevision(set *apps.StatefulSet, revision *apps.ControllerRevision) (*a
 	if err != nil {
 		return nil, err
 	}
-	err = json.Unmarshal(patched, clone)
+	restoredSet := &apps.StatefulSet{}
+	err = json.Unmarshal(patched, restoredSet)
 	if err != nil {
 		return nil, err
 	}
-	return clone, nil
+	return restoredSet, nil
 }
 
 // nextRevision finds the next valid revision number based on revisions. If the length of revisions
@@ -365,6 +551,7 @@ func inconsistentStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) b
 		status.ReadyReplicas != set.Status.ReadyReplicas ||
 		status.UpdatedReplicas != set.Status.UpdatedReplicas ||
 		status.CurrentRevision != set.Status.CurrentRevision ||
+		status.AvailableReplicas != set.Status.AvailableReplicas ||
 		status.UpdateRevision != set.Status.UpdateRevision
 }
 
@@ -396,4 +583,22 @@ func (ao ascendingOrdinal) Swap(i, j int) {
 
 func (ao ascendingOrdinal) Less(i, j int) bool {
 	return getOrdinal(ao[i]) < getOrdinal(ao[j])
+}
+
+// getStatefulSetMaxUnavailable calculates the real maxUnavailable number according to the replica count
+// and maxUnavailable from rollingUpdateStrategy. The number defaults to 1 if the maxUnavailable field is
+// not set, and it will be round down to at least 1 if the maxUnavailable value is a percentage.
+// Note that API validation has already guaranteed the maxUnavailable field to be >1 if it is an integer
+// or 0% < value <= 100% if it is a percentage, so we don't have to consider other cases.
+func getStatefulSetMaxUnavailable(maxUnavailable *intstr.IntOrString, replicaCount int) (int, error) {
+	maxUnavailableNum, err := intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(maxUnavailable, intstr.FromInt(1)), replicaCount, false)
+	if err != nil {
+		return 0, err
+	}
+	// maxUnavailable might be zero for small percentage with round down.
+	// So we have to enforce it not to be less than 1.
+	if maxUnavailableNum < 1 {
+		maxUnavailableNum = 1
+	}
+	return maxUnavailableNum, nil
 }

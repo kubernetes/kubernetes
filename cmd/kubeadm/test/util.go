@@ -17,70 +17,26 @@ limitations under the License.
 package test
 
 import (
-	"html/template"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/renstrom/dedent"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	certtestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	certtestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 )
 
 // SetupTempDir is a utility function for kubeadm testing, that creates a temporary directory
 // NB. it is up to the caller to cleanup the folder at the end of the test with defer os.RemoveAll(tmpdir)
 func SetupTempDir(t *testing.T) string {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
 
 	return tmpdir
-}
-
-// SetupInitConfigurationFile is a utility function for kubeadm testing that writes a master configuration file
-// into /config subfolder of a given temporary directory.
-// The function returns the path of the created master configuration file.
-func SetupInitConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.InitConfiguration) string {
-
-	cfgPath := filepath.Join(tmpdir, "config/masterconfig.yaml")
-	if err := os.MkdirAll(filepath.Dir(cfgPath), os.FileMode(0755)); err != nil {
-		t.Fatalf("Couldn't create cfgDir")
-	}
-
-	cfgTemplate := template.Must(template.New("init").Parse(dedent.Dedent(`
-		apiVersion: kubeadm.k8s.io/v1beta1
-		kind: InitConfiguration
-		apiEndpoint:
-		  advertiseAddress: {{.LocalAPIEndpoint.AdvertiseAddress}}
-		  bindPort: {{.LocalAPIEndpoint.BindPort}}
-		nodeRegistration:
-		  name: {{.NodeRegistration.Name}}
-		---
-		apiVersion: kubeadm.k8s.io/v1beta1
-		kind: ClusterConfiguration
-		certificatesDir: {{.CertificatesDir}}
-		kubernetesVersion: v1.11.0
-		`)))
-
-	f, err := os.Create(cfgPath)
-	if err != nil {
-		t.Fatalf("error creating masterconfig file %s: %v", cfgPath, err)
-	}
-
-	err = cfgTemplate.Execute(f, cfg)
-	if err != nil {
-		t.Fatalf("error generating masterconfig file %s: %v", cfgPath, err)
-	}
-	f.Close()
-
-	return cfgPath
 }
 
 // SetupEmptyFiles is a utility function for kubeadm testing that creates one or more empty files (touch)
@@ -94,11 +50,11 @@ func SetupEmptyFiles(t *testing.T, tmpdir string, fileNames ...string) {
 	}
 }
 
-// SetupPkiDirWithCertificateAuthorithy is a utility function for kubeadm testing that creates a
-// CertificateAuthorithy cert/key pair into /pki subfolder of a given temporary directory.
+// SetupPkiDirWithCertificateAuthority is a utility function for kubeadm testing that creates a
+// CertificateAuthority cert/key pair into /pki subfolder of a given temporary directory.
 // The function returns the path of the created pki.
-func SetupPkiDirWithCertificateAuthorithy(t *testing.T, tmpdir string) string {
-	caCert, caKey := certtestutil.SetupCertificateAuthorithy(t)
+func SetupPkiDirWithCertificateAuthority(t *testing.T, tmpdir string) string {
+	caCert, caKey := certtestutil.SetupCertificateAuthority(t)
 
 	certDir := filepath.Join(tmpdir, "pki")
 	if err := pkiutil.WriteCertAndKey(certDir, kubeadmconstants.CACertAndKeyBaseName, caCert, caKey); err != nil {
@@ -111,7 +67,7 @@ func SetupPkiDirWithCertificateAuthorithy(t *testing.T, tmpdir string) string {
 // AssertFilesCount is a utility function for kubeadm testing that asserts if the given folder contains
 // count files.
 func AssertFilesCount(t *testing.T, dirName string, count int) {
-	files, err := ioutil.ReadDir(dirName)
+	files, err := os.ReadDir(dirName)
 	if err != nil {
 		t.Fatalf("Couldn't read files from tmpdir: %s", err)
 	}
@@ -156,10 +112,9 @@ func AssertError(t *testing.T, err error, expected string) {
 
 // GetDefaultInternalConfig returns a defaulted kubeadmapi.InitConfiguration
 func GetDefaultInternalConfig(t *testing.T) *kubeadmapi.InitConfiguration {
-	internalcfg, err := configutil.ConfigFileAndDefaultsToInternalConfig("", &kubeadmapiv1beta1.InitConfiguration{})
+	internalcfg, err := configutil.DefaultedStaticInitConfiguration()
 	if err != nil {
 		t.Fatalf("unexpected error getting default config: %v", err)
 	}
-
 	return internalcfg
 }

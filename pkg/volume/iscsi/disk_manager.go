@@ -19,8 +19,10 @@ package iscsi
 import (
 	"os"
 
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -40,7 +42,7 @@ type diskManager interface {
 // utility to mount a disk based filesystem
 // globalPDPath: global mount path like, /var/lib/kubelet/plugins/kubernetes.io/iscsi/{ifaceName}/{portal-some_iqn-lun-lun_id}
 // volPath: pod volume dir path like, /var/lib/kubelet/pods/{podUID}/volumes/kubernetes.io~iscsi/{volumeName}
-func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
+func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil && !os.IsNotExist(err) {
 		klog.Errorf("cannot validate mountpoint: %s", volPath)
@@ -65,7 +67,7 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 	}
 	globalPDPath := manager.MakeGlobalPDName(*b.iscsiDisk)
 	mountOptions := util.JoinMountOptions(b.mountOptions, options)
-	err = mounter.Mount(globalPDPath, volPath, "", mountOptions)
+	err = mounter.MountSensitiveWithoutSystemd(globalPDPath, volPath, "", mountOptions, nil)
 	if err != nil {
 		klog.Errorf("Failed to bind mount: source:%s, target:%s, err:%v", globalPDPath, volPath, err)
 		noMnt, mntErr := b.mounter.IsLikelyNotMountPoint(volPath)
@@ -94,7 +96,7 @@ func diskSetUp(manager diskManager, b iscsiDiskMounter, volPath string, mounter 
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(&b, fsGroup)
+		volume.SetVolumeOwnership(&b, fsGroup, fsGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 
 	return nil

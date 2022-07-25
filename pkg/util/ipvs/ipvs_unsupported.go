@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 /*
@@ -20,12 +21,11 @@ package ipvs
 
 import (
 	"fmt"
-
-	utilexec "k8s.io/utils/exec"
+	"time"
 )
 
 // New returns a dummy Interface for unsupported platform.
-func New(utilexec.Interface) Interface {
+func New() Interface {
 	return &runner{}
 }
 
@@ -69,6 +69,10 @@ func (runner *runner) DeleteRealServer(*VirtualServer, *RealServer) error {
 }
 
 func (runner *runner) UpdateRealServer(*VirtualServer, *RealServer) error {
+	return fmt.Errorf("IPVS not supported for this platform")
+}
+
+func (runner *runner) ConfigureTimeouts(time.Duration, time.Duration, time.Duration) error {
 	return fmt.Errorf("IPVS not supported for this platform")
 }
 

@@ -29,6 +29,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -39,6 +40,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
@@ -65,6 +67,7 @@ type Service struct {
 	client *vim25.Client
 	sm     *SessionManager
 	sdk    map[string]*Registry
+	delay  *DelayConfig
 
 	readAll func(io.Reader) ([]byte, error)
 
@@ -122,7 +125,7 @@ func (s *Service) call(ctx *Context, method *Method) soap.HasFault {
 
 	if session == nil {
 		switch method.Name {
-		case "RetrieveServiceContent", "List", "Login", "LoginByToken", "LoginExtensionByCertificate", "RetrieveProperties", "RetrievePropertiesEx", "CloneSession":
+		case "RetrieveServiceContent", "PbmRetrieveServiceContent", "List", "Login", "LoginByToken", "LoginExtensionByCertificate", "RetrieveProperties", "RetrievePropertiesEx", "CloneSession":
 			// ok for now, TODO: authz
 		default:
 			fault := &types.NotAuthenticated{
@@ -147,7 +150,8 @@ func (s *Service) call(ctx *Context, method *Method) soap.HasFault {
 		return &serverFaultBody{Reason: Fault(msg, fault)}
 	}
 
-	name := method.Name
+	// Lowercase methods can't be accessed outside their package
+	name := strings.Title(method.Name)
 
 	if strings.HasSuffix(name, vTaskSuffix) {
 		// Make golint happy renaming "Foo_Task" -> "FooTask"
@@ -169,6 +173,25 @@ func (s *Service) call(ctx *Context, method *Method) soap.HasFault {
 				fault := &types.MethodDisabled{}
 				return &serverFaultBody{Reason: Fault(msg, fault)}
 			}
+		}
+	}
+
+	// We have a valid call. Introduce a delay if requested
+	//
+	if s.delay != nil {
+		d := 0
+		if s.delay.Delay > 0 {
+			d = s.delay.Delay
+		}
+		if md, ok := s.delay.MethodDelay[method.Name]; ok {
+			d += md
+		}
+		if s.delay.DelayJitter > 0 {
+			d += int(rand.NormFloat64() * s.delay.DelayJitter * float64(d))
+		}
+		if d > 0 {
+			//fmt.Printf("Delaying method %s %d ms\n", name, d)
+			time.Sleep(time.Duration(d) * time.Millisecond)
 		}
 	}
 
@@ -230,14 +253,34 @@ type soapEnvelope struct {
 	Body    interface{} `xml:"soapenv:Body"`
 }
 
+type faultDetail struct {
+	Fault types.AnyType
+}
+
 // soapFault is a copy of soap.Fault, with the same changes as soapEnvelope
 type soapFault struct {
 	XMLName xml.Name `xml:"soapenv:Fault"`
 	Code    string   `xml:"faultcode"`
 	String  string   `xml:"faultstring"`
 	Detail  struct {
-		Fault types.AnyType `xml:",any,typeattr"`
+		Fault *faultDetail
 	} `xml:"detail"`
+}
+
+// MarshalXML renames the start element from "Fault" to "${Type}Fault"
+func (d *faultDetail) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	kind := reflect.TypeOf(d.Fault).Elem().Name()
+	start.Name.Local = kind + "Fault"
+	start.Attr = append(start.Attr,
+		xml.Attr{
+			Name:  xml.Name{Local: "xmlns"},
+			Value: "urn:" + vim25.Namespace,
+		},
+		xml.Attr{
+			Name:  xml.Name{Local: "xsi:type"},
+			Value: kind,
+		})
+	return e.EncodeElement(d.Fault, start)
 }
 
 // About generates some info about the simulator.
@@ -289,6 +332,16 @@ func (s *Service) About(w http.ResponseWriter, r *http.Request) {
 	_ = enc.Encode(&about)
 }
 
+// Handle registers the handler for the given pattern with Service.ServeMux.
+func (s *Service) Handle(pattern string, handler http.Handler) {
+	s.ServeMux.Handle(pattern, handler)
+	// Not ideal, but avoids having to add yet another registration mechanism
+	// so we can optionally use vapi/simulator internally.
+	if m, ok := handler.(tagManager); ok {
+		s.sdk[vim25.Path].tagManager = m
+	}
+}
+
 // RegisterSDK adds an HTTP handler for the Registry's Path and Namespace.
 func (s *Service) RegisterSDK(r *Registry) {
 	if s.ServeMux == nil {
@@ -321,7 +374,7 @@ func (s *Service) ServeSDK(w http.ResponseWriter, r *http.Request) {
 	ctx := &Context{
 		req: r,
 		res: w,
-		m:   s.sm,
+		svc: s,
 
 		Map:     s.sdk[r.URL.Path],
 		Context: context.Background(),
@@ -350,7 +403,9 @@ func (s *Service) ServeSDK(w http.ResponseWriter, r *http.Request) {
 			&soapFault{
 				Code:   f.Code,
 				String: f.String,
-				Detail: f.Detail,
+				Detail: struct {
+					Fault *faultDetail
+				}{&faultDetail{f.Detail.Fault}},
 			},
 		}
 	} else {
@@ -431,6 +486,9 @@ func (s *Service) ServeDatastore(w http.ResponseWriter, r *http.Request) {
 		// File does not exist, fallthrough to create via PUT logic
 		fallthrough
 	case "PUT":
+		dir := path.Dir(p)
+		_ = os.MkdirAll(dir, 0700)
+
 		f, err := os.Create(p)
 		if err != nil {
 			log.Printf("failed to %s '%s': %s", r.Method, p, err)
@@ -465,6 +523,37 @@ func (*Service) ServiceVersions(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, versions)
 }
 
+// defaultIP returns addr.IP if specified, otherwise attempts to find a non-loopback ipv4 IP
+func defaultIP(addr *net.TCPAddr) string {
+	if !addr.IP.IsUnspecified() {
+		return addr.IP.String()
+	}
+
+	nics, err := net.Interfaces()
+	if err != nil {
+		return addr.IP.String()
+	}
+
+	for _, nic := range nics {
+		if nic.Name == "docker0" || strings.HasPrefix(nic.Name, "vmnet") {
+			continue
+		}
+		addrs, aerr := nic.Addrs()
+		if aerr != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			if ip, ok := addr.(*net.IPNet); ok && !ip.IP.IsLoopback() {
+				if ip.IP.To4() != nil {
+					return ip.IP.String()
+				}
+			}
+		}
+	}
+
+	return addr.IP.String()
+}
+
 // NewServer returns an http Server instance for the given service
 func (s *Service) NewServer() *Server {
 	s.RegisterSDK(Map)
@@ -478,11 +567,12 @@ func (s *Service) NewServer() *Server {
 	// for use in main.go, where Start() blocks, we can still set ServiceHostName
 	ts := httptest.NewUnstartedServer(mux)
 
+	addr := ts.Listener.Addr().(*net.TCPAddr)
+	port := strconv.Itoa(addr.Port)
 	u := &url.URL{
 		Scheme: "http",
-		Host:   ts.Listener.Addr().String(),
+		Host:   net.JoinHostPort(defaultIP(addr), port),
 		Path:   Map.Path,
-		User:   url.UserPassword("user", "pass"),
 	}
 
 	// Redirect clients to this http server, rather than HostSystem.Name
@@ -510,13 +600,15 @@ func (s *Service) NewServer() *Server {
 	m.Setting = append(m.Setting,
 		&types.OptionValue{
 			Key:   "vcsim.server.url",
-			Value: ts.URL,
+			Value: u.String(),
 		},
 		&types.OptionValue{
 			Key:   "vcsim.server.cert",
 			Value: cert,
 		},
 	)
+
+	u.User = url.UserPassword("user", "pass")
 
 	return &Server{
 		Server: ts,

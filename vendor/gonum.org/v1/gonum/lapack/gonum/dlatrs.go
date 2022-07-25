@@ -14,11 +14,11 @@ import (
 // Dlatrs solves a triangular system of equations scaled to prevent overflow. It
 // solves
 //  A * x = scale * b if trans == blas.NoTrans
-//  A^T * x = scale * b if trans == blas.Trans
+//  Aᵀ * x = scale * b if trans == blas.Trans
 // where the scale s is set for numeric stability.
 //
 // A is an n×n triangular matrix. On entry, the slice x contains the values of
-// of b, and on exit it contains the solution vector x.
+// b, and on exit it contains the solution vector x.
 //
 // If normin == true, cnorm is an input and cnorm[j] contains the norm of the off-diagonal
 // part of the j^th column of A. If trans == blas.NoTrans, cnorm[j] must be greater
@@ -28,33 +28,42 @@ import (
 //
 // Dlatrs is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlatrs(uplo blas.Uplo, trans blas.Transpose, diag blas.Diag, normin bool, n int, a []float64, lda int, x []float64, cnorm []float64) (scale float64) {
-	if uplo != blas.Upper && uplo != blas.Lower {
+	switch {
+	case uplo != blas.Upper && uplo != blas.Lower:
 		panic(badUplo)
-	}
-	if trans != blas.Trans && trans != blas.NoTrans {
+	case trans != blas.NoTrans && trans != blas.Trans && trans != blas.ConjTrans:
 		panic(badTrans)
-	}
-	if diag != blas.Unit && diag != blas.NonUnit {
+	case diag != blas.Unit && diag != blas.NonUnit:
 		panic(badDiag)
-	}
-	upper := uplo == blas.Upper
-	noTrans := trans == blas.NoTrans
-	nonUnit := diag == blas.NonUnit
-
-	if n < 0 {
+	case n < 0:
 		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
-	checkMatrix(n, n, a, lda)
-	checkVector(n, x, 1)
-	checkVector(n, cnorm, 1)
 
+	// Quick return if possible.
 	if n == 0 {
 		return 0
 	}
+
+	switch {
+	case len(a) < (n-1)*lda+n:
+		panic(shortA)
+	case len(x) < n:
+		panic(shortX)
+	case len(cnorm) < n:
+		panic(shortCNorm)
+	}
+
+	upper := uplo == blas.Upper
+	nonUnit := diag == blas.NonUnit
+
 	smlnum := dlamchS / dlamchP
 	bignum := 1 / smlnum
 	scale = 1
+
 	bi := blas64.Implementation()
+
 	if !normin {
 		if upper {
 			cnorm[0] = 0
@@ -85,7 +94,7 @@ func (impl Implementation) Dlatrs(uplo blas.Uplo, trans blas.Transpose, diag bla
 	xbnd := xmax
 	var grow float64
 	var jfirst, jlast, jinc int
-	if noTrans {
+	if trans == blas.NoTrans {
 		if upper {
 			jfirst = n - 1
 			jlast = -1
@@ -183,7 +192,7 @@ Solve:
 		bi.Dscal(n, scale, x, 1)
 		xmax = bignum
 	}
-	if noTrans {
+	if trans == blas.NoTrans {
 		for j := jfirst; j != jlast; j += jinc {
 			xj := math.Abs(x[j])
 			var tjj, tjjs float64

@@ -27,15 +27,15 @@ import (
 // Scale represents a scaling request for a resource.
 type Scale struct {
 	metav1.TypeMeta
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta
 
-	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
 	// +optional
 	Spec ScaleSpec
 
-	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
+	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
 	// +optional
 	Status ScaleStatus
 }
@@ -62,7 +62,7 @@ type ScaleStatus struct {
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
-	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
 	Kind string
 	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string
@@ -76,8 +76,11 @@ type HorizontalPodAutoscalerSpec struct {
 	// ScaleTargetRef points to the target resource to scale, and is used to the pods for which metrics
 	// should be collected, as well as to actually change the replica count.
 	ScaleTargetRef CrossVersionObjectReference
-	// MinReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.
-	// It defaults to 1 pod.
+	// minReplicas is the lower limit for the number of replicas to which the autoscaler
+	// can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the
+	// alpha feature gate HPAScaleToZero is enabled and at least one Object or External
+	// metric is configured.  Scaling is active as long as at least one metric value is
+	// available.
 	// +optional
 	MinReplicas *int32
 	// MaxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
@@ -92,12 +95,96 @@ type HorizontalPodAutoscalerSpec struct {
 	// more information about how each type of metric must respond.
 	// +optional
 	Metrics []MetricSpec
+
+	// behavior configures the scaling behavior of the target
+	// in both Up and Down directions (scaleUp and scaleDown fields respectively).
+	// If not set, the default HPAScalingRules for scale up and scale down are used.
+	// +optional
+	Behavior *HorizontalPodAutoscalerBehavior
+}
+
+// HorizontalPodAutoscalerBehavior configures a scaling behavior for Up and Down direction
+// (scaleUp and scaleDown fields respectively).
+type HorizontalPodAutoscalerBehavior struct {
+	// scaleUp is scaling policy for scaling Up.
+	// If not set, the default value is the higher of:
+	//   * increase no more than 4 pods per 60 seconds
+	//   * double the number of pods per 60 seconds
+	// No stabilization is used.
+	// +optional
+	ScaleUp *HPAScalingRules
+	// scaleDown is scaling policy for scaling Down.
+	// If not set, the default value is to allow to scale down to minReplicas pods, with a
+	// 300 second stabilization window (i.e., the highest recommendation for
+	// the last 300sec is used).
+	// +optional
+	ScaleDown *HPAScalingRules
+}
+
+// ScalingPolicySelect is used to specify which policy should be used while scaling in a certain direction
+type ScalingPolicySelect string
+
+const (
+	// MaxPolicySelect selects the policy with the highest possible change.
+	MaxPolicySelect ScalingPolicySelect = "Max"
+	// MinPolicySelect selects the policy with the lowest possible change.
+	MinPolicySelect ScalingPolicySelect = "Min"
+	// DisabledPolicySelect disables the scaling in this direction.
+	DisabledPolicySelect ScalingPolicySelect = "Disabled"
+)
+
+// HPAScalingRules configures the scaling behavior for one direction.
+// These Rules are applied after calculating DesiredReplicas from metrics for the HPA.
+// They can limit the scaling velocity by specifying scaling policies.
+// They can prevent flapping by specifying the stabilization window, so that the
+// number of replicas is not set instantly, instead, the safest value from the stabilization
+// window is chosen.
+type HPAScalingRules struct {
+	// StabilizationWindowSeconds is the number of seconds for which past recommendations should be
+	// considered while scaling up or scaling down.
+	// StabilizationWindowSeconds must be greater than or equal to zero and less than or equal to 3600 (one hour).
+	// If not set, use the default values:
+	// - For scale up: 0 (i.e. no stabilization is done).
+	// - For scale down: 300 (i.e. the stabilization window is 300 seconds long).
+	// +optional
+	StabilizationWindowSeconds *int32
+	// selectPolicy is used to specify which policy should be used.
+	// If not set, the default value MaxPolicySelect is used.
+	// +optional
+	SelectPolicy *ScalingPolicySelect
+	// policies is a list of potential scaling polices which can used during scaling.
+	// At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+	// +optional
+	Policies []HPAScalingPolicy
+}
+
+// HPAScalingPolicyType is the type of the policy which could be used while making scaling decisions.
+type HPAScalingPolicyType string
+
+const (
+	// PodsScalingPolicy is a policy used to specify a change in absolute number of pods.
+	PodsScalingPolicy HPAScalingPolicyType = "Pods"
+	// PercentScalingPolicy is a policy used to specify a relative amount of change with respect to
+	// the current number of pods.
+	PercentScalingPolicy HPAScalingPolicyType = "Percent"
+)
+
+// HPAScalingPolicy is a single policy which must hold true for a specified past interval.
+type HPAScalingPolicy struct {
+	// Type is used to specify the scaling policy.
+	Type HPAScalingPolicyType
+	// Value contains the amount of change which is permitted by the policy.
+	// It must be greater than zero
+	Value int32
+	// PeriodSeconds specifies the window of time for which the policy should hold true.
+	// PeriodSeconds must be greater than zero and less than or equal to 1800 (30 min).
+	PeriodSeconds int32
 }
 
 // MetricSourceType indicates the type of metric.
 type MetricSourceType string
 
-var (
+const (
 	// ObjectMetricSourceType is a metric describing a kubernetes object
 	// (for example, hits-per-second on an Ingress object).
 	ObjectMetricSourceType MetricSourceType = "Object"
@@ -117,6 +204,12 @@ var (
 	// (for example length of queue in cloud messaging service, or
 	// QPS from loadbalancer running outside of cluster).
 	ExternalMetricSourceType MetricSourceType = "External"
+	// ContainerResourceMetricSourceType is a resource metric known to Kubernetes, as
+	// specified in requests and limits, describing a single container in each pod in the current
+	// scale target (e.g. CPU or memory).  Such metrics are built in to
+	// Kubernetes, and have special scaling options on top of those available
+	// to normal per-pod metrics (the "pods" source).
+	ContainerResourceMetricSourceType MetricSourceType = "ContainerResource"
 )
 
 // MetricSpec specifies how to scale based on a single metric
@@ -142,6 +235,13 @@ type MetricSpec struct {
 	// to normal per-pod metrics using the "pods" source.
 	// +optional
 	Resource *ResourceMetricSource
+	// ContainerResource refers to a resource metric (such as those specified in
+	// requests and limits) known to Kubernetes describing a single container in each pod of the
+	// current scale target (e.g. CPU or memory). Such metrics are built in to
+	// Kubernetes, and have special scaling options on top of those available
+	// to normal per-pod metrics using the "pods" source.
+	// +optional
+	ContainerResource *ContainerResourceMetricSource
 	// External refers to a global metric that is not associated
 	// with any Kubernetes object. It allows autoscaling based on information
 	// coming from components running outside of cluster
@@ -181,6 +281,22 @@ type ResourceMetricSource struct {
 	// Name is the name of the resource in question.
 	Name api.ResourceName
 	// Target specifies the target value for the given metric
+	Target MetricTarget
+}
+
+// ContainerResourceMetricSource indicates how to scale on a resource metric known to
+// Kubernetes, as specified in the requests and limits, describing a single container in
+// each of the pods of the current scale target(e.g. CPU or memory). The values will be
+// averaged together before being compared to the target. Such metrics are built into
+// Kubernetes, and have special scaling options on top of those available to
+// normal per-pod metrics using the "pods" source. Only one "target" type
+// should be set.
+type ContainerResourceMetricSource struct {
+	// name is the name of the of the resource
+	Name api.ResourceName
+	// container is the name of the container in the pods of the scaling target.
+	Container string
+	// target specifies the target value for the given metric
 	Target MetricTarget
 }
 
@@ -225,9 +341,12 @@ type MetricTarget struct {
 // "Value", "AverageValue", or "Utilization"
 type MetricTargetType string
 
-var (
-	UtilizationMetricType  MetricTargetType = "Utilization"
-	ValueMetricType        MetricTargetType = "Value"
+const (
+	// UtilizationMetricType is a possible value for MetricTarget.Type.
+	UtilizationMetricType MetricTargetType = "Utilization"
+	// ValueMetricType is a possible value for MetricTarget.Type.
+	ValueMetricType MetricTargetType = "Value"
+	// AverageValueMetricType is a possible value for MetricTarget.Type.
 	AverageValueMetricType MetricTargetType = "AverageValue"
 )
 
@@ -276,7 +395,7 @@ const (
 // a HorizontalPodAutoscaler.
 type HorizontalPodAutoscalerConditionType string
 
-var (
+const (
 	// ScalingActive indicates that the HPA controller is able to scale if necessary:
 	// it's correctly configured, can fetch the desired metrics, and isn't disabled.
 	ScalingActive HorizontalPodAutoscalerConditionType = "ScalingActive"
@@ -330,6 +449,13 @@ type MetricStatus struct {
 	// to normal per-pod metrics using the "pods" source.
 	// +optional
 	Resource *ResourceMetricStatus
+	// ContainerResource refers to a resource metric (such as those specified in
+	// requests and limits) known to Kubernetes describing a single container in each pod in the
+	// current scale target (e.g. CPU or memory). Such metrics are built in to
+	// Kubernetes, and have special scaling options on top of those available
+	// to normal per-pod metrics using the "pods" source.
+	// +optional
+	ContainerResource *ContainerResourceMetricStatus
 	// External refers to a global metric that is not associated
 	// with any Kubernetes object. It allows autoscaling based on information
 	// coming from components running outside of cluster
@@ -366,6 +492,18 @@ type ResourceMetricStatus struct {
 	Current MetricValueStatus
 }
 
+// ContainerResourceMetricStatus indicates the current value of a resource metric known to
+// Kubernetes, as specified in requests and limits, describing each pod in the
+// current scale target (e.g. CPU or memory).  Such metrics are built in to
+// Kubernetes, and have special scaling options on top of those available to
+// normal per-pod metrics using the "pods" source.
+type ContainerResourceMetricStatus struct {
+	// Name is the name of the resource in question.
+	Name      api.ResourceName
+	Container string
+	Current   MetricValueStatus
+}
+
 // ExternalMetricStatus indicates the current value of a global metric
 // not associated with any Kubernetes object.
 type ExternalMetricStatus struct {
@@ -373,13 +511,13 @@ type ExternalMetricStatus struct {
 	Current MetricValueStatus
 }
 
+// MetricValueStatus indicates the current value of a metric.
 type MetricValueStatus struct {
 	Value              *resource.Quantity
 	AverageValue       *resource.Quantity
 	AverageUtilization *int32
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // HorizontalPodAutoscaler is the configuration for a horizontal pod
@@ -388,12 +526,12 @@ type MetricValueStatus struct {
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta
 	// Metadata is the standard object metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Spec is the specification for the behaviour of the autoscaler.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
 	// +optional
 	Spec HorizontalPodAutoscalerSpec
 

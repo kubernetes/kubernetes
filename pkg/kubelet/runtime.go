@@ -17,9 +17,12 @@ limitations under the License.
 package kubelet
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
+
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 type runtimeState struct {
@@ -27,6 +30,8 @@ type runtimeState struct {
 	lastBaseRuntimeSync      time.Time
 	baseRuntimeSyncThreshold time.Duration
 	networkError             error
+	runtimeError             error
+	storageError             error
 	cidr                     string
 	healthChecks             []*healthCheck
 }
@@ -58,6 +63,18 @@ func (s *runtimeState) setNetworkState(err error) {
 	s.networkError = err
 }
 
+func (s *runtimeState) setRuntimeState(err error) {
+	s.Lock()
+	defer s.Unlock()
+	s.runtimeError = err
+}
+
+func (s *runtimeState) setStorageState(err error) {
+	s.Lock()
+	defer s.Unlock()
+	s.storageError = err
+}
+
 func (s *runtimeState) setPodCIDR(cidr string) {
 	s.Lock()
 	defer s.Unlock()
@@ -70,40 +87,51 @@ func (s *runtimeState) podCIDR() string {
 	return s.cidr
 }
 
-func (s *runtimeState) runtimeErrors() []string {
+func (s *runtimeState) runtimeErrors() error {
 	s.RLock()
 	defer s.RUnlock()
-	var ret []string
+	errs := []error{}
 	if s.lastBaseRuntimeSync.IsZero() {
-		ret = append(ret, "container runtime status check may not have completed yet")
+		errs = append(errs, errors.New("container runtime status check may not have completed yet"))
 	} else if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
-		ret = append(ret, "container runtime is down")
+		errs = append(errs, errors.New("container runtime is down"))
 	}
 	for _, hc := range s.healthChecks {
 		if ok, err := hc.fn(); !ok {
-			ret = append(ret, fmt.Sprintf("%s is not healthy: %v", hc.name, err))
+			errs = append(errs, fmt.Errorf("%s is not healthy: %v", hc.name, err))
 		}
 	}
+	if s.runtimeError != nil {
+		errs = append(errs, s.runtimeError)
+	}
 
-	return ret
+	return utilerrors.NewAggregate(errs)
 }
 
-func (s *runtimeState) networkErrors() []string {
+func (s *runtimeState) networkErrors() error {
 	s.RLock()
 	defer s.RUnlock()
-	var ret []string
+	errs := []error{}
 	if s.networkError != nil {
-		ret = append(ret, s.networkError.Error())
+		errs = append(errs, s.networkError)
 	}
-	return ret
+	return utilerrors.NewAggregate(errs)
 }
 
-func newRuntimeState(
-	runtimeSyncThreshold time.Duration,
-) *runtimeState {
+func (s *runtimeState) storageErrors() error {
+	s.RLock()
+	defer s.RUnlock()
+	errs := []error{}
+	if s.storageError != nil {
+		errs = append(errs, s.storageError)
+	}
+	return utilerrors.NewAggregate(errs)
+}
+
+func newRuntimeState(runtimeSyncThreshold time.Duration) *runtimeState {
 	return &runtimeState{
 		lastBaseRuntimeSync:      time.Time{},
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,
-		networkError:             fmt.Errorf("network state unknown"),
+		networkError:             ErrNetworkUnknown,
 	}
 }

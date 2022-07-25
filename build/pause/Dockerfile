@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM scratch
+ARG BASE
+FROM ${BASE}
 ARG ARCH
-ADD bin/pause-${ARCH} /pause
+ADD bin/pause-linux-${ARCH} /pause
+USER 65535:65535
 ENTRYPOINT ["/pause"]

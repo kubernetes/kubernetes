@@ -28,8 +28,10 @@ const GroupName = "podtolerationrestriction.admission.k8s.io"
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
 var (
+	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	// AddToScheme is used to register the types to API encoding/decoding machinery
+	AddToScheme = SchemeBuilder.AddToScheme
 )
 
 // Kind takes an unqualified kind and returns a Group qualified GroupKind

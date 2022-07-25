@@ -1,3 +1,4 @@
+//go:build !linux && !windows
 // +build !linux,!windows
 
 /*
@@ -21,13 +22,14 @@ package cm
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/mount-utils"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 type unsupportedContainerManager struct {

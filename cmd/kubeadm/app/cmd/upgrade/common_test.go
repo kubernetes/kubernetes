@@ -18,22 +18,69 @@ package upgrade
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
+
+func TestEnforceRequirements(t *testing.T) {
+	tcases := []struct {
+		name          string
+		newK8sVersion string
+		dryRun        bool
+		flags         applyPlanFlags
+		expectedErr   bool
+	}{
+		{
+			name:        "Fail pre-flight check",
+			expectedErr: true,
+		},
+		{
+			name: "Bogus preflight check disabled when also 'all' is specified",
+			flags: applyPlanFlags{
+				ignorePreflightErrors: []string{"bogusvalue", "all"},
+			},
+			expectedErr: true,
+		},
+		{
+			name: "Fail to create client",
+			flags: applyPlanFlags{
+				ignorePreflightErrors: []string{"all"},
+			},
+			expectedErr: true,
+		},
+	}
+	for _, tt := range tcases {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, _, err := enforceRequirements(&tt.flags, nil, tt.dryRun, false, &output.TextPrinter{})
+
+			if err == nil && tt.expectedErr {
+				t.Error("Expected error, but got success")
+			}
+			if err != nil && !tt.expectedErr {
+				t.Errorf("Unexpected error: %+v", err)
+			}
+		})
+	}
+}
 
 func TestPrintConfiguration(t *testing.T) {
 	var tests = []struct {
+		name          string
 		cfg           *kubeadmapi.ClusterConfiguration
 		buf           *bytes.Buffer
 		expectedBytes []byte
 	}{
 		{
+			name:          "config is nil",
 			cfg:           nil,
 			expectedBytes: []byte(""),
 		},
 		{
+			name: "cluster config with local Etcd",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.7.1",
 				Etcd: kubeadmapi.Etcd{
@@ -41,32 +88,23 @@ func TestPrintConfiguration(t *testing.T) {
 						DataDir: "/some/path",
 					},
 				},
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
-				},
 			},
-			expectedBytes: []byte(`[upgrade/config] Configuration used:
+			expectedBytes: []byte(fmt.Sprintf(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta1
-	certificatesDir: ""
-	controlPlaneEndpoint: ""
+	apiVersion: %s
 	controllerManager: {}
-	dns:
-	  type: CoreDNS
+	dns: {}
 	etcd:
 	  local:
 	    dataDir: /some/path
-	imageRepository: ""
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
-	networking:
-	  dnsDomain: ""
-	  podSubnet: ""
-	  serviceSubnet: ""
+	networking: {}
 	scheduler: {}
-`),
+`, kubeadmapiv1.SchemeGroupVersion.String())),
 		},
 		{
+			name: "cluster config with ServiceSubnet and external Etcd",
 			cfg: &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.7.1",
 				Networking: kubeadmapi.Networking{
@@ -77,18 +115,12 @@ func TestPrintConfiguration(t *testing.T) {
 						Endpoints: []string{"https://one-etcd-instance:2379"},
 					},
 				},
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
-				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta1
-	certificatesDir: ""
-	controlPlaneEndpoint: ""
+	apiVersion: ` + kubeadmapiv1.SchemeGroupVersion.String() + `
 	controllerManager: {}
-	dns:
-	  type: CoreDNS
+	dns: {}
 	etcd:
 	  external:
 	    caFile: ""
@@ -96,27 +128,26 @@ func TestPrintConfiguration(t *testing.T) {
 	    endpoints:
 	    - https://one-etcd-instance:2379
 	    keyFile: ""
-	imageRepository: ""
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
 	networking:
-	  dnsDomain: ""
-	  podSubnet: ""
 	  serviceSubnet: 10.96.0.1/12
 	scheduler: {}
 `),
 		},
 	}
 	for _, rt := range tests {
-		rt.buf = bytes.NewBufferString("")
-		printConfiguration(rt.cfg, rt.buf)
-		actualBytes := rt.buf.Bytes()
-		if !bytes.Equal(actualBytes, rt.expectedBytes) {
-			t.Errorf(
-				"failed PrintConfiguration:\n\texpected: %q\n\t  actual: %q",
-				string(rt.expectedBytes),
-				string(actualBytes),
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			rt.buf = bytes.NewBufferString("")
+			printConfiguration(rt.cfg, rt.buf, &output.TextPrinter{})
+			actualBytes := rt.buf.Bytes()
+			if !bytes.Equal(actualBytes, rt.expectedBytes) {
+				t.Errorf(
+					"failed PrintConfiguration:\n\texpected: %q\n\t  actual: %q",
+					string(rt.expectedBytes),
+					string(actualBytes),
+				)
+			}
+		})
 	}
 }

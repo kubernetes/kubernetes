@@ -2,18 +2,24 @@ package aws
 
 import (
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go/internal/sdkio"
 )
 
-// ReadSeekCloser wraps a io.Reader returning a ReaderSeekerCloser. Should
-// only be used with an io.Reader that is also an io.Seeker. Doing so may
-// cause request signature errors, or request body's not sent for GET, HEAD
-// and DELETE HTTP methods.
+// ReadSeekCloser wraps a io.Reader returning a ReaderSeekerCloser. Allows the
+// SDK to accept an io.Reader that is not also an io.Seeker for unsigned
+// streaming payload API operations.
 //
-// Deprecated: Should only be used with io.ReadSeeker. If using for
-// S3 PutObject to stream content use s3manager.Uploader instead.
+// A ReadSeekCloser wrapping an nonseekable io.Reader used in an API
+// operation's input will prevent that operation being retried in the case of
+// network errors, and cause operation requests to fail if the operation
+// requires payload signing.
+//
+// Note: If using With S3 PutObject to stream an object upload The SDK's S3
+// Upload manager (s3manager.Uploader) provides support for streaming with the
+// ability to retry network errors.
 func ReadSeekCloser(r io.Reader) ReaderSeekerCloser {
 	return ReaderSeekerCloser{r}
 }
@@ -43,7 +49,8 @@ func IsReaderSeekable(r io.Reader) bool {
 // Read reads from the reader up to size of p. The number of bytes read, and
 // error if it occurred will be returned.
 //
-// If the reader is not an io.Reader zero bytes read, and nil error will be returned.
+// If the reader is not an io.Reader zero bytes read, and nil error will be
+// returned.
 //
 // Performs the same functionality as io.Reader Read
 func (r ReaderSeekerCloser) Read(p []byte) (int, error) {
@@ -198,4 +205,60 @@ func (b *WriteAtBuffer) Bytes() []byte {
 	b.m.Lock()
 	defer b.m.Unlock()
 	return b.buf
+}
+
+// MultiCloser is a utility to close multiple io.Closers within a single
+// statement.
+type MultiCloser []io.Closer
+
+// Close closes all of the io.Closers making up the MultiClosers. Any
+// errors that occur while closing will be returned in the order they
+// occur.
+func (m MultiCloser) Close() error {
+	var errs errors
+	for _, c := range m {
+		err := c.Close()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) != 0 {
+		return errs
+	}
+
+	return nil
+}
+
+type errors []error
+
+func (es errors) Error() string {
+	var parts []string
+	for _, e := range es {
+		parts = append(parts, e.Error())
+	}
+
+	return strings.Join(parts, "\n")
+}
+
+// CopySeekableBody copies the seekable body to an io.Writer
+func CopySeekableBody(dst io.Writer, src io.ReadSeeker) (int64, error) {
+	curPos, err := src.Seek(0, sdkio.SeekCurrent)
+	if err != nil {
+		return 0, err
+	}
+
+	// copy errors may be assumed to be from the body.
+	n, err := io.Copy(dst, src)
+	if err != nil {
+		return n, err
+	}
+
+	// seek back to the first position after reading to reset
+	// the body for transmission.
+	_, err = src.Seek(curPos, sdkio.SeekStart)
+	if err != nil {
+		return n, err
+	}
+
+	return n, nil
 }

@@ -1,0 +1,2 @@
+linux/amd64=docker.io/gluster/glusterdynamic-provisioner:v1.3
+linux/arm64=docker.io/gluster/glusterdynamic-provisioner-arm64:v1.3

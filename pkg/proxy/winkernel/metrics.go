@@ -18,33 +18,22 @@ package winkernel
 
 import (
 	"sync"
-	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-)
-
-const kubeProxySubsystem = "kubeproxy"
-
-var (
-	SyncProxyRulesLatency = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: kubeProxySubsystem,
-			Name:      "sync_proxy_rules_latency_microseconds",
-			Help:      "SyncProxyRules latency",
-			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
-		},
-	)
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 )
 
 var registerMetricsOnce sync.Once
 
+// RegisterMetrics registers kube-proxy metrics for Windows modes.
 func RegisterMetrics() {
 	registerMetricsOnce.Do(func() {
-		prometheus.MustRegister(SyncProxyRulesLatency)
+		legacyregistry.MustRegister(metrics.SyncProxyRulesLatency)
+		legacyregistry.MustRegister(metrics.SyncProxyRulesLastTimestamp)
+		legacyregistry.MustRegister(metrics.EndpointChangesPending)
+		legacyregistry.MustRegister(metrics.EndpointChangesTotal)
+		legacyregistry.MustRegister(metrics.ServiceChangesPending)
+		legacyregistry.MustRegister(metrics.ServiceChangesTotal)
+		legacyregistry.MustRegister(metrics.SyncProxyRulesLastQueuedTimestamp)
 	})
-}
-
-// Gets the time since the specified start in microseconds.
-func sinceInMicroseconds(start time.Time) float64 {
-	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
 }

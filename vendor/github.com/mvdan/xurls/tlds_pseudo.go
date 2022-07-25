@@ -1,3 +1,6 @@
+// Copyright (c) 2015, Daniel Martí <mvdan@mvdan.cc>
+// See LICENSE for licensing information
+
 package xurls
 
 // PseudoTLDs is a sorted list of some widely used unofficial TLDs.
@@ -16,7 +19,6 @@ var PseudoTLDs = []string{
 	`invalid`,   // Invalid domain
 	`local`,     // Local network
 	`localhost`, // Local network
-	`onion`,     // Tor hidden services
 	`test`,      // Test domain
 	`zkey`,      // GNS domain name
 }

@@ -1,1 +1,4 @@
 logrus
+vendor
+
+.idea/

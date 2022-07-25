@@ -42,5 +42,5 @@ so option 1 is a good choice.
 Unless specified by the `-domain` argument, `peer-finder` will determine the FQDN of the pod by examining the
 `/etc/resolv.conf` file, looking for a `search` line and looking for the best match.
 
-If your pod is not using the default `dnsPolicy` value which is `ClusterFirst` as the DNS policy, you may need 
+If your pod is not using the default `dnsPolicy` value which is `ClusterFirst` as the DNS policy, you may need
 to provide the `-domain` argument.  In most common configurations, `-domain=cluster.local` will be the correct setting.

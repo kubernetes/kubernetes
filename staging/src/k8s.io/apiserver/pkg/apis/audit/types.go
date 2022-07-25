@@ -17,6 +17,7 @@ limitations under the License.
 package audit
 
 import (
+	authnv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -61,15 +62,15 @@ type Stage string
 const (
 	// The stage for events generated as soon as the audit handler receives the request, and before it
 	// is delegated down the handler chain.
-	StageRequestReceived = "RequestReceived"
+	StageRequestReceived Stage = "RequestReceived"
 	// The stage for events generated once the response headers are sent, but before the response body
 	// is sent. This stage is only generated for long-running requests (e.g. watch).
-	StageResponseStarted = "ResponseStarted"
+	StageResponseStarted Stage = "ResponseStarted"
 	// The stage for events generated once the response body has been completed, and no more bytes
 	// will be sent.
-	StageResponseComplete = "ResponseComplete"
+	StageResponseComplete Stage = "ResponseComplete"
 	// The stage for events generated when a panic occurred.
-	StagePanic = "Panic"
+	StagePanic Stage = "Panic"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -92,11 +93,17 @@ type Event struct {
 	// For non-resource requests, this is the lower-cased HTTP method.
 	Verb string
 	// Authenticated user information.
-	User UserInfo
+	User authnv1.UserInfo
 	// Impersonated user information.
 	// +optional
-	ImpersonatedUser *UserInfo
+	ImpersonatedUser *authnv1.UserInfo
 	// Source IPs, from where the request originated and intermediate proxies.
+	// The source IPs are listed from (in order):
+	// 1. X-Forwarded-For request header IPs
+	// 2. X-Real-Ip header, if not present in the X-Forwarded-For list
+	// 3. The remote address for the connection, if it doesn't match the last
+	//    IP in the list up to here (X-Forwarded-For or X-Real-Ip).
+	// Note: All but the last IP can be arbitrarily set by the client.
 	// +optional
 	SourceIPs []string
 	// UserAgent records the user agent string reported by the client.
@@ -171,6 +178,15 @@ type Policy struct {
 	// be specified per rule in which case the union of both are omitted.
 	// +optional
 	OmitStages []Stage
+
+	// OmitManagedFields indicates whether to omit the managed fields of the request
+	// and response bodies from being written to the API audit log.
+	// This is used as a global default - a value of 'true' will omit the managed fileds,
+	// otherwise the managed fields will be included in the API audit log.
+	// Note that this can also be specified per rule in which case the value specified
+	// in a rule will override the global default.
+	// +optional
+	OmitManagedFields bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -231,6 +247,17 @@ type PolicyRule struct {
 	// An empty list means no restrictions will apply.
 	// +optional
 	OmitStages []Stage
+
+	// OmitManagedFields indicates whether to omit the managed fields of the request
+	// and response bodies from being written to the API audit log.
+	// - a value of 'true' will drop the managed fields from the API audit log
+	// - a value of 'false' indicates that the managed fileds should be included
+	//   in the API audit log
+	// Note that the value, if specified, in this rule will override the global default
+	// If a value is not specified then the global default specified in
+	// Policy.OmitManagedFields will stand.
+	// +optional
+	OmitManagedFields *bool
 }
 
 // GroupResources represents resource kinds in an API group.
@@ -283,21 +310,3 @@ type ObjectReference struct {
 	// +optional
 	Subresource string
 }
-
-// UserInfo holds the information about the user needed to implement the
-// user.Info interface.
-type UserInfo struct {
-	// The name that uniquely identifies this user among all active users.
-	Username string
-	// A unique value that identifies this user across time. If this user is
-	// deleted and another user by the same name is added, they will have
-	// different UIDs.
-	UID string
-	// The names of groups this user is a part of.
-	Groups []string
-	// Any additional information provided by the authenticator.
-	Extra map[string]ExtraValue
-}
-
-// ExtraValue masks the value so protobuf can generate
-type ExtraValue []string

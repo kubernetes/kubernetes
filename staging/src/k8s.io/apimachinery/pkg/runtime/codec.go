@@ -19,13 +19,17 @@ package runtime
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/conversion/queryparams"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2"
 )
 
 // codec binds an encoder and decoder.
@@ -100,8 +104,17 @@ type NoopEncoder struct {
 
 var _ Serializer = NoopEncoder{}
 
+const noopEncoderIdentifier Identifier = "noop"
+
 func (n NoopEncoder) Encode(obj Object, w io.Writer) error {
+	// There is no need to handle runtime.CacheableObject, as we don't
+	// process the obj at all.
 	return fmt.Errorf("encoding is not allowed for this codec: %v", reflect.TypeOf(n.Decoder))
+}
+
+// Identifier implements runtime.Encoder interface.
+func (n NoopEncoder) Identifier() Identifier {
+	return noopEncoderIdentifier
 }
 
 // NoopDecoder converts an Encoder to a Serializer or Codec for code that expects them but only uses encoding.
@@ -193,17 +206,49 @@ func (c *parameterCodec) EncodeParameters(obj Object, to schema.GroupVersion) (u
 type base64Serializer struct {
 	Encoder
 	Decoder
+
+	identifier Identifier
 }
 
 func NewBase64Serializer(e Encoder, d Decoder) Serializer {
-	return &base64Serializer{e, d}
+	return &base64Serializer{
+		Encoder:    e,
+		Decoder:    d,
+		identifier: identifier(e),
+	}
+}
+
+func identifier(e Encoder) Identifier {
+	result := map[string]string{
+		"name": "base64",
+	}
+	if e != nil {
+		result["encoder"] = string(e.Identifier())
+	}
+	identifier, err := json.Marshal(result)
+	if err != nil {
+		klog.Fatalf("Failed marshaling identifier for base64Serializer: %v", err)
+	}
+	return Identifier(identifier)
 }
 
 func (s base64Serializer) Encode(obj Object, stream io.Writer) error {
+	if co, ok := obj.(CacheableObject); ok {
+		return co.CacheEncode(s.Identifier(), s.doEncode, stream)
+	}
+	return s.doEncode(obj, stream)
+}
+
+func (s base64Serializer) doEncode(obj Object, stream io.Writer) error {
 	e := base64.NewEncoder(base64.StdEncoding, stream)
 	err := s.Encoder.Encode(obj, e)
 	e.Close()
 	return err
+}
+
+// Identifier implements runtime.Encoder interface.
+func (s base64Serializer) Identifier() Identifier {
+	return s.identifier
 }
 
 func (s base64Serializer) Decode(data []byte, defaults *schema.GroupVersionKind, into Object) (Object, *schema.GroupVersionKind, error) {
@@ -238,6 +283,11 @@ var (
 	DisabledGroupVersioner GroupVersioner = disabledGroupVersioner{}
 )
 
+const (
+	internalGroupVersionerIdentifier = "internal"
+	disabledGroupVersionerIdentifier = "disabled"
+)
+
 type internalGroupVersioner struct{}
 
 // KindForGroupVersionKinds returns an internal Kind if one is found, or converts the first provided kind to the internal version.
@@ -253,6 +303,11 @@ func (internalGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersi
 	return schema.GroupVersionKind{}, false
 }
 
+// Identifier implements GroupVersioner interface.
+func (internalGroupVersioner) Identifier() string {
+	return internalGroupVersionerIdentifier
+}
+
 type disabledGroupVersioner struct{}
 
 // KindForGroupVersionKinds returns false for any input.
@@ -260,19 +315,9 @@ func (disabledGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersi
 	return schema.GroupVersionKind{}, false
 }
 
-// GroupVersioners implements GroupVersioner and resolves to the first exact match for any kind.
-type GroupVersioners []GroupVersioner
-
-// KindForGroupVersionKinds returns the first match of any of the group versioners, or false if no match occurred.
-func (gvs GroupVersioners) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
-	for _, gv := range gvs {
-		target, ok := gv.KindForGroupVersionKinds(kinds)
-		if !ok {
-			continue
-		}
-		return target, true
-	}
-	return schema.GroupVersionKind{}, false
+// Identifier implements GroupVersioner interface.
+func (disabledGroupVersioner) Identifier() string {
+	return disabledGroupVersionerIdentifier
 }
 
 // Assert that schema.GroupVersion and GroupVersions implement GroupVersioner
@@ -283,6 +328,7 @@ var _ GroupVersioner = multiGroupVersioner{}
 type multiGroupVersioner struct {
 	target             schema.GroupVersion
 	acceptedGroupKinds []schema.GroupKind
+	coerce             bool
 }
 
 // NewMultiGroupVersioner returns the provided group version for any kind that matches one of the provided group kinds.
@@ -292,6 +338,22 @@ func NewMultiGroupVersioner(gv schema.GroupVersion, groupKinds ...schema.GroupKi
 		return gv
 	}
 	return multiGroupVersioner{target: gv, acceptedGroupKinds: groupKinds}
+}
+
+// NewCoercingMultiGroupVersioner returns the provided group version for any incoming kind.
+// Incoming kinds that match the provided groupKinds are preferred.
+// Kind may be empty in the provided group kind, in which case any kind will match.
+// Examples:
+//   gv=mygroup/__internal, groupKinds=mygroup/Foo, anothergroup/Bar
+//   KindForGroupVersionKinds(yetanother/v1/Baz, anothergroup/v1/Bar) -> mygroup/__internal/Bar (matched preferred group/kind)
+//
+//   gv=mygroup/__internal, groupKinds=mygroup, anothergroup
+//   KindForGroupVersionKinds(yetanother/v1/Baz, anothergroup/v1/Bar) -> mygroup/__internal/Bar (matched preferred group)
+//
+//   gv=mygroup/__internal, groupKinds=mygroup, anothergroup
+//   KindForGroupVersionKinds(yetanother/v1/Baz, yetanother/v1/Bar) -> mygroup/__internal/Baz (no preferred group/kind match, uses first kind in list)
+func NewCoercingMultiGroupVersioner(gv schema.GroupVersion, groupKinds ...schema.GroupKind) GroupVersioner {
+	return multiGroupVersioner{target: gv, acceptedGroupKinds: groupKinds, coerce: true}
 }
 
 // KindForGroupVersionKinds returns the target group version if any kind matches any of the original group kinds. It will
@@ -308,5 +370,27 @@ func (v multiGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersio
 			return v.target.WithKind(src.Kind), true
 		}
 	}
+	if v.coerce && len(kinds) > 0 {
+		return v.target.WithKind(kinds[0].Kind), true
+	}
 	return schema.GroupVersionKind{}, false
+}
+
+// Identifier implements GroupVersioner interface.
+func (v multiGroupVersioner) Identifier() string {
+	groupKinds := make([]string, 0, len(v.acceptedGroupKinds))
+	for _, gk := range v.acceptedGroupKinds {
+		groupKinds = append(groupKinds, gk.String())
+	}
+	result := map[string]string{
+		"name":     "multi",
+		"target":   v.target.String(),
+		"accepted": strings.Join(groupKinds, ","),
+		"coerce":   strconv.FormatBool(v.coerce),
+	}
+	identifier, err := json.Marshal(result)
+	if err != nil {
+		klog.Fatalf("Failed marshaling Identifier for %#v: %v", v, err)
+	}
+	return string(identifier)
 }

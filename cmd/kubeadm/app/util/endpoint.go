@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
 	"net"
 	"net/url"
 	"strconv"
@@ -25,58 +24,59 @@ import (
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-// GetMasterEndpoint returns a properly formatted endpoint for the control plane built according following rules:
-// - If the ControlPlaneEndpoint is defined, use it.
-// - if the ControlPlaneEndpoint is defined but without a port number, use the ControlPlaneEndpoint + api.BindPort is used.
-// - Otherwise, in case the ControlPlaneEndpoint is not defined, use the api.AdvertiseAddress + the api.BindPort.
-func GetMasterEndpoint(cfg *kubeadmapi.InitConfiguration) (string, error) {
-	// parse the bind port
-	bindPortString := strconv.Itoa(int(cfg.LocalAPIEndpoint.BindPort))
-	if _, err := ParsePort(bindPortString); err != nil {
-		return "", errors.Wrapf(err, "invalid value %q given for api.bindPort", cfg.LocalAPIEndpoint.BindPort)
-	}
-
-	// parse the AdvertiseAddress
-	var ip = net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress)
-	if ip == nil {
-		return "", errors.Errorf("invalid value `%s` given for api.advertiseAddress", cfg.LocalAPIEndpoint.AdvertiseAddress)
-	}
-
-	// set the master url using cfg.API.AdvertiseAddress + the cfg.API.BindPort
-	masterURL := &url.URL{
-		Scheme: "https",
-		Host:   net.JoinHostPort(ip.String(), bindPortString),
+// GetControlPlaneEndpoint returns a properly formatted endpoint for the control plane built according following rules:
+// - If the controlPlaneEndpoint is defined, use it.
+// - if the controlPlaneEndpoint is defined but without a port number, use the controlPlaneEndpoint + localEndpoint.BindPort is used.
+// - Otherwise, in case the controlPlaneEndpoint is not defined, use the localEndpoint.AdvertiseAddress + the localEndpoint.BindPort.
+func GetControlPlaneEndpoint(controlPlaneEndpoint string, localEndpoint *kubeadmapi.APIEndpoint) (string, error) {
+	// get the URL of the local endpoint
+	localAPIEndpoint, err := GetLocalAPIEndpoint(localEndpoint)
+	if err != nil {
+		return "", err
 	}
 
 	// if the controlplane endpoint is defined
-	if len(cfg.ControlPlaneEndpoint) > 0 {
+	if len(controlPlaneEndpoint) > 0 {
 		// parse the controlplane endpoint
 		var host, port string
 		var err error
-		if host, port, err = ParseHostPort(cfg.ControlPlaneEndpoint); err != nil {
-			return "", errors.Wrapf(err, "invalid value %q given for controlPlaneEndpoint", cfg.ControlPlaneEndpoint)
+		if host, port, err = ParseHostPort(controlPlaneEndpoint); err != nil {
+			return "", errors.Wrapf(err, "invalid value %q given for controlPlaneEndpoint", controlPlaneEndpoint)
 		}
 
 		// if a port is provided within the controlPlaneAddress warn the users we are using it, else use the bindport
+		localEndpointPort := strconv.Itoa(int(localEndpoint.BindPort))
 		if port != "" {
-			if port != bindPortString {
-				fmt.Println("[endpoint] WARNING: port specified in controlPlaneEndpoint overrides bindPort in the controlplane address")
+			if port != localEndpointPort {
+				klog.Warning("[endpoint] WARNING: port specified in controlPlaneEndpoint overrides bindPort in the controlplane address")
 			}
 		} else {
-			port = bindPortString
+			port = localEndpointPort
 		}
 
-		// overrides the master url using the controlPlaneAddress (and eventually the bindport)
-		masterURL = &url.URL{
-			Scheme: "https",
-			Host:   net.JoinHostPort(host, port),
-		}
+		// overrides the control-plane url using the controlPlaneAddress (and eventually the bindport)
+		return formatURL(host, port).String(), nil
 	}
 
-	return masterURL.String(), nil
+	return localAPIEndpoint, nil
+}
+
+// GetLocalAPIEndpoint parses an APIEndpoint and returns it as a string,
+// or returns and error in case it cannot be parsed.
+func GetLocalAPIEndpoint(localEndpoint *kubeadmapi.APIEndpoint) (string, error) {
+	// get the URL of the local endpoint
+	localEndpointIP, localEndpointPort, err := parseAPIEndpoint(localEndpoint)
+	if err != nil {
+		return "", err
+	}
+	url := formatURL(localEndpointIP.String(), localEndpointPort)
+	return url.String(), nil
 }
 
 // ParseHostPort parses a network address of the form "host:port", "ipv4:port", "[ipv6]:port" into host and port;
@@ -95,12 +95,12 @@ func ParseHostPort(hostport string) (string, string, error) {
 	// if port is defined, parse and validate it
 	if port != "" {
 		if _, err := ParsePort(port); err != nil {
-			return "", "", errors.New("port must be a valid number between 1 and 65535, inclusive")
+			return "", "", errors.Errorf("hostport %s: port %s must be a valid number between 1 and 65535, inclusive", hostport, port)
 		}
 	}
 
 	// if host is a valid IP, returns it
-	if ip := net.ParseIP(host); ip != nil {
+	if ip := netutils.ParseIPSloppy(host); ip != nil {
 		return host, port, nil
 	}
 
@@ -109,16 +109,42 @@ func ParseHostPort(hostport string) (string, string, error) {
 		return host, port, nil
 	}
 
-	return "", "", errors.New("host must be a valid IP address or a valid RFC-1123 DNS subdomain")
+	return "", "", errors.Errorf("hostport %s: host '%s' must be a valid IP address or a valid RFC-1123 DNS subdomain", hostport, host)
 }
 
 // ParsePort parses a string representing a TCP port.
 // If the string is not a valid representation of a TCP port, ParsePort returns an error.
 func ParsePort(port string) (int, error) {
-	portInt, err := strconv.Atoi(port)
+	portInt, err := netutils.ParsePort(port, true)
 	if err == nil && (1 <= portInt && portInt <= 65535) {
 		return portInt, nil
 	}
 
 	return 0, errors.New("port must be a valid number between 1 and 65535, inclusive")
+}
+
+// parseAPIEndpoint parses an APIEndpoint and returns the AdvertiseAddress as net.IP and the BindPort as string.
+// If the BindPort or AdvertiseAddress are invalid it returns an error.
+func parseAPIEndpoint(localEndpoint *kubeadmapi.APIEndpoint) (net.IP, string, error) {
+	// parse the bind port
+	bindPortString := strconv.Itoa(int(localEndpoint.BindPort))
+	if _, err := ParsePort(bindPortString); err != nil {
+		return nil, "", errors.Wrapf(err, "invalid value %q given for api.bindPort", localEndpoint.BindPort)
+	}
+
+	// parse the AdvertiseAddress
+	var ip = netutils.ParseIPSloppy(localEndpoint.AdvertiseAddress)
+	if ip == nil {
+		return nil, "", errors.Errorf("invalid value `%s` given for api.advertiseAddress", localEndpoint.AdvertiseAddress)
+	}
+
+	return ip, bindPortString, nil
+}
+
+// formatURL takes a host and a port string and creates a net.URL using https scheme
+func formatURL(host, port string) *url.URL {
+	return &url.URL{
+		Scheme: "https",
+		Host:   net.JoinHostPort(host, port),
+	}
 }

@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -27,7 +28,6 @@ import (
 	// ensure libs have a chance to globally register their flags
 	_ "github.com/google/cadvisor/container/common"
 	_ "github.com/google/cadvisor/container/containerd"
-	_ "github.com/google/cadvisor/container/docker"
 	_ "github.com/google/cadvisor/container/raw"
 	_ "github.com/google/cadvisor/machine"
 	_ "github.com/google/cadvisor/manager"
@@ -40,9 +40,6 @@ func addCadvisorFlags(fs *pflag.FlagSet) {
 	global := flag.CommandLine
 	local := pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
 
-	// These flags were also implicit from cadvisor, but are actually used by something in the core repo:
-	// TODO(mtaufen): This one is stil used by our salt, but for heaven's sake it's even deprecated in cadvisor
-	register(global, local, "docker_root")
 	// e2e node tests rely on this
 	register(global, local, "housekeeping_interval")
 
@@ -53,13 +50,6 @@ func addCadvisorFlags(fs *pflag.FlagSet) {
 	registerDeprecated(global, local, "boot_id_file", deprecated)
 	registerDeprecated(global, local, "container_hints", deprecated)
 	registerDeprecated(global, local, "containerd", deprecated)
-	registerDeprecated(global, local, "docker", deprecated)
-	registerDeprecated(global, local, "docker_env_metadata_whitelist", deprecated)
-	registerDeprecated(global, local, "docker_only", deprecated)
-	registerDeprecated(global, local, "docker-tls", deprecated)
-	registerDeprecated(global, local, "docker-tls-ca", deprecated)
-	registerDeprecated(global, local, "docker-tls-cert", deprecated)
-	registerDeprecated(global, local, "docker-tls-key", deprecated)
 	registerDeprecated(global, local, "enable_load_reader", deprecated)
 	registerDeprecated(global, local, "event_storage_age_limit", deprecated)
 	registerDeprecated(global, local, "event_storage_event_limit", deprecated)
@@ -73,6 +63,7 @@ func addCadvisorFlags(fs *pflag.FlagSet) {
 	registerDeprecated(global, local, "storage_driver_table", deprecated)
 	registerDeprecated(global, local, "storage_driver_secure", deprecated)
 	registerDeprecated(global, local, "storage_driver_buffer_duration", deprecated)
+	registerDeprecated(global, local, "containerd-namespace", deprecated)
 
 	// finally, add cadvisor flags to the provided flagset
 	fs.AddFlagSet(local)

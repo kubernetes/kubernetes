@@ -17,6 +17,7 @@ limitations under the License.
 package proxy
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -84,6 +85,7 @@ func (fakeConn) SetWriteDeadline(t time.Time) error { return nil }
 
 type SimpleBackendHandler struct {
 	requestURL     url.URL
+	requestHost    string
 	requestHeader  http.Header
 	requestBody    []byte
 	requestMethod  string
@@ -94,6 +96,7 @@ type SimpleBackendHandler struct {
 
 func (s *SimpleBackendHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.requestURL = *req.URL
+	s.requestHost = req.Host
 	s.requestHeader = req.Header
 	s.requestMethod = req.Method
 	var err error
@@ -160,7 +163,9 @@ func TestServeHTTP(t *testing.T) {
 		expectedRespHeader    map[string]string
 		notExpectedRespHeader []string
 		upgradeRequired       bool
+		appendLocationPath    bool
 		expectError           func(err error) bool
+		useLocationHost       bool
 	}{
 		{
 			name:         "root path, simple get",
@@ -221,6 +226,48 @@ func TestServeHTTP(t *testing.T) {
 				"Access-Control-Allow-Methods",
 			},
 		},
+		{
+			name:            "use location host",
+			method:          "GET",
+			requestPath:     "/some/path",
+			expectedPath:    "/some/path",
+			useLocationHost: true,
+		},
+		{
+			name:            "use location host - invalid upgrade",
+			method:          "GET",
+			upgradeRequired: true,
+			requestHeader: map[string]string{
+				httpstream.HeaderConnection: httpstream.HeaderUpgrade,
+			},
+			expectError: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "invalid upgrade response: status code 200")
+			},
+			requestPath:     "/some/path",
+			expectedPath:    "/some/path",
+			useLocationHost: true,
+		},
+		{
+			name:               "append server path to request path",
+			method:             "GET",
+			requestPath:        "/base",
+			expectedPath:       "/base/base",
+			appendLocationPath: true,
+		},
+		{
+			name:               "append server path to request path with ending slash",
+			method:             "GET",
+			requestPath:        "/base/",
+			expectedPath:       "/base/base/",
+			appendLocationPath: true,
+		},
+		{
+			name:               "don't append server path to request path",
+			method:             "GET",
+			requestPath:        "/base",
+			expectedPath:       "/base",
+			appendLocationPath: false,
+		},
 	}
 
 	for i, test := range tests {
@@ -243,6 +290,8 @@ func TestServeHTTP(t *testing.T) {
 			backendURL, _ := url.Parse(backendServer.URL)
 			backendURL.Path = test.requestPath
 			proxyHandler := NewUpgradeAwareHandler(backendURL, nil, false, test.upgradeRequired, responder)
+			proxyHandler.UseLocationHost = test.useLocationHost
+			proxyHandler.AppendLocationPath = test.appendLocationPath
 			proxyServer := httptest.NewServer(proxyHandler)
 			defer proxyServer.Close()
 			proxyURL, _ := url.Parse(proxyServer.URL)
@@ -271,6 +320,13 @@ func TestServeHTTP(t *testing.T) {
 			res, err := client.Do(req)
 			if err != nil {
 				t.Errorf("Error from proxy request: %v", err)
+			}
+
+			// Host
+			if test.useLocationHost && backendHandler.requestHost != backendURL.Host {
+				t.Errorf("Unexpected request host: %s", backendHandler.requestHost)
+			} else if !test.useLocationHost && backendHandler.requestHost == backendURL.Host {
+				t.Errorf("Unexpected request host: %s", backendHandler.requestHost)
 			}
 
 			if test.expectError != nil {
@@ -354,6 +410,25 @@ func TestProxyUpgrade(t *testing.T) {
 			ServerFunc:     httptest.NewServer,
 			ProxyTransport: nil,
 		},
+		"both client and server support http2, but force to http/1.1 for upgrade": {
+			ServerFunc: func(h http.Handler) *httptest.Server {
+				cert, err := tls.X509KeyPair(exampleCert, exampleKey)
+				if err != nil {
+					t.Errorf("https (invalid hostname): proxy_test: %v", err)
+				}
+				ts := httptest.NewUnstartedServer(h)
+				ts.TLS = &tls.Config{
+					Certificates: []tls.Certificate{cert},
+					NextProtos:   []string{"http2", "http/1.1"},
+				}
+				ts.StartTLS()
+				return ts
+			},
+			ProxyTransport: utilnet.SetTransportDefaults(&http.Transport{TLSClientConfig: &tls.Config{
+				NextProtos:         []string{"http2", "http/1.1"},
+				InsecureSkipVerify: true,
+			}}),
+		},
 		"https (invalid hostname + InsecureSkipVerify)": {
 			ServerFunc: func(h http.Handler) *httptest.Server {
 				cert, err := tls.X509KeyPair(exampleCert, exampleKey)
@@ -426,61 +501,54 @@ func TestProxyUpgrade(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		for _, redirect := range []bool{false, true} {
-			tcName := k
-			backendPath := "/hello"
-			if redirect {
-				tcName += " with redirect"
-				backendPath = "/redirect"
-			}
-			func() { // Cleanup after each test case.
-				backend := http.NewServeMux()
-				backend.Handle("/hello", websocket.Handler(func(ws *websocket.Conn) {
-					if ws.Request().Header.Get("Authorization") != tc.ExpectedAuth {
-						t.Errorf("%s: unexpected headers on request: %v", k, ws.Request().Header)
-						defer ws.Close()
-						ws.Write([]byte("you failed"))
-						return
-					}
+		tcName := k
+		backendPath := "/hello"
+		func() { // Cleanup after each test case.
+			backend := http.NewServeMux()
+			backend.Handle("/hello", websocket.Handler(func(ws *websocket.Conn) {
+				if ws.Request().Header.Get("Authorization") != tc.ExpectedAuth {
+					t.Errorf("%s: unexpected headers on request: %v", k, ws.Request().Header)
 					defer ws.Close()
-					body := make([]byte, 5)
-					ws.Read(body)
-					ws.Write([]byte("hello " + string(body)))
-				}))
-				backend.Handle("/redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					http.Redirect(w, r, "/hello", http.StatusFound)
-				}))
-				backendServer := tc.ServerFunc(backend)
-				defer backendServer.Close()
-
-				serverURL, _ := url.Parse(backendServer.URL)
-				serverURL.Path = backendPath
-				proxyHandler := NewUpgradeAwareHandler(serverURL, tc.ProxyTransport, false, false, &noErrorsAllowed{t: t})
-				proxyHandler.UpgradeTransport = tc.UpgradeTransport
-				proxyHandler.InterceptRedirects = redirect
-				proxy := httptest.NewServer(proxyHandler)
-				defer proxy.Close()
-
-				ws, err := websocket.Dial("ws://"+proxy.Listener.Addr().String()+"/some/path", "", "http://127.0.0.1/")
-				if err != nil {
-					t.Fatalf("%s: websocket dial err: %s", tcName, err)
+					ws.Write([]byte("you failed"))
+					return
 				}
 				defer ws.Close()
+				body := make([]byte, 5)
+				ws.Read(body)
+				ws.Write([]byte("hello " + string(body)))
+			}))
+			backend.Handle("/redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "/hello", http.StatusFound)
+			}))
+			backendServer := tc.ServerFunc(backend)
+			defer backendServer.Close()
 
-				if _, err := ws.Write([]byte("world")); err != nil {
-					t.Fatalf("%s: write err: %s", tcName, err)
-				}
+			serverURL, _ := url.Parse(backendServer.URL)
+			serverURL.Path = backendPath
+			proxyHandler := NewUpgradeAwareHandler(serverURL, tc.ProxyTransport, false, false, &noErrorsAllowed{t: t})
+			proxyHandler.UpgradeTransport = tc.UpgradeTransport
+			proxy := httptest.NewServer(proxyHandler)
+			defer proxy.Close()
 
-				response := make([]byte, 20)
-				n, err := ws.Read(response)
-				if err != nil {
-					t.Fatalf("%s: read err: %s", tcName, err)
-				}
-				if e, a := "hello world", string(response[0:n]); e != a {
-					t.Fatalf("%s: expected '%#v', got '%#v'", tcName, e, a)
-				}
-			}()
-		}
+			ws, err := websocket.Dial("ws://"+proxy.Listener.Addr().String()+"/some/path", "", "http://127.0.0.1/")
+			if err != nil {
+				t.Fatalf("%s: websocket dial err: %s", tcName, err)
+			}
+			defer ws.Close()
+
+			if _, err := ws.Write([]byte("world")); err != nil {
+				t.Fatalf("%s: write err: %s", tcName, err)
+			}
+
+			response := make([]byte, 20)
+			n, err := ws.Read(response)
+			if err != nil {
+				t.Fatalf("%s: read err: %s", tcName, err)
+			}
+			if e, a := "hello world", string(response[0:n]); e != a {
+				t.Fatalf("%s: expected '%#v', got '%#v'", tcName, e, a)
+			}
+		}()
 	}
 }
 
@@ -492,7 +560,7 @@ func (r *noErrorsAllowed) Error(w http.ResponseWriter, req *http.Request, err er
 	r.t.Error(err)
 }
 
-func TestProxyUpgradeErrorResponse(t *testing.T) {
+func TestProxyUpgradeConnectionErrorResponse(t *testing.T) {
 	var (
 		responder   *fakeResponder
 		expectedErr = errors.New("EXPECTED")
@@ -536,6 +604,104 @@ func TestProxyUpgradeErrorResponse(t *testing.T) {
 	msg, err := ioutil.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Contains(t, string(msg), expectedErr.Error())
+}
+
+func TestProxyUpgradeErrorResponseTerminates(t *testing.T) {
+	for _, code := range []int{400, 500} {
+		t.Run(fmt.Sprintf("code=%v", code), func(t *testing.T) {
+			// Set up a backend server
+			backend := http.NewServeMux()
+			backend.Handle("/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(code)
+				w.Write([]byte(`some data`))
+			}))
+			backend.Handle("/there", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Error("request to /there")
+			}))
+			backendServer := httptest.NewServer(backend)
+			defer backendServer.Close()
+			backendServerURL, _ := url.Parse(backendServer.URL)
+			backendServerURL.Path = "/hello"
+
+			// Set up a proxy pointing to a specific path on the backend
+			proxyHandler := NewUpgradeAwareHandler(backendServerURL, nil, false, false, &noErrorsAllowed{t: t})
+			proxy := httptest.NewServer(proxyHandler)
+			defer proxy.Close()
+			proxyURL, _ := url.Parse(proxy.URL)
+
+			conn, err := net.Dial("tcp", proxyURL.Host)
+			require.NoError(t, err)
+			bufferedReader := bufio.NewReader(conn)
+
+			// Send upgrade request resulting in a non-101 response from the backend
+			req, _ := http.NewRequest("GET", "/", nil)
+			req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
+			require.NoError(t, req.Write(conn))
+			// Verify we get the correct response and full message body content
+			resp, err := http.ReadResponse(bufferedReader, nil)
+			require.NoError(t, err)
+			data, err := ioutil.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.Equal(t, resp.StatusCode, code)
+			require.Equal(t, data, []byte(`some data`))
+			resp.Body.Close()
+
+			// try to read from the connection to verify it was closed
+			b := make([]byte, 1)
+			conn.SetReadDeadline(time.Now().Add(time.Second))
+			if _, err := conn.Read(b); err != io.EOF {
+				t.Errorf("expected EOF, got %v", err)
+			}
+
+			// Send another request to another endpoint to verify it is not received
+			req, _ = http.NewRequest("GET", "/there", nil)
+			req.Write(conn)
+			// wait to ensure the handler does not receive the request
+			time.Sleep(time.Second)
+
+			// clean up
+			conn.Close()
+		})
+	}
+}
+
+func TestProxyUpgradeErrorResponse(t *testing.T) {
+	for _, code := range []int{200, 300, 302, 307} {
+		t.Run(fmt.Sprintf("code=%v", code), func(t *testing.T) {
+			// Set up a backend server
+			backend := http.NewServeMux()
+			backend.Handle("/hello", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "https://example.com/there", code)
+			}))
+			backendServer := httptest.NewServer(backend)
+			defer backendServer.Close()
+			backendServerURL, _ := url.Parse(backendServer.URL)
+			backendServerURL.Path = "/hello"
+
+			// Set up a proxy pointing to a specific path on the backend
+			proxyHandler := NewUpgradeAwareHandler(backendServerURL, nil, false, false, &fakeResponder{t: t})
+			proxy := httptest.NewServer(proxyHandler)
+			defer proxy.Close()
+			proxyURL, _ := url.Parse(proxy.URL)
+
+			conn, err := net.Dial("tcp", proxyURL.Host)
+			require.NoError(t, err)
+			bufferedReader := bufio.NewReader(conn)
+
+			// Send upgrade request resulting in a non-101 response from the backend
+			req, _ := http.NewRequest("GET", "/", nil)
+			req.Header.Set(httpstream.HeaderConnection, httpstream.HeaderUpgrade)
+			require.NoError(t, req.Write(conn))
+			// Verify we get the correct response and full message body content
+			resp, err := http.ReadResponse(bufferedReader, nil)
+			require.NoError(t, err)
+			assert.Equal(t, fakeStatusCode, resp.StatusCode)
+			resp.Body.Close()
+
+			// clean up
+			conn.Close()
+		})
+	}
 }
 
 func TestDefaultProxyTransport(t *testing.T) {
@@ -634,21 +800,6 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 				"Content-Length":    []string{"5"},
 				"Content-Encoding":  nil, // none set
 				"Transfer-Encoding": nil, // none set
-			},
-			expectedBody: sampleData,
-		},
-
-		"content-length + identity transfer-encoding": {
-			reqHeaders: http.Header{
-				"Content-Length":    []string{"5"},
-				"Transfer-Encoding": []string{"identity"},
-			},
-			reqBody: sampleData,
-
-			expectedHeaders: http.Header{
-				"Content-Length":    []string{"5"},
-				"Content-Encoding":  nil, // none set
-				"Transfer-Encoding": nil, // gets removed
 			},
 			expectedBody: sampleData,
 		},
@@ -802,25 +953,211 @@ func TestProxyRequestContentLengthAndTransferEncoding(t *testing.T) {
 	}
 }
 
+func TestFlushIntervalHeaders(t *testing.T) {
+	const expected = "hi"
+	stopCh := make(chan struct{})
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("MyHeader", expected)
+		w.WriteHeader(200)
+		w.(http.Flusher).Flush()
+		<-stopCh
+	}))
+	defer backend.Close()
+	defer close(stopCh)
+
+	backendURL, err := url.Parse(backend.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	responder := &fakeResponder{t: t}
+	proxyHandler := NewUpgradeAwareHandler(backendURL, nil, false, false, responder)
+
+	frontend := httptest.NewServer(proxyHandler)
+	defer frontend.Close()
+
+	req, _ := http.NewRequest("GET", frontend.URL, nil)
+	req.Close = true
+
+	ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
+	defer cancel()
+	req = req.WithContext(ctx)
+
+	res, err := frontend.Client().Do(req)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	defer res.Body.Close()
+
+	if res.Header.Get("MyHeader") != expected {
+		t.Errorf("got header %q; expected %q", res.Header.Get("MyHeader"), expected)
+	}
+}
+
+type fakeRT struct {
+	err error
+}
+
+func (frt *fakeRT) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, frt.err
+}
+
+// TestErrorPropagation checks if the default transport doesn't swallow the errors by providing a fakeResponder that intercepts and stores the error.
+func TestErrorPropagation(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		panic("unreachable")
+	}))
+	defer backend.Close()
+
+	backendURL, err := url.Parse(backend.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	responder := &fakeResponder{t: t}
+	expectedErr := errors.New("nasty error")
+	proxyHandler := NewUpgradeAwareHandler(backendURL, &fakeRT{err: expectedErr}, true, false, responder)
+
+	frontend := httptest.NewServer(proxyHandler)
+	defer frontend.Close()
+
+	req, _ := http.NewRequest("GET", frontend.URL, nil)
+	req.Close = true
+
+	ctx, cancel := context.WithTimeout(req.Context(), 10*time.Second)
+	defer cancel()
+	req = req.WithContext(ctx)
+
+	res, err := frontend.Client().Do(req)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != fakeStatusCode {
+		t.Fatalf("unexpected HTTP status code returned: %v, expected: %v", res.StatusCode, fakeStatusCode)
+	}
+	if !strings.Contains(responder.err.Error(), expectedErr.Error()) {
+		t.Fatalf("responder got unexpected error: %v, expected the error to contain %q", responder.err.Error(), expectedErr.Error())
+	}
+}
+
+func TestProxyRedirectsforRootPath(t *testing.T) {
+
+	tests := []struct {
+		name               string
+		method             string
+		requestPath        string
+		expectedHeader     http.Header
+		expectedStatusCode int
+		redirect           bool
+	}{
+		{
+			name:               "root path, simple get",
+			method:             "GET",
+			requestPath:        "",
+			redirect:           true,
+			expectedStatusCode: 301,
+			expectedHeader: http.Header{
+				"Location": []string{"/"},
+			},
+		},
+		{
+			name:               "root path, simple put",
+			method:             "PUT",
+			requestPath:        "",
+			redirect:           false,
+			expectedStatusCode: 200,
+		},
+		{
+			name:               "root path, simple head",
+			method:             "HEAD",
+			requestPath:        "",
+			redirect:           true,
+			expectedStatusCode: 301,
+			expectedHeader: http.Header{
+				"Location": []string{"/"},
+			},
+		},
+		{
+			name:               "root path, simple delete with params",
+			method:             "DELETE",
+			requestPath:        "",
+			redirect:           false,
+			expectedStatusCode: 200,
+		},
+	}
+
+	for _, test := range tests {
+		func() {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(test.method, test.requestPath, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			redirect := proxyRedirectsforRootPath(test.requestPath, w, req)
+			if got, want := redirect, test.redirect; got != want {
+				t.Errorf("Expected redirect state %v; got %v", want, got)
+			}
+
+			res := w.Result()
+			if got, want := res.StatusCode, test.expectedStatusCode; got != want {
+				t.Errorf("Expected status code %d; got %d", want, got)
+			}
+
+			if res.StatusCode == 301 && !reflect.DeepEqual(res.Header, test.expectedHeader) {
+				t.Errorf("Expected location header to be %v, got %v", test.expectedHeader, res.Header)
+			}
+		}()
+	}
+}
+
 // exampleCert was generated from crypto/tls/generate_cert.go with the following command:
-//    go run generate_cert.go  --rsa-bits 512 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+//    go run generate_cert.go  --rsa-bits 1024 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var exampleCert = []byte(`-----BEGIN CERTIFICATE-----
-MIIBdzCCASGgAwIBAgIRAOVTAdPnfbS5V85mfS90TfIwDQYJKoZIhvcNAQELBQAw
-EjEQMA4GA1UEChMHQWNtZSBDbzAgFw03MDAxMDEwMDAwMDBaGA8yMDg0MDEyOTE2
-MDAwMFowEjEQMA4GA1UEChMHQWNtZSBDbzBcMA0GCSqGSIb3DQEBAQUAA0sAMEgC
-QQCoVSqeu8TBvF+70T7Jm4340YQNhds6IxjRoifenYodAO1dnKGrcbF266DJGunh
-nIjQH7B12tduhl0fLK4Ezf7/AgMBAAGjUDBOMA4GA1UdDwEB/wQEAwICpDATBgNV
-HSUEDDAKBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MBYGA1UdEQQPMA2CC2V4
-YW1wbGUuY29tMA0GCSqGSIb3DQEBCwUAA0EAk1kVa5uZ/AzwYDVcS9bpM/czwjjV
-xq3VeSCfmNa2uNjbFvodmCRwZOHUvipAMGCUCV6j5vMrJ8eMj8tCQ36W9A==
+MIIDADCCAeigAwIBAgIQVHG3Fn9SdWayyLOZKCW1vzANBgkqhkiG9w0BAQsFADAS
+MRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw
+MDAwWjASMRAwDgYDVQQKEwdBY21lIENvMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
+MIIBCgKCAQEArTCu9fiIclNgDdWHphewM+JW55dCb5yYGlJgCBvwbOx547M9p+tn
+zm9QOhsdZDHDZsG9tqnWxE2Nc1HpIJyOlfYsOoonpEoG/Ep6nnK91ngj0bn/JlNy
++i/bwU4r97MOukvnOIQez9/D9jAJaOX2+b8/d4lRz9BsqiwJyg+ynZ5tVVYj7aMi
+vXnd6HOnJmtqutOtr3beucJnkd6XbwRkLUcAYATT+ZihOWRbTuKqhCg6zGkJOoUG
+f8sX61JjoilxiURA//ftGVbdTCU3DrmGmardp5NNOHbumMYU8Vhmqgx1Bqxb+9he
+7G42uW5YWYK/GqJzgVPjjlB2dOGj9KrEWQIDAQABo1AwTjAOBgNVHQ8BAf8EBAMC
+AqQwEwYDVR0lBAwwCgYIKwYBBQUHAwEwDwYDVR0TAQH/BAUwAwEB/zAWBgNVHREE
+DzANggtleGFtcGxlLmNvbTANBgkqhkiG9w0BAQsFAAOCAQEAig4AIi9xWs1+pLES
+eeGGdSDoclplFpcbXANnsYYFyLf+8pcWgVi2bOmb2gXMbHFkB07MA82wRJAUTaA+
+2iNXVQMhPCoA7J6ADUbww9doJX2S9HGyArhiV/MhHtE8txzMn2EKNLdhhk3N9rmV
+x/qRbWAY1U2z4BpdrAR87Fe81Nlj7h45csW9K+eS+NgXipiNTIfEShKgCFM8EdxL
+1WXg7r9AvYV3TNDPWTjLsm1rQzzZQ7Uvcf6deWiNodZd8MOT/BFLclDPTK6cF2Hr
+UU4dq6G4kCwMSxWE4cM3HlZ4u1dyIt47VbkP0rtvkBCXx36y+NXYA5lzntchNFZP
+uvEQdw==
 -----END CERTIFICATE-----`)
 
 var exampleKey = []byte(`-----BEGIN RSA PRIVATE KEY-----
-MIIBOgIBAAJBAKhVKp67xMG8X7vRPsmbjfjRhA2F2zojGNGiJ96dih0A7V2coatx
-sXbroMka6eGciNAfsHXa126GXR8srgTN/v8CAwEAAQJASdzdD7vKsUwMIejGCUb1
-fAnLTPfAY3lFCa+CmR89nE22dAoRDv+5RbnBsZ58BazPNJHrsVPRlfXB3OQmSQr0
-SQIhANoJhs+xOJE/i8nJv0uAbzKyiD1YkvRkta0GpUOULyAVAiEAxaQus3E/SuqD
-P7y5NeJnE7X6XkyC35zrsJRkz7orE8MCIHdDjsI8pjyNDeGqwUCDWE/a6DrmIDwe
-emHSqMN2YvChAiEAnxLCM9NWaenOsaIoP+J1rDuvw+4499nJKVqGuVrSCRkCIEqK
-4KSchPMc3x8M/uhw9oWTtKFmjA/PPh0FsWCdKrEy
+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
 -----END RSA PRIVATE KEY-----`)

@@ -1,8 +1,9 @@
-// +build linux
-
 package libcontainer
 
 import (
+	"fmt"
+	"math"
+
 	"github.com/vishvananda/netlink/nl"
 	"golang.org/x/sys/unix"
 )
@@ -10,16 +11,17 @@ import (
 // list of known message types we want to send to bootstrap program
 // The number is randomly chosen to not conflict with known netlink types
 const (
-	InitMsg         uint16 = 62000
-	CloneFlagsAttr  uint16 = 27281
-	NsPathsAttr     uint16 = 27282
-	UidmapAttr      uint16 = 27283
-	GidmapAttr      uint16 = 27284
-	SetgroupAttr    uint16 = 27285
-	OomScoreAdjAttr uint16 = 27286
-	RootlessAttr    uint16 = 27287
-	UidmapPathAttr  uint16 = 27288
-	GidmapPathAttr  uint16 = 27289
+	InitMsg          uint16 = 62000
+	CloneFlagsAttr   uint16 = 27281
+	NsPathsAttr      uint16 = 27282
+	UidmapAttr       uint16 = 27283
+	GidmapAttr       uint16 = 27284
+	SetgroupAttr     uint16 = 27285
+	OomScoreAdjAttr  uint16 = 27286
+	RootlessEUIDAttr uint16 = 27287
+	UidmapPathAttr   uint16 = 27288
+	GidmapPathAttr   uint16 = 27289
+	MountSourcesAttr uint16 = 27290
 )
 
 type Int32msg struct {
@@ -54,6 +56,12 @@ type Bytemsg struct {
 
 func (msg *Bytemsg) Serialize() []byte {
 	l := msg.Len()
+	if l > math.MaxUint16 {
+		// We cannot return nil nor an error here, so we panic with
+		// a specific type instead, which is handled via recover in
+		// bootstrapData.
+		panic(netlinkError{fmt.Errorf("netlink: cannot serialize bytemsg of length %d (larger than UINT16_MAX)", l)})
+	}
 	buf := make([]byte, (l+unix.NLA_ALIGNTO-1) & ^(unix.NLA_ALIGNTO-1))
 	native := nl.NativeEndian()
 	native.PutUint16(buf[0:2], uint16(l))

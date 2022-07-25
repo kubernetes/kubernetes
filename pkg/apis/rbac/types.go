@@ -25,6 +25,7 @@ import (
 // 2. evaluation of RoleBindings in the namespace requested - short circuit on match
 // 3. deny by default
 
+// APIGroupAll and these consts are default values for rbac authorization.
 const (
 	APIGroupAll    = "*"
 	ResourceAll    = "*"
@@ -42,11 +43,11 @@ const (
 // PolicyRule holds information that describes a policy rule, but does not contain information
 // about who the rule applies to or which namespace the rule applies to.
 type PolicyRule struct {
-	// Verbs is a list of Verbs that apply to ALL the ResourceKinds and AttributeRestrictions contained in this rule.  VerbAll represents all kinds.
+	// Verbs is a list of Verbs that apply to ALL the ResourceKinds contained in this rule. '*' represents all verbs.
 	Verbs []string
 
 	// APIGroups is the name of the APIGroup that contains the resources.
-	// If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.
+	// If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed. "" represents the core API group and "*" represents all API groups.
 	APIGroups []string
 	// Resources is a list of resources this rule applies to.  '*' represents all resources in the specified apiGroups.
 	// '*/foo' represents the subresource 'foo' for all resources in the specified apiGroups.
@@ -88,7 +89,6 @@ type RoleRef struct {
 	Name string
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
@@ -101,7 +101,6 @@ type Role struct {
 	Rules []PolicyRule
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace.
@@ -143,8 +142,6 @@ type RoleList struct {
 	Items []Role
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
@@ -169,8 +166,6 @@ type AggregationRule struct {
 	ClusterRoleSelectors []metav1.LabelSelector
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace,

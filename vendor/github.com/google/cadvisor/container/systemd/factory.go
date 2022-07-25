@@ -21,9 +21,9 @@ import (
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/manager/watcher"
+	"github.com/google/cadvisor/watcher"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type systemdFactory struct{}
@@ -32,7 +32,7 @@ func (f *systemdFactory) String() string {
 	return "systemd"
 }
 
-func (f *systemdFactory) NewContainerHandler(name string, inHostNamespace bool) (container.ContainerHandler, error) {
+func (f *systemdFactory) NewContainerHandler(name string, metadataEnvAllowList []string, inHostNamespace bool) (container.ContainerHandler, error) {
 	return nil, fmt.Errorf("Not yet supported")
 }
 
@@ -42,7 +42,8 @@ func (f *systemdFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	if strings.HasSuffix(name, ".mount") {
 		return true, false, nil
 	}
-	return false, false, fmt.Errorf("%s not handled by systemd handler", name)
+	klog.V(5).Infof("%s not handled by systemd handler", name)
+	return false, false, nil
 }
 
 func (f *systemdFactory) DebugInfo() map[string][]string {

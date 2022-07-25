@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
@@ -65,15 +64,6 @@ func TestUnstructuredMetadataRoundTrip(t *testing.T) {
 		}
 		setObjectMetaUsingAccessors(u, uCopy)
 
-		// TODO: remove this special casing when creationTimestamp becomes a pointer.
-		// Right now, creationTimestamp is a struct (metav1.Time) so omitempty holds no meaning for it.
-		// However, the current behaviour is to remove the field if it holds an empty struct.
-		// This special casing exists here because custom marshallers for metav1.Time marshal
-		// an empty value to "null", which gets converted to nil when converting to an unstructured map by "ToUnstructured".
-		if err := unstructured.SetNestedField(uCopy.UnstructuredContent(), nil, "metadata", "creationTimestamp"); err != nil {
-			t.Fatalf("unexpected error setting creationTimestamp as nil: %v", err)
-		}
-
 		if !equality.Semantic.DeepEqual(u, uCopy) {
 			t.Errorf("diff: %v", diff.ObjectReflectDiff(u, uCopy))
 		}
@@ -114,9 +104,8 @@ func TestUnstructuredMetadataOmitempty(t *testing.T) {
 	u.SetLabels(nil)
 	u.SetAnnotations(nil)
 	u.SetOwnerReferences(nil)
-	u.SetInitializers(nil)
 	u.SetFinalizers(nil)
-	u.SetClusterName("")
+	u.SetManagedFields(nil)
 
 	gotMetadata, _, err := unstructured.NestedFieldNoCopy(u.UnstructuredContent(), "metadata")
 	if err != nil {
@@ -156,7 +145,6 @@ func setObjectMetaUsingAccessors(u, uCopy *unstructured.Unstructured) {
 	uCopy.SetLabels(u.GetLabels())
 	uCopy.SetAnnotations(u.GetAnnotations())
 	uCopy.SetOwnerReferences(u.GetOwnerReferences())
-	uCopy.SetInitializers(u.GetInitializers())
 	uCopy.SetFinalizers(u.GetFinalizers())
-	uCopy.SetClusterName(u.GetClusterName())
+	uCopy.SetManagedFields(u.GetManagedFields())
 }

@@ -53,6 +53,10 @@ var LogHTTPRequestHandler = request.NamedHandler{
 }
 
 func logRequest(r *request.Request) {
+	if !r.Config.LogLevel.AtLeast(aws.LogDebug) {
+		return
+	}
+
 	logBody := r.Config.LogLevel.Matches(aws.LogDebugWithHTTPBody)
 	bodySeekable := aws.IsReaderSeekable(r.Body)
 
@@ -67,10 +71,14 @@ func logRequest(r *request.Request) {
 		if !bodySeekable {
 			r.SetReaderBody(aws.ReadSeekCloser(r.HTTPRequest.Body))
 		}
-		// Reset the request body because dumpRequest will re-wrap the r.HTTPRequest's
-		// Body as a NoOpCloser and will not be reset after read by the HTTP
-		// client reader.
-		r.ResetBody()
+		// Reset the request body because dumpRequest will re-wrap the
+		// r.HTTPRequest's Body as a NoOpCloser and will not be reset after
+		// read by the HTTP client reader.
+		if err := r.Error; err != nil {
+			r.Config.Logger.Log(fmt.Sprintf(logReqErrMsg,
+				r.ClientInfo.ServiceName, r.Operation.Name, err))
+			return
+		}
 	}
 
 	r.Config.Logger.Log(fmt.Sprintf(logReqMsg,
@@ -116,7 +124,17 @@ var LogHTTPResponseHandler = request.NamedHandler{
 }
 
 func logResponse(r *request.Request) {
+	if !r.Config.LogLevel.AtLeast(aws.LogDebug) {
+		return
+	}
+
 	lw := &logWriter{r.Config.Logger, bytes.NewBuffer(nil)}
+
+	if r.HTTPResponse == nil {
+		lw.Logger.Log(fmt.Sprintf(logRespErrMsg,
+			r.ClientInfo.ServiceName, r.Operation.Name, "request's HTTPResponse is nil"))
+		return
+	}
 
 	logBody := r.Config.LogLevel.Matches(aws.LogDebugWithHTTPBody)
 	if logBody {

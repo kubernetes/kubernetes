@@ -16,20 +16,24 @@ limitations under the License.
 
 package metrics
 
-type ClusterAutoscalerMetrics Metrics
+import "k8s.io/component-base/metrics/testutil"
 
+// ClusterAutoscalerMetrics is metrics for cluster autoscaler
+type ClusterAutoscalerMetrics testutil.Metrics
+
+// Equal returns true if all metrics are the same as the arguments.
 func (m *ClusterAutoscalerMetrics) Equal(o ClusterAutoscalerMetrics) bool {
-	return (*Metrics)(m).Equal(Metrics(o))
+	return (*testutil.Metrics)(m).Equal(testutil.Metrics(o))
 }
 
-func NewClusterAutoscalerMetrics() ClusterAutoscalerMetrics {
-	result := NewMetrics()
+func newClusterAutoscalerMetrics() ClusterAutoscalerMetrics {
+	result := testutil.NewMetrics()
 	return ClusterAutoscalerMetrics(result)
 }
 
 func parseClusterAutoscalerMetrics(data string) (ClusterAutoscalerMetrics, error) {
-	result := NewClusterAutoscalerMetrics()
-	if err := parseMetrics(data, (*Metrics)(&result)); err != nil {
+	result := newClusterAutoscalerMetrics()
+	if err := testutil.ParseMetrics(data, (*testutil.Metrics)(&result)); err != nil {
 		return ClusterAutoscalerMetrics{}, err
 	}
 	return result, nil

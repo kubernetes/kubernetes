@@ -17,27 +17,65 @@ limitations under the License.
 package rest
 
 import (
-	"context"
-
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
+
+// WipeObjectMetaSystemFields erases fields that are managed by the system on ObjectMeta.
+func WipeObjectMetaSystemFields(meta metav1.Object) {
+	meta.SetCreationTimestamp(metav1.Time{})
+	meta.SetUID("")
+	meta.SetDeletionTimestamp(nil)
+	meta.SetDeletionGracePeriodSeconds(nil)
+	meta.SetSelfLink("")
+}
 
 // FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
 func FillObjectMetaSystemFields(meta metav1.Object) {
 	meta.SetCreationTimestamp(metav1.Now())
 	meta.SetUID(uuid.NewUUID())
-	meta.SetSelfLink("")
 }
 
-// ValidNamespace returns false if the namespace on the context differs from
-// the resource.  If the resource has no namespace, it is set to the value in
-// the context.
-func ValidNamespace(ctx context.Context, resource metav1.Object) bool {
-	ns, ok := genericapirequest.NamespaceFrom(ctx)
-	if len(resource.GetNamespace()) == 0 {
-		resource.SetNamespace(ns)
+// EnsureObjectNamespaceMatchesRequestNamespace returns an error if obj.Namespace and requestNamespace
+// are both populated and do not match. If either is unpopulated, it modifies obj as needed to ensure
+// obj.GetNamespace() == requestNamespace.
+func EnsureObjectNamespaceMatchesRequestNamespace(requestNamespace string, obj metav1.Object) error {
+	objNamespace := obj.GetNamespace()
+	switch {
+	case objNamespace == requestNamespace:
+		// already matches, no-op
+		return nil
+
+	case objNamespace == metav1.NamespaceNone:
+		// unset, default to request namespace
+		obj.SetNamespace(requestNamespace)
+		return nil
+
+	case requestNamespace == metav1.NamespaceNone:
+		// cluster-scoped, clear namespace
+		obj.SetNamespace(metav1.NamespaceNone)
+		return nil
+
+	default:
+		// mismatch, error
+		return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
 	}
-	return ns == resource.GetNamespace() && ok
+}
+
+// ExpectedNamespaceForScope returns the expected namespace for a resource, given the request namespace and resource scope.
+func ExpectedNamespaceForScope(requestNamespace string, namespaceScoped bool) string {
+	if namespaceScoped {
+		return requestNamespace
+	}
+	return ""
+}
+
+// ExpectedNamespaceForResource returns the expected namespace for a resource, given the request namespace.
+func ExpectedNamespaceForResource(requestNamespace string, resource schema.GroupVersionResource) string {
+	if resource.Resource == "namespaces" && resource.Group == "" {
+		return ""
+	}
+	return requestNamespace
 }

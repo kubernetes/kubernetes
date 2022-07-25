@@ -24,7 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // KubeletAuth implements AuthInterface
@@ -42,6 +42,7 @@ func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGett
 	return &KubeletAuth{authenticator, authorizerAttributeGetter, authorizer}
 }
 
+// NewNodeAuthorizerAttributesGetter creates a new authorizer.RequestAttributesGetter for the node.
 func NewNodeAuthorizerAttributesGetter(nodeName types.NodeName) authorizer.RequestAttributesGetter {
 	return nodeAuthorizerAttributesGetter{nodeName: nodeName}
 }
@@ -61,7 +62,6 @@ func isSubpath(subpath, path string) bool {
 //    /stats/*   => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=stats
 //    /metrics/* => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=metrics
 //    /logs/*    => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=log
-//    /spec/*    => verb=<api verb from request>, resource=nodes, name=<node name>, subresource=spec
 func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *http.Request) authorizer.Attributes {
 
 	apiVerb := ""
@@ -104,11 +104,9 @@ func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *htt
 	case isSubpath(requestPath, logsPath):
 		// "log" to match other log subresources (pods/log, etc)
 		attrs.Subresource = "log"
-	case isSubpath(requestPath, specPath):
-		attrs.Subresource = "spec"
 	}
 
-	klog.V(5).Infof("Node request attributes: user=%#v attrs=%#v", attrs.GetUser(), attrs)
+	klog.V(5).InfoS("Node request attributes", "user", attrs.GetUser().GetName(), "verb", attrs.GetVerb(), "resource", attrs.GetResource(), "subresource", attrs.GetSubresource())
 
 	return attrs
 }

@@ -1,4 +1,5 @@
-// +build !linux,!windows
+//go:build !linux
+// +build !linux
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -17,8 +18,3 @@ limitations under the License.
 */
 
 package kuberuntime
-
-// milliCPUToShares converts milliCPU to CPU shares
-func milliCPUToShares(milliCPU int64) int64 {
-	return 0
-}

@@ -19,7 +19,6 @@ package record
 import (
 	"fmt"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -28,25 +27,34 @@ import (
 // thrown away in this case.
 type FakeRecorder struct {
 	Events chan string
+
+	IncludeObject bool
+}
+
+func objectString(object runtime.Object, includeObject bool) string {
+	if !includeObject {
+		return ""
+	}
+	return fmt.Sprintf(" involvedObject{kind=%s,apiVersion=%s}",
+		object.GetObjectKind().GroupVersionKind().Kind,
+		object.GetObjectKind().GroupVersionKind().GroupVersion(),
+	)
 }
 
 func (f *FakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
 	if f.Events != nil {
-		f.Events <- fmt.Sprintf("%s %s %s", eventtype, reason, message)
+		f.Events <- fmt.Sprintf("%s %s %s%s", eventtype, reason, message, objectString(object, f.IncludeObject))
 	}
 }
 
 func (f *FakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
 	if f.Events != nil {
-		f.Events <- fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...)
+		f.Events <- fmt.Sprintf(eventtype+" "+reason+" "+messageFmt, args...) + objectString(object, f.IncludeObject)
 	}
 }
 
-func (f *FakeRecorder) PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
-}
-
 func (f *FakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.Eventf(object, eventtype, reason, messageFmt, args)
+	f.Eventf(object, eventtype, reason, messageFmt, args...)
 }
 
 // NewFakeRecorder creates new fake event recorder with event channel with

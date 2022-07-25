@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -29,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -44,6 +43,7 @@ const (
 )
 
 func main() {
+	klog.InitFlags(nil)
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [FLAG]... [PROFILE_DIR]...\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Load the AppArmor profiles specified in the PROFILE_DIR directories.\n")
@@ -117,7 +117,7 @@ func loadNewProfiles() (success bool, newProfiles []string) {
 
 	success = true
 	for _, dir := range dirs {
-		infos, err := ioutil.ReadDir(dir)
+		infos, err := os.ReadDir(dir)
 		if err != nil {
 			klog.Warningf("Error reading %s: %v", dir, err)
 			success = false
@@ -206,12 +206,17 @@ func loadProfiles(path string) error {
 
 // If the given fileinfo is a symlink, return the FileInfo of the target. Otherwise, return the
 // given fileinfo.
-func resolveSymlink(basePath string, info os.FileInfo) (os.FileInfo, error) {
-	if info.Mode()&os.ModeSymlink == 0 {
-		// Not a symlink.
-		return info, nil
+func resolveSymlink(basePath string, entry os.DirEntry) (os.FileInfo, error) {
+	if info, err := entry.Info(); err != nil {
+		return nil, fmt.Errorf("error getting the fileInfo: %v", err)
+	} else {
+		if info.Mode()&os.ModeSymlink == 0 {
+			// Not a symlink.
+			return info, nil
+		}
 	}
-	fpath := filepath.Join(basePath, info.Name())
+
+	fpath := filepath.Join(basePath, entry.Name())
 	resolvedName, err := filepath.EvalSymlinks(fpath)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving symlink %s: %v", fpath, err)

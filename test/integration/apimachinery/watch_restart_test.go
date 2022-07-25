@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -32,10 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -62,29 +60,27 @@ func normalizeInformerOutputFunc(initialVal string) func(output []string) []stri
 	}
 }
 
+func noop() {}
+
 func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	// Has to be longer than 5 seconds
-	timeout := 2 * time.Minute
+	timeout := 30 * time.Second
 
-	// Set up a master
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	// Timeout is set random between MinRequestTimeout and 2x
-	masterConfig.GenericConfig.MinRequestTimeout = int(timeout.Seconds()) / 4
-	_, s, closeFn := framework.RunAMaster(masterConfig)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--min-request-timeout=7"}, framework.SharedEtcd())
+	defer server.TearDownFn()
 
-	config := &restclient.Config{
-		Host:          s.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[corev1.GroupName].GroupVersion()},
+	clientset, err := kubernetes.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	namespaceObject := framework.CreateTestingNamespace("retry-watch", s, t)
-	defer framework.DeleteTestingNamespace(namespaceObject, s, t)
+	namespaceObject := framework.CreateNamespaceOrDie(clientset, "retry-watch", t)
+	defer framework.DeleteNamespaceOrDie(clientset, namespaceObject, t)
 
-	getListFunc := func(c *kubernetes.Clientset, secret *v1.Secret) func(options metav1.ListOptions) *v1.SecretList {
-		return func(options metav1.ListOptions) *v1.SecretList {
+	getListFunc := func(c *kubernetes.Clientset, secret *corev1.Secret) func(options metav1.ListOptions) *corev1.SecretList {
+		return func(options metav1.ListOptions) *corev1.SecretList {
 			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", secret.Name).String()
-			res, err := c.CoreV1().Secrets(secret.Namespace).List(options)
+			res, err := c.CoreV1().Secrets(secret.Namespace).List(context.TODO(), options)
 			if err != nil {
 				t.Fatalf("Failed to list Secrets: %v", err)
 			}
@@ -92,10 +88,10 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 		}
 	}
 
-	getWatchFunc := func(c *kubernetes.Clientset, secret *v1.Secret) func(options metav1.ListOptions) (watch.Interface, error) {
+	getWatchFunc := func(c *kubernetes.Clientset, secret *corev1.Secret) func(options metav1.ListOptions) (watch.Interface, error) {
 		return func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", secret.Name).String()
-			res, err := c.CoreV1().Secrets(secret.Namespace).Watch(options)
+			res, err := c.CoreV1().Secrets(secret.Namespace).Watch(context.TODO(), options)
 			if err != nil {
 				t.Fatalf("Failed to create a watcher on Secrets: %v", err)
 			}
@@ -103,7 +99,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 		}
 	}
 
-	generateEvents := func(t *testing.T, c *kubernetes.Clientset, secret *v1.Secret, referenceOutput *[]string, stopChan chan struct{}, stoppedChan chan struct{}) {
+	generateEvents := func(t *testing.T, c *kubernetes.Clientset, secret *corev1.Secret, referenceOutput *[]string, stopChan chan struct{}, stoppedChan chan struct{}) {
 		defer close(stoppedChan)
 		counter := 0
 
@@ -120,9 +116,10 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 				counter = counter + 1
 
 				patch := fmt.Sprintf(`{"metadata": {"annotations": {"count": "%d"}}}`, counter)
-				_, err := c.CoreV1().Secrets(secret.Namespace).Patch(secret.Name, types.StrategicMergePatchType, []byte(patch))
+				_, err := c.CoreV1().Secrets(secret.Namespace).Patch(context.TODO(), secret.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{})
 				if err != nil {
-					t.Fatalf("Failed to patch secret: %v", err)
+					t.Errorf("Failed to patch secret: %v", err)
+					return
 				}
 
 				*referenceOutput = append(*referenceOutput, fmt.Sprintf("%d", counter))
@@ -135,8 +132,8 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	}
 
 	initialCount := "0"
-	newTestSecret := func(name string) *v1.Secret {
-		return &v1.Secret{
+	newTestSecret := func(name string) *corev1.Secret {
+		return &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
 				Namespace: namespaceObject.Name,
@@ -153,27 +150,43 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	tt := []struct {
 		name                string
 		succeed             bool
-		secret              *v1.Secret
-		getWatcher          func(c *kubernetes.Clientset, secret *v1.Secret) (watch.Interface, error)
+		secret              *corev1.Secret
+		getWatcher          func(c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, error, func())
 		normalizeOutputFunc func(referenceOutput []string) []string
 	}{
 		{
 			name:    "regular watcher should fail",
 			succeed: false,
 			secret:  newTestSecret("secret-01"),
-			getWatcher: func(c *kubernetes.Clientset, secret *v1.Secret) (watch.Interface, error) {
+			getWatcher: func(c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, error, func()) {
 				options := metav1.ListOptions{
 					ResourceVersion: secret.ResourceVersion,
 				}
-				return getWatchFunc(c, secret)(options)
+				w, err := getWatchFunc(c, secret)(options)
+				return w, err, noop
 			}, // regular watcher; unfortunately destined to fail
+			normalizeOutputFunc: noopNormalization,
+		},
+		{
+			name:    "RetryWatcher survives closed watches",
+			succeed: true,
+			secret:  newTestSecret("secret-02"),
+			getWatcher: func(c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, error, func()) {
+				lw := &cache.ListWatch{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						return getWatchFunc(c, secret)(options)
+					},
+				}
+				w, err := watchtools.NewRetryWatcher(secret.ResourceVersion, lw)
+				return w, err, func() { <-w.Done() }
+			},
 			normalizeOutputFunc: noopNormalization,
 		},
 		{
 			name:    "InformerWatcher survives closed watches",
 			succeed: true,
 			secret:  newTestSecret("secret-03"),
-			getWatcher: func(c *kubernetes.Clientset, secret *v1.Secret) (watch.Interface, error) {
+			getWatcher: func(c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, error, func()) {
 				lw := &cache.ListWatch{
 					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 						return getListFunc(c, secret)(options), nil
@@ -182,77 +195,86 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 						return getWatchFunc(c, secret)(options)
 					},
 				}
-				_, _, w := watchtools.NewIndexerInformerWatcher(lw, &v1.Secret{})
-				return w, nil
+				// there is an inherent race between a producer (generateEvents) and a consumer (the watcher) that needs to be solved here
+				// since the watcher is driven by an informer it is crucial to start producing only after the informer has synced
+				// otherwise we might not get all expected events since the informer LIST (or watchelist) and only then WATCHES
+				// all events received during the initial LIST (or watchlist) will be seen as a single event (to most recent version of an obj)
+				_, informer, w, done := watchtools.NewIndexerInformerWatcher(lw, &corev1.Secret{})
+				cache.WaitForCacheSync(context.TODO().Done(), informer.HasSynced)
+				return w, nil, func() { <-done }
 			},
 			normalizeOutputFunc: normalizeInformerOutputFunc(initialCount),
 		},
 	}
 
-	for _, tmptc := range tt {
-		tc := tmptc // we need to copy it for parallel runs
-		t.Run(tc.name, func(t *testing.T) {
-			c, err := kubernetes.NewForConfig(config)
-			if err != nil {
-				t.Fatalf("Failed to create clientset: %v", err)
-			}
-
-			secret, err := c.CoreV1().Secrets(tc.secret.Namespace).Create(tc.secret)
-			if err != nil {
-				t.Fatalf("Failed to create testing secret %s/%s: %v", tc.secret.Namespace, tc.secret.Name, err)
-			}
-
-			watcher, err := tc.getWatcher(c, secret)
-			if err != nil {
-				t.Fatalf("Failed to create watcher: %v", err)
-			}
-
-			var referenceOutput []string
-			var output []string
-			stopChan := make(chan struct{})
-			stoppedChan := make(chan struct{})
-			go generateEvents(t, c, secret, &referenceOutput, stopChan, stoppedChan)
-
-			// Record current time to be able to asses if the timeout has been reached
-			startTime := time.Now()
-			ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
-			defer cancel()
-			_, err = watchtools.UntilWithoutRetry(ctx, watcher, func(event watch.Event) (bool, error) {
-				s, ok := event.Object.(*v1.Secret)
-				if !ok {
-					t.Fatalf("Received an object that is not a Secret: %#v", event.Object)
+	t.Run("group", func(t *testing.T) {
+		for _, tmptc := range tt {
+			tc := tmptc // we need to copy it for parallel runs
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				c, err := kubernetes.NewForConfig(server.ClientConfig)
+				if err != nil {
+					t.Fatalf("Failed to create clientset: %v", err)
 				}
-				output = append(output, s.Annotations["count"])
-				// Watch will never end voluntarily
-				return false, nil
+
+				secret, err := c.CoreV1().Secrets(tc.secret.Namespace).Create(context.TODO(), tc.secret, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to create testing secret %s/%s: %v", tc.secret.Namespace, tc.secret.Name, err)
+				}
+
+				watcher, err, doneFn := tc.getWatcher(c, secret)
+				if err != nil {
+					t.Fatalf("Failed to create watcher: %v", err)
+				}
+				defer doneFn()
+
+				var referenceOutput []string
+				var output []string
+				stopChan := make(chan struct{})
+				stoppedChan := make(chan struct{})
+				go generateEvents(t, c, secret, &referenceOutput, stopChan, stoppedChan)
+
+				// Record current time to be able to asses if the timeout has been reached
+				startTime := time.Now()
+				ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
+				defer cancel()
+				_, err = watchtools.UntilWithoutRetry(ctx, watcher, func(event watch.Event) (bool, error) {
+					s, ok := event.Object.(*corev1.Secret)
+					if !ok {
+						t.Fatalf("Received an object that is not a Secret: %#v", event.Object)
+					}
+					output = append(output, s.Annotations["count"])
+					// Watch will never end voluntarily
+					return false, nil
+				})
+				watchDuration := time.Since(startTime)
+				close(stopChan)
+				<-stoppedChan
+
+				output = tc.normalizeOutputFunc(output)
+
+				t.Logf("Watch duration: %v; timeout: %v", watchDuration, timeout)
+
+				if err == nil && !tc.succeed {
+					t.Fatalf("Watch should have timed out but it exited without an error!")
+				}
+
+				if err != wait.ErrWaitTimeout && tc.succeed {
+					t.Fatalf("Watch exited with error: %v!", err)
+				}
+
+				if watchDuration < timeout && tc.succeed {
+					t.Fatalf("Watch should have timed out after %v but it timed out prematurely after %v!", timeout, watchDuration)
+				}
+
+				if watchDuration >= timeout && !tc.succeed {
+					t.Fatalf("Watch should have timed out but it succeeded!")
+				}
+
+				if tc.succeed && !reflect.DeepEqual(referenceOutput, output) {
+					t.Fatalf("Reference and real output differ! We must have lost some events or read some multiple times!\nRef:  %#v\nReal: %#v", referenceOutput, output)
+				}
 			})
-			watchDuration := time.Since(startTime)
-			close(stopChan)
-			<-stoppedChan
-
-			output = tc.normalizeOutputFunc(output)
-
-			t.Logf("Watch duration: %v; timeout: %v", watchDuration, timeout)
-
-			if err == nil && !tc.succeed {
-				t.Fatalf("Watch should have timed out but it exited without an error!")
-			}
-
-			if err != wait.ErrWaitTimeout && tc.succeed {
-				t.Fatalf("Watch exited with error: %v!", err)
-			}
-
-			if watchDuration < timeout && tc.succeed {
-				t.Fatalf("Watch should have timed out after %v but it timed out prematurely after %v!", timeout, watchDuration)
-			}
-
-			if watchDuration >= timeout && !tc.succeed {
-				t.Fatalf("Watch should have timed out but it succeeded!")
-			}
-
-			if tc.succeed && !reflect.DeepEqual(referenceOutput, output) {
-				t.Fatalf("Reference and real output differ! We must have lost some events or read some multiple times!\nRef:  %#v\nReal: %#v", referenceOutput, output)
-			}
-		})
-	}
+		}
+	})
 }

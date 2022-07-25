@@ -59,7 +59,7 @@ type Flavor struct {
 	RxTxFactor float64 `json:"rxtx_factor"`
 
 	// Swap is the amount of swap space, measured in MB.
-	Swap int `json:"swap"`
+	Swap int `json:"-"`
 
 	// VCPUs indicates how many (virtual) CPUs are available for this flavor.
 	VCPUs int `json:"vcpus"`

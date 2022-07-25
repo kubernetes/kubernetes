@@ -3,4 +3,4 @@
 // license that can be found in the LICENSE file.
 
 // Package lexer provides generated internal lexer functions for DOT parsing.
-package lexer
+package lexer // import "gonum.org/v1/gonum/graph/formats/dot/internal/lexer"

@@ -5,12 +5,12 @@
 // Package websocket implements a client and server for the WebSocket protocol
 // as specified in RFC 6455.
 //
-// This package currently lacks some features found in an alternative
-// and more actively maintained WebSocket package:
+// This package currently lacks some features found in alternative
+// and more actively maintained WebSocket packages:
 //
 //     https://godoc.org/github.com/gorilla/websocket
-//
-package websocket
+//     https://godoc.org/nhooyr.io/websocket
+package websocket // import "golang.org/x/net/websocket"
 
 import (
 	"bufio"
@@ -241,7 +241,10 @@ func (ws *Conn) Close() error {
 	return err1
 }
 
+// IsClientConn reports whether ws is a client-side connection.
 func (ws *Conn) IsClientConn() bool { return ws.request == nil }
+
+// IsServerConn reports whether ws is a server-side connection.
 func (ws *Conn) IsServerConn() bool { return ws.request != nil }
 
 // LocalAddr returns the WebSocket Origin for the connection for client, or

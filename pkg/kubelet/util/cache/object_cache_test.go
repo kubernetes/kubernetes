@@ -21,8 +21,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	expirationcache "k8s.io/client-go/tools/cache"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type testObject struct {
@@ -32,7 +33,7 @@ type testObject struct {
 
 // A fake objectCache for unit test.
 func NewFakeObjectCache(f func() (interface{}, error), ttl time.Duration, clock clock.Clock) *ObjectCache {
-	ttlPolicy := &expirationcache.TTLPolicy{Ttl: ttl, Clock: clock}
+	ttlPolicy := &expirationcache.TTLPolicy{TTL: ttl, Clock: clock}
 	deleteChan := make(chan string, 1)
 	return &ObjectCache{
 		updater: f,
@@ -46,8 +47,8 @@ func TestAddAndGet(t *testing.T) {
 		val: "bar",
 	}
 	objectCache := NewFakeObjectCache(func() (interface{}, error) {
-		return nil, fmt.Errorf("Unexpected Error: updater should never be called in this test!")
-	}, 1*time.Hour, clock.NewFakeClock(time.Now()))
+		return nil, fmt.Errorf("Unexpected Error: updater should never be called in this test")
+	}, 1*time.Hour, testingclock.NewFakeClock(time.Now()))
 
 	err := objectCache.Add(testObj.key, testObj.val)
 	if err != nil {
@@ -72,7 +73,7 @@ func TestExpirationBasic(t *testing.T) {
 		val: unexpectedVal,
 	}
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	objectCache := NewFakeObjectCache(func() (interface{}, error) {
 		return expectedVal, nil

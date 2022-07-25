@@ -17,12 +17,16 @@ limitations under the License.
 package authorizer
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/union"
+	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	versionedinformers "k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
@@ -46,12 +50,21 @@ type Config struct {
 
 	// Kubeconfig file for Webhook authorization plugin.
 	WebhookConfigFile string
+	// API version of subject access reviews to send to the webhook (e.g. "v1", "v1beta1")
+	WebhookVersion string
 	// TTL for caching of authorized responses from the webhook server.
 	WebhookCacheAuthorizedTTL time.Duration
 	// TTL for caching of unauthorized responses from the webhook server.
 	WebhookCacheUnauthorizedTTL time.Duration
+	// WebhookRetryBackoff specifies the backoff parameters for the authorization webhook retry logic.
+	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
+	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
+	WebhookRetryBackoff *wait.Backoff
 
 	VersionedInformerFactory versionedinformers.SharedInformerFactory
+
+	// Optional field, custom dial function used to connect to webhook
+	CustomDial utilnet.DialFunc
 }
 
 // New returns the right sort of union of multiple authorizer.Authorizer objects
@@ -70,16 +83,18 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 		// Keep cases in sync with constant list in k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes/modes.go.
 		switch authorizationMode {
 		case modes.ModeNode:
+			node.RegisterMetrics()
 			graph := node.NewGraph()
 			node.AddGraphEventHandlers(
 				graph,
 				config.VersionedInformerFactory.Core().V1().Nodes(),
 				config.VersionedInformerFactory.Core().V1().Pods(),
 				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
-				config.VersionedInformerFactory.Storage().V1beta1().VolumeAttachments(),
+				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
 			)
 			nodeAuthorizer := node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
 			authorizers = append(authorizers, nodeAuthorizer)
+			ruleResolvers = append(ruleResolvers, nodeAuthorizer)
 
 		case modes.ModeAlwaysAllow:
 			alwaysAllowAuthorizer := authorizerfactory.NewAlwaysAllowAuthorizer()
@@ -97,9 +112,19 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			authorizers = append(authorizers, abacAuthorizer)
 			ruleResolvers = append(ruleResolvers, abacAuthorizer)
 		case modes.ModeWebhook:
-			webhookAuthorizer, err := webhook.New(config.WebhookConfigFile,
+			if config.WebhookRetryBackoff == nil {
+				return nil, nil, errors.New("retry backoff parameters for authorization webhook has not been specified")
+			}
+			clientConfig, err := webhookutil.LoadKubeconfig(config.WebhookConfigFile, config.CustomDial)
+			if err != nil {
+				return nil, nil, err
+			}
+			webhookAuthorizer, err := webhook.New(clientConfig,
+				config.WebhookVersion,
 				config.WebhookCacheAuthorizedTTL,
-				config.WebhookCacheUnauthorizedTTL)
+				config.WebhookCacheUnauthorizedTTL,
+				*config.WebhookRetryBackoff,
+			)
 			if err != nil {
 				return nil, nil, err
 			}

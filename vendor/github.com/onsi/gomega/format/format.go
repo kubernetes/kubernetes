@@ -1,17 +1,26 @@
 /*
 Gomega's format package pretty-prints objects.  It explores input objects recursively and generates formatted, indented output with type information.
 */
+
+// untested sections: 4
+
 package format
 
 import (
+	"context"
 	"fmt"
 	"reflect"
-	"strings"
 	"strconv"
+	"strings"
+	"time"
 )
 
 // Use MaxDepth to set the maximum recursion depth when printing deeply nested objects
 var MaxDepth = uint(10)
+
+// MaxLength of the string representation of an object.
+// If MaxLength is set to 0, the Object will not be truncated.
+var MaxLength = 4000
 
 /*
 By default, all objects (even those that implement fmt.Stringer and fmt.GoStringer) are recursively inspected to generate output.
@@ -22,10 +31,39 @@ Note that GoString and String don't always have all the information you need to 
 */
 var UseStringerRepresentation = false
 
+/*
+Print the content of context objects. By default it will be suppressed.
+
+Set PrintContextObjects = true to enable printing of the context internals.
+*/
+var PrintContextObjects = false
+
+// TruncatedDiff choose if we should display a truncated pretty diff or not
+var TruncatedDiff = true
+
+// TruncateThreshold (default 50) specifies the maximum length string to print in string comparison assertion error
+// messages.
+var TruncateThreshold uint = 50
+
+// CharactersAroundMismatchToInclude (default 5) specifies how many contextual characters should be printed before and
+// after the first diff location in a truncated string assertion error message.
+var CharactersAroundMismatchToInclude uint = 5
+
+var contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
+var timeType = reflect.TypeOf(time.Time{})
+
 //The default indentation string emitted by the format package
 var Indent = "    "
 
 var longFormThreshold = 20
+
+// GomegaStringer allows for custom formating of objects for gomega.
+type GomegaStringer interface {
+	// GomegaString will be used to custom format an object.
+	// It does not follow UseStringerRepresentation value and will always be called regardless.
+	// It also ignores the MaxLength value.
+	GomegaString() string
+}
 
 /*
 Generates a formatted matcher success/failure message of the form:
@@ -35,7 +73,7 @@ Generates a formatted matcher success/failure message of the form:
 	<message>
 		<pretty printed expected>
 
-If expected is omited, then the message looks like:
+If expected is omitted, then the message looks like:
 
 	Expected
 		<pretty printed actual>
@@ -44,9 +82,120 @@ If expected is omited, then the message looks like:
 func Message(actual interface{}, message string, expected ...interface{}) string {
 	if len(expected) == 0 {
 		return fmt.Sprintf("Expected\n%s\n%s", Object(actual, 1), message)
-	} else {
-		return fmt.Sprintf("Expected\n%s\n%s\n%s", Object(actual, 1), message, Object(expected[0], 1))
 	}
+	return fmt.Sprintf("Expected\n%s\n%s\n%s", Object(actual, 1), message, Object(expected[0], 1))
+}
+
+/*
+
+Generates a nicely formatted matcher success / failure message
+
+Much like Message(...), but it attempts to pretty print diffs in strings
+
+Expected
+    <string>: "...aaaaabaaaaa..."
+to equal               |
+    <string>: "...aaaaazaaaaa..."
+
+*/
+
+func MessageWithDiff(actual, message, expected string) string {
+	if TruncatedDiff && len(actual) >= int(TruncateThreshold) && len(expected) >= int(TruncateThreshold) {
+		diffPoint := findFirstMismatch(actual, expected)
+		formattedActual := truncateAndFormat(actual, diffPoint)
+		formattedExpected := truncateAndFormat(expected, diffPoint)
+
+		spacesBeforeFormattedMismatch := findFirstMismatch(formattedActual, formattedExpected)
+
+		tabLength := 4
+		spaceFromMessageToActual := tabLength + len("<string>: ") - len(message)
+
+		paddingCount := spaceFromMessageToActual + spacesBeforeFormattedMismatch
+		if paddingCount < 0 {
+			return Message(formattedActual, message, formattedExpected)
+		}
+
+		padding := strings.Repeat(" ", paddingCount) + "|"
+		return Message(formattedActual, message+padding, formattedExpected)
+	}
+
+	actual = escapedWithGoSyntax(actual)
+	expected = escapedWithGoSyntax(expected)
+
+	return Message(actual, message, expected)
+}
+
+func escapedWithGoSyntax(str string) string {
+	withQuotes := fmt.Sprintf("%q", str)
+	return withQuotes[1 : len(withQuotes)-1]
+}
+
+func truncateAndFormat(str string, index int) string {
+	leftPadding := `...`
+	rightPadding := `...`
+
+	start := index - int(CharactersAroundMismatchToInclude)
+	if start < 0 {
+		start = 0
+		leftPadding = ""
+	}
+
+	// slice index must include the mis-matched character
+	lengthOfMismatchedCharacter := 1
+	end := index + int(CharactersAroundMismatchToInclude) + lengthOfMismatchedCharacter
+	if end > len(str) {
+		end = len(str)
+		rightPadding = ""
+
+	}
+	return fmt.Sprintf("\"%s\"", leftPadding+str[start:end]+rightPadding)
+}
+
+func findFirstMismatch(a, b string) int {
+	aSlice := strings.Split(a, "")
+	bSlice := strings.Split(b, "")
+
+	for index, str := range aSlice {
+		if index > len(bSlice)-1 {
+			return index
+		}
+		if str != bSlice[index] {
+			return index
+		}
+	}
+
+	if len(b) > len(a) {
+		return len(a) + 1
+	}
+
+	return 0
+}
+
+const truncateHelpText = `
+Gomega truncated this representation as it exceeds 'format.MaxLength'.
+Consider having the object provide a custom 'GomegaStringer' representation
+or adjust the parameters in Gomega's 'format' package.
+
+Learn more here: https://onsi.github.io/gomega/#adjusting-output
+`
+
+func truncateLongStrings(s string) string {
+	if MaxLength > 0 && len(s) > MaxLength {
+		var sb strings.Builder
+		for i, r := range s {
+			if i < MaxLength {
+				sb.WriteRune(r)
+				continue
+			}
+			break
+		}
+
+		sb.WriteString("...\n")
+		sb.WriteString(truncateHelpText)
+
+		return sb.String()
+	}
+	return s
 }
 
 /*
@@ -57,11 +206,13 @@ Object recurses into deeply nested objects emitting pretty-printed representatio
 Modify format.MaxDepth to control how deep the recursion is allowed to go
 Set format.UseStringerRepresentation to true to return object.GoString() or object.String() when available instead of
 recursing into the object.
+
+Set PrintContextObjects to true to print the content of objects implementing context.Context
 */
 func Object(object interface{}, indentation uint) string {
 	indent := strings.Repeat(Indent, int(indentation))
 	value := reflect.ValueOf(object)
-	return fmt.Sprintf("%s<%s>: %s", indent, formatType(object), formatValue(value, indentation))
+	return fmt.Sprintf("%s<%s>: %s", indent, formatType(value), formatValue(value, indentation))
 }
 
 /*
@@ -81,25 +232,20 @@ func IndentString(s string, indentation uint) string {
 	return result
 }
 
-func formatType(object interface{}) string {
-	t := reflect.TypeOf(object)
-	if t == nil {
+func formatType(v reflect.Value) string {
+	switch v.Kind() {
+	case reflect.Invalid:
 		return "nil"
-	}
-	switch t.Kind() {
 	case reflect.Chan:
-		v := reflect.ValueOf(object)
-		return fmt.Sprintf("%T | len:%d, cap:%d", object, v.Len(), v.Cap())
+		return fmt.Sprintf("%s | len:%d, cap:%d", v.Type(), v.Len(), v.Cap())
 	case reflect.Ptr:
-		return fmt.Sprintf("%T | %p", object, object)
+		return fmt.Sprintf("%s | 0x%x", v.Type(), v.Pointer())
 	case reflect.Slice:
-		v := reflect.ValueOf(object)
-		return fmt.Sprintf("%T | len:%d, cap:%d", object, v.Len(), v.Cap())
+		return fmt.Sprintf("%s | len:%d, cap:%d", v.Type(), v.Len(), v.Cap())
 	case reflect.Map:
-		v := reflect.ValueOf(object)
-		return fmt.Sprintf("%T | len:%d", object, v.Len())
+		return fmt.Sprintf("%s | len:%d", v.Type(), v.Len())
 	default:
-		return fmt.Sprintf("%T", object)
+		return fmt.Sprintf("%s", v.Type())
 	}
 }
 
@@ -112,15 +258,28 @@ func formatValue(value reflect.Value, indentation uint) string {
 		return "nil"
 	}
 
-	if UseStringerRepresentation {
-		if value.CanInterface() {
-			obj := value.Interface()
+	if value.CanInterface() {
+		obj := value.Interface()
+
+		// GomegaStringer will take precedence to other representations and disregards UseStringerRepresentation
+		if x, ok := obj.(GomegaStringer); ok {
+			// do not truncate a user-defined GoMegaString() value
+			return x.GomegaString()
+		}
+
+		if UseStringerRepresentation {
 			switch x := obj.(type) {
 			case fmt.GoStringer:
-				return x.GoString()
+				return truncateLongStrings(x.GoString())
 			case fmt.Stringer:
-				return x.String()
+				return truncateLongStrings(x.String())
 			}
+		}
+	}
+
+	if !PrintContextObjects {
+		if value.Type().Implements(contextType) && indentation > 1 {
+			return "<suppressed context>"
 		}
 	}
 
@@ -144,23 +303,26 @@ func formatValue(value reflect.Value, indentation uint) string {
 	case reflect.Ptr:
 		return formatValue(value.Elem(), indentation)
 	case reflect.Slice:
-		return formatSlice(value, indentation)
+		return truncateLongStrings(formatSlice(value, indentation))
 	case reflect.String:
-		return formatString(value.String(), indentation)
+		return truncateLongStrings(formatString(value.String(), indentation))
 	case reflect.Array:
-		return formatSlice(value, indentation)
+		return truncateLongStrings(formatSlice(value, indentation))
 	case reflect.Map:
-		return formatMap(value, indentation)
+		return truncateLongStrings(formatMap(value, indentation))
 	case reflect.Struct:
-		return formatStruct(value, indentation)
+		if value.Type() == timeType && value.CanInterface() {
+			t, _ := value.Interface().(time.Time)
+			return t.Format(time.RFC3339Nano)
+		}
+		return truncateLongStrings(formatStruct(value, indentation))
 	case reflect.Interface:
-		return formatValue(value.Elem(), indentation)
+		return formatInterface(value, indentation)
 	default:
 		if value.CanInterface() {
-			return fmt.Sprintf("%#v", value.Interface())
-		} else {
-			return fmt.Sprintf("%#v", value)
+			return truncateLongStrings(fmt.Sprintf("%#v", value.Interface()))
 		}
+		return truncateLongStrings(fmt.Sprintf("%#v", value))
 	}
 }
 
@@ -180,14 +342,14 @@ func formatString(object interface{}, indentation uint) string {
 			}
 		}
 
-		return fmt.Sprintf("%s", result)
+		return result
 	} else {
 		return fmt.Sprintf("%q", object)
 	}
 }
 
 func formatSlice(v reflect.Value, indentation uint) string {
-	if v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 && isPrintableString(string(v.Bytes())){
+	if v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 && isPrintableString(string(v.Bytes())) {
 		return formatString(v.Bytes(), indentation)
 	}
 
@@ -204,9 +366,8 @@ func formatSlice(v reflect.Value, indentation uint) string {
 	if longest > longFormThreshold {
 		indenter := strings.Repeat(Indent, int(indentation))
 		return fmt.Sprintf("[\n%s%s,\n%s]", indenter+Indent, strings.Join(result, ",\n"+indenter+Indent), indenter)
-	} else {
-		return fmt.Sprintf("[%s]", strings.Join(result, ", "))
 	}
+	return fmt.Sprintf("[%s]", strings.Join(result, ", "))
 }
 
 func formatMap(v reflect.Value, indentation uint) string {
@@ -216,7 +377,7 @@ func formatMap(v reflect.Value, indentation uint) string {
 	longest := 0
 	for i, key := range v.MapKeys() {
 		value := v.MapIndex(key)
-		result[i] = fmt.Sprintf("%s: %s", formatValue(key, 0), formatValue(value, indentation+1))
+		result[i] = fmt.Sprintf("%s: %s", formatValue(key, indentation+1), formatValue(value, indentation+1))
 		if len(result[i]) > longest {
 			longest = len(result[i])
 		}
@@ -225,9 +386,8 @@ func formatMap(v reflect.Value, indentation uint) string {
 	if longest > longFormThreshold {
 		indenter := strings.Repeat(Indent, int(indentation))
 		return fmt.Sprintf("{\n%s%s,\n%s}", indenter+Indent, strings.Join(result, ",\n"+indenter+Indent), indenter)
-	} else {
-		return fmt.Sprintf("{%s}", strings.Join(result, ", "))
 	}
+	return fmt.Sprintf("{%s}", strings.Join(result, ", "))
 }
 
 func formatStruct(v reflect.Value, indentation uint) string {
@@ -248,9 +408,12 @@ func formatStruct(v reflect.Value, indentation uint) string {
 	if longest > longFormThreshold {
 		indenter := strings.Repeat(Indent, int(indentation))
 		return fmt.Sprintf("{\n%s%s,\n%s}", indenter+Indent, strings.Join(result, ",\n"+indenter+Indent), indenter)
-	} else {
-		return fmt.Sprintf("{%s}", strings.Join(result, ", "))
 	}
+	return fmt.Sprintf("{%s}", strings.Join(result, ", "))
+}
+
+func formatInterface(v reflect.Value, indentation uint) string {
+	return fmt.Sprintf("<%s>%s", formatType(v.Elem()), formatValue(v.Elem(), indentation))
 }
 
 func isNilValue(a reflect.Value) bool {

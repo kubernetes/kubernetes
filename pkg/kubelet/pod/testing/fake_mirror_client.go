@@ -20,9 +20,8 @@ import (
 	"sync"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	cp "k8s.io/kubernetes/pkg/kubelet/checkpoint"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -52,12 +51,13 @@ func (fmc *FakeMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
 	return nil
 }
 
-func (fmc *FakeMirrorClient) DeleteMirrorPod(podFullName string) error {
+// TODO (Robert Krawitz): Implement UID checking
+func (fmc *FakeMirrorClient) DeleteMirrorPod(podFullName string, _ *types.UID) (bool, error) {
 	fmc.mirrorPodLock.Lock()
 	defer fmc.mirrorPodLock.Unlock()
 	fmc.mirrorPods.Delete(podFullName)
 	fmc.deleteCounts[podFullName]++
-	return nil
+	return true, nil
 }
 
 func (fmc *FakeMirrorClient) HasPod(podFullName string) bool {
@@ -82,38 +82,4 @@ func (fmc *FakeMirrorClient) GetCounts(podFullName string) (int, int) {
 	fmc.mirrorPodLock.RLock()
 	defer fmc.mirrorPodLock.RUnlock()
 	return fmc.createCounts[podFullName], fmc.deleteCounts[podFullName]
-}
-
-type MockCheckpointManager struct {
-	checkpoint map[string]*cp.Data
-}
-
-func (ckm *MockCheckpointManager) CreateCheckpoint(checkpointKey string, checkpoint checkpointmanager.Checkpoint) error {
-	ckm.checkpoint[checkpointKey] = (checkpoint.(*cp.Data))
-	return nil
-}
-
-func (ckm *MockCheckpointManager) GetCheckpoint(checkpointKey string, checkpoint checkpointmanager.Checkpoint) error {
-	*(checkpoint.(*cp.Data)) = *(ckm.checkpoint[checkpointKey])
-	return nil
-}
-
-func (ckm *MockCheckpointManager) RemoveCheckpoint(checkpointKey string) error {
-	_, ok := ckm.checkpoint[checkpointKey]
-	if ok {
-		delete(ckm.checkpoint, "moo")
-	}
-	return nil
-}
-
-func (ckm *MockCheckpointManager) ListCheckpoints() ([]string, error) {
-	var keys []string
-	for key := range ckm.checkpoint {
-		keys = append(keys, key)
-	}
-	return keys, nil
-}
-
-func NewMockCheckpointManager() checkpointmanager.CheckpointManager {
-	return &MockCheckpointManager{checkpoint: make(map[string]*cp.Data)}
 }

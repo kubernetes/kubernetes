@@ -40,14 +40,11 @@ type Config struct {
 	// the general kube client
 	Client *clientset.Clientset
 
-	// the client only used for leader election
-	LeaderElectionClient *clientset.Clientset
-
 	// the rest config for the master
 	Kubeconfig *restclient.Config
 
-	// the event sink
-	EventRecorder record.EventRecorder
+	EventBroadcaster record.EventBroadcaster
+	EventRecorder    record.EventRecorder
 }
 
 type completedConfig struct {

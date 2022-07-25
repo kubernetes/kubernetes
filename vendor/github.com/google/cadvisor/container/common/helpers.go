@@ -17,19 +17,23 @@ package common
 import (
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/karrick/godirwalk"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
+
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
-	"github.com/karrick/godirwalk"
-	"github.com/pkg/errors"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func DebugInfo(watches map[string][]string) map[string][]string {
@@ -47,24 +51,49 @@ func DebugInfo(watches map[string][]string) map[string][]string {
 	return out
 }
 
+var bootTime = func() time.Time {
+	now := time.Now()
+	var sysinfo unix.Sysinfo_t
+	if err := unix.Sysinfo(&sysinfo); err != nil {
+		return now
+	}
+	sinceBoot := time.Duration(sysinfo.Uptime) * time.Second
+	return now.Add(-1 * sinceBoot).Truncate(time.Minute)
+}()
+
 func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoFactory, hasNetwork, hasFilesystem bool) (info.ContainerSpec, error) {
+	return getSpecInternal(cgroupPaths, machineInfoFactory, hasNetwork, hasFilesystem, cgroups.IsCgroup2UnifiedMode())
+}
+
+func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoFactory, hasNetwork, hasFilesystem, cgroup2UnifiedMode bool) (info.ContainerSpec, error) {
 	var spec info.ContainerSpec
 
 	// Assume unified hierarchy containers.
 	// Get the lowest creation time from all hierarchies as the container creation time.
 	now := time.Now()
 	lowestTime := now
-	for _, cgroupPath := range cgroupPaths {
-		// The modified time of the cgroup directory changes whenever a subcontainer is created.
+	for _, cgroupPathDir := range cgroupPaths {
+		dir, err := os.Stat(cgroupPathDir)
+		if err == nil && dir.ModTime().Before(lowestTime) {
+			lowestTime = dir.ModTime()
+		}
+		// The modified time of the cgroup directory sometimes changes whenever a subcontainer is created.
 		// eg. /docker will have creation time matching the creation of latest docker container.
-		// Use clone_children as a workaround as it isn't usually modified. It is only likely changed
-		// immediately after creating a container.
-		cgroupPath = path.Join(cgroupPath, "cgroup.clone_children")
-		fi, err := os.Stat(cgroupPath)
+		// Use clone_children/events as a workaround as it isn't usually modified. It is only likely changed
+		// immediately after creating a container. If the directory modified time is lower, we use that.
+		cgroupPathFile := path.Join(cgroupPathDir, "cgroup.clone_children")
+		if cgroup2UnifiedMode {
+			cgroupPathFile = path.Join(cgroupPathDir, "cgroup.events")
+		}
+		fi, err := os.Stat(cgroupPathFile)
 		if err == nil && fi.ModTime().Before(lowestTime) {
 			lowestTime = fi.ModTime()
 		}
 	}
+	if lowestTime.Before(bootTime) {
+		lowestTime = bootTime
+	}
+
 	if lowestTime != now {
 		spec.CreationTime = lowestTime
 	}
@@ -76,54 +105,129 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 	}
 
 	// CPU.
-	cpuRoot, ok := cgroupPaths["cpu"]
+	cpuRoot, ok := GetControllerPath(cgroupPaths, "cpu", cgroup2UnifiedMode)
 	if ok {
 		if utils.FileExists(cpuRoot) {
-			spec.HasCpu = true
-			spec.Cpu.Limit = readUInt64(cpuRoot, "cpu.shares")
-			spec.Cpu.Period = readUInt64(cpuRoot, "cpu.cfs_period_us")
-			quota := readString(cpuRoot, "cpu.cfs_quota_us")
+			if cgroup2UnifiedMode {
+				spec.HasCpu = true
 
-			if quota != "" && quota != "-1" {
-				val, err := strconv.ParseUint(quota, 10, 64)
-				if err != nil {
-					klog.Errorf("GetSpec: Failed to parse CPUQuota from %q: %s", path.Join(cpuRoot, "cpu.cfs_quota_us"), err)
+				weight := readUInt64(cpuRoot, "cpu.weight")
+				if weight > 0 {
+					limit, err := convertCPUWeightToCPULimit(weight)
+					if err != nil {
+						klog.Errorf("GetSpec: Failed to read CPULimit from %q: %s", path.Join(cpuRoot, "cpu.weight"), err)
+					} else {
+						spec.Cpu.Limit = limit
+					}
 				}
-				spec.Cpu.Quota = val
+				max := readString(cpuRoot, "cpu.max")
+				if max != "" {
+					splits := strings.SplitN(max, " ", 2)
+					if len(splits) != 2 {
+						klog.Errorf("GetSpec: Failed to parse CPUmax from %q", path.Join(cpuRoot, "cpu.max"))
+					} else {
+						if splits[0] != "max" {
+							spec.Cpu.Quota = parseUint64String(splits[0])
+						}
+						spec.Cpu.Period = parseUint64String(splits[1])
+					}
+				}
+			} else {
+				spec.HasCpu = true
+				spec.Cpu.Limit = readUInt64(cpuRoot, "cpu.shares")
+				spec.Cpu.Period = readUInt64(cpuRoot, "cpu.cfs_period_us")
+				quota := readString(cpuRoot, "cpu.cfs_quota_us")
+
+				if quota != "" && quota != "-1" {
+					val, err := strconv.ParseUint(quota, 10, 64)
+					if err != nil {
+						klog.Errorf("GetSpec: Failed to parse CPUQuota from %q: %s", path.Join(cpuRoot, "cpu.cfs_quota_us"), err)
+					} else {
+						spec.Cpu.Quota = val
+					}
+				}
 			}
 		}
 	}
 
 	// Cpu Mask.
 	// This will fail for non-unified hierarchies. We'll return the whole machine mask in that case.
-	cpusetRoot, ok := cgroupPaths["cpuset"]
+	cpusetRoot, ok := GetControllerPath(cgroupPaths, "cpuset", cgroup2UnifiedMode)
 	if ok {
 		if utils.FileExists(cpusetRoot) {
 			spec.HasCpu = true
-			mask := readString(cpusetRoot, "cpuset.cpus")
+			mask := ""
+			if cgroup2UnifiedMode {
+				mask = readString(cpusetRoot, "cpuset.cpus.effective")
+			} else {
+				mask = readString(cpusetRoot, "cpuset.cpus")
+			}
 			spec.Cpu.Mask = utils.FixCpuMask(mask, mi.NumCores)
 		}
 	}
 
 	// Memory
-	memoryRoot, ok := cgroupPaths["memory"]
+	memoryRoot, ok := GetControllerPath(cgroupPaths, "memory", cgroup2UnifiedMode)
 	if ok {
-		if utils.FileExists(memoryRoot) {
-			spec.HasMemory = true
-			spec.Memory.Limit = readUInt64(memoryRoot, "memory.limit_in_bytes")
-			spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.memsw.limit_in_bytes")
-			spec.Memory.Reservation = readUInt64(memoryRoot, "memory.soft_limit_in_bytes")
+		if cgroup2UnifiedMode {
+			if utils.FileExists(path.Join(memoryRoot, "memory.max")) {
+				spec.HasMemory = true
+				spec.Memory.Reservation = readUInt64(memoryRoot, "memory.high")
+				spec.Memory.Limit = readUInt64(memoryRoot, "memory.max")
+				spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.swap.max")
+			}
+		} else {
+			if utils.FileExists(memoryRoot) {
+				spec.HasMemory = true
+				spec.Memory.Limit = readUInt64(memoryRoot, "memory.limit_in_bytes")
+				spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.memsw.limit_in_bytes")
+				spec.Memory.Reservation = readUInt64(memoryRoot, "memory.soft_limit_in_bytes")
+			}
+		}
+	}
+
+	// Hugepage
+	hugepageRoot, ok := cgroupPaths["hugetlb"]
+	if ok {
+		if utils.FileExists(hugepageRoot) {
+			spec.HasHugetlb = true
+		}
+	}
+
+	// Processes, read it's value from pids path directly
+	pidsRoot, ok := GetControllerPath(cgroupPaths, "pids", cgroup2UnifiedMode)
+	if ok {
+		if utils.FileExists(pidsRoot) {
+			spec.HasProcesses = true
+			spec.Processes.Limit = readUInt64(pidsRoot, "pids.max")
 		}
 	}
 
 	spec.HasNetwork = hasNetwork
 	spec.HasFilesystem = hasFilesystem
 
-	if blkioRoot, ok := cgroupPaths["blkio"]; ok && utils.FileExists(blkioRoot) {
+	ioControllerName := "blkio"
+	if cgroup2UnifiedMode {
+		ioControllerName = "io"
+	}
+	if blkioRoot, ok := cgroupPaths[ioControllerName]; ok && utils.FileExists(blkioRoot) {
 		spec.HasDiskIo = true
 	}
 
 	return spec, nil
+}
+
+func GetControllerPath(cgroupPaths map[string]string, controllerName string, cgroup2UnifiedMode bool) (string, bool) {
+
+	ok := false
+	path := ""
+
+	if cgroup2UnifiedMode {
+		path, ok = cgroupPaths[""]
+	} else {
+		path, ok = cgroupPaths[controllerName]
+	}
+	return path, ok
 }
 
 func readString(dirpath string, file string) string {
@@ -134,15 +238,49 @@ func readString(dirpath string, file string) string {
 	if err != nil {
 		// Ignore non-existent files
 		if !os.IsNotExist(err) {
-			klog.Errorf("readString: Failed to read %q: %s", cgroupFile, err)
+			klog.Warningf("readString: Failed to read %q: %s", cgroupFile, err)
 		}
 		return ""
 	}
 	return strings.TrimSpace(string(out))
 }
 
+// Convert from [1-10000] to [2-262144]
+func convertCPUWeightToCPULimit(weight uint64) (uint64, error) {
+	const (
+		// minWeight is the lowest value possible for cpu.weight
+		minWeight = 1
+		// maxWeight is the highest value possible for cpu.weight
+		maxWeight = 10000
+	)
+	if weight < minWeight || weight > maxWeight {
+		return 0, fmt.Errorf("convertCPUWeightToCPULimit: invalid cpu weight: %v", weight)
+	}
+	return 2 + ((weight-1)*262142)/9999, nil
+}
+
+func parseUint64String(strValue string) uint64 {
+	if strValue == "max" {
+		return math.MaxUint64
+	}
+	if strValue == "" {
+		return 0
+	}
+
+	val, err := strconv.ParseUint(strValue, 10, 64)
+	if err != nil {
+		klog.Errorf("parseUint64String: Failed to parse int %q: %s", strValue, err)
+		return 0
+	}
+
+	return val
+}
+
 func readUInt64(dirpath string, file string) uint64 {
 	out := readString(dirpath, file)
+	if out == "max" {
+		return math.MaxUint64
+	}
 	if out == "" {
 		return 0
 	}
@@ -158,7 +296,7 @@ func readUInt64(dirpath string, file string) uint64 {
 
 // Lists all directories under "path" and outputs the results as children of "parent".
 func ListDirectories(dirpath string, parent string, recursive bool, output map[string]struct{}) error {
-	buf := make([]byte, godirwalk.DefaultScratchBufferSize)
+	buf := make([]byte, godirwalk.MinimumScratchBufferSize)
 	return listDirectories(dirpath, parent, recursive, output, buf)
 }
 

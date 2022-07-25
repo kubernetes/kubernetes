@@ -25,7 +25,7 @@ trpcL := m.Match(cmux.Any()) // Any means anything that is not yet matched.
 
 // Create your protocol servers.
 grpcS := grpc.NewServer()
-grpchello.RegisterGreeterServer(grpcs, &server{})
+grpchello.RegisterGreeterServer(grpcS, &server{})
 
 httpS := &http.Server{
 	Handler: &helloHTTP1Handler{},

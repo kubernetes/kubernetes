@@ -4,7 +4,11 @@
 // This package's client can be disabled completely by setting the environment
 // variable "AWS_EC2_METADATA_DISABLED=true". This environment variable set to
 // true instructs the SDK to disable the EC2 Metadata client. The client cannot
-// be used while the environemnt variable is set to true, (case insensitive).
+// be used while the environment variable is set to true, (case insensitive).
+//
+// The endpoint of the EC2 IMDS client can be configured via the environment
+// variable, AWS_EC2_METADATA_SERVICE_ENDPOINT when creating the client with a
+// Session. See aws/session#Options.EC2IMDSEndpoint for more details.
 package ec2metadata
 
 import (
@@ -12,7 +16,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,9 +30,25 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 )
 
-// ServiceName is the name of the service.
-const ServiceName = "ec2metadata"
-const disableServiceEnvVar = "AWS_EC2_METADATA_DISABLED"
+const (
+	// ServiceName is the name of the service.
+	ServiceName          = "ec2metadata"
+	disableServiceEnvVar = "AWS_EC2_METADATA_DISABLED"
+
+	// Headers for Token and TTL
+	ttlHeader   = "x-aws-ec2-metadata-token-ttl-seconds"
+	tokenHeader = "x-aws-ec2-metadata-token"
+
+	// Named Handler constants
+	fetchTokenHandlerName          = "FetchTokenHandler"
+	unmarshalMetadataHandlerName   = "unmarshalMetadataHandler"
+	unmarshalTokenHandlerName      = "unmarshalTokenHandler"
+	enableTokenProviderHandlerName = "enableTokenProviderHandler"
+
+	// TTL constants
+	defaultTTL          = 21600 * time.Second
+	ttlExpirationWindow = 30 * time.Second
+)
 
 // A EC2Metadata is an EC2 Metadata service Client.
 type EC2Metadata struct {
@@ -52,6 +74,9 @@ func New(p client.ConfigProvider, cfgs ...*aws.Config) *EC2Metadata {
 // a client when not using a session. Generally using just New with a session
 // is preferred.
 //
+// Will remove the URL path from the endpoint provided to ensure the EC2 IMDS
+// client is able to communicate with the EC2 IMDS API.
+//
 // If an unmodified HTTP client is provided from the stdlib default, or no client
 // the EC2RoleProvider's EC2Metadata HTTP client's timeout will be shortened.
 // To disable this set Config.EC2MetadataDisableTimeoutOverride to false. Enabled by default.
@@ -63,8 +88,19 @@ func NewClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 			// use a shorter timeout than default because the metadata
 			// service is local if it is running, and to fail faster
 			// if not running on an ec2 instance.
-			Timeout: 5 * time.Second,
+			Timeout: 1 * time.Second,
 		}
+		// max number of retries on the client operation
+		cfg.MaxRetries = aws.Int(2)
+	}
+
+	if u, err := url.Parse(endpoint); err == nil {
+		// Remove path from the endpoint since it will be added by requests.
+		// This is an artifact of the SDK adding `/latest` to the endpoint for
+		// EC2 IMDS, but this is now moved to the operation definition.
+		u.Path = ""
+		u.RawPath = ""
+		endpoint = u.String()
 	}
 
 	svc := &EC2Metadata{
@@ -72,6 +108,7 @@ func NewClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 			cfg,
 			metadata.ClientInfo{
 				ServiceName: ServiceName,
+				ServiceID:   ServiceName,
 				Endpoint:    endpoint,
 				APIVersion:  "latest",
 			},
@@ -79,18 +116,35 @@ func NewClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 		),
 	}
 
-	svc.Handlers.Unmarshal.PushBack(unmarshalHandler)
+	// token provider instance
+	tp := newTokenProvider(svc, defaultTTL)
+
+	// NamedHandler for fetching token
+	svc.Handlers.Sign.PushBackNamed(request.NamedHandler{
+		Name: fetchTokenHandlerName,
+		Fn:   tp.fetchTokenHandler,
+	})
+	// NamedHandler for enabling token provider
+	svc.Handlers.Complete.PushBackNamed(request.NamedHandler{
+		Name: enableTokenProviderHandlerName,
+		Fn:   tp.enableTokenProviderHandler,
+	})
+
+	svc.Handlers.Unmarshal.PushBackNamed(unmarshalHandler)
 	svc.Handlers.UnmarshalError.PushBack(unmarshalError)
 	svc.Handlers.Validate.Clear()
 	svc.Handlers.Validate.PushBack(validateEndpointHandler)
 
 	// Disable the EC2 Metadata service if the environment variable is set.
-	// This shortcirctes the service's functionality to always fail to send
+	// This short-circuits the service's functionality to always fail to send
 	// requests.
 	if strings.ToLower(os.Getenv(disableServiceEnvVar)) == "true" {
 		svc.Handlers.Send.SwapNamed(request.NamedHandler{
 			Name: corehandlers.SendHandler.Name,
 			Fn: func(r *request.Request) {
+				r.HTTPResponse = &http.Response{
+					Header: http.Header{},
+				}
 				r.Error = awserr.New(
 					request.CanceledErrorCode,
 					"EC2 IMDS access disabled via "+disableServiceEnvVar+" env var",
@@ -103,7 +157,6 @@ func NewClient(cfg aws.Config, handlers request.Handlers, endpoint, signingRegio
 	for _, option := range opts {
 		option(svc.Client)
 	}
-
 	return svc
 }
 
@@ -115,30 +168,74 @@ type metadataOutput struct {
 	Content string
 }
 
-func unmarshalHandler(r *request.Request) {
-	defer r.HTTPResponse.Body.Close()
-	b := &bytes.Buffer{}
-	if _, err := io.Copy(b, r.HTTPResponse.Body); err != nil {
-		r.Error = awserr.New("SerializationError", "unable to unmarshal EC2 metadata respose", err)
-		return
-	}
+type tokenOutput struct {
+	Token string
+	TTL   time.Duration
+}
 
-	if data, ok := r.Data.(*metadataOutput); ok {
-		data.Content = b.String()
-	}
+// unmarshal token handler is used to parse the response of a getToken operation
+var unmarshalTokenHandler = request.NamedHandler{
+	Name: unmarshalTokenHandlerName,
+	Fn: func(r *request.Request) {
+		defer r.HTTPResponse.Body.Close()
+		var b bytes.Buffer
+		if _, err := io.Copy(&b, r.HTTPResponse.Body); err != nil {
+			r.Error = awserr.NewRequestFailure(awserr.New(request.ErrCodeSerialization,
+				"unable to unmarshal EC2 metadata response", err), r.HTTPResponse.StatusCode, r.RequestID)
+			return
+		}
+
+		v := r.HTTPResponse.Header.Get(ttlHeader)
+		data, ok := r.Data.(*tokenOutput)
+		if !ok {
+			return
+		}
+
+		data.Token = b.String()
+		// TTL is in seconds
+		i, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			r.Error = awserr.NewRequestFailure(awserr.New(request.ParamFormatErrCode,
+				"unable to parse EC2 token TTL response", err), r.HTTPResponse.StatusCode, r.RequestID)
+			return
+		}
+		t := time.Duration(i) * time.Second
+		data.TTL = t
+	},
+}
+
+var unmarshalHandler = request.NamedHandler{
+	Name: unmarshalMetadataHandlerName,
+	Fn: func(r *request.Request) {
+		defer r.HTTPResponse.Body.Close()
+		var b bytes.Buffer
+		if _, err := io.Copy(&b, r.HTTPResponse.Body); err != nil {
+			r.Error = awserr.NewRequestFailure(awserr.New(request.ErrCodeSerialization,
+				"unable to unmarshal EC2 metadata response", err), r.HTTPResponse.StatusCode, r.RequestID)
+			return
+		}
+
+		if data, ok := r.Data.(*metadataOutput); ok {
+			data.Content = b.String()
+		}
+	},
 }
 
 func unmarshalError(r *request.Request) {
 	defer r.HTTPResponse.Body.Close()
-	b := &bytes.Buffer{}
-	if _, err := io.Copy(b, r.HTTPResponse.Body); err != nil {
-		r.Error = awserr.New("SerializationError", "unable to unmarshal EC2 metadata error respose", err)
+	var b bytes.Buffer
+
+	if _, err := io.Copy(&b, r.HTTPResponse.Body); err != nil {
+		r.Error = awserr.NewRequestFailure(
+			awserr.New(request.ErrCodeSerialization, "unable to unmarshal EC2 metadata error response", err),
+			r.HTTPResponse.StatusCode, r.RequestID)
 		return
 	}
 
 	// Response body format is not consistent between metadata endpoints.
 	// Grab the error message as a string and include that as the source error
-	r.Error = awserr.New("EC2MetadataError", "failed to make EC2Metadata request", errors.New(b.String()))
+	r.Error = awserr.NewRequestFailure(awserr.New("EC2MetadataError", "failed to make EC2Metadata request", errors.New(b.String())),
+		r.HTTPResponse.StatusCode, r.RequestID)
 }
 
 func validateEndpointHandler(r *request.Request) {

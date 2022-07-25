@@ -17,6 +17,7 @@ limitations under the License.
 package simulator
 
 import (
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,11 +28,21 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
+var (
+	hostPortUnique = os.Getenv("VCSIM_HOST_PORT_UNIQUE") == "true"
+)
+
 type HostSystem struct {
 	mo.HostSystem
 }
 
 func NewHostSystem(host mo.HostSystem) *HostSystem {
+	if hostPortUnique { // configure unique port for each host
+		port := &esx.HostSystem.Summary.Config.Port
+		*port++
+		host.Summary.Config.Port = *port
+	}
+
 	now := time.Now()
 
 	hs := &HostSystem{
@@ -69,6 +80,16 @@ func NewHostSystem(host mo.HostSystem) *HostSystem {
 	}
 
 	return hs
+}
+
+func (h *HostSystem) event() types.HostEvent {
+	return types.HostEvent{
+		Event: types.Event{
+			Datacenter:      datacenterEventArgument(h),
+			ComputeResource: h.eventArgumentParent(),
+			Host:            h.eventArgument(),
+		},
+	}
 }
 
 func (h *HostSystem) eventArgument() *types.HostEventArgument {
@@ -121,6 +142,7 @@ func CreateDefaultESX(f *Folder) {
 	addComputeResource(summary, host)
 
 	cr := &mo.ComputeResource{Summary: summary}
+	cr.EnvironmentBrowser = newEnvironmentBrowser()
 	cr.Self = *host.Parent
 	cr.Name = host.Name
 	cr.Host = append(cr.Host, host.Reference())
@@ -155,7 +177,8 @@ func CreateStandaloneHost(f *Folder, spec types.HostConnectSpec) (*HostSystem, t
 		ConfigurationEx: &types.ComputeResourceConfigInfo{
 			VmSwapPlacement: string(types.VirtualMachineConfigInfoSwapPlacementTypeVmDirectory),
 		},
-		Summary: summary,
+		Summary:            summary,
+		EnvironmentBrowser: newEnvironmentBrowser(),
 	}
 
 	Map.PutEntity(cr, Map.NewEntity(host))
@@ -173,11 +196,13 @@ func CreateStandaloneHost(f *Folder, spec types.HostConnectSpec) (*HostSystem, t
 	return host, nil
 }
 
-func (h *HostSystem) DestroyTask(req *types.Destroy_Task) soap.HasFault {
+func (h *HostSystem) DestroyTask(ctx *Context, req *types.Destroy_Task) soap.HasFault {
 	task := CreateTask(h, "destroy", func(t *Task) (types.AnyType, types.BaseMethodFault) {
 		if len(h.Vm) > 0 {
 			return nil, &types.ResourceInUse{}
 		}
+
+		ctx.postEvent(&types.HostRemovedEvent{HostEvent: h.event()})
 
 		f := Map.getEntityParent(h, "Folder").(*Folder)
 		f.removeChild(h.Reference())

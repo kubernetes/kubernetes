@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -destination=testing/mock_manager.go -package=testing -build_flags=-mod=mod . Manager
 package pod
 
 import (
 	"sync"
 
-	"k8s.io/klog"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -59,7 +59,7 @@ type Manager interface {
 	// whether the pod is found.
 	GetPodByUID(types.UID) (*v1.Pod, bool)
 	// GetPodByMirrorPod returns the static pod for the given mirror pod and
-	// whether it was known to the pod manger.
+	// whether it was known to the pod manager.
 	GetPodByMirrorPod(*v1.Pod) (*v1.Pod, bool)
 	// GetMirrorPodByPod returns the mirror pod for the given static pod and
 	// whether it was known to the pod manager.
@@ -77,10 +77,8 @@ type Manager interface {
 	// this means deleting the mappings related to mirror pods.  For non-
 	// mirror pods, this means deleting from indexes for all non-mirror pods.
 	DeletePod(pod *v1.Pod)
-	// DeleteOrphanedMirrorPods deletes all mirror pods which do not have
-	// associated static pods. This method sends deletion requests to the API
-	// server, but does NOT modify the internal pod storage in basicManager.
-	DeleteOrphanedMirrorPods()
+	// GetOrphanedMirrorPodNames returns names of orphaned mirror pods
+	GetOrphanedMirrorPodNames() []string
 	// TranslatePodUID returns the actual UID of a pod. If the UID belongs to
 	// a mirror pod, returns the UID of its static pod. Otherwise, returns the
 	// original UID.
@@ -120,20 +118,18 @@ type basicManager struct {
 	translationByUID map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID
 
 	// basicManager is keeping secretManager and configMapManager up-to-date.
-	secretManager     secret.Manager
-	configMapManager  configmap.Manager
-	checkpointManager checkpointmanager.CheckpointManager
+	secretManager    secret.Manager
+	configMapManager configmap.Manager
 
 	// A mirror pod client to create/delete mirror pods.
 	MirrorClient
 }
 
 // NewBasicPodManager returns a functional Manager.
-func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, configMapManager configmap.Manager, cpm checkpointmanager.CheckpointManager) Manager {
+func NewBasicPodManager(client MirrorClient, secretManager secret.Manager, configMapManager configmap.Manager) Manager {
 	pm := &basicManager{}
 	pm.secretManager = secretManager
 	pm.configMapManager = configMapManager
-	pm.checkpointManager = cpm
 	pm.MirrorClient = client
 	pm.SetPods(nil)
 	return pm
@@ -161,10 +157,24 @@ func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pm.updatePodsInternal(pod)
-	if pm.checkpointManager != nil {
-		if err := checkpoint.WritePod(pm.checkpointManager, pod); err != nil {
-			klog.Errorf("Error writing checkpoint for pod: %v", pod.GetName())
-		}
+}
+
+// updateMetrics updates the metrics surfaced by the pod manager.
+// oldPod or newPod may be nil to signify creation or deletion.
+func updateMetrics(oldPod, newPod *v1.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		return
+	}
+
+	var numEC int
+	if oldPod != nil {
+		numEC -= len(oldPod.Spec.EphemeralContainers)
+	}
+	if newPod != nil {
+		numEC += len(newPod.Spec.EphemeralContainers)
+	}
+	if numEC != 0 {
+		metrics.ManagedEphemeralContainers.Add(float64(numEC))
 	}
 }
 
@@ -173,20 +183,10 @@ func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 // lock.
 func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 	for _, pod := range pods {
-		if pm.secretManager != nil {
-			// TODO: Consider detecting only status update and in such case do
-			// not register pod, as it doesn't really matter.
-			pm.secretManager.RegisterPod(pod)
-		}
-		if pm.configMapManager != nil {
-			// TODO: Consider detecting only status update and in such case do
-			// not register pod, as it doesn't really matter.
-			pm.configMapManager.RegisterPod(pod)
-		}
 		podFullName := kubecontainer.GetPodFullName(pod)
 		// This logic relies on a static pod and its mirror to have the same name.
 		// It is safe to type convert here due to the IsMirrorPod guard.
-		if IsMirrorPod(pod) {
+		if kubetypes.IsMirrorPod(pod) {
 			mirrorPodUID := kubetypes.MirrorPodUID(pod.UID)
 			pm.mirrorPodByUID[mirrorPodUID] = pod
 			pm.mirrorPodByFullName[podFullName] = pod
@@ -195,6 +195,7 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 			}
 		} else {
 			resolvedPodUID := kubetypes.ResolvedPodUID(pod.UID)
+			updateMetrics(pm.podByUID[resolvedPodUID], pod)
 			pm.podByUID[resolvedPodUID] = pod
 			pm.podByFullName[podFullName] = pod
 			if mirror, ok := pm.mirrorPodByFullName[podFullName]; ok {
@@ -205,17 +206,12 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 }
 
 func (pm *basicManager) DeletePod(pod *v1.Pod) {
+	updateMetrics(pod, nil)
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
-	if pm.secretManager != nil {
-		pm.secretManager.UnregisterPod(pod)
-	}
-	if pm.configMapManager != nil {
-		pm.configMapManager.UnregisterPod(pod)
-	}
 	podFullName := kubecontainer.GetPodFullName(pod)
 	// It is safe to type convert here due to the IsMirrorPod guard.
-	if IsMirrorPod(pod) {
+	if kubetypes.IsMirrorPod(pod) {
 		mirrorPodUID := kubetypes.MirrorPodUID(pod.UID)
 		delete(pm.mirrorPodByUID, mirrorPodUID)
 		delete(pm.mirrorPodByFullName, podFullName)
@@ -223,11 +219,6 @@ func (pm *basicManager) DeletePod(pod *v1.Pod) {
 	} else {
 		delete(pm.podByUID, kubetypes.ResolvedPodUID(pod.UID))
 		delete(pm.podByFullName, podFullName)
-	}
-	if pm.checkpointManager != nil {
-		if err := checkpoint.DeletePod(pm.checkpointManager, pod); err != nil {
-			klog.Errorf("Error deleting checkpoint for pod: %v", pod.GetName())
-		}
 	}
 }
 
@@ -287,7 +278,7 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror map[kubetypes.Resolved
 	mirrorToPod = make(map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID, len(pm.translationByUID))
 	// Insert empty translation mapping for all static pods.
 	for uid, pod := range pm.podByUID {
-		if !IsStaticPod(pod) {
+		if !kubetypes.IsStaticPod(pod) {
 			continue
 		}
 		podToMirror[uid] = ""
@@ -303,7 +294,7 @@ func (pm *basicManager) GetUIDTranslations() (podToMirror map[kubetypes.Resolved
 	return podToMirror, mirrorToPod
 }
 
-func (pm *basicManager) getOrphanedMirrorPodNames() []string {
+func (pm *basicManager) GetOrphanedMirrorPodNames() []string {
 	pm.lock.RLock()
 	defer pm.lock.RUnlock()
 	var podFullNames []string
@@ -313,13 +304,6 @@ func (pm *basicManager) getOrphanedMirrorPodNames() []string {
 		}
 	}
 	return podFullNames
-}
-
-func (pm *basicManager) DeleteOrphanedMirrorPods() {
-	podFullNames := pm.getOrphanedMirrorPodNames()
-	for _, podFullName := range podFullNames {
-		pm.MirrorClient.DeleteMirrorPod(podFullName)
-	}
 }
 
 func (pm *basicManager) IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool {

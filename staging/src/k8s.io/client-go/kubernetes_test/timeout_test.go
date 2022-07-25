@@ -18,6 +18,7 @@ package kubernetes_test
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -55,6 +56,6 @@ func TestListTimeout(t *testing.T) {
 	realClient := kubernetes.New(restClient)
 
 	timeout := int64(21)
-	realClient.AppsV1().DaemonSets("").List(metav1.ListOptions{TimeoutSeconds: &timeout})
-	realClient.AppsV1().DaemonSets("").Watch(metav1.ListOptions{TimeoutSeconds: &timeout})
+	realClient.AppsV1().DaemonSets("").List(context.TODO(), metav1.ListOptions{TimeoutSeconds: &timeout})
+	realClient.AppsV1().DaemonSets("").Watch(context.TODO(), metav1.ListOptions{TimeoutSeconds: &timeout})
 }

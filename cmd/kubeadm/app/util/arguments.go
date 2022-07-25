@@ -22,6 +22,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
+	"k8s.io/klog/v2"
 )
 
 // BuildArgumentListFromMap takes two string-string maps, one with the base arguments and one
@@ -30,26 +32,26 @@ import (
 func BuildArgumentListFromMap(baseArguments map[string]string, overrideArguments map[string]string) []string {
 	var command []string
 	var keys []string
-	for k := range overrideArguments {
+
+	argsMap := make(map[string]string)
+
+	for k, v := range baseArguments {
+		argsMap[k] = v
+	}
+
+	for k, v := range overrideArguments {
+		argsMap[k] = v
+	}
+
+	for k := range argsMap {
 		keys = append(keys, k)
 	}
+
 	sort.Strings(keys)
 	for _, k := range keys {
-		v := overrideArguments[k]
-		// values of "" are allowed as well
-		command = append(command, fmt.Sprintf("--%s=%s", k, v))
+		command = append(command, fmt.Sprintf("--%s=%s", k, argsMap[k]))
 	}
-	keys = []string{}
-	for k := range baseArguments {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		v := baseArguments[k]
-		if _, overrideExists := overrideArguments[k]; !overrideExists {
-			command = append(command, fmt.Sprintf("--%s=%s", k, v))
-		}
-	}
+
 	return command
 }
 
@@ -63,7 +65,7 @@ func ParseArgumentListToMap(arguments []string) map[string]string {
 		// Warn in all other cases, but don't error out. This can happen only if the user has edited the argument list by hand, so they might know what they are doing
 		if err != nil {
 			if i != 0 {
-				fmt.Printf("[kubeadm] WARNING: The component argument %q could not be parsed correctly. The argument must be of the form %q. Skipping...", arg, "--")
+				klog.Warningf("[kubeadm] WARNING: The component argument %q could not be parsed correctly. The argument must be of the form %q. Skipping...\n", arg, "--")
 			}
 			continue
 		}

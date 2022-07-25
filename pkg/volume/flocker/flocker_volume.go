@@ -55,16 +55,16 @@ type flockerVolumeProvisioner struct {
 var _ volume.Provisioner = &flockerVolumeProvisioner{}
 
 func (c *flockerVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
-	if !util.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
+	if !util.ContainsAllAccessModes(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
 	}
 
 	if len(c.options.Parameters) > 0 {
-		return nil, fmt.Errorf("Provisioning failed: Specified at least one unsupported parameter")
+		return nil, fmt.Errorf("provisioning failed: Specified at least one unsupported parameter")
 	}
 
 	if c.options.PVC.Spec.Selector != nil {
-		return nil, fmt.Errorf("Provisioning failed: Specified unsupported selector")
+		return nil, fmt.Errorf("provisioning failed: Specified unsupported selector")
 	}
 
 	if util.CheckPersistentVolumeClaimModeBlock(c.options.PVC) {

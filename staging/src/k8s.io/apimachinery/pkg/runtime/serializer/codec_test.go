@@ -29,10 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	serializertesting "k8s.io/apimachinery/pkg/runtime/serializer/testing"
+	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
 	"sigs.k8s.io/yaml"
 )
@@ -60,7 +61,7 @@ func (testMetaFactory) Interpret(data []byte) (*schema.GroupVersionKind, error) 
 
 // TestObjectFuzzer can randomly populate all the above objects.
 var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
-	func(j *serializertesting.MyWeirdCustomEmbeddedVersionKindField, c fuzz.Continue) {
+	func(j *runtimetesting.MyWeirdCustomEmbeddedVersionKindField, c fuzz.Continue) {
 		c.FuzzNoCustom(j)
 		j.APIVersion = ""
 		j.ObjectKind = ""
@@ -77,23 +78,25 @@ func GetTestScheme() (*runtime.Scheme, runtime.Codec) {
 	// Ordinarily, we wouldn't add TestType2, but because this is a test and
 	// both types are from the same package, we need to get it into the system
 	// so that converter will match it with ExternalType2.
-	s.AddKnownTypes(internalGV, &serializertesting.TestType1{}, &serializertesting.TestType2{}, &serializertesting.ExternalInternalSame{})
-	s.AddKnownTypes(externalGV, &serializertesting.ExternalInternalSame{})
-	s.AddKnownTypeWithName(externalGV.WithKind("TestType1"), &serializertesting.ExternalTestType1{})
-	s.AddKnownTypeWithName(externalGV.WithKind("TestType2"), &serializertesting.ExternalTestType2{})
-	s.AddKnownTypeWithName(internalGV.WithKind("TestType3"), &serializertesting.TestType1{})
-	s.AddKnownTypeWithName(externalGV.WithKind("TestType3"), &serializertesting.ExternalTestType1{})
-	s.AddKnownTypeWithName(externalGV2.WithKind("TestType1"), &serializertesting.ExternalTestType1{})
+	s.AddKnownTypes(internalGV, &runtimetesting.TestType1{}, &runtimetesting.TestType2{}, &runtimetesting.ExternalInternalSame{})
+	s.AddKnownTypes(externalGV, &runtimetesting.ExternalInternalSame{})
+	s.AddKnownTypeWithName(externalGV.WithKind("TestType1"), &runtimetesting.ExternalTestType1{})
+	s.AddKnownTypeWithName(externalGV.WithKind("TestType2"), &runtimetesting.ExternalTestType2{})
+	s.AddKnownTypeWithName(internalGV.WithKind("TestType3"), &runtimetesting.TestType1{})
+	s.AddKnownTypeWithName(externalGV.WithKind("TestType3"), &runtimetesting.ExternalTestType1{})
+	s.AddKnownTypeWithName(externalGV2.WithKind("TestType1"), &runtimetesting.ExternalTestType1{})
 
 	s.AddUnversionedTypes(externalGV, &metav1.Status{})
 
-	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
+	utilruntime.Must(runtimetesting.RegisterConversions(s))
+
+	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}, CodecFactoryOptions{Pretty: true, Strict: true}))
 	codec := cf.LegacyCodec(schema.GroupVersion{Version: "v1"})
 	return s, codec
 }
 
 var semantic = conversion.EqualitiesOrDie(
-	func(a, b serializertesting.MyWeirdCustomEmbeddedVersionKindField) bool {
+	func(a, b runtimetesting.MyWeirdCustomEmbeddedVersionKindField) bool {
 		a.APIVersion, a.ObjectKind = "", ""
 		b.APIVersion, b.ObjectKind = "", ""
 		return a == b
@@ -132,8 +135,8 @@ func runTest(t *testing.T, source interface{}) {
 
 func TestTypes(t *testing.T) {
 	table := []interface{}{
-		&serializertesting.TestType1{},
-		&serializertesting.ExternalInternalSame{},
+		&runtimetesting.TestType1{},
+		&runtimetesting.ExternalInternalSame{},
 	}
 	for _, item := range table {
 		// Try a few times, since runTest uses random values.
@@ -145,12 +148,12 @@ func TestTypes(t *testing.T) {
 
 func TestVersionedEncoding(t *testing.T) {
 	s, _ := GetTestScheme()
-	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
+	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}, CodecFactoryOptions{Pretty: true, Strict: true}))
 	info, _ := runtime.SerializerInfoForMediaType(cf.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	encoder := info.Serializer
 
-	codec := cf.CodecForVersions(encoder, nil, schema.GroupVersion{Version: "v2"}, nil)
-	out, err := runtime.Encode(codec, &serializertesting.TestType1{})
+	codec := cf.EncoderForVersion(encoder, schema.GroupVersion{Version: "v2"})
+	out, err := runtime.Encode(codec, &runtimetesting.TestType1{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,15 +161,15 @@ func TestVersionedEncoding(t *testing.T) {
 		t.Fatal(string(out))
 	}
 
-	codec = cf.CodecForVersions(encoder, nil, schema.GroupVersion{Version: "v3"}, nil)
-	_, err = runtime.Encode(codec, &serializertesting.TestType1{})
+	codec = cf.EncoderForVersion(encoder, schema.GroupVersion{Version: "v3"})
+	_, err = runtime.Encode(codec, &runtimetesting.TestType1{})
 	if err == nil {
 		t.Fatal(err)
 	}
 
 	// unversioned encode with no versions is written directly to wire
-	codec = cf.CodecForVersions(encoder, nil, runtime.InternalGroupVersioner, nil)
-	out, err = runtime.Encode(codec, &serializertesting.TestType1{})
+	codec = cf.EncoderForVersion(encoder, runtime.InternalGroupVersioner)
+	out, err = runtime.Encode(codec, &runtimetesting.TestType1{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +185,7 @@ func TestMultipleNames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	internal := obj.(*serializertesting.TestType1)
+	internal := obj.(*runtimetesting.TestType1)
 	if internal.A != "value" {
 		t.Fatalf("unexpected decoded object: %#v", internal)
 	}
@@ -196,19 +199,39 @@ func TestMultipleNames(t *testing.T) {
 	}
 }
 
+func TestStrictOption(t *testing.T) {
+	s, _ := GetTestScheme()
+	duplicateKeys := `{"myKindKey":"TestType3","myVersionKey":"v1","myVersionKey":"v1","A":"value"}`
+
+	strictCodec := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}, CodecFactoryOptions{Pretty: true, Strict: true})).LegacyCodec()
+	_, _, err := strictCodec.Decode([]byte(duplicateKeys), nil, nil)
+	if !runtime.IsStrictDecodingError(err) {
+		t.Fatalf("StrictDecodingError not returned on object with duplicate keys: %v, type: %v", err, reflect.TypeOf(err))
+	}
+
+	nonStrictCodec := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}, CodecFactoryOptions{Pretty: true, Strict: false})).LegacyCodec()
+	_, _, err = nonStrictCodec.Decode([]byte(duplicateKeys), nil, nil)
+	if runtime.IsStrictDecodingError(err) {
+		t.Fatalf("Non-Strict decoder returned a StrictDecodingError: %v", err)
+	}
+}
+
 func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 	internalGV := schema.GroupVersion{Version: runtime.APIVersionInternal}
 	externalGV := schema.GroupVersion{Version: "v1"}
 
 	s := runtime.NewScheme()
 	// create two names internally, with TestType1 being preferred
-	s.AddKnownTypeWithName(internalGV.WithKind("TestType1"), &serializertesting.TestType1{})
-	s.AddKnownTypeWithName(internalGV.WithKind("OtherType1"), &serializertesting.TestType1{})
+	s.AddKnownTypeWithName(internalGV.WithKind("TestType1"), &runtimetesting.TestType1{})
+	s.AddKnownTypeWithName(internalGV.WithKind("OtherType1"), &runtimetesting.TestType1{})
 	// create two names externally, with TestType1 being preferred
-	s.AddKnownTypeWithName(externalGV.WithKind("TestType1"), &serializertesting.ExternalTestType1{})
-	s.AddKnownTypeWithName(externalGV.WithKind("OtherType1"), &serializertesting.ExternalTestType1{})
+	s.AddKnownTypeWithName(externalGV.WithKind("TestType1"), &runtimetesting.ExternalTestType1{})
+	s.AddKnownTypeWithName(externalGV.WithKind("OtherType1"), &runtimetesting.ExternalTestType1{})
+	if err := runtimetesting.RegisterConversions(s); err != nil {
+		t.Fatalf("unexpected error; %v", err)
+	}
 
-	ext := &serializertesting.ExternalTestType1{}
+	ext := &runtimetesting.ExternalTestType1{}
 	ext.APIVersion = "v1"
 	ext.ObjectKind = "OtherType1"
 	ext.A = "test"
@@ -216,9 +239,11 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expect := &serializertesting.TestType1{A: "test"}
+	expect := &runtimetesting.TestType1{A: "test"}
 
-	codec := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{})).LegacyCodec(schema.GroupVersion{Version: "v1"})
+	codec := newCodecFactory(
+		s, newSerializersForScheme(s, testMetaFactory{}, CodecFactoryOptions{Pretty: true, Strict: true}),
+	).LegacyCodec(schema.GroupVersion{Version: "v1"})
 
 	obj, err := runtime.Decode(codec, data)
 	if err != nil {
@@ -228,7 +253,7 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 		t.Errorf("unexpected object: %#v", obj)
 	}
 
-	into := &serializertesting.TestType1{}
+	into := &runtimetesting.TestType1{}
 	if err := runtime.DecodeInto(codec, data, into); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -239,13 +264,13 @@ func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
 
 func TestEncode_Ptr(t *testing.T) {
 	_, codec := GetTestScheme()
-	tt := &serializertesting.TestType1{A: "I am a pointer object"}
+	tt := &runtimetesting.TestType1{A: "I am a pointer object"}
 	data, err := runtime.Encode(codec, tt)
 	obj2, err2 := runtime.Decode(codec, data)
 	if err != nil || err2 != nil {
 		t.Fatalf("Failure: '%v' '%v'\n%s", err, err2, data)
 	}
-	if _, ok := obj2.(*serializertesting.TestType1); !ok {
+	if _, ok := obj2.(*runtimetesting.TestType1); !ok {
 		t.Fatalf("Got wrong type")
 	}
 	if !semantic.DeepEqual(obj2, tt) {
@@ -268,10 +293,10 @@ func TestBadJSONRejection(t *testing.T) {
 		}
 	}
 	badJSONKindMismatch := []byte(`{"myVersionKey":"v1","myKindKey":"ExternalInternalSame"}`)
-	if err := runtime.DecodeInto(codec, badJSONKindMismatch, &serializertesting.TestType1{}); err == nil {
+	if err := runtime.DecodeInto(codec, badJSONKindMismatch, &runtimetesting.TestType1{}); err == nil {
 		t.Errorf("Kind is set but doesn't match the object type: %s", badJSONKindMismatch)
 	}
-	if err := runtime.DecodeInto(codec, []byte(``), &serializertesting.TestType1{}); err != nil {
+	if err := runtime.DecodeInto(codec, []byte(``), &runtimetesting.TestType1{}); err != nil {
 		t.Errorf("Should allow empty decode: %v", err)
 	}
 	if _, _, err := codec.Decode([]byte(``), &schema.GroupVersionKind{Kind: "ExternalInternalSame"}, nil); err == nil {
@@ -300,26 +325,28 @@ func GetDirectCodecTestScheme() *runtime.Scheme {
 	// Ordinarily, we wouldn't add TestType2, but because this is a test and
 	// both types are from the same package, we need to get it into the system
 	// so that converter will match it with ExternalType2.
-	s.AddKnownTypes(internalGV, &serializertesting.TestType1{})
-	s.AddKnownTypes(externalGV, &serializertesting.ExternalTestType1{})
+	s.AddKnownTypes(internalGV, &runtimetesting.TestType1{})
+	s.AddKnownTypes(externalGV, &runtimetesting.ExternalTestType1{})
 
 	s.AddUnversionedTypes(externalGV, &metav1.Status{})
+
+	utilruntime.Must(runtimetesting.RegisterConversions(s))
 	return s
 }
 
 func TestDirectCodec(t *testing.T) {
 	s := GetDirectCodecTestScheme()
-	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
+	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}, CodecFactoryOptions{Pretty: true, Strict: true}))
 	info, _ := runtime.SerializerInfoForMediaType(cf.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	serializer := info.Serializer
-	df := DirectCodecFactory{cf}
+	df := cf.WithoutConversion()
 	ignoredGV, err := schema.ParseGroupVersion("ignored group/ignored version")
 	if err != nil {
 		t.Fatal(err)
 	}
 	directEncoder := df.EncoderForVersion(serializer, ignoredGV)
 	directDecoder := df.DecoderToVersion(serializer, ignoredGV)
-	out, err := runtime.Encode(directEncoder, &serializertesting.ExternalTestType1{})
+	out, err := runtime.Encode(directEncoder, &runtimetesting.ExternalTestType1{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,8 +354,11 @@ func TestDirectCodec(t *testing.T) {
 		t.Fatal(string(out))
 	}
 	a, _, err := directDecoder.Decode(out, nil, nil)
-	e := &serializertesting.ExternalTestType1{
-		MyWeirdCustomEmbeddedVersionKindField: serializertesting.MyWeirdCustomEmbeddedVersionKindField{
+	if err != nil {
+		t.Fatalf("error on Decode: %v", err)
+	}
+	e := &runtimetesting.ExternalTestType1{
+		MyWeirdCustomEmbeddedVersionKindField: runtimetesting.MyWeirdCustomEmbeddedVersionKindField{
 			APIVersion: "v1",
 			ObjectKind: "ExternalTestType1",
 		},

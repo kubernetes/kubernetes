@@ -282,7 +282,7 @@ testCases:
 
 func TestSortMergeLists(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
-		Schema: sptest.GetSchemaOrDie(fakeMergeItemSchema, "mergeItem"),
+		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
@@ -669,11 +669,62 @@ mergingList:
 			ExpectedError: "does not contain declared merge key",
 		},
 	},
+	{
+		Description: "$deleteFromPrimitiveList of nonexistent item in primitive list should not add the item to the list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+  - 1
+  - 2
+`),
+		},
+	},
+	{
+		Description: "$deleteFromPrimitiveList on empty primitive list should not add the item to the list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingIntList:
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+mergingIntList:
+`),
+		},
+	},
+	{
+		Description: "$deleteFromPrimitiveList on nonexistent primitive list should not add the primitive list",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+foo:
+  - bar
+`),
+			TwoWay: []byte(`
+$deleteFromPrimitiveList/mergingIntList:
+  - 3
+`),
+			Modified: []byte(`
+foo:
+  - bar
+`),
+		},
+	},
 }
 
 func TestCustomStrategicMergePatch(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
-		Schema: sptest.GetSchemaOrDie(fakeMergeItemSchema, "mergeItem"),
+		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
@@ -6029,7 +6080,7 @@ func TestStrategicMergePatch(t *testing.T) {
 		"{}", "{}", []byte("<THIS IS NOT A STRUCT>"), mergepatch.ErrBadArgKind(struct{}{}, []byte{}))
 
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
-		Schema: sptest.GetSchemaOrDie(fakeMergeItemSchema, "mergeItem"),
+		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
@@ -6413,7 +6464,7 @@ func TestNumberConversion(t *testing.T) {
 	}
 
 	precisionItemOpenapiSchema := PatchMetaFromOpenAPI{
-		Schema: sptest.GetSchemaOrDie(fakePrecisionItemSchema, "precisionItem"),
+		Schema: sptest.GetSchemaOrDie(&fakePrecisionItemSchema, "precisionItem"),
 	}
 	precisionItemSchemas := []LookupPatchMeta{
 		precisionItemStructSchema,
@@ -6623,7 +6674,7 @@ replacingItem:
 
 func TestReplaceWithRawExtension(t *testing.T) {
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
-		Schema: sptest.GetSchemaOrDie(fakeMergeItemSchema, "mergeItem"),
+		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,
@@ -6662,6 +6713,106 @@ func TestUnknownField(t *testing.T) {
 			ExpectedThreeWay:       `{}`,
 			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
 		},
+		"no diff even if modified null": {
+			Original: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Current:  `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Modified: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{"key":null},"name":"foo","scalar":true}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":{"key":null}}`,
+			ExpectedTwoWayResult:   `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{},"name":"foo","scalar":true}`,
+			ExpectedThreeWay:       `{"complex_nullable":{"key":null}}`,
+			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{},"name":"foo","scalar":true}`,
+		},
+		"discard nulls in nested and adds not nulls": {
+			Original: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Current:  `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Modified: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{"key":{"keynotnull":"value","keynull":null}},"name":"foo","scalar":true}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":{"key":{"keynotnull":"value","keynull":null}}}`,
+			ExpectedTwoWayResult:   `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{"key":{"keynotnull":"value"}},"name":"foo","scalar":true}`,
+			ExpectedThreeWay:       `{"complex_nullable":{"key":{"keynotnull":"value","keynull":null}}}`,
+			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":{"key":{"keynotnull":"value"}},"name":"foo","scalar":true}`,
+		},
+		"discard if modified all nulls": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex":{"nested":null}}`,
+
+			ExpectedTwoWay:         `{"complex":{"nested":null}}`,
+			ExpectedTwoWayResult:   `{"complex":{}}`,
+			ExpectedThreeWay:       `{"complex":{"nested":null}}`,
+			ExpectedThreeWayResult: `{"complex":{}}`,
+		},
+		"add only not nulls": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex":{"nested":null,"nested2":"foo"}}`,
+
+			ExpectedTwoWay:         `{"complex":{"nested":null,"nested2":"foo"}}`,
+			ExpectedTwoWayResult:   `{"complex":{"nested2":"foo"}}`,
+			ExpectedThreeWay:       `{"complex":{"nested":null,"nested2":"foo"}}`,
+			ExpectedThreeWayResult: `{"complex":{"nested2":"foo"}}`,
+		},
+		"null values in original are preserved": {
+			Original: `{"thing":null}`,
+			Current:  `{"thing":null}`,
+			Modified: `{"nested":{"value":5},"thing":null}`,
+
+			ExpectedTwoWay:         `{"nested":{"value":5}}`,
+			ExpectedTwoWayResult:   `{"nested":{"value":5},"thing":null}`,
+			ExpectedThreeWay:       `{"nested":{"value":5}}`,
+			ExpectedThreeWayResult: `{"nested":{"value":5},"thing":null}`,
+		},
+		"nested null values in original are preserved": {
+			Original: `{"complex":{"key":null},"thing":null}`,
+			Current:  `{"complex":{"key":null},"thing":null}`,
+			Modified: `{"complex":{"key":null},"nested":{"value":5},"thing":null}`,
+
+			ExpectedTwoWay:         `{"nested":{"value":5}}`,
+			ExpectedTwoWayResult:   `{"complex":{"key":null},"nested":{"value":5},"thing":null}`,
+			ExpectedThreeWay:       `{"nested":{"value":5}}`,
+			ExpectedThreeWayResult: `{"complex":{"key":null},"nested":{"value":5},"thing":null}`,
+		},
+		"add empty slices": {
+			Original: `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Current:  `{"array":[1,2,3],"complex":{"nested":true},"name":"foo","scalar":true}`,
+			Modified: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":[],"name":"foo","scalar":true}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":[]}`,
+			ExpectedTwoWayResult:   `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":[],"name":"foo","scalar":true}`,
+			ExpectedThreeWay:       `{"complex_nullable":[]}`,
+			ExpectedThreeWayResult: `{"array":[1,2,3],"complex":{"nested":true},"complex_nullable":[],"name":"foo","scalar":true}`,
+		},
+		"filter nulls from nested slices": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex_nullable":[{"inner_one":{"key_one":"foo","key_two":null}}]}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":[{"inner_one":{"key_one":"foo","key_two":null}}]}`,
+			ExpectedTwoWayResult:   `{"complex_nullable":[{"inner_one":{"key_one":"foo"}}]}`,
+			ExpectedThreeWay:       `{"complex_nullable":[{"inner_one":{"key_one":"foo","key_two":null}}]}`,
+			ExpectedThreeWayResult: `{"complex_nullable":[{"inner_one":{"key_one":"foo"}}]}`,
+		},
+		"filter if slice is all empty": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex_nullable":[{"inner_one":{"key_one":null,"key_two":null}}]}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":[{"inner_one":{"key_one":null,"key_two":null}}]}`,
+			ExpectedTwoWayResult:   `{"complex_nullable":[{"inner_one":{}}]}`,
+			ExpectedThreeWay:       `{"complex_nullable":[{"inner_one":{"key_one":null,"key_two":null}}]}`,
+			ExpectedThreeWayResult: `{"complex_nullable":[{"inner_one":{}}]}`,
+		},
+		"not filter nulls from non-associative slice": {
+			Original: `{}`,
+			Current:  `{}`,
+			Modified: `{"complex_nullable":["key1",null,"key2"]}`,
+
+			ExpectedTwoWay:         `{"complex_nullable":["key1",null,"key2"]}`,
+			ExpectedTwoWayResult:   `{"complex_nullable":["key1",null,"key2"]}`,
+			ExpectedThreeWay:       `{"complex_nullable":["key1",null,"key2"]}`,
+			ExpectedThreeWayResult: `{"complex_nullable":["key1",null,"key2"]}`,
+		},
 		"added only": {
 			Original: `{"name":"foo"}`,
 			Current:  `{"name":"foo"}`,
@@ -6695,7 +6846,7 @@ func TestUnknownField(t *testing.T) {
 	}
 
 	mergeItemOpenapiSchema := PatchMetaFromOpenAPI{
-		Schema: sptest.GetSchemaOrDie(fakeMergeItemSchema, "mergeItem"),
+		Schema: sptest.GetSchemaOrDie(&fakeMergeItemSchema, "mergeItem"),
 	}
 	schemas := []LookupPatchMeta{
 		mergeItemStructSchema,

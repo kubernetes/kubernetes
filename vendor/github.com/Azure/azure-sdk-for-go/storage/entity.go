@@ -1,18 +1,7 @@
 package storage
 
-// Copyright 2017 Microsoft Corporation
-//
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-//  Unless required by applicable law or agreed to in writing, software
-//  distributed under the License is distributed on an "AS IS" BASIS,
-//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  See the License for the specific language governing permissions and
-//  limitations under the License.
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
 
 import (
 	"bytes"
@@ -27,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 )
 
 // Annotating as secure for gas scanning
@@ -207,7 +196,7 @@ func (e *Entity) Delete(force bool, options *EntityOptions) error {
 	uri := e.Table.tsc.client.getEndpoint(tableServiceName, e.buildPath(), query)
 	resp, err := e.Table.tsc.client.exec(http.MethodDelete, uri, headers, nil, e.Table.tsc.auth)
 	if err != nil {
-		if resp.StatusCode == http.StatusPreconditionFailed {
+		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
 			return fmt.Errorf(etagErrorTemplate, err)
 		}
 		return err
@@ -234,7 +223,7 @@ func (e *Entity) InsertOrMerge(options *EntityOptions) error {
 }
 
 func (e *Entity) buildPath() string {
-	return fmt.Sprintf("%s(PartitionKey='%s', RowKey='%s')", e.Table.buildPath(), e.PartitionKey, e.RowKey)
+	return fmt.Sprintf("%s(PartitionKey='%s',RowKey='%s')", e.Table.buildPath(), e.PartitionKey, e.RowKey)
 }
 
 // MarshalJSON is a custom marshaller for entity
@@ -257,6 +246,9 @@ func (e *Entity) MarshalJSON() ([]byte, error) {
 		case int64:
 			completeMap[typeKey] = OdataInt64
 			completeMap[k] = fmt.Sprintf("%v", v)
+		case float32, float64:
+			completeMap[typeKey] = OdataDouble
+			completeMap[k] = fmt.Sprintf("%v", v)
 		default:
 			completeMap[k] = v
 		}
@@ -264,7 +256,8 @@ func (e *Entity) MarshalJSON() ([]byte, error) {
 			if !(completeMap[k] == OdataBinary ||
 				completeMap[k] == OdataDateTime ||
 				completeMap[k] == OdataGUID ||
-				completeMap[k] == OdataInt64) {
+				completeMap[k] == OdataInt64 ||
+				completeMap[k] == OdataDouble) {
 				return nil, fmt.Errorf("Odata.type annotation %v value is not valid", k)
 			}
 			valueKey := strings.TrimSuffix(k, OdataTypeSuffix)
@@ -339,6 +332,12 @@ func (e *Entity) UnmarshalJSON(data []byte) error {
 					return fmt.Errorf(errorTemplate, err)
 				}
 				props[valueKey] = i
+			case OdataDouble:
+				f, err := strconv.ParseFloat(str, 64)
+				if err != nil {
+					return fmt.Errorf(errorTemplate, err)
+				}
+				props[valueKey] = f
 			default:
 				return fmt.Errorf(errorTemplate, fmt.Sprintf("%v is not supported", v))
 			}
@@ -423,7 +422,7 @@ func (e *Entity) updateMerge(force bool, verb string, options *EntityOptions) er
 	uri := e.Table.tsc.client.getEndpoint(tableServiceName, e.buildPath(), query)
 	resp, err := e.Table.tsc.client.exec(verb, uri, headers, bytes.NewReader(body), e.Table.tsc.auth)
 	if err != nil {
-		if resp.StatusCode == http.StatusPreconditionFailed {
+		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
 			return fmt.Errorf(etagErrorTemplate, err)
 		}
 		return err

@@ -169,6 +169,7 @@ func (c *Client) NewServiceClient(path string, namespace string) *Client {
 
 	client := NewClient(u, c.k)
 	client.Namespace = "urn:" + namespace
+	client.Transport.(*http.Transport).TLSClientConfig = c.Transport.(*http.Transport).TLSClientConfig
 	if cert := c.Certificate(); cert != nil {
 		client.SetCertificate(*cert)
 	}
@@ -655,6 +656,8 @@ func (c *Client) Upload(ctx context.Context, f io.Reader, u *url.URL, param *Upl
 	if err != nil {
 		return err
 	}
+
+	defer res.Body.Close()
 
 	switch res.StatusCode {
 	case http.StatusOK:

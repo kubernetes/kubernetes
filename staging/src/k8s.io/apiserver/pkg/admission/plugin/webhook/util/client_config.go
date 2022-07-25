@@ -17,26 +17,15 @@ limitations under the License.
 package util
 
 import (
-	"k8s.io/api/admissionregistration/v1beta1"
-	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 )
 
-// HookClientConfigForWebhook construct a webhook.ClientConfig using a v1beta1.Webhook API object.
-// webhook.ClientConfig is used to create a HookClient and the purpose of the config struct is to
-// share that with other packages that need to create a HookClient.
-func HookClientConfigForWebhook(w *v1beta1.Webhook) webhook.ClientConfig {
-	ret := webhook.ClientConfig{Name: w.Name, CABundle: w.ClientConfig.CABundle}
-	if w.ClientConfig.URL != nil {
-		ret.URL = *w.ClientConfig.URL
-	}
-	if w.ClientConfig.Service != nil {
-		ret.Service = &webhook.ClientConfigService{
-			Name:      w.ClientConfig.Service.Name,
-			Namespace: w.ClientConfig.Service.Namespace,
-		}
-		if w.ClientConfig.Service.Path != nil {
-			ret.Service.Path = *w.ClientConfig.Service.Path
+// HasAdmissionReviewVersion check whether a version is accepted by a given webhook.
+func HasAdmissionReviewVersion(a string, w webhook.WebhookAccessor) bool {
+	for _, b := range w.GetAdmissionReviewVersions() {
+		if b == a {
+			return true
 		}
 	}
-	return ret
+	return false
 }

@@ -27,6 +27,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1"
 )
 
@@ -37,6 +38,7 @@ var (
 
 func init() {
 	utilruntime.Must(webhookadmission.AddToScheme(scheme))
+	utilruntime.Must(v1.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 }
 

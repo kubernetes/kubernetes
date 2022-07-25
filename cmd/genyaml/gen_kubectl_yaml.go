@@ -17,16 +17,18 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v2"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubectl/pkg/cmd"
 	"k8s.io/kubernetes/cmd/genutils"
-	"k8s.io/kubernetes/pkg/kubectl/cmd"
 )
 
 type cmdOption struct {
@@ -64,8 +66,7 @@ func main() {
 	// Set environment variables used by kubectl so the output is consistent,
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
-	// TODO os.Stdin should really be something like ioutil.Discard, but a Reader
-	kubectl := cmd.NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
+	kubectl := cmd.NewKubectlCommand(cmd.KubectlOptions{IOStreams: genericclioptions.IOStreams{In: bytes.NewReader(nil), Out: io.Discard, ErrOut: io.Discard}})
 	genYaml(kubectl, "", outDir)
 	for _, c := range kubectl.Commands() {
 		genYaml(c, "kubectl", outDir)

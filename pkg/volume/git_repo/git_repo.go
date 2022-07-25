@@ -19,16 +19,15 @@ package git_repo
 import (
 	"fmt"
 	"io/ioutil"
-	"path"
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -78,7 +77,7 @@ func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.GitRepo != nil
 }
 
-func (plugin *gitRepoPlugin) RequiresRemount() bool {
+func (plugin *gitRepoPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -143,7 +142,7 @@ var _ volume.Volume = &gitRepoVolume{}
 
 func (gr *gitRepoVolume) GetPath() string {
 	name := gitRepoPluginName
-	return gr.plugin.host.GetPodVolumeDir(gr.podUID, utilstrings.EscapeQualifiedNameForDisk(name), gr.volName)
+	return gr.plugin.host.GetPodVolumeDir(gr.podUID, utilstrings.EscapeQualifiedName(name), gr.volName)
 }
 
 // gitRepoVolumeMounter builds git repo volumes.
@@ -162,26 +161,19 @@ var _ volume.Mounter = &gitRepoVolumeMounter{}
 
 func (b *gitRepoVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        false,
-		Managed:         true,
-		SupportsSELinux: true, // xattr change should be okay, TODO: double check
+		ReadOnly:       false,
+		Managed:        true,
+		SELinuxRelabel: true, // xattr change should be okay, TODO: double check
 	}
 }
 
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *gitRepoVolumeMounter) CanMount() error {
-	return nil
-}
-
 // SetUp creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *gitRepoVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *gitRepoVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	if volumeutil.IsReady(b.getMetaDir()) {
 		return nil
 	}
@@ -191,7 +183,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
 		return err
 	}
 
@@ -221,10 +213,10 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	switch {
 	case len(b.target) != 0 && filepath.Clean(b.target) == ".":
 		// if target dir is '.', use the current dir
-		subdir = path.Join(dir)
+		subdir = filepath.Join(dir)
 	case len(files) == 1:
 		// if target is not '.', use the generated folder
-		subdir = path.Join(dir, files[0].Name())
+		subdir = filepath.Join(dir, files[0].Name())
 	default:
 		// if target is not '.', but generated many files, it's wrong
 		return fmt.Errorf("unexpected directory contents: %v", files)
@@ -237,14 +229,14 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return fmt.Errorf("failed to exec 'git reset --hard': %s: %v", output, err)
 	}
 
-	volume.SetVolumeOwnership(b, fsGroup)
+	volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
 
 	volumeutil.SetReady(b.getMetaDir())
 	return nil
 }
 
 func (b *gitRepoVolumeMounter) getMetaDir() string {
-	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(gitRepoPluginName)), b.volName)
+	return filepath.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedName(gitRepoPluginName)), b.volName)
 }
 
 func (b *gitRepoVolumeMounter) execCommand(command string, args []string, dir string) ([]byte, error) {

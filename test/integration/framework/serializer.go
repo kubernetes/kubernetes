@@ -21,14 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 )
 
-// NewSingleContentTypeSerializer wraps a serializer in a NegotiatedSerializer that handles one content type
-func NewSingleContentTypeSerializer(scheme *runtime.Scheme, info runtime.SerializerInfo) runtime.StorageSerializer {
-	return &wrappedSerializer{
-		scheme: scheme,
-		info:   info,
-	}
-}
-
 type wrappedSerializer struct {
 	scheme *runtime.Scheme
 	info   runtime.SerializerInfo

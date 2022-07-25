@@ -19,15 +19,15 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
-	mangen "github.com/cpuguy83/go-md2man/md2man"
+	mangen "github.com/cpuguy83/go-md2man/v2/md2man"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/apiserver/pkg/server"
-	ccmapp "k8s.io/kubernetes/cmd/cloud-controller-manager/app"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	kubectlcmd "k8s.io/kubectl/pkg/cmd"
 	"k8s.io/kubernetes/cmd/genutils"
 	apiservapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
@@ -35,7 +35,6 @@ import (
 	schapp "k8s.io/kubernetes/cmd/kube-scheduler/app"
 	kubeadmapp "k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
-	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 )
 
 func main() {
@@ -63,7 +62,7 @@ func main() {
 	switch module {
 	case "kube-apiserver":
 		// generate manpage for kube-apiserver
-		apiserver := apiservapp.NewAPIServerCommand(server.SetupSignalHandler())
+		apiserver := apiservapp.NewAPIServerCommand()
 		genMarkdown(apiserver, "", outDir)
 		for _, c := range apiserver.Commands() {
 			genMarkdown(c, "kube-apiserver", outDir)
@@ -74,13 +73,6 @@ func main() {
 		genMarkdown(controllermanager, "", outDir)
 		for _, c := range controllermanager.Commands() {
 			genMarkdown(c, "kube-controller-manager", outDir)
-		}
-	case "cloud-controller-manager":
-		//generate manpage for cloud-controller-manager
-		controllermanager := ccmapp.NewCloudControllerManagerCommand()
-		genMarkdown(controllermanager, "", outDir)
-		for _, c := range controllermanager.Commands() {
-			genMarkdown(c, "cloud-controller-manager", outDir)
 		}
 	case "kube-proxy":
 		// generate manpage for kube-proxy
@@ -98,22 +90,21 @@ func main() {
 		}
 	case "kubelet":
 		// generate manpage for kubelet
-		kubelet := kubeletapp.NewKubeletCommand(server.SetupSignalHandler())
+		kubelet := kubeletapp.NewKubeletCommand()
 		genMarkdown(kubelet, "", outDir)
 		for _, c := range kubelet.Commands() {
 			genMarkdown(c, "kubelet", outDir)
 		}
 	case "kubectl":
 		// generate manpage for kubectl
-		// TODO os.Stdin should really be something like ioutil.Discard, but a Reader
-		kubectl := kubectlcmd.NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
+		kubectl := kubectlcmd.NewKubectlCommand(kubectlcmd.KubectlOptions{IOStreams: genericclioptions.IOStreams{In: bytes.NewReader(nil), Out: io.Discard, ErrOut: io.Discard}})
 		genMarkdown(kubectl, "", outDir)
 		for _, c := range kubectl.Commands() {
 			genMarkdown(c, "kubectl", outDir)
 		}
 	case "kubeadm":
-		// generate manpage for kubelet
-		kubeadm := kubeadmapp.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
+		// generate manpage for kubeadm
+		kubeadm := kubeadmapp.NewKubeadmCommand(bytes.NewReader(nil), io.Discard, io.Discard)
 		genMarkdown(kubeadm, "", outDir)
 		for _, c := range kubeadm.Commands() {
 			genMarkdown(c, "kubeadm", outDir)

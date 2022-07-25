@@ -28,10 +28,12 @@ import (
 type Config struct {
 	// Legacy field from pkg/api/types.go TypeMeta.
 	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
+	// +k8s:conversion-gen=false
 	// +optional
 	Kind string `json:"kind,omitempty"`
 	// Legacy field from pkg/api/types.go TypeMeta.
 	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
+	// +k8s:conversion-gen=false
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
@@ -61,6 +63,9 @@ type Preferences struct {
 type Cluster struct {
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
+	// TLSServerName is used to check server certificate. If TLSServerName is empty, the hostname used to contact the server is used.
+	// +optional
+	TLSServerName string `json:"tls-server-name,omitempty"`
 	// InsecureSkipTLSVerify skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
 	// +optional
 	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`
@@ -70,6 +75,17 @@ type Cluster struct {
 	// CertificateAuthorityData contains PEM-encoded certificate authority certificates. Overrides CertificateAuthority
 	// +optional
 	CertificateAuthorityData []byte `json:"certificate-authority-data,omitempty"`
+	// ProxyURL is the URL to the proxy to be used for all requests made by this
+	// client. URLs with "http", "https", and "socks5" schemes are supported.  If
+	// this configuration is not provided or the empty string, the client
+	// attempts to construct a proxy configuration from http_proxy and
+	// https_proxy environment variables. If these environment variables are not
+	// set, the client does not attempt to proxy requests.
+	//
+	// socks5 proxying does not currently support spdy streaming endpoints (exec,
+	// attach, port forward).
+	// +optional
+	ProxyURL string `json:"proxy-url,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
 	Extensions []NamedExtension `json:"extensions,omitempty"`
@@ -88,17 +104,20 @@ type AuthInfo struct {
 	ClientKey string `json:"client-key,omitempty"`
 	// ClientKeyData contains PEM-encoded data from a client key file for TLS. Overrides ClientKey
 	// +optional
-	ClientKeyData []byte `json:"client-key-data,omitempty"`
+	ClientKeyData []byte `json:"client-key-data,omitempty" datapolicy:"security-key"`
 	// Token is the bearer token for authentication to the kubernetes cluster.
 	// +optional
-	Token string `json:"token,omitempty"`
+	Token string `json:"token,omitempty" datapolicy:"token"`
 	// TokenFile is a pointer to a file that contains a bearer token (as described above).  If both Token and TokenFile are present, Token takes precedence.
 	// +optional
 	TokenFile string `json:"tokenFile,omitempty"`
-	// Impersonate is the username to imperonate.  The name matches the flag.
+	// Impersonate is the username to impersonate.  The name matches the flag.
 	// +optional
 	Impersonate string `json:"as,omitempty"`
-	// ImpersonateGroups is the groups to imperonate.
+	// ImpersonateUID is the uid to impersonate.
+	// +optional
+	ImpersonateUID string `json:"as-uid,omitempty"`
+	// ImpersonateGroups is the groups to impersonate.
 	// +optional
 	ImpersonateGroups []string `json:"as-groups,omitempty"`
 	// ImpersonateUserExtra contains additional information for impersonated user.
@@ -109,7 +128,7 @@ type AuthInfo struct {
 	Username string `json:"username,omitempty"`
 	// Password is the password for basic authentication to the kubernetes cluster.
 	// +optional
-	Password string `json:"password,omitempty"`
+	Password string `json:"password,omitempty" datapolicy:"password"`
 	// AuthProvider specifies a custom authentication plugin for the kubernetes cluster.
 	// +optional
 	AuthProvider *AuthProviderConfig `json:"auth-provider,omitempty"`
@@ -176,7 +195,7 @@ type AuthProviderConfig struct {
 // ExecConfig specifies a command to provide client credentials. The command is exec'd
 // and outputs structured stdout holding credentials.
 //
-// See the client.authentiction.k8s.io API group for specifications of the exact input
+// See the client.authentication.k8s.io API group for specifications of the exact input
 // and output format
 type ExecConfig struct {
 	// Command to execute.
@@ -193,6 +212,30 @@ type ExecConfig struct {
 	// Preferred input version of the ExecInfo. The returned ExecCredentials MUST use
 	// the same encoding version as the input.
 	APIVersion string `json:"apiVersion,omitempty"`
+
+	// This text is shown to the user when the executable doesn't seem to be
+	// present. For example, `brew install foo-cli` might be a good InstallHint for
+	// foo-cli on Mac OS systems.
+	InstallHint string `json:"installHint,omitempty"`
+
+	// ProvideClusterInfo determines whether or not to provide cluster information,
+	// which could potentially contain very large CA data, to this exec plugin as a
+	// part of the KUBERNETES_EXEC_INFO environment variable. By default, it is set
+	// to false. Package k8s.io/client-go/tools/auth/exec provides helper methods for
+	// reading this environment variable.
+	ProvideClusterInfo bool `json:"provideClusterInfo"`
+
+	// InteractiveMode determines this plugin's relationship with standard input. Valid
+	// values are "Never" (this exec plugin never uses standard input), "IfAvailable" (this
+	// exec plugin wants to use standard input if it is available), or "Always" (this exec
+	// plugin requires standard input to function). See ExecInteractiveMode values for more
+	// details.
+	//
+	// If APIVersion is client.authentication.k8s.io/v1alpha1 or
+	// client.authentication.k8s.io/v1beta1, then this field is optional and defaults
+	// to "IfAvailable" when unset. Otherwise, this field is required.
+	//+optional
+	InteractiveMode ExecInteractiveMode `json:"interactiveMode,omitempty"`
 }
 
 // ExecEnvVar is used for setting environment variables when executing an exec-based
@@ -201,3 +244,23 @@ type ExecEnvVar struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
+
+// ExecInteractiveMode is a string that describes an exec plugin's relationship with standard input.
+type ExecInteractiveMode string
+
+const (
+	// NeverExecInteractiveMode declares that this exec plugin never needs to use standard
+	// input, and therefore the exec plugin will be run regardless of whether standard input is
+	// available for user input.
+	NeverExecInteractiveMode ExecInteractiveMode = "Never"
+	// IfAvailableExecInteractiveMode declares that this exec plugin would like to use standard input
+	// if it is available, but can still operate if standard input is not available. Therefore, the
+	// exec plugin will be run regardless of whether stdin is available for user input. If standard
+	// input is available for user input, then it will be provided to this exec plugin.
+	IfAvailableExecInteractiveMode ExecInteractiveMode = "IfAvailable"
+	// AlwaysExecInteractiveMode declares that this exec plugin requires standard input in order to
+	// run, and therefore the exec plugin will only be run if standard input is available for user
+	// input. If standard input is not available for user input, then the exec plugin will not be run
+	// and an error will be returned by the exec plugin runner.
+	AlwaysExecInteractiveMode ExecInteractiveMode = "Always"
+)

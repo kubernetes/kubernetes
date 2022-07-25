@@ -26,33 +26,45 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
-	"k8s.io/api/core/v1"
-	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	awscloud "k8s.io/legacy-cloud-providers/aws"
 )
 
 func init() {
-	framework.RegisterProvider("aws", NewProvider)
+	framework.RegisterProvider("aws", newProvider)
 }
 
-func NewProvider() (framework.ProviderInterface, error) {
+func newProvider() (framework.ProviderInterface, error) {
 	if framework.TestContext.CloudConfig.Zone == "" {
-		return nil, fmt.Errorf("gce-zone must be specified for AWS")
+		framework.Logf("Warning: gce-zone not specified! Some tests that use the AWS SDK may select the wrong region and fail.")
 	}
 	return &Provider{}, nil
 }
 
+// Provider is a structure to handle AWS clouds for e2e testing
 type Provider struct {
 	framework.NullProvider
 }
 
+// ResizeGroup resizes an instance group
 func (p *Provider) ResizeGroup(group string, size int32) error {
-	client := autoscaling.New(session.New())
+	awsSession, err := session.NewSession()
+	if err != nil {
+		return err
+	}
+	client := autoscaling.New(awsSession)
 	return awscloud.ResizeInstanceGroup(client, group, int(size))
 }
 
+// GroupSize returns the size of an instance group
 func (p *Provider) GroupSize(group string) (int, error) {
-	client := autoscaling.New(session.New())
+	awsSession, err := session.NewSession()
+	if err != nil {
+		return -1, err
+	}
+	client := autoscaling.New(awsSession)
 	instanceGroup, err := awscloud.DescribeInstanceGroup(client, group)
 	if err != nil {
 		return -1, fmt.Errorf("error describing instance group: %v", err)
@@ -63,12 +75,62 @@ func (p *Provider) GroupSize(group string) (int, error) {
 	return instanceGroup.CurrentSize()
 }
 
+// DeleteNode deletes a node which is specified as the argument
+func (p *Provider) DeleteNode(node *v1.Node) error {
+	client := newAWSClient("")
+
+	instanceID, err := awscloud.KubernetesInstanceID(node.Spec.ProviderID).MapToAWSInstanceID()
+	if err != nil {
+		return err
+	}
+
+	req := &ec2.TerminateInstancesInput{
+		InstanceIds: []*string{
+			aws.String(string(instanceID)),
+		},
+	}
+	_, err = client.TerminateInstances(req)
+	return err
+}
+
+func (p *Provider) CreateShare() (string, string, string, error) {
+	return "", "", "", nil
+}
+
+func (p *Provider) DeleteShare(accountName, shareName string) error {
+	return nil
+}
+
+// CreatePD creates a persistent volume on the specified availability zone
 func (p *Provider) CreatePD(zone string) (string, error) {
 	client := newAWSClient(zone)
 	request := &ec2.CreateVolumeInput{}
 	request.AvailabilityZone = aws.String(zone)
 	request.Size = aws.Int64(10)
 	request.VolumeType = aws.String(awscloud.DefaultVolumeType)
+
+	// We need to tag the volume so that locked-down IAM configurations can still mount it
+	if framework.TestContext.CloudConfig.ClusterTag != "" {
+		clusterID := framework.TestContext.CloudConfig.ClusterTag
+
+		legacyTag := &ec2.Tag{
+			Key:   aws.String(awscloud.TagNameKubernetesClusterLegacy),
+			Value: aws.String(clusterID),
+		}
+
+		newTag := &ec2.Tag{
+			Key:   aws.String(awscloud.TagNameKubernetesClusterPrefix + clusterID),
+			Value: aws.String(awscloud.ResourceLifecycleOwned),
+		}
+
+		tagSpecification := &ec2.TagSpecification{
+			ResourceType: aws.String(ec2.ResourceTypeVolume),
+			Tags:         []*ec2.Tag{legacyTag, newTag},
+		}
+
+		request.TagSpecifications = append(request.TagSpecifications, tagSpecification)
+	}
+
 	response, err := client.CreateVolume(request)
 	if err != nil {
 		return "", err
@@ -81,6 +143,7 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 	return volumeName, nil
 }
 
+// DeletePD deletes a persistent volume
 func (p *Provider) DeletePD(pdName string) error {
 	client := newAWSClient("")
 
@@ -99,6 +162,7 @@ func (p *Provider) DeletePD(pdName string) error {
 	return nil
 }
 
+// CreatePVSource creates a persistent volume source
 func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error) {
 	return &v1.PersistentVolumeSource{
 		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
@@ -108,8 +172,9 @@ func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSo
 	}, nil
 }
 
+// DeletePVSource deletes a persistent volume source
 func (p *Provider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
-	return framework.DeletePDWithRetry(pvSource.AWSElasticBlockStore.VolumeID)
+	return e2epv.DeletePDWithRetry(pvSource.AWSElasticBlockStore.VolumeID)
 }
 
 func newAWSClient(zone string) *ec2.EC2 {
@@ -125,5 +190,9 @@ func newAWSClient(zone string) *ec2.EC2 {
 		region := zone[:len(zone)-1]
 		cfg = &aws.Config{Region: aws.String(region)}
 	}
-	return ec2.New(session.New(), cfg)
+	session, err := session.NewSession()
+	if err != nil {
+		framework.Logf("Warning: failed to create aws session")
+	}
+	return ec2.New(session, cfg)
 }

@@ -20,13 +20,14 @@ import (
 	"reflect"
 	"testing"
 
-	registrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	registrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 )
 
 type fakeNamespaceLister struct {
@@ -75,27 +76,27 @@ func TestGetNamespaceLabels(t *testing.T) {
 	}{
 		{
 			name:           "request is for creating namespace, the labels should be from the object itself",
-			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, "", namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Create, false, nil),
+			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, "", namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectedLabels: namespace2Labels,
 		},
 		{
 			name:           "request is for updating namespace, the labels should be from the new object",
-			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, namespace2.Name, namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Update, false, nil),
+			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, namespace2.Name, namespace2.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Update, &metav1.UpdateOptions{}, false, nil),
 			expectedLabels: namespace2Labels,
 		},
 		{
 			name:           "request is for deleting namespace, the labels should be from the cache",
-			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, namespace1.Name, namespace1.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Delete, false, nil),
+			attr:           admission.NewAttributesRecord(&namespace2, nil, schema.GroupVersionKind{}, namespace1.Name, namespace1.Name, schema.GroupVersionResource{Resource: "namespaces"}, "", admission.Delete, &metav1.DeleteOptions{}, false, nil),
 			expectedLabels: namespace1Labels,
 		},
 		{
 			name:           "request is for namespace/finalizer",
-			attr:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "namespaces"}, "finalizers", admission.Create, false, nil),
+			attr:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "namespaces"}, "finalizers", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectedLabels: namespace1Labels,
 		},
 		{
 			name:           "request is for pod",
-			attr:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "pods"}, "", admission.Create, false, nil),
+			attr:           admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, namespace1.Name, "mock-name", schema.GroupVersionResource{Resource: "pods"}, "", admission.Create, &metav1.CreateOptions{}, false, nil),
 			expectedLabels: namespace1Labels,
 		},
 	}
@@ -114,12 +115,12 @@ func TestGetNamespaceLabels(t *testing.T) {
 }
 
 func TestNotExemptClusterScopedResource(t *testing.T) {
-	hook := &registrationv1beta1.Webhook{
+	hook := &registrationv1.ValidatingWebhook{
 		NamespaceSelector: &metav1.LabelSelector{},
 	}
-	attr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "mock-name", schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "", admission.Create, false, nil)
+	attr := admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "mock-name", schema.GroupVersionResource{Version: "v1", Resource: "nodes"}, "", admission.Create, &metav1.CreateOptions{}, false, nil)
 	matcher := Matcher{}
-	matches, err := matcher.MatchNamespaceSelector(hook, attr)
+	matches, err := matcher.MatchNamespaceSelector(webhook.NewValidatingWebhookAccessor("mock-hook", "mock-cfg", hook), attr)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -45,9 +45,24 @@ func NewStorage(s rest.StandardStorage, authorizer authorizer.Authorizer, ruleRe
 	return &Storage{s, authorizer, ruleResolver}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *Storage) Destroy() {
+	r.StandardStorage.Destroy()
+}
+
 func (r *Storage) NamespaceScoped() bool {
 	return true
 }
+
+func (r *Storage) StorageVersion() runtime.GroupVersioner {
+	svp, ok := r.StandardStorage.(rest.StorageVersionProvider)
+	if !ok {
+		return nil
+	}
+	return svp.StorageVersion()
+}
+
+var _ rest.StorageVersionProvider = &Storage{}
 
 func (s *Storage) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	if rbacregistry.EscalationAllowed(ctx) || rbacregistry.RoleEscalationAuthorized(ctx, s.authorizer) {

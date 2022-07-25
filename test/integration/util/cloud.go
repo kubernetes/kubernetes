@@ -19,9 +19,9 @@ package util
 import (
 	"time"
 
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"golang.org/x/oauth2"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce/cloud"
+	"k8s.io/legacy-cloud-providers/gce"
 )
 
 const (

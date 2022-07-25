@@ -23,24 +23,35 @@ set -o pipefail
 # echo "NOTE:"
 # echo "kubectl.sh is deprecated and will be removed soon."
 # echo "please replace all usage with calls to the kubectl"
-# echo "binary and ensure that it is in your PATH." 
+# echo "binary and ensure that it is in your PATH."
 # echo ""
 # echo "Please see 'kubectl help config' for more details"
 # echo "about configuring kubectl for your cluster."
 # echo "-=-=-=-=-=-=-=-=-=-="
 
 
-KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE}")/..}
+KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE[0]}")/..}
 source "${KUBE_ROOT}/cluster/kube-util.sh"
-source "${KUBE_ROOT}/cluster/clientbin.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
+source "${KUBE_ROOT}/hack/lib/logging.sh"
 
 # If KUBECTL_PATH isn't set, gather up the list of likely places and use ls
 # to find the latest one.
 if [[ -z "${KUBECTL_PATH:-}" ]]; then
-  kubectl=$( get_bin "kubectl" "cmd/kubectl" )
+  kubectl=$( kube::util::find-binary "kubectl" )
 
   if [[ ! -x "$kubectl" ]]; then
-    print_error "kubectl"
+    {
+      echo "It looks as if you don't have a compiled kubectl binary"
+      echo
+      echo "If you are running from a clone of the git repo, please run"
+      echo "'./build/run.sh make cross'. Note that this requires having"
+      echo "Docker installed."
+      echo
+      echo "If you are running from a binary release tarball, something is wrong. "
+      echo "Look at http://kubernetes.io/ for information on how to contact the "
+      echo "development team for help."
+    } >&2
     exit 1
   fi
 elif [[ ! -x "${KUBECTL_PATH}" ]]; then

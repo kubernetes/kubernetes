@@ -17,19 +17,21 @@ limitations under the License.
 package cephfs
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -71,7 +73,7 @@ func (plugin *cephfsPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.CephFS != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.CephFS != nil)
 }
 
-func (plugin *cephfsPlugin) RequiresRemount() bool {
+func (plugin *cephfsPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -101,11 +103,11 @@ func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.
 		// if secret is provideded, retrieve it
 		kubeClient := plugin.host.GetKubeClient()
 		if kubeClient == nil {
-			return nil, fmt.Errorf("Cannot get kube client")
+			return nil, fmt.Errorf("cannot get kube client")
 		}
-		secrets, err := kubeClient.CoreV1().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
+		secrets, err := kubeClient.CoreV1().Secrets(secretNs).Get(context.TODO(), secretName, metav1.GetOptions{})
 		if err != nil {
-			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
+			err = fmt.Errorf("couldn't get secret %v/%v err: %w", secretNs, secretName, err)
 			return nil, err
 		}
 		for name, data := range secrets.Data {
@@ -187,7 +189,7 @@ type cephfs struct {
 	mon        []string
 	path       string
 	id         string
-	secret     string
+	secret     string `datapolicy:"token"`
 	secretFile string
 	readonly   bool
 	mounter    mount.Interface
@@ -204,26 +206,19 @@ var _ volume.Mounter = &cephfsMounter{}
 
 func (cephfsVolume *cephfsMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        cephfsVolume.readonly,
-		Managed:         false,
-		SupportsSELinux: false,
+		ReadOnly:       cephfsVolume.readonly,
+		Managed:        false,
+		SELinuxRelabel: false,
 	}
 }
 
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (cephfsVolume *cephfsMounter) CanMount() error {
-	return nil
-}
-
 // SetUp attaches the disk and bind mounts to the volume path.
-func (cephfsVolume *cephfsMounter) SetUp(fsGroup *int64) error {
-	return cephfsVolume.SetUpAt(cephfsVolume.GetPath(), fsGroup)
+func (cephfsVolume *cephfsMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return cephfsVolume.SetUpAt(cephfsVolume.GetPath(), mounterArgs)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (cephfsVolume *cephfsMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := cephfsVolume.mounter.IsLikelyNotMountPoint(dir)
 	klog.V(4).Infof("CephFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
@@ -260,7 +255,7 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	err = cephfsVolume.execMount(dir)
 	if err != nil {
 		// cleanup upon failure.
-		util.UnmountPath(dir, cephfsVolume.mounter)
+		mount.CleanupMountPoint(dir, cephfsVolume.mounter, false)
 		return err
 	}
 	return nil
@@ -279,52 +274,43 @@ func (cephfsVolume *cephfsUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (cephfsVolume *cephfsUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, cephfsVolume.mounter)
+	return mount.CleanupMountPoint(dir, cephfsVolume.mounter, false)
 }
 
 // GetPath creates global mount path
 func (cephfsVolume *cephfs) GetPath() string {
 	name := cephfsPluginName
-	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
+	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedName(name), cephfsVolume.volName)
 }
 
 // GetKeyringPath creates cephfuse keyring path
 func (cephfsVolume *cephfs) GetKeyringPath() string {
 	name := cephfsPluginName
-	volumeDir := cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
+	volumeDir := cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedName(name), cephfsVolume.volName)
 	volumeKeyringDir := volumeDir + "~keyring"
 	return volumeKeyringDir
 }
 
 func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	// cephfs mount option
-	cephOpt := ""
+	cephSensitiveOpt := []string{"name=" + cephfsVolume.id}
 	// override secretfile if secret is provided
 	if cephfsVolume.secret != "" {
-		cephOpt = "name=" + cephfsVolume.id + ",secret=" + cephfsVolume.secret
+		cephSensitiveOpt = append(cephSensitiveOpt, "secret="+cephfsVolume.secret)
 	} else {
-		cephOpt = "name=" + cephfsVolume.id + ",secretfile=" + cephfsVolume.secretFile
+		cephSensitiveOpt = append(cephSensitiveOpt, "secretfile="+cephfsVolume.secretFile)
 	}
 	// build option array
 	opt := []string{}
 	if cephfsVolume.readonly {
 		opt = append(opt, "ro")
 	}
-	opt = append(opt, cephOpt)
 
 	// build src like mon1:6789,mon2:6789,mon3:6789:/
-	hosts := cephfsVolume.mon
-	l := len(hosts)
-	// pass all monitors and let ceph randomize and fail over
-	i := 0
-	src := ""
-	for i = 0; i < l-1; i++ {
-		src += hosts[i] + ","
-	}
-	src += hosts[i] + ":" + cephfsVolume.path
+	src := strings.Join(cephfsVolume.mon, ",") + ":" + cephfsVolume.path
 
 	opt = util.JoinMountOptions(cephfsVolume.mountOptions, opt)
-	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", opt); err != nil {
+	if err := cephfsVolume.mounter.MountSensitive(src, mountpoint, "ceph", opt, cephSensitiveOpt); err != nil {
 		return fmt.Errorf("CephFS: mount failed: %v", err)
 	}
 
@@ -335,7 +321,7 @@ func (cephfsVolume *cephfsMounter) checkFuseMount() bool {
 	execute := cephfsVolume.plugin.host.GetExec(cephfsVolume.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		if _, err := execute.Run("/usr/bin/test", "-x", "/sbin/mount.fuse.ceph"); err == nil {
+		if _, err := execute.Command("/usr/bin/test", "-x", "/sbin/mount.fuse.ceph").CombinedOutput(); err == nil {
 			klog.V(4).Info("/sbin/mount.fuse.ceph exists, it should be fuse mount.")
 			return true
 		}
@@ -354,7 +340,9 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 		klog.V(4).Info("cephfs mount begin using fuse.")
 
 		keyringPath := cephfsVolume.GetKeyringPath()
-		os.MkdirAll(keyringPath, 0750)
+		if err := os.MkdirAll(keyringPath, 0750); err != nil {
+			return err
+		}
 
 		payload := make(map[string]util.FileProjection, 1)
 		var fileProjection util.FileProjection
@@ -380,22 +368,13 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 			return err
 		}
 
-		keyringFile = path.Join(keyringPath, fileName)
+		keyringFile = filepath.Join(keyringPath, fileName)
 
 	} else {
 		keyringFile = cephfsVolume.secretFile
 	}
-
 	// build src like mon1:6789,mon2:6789,mon3:6789:/
-	hosts := cephfsVolume.mon
-	l := len(hosts)
-	// pass all monitors and let ceph randomize and fail over
-	i := 0
-	src := ""
-	for i = 0; i < l-1; i++ {
-		src += hosts[i] + ","
-	}
-	src += hosts[i]
+	src := strings.Join(cephfsVolume.mon, ",")
 
 	mountArgs := []string{}
 	mountArgs = append(mountArgs, "-k")

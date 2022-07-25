@@ -135,6 +135,21 @@ func (r CreateResult) ExtractToken() (*Token, error) {
 	}, nil
 }
 
+// ExtractTokenID implements the gophercloud.AuthResult interface. The returned
+// string is the same as the ID field of the Token struct returned from
+// ExtractToken().
+func (r CreateResult) ExtractTokenID() (string, error) {
+	var s struct {
+		Access struct {
+			Token struct {
+				ID string `json:"id"`
+			} `json:"token"`
+		} `json:"access"`
+	}
+	err := r.ExtractInto(&s)
+	return s.Access.Token.ID, err
+}
+
 // ExtractServiceCatalog returns the ServiceCatalog that was generated along
 // with the user's Token.
 func (r CreateResult) ExtractServiceCatalog() (*ServiceCatalog, error) {

@@ -19,35 +19,68 @@ package cacher
 import (
 	"testing"
 	"time"
+
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestTimeBudget(t *testing.T) {
-	budget := &timeBudget{
+	fakeClock := testingclock.NewFakeClock(time.Now())
+
+	budget := &timeBudgetImpl{
+		clock:     fakeClock,
 		budget:    time.Duration(0),
-		maxBudget: time.Duration(200),
+		maxBudget: 200 * time.Millisecond,
+		refresh:   50 * time.Millisecond,
+		last:      fakeClock.Now(),
 	}
 	if res := budget.takeAvailable(); res != time.Duration(0) {
 		t.Errorf("Expected: %v, got: %v", time.Duration(0), res)
 	}
-	budget.budget = time.Duration(100)
-	if res := budget.takeAvailable(); res != time.Duration(100) {
-		t.Errorf("Expected: %v, got: %v", time.Duration(100), res)
+
+	// wait for longer than the maxBudget
+	nextTime := time.Now().Add(10 * time.Second)
+	fakeClock.SetTime(nextTime)
+	if res := budget.takeAvailable(); res != budget.maxBudget {
+		t.Errorf("Expected: %v, got: %v", budget.maxBudget, res)
 	}
-	if res := budget.takeAvailable(); res != time.Duration(0) {
-		t.Errorf("Expected: %v, got: %v", time.Duration(0), res)
+	// add two refresh intervals to accumulate 2*refresh durations
+	nextTime = nextTime.Add(2 * time.Second)
+	fakeClock.SetTime(nextTime)
+	if res := budget.takeAvailable(); res != 2*budget.refresh {
+		t.Errorf("Expected: %v, got: %v", 2*budget.refresh, res)
 	}
-	budget.returnUnused(time.Duration(50))
-	if res := budget.takeAvailable(); res != time.Duration(50) {
-		t.Errorf("Expected: %v, got: %v", time.Duration(50), res)
+	// return one refresh duration to have only one refresh duration available
+	// we didn't advanced on time yet
+	budget.returnUnused(budget.refresh)
+	if res := budget.takeAvailable(); res != budget.refresh {
+		t.Errorf("Expected: %v, got: %v", budget.refresh, res)
 	}
-	budget.budget = time.Duration(100)
+
+	// return a negative value to the budget
+	// we didn't advanced on time yet
 	budget.returnUnused(-time.Duration(50))
-	if res := budget.takeAvailable(); res != time.Duration(100) {
-		t.Errorf("Expected: %v, got: %v", time.Duration(100), res)
+	if res := budget.takeAvailable(); res != time.Duration(0) {
+		t.Errorf("Expected: %v, got: %v", time.Duration(0), res)
 	}
-	// test overflow.
-	budget.returnUnused(time.Duration(500))
-	if res := budget.takeAvailable(); res != time.Duration(200) {
-		t.Errorf("Expected: %v, got: %v", time.Duration(200), res)
+	// handle back in time problem with an empty budget
+	nextTime = nextTime.Add(-2 * time.Minute)
+	fakeClock.SetTime(nextTime)
+	if res := budget.takeAvailable(); res != time.Duration(0) {
+		t.Errorf("Expected: %v, got: %v", time.Duration(0), res)
+	}
+	// wait for longer than the maxBudget
+	// verify that adding a negative value didn't affected
+	nextTime = nextTime.Add(10 * time.Minute)
+	fakeClock.SetTime(nextTime)
+	if res := budget.takeAvailable(); res != budget.maxBudget {
+		t.Errorf("Expected: %v, got: %v", budget.maxBudget, res)
+	}
+
+	// handle back in time problem with time on the budget
+	budget.returnUnused(10 * time.Second)
+	nextTime = nextTime.Add(-2 * time.Minute)
+	fakeClock.SetTime(nextTime)
+	if res := budget.takeAvailable(); res != budget.maxBudget {
+		t.Errorf("Expected: %v, got: %v", budget.maxBudget, res)
 	}
 }

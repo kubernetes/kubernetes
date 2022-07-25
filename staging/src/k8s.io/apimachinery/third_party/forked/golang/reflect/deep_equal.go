@@ -16,7 +16,7 @@ import (
 // that type.
 type Equalities map[reflect.Type]reflect.Value
 
-// For convenience, panics on errrors
+// For convenience, panics on errors
 func EqualitiesOrDie(funcs ...interface{}) Equalities {
 	e := Equalities{}
 	if err := e.AddFuncs(funcs...); err != nil {
@@ -179,7 +179,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 			return v1.IsNil() == v2.IsNil()
 		}
 		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, depth+1)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		return e.deepValueEqual(v1.Elem(), v2.Elem(), visited, depth+1)
 	case reflect.Struct:
 		for i, n := 0, v1.NumField(); i < n; i++ {
@@ -229,7 +229,7 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 //
 // An empty slice *is* equal to a nil slice for our purposes; same for maps.
 //
-// Unexported field members cannot be compared and will cause an imformative panic; you must add an Equality
+// Unexported field members cannot be compared and will cause an informative panic; you must add an Equality
 // function for these types.
 func (e Equalities) DeepEqual(a1, a2 interface{}) bool {
 	if a1 == nil || a2 == nil {
@@ -327,7 +327,7 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 			return true
 		}
 		return e.deepValueDerive(v1.Elem(), v2.Elem(), visited, depth+1)
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if v1.IsNil() {
 			return true
 		}

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"time"
 
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 )
@@ -27,47 +28,49 @@ import (
 //FakeIPVS no-op implementation of ipvs Interface
 type FakeIPVS struct {
 	Scheduler    string
-	Services     map[serviceKey]*utilipvs.VirtualServer
-	Destinations map[serviceKey][]*utilipvs.RealServer
+	Services     map[ServiceKey]*utilipvs.VirtualServer
+	Destinations map[ServiceKey][]*utilipvs.RealServer
 }
 
-type serviceKey struct {
+// ServiceKey uniquely identifies a Service for an IPVS virtual server
+type ServiceKey struct {
 	IP       string
 	Port     uint16
 	Protocol string
 }
 
-func (s *serviceKey) String() string {
+func (s *ServiceKey) String() string {
 	return fmt.Sprintf("%s:%d/%s", s.IP, s.Port, s.Protocol)
 }
 
-type realServerKey struct {
+// RealServerKey uniquely identifies an Endpoint for an IPVS real server
+type RealServerKey struct {
 	Address net.IP
 	Port    uint16
 }
 
-func (r *realServerKey) String() string {
+func (r *RealServerKey) String() string {
 	return net.JoinHostPort(r.Address.String(), strconv.Itoa(int(r.Port)))
 }
 
 //NewFake creates a fake ipvs implementation - a cache store.
 func NewFake() *FakeIPVS {
 	return &FakeIPVS{
-		Services:     make(map[serviceKey]*utilipvs.VirtualServer),
-		Destinations: make(map[serviceKey][]*utilipvs.RealServer),
+		Services:     make(map[ServiceKey]*utilipvs.VirtualServer),
+		Destinations: make(map[ServiceKey][]*utilipvs.RealServer),
 	}
 }
 
-func toServiceKey(serv *utilipvs.VirtualServer) serviceKey {
-	return serviceKey{
+func toServiceKey(serv *utilipvs.VirtualServer) ServiceKey {
+	return ServiceKey{
 		IP:       serv.Address.String(),
 		Port:     serv.Port,
 		Protocol: serv.Protocol,
 	}
 }
 
-func toRealServerKey(rs *utilipvs.RealServer) *realServerKey {
-	return &realServerKey{
+func toRealServerKey(rs *utilipvs.RealServer) *RealServerKey {
+	return &RealServerKey{
 		Address: rs.Address,
 		Port:    rs.Port,
 	}
@@ -76,7 +79,7 @@ func toRealServerKey(rs *utilipvs.RealServer) *realServerKey {
 //AddVirtualServer is a fake implementation, it simply adds the VirtualServer into the cache store.
 func (f *FakeIPVS) AddVirtualServer(serv *utilipvs.VirtualServer) error {
 	if serv == nil {
-		return fmt.Errorf("Failed to add virtual server, error: virtual server can't be nil")
+		return fmt.Errorf("failed to add virtual server, error: virtual server can't be nil")
 	}
 	key := toServiceKey(serv)
 	f.Services[key] = serv
@@ -88,7 +91,7 @@ func (f *FakeIPVS) AddVirtualServer(serv *utilipvs.VirtualServer) error {
 //UpdateVirtualServer is a fake implementation, it updates the VirtualServer in the cache store.
 func (f *FakeIPVS) UpdateVirtualServer(serv *utilipvs.VirtualServer) error {
 	if serv == nil {
-		return fmt.Errorf("Failed to update service, service can't be nil")
+		return fmt.Errorf("failed to update service, service can't be nil")
 	}
 	key := toServiceKey(serv)
 	f.Services[key] = serv
@@ -98,7 +101,7 @@ func (f *FakeIPVS) UpdateVirtualServer(serv *utilipvs.VirtualServer) error {
 //DeleteVirtualServer is a fake implementation, it simply deletes the VirtualServer from the cache store.
 func (f *FakeIPVS) DeleteVirtualServer(serv *utilipvs.VirtualServer) error {
 	if serv == nil {
-		return fmt.Errorf("Failed to delete service: service can't be nil")
+		return fmt.Errorf("failed to delete service: service can't be nil")
 	}
 	key := toServiceKey(serv)
 	delete(f.Services, key)
@@ -110,14 +113,14 @@ func (f *FakeIPVS) DeleteVirtualServer(serv *utilipvs.VirtualServer) error {
 //GetVirtualServer is a fake implementation, it tries to find a specific VirtualServer from the cache store.
 func (f *FakeIPVS) GetVirtualServer(serv *utilipvs.VirtualServer) (*utilipvs.VirtualServer, error) {
 	if serv == nil {
-		return nil, fmt.Errorf("Failed to get service: service can't be nil")
+		return nil, fmt.Errorf("failed to get service: service can't be nil")
 	}
 	key := toServiceKey(serv)
 	svc, found := f.Services[key]
 	if found {
 		return svc, nil
 	}
-	return nil, fmt.Errorf("Not found serv: %v", key.String())
+	return nil, fmt.Errorf("not found serv: %v", key.String())
 }
 
 //GetVirtualServers is a fake implementation, it simply returns all VirtualServers in the cache store.
@@ -140,11 +143,11 @@ func (f *FakeIPVS) Flush() error {
 //AddRealServer is a fake implementation, it simply creates a RealServer for a VirtualServer in the cache store.
 func (f *FakeIPVS) AddRealServer(serv *utilipvs.VirtualServer, dest *utilipvs.RealServer) error {
 	if serv == nil || dest == nil {
-		return fmt.Errorf("Failed to add destination for service, neither service nor destination shouldn't be nil")
+		return fmt.Errorf("failed to add destination for service, neither service nor destination shouldn't be nil")
 	}
 	key := toServiceKey(serv)
 	if _, ok := f.Services[key]; !ok {
-		return fmt.Errorf("Failed to add destination for service %v, service not found", key.String())
+		return fmt.Errorf("failed to add destination for service %v, service not found", key.String())
 	}
 	dests := f.Destinations[key]
 	if dests == nil {
@@ -158,11 +161,11 @@ func (f *FakeIPVS) AddRealServer(serv *utilipvs.VirtualServer, dest *utilipvs.Re
 //GetRealServers is a fake implementation, it simply returns all RealServers in the cache store.
 func (f *FakeIPVS) GetRealServers(serv *utilipvs.VirtualServer) ([]*utilipvs.RealServer, error) {
 	if serv == nil {
-		return nil, fmt.Errorf("Failed to get destination for nil service")
+		return nil, fmt.Errorf("failed to get destination for nil service")
 	}
 	key := toServiceKey(serv)
 	if _, ok := f.Services[key]; !ok {
-		return nil, fmt.Errorf("Failed to get destinations for service %v, service not found", key.String())
+		return nil, fmt.Errorf("failed to get destinations for service %v, service not found", key.String())
 	}
 	return f.Destinations[key], nil
 }
@@ -170,11 +173,11 @@ func (f *FakeIPVS) GetRealServers(serv *utilipvs.VirtualServer) ([]*utilipvs.Rea
 //DeleteRealServer is a fake implementation, it deletes the real server in the cache store.
 func (f *FakeIPVS) DeleteRealServer(serv *utilipvs.VirtualServer, dest *utilipvs.RealServer) error {
 	if serv == nil || dest == nil {
-		return fmt.Errorf("Failed to delete destination, neither service nor destination can't be nil")
+		return fmt.Errorf("failed to delete destination, neither service nor destination can't be nil")
 	}
 	key := toServiceKey(serv)
 	if _, ok := f.Services[key]; !ok {
-		return fmt.Errorf("Failed to delete destination for service %v, service not found", key.String())
+		return fmt.Errorf("failed to delete destination for service %v, service not found", key.String())
 	}
 	dests := f.Destinations[key]
 	exist := false
@@ -188,7 +191,7 @@ func (f *FakeIPVS) DeleteRealServer(serv *utilipvs.VirtualServer, dest *utilipvs
 	}
 	// Not Found
 	if !exist {
-		return fmt.Errorf("Failed to delete real server for service %v, real server not found", key.String())
+		return fmt.Errorf("failed to delete real server for service %v, real server not found", key.String())
 	}
 	return nil
 }
@@ -200,6 +203,11 @@ func (f *FakeIPVS) UpdateRealServer(serv *utilipvs.VirtualServer, dest *utilipvs
 		return err
 	}
 	return f.AddRealServer(serv, dest)
+}
+
+// ConfigureTimeouts is not supported for fake IPVS
+func (f *FakeIPVS) ConfigureTimeouts(time.Duration, time.Duration, time.Duration) error {
+	return fmt.Errorf("not supported in fake IPVS")
 }
 
 var _ = utilipvs.Interface(&FakeIPVS{})

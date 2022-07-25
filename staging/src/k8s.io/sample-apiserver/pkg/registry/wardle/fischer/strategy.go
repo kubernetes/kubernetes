@@ -36,14 +36,13 @@ func NewStrategy(typer runtime.ObjectTyper) fischerStrategy {
 	return fischerStrategy{typer, names.SimpleNameGenerator}
 }
 
-// GetAttrs returns labels.Set, fields.Set, the presence of Initializers if any
-// and error in case the given runtime.Object is not a Fischer
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+// GetAttrs returns labels.Set, fields.Set, and error in case the given runtime.Object is not a Fischer
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	apiserver, ok := obj.(*wardle.Fischer)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a Fischer")
+		return nil, nil, fmt.Errorf("given object is not a Fischer")
 	}
-	return labels.Set(apiserver.ObjectMeta.Labels), SelectableFields(apiserver), apiserver.Initializers != nil, nil
+	return labels.Set(apiserver.ObjectMeta.Labels), SelectableFields(apiserver), nil
 }
 
 // MatchFischer is the filter used by the generic etcd backend to watch events
@@ -80,6 +79,9 @@ func (fischerStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 	return field.ErrorList{}
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (fischerStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 func (fischerStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
@@ -93,4 +95,9 @@ func (fischerStrategy) Canonicalize(obj runtime.Object) {
 
 func (fischerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (fischerStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

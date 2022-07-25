@@ -19,14 +19,16 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"net/http"
+
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
 type StorageV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	CSIStorageCapacitiesGetter
 	VolumeAttachmentsGetter
 }
 
@@ -35,17 +37,37 @@ type StorageV1alpha1Client struct {
 	restClient rest.Interface
 }
 
+func (c *StorageV1alpha1Client) CSIStorageCapacities(namespace string) CSIStorageCapacityInterface {
+	return newCSIStorageCapacities(c, namespace)
+}
+
 func (c *StorageV1alpha1Client) VolumeAttachments() VolumeAttachmentInterface {
 	return newVolumeAttachments(c)
 }
 
 // NewForConfig creates a new StorageV1alpha1Client for the given config.
+// NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
+// where httpClient was generated with rest.HTTPClientFor(c).
 func NewForConfig(c *rest.Config) (*StorageV1alpha1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := rest.RESTClientFor(&config)
+	httpClient, err := rest.HTTPClientFor(&config)
+	if err != nil {
+		return nil, err
+	}
+	return NewForConfigAndClient(&config, httpClient)
+}
+
+// NewForConfigAndClient creates a new StorageV1alpha1Client for the given config and http client.
+// Note the http client provided takes precedence over the configured transport values.
+func NewForConfigAndClient(c *rest.Config, h *http.Client) (*StorageV1alpha1Client, error) {
+	config := *c
+	if err := setConfigDefaults(&config); err != nil {
+		return nil, err
+	}
+	client, err := rest.RESTClientForConfigAndClient(&config, h)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +93,7 @@ func setConfigDefaults(config *rest.Config) error {
 	gv := v1alpha1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

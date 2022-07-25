@@ -7,8 +7,8 @@ package gonum
 import "math"
 
 // Dlaln2 solves a linear equation or a system of 2 linear equations of the form
-//  (ca A   - w D) X = scale B,  if trans == false,
-//  (ca A^T - w D) X = scale B,  if trans == true,
+//  (ca A   - w D) X = scale B  if trans == false,
+//  (ca Aᵀ - w D) X = scale B   if trans == true,
 // where A is a na×na real matrix, ca is a real scalar, D is a na×na diagonal
 // real matrix, w is a scalar, real if nw == 1, complex if nw == 2, and X and B
 // are na×1 matrices, real if w is real, complex if w is complex.
@@ -57,15 +57,24 @@ func (impl Implementation) Dlaln2(trans bool, na, nw int, smin, ca float64, a []
 	// would be simpler and more natural, and the implementation not as
 	// convoluted.
 
-	if na != 1 && na != 2 {
-		panic("lapack: invalid value of na")
+	switch {
+	case na != 1 && na != 2:
+		panic(badNa)
+	case nw != 1 && nw != 2:
+		panic(badNw)
+	case lda < na:
+		panic(badLdA)
+	case len(a) < (na-1)*lda+na:
+		panic(shortA)
+	case ldb < nw:
+		panic(badLdB)
+	case len(b) < (na-1)*ldb+nw:
+		panic(shortB)
+	case ldx < nw:
+		panic(badLdX)
+	case len(x) < (na-1)*ldx+nw:
+		panic(shortX)
 	}
-	if nw != 1 && nw != 2 {
-		panic("lapack: invalid value of nw")
-	}
-	checkMatrix(na, na, a, lda)
-	checkMatrix(na, nw, b, ldb)
-	checkMatrix(na, nw, x, ldx)
 
 	smlnum := 2 * dlamchS
 	bignum := 1 / smlnum
@@ -138,7 +147,7 @@ func (impl Implementation) Dlaln2(trans bool, na, nw int, smin, ca float64, a []
 	// Compute the real part of
 	//  C = ca A   - w D
 	// or
-	//  C = ca A^T - w D.
+	//  C = ca Aᵀ - w D.
 	crv := [4]float64{
 		ca*a[0] - wr*d1,
 		ca * a[1],

@@ -24,34 +24,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
     source "${KUBE_ROOT}/cluster/env.sh"
 fi
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
-
-DEPRECATED_PROVIDERS=(
-  "centos"
-  "local"
-)
-
-for provider in "${DEPRECATED_PROVIDERS[@]}"; do
-  if [[ "${KUBERNETES_PROVIDER}" == "${provider}" ]]; then
-    cat <<EOF 1>&2
-
-!!! DEPRECATION NOTICE !!!
-
-The '${provider}' kube-up provider is deprecated and will be removed in a future
-release of kubernetes. Deprecated providers will be removed within 2 releases.
-
-See https://github.com/kubernetes/kubernetes/issues/49213 for more info.
-
-EOF
-    break
-  fi
-done
 
 if [ -z "${ZONE-}" ]; then
   echo "... Starting cluster using provider: ${KUBERNETES_PROVIDER}" >&2
@@ -84,6 +63,7 @@ elif [[ "${validate_result}" == "2" ]]; then
 fi
 
 if [[ "${ENABLE_PROXY:-}" == "true" ]]; then
+  # shellcheck disable=SC1091
   . /tmp/kube-proxy-env
   echo ""
   echo "*** Please run the following to add the kube-apiserver endpoint to your proxy white-list ***"

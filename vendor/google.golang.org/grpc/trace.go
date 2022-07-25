@@ -24,6 +24,7 @@ import (
 	"io"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/net/trace"
@@ -40,9 +41,6 @@ func methodFamily(m string) string {
 	if i := strings.Index(m, "/"); i >= 0 {
 		m = m[:i] // remove everything from second slash
 	}
-	if i := strings.LastIndex(m, "."); i >= 0 {
-		m = m[i+1:] // cut down to last dotted component
-	}
 	return m
 }
 
@@ -53,13 +51,25 @@ type traceInfo struct {
 }
 
 // firstLine is the first line of an RPC trace.
+// It may be mutated after construction; remoteAddr specifically may change
+// during client-side use.
 type firstLine struct {
+	mu         sync.Mutex
 	client     bool // whether this is a client (outgoing) RPC
 	remoteAddr net.Addr
 	deadline   time.Duration // may be zero
 }
 
+func (f *firstLine) SetRemoteAddr(addr net.Addr) {
+	f.mu.Lock()
+	f.remoteAddr = addr
+	f.mu.Unlock()
+}
+
 func (f *firstLine) String() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	var line bytes.Buffer
 	io.WriteString(&line, "RPC: ")
 	if f.client {

@@ -37,14 +37,13 @@ func NewStrategy(typer runtime.ObjectTyper) flunderStrategy {
 	return flunderStrategy{typer, names.SimpleNameGenerator}
 }
 
-// GetAttrs returns labels.Set, fields.Set, the presence of Initializers if any
-// and error in case the given runtime.Object is not a Flunder
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+// GetAttrs returns labels.Set, fields.Set, and error in case the given runtime.Object is not a Flunder
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	apiserver, ok := obj.(*wardle.Flunder)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a Flunder")
+		return nil, nil, fmt.Errorf("given object is not a Flunder")
 	}
-	return labels.Set(apiserver.ObjectMeta.Labels), SelectableFields(apiserver), apiserver.Initializers != nil, nil
+	return labels.Set(apiserver.ObjectMeta.Labels), SelectableFields(apiserver), nil
 }
 
 // MatchFlunder is the filter used by the generic etcd backend to watch events
@@ -82,6 +81,9 @@ func (flunderStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 	return validation.ValidateFlunder(flunder)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (flunderStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 func (flunderStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
@@ -95,4 +97,9 @@ func (flunderStrategy) Canonicalize(obj runtime.Object) {
 
 func (flunderStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (flunderStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

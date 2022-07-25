@@ -30,11 +30,12 @@ func validateBandwidthIsReasonable(rsrc *resource.Quantity) error {
 		return fmt.Errorf("resource is unreasonably small (< 1kbit)")
 	}
 	if rsrc.Value() > maxRsrc.Value() {
-		return fmt.Errorf("resoruce is unreasonably large (> 1Pbit)")
+		return fmt.Errorf("resource is unreasonably large (> 1Pbit)")
 	}
 	return nil
 }
 
+// ExtractPodBandwidthResources extracts the ingress and egress from the given pod annotations
 func ExtractPodBandwidthResources(podAnnotations map[string]string) (ingress, egress *resource.Quantity, err error) {
 	if podAnnotations == nil {
 		return nil, nil, nil

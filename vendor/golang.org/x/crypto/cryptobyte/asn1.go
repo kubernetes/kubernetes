@@ -81,7 +81,7 @@ func (b *Builder) AddASN1BigInt(n *big.Int) {
 			for i := range bytes {
 				bytes[i] ^= 0xff
 			}
-			if bytes[0]&0x80 == 0 {
+			if len(bytes) == 0 || bytes[0]&0x80 == 0 {
 				c.add(0xff)
 			}
 			c.add(bytes...)
@@ -114,6 +114,19 @@ func (b *Builder) AddASN1GeneralizedTime(t time.Time) {
 	}
 	b.AddASN1(asn1.GeneralizedTime, func(c *Builder) {
 		c.AddBytes([]byte(t.Format(generalizedTimeFormatStr)))
+	})
+}
+
+// AddASN1UTCTime appends a DER-encoded ASN.1 UTCTime.
+func (b *Builder) AddASN1UTCTime(t time.Time) {
+	b.AddASN1(asn1.UTCTime, func(c *Builder) {
+		// As utilized by the X.509 profile, UTCTime can only
+		// represent the years 1950 through 2049.
+		if t.Year() < 1950 || t.Year() >= 2050 {
+			b.err = fmt.Errorf("cryptobyte: cannot represent %v as a UTCTime", t)
+			return
+		}
+		c.AddBytes([]byte(t.Format(defaultUTCTimeFormatStr)))
 	})
 }
 
@@ -230,12 +243,12 @@ func (b *Builder) AddASN1(tag asn1.Tag, f BuilderContinuation) {
 
 // String
 
-// ReadASN1Boolean decodes an ASN.1 INTEGER and converts it to a boolean
+// ReadASN1Boolean decodes an ASN.1 BOOLEAN and converts it to a boolean
 // representation into out and advances. It reports whether the read
 // was successful.
 func (s *String) ReadASN1Boolean(out *bool) bool {
 	var bytes String
-	if !s.ReadASN1(&bytes, asn1.INTEGER) || len(bytes) != 1 {
+	if !s.ReadASN1(&bytes, asn1.BOOLEAN) || len(bytes) != 1 {
 		return false
 	}
 
@@ -394,7 +407,12 @@ func (s *String) ReadASN1Enum(out *int) bool {
 func (s *String) readBase128Int(out *int) bool {
 	ret := 0
 	for i := 0; len(*s) > 0; i++ {
-		if i == 4 {
+		if i == 5 {
+			return false
+		}
+		// Avoid overflowing int on a 32-bit platform.
+		// We don't want different behavior based on the architecture.
+		if ret >= 1<<(31-7) {
 			return false
 		}
 		ret <<= 7
@@ -466,11 +484,51 @@ func (s *String) ReadASN1GeneralizedTime(out *time.Time) bool {
 	return true
 }
 
+const defaultUTCTimeFormatStr = "060102150405Z0700"
+
+// ReadASN1UTCTime decodes an ASN.1 UTCTime into out and advances.
+// It reports whether the read was successful.
+func (s *String) ReadASN1UTCTime(out *time.Time) bool {
+	var bytes String
+	if !s.ReadASN1(&bytes, asn1.UTCTime) {
+		return false
+	}
+	t := string(bytes)
+
+	formatStr := defaultUTCTimeFormatStr
+	var err error
+	res, err := time.Parse(formatStr, t)
+	if err != nil {
+		// Fallback to minute precision if we can't parse second
+		// precision. If we are following X.509 or X.690 we shouldn't
+		// support this, but we do.
+		formatStr = "0601021504Z0700"
+		res, err = time.Parse(formatStr, t)
+	}
+	if err != nil {
+		return false
+	}
+
+	if serialized := res.Format(formatStr); serialized != t {
+		return false
+	}
+
+	if res.Year() >= 2050 {
+		// UTCTime interprets the low order digits 50-99 as 1950-99.
+		// This only applies to its use in the X.509 profile.
+		// See https://tools.ietf.org/html/rfc5280#section-4.1.2.5.1
+		res = res.AddDate(-100, 0, 0)
+	}
+	*out = res
+	return true
+}
+
 // ReadASN1BitString decodes an ASN.1 BIT STRING into out and advances.
 // It reports whether the read was successful.
 func (s *String) ReadASN1BitString(out *encoding_asn1.BitString) bool {
 	var bytes String
-	if !s.ReadASN1(&bytes, asn1.BIT_STRING) || len(bytes) == 0 {
+	if !s.ReadASN1(&bytes, asn1.BIT_STRING) || len(bytes) == 0 ||
+		len(bytes)*8/8 != len(bytes) {
 		return false
 	}
 
@@ -740,7 +798,7 @@ func (s *String) readASN1(out *String, outTag *asn1.Tag, skipHeader bool) bool {
 		length = headerLen + len32
 	}
 
-	if uint32(int(length)) != length || !s.ReadBytes((*[]byte)(out), int(length)) {
+	if int(length) < 0 || !s.ReadBytes((*[]byte)(out), int(length)) {
 		return false
 	}
 	if skipHeader && !out.Skip(int(headerLen)) {

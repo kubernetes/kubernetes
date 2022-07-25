@@ -83,11 +83,13 @@ const (
 	// Interface is any type that could have differing types at run time.
 	Interface Kind = "Interface"
 
+	// Array is just like slice, but has a fixed length.
+	Array Kind = "Array"
+
 	// The remaining types are included for completeness, but are not well
 	// supported.
-	Array Kind = "Array" // Array is just like slice, but has a fixed length.
-	Chan  Kind = "Chan"
-	Func  Kind = "Func"
+	Chan Kind = "Chan"
+	Func Kind = "Func"
 
 	// DeclarationOf is different from other Kinds; it indicates that instead of
 	// representing an actual Type, the type is a declaration of an instance of
@@ -134,6 +136,10 @@ type Package struct {
 	// Global variables within this package, indexed by their name (*not* including
 	// package name).
 	Variables map[string]*Type
+
+	// Global constants within this package, indexed by their name (*not* including
+	// package name).
+	Constants map[string]*Type
 
 	// Packages imported by this package, indexed by (canonicalized)
 	// package path.
@@ -193,6 +199,20 @@ func (p *Package) Variable(varName string) *Type {
 	return t
 }
 
+// Constant gets the given constant Type in this Package. If the constant is
+// not already defined, this will add it. If a constant is added, it's the caller's
+// responsibility to finish construction of the constant by setting Underlying
+// to the correct type.
+func (p *Package) Constant(constName string) *Type {
+	if t, ok := p.Constants[constName]; ok {
+		return t
+	}
+	t := &Type{Name: Name{Package: p.Path, Name: constName}}
+	t.Kind = DeclarationOf
+	p.Constants[constName] = t
+	return t
+}
+
 // HasImport returns true if p imports packageName. Package names include the
 // package directory.
 func (p *Package) HasImport(packageName string) bool {
@@ -229,6 +249,14 @@ func (u Universe) Variable(n Name) *Type {
 	return u.Package(n.Package).Variable(n.Name)
 }
 
+// Constant returns the canonical constant for the given fully-qualified name.
+// If a non-existing constant is requested, this will create (a marker for) it.
+// If a marker is created, it's the caller's responsibility to finish
+// construction of the constant by setting Underlying to the correct type.
+func (u Universe) Constant(n Name) *Type {
+	return u.Package(n.Package).Constant(n.Name)
+}
+
 // AddImports registers import lines for packageName. May be called multiple times.
 // You are responsible for canonicalizing all package paths.
 func (u Universe) AddImports(packagePath string, importPaths ...string) {
@@ -251,6 +279,7 @@ func (u Universe) Package(packagePath string) *Package {
 		Types:     map[string]*Type{},
 		Functions: map[string]*Type{},
 		Variables: map[string]*Type{},
+		Constants: map[string]*Type{},
 		Imports:   map[string]*Package{},
 	}
 	u[packagePath] = p
@@ -314,9 +343,18 @@ type Type struct {
 	// If Kind == func, this is the signature of the function.
 	Signature *Signature
 
+	// ConstValue contains a stringified constant value if
+	// Kind == DeclarationOf and this is a constant value
+	// declaration. For string constants, this field contains
+	// the entire, un-quoted value. For other types, it contains
+	// a human-readable literal.
+	ConstValue *string
+
 	// TODO: Add:
 	// * channel direction
-	// * array length
+
+	// If Kind == Array
+	Len int64
 }
 
 // String returns the name of the type.
@@ -385,12 +423,12 @@ func (m Member) String() string {
 
 // Signature is a function's signature.
 type Signature struct {
-	// TODO: store the parameter names, not just types.
-
 	// If a method of some type, this is the type it's a member of.
-	Receiver   *Type
-	Parameters []*Type
-	Results    []*Type
+	Receiver       *Type
+	Parameters     []*Type
+	ParameterNames []string
+	Results        []*Type
+	ResultNames    []string
 
 	// True if the last in parameter is of the form ...T.
 	Variadic bool

@@ -184,7 +184,7 @@ func (p *union) Generate(file *generator.FileDescriptor) {
 				goTyp, _ := p.GoType(message, field)
 				obj := p.ObjectNamed(field.GetTypeName()).(*generator.Descriptor)
 
-				if gogoproto.IsUnion(obj.File(), obj.DescriptorProto) {
+				if gogoproto.IsUnion(obj.File().FileDescriptorProto, obj.DescriptorProto) {
 					p.P(`this.`, fieldname, ` = new(`, generator.GoTypeToName(goTyp), `)`)
 					p.P(`if set := this.`, fieldname, `.SetValue(value); set {`)
 					p.In()

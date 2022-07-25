@@ -18,11 +18,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SCRIPT_ROOT=$(dirname "${BASH_SOURCE}")/..
-SCRIPT_BASE=${SCRIPT_ROOT}/../..
+SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
-DIFFROOT="${SCRIPT_ROOT}/_examples"
-TMP_DIFFROOT="${SCRIPT_ROOT}/_tmp/_examples"
+DIFFROOT="${SCRIPT_ROOT}/examples"
+TMP_DIFFROOT="${SCRIPT_ROOT}/_tmp/examples"
 _tmp="${SCRIPT_ROOT}/_tmp"
 
 cleanup() {
@@ -49,7 +48,10 @@ else
 fi
 
 # smoke test
-echo "Smoke testing _example by compiling..."
-go build ./${SCRIPT_ROOT}/_examples/crd/...
-go build ./${SCRIPT_ROOT}/_examples/apiserver/...
-go build ./${SCRIPT_ROOT}/_examples/MixedCase/...
+echo "Smoke testing examples by compiling..."
+pushd "./${SCRIPT_ROOT}/examples"
+  go build "k8s.io/code-generator/examples/crd/..."
+  go build "k8s.io/code-generator/examples/apiserver/..."
+  go build "k8s.io/code-generator/examples/MixedCase/..."
+  go build "k8s.io/code-generator/examples/HyphenGroup/..."
+popd

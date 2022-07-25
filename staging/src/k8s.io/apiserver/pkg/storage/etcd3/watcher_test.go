@@ -19,18 +19,16 @@ package etcd3
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/integration"
+	"go.etcd.io/etcd/api/v3/mvccpb"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 
-	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -38,122 +36,31 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 )
 
 func TestWatch(t *testing.T) {
-	testWatch(t, false)
-}
-
-func TestWatchList(t *testing.T) {
-	testWatch(t, true)
-}
-
-// It tests that
-// - first occurrence of objects should notify Add event
-// - update should trigger Modified event
-// - update that gets filtered should trigger Deleted event
-func testWatch(t *testing.T, recursive bool) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	podFoo := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
-	podBar := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
-
-	tests := []struct {
-		key        string
-		pred       storage.SelectionPredicate
-		watchTests []*testWatchStruct
-	}{{ // create a key
-		key:        "/somekey-1",
-		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}},
-		pred:       storage.Everything,
-	}, { // create a key but obj gets filtered. Then update it with unfiltered obj
-		key:        "/somekey-3",
-		watchTests: []*testWatchStruct{{podFoo, false, ""}, {podBar, true, watch.Added}},
-		pred: storage.SelectionPredicate{
-			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("metadata.name=bar"),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
-			},
-		},
-	}, { // update
-		key:        "/somekey-4",
-		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Modified}},
-		pred:       storage.Everything,
-	}, { // delete because of being filtered
-		key:        "/somekey-5",
-		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Deleted}},
-		pred: storage.SelectionPredicate{
-			Label: labels.Everything(),
-			Field: fields.ParseSelectorOrDie("metadata.name!=bar"),
-			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-				pod := obj.(*example.Pod)
-				return nil, fields.Set{"metadata.name": pod.Name}, pod.Initializers != nil, nil
-			},
-		},
-	}}
-	for i, tt := range tests {
-		w, err := store.watch(ctx, tt.key, "0", tt.pred, recursive)
-		if err != nil {
-			t.Fatalf("Watch failed: %v", err)
-		}
-		var prevObj *example.Pod
-		for _, watchTest := range tt.watchTests {
-			out := &example.Pod{}
-			key := tt.key
-			if recursive {
-				key = key + "/item"
-			}
-			err := store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
-				func(runtime.Object) (runtime.Object, error) {
-					return watchTest.obj, nil
-				}))
-			if err != nil {
-				t.Fatalf("GuaranteedUpdate failed: %v", err)
-			}
-			if watchTest.expectEvent {
-				expectObj := out
-				if watchTest.watchType == watch.Deleted {
-					expectObj = prevObj
-					expectObj.ResourceVersion = out.ResourceVersion
-				}
-				testCheckResult(t, i, watchTest.watchType, w, expectObj)
-			}
-			prevObj = out
-		}
-		w.Stop()
-		testCheckStop(t, i, w)
-	}
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatch(ctx, t, store)
 }
 
 func TestDeleteTriggerWatch(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
-	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	if err := store.Delete(ctx, key, &example.Pod{}, nil); err != nil {
-		t.Fatalf("Delete failed: %v", err)
-	}
-	testCheckEventType(t, watch.Deleted, w)
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestDeleteTriggerWatch(ctx, t, store)
 }
 
 // TestWatchFromZero tests that
 // - watch from 0 should sync up and grab the object added before
 // - watch from 0 is able to return events for objects whose previous version has been compacted
 func TestWatchFromZero(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
+	ctx, store, client := testSetup(t)
+	key, storedObj := storagetesting.TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}})
 
-	w, err := store.Watch(ctx, key, "0", storage.Everything)
+	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, 0, watch.Added, w, storedObj)
+	storagetesting.TestCheckResult(t, watch.Added, w, storedObj)
 	w.Stop()
 
 	// Update
@@ -161,17 +68,17 @@ func TestWatchFromZero(t *testing.T) {
 	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns", Annotations: map[string]string{"a": "1"}}}, nil
-		}))
+		}), nil)
 	if err != nil {
 		t.Fatalf("GuaranteedUpdate failed: %v", err)
 	}
 
 	// Make sure when we watch from 0 we receive an ADDED event
-	w, err = store.Watch(ctx, key, "0", storage.Everything)
+	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, 1, watch.Added, w, out)
+	storagetesting.TestCheckResult(t, watch.Added, w, out)
 	w.Stop()
 
 	// Update again
@@ -179,7 +86,7 @@ func TestWatchFromZero(t *testing.T) {
 	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}}, nil
-		}))
+		}), nil)
 	if err != nil {
 		t.Fatalf("GuaranteedUpdate failed: %v", err)
 	}
@@ -189,83 +96,54 @@ func TestWatchFromZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error converting %q to an int: %v", storedObj.ResourceVersion, err)
 	}
-	_, err = cluster.RandClient().Compact(ctx, int64(revToCompact), clientv3.WithCompactPhysical())
+	_, err = client.Compact(ctx, int64(revToCompact), clientv3.WithCompactPhysical())
 	if err != nil {
 		t.Fatalf("Error compacting: %v", err)
 	}
 
 	// Make sure we can still watch from 0 and receive an ADDED event
-	w, err = store.Watch(ctx, key, "0", storage.Everything)
+	w, err = store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	testCheckResult(t, 2, watch.Added, w, out)
+	storagetesting.TestCheckResult(t, watch.Added, w, out)
 }
 
 // TestWatchFromNoneZero tests that
 // - watch from non-0 should just watch changes after given version
 func TestWatchFromNoneZero(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
-
-	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
-	if err != nil {
-		t.Fatalf("Watch failed: %v", err)
-	}
-	out := &example.Pod{}
-	store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
-		func(runtime.Object) (runtime.Object, error) {
-			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}, err
-		}))
-	testCheckResult(t, 0, watch.Modified, w, out)
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchFromNoneZero(ctx, t, store)
 }
 
 func TestWatchError(t *testing.T) {
-	codec := &testCodec{apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	defer cluster.Terminate(t)
-	invalidStore := newStore(cluster.RandClient(), true, codec, "", prefixTransformer{prefix: []byte("test!")})
-	ctx := context.Background()
-	w, err := invalidStore.Watch(ctx, "/abc", "0", storage.Everything)
+	// this codec fails on decodes, which will bubble up so we can verify the behavior
+	invalidCodec := &testCodec{apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)}
+	ctx, invalidStore, client := testSetup(t, withCodec(invalidCodec))
+	w, err := invalidStore.Watch(ctx, "/abc", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	validStore := newStore(cluster.RandClient(), true, codec, "", prefixTransformer{prefix: []byte("test!")})
-	validStore.GuaranteedUpdate(ctx, "/abc", &example.Pod{}, true, nil, storage.SimpleUpdate(
+	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
+	_, validStore, _ := testSetup(t, withCodec(codec), withClient(client))
+	if err := validStore.GuaranteedUpdate(ctx, "/abc", &example.Pod{}, true, nil, storage.SimpleUpdate(
 		func(runtime.Object) (runtime.Object, error) {
 			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}, nil
-		}))
-	testCheckEventType(t, watch.Error, w)
+		}), nil); err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+	storagetesting.TestCheckEventType(t, watch.Error, w)
 }
 
 func TestWatchContextCancel(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	canceledCtx, cancel := context.WithCancel(ctx)
-	cancel()
-	// When we watch with a canceled context, we should detect that it's context canceled.
-	// We won't take it as error and also close the watcher.
-	w, err := store.watcher.Watch(canceledCtx, "/abc", 0, false, storage.Everything)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	select {
-	case _, ok := <-w.ResultChan():
-		if ok {
-			t.Error("ResultChan() should be closed")
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
-	}
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchContextCancel(ctx, t, store)
 }
 
 func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
-	origCtx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	origCtx, store, _ := testSetup(t)
 	ctx, cancel := context.WithCancel(origCtx)
-	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, storage.Everything)
+	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, false, storage.Everything)
 	// make resutlChan and errChan blocking to ensure ordering.
 	w.resultChan = make(chan watch.Event)
 	w.errChan = make(chan error)
@@ -285,39 +163,110 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 }
 
 func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	ctx, store, client := testSetup(t)
+	key, storedObj := storagetesting.TestPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
-	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
+	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	etcdW := cluster.RandClient().Watch(ctx, "/", clientv3.WithPrefix())
+	rv, err := storage.APIObjectVersioner{}.ObjectResourceVersion(storedObj)
+	if err != nil {
+		t.Fatalf("failed to parse resourceVersion on stored object: %v", err)
+	}
+	etcdW := client.Watch(ctx, key, clientv3.WithRev(int64(rv)))
 
-	if err := store.Delete(ctx, key, &example.Pod{}, &storage.Preconditions{}); err != nil {
+	if err := store.Delete(ctx, key, &example.Pod{}, &storage.Preconditions{}, storage.ValidateAllObjectFunc, nil); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	e := <-w.ResultChan()
+	var e watch.Event
+	watchCtx, _ := context.WithTimeout(ctx, wait.ForeverTestTimeout)
+	select {
+	case e = <-w.ResultChan():
+	case <-watchCtx.Done():
+		t.Fatalf("timed out waiting for watch event")
+	}
+	deletedRV, err := deletedRevision(watchCtx, etcdW)
+	if err != nil {
+		t.Fatalf("did not see delete event in raw watch: %v", err)
+	}
 	watchedDeleteObj := e.Object.(*example.Pod)
-	var wres clientv3.WatchResponse
-	wres = <-etcdW
 
 	watchedDeleteRev, err := store.versioner.ParseResourceVersion(watchedDeleteObj.ResourceVersion)
 	if err != nil {
 		t.Fatalf("ParseWatchResourceVersion failed: %v", err)
 	}
-	if int64(watchedDeleteRev) != wres.Events[0].Kv.ModRevision {
+	if int64(watchedDeleteRev) != deletedRV {
 		t.Errorf("Object from delete event have version: %v, should be the same as etcd delete's mod rev: %d",
-			watchedDeleteRev, wres.Events[0].Kv.ModRevision)
+			watchedDeleteRev, deletedRV)
 	}
 }
 
-type testWatchStruct struct {
-	obj         *example.Pod
-	expectEvent bool
-	watchType   watch.EventType
+func deletedRevision(ctx context.Context, watch <-chan clientv3.WatchResponse) (int64, error) {
+	for {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case wres := <-watch:
+			for _, evt := range wres.Events {
+				if evt.Type == mvccpb.DELETE && evt.Kv != nil {
+					return evt.Kv.ModRevision, nil
+				}
+			}
+		}
+	}
+}
+
+func TestWatchInitializationSignal(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunTestWatchInitializationSignal(ctx, t, store)
+}
+
+func TestProgressNotify(t *testing.T) {
+	clusterConfig := testserver.NewTestConfig(t)
+	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
+	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
+
+	key := "/somekey"
+	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}}
+	out := &example.Pod{}
+	if err := store.Create(ctx, key, input, out, 0); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	validateResourceVersion := storagetesting.ResourceVersionNotOlderThan(out.ResourceVersion)
+
+	opts := storage.ListOptions{
+		ResourceVersion: out.ResourceVersion,
+		Predicate:       storage.Everything,
+		ProgressNotify:  true,
+	}
+	w, err := store.Watch(ctx, key, opts)
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+
+	// when we send a bookmark event, the client expects the event to contain an
+	// object of the correct type, but with no fields set other than the resourceVersion
+	storagetesting.TestCheckResultFunc(t, watch.Bookmark, w, func(object runtime.Object) error {
+		// first, check that we have the correct resource version
+		obj, ok := object.(metav1.Object)
+		if !ok {
+			return fmt.Errorf("got %T, not metav1.Object", object)
+		}
+		if err := validateResourceVersion(obj.GetResourceVersion()); err != nil {
+			return err
+		}
+
+		// then, check that we have the right type and content
+		pod, ok := object.(*example.Pod)
+		if !ok {
+			return fmt.Errorf("got %T, not *example.Pod", object)
+		}
+		pod.ResourceVersion = ""
+		storagetesting.ExpectNoDiff(t, "bookmark event should contain an object with no fields set other than resourceVersion", newPod(), pod)
+		return nil
+	})
 }
 
 type testCodec struct {
@@ -326,48 +275,4 @@ type testCodec struct {
 
 func (c *testCodec) Decode(data []byte, defaults *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
 	return nil, nil, errTestingDecode
-}
-
-func testCheckEventType(t *testing.T, expectEventType watch.EventType, w watch.Interface) {
-	select {
-	case res := <-w.ResultChan():
-		if res.Type != expectEventType {
-			t.Errorf("event type want=%v, get=%v", expectEventType, res.Type)
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("time out after waiting %v on ResultChan", wait.ForeverTestTimeout)
-	}
-}
-
-func testCheckResult(t *testing.T, i int, expectEventType watch.EventType, w watch.Interface, expectObj *example.Pod) {
-	select {
-	case res := <-w.ResultChan():
-		if res.Type != expectEventType {
-			t.Errorf("#%d: event type want=%v, get=%v", i, expectEventType, res.Type)
-			return
-		}
-		if !reflect.DeepEqual(expectObj, res.Object) {
-			t.Errorf("#%d: obj want=\n%#v\nget=\n%#v", i, expectObj, res.Object)
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("#%d: time out after waiting %v on ResultChan", i, wait.ForeverTestTimeout)
-	}
-}
-
-func testCheckStop(t *testing.T, i int, w watch.Interface) {
-	select {
-	case e, ok := <-w.ResultChan():
-		if ok {
-			var obj string
-			switch e.Object.(type) {
-			case *example.Pod:
-				obj = e.Object.(*example.Pod).Name
-			case *metav1.Status:
-				obj = e.Object.(*metav1.Status).Message
-			}
-			t.Errorf("#%d: ResultChan should have been closed. Event: %s. Object: %s", i, e.Type, obj)
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("#%d: time out after waiting 1s on ResultChan", i)
-	}
 }

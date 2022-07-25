@@ -65,6 +65,9 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	return validation.ValidateControllerRevision(revision)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 func (strategy) PrepareForUpdate(ctx context.Context, newObj, oldObj runtime.Object) {
 	_ = oldObj.(*apps.ControllerRevision)
 	_ = newObj.(*apps.ControllerRevision)
@@ -78,3 +81,6 @@ func (strategy) ValidateUpdate(ctx context.Context, newObj, oldObj runtime.Objec
 	oldRevision, newRevision := oldObj.(*apps.ControllerRevision), newObj.(*apps.ControllerRevision)
 	return validation.ValidateControllerRevisionUpdate(newRevision, oldRevision)
 }
+
+// WarningsOnUpdate returns warnings for the given update.
+func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string { return nil }

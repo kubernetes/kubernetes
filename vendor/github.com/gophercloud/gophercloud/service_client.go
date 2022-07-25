@@ -28,6 +28,10 @@ type ServiceClient struct {
 
 	// The microversion of the service to use. Set this to use a particular microversion.
 	Microversion string
+
+	// MoreHeaders allows users (or Gophercloud) to set service-wide headers on requests. Put another way,
+	// values set in this field will be set on all the HTTP requests the service client sends.
+	MoreHeaders map[string]string
 }
 
 // ResourceBaseURL returns the base URL of any resources used by this service. It MUST end with a /.
@@ -108,6 +112,15 @@ func (client *ServiceClient) Delete(url string, opts *RequestOpts) (*http.Respon
 	return client.Request("DELETE", url, opts)
 }
 
+// Head calls `Request` with the "HEAD" HTTP verb.
+func (client *ServiceClient) Head(url string, opts *RequestOpts) (*http.Response, error) {
+	if opts == nil {
+		opts = new(RequestOpts)
+	}
+	client.initReqOpts(url, nil, nil, opts)
+	return client.Request("HEAD", url, opts)
+}
+
 func (client *ServiceClient) setMicroversionHeader(opts *RequestOpts) {
 	switch client.Type {
 	case "compute":
@@ -116,9 +129,26 @@ func (client *ServiceClient) setMicroversionHeader(opts *RequestOpts) {
 		opts.MoreHeaders["X-OpenStack-Manila-API-Version"] = client.Microversion
 	case "volume":
 		opts.MoreHeaders["X-OpenStack-Volume-API-Version"] = client.Microversion
+	case "baremetal":
+		opts.MoreHeaders["X-OpenStack-Ironic-API-Version"] = client.Microversion
+	case "baremetal-introspection":
+		opts.MoreHeaders["X-OpenStack-Ironic-Inspector-API-Version"] = client.Microversion
 	}
 
 	if client.Type != "" {
 		opts.MoreHeaders["OpenStack-API-Version"] = client.Type + " " + client.Microversion
 	}
+}
+
+// Request carries out the HTTP operation for the service client
+func (client *ServiceClient) Request(method, url string, options *RequestOpts) (*http.Response, error) {
+	if len(client.MoreHeaders) > 0 {
+		if options == nil {
+			options = new(RequestOpts)
+		}
+		for k, v := range client.MoreHeaders {
+			options.MoreHeaders[k] = v
+		}
+	}
+	return client.ProviderClient.Request(method, url, options)
 }

@@ -25,13 +25,15 @@ run_certificates_tests() {
   kube::log::status "Testing certificates"
 
   # approve
-  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/csr.yml "${kube_flags[@]:?}"
   kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''
   kubectl certificate approve foo "${kube_flags[@]}"
   kubectl get csr "${kube_flags[@]}" -o json
   kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' 'Approved'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert certificatesigningrequests events
   kubectl delete -f hack/testdata/csr.yml "${kube_flags[@]}"
-  kube::test::get_object_assert csr "{{range.items}}{{$id_field}}{{end}}" ''
+  kube::test::get_object_assert csr "{{range.items}}{{${id_field:?}}}{{end}}" ''
 
   kubectl create -f hack/testdata/csr.yml "${kube_flags[@]}"
   kube::test::get_object_assert 'csr/foo' '{{range.status.conditions}}{{.type}}{{end}}' ''

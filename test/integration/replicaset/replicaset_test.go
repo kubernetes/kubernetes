@@ -17,8 +17,8 @@ limitations under the License.
 package replicaset
 
 import (
+	"context"
 	"fmt"
-	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -26,11 +26,12 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	appsclient "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -38,11 +39,15 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
-	"k8s.io/kubernetes/pkg/util/slice"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -112,50 +117,47 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 	}
 }
 
-func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.ReplicaSetController, informers.SharedInformerFactory, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+func rmSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *replicaset.ReplicaSetController, informers.SharedInformerFactory, clientset.Interface) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
-	config := restclient.Config{Host: s.URL}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "rs-informers")), resyncPeriod)
+	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "rs-informers")), resyncPeriod)
 
 	rm := replicaset.NewReplicaSetController(
 		informers.Apps().V1().ReplicaSets(),
 		informers.Core().V1().Pods(),
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "replicaset-controller")),
 		replicaset.BurstReplicas,
 	)
 
-	if err != nil {
-		t.Fatalf("Failed to create replicaset controller")
-	}
-	return s, closeFn, rm, informers, clientSet
+	return server.TearDownFn, rm, informers, clientSet
 }
 
-func rmSimpleSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+func rmSimpleSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, clientset.Interface) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 
-	config := restclient.Config{Host: s.URL}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
 	}
-	return s, closeFn, clientSet
+	return server.TearDownFn, clientSet
 }
 
 // Run RS controller and informers
-func runControllerAndInformers(t *testing.T, rm *replicaset.ReplicaSetController, informers informers.SharedInformerFactory, podNum int) chan struct{} {
-	stopCh := make(chan struct{})
-	informers.Start(stopCh)
+func runControllerAndInformers(t *testing.T, rm *replicaset.ReplicaSetController, informers informers.SharedInformerFactory, podNum int) func() {
+	ctx, cancelFn := context.WithCancel(context.Background())
+	informers.Start(ctx.Done())
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), podNum)
-	go rm.Run(5, stopCh)
-	return stopCh
+	go rm.Run(ctx, 5)
+	return cancelFn
 }
 
 // wait for the podInformer to observe the pods. Call this function before
@@ -174,14 +176,14 @@ func createRSsPods(t *testing.T, clientSet clientset.Interface, rss []*apps.Repl
 	var createdRSs []*apps.ReplicaSet
 	var createdPods []*v1.Pod
 	for _, rs := range rss {
-		createdRS, err := clientSet.AppsV1().ReplicaSets(rs.Namespace).Create(rs)
+		createdRS, err := clientSet.AppsV1().ReplicaSets(rs.Namespace).Create(context.TODO(), rs, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create replica set %s: %v", rs.Name, err)
 		}
 		createdRSs = append(createdRSs, createdRS)
 	}
 	for _, pod := range pods {
-		createdPod, err := clientSet.CoreV1().Pods(pod.Namespace).Create(pod)
+		createdPod, err := clientSet.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create pod %s: %v", pod.Name, err)
 		}
@@ -210,12 +212,12 @@ func scaleRS(t *testing.T, c clientset.Interface, rs *apps.ReplicaSet, replicas 
 func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, updateFunc func(*v1.Pod)) *v1.Pod {
 	var pod *v1.Pod
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newPod, err := podClient.Get(podName, metav1.GetOptions{})
+		newPod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		updateFunc(newPod)
-		pod, err = podClient.Update(newPod)
+		pod, err = podClient.Update(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to update pod %s: %v", podName, err)
@@ -223,24 +225,24 @@ func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, upd
 	return pod
 }
 
-func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, pod *v1.Pod, updateStatusFunc func(*v1.Pod)) {
+func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, podName string, updateStatusFunc func(*v1.Pod)) {
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		newPod, err := podClient.Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		updateStatusFunc(newPod)
-		_, err = podClient.UpdateStatus(newPod)
+		_, err = podClient.UpdateStatus(context.TODO(), newPod, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
-		t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
+		t.Fatalf("Failed to update status of pod %s: %v", podName, err)
 	}
 }
 
 func getPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]string) *v1.PodList {
 	podSelector := labels.Set(labelMap).AsSelector()
 	options := metav1.ListOptions{LabelSelector: podSelector.String()}
-	pods, err := podClient.List(options)
+	pods, err := podClient.List(context.TODO(), options)
 	if err != nil {
 		t.Fatalf("Failed obtaining a list of pods that match the pod labels %v: %v", labelMap, err)
 	}
@@ -250,12 +252,12 @@ func getPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]s
 func updateRS(t *testing.T, rsClient appsclient.ReplicaSetInterface, rsName string, updateFunc func(*apps.ReplicaSet)) *apps.ReplicaSet {
 	var rs *apps.ReplicaSet
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newRS, err := rsClient.Get(rsName, metav1.GetOptions{})
+		newRS, err := rsClient.Get(context.TODO(), rsName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		updateFunc(newRS)
-		rs, err = rsClient.Update(newRS)
+		rs, err = rsClient.Update(context.TODO(), newRS, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to update rs %s: %v", rsName, err)
@@ -272,7 +274,7 @@ func testPodControllerRefPatch(t *testing.T, c clientset.Interface, pod *v1.Pod,
 	})
 
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		newPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		newPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -281,7 +283,7 @@ func testPodControllerRefPatch(t *testing.T, c clientset.Interface, pod *v1.Pod,
 		t.Fatalf("Failed to verify ControllerRef for the pod %s is not nil: %v", pod.Name, err)
 	}
 
-	newPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+	newPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to obtain pod %s: %v", pod.Name, err)
 	}
@@ -319,7 +321,7 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 				}
 				pod.Status.Conditions = append(pod.Status.Conditions, *condition)
 			}
-			_, err := clientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(pod)
+			_, err := clientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 			if err != nil {
 				// When status fails to be updated, we continue to next pod
 				continue
@@ -335,12 +337,12 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 
 func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *apps.ReplicaSet, replicas int32) {
 	ns := rs.Namespace
-	rsClient := c.ExtensionsV1beta1().ReplicaSets(ns)
-	newRS, err := rsClient.Get(rs.Name, metav1.GetOptions{})
+	rsClient := c.AppsV1().ReplicaSets(ns)
+	newRS, err := rsClient.Get(context.TODO(), rs.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to obtain rs %s: %v", rs.Name, err)
 	}
-	scale, err := c.AppsV1().ReplicaSets(ns).GetScale(rs.Name, metav1.GetOptions{})
+	scale, err := c.AppsV1().ReplicaSets(ns).GetScale(context.TODO(), rs.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to obtain scale subresource for rs %s: %v", rs.Name, err)
 	}
@@ -349,18 +351,18 @@ func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *a
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		scale, err := c.AppsV1().ReplicaSets(ns).GetScale(rs.Name, metav1.GetOptions{})
+		scale, err := c.AppsV1().ReplicaSets(ns).GetScale(context.TODO(), rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		scale.Spec.Replicas = replicas
-		_, err = c.AppsV1().ReplicaSets(ns).UpdateScale(rs.Name, scale)
+		_, err = c.AppsV1().ReplicaSets(ns).UpdateScale(context.TODO(), rs.Name, scale, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to set .Spec.Replicas of scale subresource for rs %s: %v", rs.Name, err)
 	}
 
-	newRS, err = rsClient.Get(rs.Name, metav1.GetOptions{})
+	newRS, err = rsClient.Get(context.TODO(), rs.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to obtain rs %s: %v", rs.Name, err)
 	}
@@ -420,81 +422,67 @@ func TestAdoption(t *testing.T) {
 		},
 	}
 	for i, tc := range testCases {
-		func() {
-			s, closeFn, rm, informers, clientSet := rmSetup(t)
+		t.Run(tc.name, func(t *testing.T) {
+			closeFn, rm, informers, clientSet := rmSetup(t)
 			defer closeFn()
-			ns := framework.CreateTestingNamespace(fmt.Sprintf("rs-adoption-%d", i), s, t)
-			defer framework.DeleteTestingNamespace(ns, s, t)
+			ns := framework.CreateNamespaceOrDie(clientSet, fmt.Sprintf("rs-adoption-%d", i), t)
+			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
 			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
 			podClient := clientSet.CoreV1().Pods(ns.Name)
 			const rsName = "rs"
-			rs, err := rsClient.Create(newRS(rsName, ns.Name, 1))
+			rs, err := rsClient.Create(context.TODO(), newRS(rsName, ns.Name, 1), metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create replica set: %v", err)
 			}
 			podName := fmt.Sprintf("pod%d", i)
 			pod := newMatchingPod(podName, ns.Name)
 			pod.OwnerReferences = tc.existingOwnerReferences(rs)
-			_, err = podClient.Create(pod)
+			_, err = podClient.Create(context.TODO(), pod, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Failed to create Pod: %v", err)
 			}
 
-			stopCh := runControllerAndInformers(t, rm, informers, 1)
-			defer close(stopCh)
+			stopControllers := runControllerAndInformers(t, rm, informers, 1)
+			defer stopControllers()
 			if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-				updatedPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+				updatedPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 				if err != nil {
 					return false, err
 				}
-				if e, a := tc.expectedOwnerReferences(rs), updatedPod.OwnerReferences; reflect.DeepEqual(e, a) {
+
+				e, a := tc.expectedOwnerReferences(rs), updatedPod.OwnerReferences
+				if reflect.DeepEqual(e, a) {
 					return true, nil
-				} else {
-					t.Logf("ownerReferences don't match, expect %v, got %v", e, a)
-					return false, nil
 				}
+
+				t.Logf("ownerReferences don't match, expect %v, got %v", e, a)
+				return false, nil
 			}); err != nil {
 				t.Fatalf("test %q failed: %v", tc.name, err)
 			}
-		}()
+		})
 	}
 }
 
 // selectors are IMMUTABLE for all API versions except extensions/v1beta1
 func TestRSSelectorImmutability(t *testing.T) {
-	s, closeFn, clientSet := rmSimpleSetup(t)
+	closeFn, clientSet := rmSimpleSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("rs-selector-immutability", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(clientSet, "rs-selector-immutability", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 	rs := newRS("rs", ns.Name, 0)
 	createRSsPods(t, clientSet, []*apps.ReplicaSet{rs}, []*v1.Pod{})
 
-	// test to ensure extensions/v1beta1 selector is mutable
-	newSelectorLabels := map[string]string{"changed_name_extensions_v1beta1": "changed_test_extensions_v1beta1"}
-	rsExt, err := clientSet.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(rs.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("failed to get extensions/v1beta replicaset %s: %v", rs.Name, err)
-	}
-	rsExt.Spec.Selector.MatchLabels = newSelectorLabels
-	rsExt.Spec.Template.Labels = newSelectorLabels
-	replicaset, err := clientSet.ExtensionsV1beta1().ReplicaSets(ns.Name).Update(rsExt)
-	if err != nil {
-		t.Fatalf("failed to update extensions/v1beta1 replicaset %s: %v", replicaset.Name, err)
-	}
-	if !reflect.DeepEqual(replicaset.Spec.Selector.MatchLabels, newSelectorLabels) {
-		t.Errorf("selector should be changed for extensions/v1beta1, expected: %v, got: %v", newSelectorLabels, replicaset.Spec.Selector.MatchLabels)
-	}
-
 	// test to ensure apps/v1 selector is immutable
-	rsV1, err := clientSet.AppsV1().ReplicaSets(ns.Name).Get(rs.Name, metav1.GetOptions{})
+	rsV1, err := clientSet.AppsV1().ReplicaSets(ns.Name).Get(context.TODO(), rs.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get apps/v1 replicaset %s: %v", rs.Name, err)
 	}
-	newSelectorLabels = map[string]string{"changed_name_apps_v1": "changed_test_apps_v1"}
+	newSelectorLabels := map[string]string{"changed_name_apps_v1": "changed_test_apps_v1"}
 	rsV1.Spec.Selector.MatchLabels = newSelectorLabels
 	rsV1.Spec.Template.Labels = newSelectorLabels
-	_, err = clientSet.AppsV1().ReplicaSets(ns.Name).Update(rsV1)
+	_, err = clientSet.AppsV1().ReplicaSets(ns.Name).Update(context.TODO(), rsV1, metav1.UpdateOptions{})
 	if err == nil {
 		t.Fatalf("failed to provide validation error when changing immutable selector when updating apps/v1 replicaset %s", rsV1.Name)
 	}
@@ -506,12 +494,12 @@ func TestRSSelectorImmutability(t *testing.T) {
 }
 
 func TestSpecReplicasChange(t *testing.T) {
-	s, closeFn, rm, informers, c := rmSetup(t)
+	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-spec-replicas-change", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	ns := framework.CreateNamespaceOrDie(c, "test-spec-replicas-change", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 2)
 	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -537,7 +525,7 @@ func TestSpecReplicasChange(t *testing.T) {
 	}
 
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		newRS, err := rsClient.Get(rs.Name, metav1.GetOptions{})
+		newRS, err := rsClient.Get(context.TODO(), rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -548,12 +536,12 @@ func TestSpecReplicasChange(t *testing.T) {
 }
 
 func TestDeletingAndFailedPods(t *testing.T) {
-	s, closeFn, rm, informers, c := rmSetup(t)
+	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-deleting-and-failed-pods", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	ns := framework.CreateNamespaceOrDie(c, "test-deleting-and-failed-pods", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 2)
 	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -573,13 +561,13 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	updatePod(t, podClient, deletingPod.Name, func(pod *v1.Pod) {
 		pod.Finalizers = []string{"fake.example.com/blockDeletion"}
 	})
-	if err := c.CoreV1().Pods(ns.Name).Delete(deletingPod.Name, &metav1.DeleteOptions{}); err != nil {
+	if err := c.CoreV1().Pods(ns.Name).Delete(context.TODO(), deletingPod.Name, metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Error deleting pod %s: %v", deletingPod.Name, err)
 	}
 
 	// Set second pod as failed pod
 	failedPod := &pods.Items[1]
-	updatePodStatus(t, podClient, failedPod, func(pod *v1.Pod) {
+	updatePodStatus(t, podClient, failedPod.Name, func(pod *v1.Pod) {
 		pod.Status.Phase = v1.PodFailed
 	})
 
@@ -612,13 +600,110 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	}
 }
 
+func TestPodDeletionCost(t *testing.T) {
+	tests := []struct {
+		name              string
+		costs             []string
+		restarts          []int32
+		enabled           bool
+		remainingPodIndex int
+	}{
+		{
+			name:              "enabled-with-different-costs",
+			costs:             []string{"1000", "100"},
+			restarts:          []int32{5, 0},
+			enabled:           true,
+			remainingPodIndex: 0,
+		},
+		{
+			name:              "enabled-with-same-costs",
+			costs:             []string{"100", "100"},
+			restarts:          []int32{5, 0},
+			enabled:           true,
+			remainingPodIndex: 1,
+		},
+		{
+			name:              "enabled-with-no-costs",
+			restarts:          []int32{5, 0},
+			enabled:           true,
+			remainingPodIndex: 1,
+		},
+		{
+			name:              "disabled-with-different-costs",
+			costs:             []string{"1000", "100"},
+			restarts:          []int32{5, 0},
+			enabled:           false,
+			remainingPodIndex: 1,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDeletionCost, tc.enabled)()
+			closeFn, rm, informers, c := rmSetup(t)
+			defer closeFn()
+			ns := framework.CreateNamespaceOrDie(c, tc.name, t)
+			defer framework.DeleteNamespaceOrDie(c, ns, t)
+			stopControllers := runControllerAndInformers(t, rm, informers, 0)
+			defer stopControllers()
+
+			rs := newRS("rs", ns.Name, 2)
+			rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+			rs = rss[0]
+			waitRSStable(t, c, rs)
+
+			// Verify RS creates 2 pods.
+			podClient := c.CoreV1().Pods(ns.Name)
+			pods := getPods(t, podClient, labelMap())
+			if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+				pods = getPods(t, podClient, labelMap())
+				return len(pods.Items) == 2, nil
+			}); err != nil {
+				t.Fatalf("Failed to verify replicaset has 2 pods: %v", err)
+			}
+
+			// Set a higher deletion cost to the pod that is supposed to remain after scale down.
+			remainingPodUID := pods.Items[tc.remainingPodIndex].UID
+			for i := range pods.Items {
+				podName := pods.Items[i].Name
+				if len(tc.costs) != 0 {
+					updatePod(t, podClient, podName, func(pod *v1.Pod) {
+						pod.Annotations = map[string]string{core.PodDeletionCost: tc.costs[i]}
+					})
+				}
+				updatePodStatus(t, podClient, podName, func(pod *v1.Pod) {
+					pod.Status.ContainerStatuses = []v1.ContainerStatus{{RestartCount: tc.restarts[i]}}
+				})
+			}
+
+			// Change RS's number of replics to 1
+			rsClient := c.AppsV1().ReplicaSets(ns.Name)
+			updateRS(t, rsClient, rs.Name, func(rs *apps.ReplicaSet) {
+				rs.Spec.Replicas = pointer.Int32Ptr(1)
+			})
+
+			// Poll until ReplicaSet is downscaled to 1.
+			if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+				pods = getPods(t, podClient, labelMap())
+				return len(pods.Items) == 1, nil
+			}); err != nil {
+				t.Fatalf("Failed to downscale replicaset to 1 pod: %v", err)
+			}
+
+			if pods.Items[0].UID != remainingPodUID {
+				t.Errorf("expected remaining Pod UID %v, got UID %v with container statues %v",
+					remainingPodUID, pods.Items[0].UID, pods.Items[0].Status.ContainerStatuses)
+			}
+		})
+	}
+}
+
 func TestOverlappingRSs(t *testing.T) {
-	s, closeFn, rm, informers, c := rmSetup(t)
+	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-overlapping-rss", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	ns := framework.CreateNamespaceOrDie(c, "test-overlapping-rss", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	// Create 2 RSs with identical selectors
 	for i := 0; i < 2; i++ {
@@ -637,7 +722,7 @@ func TestOverlappingRSs(t *testing.T) {
 
 	// Expect both RSs have .status.replicas = .spec.replicas
 	for i := 0; i < 2; i++ {
-		newRS, err := c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(fmt.Sprintf("rs-%d", i+1), metav1.GetOptions{})
+		newRS, err := c.AppsV1().ReplicaSets(ns.Name).Get(context.TODO(), fmt.Sprintf("rs-%d", i+1), metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to obtain rs rs-%d: %v", i+1, err)
 		}
@@ -648,12 +733,12 @@ func TestOverlappingRSs(t *testing.T) {
 }
 
 func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
-	s, closeFn, rm, informers, c := rmSetup(t)
+	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-pod-orphaning-and-adoption-when-labels-change", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	ns := framework.CreateNamespaceOrDie(c, "test-pod-orphaning-and-adoption-when-labels-change", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 1)
 	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -677,7 +762,7 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 		pod.Labels = newLabelMap
 	})
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		newPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		newPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -692,11 +777,11 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 		pod.Labels = labelMap()
 	})
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		newPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		newPod, err := podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			// If the pod is not found, it means the RS picks the pod for deletion (it is extra)
 			// Verify there is only one pod in namespace and it has ControllerRef to the RS
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				pods := getPods(t, podClient, labelMap())
 				if len(pods.Items) != 1 {
 					return false, fmt.Errorf("Expected 1 pod in current namespace, got %d", len(pods.Items))
@@ -725,12 +810,12 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 }
 
 func TestGeneralPodAdoption(t *testing.T) {
-	s, closeFn, rm, informers, c := rmSetup(t)
+	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-general-pod-adoption", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	ns := framework.CreateNamespaceOrDie(c, "test-general-pod-adoption", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 1)
 	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -757,12 +842,12 @@ func TestGeneralPodAdoption(t *testing.T) {
 }
 
 func TestReadyAndAvailableReplicas(t *testing.T) {
-	s, closeFn, rm, informers, c := rmSetup(t)
+	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-ready-and-available-replicas", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	ns := framework.CreateNamespaceOrDie(c, "test-ready-and-available-replicas", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 3)
 	rs.Spec.MinReadySeconds = 3600
@@ -795,9 +880,9 @@ func TestReadyAndAvailableReplicas(t *testing.T) {
 	// by setting LastTransitionTime to more than 3600 seconds ago
 	setPodsReadyCondition(t, c, thirdPodList, v1.ConditionTrue, time.Now().Add(-120*time.Minute))
 
-	rsClient := c.ExtensionsV1beta1().ReplicaSets(ns.Name)
+	rsClient := c.AppsV1().ReplicaSets(ns.Name)
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		newRS, err := rsClient.Get(rs.Name, metav1.GetOptions{})
+		newRS, err := rsClient.Get(context.TODO(), rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -809,12 +894,12 @@ func TestReadyAndAvailableReplicas(t *testing.T) {
 }
 
 func TestRSScaleSubresource(t *testing.T) {
-	s, closeFn, rm, informers, c := rmSetup(t)
+	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-rs-scale-subresource", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	ns := framework.CreateNamespaceOrDie(c, "test-rs-scale-subresource", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 1)
 	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -828,10 +913,10 @@ func TestRSScaleSubresource(t *testing.T) {
 }
 
 func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
-	s, closeFn, rm, informers, c := rmSetup(t)
+	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-extra-pods-adoption-and-deletion", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
+	ns := framework.CreateNamespaceOrDie(c, "test-extra-pods-adoption-and-deletion", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
 
 	rs := newRS("rs", ns.Name, 2)
 	// Create 3 pods, RS should adopt only 2 of them
@@ -843,8 +928,8 @@ func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 	}
 	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, podList)
 	rs = rss[0]
-	stopCh := runControllerAndInformers(t, rm, informers, 3)
-	defer close(stopCh)
+	stopControllers := runControllerAndInformers(t, rm, informers, 3)
+	defer stopControllers()
 	waitRSStable(t, c, rs)
 
 	// Verify the extra pod is deleted eventually by determining whether number of
@@ -860,12 +945,12 @@ func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 }
 
 func TestFullyLabeledReplicas(t *testing.T) {
-	s, closeFn, rm, informers, c := rmSetup(t)
+	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-fully-labeled-replicas", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	ns := framework.CreateNamespaceOrDie(c, "test-fully-labeled-replicas", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	extraLabelMap := map[string]string{"foo": "bar", "extraKey": "extraValue"}
 	rs := newRS("rs", ns.Name, 2)
@@ -892,7 +977,7 @@ func TestFullyLabeledReplicas(t *testing.T) {
 
 	// Verify only one pod is fully labeled
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		newRS, err := rsClient.Get(rs.Name, metav1.GetOptions{})
+		newRS, err := rsClient.Get(context.TODO(), rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -902,67 +987,13 @@ func TestFullyLabeledReplicas(t *testing.T) {
 	}
 }
 
-func TestReplicaSetsExtensionsV1beta1DefaultGCPolicy(t *testing.T) {
-	s, closeFn, rm, informers, c := rmSetup(t)
-	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-default-gc-extensions", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
-
-	rs := newRS("rs", ns.Name, 2)
-	fakeFinalizer := "kube.io/dummy-finalizer"
-	rs.Finalizers = []string{fakeFinalizer}
-	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
-	rs = rss[0]
-	waitRSStable(t, c, rs)
-
-	// Verify RS creates 2 pods
-	podClient := c.CoreV1().Pods(ns.Name)
-	pods := getPods(t, podClient, labelMap())
-	if len(pods.Items) != 2 {
-		t.Fatalf("len(pods) = %d, want 2", len(pods.Items))
-	}
-
-	// Delete via the extensions/v1beta1 endpoint.
-	err := c.ExtensionsV1beta1().ReplicaSets(ns.Name).Delete(rs.Name, nil)
-	if err != nil {
-		t.Fatalf("Failed to delete rs: %v", err)
-	}
-
-	// Verify orphan finalizer has been added
-	rsClient := c.AppsV1().ReplicaSets(ns.Name)
-	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		newRS, err := rsClient.Get(rs.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return slice.ContainsString(newRS.Finalizers, metav1.FinalizerOrphanDependents, nil), nil
-	}); err != nil {
-		t.Fatalf("Failed to verify orphan finalizer is added: %v", err)
-	}
-
-	updateRS(t, rsClient, rs.Name, func(rs *apps.ReplicaSet) {
-		var finalizers []string
-		// remove fakeFinalizer
-		for _, finalizer := range rs.Finalizers {
-			if finalizer != fakeFinalizer {
-				finalizers = append(finalizers, finalizer)
-			}
-		}
-		rs.Finalizers = finalizers
-	})
-
-	rsClient.Delete(rs.Name, nil)
-}
-
 func TestReplicaSetsAppsV1DefaultGCPolicy(t *testing.T) {
-	s, closeFn, rm, informers, c := rmSetup(t)
+	closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("test-default-gc-v1", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-	stopCh := runControllerAndInformers(t, rm, informers, 0)
-	defer close(stopCh)
+	ns := framework.CreateNamespaceOrDie(c, "test-default-gc-v1", t)
+	defer framework.DeleteNamespaceOrDie(c, ns, t)
+	stopControllers := runControllerAndInformers(t, rm, informers, 0)
+	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 2)
 	fakeFinalizer := "kube.io/dummy-finalizer"
@@ -979,14 +1010,14 @@ func TestReplicaSetsAppsV1DefaultGCPolicy(t *testing.T) {
 	}
 
 	rsClient := c.AppsV1().ReplicaSets(ns.Name)
-	err := rsClient.Delete(rs.Name, nil)
+	err := rsClient.Delete(context.TODO(), rs.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Failed to delete rs: %v", err)
 	}
 
 	// Verify no new finalizer has been added
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		newRS, err := rsClient.Get(rs.Name, metav1.GetOptions{})
+		newRS, err := rsClient.Get(context.TODO(), rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -1012,5 +1043,5 @@ func TestReplicaSetsAppsV1DefaultGCPolicy(t *testing.T) {
 		rs.Finalizers = finalizers
 	})
 
-	rsClient.Delete(rs.Name, nil)
+	rsClient.Delete(context.TODO(), rs.Name, metav1.DeleteOptions{})
 }

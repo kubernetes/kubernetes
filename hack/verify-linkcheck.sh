@@ -14,11 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script extracts the links from types.go and .md files in pkg/api/,
+# pkg/apis/ and docs/ directories, checks the status code of the response, and
+# output the list of invalid links.
+# Usage: `hack/verify-linkcheck.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -38,7 +43,7 @@ mkdir -p "$OUTPUT"
 APIROOT="${KUBE_ROOT}/pkg/api/"
 APISROOT="${KUBE_ROOT}/pkg/apis/"
 DOCROOT="${KUBE_ROOT}/docs/"
-ROOTS=($APIROOT $APISROOT $DOCROOT)
+ROOTS=("$APIROOT" "$APISROOT" "$DOCROOT")
 found_invalid=false
 for root in "${ROOTS[@]}"; do
   "${linkcheck}" "--root-dir=${root}" 2> >(tee -a "${OUTPUT}/error" >&2) && ret=0 || ret=$?
@@ -54,7 +59,7 @@ done
 
 if [ ${found_invalid} = true ]; then
   echo "Summary of invalid links:"
-  cat ${OUTPUT}/error
+  cat "${OUTPUT}/error"
   exit 1
 fi
 

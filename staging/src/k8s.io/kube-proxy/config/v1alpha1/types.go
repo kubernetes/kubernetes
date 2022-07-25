@@ -17,8 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	apimachineryconfigv1alpha1 "k8s.io/apimachinery/pkg/apis/config/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 )
 
 // KubeProxyIPTablesConfiguration contains iptables-related configuration
@@ -51,14 +51,23 @@ type KubeProxyIPVSConfiguration struct {
 	// excludeCIDRs is a list of CIDR's which the ipvs proxier should not touch
 	// when cleaning up ipvs services.
 	ExcludeCIDRs []string `json:"excludeCIDRs"`
+	// strict ARP configure arp_ignore and arp_announce to avoid answering ARP queries
+	// from kube-ipvs0 interface
+	StrictARP bool `json:"strictARP"`
+	// tcpTimeout is the timeout value used for idle IPVS TCP sessions.
+	// The default value is 0, which preserves the current timeout value on the system.
+	TCPTimeout metav1.Duration `json:"tcpTimeout"`
+	// tcpFinTimeout is the timeout value used for IPVS TCP sessions after receiving a FIN.
+	// The default value is 0, which preserves the current timeout value on the system.
+	TCPFinTimeout metav1.Duration `json:"tcpFinTimeout"`
+	// udpTimeout is the timeout value used for IPVS UDP packets.
+	// The default value is 0, which preserves the current timeout value on the system.
+	UDPTimeout metav1.Duration `json:"udpTimeout"`
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
 // the Kubernetes proxy server.
 type KubeProxyConntrackConfiguration struct {
-	// max is the maximum number of NAT connections to track (0 to
-	// leave as-is).  This takes precedence over maxPerCore and min.
-	Max *int32 `json:"max"`
 	// maxPerCore is the maximum number of NAT connections to track
 	// per CPU core (0 to leave the limit as-is and ignore min).
 	MaxPerCore *int32 `json:"maxPerCore"`
@@ -72,6 +81,38 @@ type KubeProxyConntrackConfiguration struct {
 	// in CLOSE_WAIT state will remain in the conntrack
 	// table. (e.g. '60s'). Must be greater than 0 to set.
 	TCPCloseWaitTimeout *metav1.Duration `json:"tcpCloseWaitTimeout"`
+}
+
+// KubeProxyWinkernelConfiguration contains Windows/HNS settings for
+// the Kubernetes proxy server.
+type KubeProxyWinkernelConfiguration struct {
+	// networkName is the name of the network kube-proxy will use
+	// to create endpoints and policies
+	NetworkName string `json:"networkName"`
+	// sourceVip is the IP address of the source VIP endoint used for
+	// NAT when loadbalancing
+	SourceVip string `json:"sourceVip"`
+	// enableDSR tells kube-proxy whether HNS policies should be created
+	// with DSR
+	EnableDSR bool `json:"enableDSR"`
+	// RootHnsEndpointName is the name of hnsendpoint that is attached to
+	// l2bridge for root network namespace
+	RootHnsEndpointName string `json:"rootHnsEndpointName"`
+	// ForwardHealthCheckVip forwards service VIP for health check port on
+	// Windows
+	ForwardHealthCheckVip bool `json:"forwardHealthCheckVip"`
+}
+
+// DetectLocalConfiguration contains optional settings related to DetectLocalMode option
+type DetectLocalConfiguration struct {
+	// BridgeInterface is a string argument which represents a single bridge interface name.
+	// Kube-proxy considers traffic as local if originating from this given bridge.
+	// This argument should be set if DetectLocalMode is set to LocalModeBridgeInterface.
+	BridgeInterface string `json:"bridgeInterface"`
+	// InterfaceNamePrefix is a string argument which represents a single interface prefix name.
+	// Kube-proxy considers traffic as local if originating from one or more interfaces which match
+	// the given prefix. This argument should be set if DetectLocalMode is set to LocalModeInterfaceNamePrefix.
+	InterfaceNamePrefix string `json:"interfaceNamePrefix"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -93,6 +134,8 @@ type KubeProxyConfiguration struct {
 	// metricsBindAddress is the IP address and port for the metrics server to serve on,
 	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
 	MetricsBindAddress string `json:"metricsBindAddress"`
+	// bindAddressHardFail, if true, kube-proxy will treat failure to bind to a port as fatal and exit
+	BindAddressHardFail bool `json:"bindAddressHardFail"`
 	// enableProfiling enables profiling via web interface on /debug/pprof handler.
 	// Profiling handlers will be handled by metrics server.
 	EnableProfiling bool `json:"enableProfiling"`
@@ -104,7 +147,7 @@ type KubeProxyConfiguration struct {
 	HostnameOverride string `json:"hostnameOverride"`
 	// clientConnection specifies the kubeconfig file and client connection settings for the proxy
 	// server to use when communicating with the apiserver.
-	ClientConnection apimachineryconfigv1alpha1.ClientConnectionConfiguration `json:"clientConnection"`
+	ClientConnection componentbaseconfigv1alpha1.ClientConnectionConfiguration `json:"clientConnection"`
 	// iptables contains iptables-related configuration options.
 	IPTables KubeProxyIPTablesConfiguration `json:"iptables"`
 	// ipvs contains ipvs-related configuration options.
@@ -117,9 +160,6 @@ type KubeProxyConfiguration struct {
 	// portRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed
 	// in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
 	PortRange string `json:"portRange"`
-	// resourceContainer is the bsolute name of the resource-only container to create and run
-	// the Kube-proxy in (Default: /kube-proxy).
-	ResourceContainer string `json:"resourceContainer"`
 	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
 	UDPIdleTimeout metav1.Duration `json:"udpIdleTimeout"`
@@ -136,8 +176,18 @@ type KubeProxyConfiguration struct {
 	// If set it to a non-zero IP block, kube-proxy will filter that down to just the IPs that applied to the node.
 	// An empty string slice is meant to select all network interfaces.
 	NodePortAddresses []string `json:"nodePortAddresses"`
+	// winkernel contains winkernel-related configuration options.
+	Winkernel KubeProxyWinkernelConfiguration `json:"winkernel"`
+	// ShowHiddenMetricsForVersion is the version for which you want to show hidden metrics.
+	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
+	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
+	DetectLocalMode LocalMode `json:"detectLocalMode"`
+	// DetectLocal contains optional configuration settings related to DetectLocalMode.
+	DetectLocal DetectLocalConfiguration `json:"detectLocal"`
 }
 
+// ProxyMode represents modes used by the Kubernetes proxy server.
+//
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
 // (newer, faster), 'ipvs'(newest, better in performance and scalability).
 //
@@ -147,8 +197,11 @@ type KubeProxyConfiguration struct {
 // future). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are
 // insufficient, this always falls back to the userspace proxy. IPVS mode will be enabled when proxy mode is set to 'ipvs',
 // and the fall back path is firstly iptables and then userspace.
-
+//
 // In Windows platform, if proxy mode is blank, use the best-available proxy (currently userspace, but may change in the
 // future). If winkernel proxy is selected, regardless of how, but the Windows kernel can't support this mode of proxy,
 // this always falls back to the userspace proxy.
 type ProxyMode string
+
+// LocalMode represents modes to detect local traffic from the node
+type LocalMode string

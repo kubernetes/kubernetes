@@ -25,15 +25,16 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
+	netutils "k8s.io/utils/net"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
-	_, clusterCIDRRange, _ = net.ParseCIDR("10.1.0.0/16")
+	_, clusterCIDRRange, _ = netutils.ParseCIDRSloppy("10.1.0.0/16")
 )
 
 type fakeEvent struct {
@@ -58,13 +59,13 @@ type fakeAPIs struct {
 	results []error
 }
 
-func (f *fakeAPIs) Alias(ctx context.Context, nodeName string) (*net.IPNet, error) {
-	f.calls = append(f.calls, fmt.Sprintf("alias %v", nodeName))
+func (f *fakeAPIs) Alias(ctx context.Context, node *v1.Node) (*net.IPNet, error) {
+	f.calls = append(f.calls, fmt.Sprintf("alias %v", node.Name))
 	return f.aliasRange, f.aliasErr
 }
 
-func (f *fakeAPIs) AddAlias(ctx context.Context, nodeName string, cidrRange *net.IPNet) error {
-	f.calls = append(f.calls, fmt.Sprintf("addAlias %v %v", nodeName, cidrRange))
+func (f *fakeAPIs) AddAlias(ctx context.Context, node *v1.Node, cidrRange *net.IPNet) error {
+	f.calls = append(f.calls, fmt.Sprintf("addAlias %v %v", node.Name, cidrRange))
 	return f.addAliasErr
 }
 

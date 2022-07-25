@@ -17,31 +17,24 @@ limitations under the License.
 package kubelet
 
 import (
+	"bytes"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
 func TestCreateConfigMap(t *testing.T) {
 	nodeName := "fake-node"
 	client := fake.NewSimpleClientset()
-	cfg := &kubeadmapi.InitConfiguration{
-		NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodeName},
-		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-			KubernetesVersion: "v1.12.0",
-			ComponentConfigs: kubeadmapi.ComponentConfigs{
-				Kubelet: &kubeletconfig.KubeletConfiguration{},
-			},
-		},
-	}
-
 	client.PrependReactor("get", "nodes", func(action core.Action) (bool, runtime.Object, error) {
 		return true, &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -60,7 +53,12 @@ func TestCreateConfigMap(t *testing.T) {
 		return true, nil, nil
 	})
 
-	if err := CreateConfigMap(cfg, client); err != nil {
+	internalcfg, err := configutil.DefaultedStaticInitConfiguration()
+	if err != nil {
+		t.Fatalf("unexpected failure when defaulting InitConfiguration: %v", err)
+	}
+
+	if err := CreateConfigMap(&internalcfg.ClusterConfiguration, client); err != nil {
 		t.Errorf("CreateConfigMap: unexpected error %v", err)
 	}
 }
@@ -74,7 +72,34 @@ func TestCreateConfigMapRBACRules(t *testing.T) {
 		return true, nil, nil
 	})
 
-	if err := createConfigMapRBACRules(client, version.MustParseSemantic("v1.11.0")); err != nil {
+	if err := createConfigMapRBACRules(client); err != nil {
 		t.Errorf("createConfigMapRBACRules: unexpected error %v", err)
+	}
+}
+
+func TestApplyKubeletConfigPatches(t *testing.T) {
+	var (
+		input          = []byte("bar: 0\nfoo: 0\n")
+		patch          = []byte("bar: 1\n")
+		expectedOutput = []byte("bar: 1\nfoo: 0\n")
+	)
+
+	dir, err := ioutil.TempDir("", "patches")
+	if err != nil {
+		t.Fatalf("could not create temp dir: %v", err)
+	}
+	defer os.RemoveAll(dir)
+
+	if err := ioutil.WriteFile(filepath.Join(dir, "kubeletconfiguration.yaml"), patch, 0644); err != nil {
+		t.Fatalf("could not write patch file: %v", err)
+	}
+
+	output, err := applyKubeletConfigPatches(input, dir, ioutil.Discard)
+	if err != nil {
+		t.Fatalf("could not apply patch: %v", err)
+	}
+
+	if !bytes.Equal(output, expectedOutput) {
+		t.Fatalf("expected output:\n%s\ngot\n%s\n", expectedOutput, output)
 	}
 }

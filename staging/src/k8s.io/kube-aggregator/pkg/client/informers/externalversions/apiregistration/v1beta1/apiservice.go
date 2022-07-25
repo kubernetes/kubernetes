@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	time "time"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,13 +61,13 @@ func NewFilteredAPIServiceInformer(client clientset.Interface, resyncPeriod time
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ApiregistrationV1beta1().APIServices().List(options)
+				return client.ApiregistrationV1beta1().APIServices().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ApiregistrationV1beta1().APIServices().Watch(options)
+				return client.ApiregistrationV1beta1().APIServices().Watch(context.TODO(), options)
 			},
 		},
 		&apiregistrationv1beta1.APIService{},

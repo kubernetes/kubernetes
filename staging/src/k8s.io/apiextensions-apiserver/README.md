@@ -6,7 +6,7 @@ It provides an API for registering `CustomResourceDefinitions`.
 
 ## Purpose
 
-This API server provides the implementation for `CustomResourceDefinitions` which is included as 
+This API server provides the implementation for `CustomResourceDefinitions` which is included as
 delegate server inside of `kube-apiserver`.
 
 
@@ -18,3 +18,4 @@ HEAD of this repo will match HEAD of k8s.io/apiserver, k8s.io/apimachinery, and 
 
 `apiextensions-apiserver` is synced from https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiextensions-apiserver.
 Code changes are made in that location, merged into `k8s.io/kubernetes` and later synced here.
+

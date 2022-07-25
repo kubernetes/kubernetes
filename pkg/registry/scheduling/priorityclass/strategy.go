@@ -36,7 +36,7 @@ type priorityClassStrategy struct {
 // Strategy is the default logic that applies when creating and updating PriorityClass objects.
 var Strategy = priorityClassStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// NamespaceScoped returns true because all PriorityClasses are global.
+// NamespaceScoped returns false because all PriorityClasses are global.
 func (priorityClassStrategy) NamespaceScoped() bool {
 	return false
 }
@@ -48,15 +48,17 @@ func (priorityClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (priorityClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	_ = obj.(*scheduling.PriorityClass)
-	_ = old.(*scheduling.PriorityClass)
-}
+func (priorityClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {}
 
 // Validate validates a new PriorityClass.
 func (priorityClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pc := obj.(*scheduling.PriorityClass)
 	return validation.ValidatePriorityClass(pc)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (priorityClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
 }
 
 // Canonicalize normalizes the object after validation.
@@ -70,6 +72,11 @@ func (priorityClassStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (priorityClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePriorityClassUpdate(obj.(*scheduling.PriorityClass), old.(*scheduling.PriorityClass))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (priorityClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for PriorityClass objects.

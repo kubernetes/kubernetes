@@ -17,32 +17,24 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"os"
 
-	"k8s.io/klog"
-
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/component-base/cli"
 	"k8s.io/kube-aggregator/pkg/cmd/server"
 
 	// force compilation of packages we'll later rely upon
 	_ "k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
 	_ "k8s.io/kube-aggregator/pkg/apis/apiregistration/validation"
-	_ "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset"
-	_ "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
+	_ "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
+	_ "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	_ "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1"
 )
 
 func main() {
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
 	stopCh := genericapiserver.SetupSignalHandler()
 	options := server.NewDefaultOptions(os.Stdout, os.Stderr)
 	cmd := server.NewCommandStartAggregator(options, stopCh)
-	cmd.Flags().AddGoFlagSet(flag.CommandLine)
-	if err := cmd.Execute(); err != nil {
-		klog.Fatal(err)
-	}
+	code := cli.Run(cmd)
+	os.Exit(code)
 }

@@ -26,10 +26,13 @@ import (
 )
 
 // ClusterRoleBindingLister helps list ClusterRoleBindings.
+// All objects returned here must be treated as read-only.
 type ClusterRoleBindingLister interface {
 	// List lists all ClusterRoleBindings in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.ClusterRoleBinding, err error)
 	// Get retrieves the ClusterRoleBinding from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1beta1.ClusterRoleBinding, error)
 	ClusterRoleBindingListerExpansion
 }

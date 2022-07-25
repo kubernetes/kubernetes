@@ -11,7 +11,7 @@ import (
 
 // Dlatrd reduces nb rows and columns of a real n×n symmetric matrix A to symmetric
 // tridiagonal form. It computes the orthonormal similarity transformation
-//  Q^T * A * Q
+//  Qᵀ * A * Q
 // and returns the matrices V and W to apply to the unreduced part of A. If
 // uplo == blas.Upper, the upper triangle is supplied and the last nb rows are
 // reduced. If uplo == blas.Lower, the lower triangle is supplied and the first
@@ -51,7 +51,7 @@ import (
 //
 // The matrix Q is represented as a product of elementary reflectors. Each reflector
 // H has the form
-//  I - tau * v * v^T
+//  I - tau * v * vᵀ
 // If uplo == blas.Upper,
 //  Q = H_{n-1} * H_{n-2} * ... * H_{n-nb}
 // where v[:i-1] is stored in A[:i-1,i], v[i-1] = 1, and v[i:n] = 0.
@@ -62,22 +62,42 @@ import (
 //
 // The vectors v form the n×nb matrix V which is used with W to apply a
 // symmetric rank-2 update to the unreduced part of A
-//  A = A - V * W^T - W * V^T
+//  A = A - V * Wᵀ - W * Vᵀ
 //
 // Dlatrd is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlatrd(uplo blas.Uplo, n, nb int, a []float64, lda int, e, tau, w []float64, ldw int) {
-	checkMatrix(n, n, a, lda)
-	checkMatrix(n, nb, w, ldw)
-	if len(e) < n-1 {
-		panic(badE)
+	switch {
+	case uplo != blas.Upper && uplo != blas.Lower:
+		panic(badUplo)
+	case n < 0:
+		panic(nLT0)
+	case nb < 0:
+		panic(nbLT0)
+	case nb > n:
+		panic(nbGTN)
+	case lda < max(1, n):
+		panic(badLdA)
+	case ldw < max(1, nb):
+		panic(badLdW)
 	}
-	if len(tau) < n-1 {
-		panic(badTau)
-	}
-	if n <= 0 {
+
+	if n == 0 {
 		return
 	}
+
+	switch {
+	case len(a) < (n-1)*lda+n:
+		panic(shortA)
+	case len(w) < (n-1)*ldw+nb:
+		panic(shortW)
+	case len(e) < n-1:
+		panic(shortE)
+	case len(tau) < n-1:
+		panic(shortTau)
+	}
+
 	bi := blas64.Implementation()
+
 	if uplo == blas.Upper {
 		for i := n - 1; i >= n-nb; i-- {
 			iw := i - n + nb

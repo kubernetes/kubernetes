@@ -20,13 +20,30 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
+	componentconfigtesting "k8s.io/component-base/config/testing"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/fuzzer"
 )
 
-func TestRoundTripTypes(t *testing.T) {
+func TestRoundTripFuzzing(t *testing.T) {
 	scheme, _, err := NewSchemeAndCodecs()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	roundtrip.RoundTripTestForScheme(t, scheme, fuzzer.Funcs)
+}
+
+func TestRoundTripYAML(t *testing.T) {
+	scheme, codec, err := NewSchemeAndCodecs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	componentconfigtesting.RoundTripTest(t, scheme, *codec)
+}
+
+func TestDefaultsYAML(t *testing.T) {
+	scheme, codec, err := NewSchemeAndCodecs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	componentconfigtesting.DefaultingTest(t, scheme, *codec)
 }

@@ -45,7 +45,7 @@ func TestPodSyncResult(t *testing.T) {
 	result.AddSyncResult(okResults...)
 	result.AddSyncResult(errResults...)
 	if result.Error() == nil {
-		t.Errorf("PodSyncResult should be error: %q", result)
+		t.Errorf("PodSyncResult should be error: %v", result)
 	}
 
 	// If the PodSyncResult is failed, it should be error
@@ -53,7 +53,7 @@ func TestPodSyncResult(t *testing.T) {
 	result.AddSyncResult(okResults...)
 	result.Fail(errors.New("error"))
 	if result.Error() == nil {
-		t.Errorf("PodSyncResult should be error: %q", result)
+		t.Errorf("PodSyncResult should be error: %v", result)
 	}
 
 	// If the PodSyncResult is added an error PodSyncResult, it should be error
@@ -63,6 +63,6 @@ func TestPodSyncResult(t *testing.T) {
 	result.AddSyncResult(okResults...)
 	result.AddPodSyncResult(errResult)
 	if result.Error() == nil {
-		t.Errorf("PodSyncResult should be error: %q", result)
+		t.Errorf("PodSyncResult should be error: %v", result)
 	}
 }

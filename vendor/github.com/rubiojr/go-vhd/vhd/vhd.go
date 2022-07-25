@@ -11,6 +11,9 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/transform"
 )
 
 const VHD_COOKIE = "636f6e6563746978"     // conectix
@@ -324,8 +327,14 @@ func (vhd *VHD) PrintExtraHeader() {
 	fmtField("Parent timestamp", fmt.Sprintf("%s", t))
 
 	fmtField("Reserved", hexs(header.Reserved[:]))
-	parentName := utf16BytesToString(header.ParentUnicodeName[:],
-		binary.BigEndian)
+	parentNameBytes, _, err := transform.Bytes(
+		unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM).NewDecoder(),
+		header.ParentUnicodeName[:],
+	)
+	if err != nil {
+		panic(err)
+	}
+	parentName := string(parentNameBytes)
 	fmtField("Parent Name", parentName)
 	// Parent locator entries ignored since it's a dynamic disk
 	sum := 0

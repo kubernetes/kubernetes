@@ -28,39 +28,55 @@ import (
 //
 // Dorgqr is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dorgqr(m, n, k int, a []float64, lda int, tau, work []float64, lwork int) {
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case n > m:
+		panic(nGTM)
+	case k < 0:
+		panic(kLT0)
+	case k > n:
+		panic(kGTN)
+	case lda < max(1, n) && lwork != -1:
+		// Normally, we follow the reference and require the leading
+		// dimension to be always valid, even in case of workspace
+		// queries. However, if a caller provided a placeholder value
+		// for lda (and a) when doing a workspace query that didn't
+		// fulfill the condition here, it would cause a panic. This is
+		// exactly what Dgesvd does.
+		panic(badLdA)
+	case lwork < max(1, n) && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
+		panic(shortWork)
+	}
+
+	if n == 0 {
+		work[0] = 1
+		return
+	}
+
 	nb := impl.Ilaenv(1, "DORGQR", " ", m, n, k, -1)
 	// work is treated as an n×nb matrix
 	if lwork == -1 {
-		work[0] = float64(max(1, n) * nb)
+		work[0] = float64(n * nb)
 		return
 	}
-	checkMatrix(m, n, a, lda)
-	if k < 0 {
-		panic(kLT0)
+
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(tau) < k:
+		panic(shortTau)
 	}
-	if k > n {
-		panic(kGTN)
-	}
-	if n > m {
-		panic(mLTN)
-	}
-	if len(tau) < k {
-		panic(badTau)
-	}
-	if len(work) < lwork {
-		panic(shortWork)
-	}
-	if lwork < n {
-		panic(badWork)
-	}
-	if n == 0 {
-		return
-	}
-	nbmin := 2 // Minimum number of blocks
-	var nx int // Minimum number of rows
+
+	nbmin := 2 // Minimum block size
+	var nx int // Crossover size from blocked to unbloked code
 	iws := n   // Length of work needed
 	var ldwork int
-	if nb > 1 && nb < k {
+	if 1 < nb && nb < k {
 		nx = max(0, impl.Ilaenv(3, "DORGQR", " ", m, n, k, -1))
 		if nx < k {
 			ldwork = nb
@@ -73,14 +89,12 @@ func (impl Implementation) Dorgqr(m, n, k int, a []float64, lda int, tau, work [
 		}
 	}
 	var ki, kk int
-	if nb >= nbmin && nb < k && nx < k {
+	if nbmin <= nb && nb < k && nx < k {
 		// The first kk columns are handled by the blocked method.
-		// Note: lapack has nx here, but this means the last nx rows are handled
-		// serially which could be quite different than nb.
-		ki = ((k - nb - 1) / nb) * nb
+		ki = ((k - nx - 1) / nb) * nb
 		kk = min(k, ki+nb)
-		for j := kk; j < n; j++ {
-			for i := 0; i < kk; i++ {
+		for i := 0; i < kk; i++ {
+			for j := kk; j < n; j++ {
 				a[i*lda+j] = 0
 			}
 		}
@@ -89,32 +103,32 @@ func (impl Implementation) Dorgqr(m, n, k int, a []float64, lda int, tau, work [
 		// Perform the operation on colums kk to the end.
 		impl.Dorg2r(m-kk, n-kk, k-kk, a[kk*lda+kk:], lda, tau[kk:], work)
 	}
-	if kk == 0 {
-		return
-	}
-	// Perform the operation on column-blocks
-	for i := ki; i >= 0; i -= nb {
-		ib := min(nb, k-i)
-		if i+ib < n {
-			impl.Dlarft(lapack.Forward, lapack.ColumnWise,
-				m-i, ib,
-				a[i*lda+i:], lda,
-				tau[i:],
-				work, ldwork)
+	if kk > 0 {
+		// Perform the operation on column-blocks.
+		for i := ki; i >= 0; i -= nb {
+			ib := min(nb, k-i)
+			if i+ib < n {
+				impl.Dlarft(lapack.Forward, lapack.ColumnWise,
+					m-i, ib,
+					a[i*lda+i:], lda,
+					tau[i:],
+					work, ldwork)
 
-			impl.Dlarfb(blas.Left, blas.NoTrans, lapack.Forward, lapack.ColumnWise,
-				m-i, n-i-ib, ib,
-				a[i*lda+i:], lda,
-				work, ldwork,
-				a[i*lda+i+ib:], lda,
-				work[ib*ldwork:], ldwork)
-		}
-		impl.Dorg2r(m-i, ib, ib, a[i*lda+i:], lda, tau[i:], work)
-		// Set rows 0:i-1 of current block to zero
-		for j := i; j < i+ib; j++ {
-			for l := 0; l < i; l++ {
-				a[l*lda+j] = 0
+				impl.Dlarfb(blas.Left, blas.NoTrans, lapack.Forward, lapack.ColumnWise,
+					m-i, n-i-ib, ib,
+					a[i*lda+i:], lda,
+					work, ldwork,
+					a[i*lda+i+ib:], lda,
+					work[ib*ldwork:], ldwork)
+			}
+			impl.Dorg2r(m-i, ib, ib, a[i*lda+i:], lda, tau[i:], work)
+			// Set rows 0:i-1 of current block to zero.
+			for j := i; j < i+ib; j++ {
+				for l := 0; l < i; l++ {
+					a[l*lda+j] = 0
+				}
 			}
 		}
 	}
+	work[0] = float64(iws)
 }

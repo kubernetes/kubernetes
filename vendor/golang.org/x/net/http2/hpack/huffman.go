@@ -47,6 +47,7 @@ var ErrInvalidHuffman = errors.New("hpack: invalid Huffman-encoded data")
 // If maxLen is greater than 0, attempts to write more to buf than
 // maxLen bytes will return ErrStringLength.
 func huffmanDecode(buf *bytes.Buffer, maxLen int, v []byte) error {
+	rootHuffmanNode := getRootHuffmanNode()
 	n := rootHuffmanNode
 	// cur is the bit buffer that has not been fed into n.
 	// cbits is the number of low order bits in cur that are valid.
@@ -104,9 +105,16 @@ func huffmanDecode(buf *bytes.Buffer, maxLen int, v []byte) error {
 	return nil
 }
 
+// incomparable is a zero-width, non-comparable type. Adding it to a struct
+// makes that struct also non-comparable, and generally doesn't add
+// any size (as long as it's first).
+type incomparable [0]func()
+
 type node struct {
+	_ incomparable
+
 	// children is non-nil for internal nodes
-	children []*node
+	children *[256]*node
 
 	// The following are only valid if children is nil:
 	codeLen uint8 // number of bits that led to the output of sym
@@ -114,34 +122,47 @@ type node struct {
 }
 
 func newInternalNode() *node {
-	return &node{children: make([]*node, 256)}
+	return &node{children: new([256]*node)}
 }
 
-var rootHuffmanNode = newInternalNode()
+var (
+	buildRootOnce       sync.Once
+	lazyRootHuffmanNode *node
+)
 
-func init() {
+func getRootHuffmanNode() *node {
+	buildRootOnce.Do(buildRootHuffmanNode)
+	return lazyRootHuffmanNode
+}
+
+func buildRootHuffmanNode() {
 	if len(huffmanCodes) != 256 {
 		panic("unexpected size")
 	}
-	for i, code := range huffmanCodes {
-		addDecoderNode(byte(i), code, huffmanCodeLen[i])
-	}
-}
+	lazyRootHuffmanNode = newInternalNode()
+	// allocate a leaf node for each of the 256 symbols
+	leaves := new([256]node)
 
-func addDecoderNode(sym byte, code uint32, codeLen uint8) {
-	cur := rootHuffmanNode
-	for codeLen > 8 {
-		codeLen -= 8
-		i := uint8(code >> codeLen)
-		if cur.children[i] == nil {
-			cur.children[i] = newInternalNode()
+	for sym, code := range huffmanCodes {
+		codeLen := huffmanCodeLen[sym]
+
+		cur := lazyRootHuffmanNode
+		for codeLen > 8 {
+			codeLen -= 8
+			i := uint8(code >> codeLen)
+			if cur.children[i] == nil {
+				cur.children[i] = newInternalNode()
+			}
+			cur = cur.children[i]
 		}
-		cur = cur.children[i]
-	}
-	shift := 8 - codeLen
-	start, end := int(uint8(code<<shift)), int(1<<shift)
-	for i := start; i < start+end; i++ {
-		cur.children[i] = &node{sym: sym, codeLen: codeLen}
+		shift := 8 - codeLen
+		start, end := int(uint8(code<<shift)), int(1<<shift)
+
+		leaves[sym].sym = byte(sym)
+		leaves[sym].codeLen = codeLen
+		for i := start; i < start+end; i++ {
+			cur.children[i] = &leaves[sym]
+		}
 	}
 }
 

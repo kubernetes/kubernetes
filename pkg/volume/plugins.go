@@ -22,20 +22,28 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	"k8s.io/utils/exec"
+
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
 type ProbeOperation uint32
@@ -54,6 +62,15 @@ const (
 
 	ProbeAddOrUpdate ProbeOperation = 1 << iota
 	ProbeRemove
+)
+
+var (
+	deprecatedVolumeProviders = map[string]string{
+		"kubernetes.io/cinder":    "The Cinder volume provider is deprecated and will be removed in a future release",
+		"kubernetes.io/storageos": "The StorageOS volume provider is deprecated and will be removed in a future release",
+		"kubernetes.io/quobyte":   "The Quobyte volume provider is deprecated and will be removed in a future release",
+		"kubernetes.io/flocker":   "The Flocker volume provider is deprecated and will be removed in a future release",
+	}
 )
 
 // VolumeOptions contains option information about a volume.
@@ -84,10 +101,30 @@ type VolumeOptions struct {
 	Parameters map[string]string
 }
 
+// NodeResizeOptions contain options to be passed for node expansion.
+type NodeResizeOptions struct {
+	VolumeSpec *Spec
+
+	// DevicePath - location of actual device on the node. In case of CSI
+	// this just could be volumeID
+	DevicePath string
+
+	// DeviceMountPath location where device is mounted on the node. If volume type
+	// is attachable - this would be global mount path otherwise
+	// it would be location where volume was mounted for the pod
+	DeviceMountPath string
+
+	// DeviceStagingPath stores location where the volume is staged
+	DeviceStagePath string
+
+	NewSize resource.Quantity
+	OldSize resource.Quantity
+}
+
 type DynamicPluginProber interface {
 	Init() error
 
-	// If an error occurs, events are undefined.
+	// aggregates events for successful drivers and errors for failed drivers
 	Probe() (events []ProbeEvent, err error)
 }
 
@@ -121,7 +158,7 @@ type VolumePlugin interface {
 	// RequiresRemount returns true if this plugin requires mount calls to be
 	// reexecuted. Atomically updating volumes, like Downward API, depend on
 	// this to update the contents of the volume.
-	RequiresRemount() bool
+	RequiresRemount(spec *Spec) bool
 
 	// NewMounter creates a new volume.Mounter from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
@@ -135,10 +172,10 @@ type VolumePlugin interface {
 	NewUnmounter(name string, podUID types.UID) (Unmounter, error)
 
 	// ConstructVolumeSpec constructs a volume spec based on the given volume name
-	// and mountPath. The spec may have incomplete information due to limited
+	// and volumePath. The spec may have incomplete information due to limited
 	// information from input. This function is used by volume manager to reconstruct
 	// volume spec by reading the volume directories from disk
-	ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error)
+	ConstructVolumeSpec(volumeName, volumePath string) (*Spec, error)
 
 	// SupportsMountOption returns true if volume plugins supports Mount options
 	// Specifying mount options in a volume plugin that doesn't support
@@ -184,12 +221,6 @@ type DeletableVolumePlugin interface {
 	NewDeleter(spec *Spec) (Deleter, error)
 }
 
-const (
-	// Name of a volume in external cloud that is being provisioned and thus
-	// should be ignored by rest of Kubernetes.
-	ProvisionedVolumeName = "placeholder-for-provisioning"
-)
-
 // ProvisionableVolumePlugin is an extended interface of VolumePlugin and is
 // used to create volumes for the cluster.
 type ProvisionableVolumePlugin interface {
@@ -206,6 +237,8 @@ type AttachableVolumePlugin interface {
 	DeviceMountableVolumePlugin
 	NewAttacher() (Attacher, error)
 	NewDetacher() (Detacher, error)
+	// CanAttach tests if provided volume spec is attachable
+	CanAttach(spec *Spec) (bool, error)
 }
 
 // DeviceMountableVolumePlugin is an extended interface of VolumePlugin and is used
@@ -215,21 +248,25 @@ type DeviceMountableVolumePlugin interface {
 	NewDeviceMounter() (DeviceMounter, error)
 	NewDeviceUnmounter() (DeviceUnmounter, error)
 	GetDeviceMountRefs(deviceMountPath string) ([]string, error)
+	// CanDeviceMount determines if device in volume.Spec is mountable
+	CanDeviceMount(spec *Spec) (bool, error)
 }
 
 // ExpandableVolumePlugin is an extended interface of VolumePlugin and is used for volumes that can be
-// expanded
+// expanded via control-plane ExpandVolumeDevice call.
 type ExpandableVolumePlugin interface {
 	VolumePlugin
 	ExpandVolumeDevice(spec *Spec, newSize resource.Quantity, oldSize resource.Quantity) (resource.Quantity, error)
 	RequiresFSResize() bool
 }
 
-// FSResizableVolumePlugin is an extension of ExpandableVolumePlugin and is used for volumes (flex)
-// that require extra steps on nodes for expansion to complete
-type FSResizableVolumePlugin interface {
-	ExpandableVolumePlugin
-	ExpandFS(spec *Spec, devicePath, deviceMountPath string, newSize, oldSize resource.Quantity) error
+// NodeExpandableVolumePlugin is an expanded interface of VolumePlugin and is used for volumes that
+// require expansion on the node via NodeExpand call.
+type NodeExpandableVolumePlugin interface {
+	VolumePlugin
+	RequiresFSResize() bool
+	// NodeExpand expands volume on given deviceMountPath and returns true if resize is successful.
+	NodeExpand(resizeOptions NodeResizeOptions) (bool, error)
 }
 
 // VolumePluginWithAttachLimits is an extended interface of VolumePlugin that restricts number of
@@ -275,7 +312,49 @@ type BlockVolumePlugin interface {
 	// The spec may have incomplete information due to limited information
 	// from input. This function is used by volume manager to reconstruct
 	// volume spec by reading the volume directories from disk.
-	ConstructBlockVolumeSpec(podUID types.UID, volumeName, mountPath string) (*Spec, error)
+	ConstructBlockVolumeSpec(podUID types.UID, volumeName, volumePath string) (*Spec, error)
+}
+
+// TODO(#14217)
+// As part of the Volume Host refactor we are starting to create Volume Hosts
+// for specific hosts. New methods for each specific host can be added here.
+// Currently consumers will do type assertions to get the specific type of Volume
+// Host; however, the end result should be that specific Volume Hosts are passed
+// to the specific functions they are needed in (instead of using a catch-all
+// VolumeHost interface)
+
+// KubeletVolumeHost is a Kubelet specific interface that plugins can use to access the kubelet.
+type KubeletVolumeHost interface {
+	// SetKubeletError lets plugins set an error on the Kubelet runtime status
+	// that will cause the Kubelet to post NotReady status with the error message provided
+	SetKubeletError(err error)
+
+	// GetInformerFactory returns the informer factory for CSIDriverLister
+	GetInformerFactory() informers.SharedInformerFactory
+	// CSIDriverLister returns the informer lister for the CSIDriver API Object
+	CSIDriverLister() storagelistersv1.CSIDriverLister
+	// CSIDriverSynced returns the informer synced for the CSIDriver API Object
+	CSIDriversSynced() cache.InformerSynced
+	// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
+	WaitForCacheSync() error
+	// Returns hostutil.HostUtils
+	GetHostUtil() hostutil.HostUtils
+}
+
+// AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
+// to access methods on the Attach Detach Controller.
+type AttachDetachVolumeHost interface {
+	// CSINodeLister returns the informer lister for the CSINode API Object
+	CSINodeLister() storagelistersv1.CSINodeLister
+
+	// CSIDriverLister returns the informer lister for the CSIDriver API Object
+	CSIDriverLister() storagelistersv1.CSIDriverLister
+
+	// VolumeAttachmentLister returns the informer lister for the VolumeAttachment API Object
+	VolumeAttachmentLister() storagelistersv1.VolumeAttachmentLister
+	// IsAttachDetachController is an interface marker to strictly tie AttachDetachVolumeHost
+	// to the attachDetachController
+	IsAttachDetachController() bool
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
@@ -317,9 +396,6 @@ type VolumeHost interface {
 	// GetKubeClient returns a client interface
 	GetKubeClient() clientset.Interface
 
-	// GetCSIClient returns a client interface to csi.storage.k8s.io
-	GetCSIClient() csiclientset.Interface
-
 	// NewWrapperMounter finds an appropriate plugin with which to handle
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
@@ -357,7 +433,7 @@ type VolumeHost interface {
 	DeleteServiceAccountTokenFunc() func(podUID types.UID)
 
 	// Returns an interface that should be used to execute any utilities in volume plugins
-	GetExec(pluginName string) mount.Exec
+	GetExec(pluginName string) exec.Interface
 
 	// Returns the labels on the node
 	GetNodeLabels() (map[string]string, error)
@@ -365,24 +441,35 @@ type VolumeHost interface {
 	// Returns the name of the node
 	GetNodeName() types.NodeName
 
+	GetAttachedVolumesFromNodeStatus() (map[v1.UniqueVolumeName]string, error)
+
 	// Returns the event recorder of kubelet.
 	GetEventRecorder() record.EventRecorder
+
+	// Returns an interface that should be used to execute subpath operations
+	GetSubpather() subpath.Interface
+
+	// Returns options to pass for proxyutil filtered dialers.
+	GetFilteredDialOptions() *proxyutil.FilteredDialOptions
 }
 
 // VolumePluginMgr tracks registered plugins.
 type VolumePluginMgr struct {
-	mutex         sync.Mutex
-	plugins       map[string]VolumePlugin
-	prober        DynamicPluginProber
-	probedPlugins map[string]VolumePlugin
-	Host          VolumeHost
+	mutex                     sync.RWMutex
+	plugins                   map[string]VolumePlugin
+	prober                    DynamicPluginProber
+	probedPlugins             map[string]VolumePlugin
+	loggedDeprecationWarnings sets.String
+	Host                      VolumeHost
 }
 
 // Spec is an internal representation of a volume.  All API volume types translate to Spec.
 type Spec struct {
-	Volume           *v1.Volume
-	PersistentVolume *v1.PersistentVolume
-	ReadOnly         bool
+	Volume                          *v1.Volume
+	PersistentVolume                *v1.PersistentVolume
+	ReadOnly                        bool
+	InlineVolumeSpecForCSIMigration bool
+	Migrated                        bool
 }
 
 // Name returns the name of either Volume or PersistentVolume, one of which must not be nil.
@@ -408,7 +495,6 @@ func (spec *Spec) IsKubeletExpandable() bool {
 		return spec.PersistentVolume.Spec.FlexVolume != nil
 	default:
 		return false
-
 	}
 }
 
@@ -505,6 +591,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 	defer pm.mutex.Unlock()
 
 	pm.Host = host
+	pm.loggedDeprecationWarnings = sets.NewString()
 
 	if prober == nil {
 		// Use a dummy prober to prevent nil deference.
@@ -514,7 +601,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 	}
 	if err := pm.prober.Init(); err != nil {
 		// Prober init failure should not affect the initialization of other plugins.
-		klog.Errorf("Error initializing dynamic plugin prober: %s", err)
+		klog.ErrorS(err, "Error initializing dynamic plugin prober")
 		pm.prober = &dummyPluginProber{}
 	}
 
@@ -539,12 +626,12 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 		}
 		err := plugin.Init(host)
 		if err != nil {
-			klog.Errorf("Failed to load volume plugin %s, error: %s", name, err.Error())
+			klog.ErrorS(err, "Failed to load volume plugin", "pluginName", name)
 			allErrs = append(allErrs, err)
 			continue
 		}
 		pm.plugins[name] = plugin
-		klog.V(1).Infof("Loaded volume plugin %q", name)
+		klog.V(1).InfoS("Loaded volume plugin", "pluginName", name)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
@@ -557,10 +644,10 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 
 	err := probedPlugin.Init(pm.Host)
 	if err != nil {
-		return fmt.Errorf("Failed to load volume plugin %s, error: %s", name, err.Error())
+		return fmt.Errorf("failed to load volume plugin %s, error: %s", name, err.Error())
 	}
 
-	klog.V(1).Infof("Loaded volume plugin %q", name)
+	klog.V(1).InfoS("Loaded volume plugin", "pluginName", name)
 	return nil
 }
 
@@ -568,86 +655,98 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 // specification.  If no plugins can support or more than one plugin can
 // support it, return error.
 func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
-	pm.mutex.Lock()
-	defer pm.mutex.Unlock()
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
 
 	if spec == nil {
-		return nil, fmt.Errorf("Could not find plugin because volume spec is nil")
+		return nil, fmt.Errorf("could not find plugin because volume spec is nil")
 	}
 
+	var match VolumePlugin
 	matchedPluginNames := []string{}
-	matches := []VolumePlugin{}
-	for k, v := range pm.plugins {
+	for _, v := range pm.plugins {
 		if v.CanSupport(spec) {
-			matchedPluginNames = append(matchedPluginNames, k)
-			matches = append(matches, v)
+			match = v
+			matchedPluginNames = append(matchedPluginNames, v.GetPluginName())
 		}
 	}
 
 	pm.refreshProbedPlugins()
 	for _, plugin := range pm.probedPlugins {
 		if plugin.CanSupport(spec) {
+			match = plugin
 			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
-			matches = append(matches, plugin)
 		}
 	}
 
-	if len(matches) == 0 {
+	if len(matchedPluginNames) == 0 {
 		return nil, fmt.Errorf("no volume plugin matched")
 	}
-	if len(matches) > 1 {
+	if len(matchedPluginNames) > 1 {
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
-	return matches[0], nil
+
+	// Issue warning if the matched provider is deprecated
+	pm.logDeprecation(match.GetPluginName())
+	return match, nil
 }
 
 // FindPluginByName fetches a plugin by name or by legacy name.  If no plugin
 // is found, returns error.
 func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
-	pm.mutex.Lock()
-	defer pm.mutex.Unlock()
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
 
 	// Once we can get rid of legacy names we can reduce this to a map lookup.
-	matchedPluginNames := []string{}
-	matches := []VolumePlugin{}
-	for k, v := range pm.plugins {
-		if v.GetPluginName() == name {
-			matchedPluginNames = append(matchedPluginNames, k)
-			matches = append(matches, v)
-		}
+	var match VolumePlugin
+	if v, found := pm.plugins[name]; found {
+		match = v
 	}
 
 	pm.refreshProbedPlugins()
-	for _, plugin := range pm.probedPlugins {
-		if plugin.GetPluginName() == name {
-			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
-			matches = append(matches, plugin)
+	if plugin, found := pm.probedPlugins[name]; found {
+		if match != nil {
+			return nil, fmt.Errorf("multiple volume plugins matched: %s and %s", match.GetPluginName(), plugin.GetPluginName())
 		}
+		match = plugin
 	}
 
-	if len(matches) == 0 {
-		return nil, fmt.Errorf("no volume plugin matched")
+	if match == nil {
+		return nil, fmt.Errorf("no volume plugin matched name: %s", name)
 	}
-	if len(matches) > 1 {
-		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
+
+	// Issue warning if the matched provider is deprecated
+	pm.logDeprecation(match.GetPluginName())
+	return match, nil
+}
+
+// logDeprecation logs warning when a deprecated plugin is used.
+func (pm *VolumePluginMgr) logDeprecation(plugin string) {
+	if detail, ok := deprecatedVolumeProviders[plugin]; ok && !pm.loggedDeprecationWarnings.Has(plugin) {
+		klog.Warningf("WARNING: %s built-in volume provider is now deprecated. %s", plugin, detail)
+		// Make sure the message is logged only once. It has Warning severity
+		// and we don't want to spam the log too much.
+		pm.loggedDeprecationWarnings.Insert(plugin)
 	}
-	return matches[0], nil
 }
 
 // Check if probedPlugin cache update is required.
 // If it is, initialize all probed plugins and replace the cache with them.
 func (pm *VolumePluginMgr) refreshProbedPlugins() {
 	events, err := pm.prober.Probe()
+
 	if err != nil {
-		klog.Errorf("Error dynamically probing plugins: %s", err)
-		return // Use cached plugins upon failure.
+		klog.ErrorS(err, "Error dynamically probing plugins")
 	}
 
+	// because the probe function can return a list of valid plugins
+	// even when an error is present we still must add the plugins
+	// or they will be skipped because each event only fires once
 	for _, event := range events {
 		if event.Op == ProbeAddOrUpdate {
 			if err := pm.initProbedPlugin(event.Plugin); err != nil {
-				klog.Errorf("Error initializing dynamically probed plugin %s; error: %s",
-					event.Plugin.GetPluginName(), err)
+				klog.ErrorS(err, "Error initializing dynamically probed plugin",
+					"pluginName", event.Plugin.GetPluginName())
 				continue
 			}
 			pm.probedPlugins[event.Plugin.GetPluginName()] = event.Plugin
@@ -655,14 +754,17 @@ func (pm *VolumePluginMgr) refreshProbedPlugins() {
 			// Plugin is not available on ProbeRemove event, only PluginName
 			delete(pm.probedPlugins, event.PluginName)
 		} else {
-			klog.Errorf("Unknown Operation on PluginName: %s.",
-				event.Plugin.GetPluginName())
+			klog.ErrorS(nil, "Unknown Operation on PluginName.",
+				"pluginName", event.Plugin.GetPluginName())
 		}
 	}
 }
 
 // ListVolumePluginWithLimits returns plugins that have volume limits on nodes
 func (pm *VolumePluginMgr) ListVolumePluginWithLimits() []VolumePluginWithAttachLimits {
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
+
 	matchedPlugins := []VolumePluginWithAttachLimits{}
 	for _, v := range pm.plugins {
 		if plugin, ok := v.(VolumePluginWithAttachLimits); ok {
@@ -678,7 +780,7 @@ func (pm *VolumePluginMgr) ListVolumePluginWithLimits() []VolumePluginWithAttach
 func (pm *VolumePluginMgr) FindPersistentPluginBySpec(spec *Spec) (PersistentVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
-		return nil, fmt.Errorf("Could not find volume plugin for spec: %#v", spec)
+		return nil, fmt.Errorf("could not find volume plugin for spec: %#v", spec)
 	}
 	if persistentVolumePlugin, ok := volumePlugin.(PersistentVolumePlugin); ok {
 		return persistentVolumePlugin, nil
@@ -691,7 +793,7 @@ func (pm *VolumePluginMgr) FindPersistentPluginBySpec(spec *Spec) (PersistentVol
 func (pm *VolumePluginMgr) FindVolumePluginWithLimitsBySpec(spec *Spec) (VolumePluginWithAttachLimits, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
-		return nil, fmt.Errorf("Could not find volume plugin for spec : %#v", spec)
+		return nil, fmt.Errorf("could not find volume plugin for spec : %#v", spec)
 	}
 
 	if limitedPlugin, ok := volumePlugin.(VolumePluginWithAttachLimits); ok {
@@ -739,7 +841,7 @@ func (pm *VolumePluginMgr) FindProvisionablePluginByName(name string) (Provision
 	return nil, fmt.Errorf("no provisionable volume plugin matched")
 }
 
-// FindDeletablePluginBySppec fetches a persistent volume plugin by spec.  If
+// FindDeletablePluginBySpec fetches a persistent volume plugin by spec.  If
 // no plugin is found, returns error.
 func (pm *VolumePluginMgr) FindDeletablePluginBySpec(spec *Spec) (DeletableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
@@ -788,7 +890,11 @@ func (pm *VolumePluginMgr) FindAttachablePluginBySpec(spec *Spec) (AttachableVol
 		return nil, err
 	}
 	if attachableVolumePlugin, ok := volumePlugin.(AttachableVolumePlugin); ok {
-		return attachableVolumePlugin, nil
+		if canAttach, err := attachableVolumePlugin.CanAttach(spec); err != nil {
+			return nil, err
+		} else if canAttach {
+			return attachableVolumePlugin, nil
+		}
 	}
 	return nil, nil
 }
@@ -815,7 +921,11 @@ func (pm *VolumePluginMgr) FindDeviceMountablePluginBySpec(spec *Spec) (DeviceMo
 		return nil, err
 	}
 	if deviceMountableVolumePlugin, ok := volumePlugin.(DeviceMountableVolumePlugin); ok {
-		return deviceMountableVolumePlugin, nil
+		if canMount, err := deviceMountableVolumePlugin.CanDeviceMount(spec); err != nil {
+			return nil, err
+		} else if canMount {
+			return deviceMountableVolumePlugin, nil
+		}
 	}
 	return nil, nil
 }
@@ -839,10 +949,10 @@ func (pm *VolumePluginMgr) FindExpandablePluginBySpec(spec *Spec) (ExpandableVol
 		if spec.IsKubeletExpandable() {
 			// for kubelet expandable volumes, return a noop plugin that
 			// returns success for expand on the controller
-			klog.Warningf("FindExpandablePluginBySpec(%s) -> returning noopExpandableVolumePluginInstance", spec.Name())
+			klog.V(4).InfoS("FindExpandablePluginBySpec -> returning noopExpandableVolumePluginInstance", "specName", spec.Name())
 			return &noopExpandableVolumePluginInstance{spec}, nil
 		}
-		klog.Warningf("FindExpandablePluginBySpec(%s) -> err:%v", spec.Name(), err)
+		klog.V(4).InfoS("FindExpandablePluginBySpec -> err", "specName", spec.Name(), "err", err)
 		return nil, err
 	}
 
@@ -891,30 +1001,40 @@ func (pm *VolumePluginMgr) FindMapperPluginByName(name string) (BlockVolumePlugi
 	return nil, nil
 }
 
-// FindFSResizablePluginBySpec fetches a persistent volume plugin by spec
-func (pm *VolumePluginMgr) FindFSResizablePluginBySpec(spec *Spec) (FSResizableVolumePlugin, error) {
+// FindNodeExpandablePluginBySpec fetches a persistent volume plugin by spec
+func (pm *VolumePluginMgr) FindNodeExpandablePluginBySpec(spec *Spec) (NodeExpandableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
 	}
-	if fsResizablePlugin, ok := volumePlugin.(FSResizableVolumePlugin); ok {
+	if fsResizablePlugin, ok := volumePlugin.(NodeExpandableVolumePlugin); ok {
 		return fsResizablePlugin, nil
 	}
 	return nil, nil
 }
 
-// FindFSResizablePluginByName fetches a persistent volume plugin by name
-func (pm *VolumePluginMgr) FindFSResizablePluginByName(name string) (FSResizableVolumePlugin, error) {
+// FindNodeExpandablePluginByName fetches a persistent volume plugin by name
+func (pm *VolumePluginMgr) FindNodeExpandablePluginByName(name string) (NodeExpandableVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginByName(name)
 	if err != nil {
 		return nil, err
 	}
 
-	if fsResizablePlugin, ok := volumePlugin.(FSResizableVolumePlugin); ok {
+	if fsResizablePlugin, ok := volumePlugin.(NodeExpandableVolumePlugin); ok {
 		return fsResizablePlugin, nil
 	}
 
 	return nil, nil
+}
+
+func (pm *VolumePluginMgr) Run(stopCh <-chan struct{}) {
+	kletHost, ok := pm.Host.(KubeletVolumeHost)
+	if ok {
+		// start informer for CSIDriver
+		informerFactory := kletHost.GetInformerFactory()
+		informerFactory.Start(stopCh)
+		informerFactory.WaitForCacheSync(stopCh)
+	}
 }
 
 // NewPersistentVolumeRecyclerPodTemplate creates a template for a recycler
@@ -953,7 +1073,7 @@ func NewPersistentVolumeRecyclerPodTemplate() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "pv-recycler",
-					Image:   "busybox:1.27",
+					Image:   "registry.k8s.io/debian-base:v2.0.0",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "test -e /scrub && rm -rf /scrub/..?* /scrub/.[!.]* /scrub/*  && test -z \"$(ls -A /scrub)\" || exit 1"},
 					VolumeMounts: []v1.VolumeMount{

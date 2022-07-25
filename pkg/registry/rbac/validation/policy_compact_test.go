@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/component-helpers/auth/rbac/validation"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 
@@ -126,11 +127,11 @@ func TestCompactRules(t *testing.T) {
 			t.Errorf("%s: CompactRules mutated rules. Expected\n%#v\ngot\n%#v", k, originalRules, rules)
 			continue
 		}
-		if covers, missing := Covers(compacted, rules); !covers {
+		if covers, missing := validation.Covers(compacted, rules); !covers {
 			t.Errorf("%s: compacted rules did not cover original rules. missing: %#v", k, missing)
 			continue
 		}
-		if covers, missing := Covers(rules, compacted); !covers {
+		if covers, missing := validation.Covers(rules, compacted); !covers {
 			t.Errorf("%s: original rules did not cover compacted rules. missing: %#v", k, missing)
 			continue
 		}

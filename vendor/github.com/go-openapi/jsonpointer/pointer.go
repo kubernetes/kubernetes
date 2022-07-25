@@ -114,16 +114,16 @@ func getSingleImpl(node interface{}, decodedToken string, nameProvider *swag.Nam
 	rValue := reflect.Indirect(reflect.ValueOf(node))
 	kind := rValue.Kind()
 
-	switch kind {
-
-	case reflect.Struct:
-		if rValue.Type().Implements(jsonPointableType) {
-			r, err := node.(JSONPointable).JSONLookup(decodedToken)
-			if err != nil {
-				return nil, kind, err
-			}
-			return r, kind, nil
+	if rValue.Type().Implements(jsonPointableType) {
+		r, err := node.(JSONPointable).JSONLookup(decodedToken)
+		if err != nil {
+			return nil, kind, err
 		}
+		return r, kind, nil
+	}
+
+	switch kind {
+	case reflect.Struct:
 		nm, ok := nameProvider.GetGoNameForType(rValue.Type(), decodedToken)
 		if !ok {
 			return nil, kind, fmt.Errorf("object has no field %q", decodedToken)
@@ -135,7 +135,7 @@ func getSingleImpl(node interface{}, decodedToken string, nameProvider *swag.Nam
 		kv := reflect.ValueOf(decodedToken)
 		mv := rValue.MapIndex(kv)
 
-		if mv.IsValid() && !swag.IsZero(mv) {
+		if mv.IsValid() {
 			return mv.Interface(), kind, nil
 		}
 		return nil, kind, fmt.Errorf("object has no key %q", decodedToken)
@@ -161,17 +161,17 @@ func getSingleImpl(node interface{}, decodedToken string, nameProvider *swag.Nam
 
 func setSingleImpl(node, data interface{}, decodedToken string, nameProvider *swag.NameProvider) error {
 	rValue := reflect.Indirect(reflect.ValueOf(node))
+
+	if ns, ok := node.(JSONSetable); ok { // pointer impl
+		return ns.JSONSet(decodedToken, data)
+	}
+
+	if rValue.Type().Implements(jsonSetableType) {
+		return node.(JSONSetable).JSONSet(decodedToken, data)
+	}
+
 	switch rValue.Kind() {
-
 	case reflect.Struct:
-		if ns, ok := node.(JSONSetable); ok { // pointer impl
-			return ns.JSONSet(decodedToken, data)
-		}
-
-		if rValue.Type().Implements(jsonSetableType) {
-			return node.(JSONSetable).JSONSet(decodedToken, data)
-		}
-
 		nm, ok := nameProvider.GetGoNameForType(rValue.Type(), decodedToken)
 		if !ok {
 			return fmt.Errorf("object has no field %q", decodedToken)
@@ -270,22 +270,22 @@ func (p *Pointer) set(node, data interface{}, nameProvider *swag.NameProvider) e
 		rValue := reflect.Indirect(reflect.ValueOf(node))
 		kind := rValue.Kind()
 
-		switch kind {
-
-		case reflect.Struct:
-			if rValue.Type().Implements(jsonPointableType) {
-				r, err := node.(JSONPointable).JSONLookup(decodedToken)
-				if err != nil {
-					return err
-				}
-				fld := reflect.ValueOf(r)
-				if fld.CanAddr() && fld.Kind() != reflect.Interface && fld.Kind() != reflect.Map && fld.Kind() != reflect.Slice && fld.Kind() != reflect.Ptr {
-					node = fld.Addr().Interface()
-					continue
-				}
-				node = r
+		if rValue.Type().Implements(jsonPointableType) {
+			r, err := node.(JSONPointable).JSONLookup(decodedToken)
+			if err != nil {
+				return err
+			}
+			fld := reflect.ValueOf(r)
+			if fld.CanAddr() && fld.Kind() != reflect.Interface && fld.Kind() != reflect.Map && fld.Kind() != reflect.Slice && fld.Kind() != reflect.Ptr {
+				node = fld.Addr().Interface()
 				continue
 			}
+			node = r
+			continue
+		}
+
+		switch kind {
+		case reflect.Struct:
 			nm, ok := nameProvider.GetGoNameForType(rValue.Type(), decodedToken)
 			if !ok {
 				return fmt.Errorf("object has no field %q", decodedToken)

@@ -17,7 +17,7 @@ limitations under the License.
 package registry
 
 import (
-	"fmt"
+	"context"
 	"testing"
 	"time"
 
@@ -30,46 +30,79 @@ import (
 
 func TestDecoratedWatcher(t *testing.T) {
 	w := watch.NewFake()
-	decorator := func(obj runtime.Object) error {
-		pod := obj.(*example.Pod)
-		pod.Annotations = map[string]string{"decorated": "true"}
-		return nil
+	decorator := func(obj runtime.Object) {
+		if pod, ok := obj.(*example.Pod); ok {
+			pod.Annotations = map[string]string{"decorated": "true"}
+		}
 	}
-	dw := newDecoratedWatcher(w, decorator)
+	ctx, cancel := context.WithCancel(context.Background())
+	dw := newDecoratedWatcher(ctx, w, decorator)
 	defer dw.Stop()
 
-	go w.Add(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	go func() {
+		w.Error(&metav1.Status{Status: "Failure"})
+		w.Add(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+		w.Error(&metav1.Status{Status: "Failure"})
+		w.Modify(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+		w.Error(&metav1.Status{Status: "Failure"})
+		w.Delete(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	}()
+
+	expectErrorEvent(t, dw) // expect error is plumbed and doesn't force close the watcher
+	expectPodEvent(t, dw, watch.Added)
+	expectErrorEvent(t, dw) // expect error is plumbed and doesn't force close the watcher
+	expectPodEvent(t, dw, watch.Modified)
+	expectErrorEvent(t, dw) // expect error is plumbed and doesn't force close the watcher
+	expectPodEvent(t, dw, watch.Deleted)
+
+	// cancel the passed-in context to simulate request timeout
+	cancel()
+
+	// expect the decorated channel to be closed
+	select {
+	case e, ok := <-dw.ResultChan():
+		if ok {
+			t.Errorf("expected result chan closed, got %#v", e)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
+	}
+
+	// expect the underlying watcher to have been stopped as a result of the context cancellation
+	if !w.IsStopped() {
+		t.Errorf("expected underlying watcher to be stopped")
+	}
+}
+
+func expectPodEvent(t *testing.T, dw *decoratedWatcher, watchType watch.EventType) {
 	select {
 	case e := <-dw.ResultChan():
 		pod, ok := e.Object.(*example.Pod)
 		if !ok {
-			t.Errorf("Should received object of type *api.Pod, get type (%T)", e.Object)
-			return
+			t.Fatalf("Should received object of type *api.Pod, get type (%T)", e.Object)
 		}
 		if pod.Annotations["decorated"] != "true" {
-			t.Errorf("pod.Annotations[\"decorated\"], want=%s, get=%s", "true", pod.Labels["decorated"])
+			t.Fatalf("pod.Annotations[\"decorated\"], want=%s, get=%s", "true", pod.Labels["decorated"])
+		}
+		if e.Type != watchType {
+			t.Fatalf("expected type %s, got %s", watchType, e.Type)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
+		t.Fatalf("timeout after %v", wait.ForeverTestTimeout)
 	}
 }
 
-func TestDecoratedWatcherError(t *testing.T) {
-	w := watch.NewFake()
-	expErr := fmt.Errorf("expected error")
-	decorator := func(obj runtime.Object) error {
-		return expErr
-	}
-	dw := newDecoratedWatcher(w, decorator)
-	defer dw.Stop()
-
-	go w.Add(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+func expectErrorEvent(t *testing.T, dw *decoratedWatcher) {
 	select {
 	case e := <-dw.ResultChan():
+		_, ok := e.Object.(*metav1.Status)
+		if !ok {
+			t.Fatalf("Should received object of type *metav1.Status, get type (%T)", e.Object)
+		}
 		if e.Type != watch.Error {
-			t.Errorf("event type want=%v, get=%v", watch.Error, e.Type)
+			t.Fatalf("expected type %s, got %s", watch.Error, e.Type)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
+		t.Fatalf("timeout after %v", wait.ForeverTestTimeout)
 	}
 }

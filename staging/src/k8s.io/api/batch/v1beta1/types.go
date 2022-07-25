@@ -18,22 +18,24 @@ package v1beta1
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.8
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // JobTemplate describes a template for creating copies of a predefined pod.
 type JobTemplate struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Defines jobs that will be created from this template.
-	// https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Template JobTemplateSpec `json:"template,omitempty" protobuf:"bytes,2,opt,name=template"`
 }
@@ -41,46 +43,54 @@ type JobTemplate struct {
 // JobTemplateSpec describes the data a Job should have when created from a template
 type JobTemplateSpec struct {
 	// Standard object's metadata of the jobs created from this template.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Specification of the desired behavior of the job.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec batchv1.JobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.8
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:removed=1.25
+// +k8s:prerelease-lifecycle-gen:replacement=batch,v1,CronJob
 
 // CronJob represents the configuration of a single cron job.
 type CronJob struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Specification of the desired behavior of a cron job, including the schedule.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec CronJobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Current status of a cron job.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status CronJobStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.8
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:removed=1.25
+// +k8s:prerelease-lifecycle-gen:replacement=batch,v1,CronJobList
 
 // CronJobList is a collection of cron jobs.
 type CronJobList struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -93,6 +103,12 @@ type CronJobSpec struct {
 
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
+
+	// The time zone for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.
+	// If not specified, this will rely on the time zone of the kube-controller-manager process.
+	// ALPHA: This field is in alpha and must be enabled via the `CronJobTimeZone` feature gate.
+	// +optional
+	TimeZone *string `json:"timeZone,omitempty" protobuf:"bytes,8,opt,name=timeZone"`
 
 	// Optional deadline in seconds for starting the job if it misses scheduled
 	// time for any reason.  Missed jobs executions will be counted as failed ones.
@@ -150,9 +166,14 @@ const (
 type CronJobStatus struct {
 	// A list of pointers to currently running jobs.
 	// +optional
+	// +listType=atomic
 	Active []v1.ObjectReference `json:"active,omitempty" protobuf:"bytes,1,rep,name=active"`
 
 	// Information when was the last time the job was successfully scheduled.
 	// +optional
 	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty" protobuf:"bytes,4,opt,name=lastScheduleTime"`
+
+	// Information when was the last time the job successfully completed.
+	// +optional
+	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty" protobuf:"bytes,5,opt,name=lastSuccessfulTime"`
 }

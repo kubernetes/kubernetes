@@ -24,26 +24,28 @@ import (
 	"sync"
 	"time"
 
-	. "k8s.io/kubernetes/test/images/resource-consumer/common"
+	"k8s.io/kubernetes/test/images/resource-consumer/common"
 )
 
+// ResourceConsumerHandler holds metrics for a resource consumer.
 type ResourceConsumerHandler struct {
 	metrics     map[string]float64
 	metricsLock sync.Mutex
 }
 
+// NewResourceConsumerHandler creates and initializes a ResourceConsumerHandler to defaults.
 func NewResourceConsumerHandler() *ResourceConsumerHandler {
 	return &ResourceConsumerHandler{metrics: map[string]float64{}}
 }
 
 func (handler *ResourceConsumerHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// handle exposing metrics in Prometheus format (both GET & POST)
-	if req.URL.Path == MetricsAddress {
+	if req.URL.Path == common.MetricsAddress {
 		handler.handleMetrics(w)
 		return
 	}
 	if req.Method != "POST" {
-		http.Error(w, BadRequest, http.StatusBadRequest)
+		http.Error(w, common.BadRequest, http.StatusBadRequest)
 		return
 	}
 	// parsing POST request data and URL data
@@ -52,34 +54,34 @@ func (handler *ResourceConsumerHandler) ServeHTTP(w http.ResponseWriter, req *ht
 		return
 	}
 	// handle consumeCPU
-	if req.URL.Path == ConsumeCPUAddress {
+	if req.URL.Path == common.ConsumeCPUAddress {
 		handler.handleConsumeCPU(w, req.Form)
 		return
 	}
 	// handle consumeMem
-	if req.URL.Path == ConsumeMemAddress {
+	if req.URL.Path == common.ConsumeMemAddress {
 		handler.handleConsumeMem(w, req.Form)
 		return
 	}
 	// handle getCurrentStatus
-	if req.URL.Path == GetCurrentStatusAddress {
+	if req.URL.Path == common.GetCurrentStatusAddress {
 		handler.handleGetCurrentStatus(w)
 		return
 	}
 	// handle bumpMetric
-	if req.URL.Path == BumpMetricAddress {
+	if req.URL.Path == common.BumpMetricAddress {
 		handler.handleBumpMetric(w, req.Form)
 		return
 	}
-	http.Error(w, fmt.Sprintf("%s: %s", UnknownFunction, req.URL.Path), http.StatusNotFound)
+	http.Error(w, fmt.Sprintf("%s: %s", common.UnknownFunction, req.URL.Path), http.StatusNotFound)
 }
 
 func (handler *ResourceConsumerHandler) handleConsumeCPU(w http.ResponseWriter, query url.Values) {
 	// getting string data for consumeCPU
-	durationSecString := query.Get(DurationSecQuery)
-	millicoresString := query.Get(MillicoresQuery)
+	durationSecString := query.Get(common.DurationSecQuery)
+	millicoresString := query.Get(common.MillicoresQuery)
 	if durationSecString == "" || millicoresString == "" {
-		http.Error(w, NotGivenFunctionArgument, http.StatusBadRequest)
+		http.Error(w, common.NotGivenFunctionArgument, http.StatusBadRequest)
 		return
 	}
 
@@ -87,22 +89,22 @@ func (handler *ResourceConsumerHandler) handleConsumeCPU(w http.ResponseWriter, 
 	durationSec, durationSecError := strconv.Atoi(durationSecString)
 	millicores, millicoresError := strconv.Atoi(millicoresString)
 	if durationSecError != nil || millicoresError != nil {
-		http.Error(w, IncorrectFunctionArgument, http.StatusBadRequest)
+		http.Error(w, common.IncorrectFunctionArgument, http.StatusBadRequest)
 		return
 	}
 
 	go ConsumeCPU(millicores, durationSec)
-	fmt.Fprintln(w, ConsumeCPUAddress[1:])
-	fmt.Fprintln(w, millicores, MillicoresQuery)
-	fmt.Fprintln(w, durationSec, DurationSecQuery)
+	fmt.Fprintln(w, common.ConsumeCPUAddress[1:])
+	fmt.Fprintln(w, millicores, common.MillicoresQuery)
+	fmt.Fprintln(w, durationSec, common.DurationSecQuery)
 }
 
 func (handler *ResourceConsumerHandler) handleConsumeMem(w http.ResponseWriter, query url.Values) {
 	// getting string data for consumeMem
-	durationSecString := query.Get(DurationSecQuery)
-	megabytesString := query.Get(MegabytesQuery)
+	durationSecString := query.Get(common.DurationSecQuery)
+	megabytesString := query.Get(common.MegabytesQuery)
 	if durationSecString == "" || megabytesString == "" {
-		http.Error(w, NotGivenFunctionArgument, http.StatusBadRequest)
+		http.Error(w, common.NotGivenFunctionArgument, http.StatusBadRequest)
 		return
 	}
 
@@ -110,20 +112,20 @@ func (handler *ResourceConsumerHandler) handleConsumeMem(w http.ResponseWriter, 
 	durationSec, durationSecError := strconv.Atoi(durationSecString)
 	megabytes, megabytesError := strconv.Atoi(megabytesString)
 	if durationSecError != nil || megabytesError != nil {
-		http.Error(w, IncorrectFunctionArgument, http.StatusBadRequest)
+		http.Error(w, common.IncorrectFunctionArgument, http.StatusBadRequest)
 		return
 	}
 
 	go ConsumeMem(megabytes, durationSec)
-	fmt.Fprintln(w, ConsumeMemAddress[1:])
-	fmt.Fprintln(w, megabytes, MegabytesQuery)
-	fmt.Fprintln(w, durationSec, DurationSecQuery)
+	fmt.Fprintln(w, common.ConsumeMemAddress[1:])
+	fmt.Fprintln(w, megabytes, common.MegabytesQuery)
+	fmt.Fprintln(w, durationSec, common.DurationSecQuery)
 }
 
 func (handler *ResourceConsumerHandler) handleGetCurrentStatus(w http.ResponseWriter) {
 	GetCurrentStatus()
 	fmt.Fprintln(w, "Warning: not implemented!")
-	fmt.Fprint(w, GetCurrentStatusAddress[1:])
+	fmt.Fprint(w, common.GetCurrentStatusAddress[1:])
 }
 
 func (handler *ResourceConsumerHandler) handleMetrics(w http.ResponseWriter) {
@@ -154,11 +156,11 @@ func (handler *ResourceConsumerHandler) bumpMetric(metric string, delta float64,
 
 func (handler *ResourceConsumerHandler) handleBumpMetric(w http.ResponseWriter, query url.Values) {
 	// getting string data for handleBumpMetric
-	metric := query.Get(MetricNameQuery)
-	deltaString := query.Get(DeltaQuery)
-	durationSecString := query.Get(DurationSecQuery)
+	metric := query.Get(common.MetricNameQuery)
+	deltaString := query.Get(common.DeltaQuery)
+	durationSecString := query.Get(common.DurationSecQuery)
 	if durationSecString == "" || metric == "" || deltaString == "" {
-		http.Error(w, NotGivenFunctionArgument, http.StatusBadRequest)
+		http.Error(w, common.NotGivenFunctionArgument, http.StatusBadRequest)
 		return
 	}
 
@@ -166,13 +168,13 @@ func (handler *ResourceConsumerHandler) handleBumpMetric(w http.ResponseWriter, 
 	durationSec, durationSecError := strconv.Atoi(durationSecString)
 	delta, deltaError := strconv.ParseFloat(deltaString, 64)
 	if durationSecError != nil || deltaError != nil {
-		http.Error(w, IncorrectFunctionArgument, http.StatusBadRequest)
+		http.Error(w, common.IncorrectFunctionArgument, http.StatusBadRequest)
 		return
 	}
 
 	go handler.bumpMetric(metric, delta, time.Duration(durationSec)*time.Second)
-	fmt.Fprintln(w, BumpMetricAddress[1:])
-	fmt.Fprintln(w, metric, MetricNameQuery)
-	fmt.Fprintln(w, delta, DeltaQuery)
-	fmt.Fprintln(w, durationSec, DurationSecQuery)
+	fmt.Fprintln(w, common.BumpMetricAddress[1:])
+	fmt.Fprintln(w, metric, common.MetricNameQuery)
+	fmt.Fprintln(w, delta, common.DeltaQuery)
+	fmt.Fprintln(w, durationSec, common.DurationSecQuery)
 }

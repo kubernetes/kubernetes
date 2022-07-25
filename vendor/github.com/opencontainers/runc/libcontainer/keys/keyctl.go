@@ -1,8 +1,7 @@
-// +build linux
-
 package keys
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -13,25 +12,25 @@ import (
 type KeySerial uint32
 
 func JoinSessionKeyring(name string) (KeySerial, error) {
-	sessKeyId, err := unix.KeyctlJoinSessionKeyring(name)
+	sessKeyID, err := unix.KeyctlJoinSessionKeyring(name)
 	if err != nil {
-		return 0, fmt.Errorf("could not create session key: %v", err)
+		return 0, fmt.Errorf("unable to create session key: %w", err)
 	}
-	return KeySerial(sessKeyId), nil
+	return KeySerial(sessKeyID), nil
 }
 
 // ModKeyringPerm modifies permissions on a keyring by reading the current permissions,
 // anding the bits with the given mask (clearing permissions) and setting
 // additional permission bits
-func ModKeyringPerm(ringId KeySerial, mask, setbits uint32) error {
-	dest, err := unix.KeyctlString(unix.KEYCTL_DESCRIBE, int(ringId))
+func ModKeyringPerm(ringID KeySerial, mask, setbits uint32) error {
+	dest, err := unix.KeyctlString(unix.KEYCTL_DESCRIBE, int(ringID))
 	if err != nil {
 		return err
 	}
 
 	res := strings.Split(dest, ";")
 	if len(res) < 5 {
-		return fmt.Errorf("Destination buffer for key description is too small")
+		return errors.New("Destination buffer for key description is too small")
 	}
 
 	// parse permissions
@@ -42,9 +41,5 @@ func ModKeyringPerm(ringId KeySerial, mask, setbits uint32) error {
 
 	perm := (uint32(perm64) & mask) | setbits
 
-	if err := unix.KeyctlSetperm(int(ringId), perm); err != nil {
-		return err
-	}
-
-	return nil
+	return unix.KeyctlSetperm(int(ringID), perm)
 }

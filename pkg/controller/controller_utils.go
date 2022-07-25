@@ -17,41 +17,44 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/rand"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/integer"
 	clientretry "k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/features"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
+	"k8s.io/utils/clock"
+	"k8s.io/utils/integer"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -89,13 +92,15 @@ var UpdateTaintBackoff = wait.Backoff{
 	Jitter:   1.0,
 }
 
-var ShutdownTaint = &v1.Taint{
-	Key:    schedulerapi.TaintNodeShutdown,
-	Effect: v1.TaintEffectNoSchedule,
+var UpdateLabelBackoff = wait.Backoff{
+	Steps:    5,
+	Duration: 100 * time.Millisecond,
+	Jitter:   1.0,
 }
 
 var (
-	KeyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
+	KeyFunc           = cache.DeletionHandlingMetaNamespaceKeyFunc
+	podPhaseToOrdinal = map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 1, v1.PodRunning: 2}
 )
 
 type ResyncPeriodFunc func() time.Duration
@@ -132,7 +137,7 @@ var ExpKeyFunc = func(obj interface{}) (string, error) {
 	if e, ok := obj.(*ControlleeExpectations); ok {
 		return e.key, nil
 	}
-	return "", fmt.Errorf("Could not find key for obj %#v", obj)
+	return "", fmt.Errorf("could not find key for obj %#v", obj)
 }
 
 // ControllerExpectationsInterface is an interface that allows users to set and wait on expectations.
@@ -159,11 +164,11 @@ type ControllerExpectations struct {
 
 // GetExpectations returns the ControlleeExpectations of the given controller.
 func (r *ControllerExpectations) GetExpectations(controllerKey string) (*ControlleeExpectations, bool, error) {
-	if exp, exists, err := r.GetByKey(controllerKey); err == nil && exists {
+	exp, exists, err := r.GetByKey(controllerKey)
+	if err == nil && exists {
 		return exp.(*ControlleeExpectations), true, nil
-	} else {
-		return nil, false, err
 	}
+	return nil, false, err
 }
 
 // DeleteExpectations deletes the expectations of the given controller from the TTLStore.
@@ -255,11 +260,6 @@ func (r *ControllerExpectations) DeletionObserved(controllerKey string) {
 	r.LowerExpectations(controllerKey, 0, 1)
 }
 
-// Expectations are either fulfilled, or expire naturally.
-type Expectations interface {
-	Fulfilled() bool
-}
-
 // ControlleeExpectations track controllee creates/deletes.
 type ControlleeExpectations struct {
 	// Important: Since these two int64 fields are using sync/atomic, they have to be at the top of the struct due to a bug on 32-bit platforms
@@ -297,7 +297,7 @@ var UIDSetKeyFunc = func(obj interface{}) (string, error) {
 	if u, ok := obj.(*UIDSet); ok {
 		return u.key, nil
 	}
-	return "", fmt.Errorf("Could not find key for obj %#v", obj)
+	return "", fmt.Errorf("could not find key for obj %#v", obj)
 }
 
 // UIDSet holds a key and a set of UIDs. Used by the
@@ -336,17 +336,17 @@ func (u *UIDTrackingControllerExpectations) GetUIDs(controllerKey string) sets.S
 
 // ExpectDeletions records expectations for the given deleteKeys, against the given controller.
 func (u *UIDTrackingControllerExpectations) ExpectDeletions(rcKey string, deletedKeys []string) error {
+	expectedUIDs := sets.NewString()
+	for _, k := range deletedKeys {
+		expectedUIDs.Insert(k)
+	}
+	klog.V(4).Infof("Controller %v waiting on deletions for: %+v", rcKey, deletedKeys)
 	u.uidStoreLock.Lock()
 	defer u.uidStoreLock.Unlock()
 
 	if existing := u.GetUIDs(rcKey); existing != nil && existing.Len() != 0 {
 		klog.Errorf("Clobbering existing delete keys: %+v", existing)
 	}
-	expectedUIDs := sets.NewString()
-	for _, k := range deletedKeys {
-		expectedUIDs.Insert(k)
-	}
-	klog.V(4).Infof("Controller %v waiting on deletions for: %+v", rcKey, deletedKeys)
 	if err := u.uidStore.Add(&UIDSet{expectedUIDs, rcKey}); err != nil {
 		return err
 	}
@@ -406,7 +406,7 @@ const (
 // ReplicaSets, as well as increment or decrement them. It is used
 // by the deployment controller to ease testing of actions that it takes.
 type RSControlInterface interface {
-	PatchReplicaSet(namespace, name string, data []byte) error
+	PatchReplicaSet(ctx context.Context, namespace, name string, data []byte) error
 }
 
 // RealRSControl is the default implementation of RSControllerInterface.
@@ -417,8 +417,8 @@ type RealRSControl struct {
 
 var _ RSControlInterface = &RealRSControl{}
 
-func (r RealRSControl) PatchReplicaSet(namespace, name string, data []byte) error {
-	_, err := r.KubeClient.ExtensionsV1beta1().ReplicaSets(namespace).Patch(name, types.StrategicMergePatchType, data)
+func (r RealRSControl) PatchReplicaSet(ctx context.Context, namespace, name string, data []byte) error {
+	_, err := r.KubeClient.AppsV1().ReplicaSets(namespace).Patch(ctx, name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 	return err
 }
 
@@ -427,7 +427,7 @@ func (r RealRSControl) PatchReplicaSet(namespace, name string, data []byte) erro
 // ControllerRevisions, as well as increment or decrement them. It is used
 // by the daemonset controller to ease testing of actions that it takes.
 type ControllerRevisionControlInterface interface {
-	PatchControllerRevision(namespace, name string, data []byte) error
+	PatchControllerRevision(ctx context.Context, namespace, name string, data []byte) error
 }
 
 // RealControllerRevisionControl is the default implementation of ControllerRevisionControlInterface.
@@ -437,25 +437,22 @@ type RealControllerRevisionControl struct {
 
 var _ ControllerRevisionControlInterface = &RealControllerRevisionControl{}
 
-func (r RealControllerRevisionControl) PatchControllerRevision(namespace, name string, data []byte) error {
-	_, err := r.KubeClient.AppsV1beta1().ControllerRevisions(namespace).Patch(name, types.StrategicMergePatchType, data)
+func (r RealControllerRevisionControl) PatchControllerRevision(ctx context.Context, namespace, name string, data []byte) error {
+	_, err := r.KubeClient.AppsV1().ControllerRevisions(namespace).Patch(ctx, name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 	return err
 }
 
 // PodControlInterface is an interface that knows how to add or delete pods
 // created as an interface to allow testing.
 type PodControlInterface interface {
-	// CreatePods creates new pods according to the spec.
-	CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object) error
-	// CreatePodsOnNode creates a new pod according to the spec on the specified node,
-	// and sets the ControllerRef.
-	CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error
-	// CreatePodsWithControllerRef creates new pods according to the spec, and sets object as the pod's controller.
-	CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error
+	// CreatePods creates new pods according to the spec, and sets object as the pod's controller.
+	CreatePods(ctx context.Context, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error
+	// CreatePodsWithGenerateName creates new pods according to the spec, sets object as the pod's controller and sets pod's generateName.
+	CreatePodsWithGenerateName(ctx context.Context, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference, generateName string) error
 	// DeletePod deletes the pod identified by podID.
-	DeletePod(namespace string, podID string, object runtime.Object) error
+	DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error
 	// PatchPod patches the pod.
-	PatchPod(namespace, name string, data []byte) error
+	PatchPod(ctx context.Context, namespace, name string, data []byte) error
 }
 
 // RealPodControl is the default implementation of PodControlInterface.
@@ -507,35 +504,35 @@ func validateControllerRef(controllerRef *metav1.OwnerReference) error {
 	if len(controllerRef.Kind) == 0 {
 		return fmt.Errorf("controllerRef has empty Kind")
 	}
-	if controllerRef.Controller == nil || *controllerRef.Controller != true {
+	if controllerRef.Controller == nil || !*controllerRef.Controller {
 		return fmt.Errorf("controllerRef.Controller is not set to true")
 	}
-	if controllerRef.BlockOwnerDeletion == nil || *controllerRef.BlockOwnerDeletion != true {
+	if controllerRef.BlockOwnerDeletion == nil || !*controllerRef.BlockOwnerDeletion {
 		return fmt.Errorf("controllerRef.BlockOwnerDeletion is not set")
 	}
 	return nil
 }
 
-func (r RealPodControl) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
-	return r.createPods("", namespace, template, object, nil)
+func (r RealPodControl) CreatePods(ctx context.Context, namespace string, template *v1.PodTemplateSpec, controllerObject runtime.Object, controllerRef *metav1.OwnerReference) error {
+	return r.CreatePodsWithGenerateName(ctx, namespace, template, controllerObject, controllerRef, "")
 }
 
-func (r RealPodControl) CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, controllerObject runtime.Object, controllerRef *metav1.OwnerReference) error {
+func (r RealPodControl) CreatePodsWithGenerateName(ctx context.Context, namespace string, template *v1.PodTemplateSpec, controllerObject runtime.Object, controllerRef *metav1.OwnerReference, generateName string) error {
 	if err := validateControllerRef(controllerRef); err != nil {
 		return err
 	}
-	return r.createPods("", namespace, template, controllerObject, controllerRef)
-}
-
-func (r RealPodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
-	if err := validateControllerRef(controllerRef); err != nil {
+	pod, err := GetPodFromTemplate(template, controllerObject, controllerRef)
+	if err != nil {
 		return err
 	}
-	return r.createPods(nodeName, namespace, template, object, controllerRef)
+	if len(generateName) > 0 {
+		pod.ObjectMeta.GenerateName = generateName
+	}
+	return r.createPods(ctx, namespace, pod, controllerObject)
 }
 
-func (r RealPodControl) PatchPod(namespace, name string, data []byte) error {
-	_, err := r.KubeClient.CoreV1().Pods(namespace).Patch(name, types.StrategicMergePatchType, data)
+func (r RealPodControl) PatchPod(ctx context.Context, namespace, name string, data []byte) error {
+	_, err := r.KubeClient.CoreV1().Pods(namespace).Patch(ctx, name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 	return err
 }
 
@@ -564,44 +561,45 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	return pod, nil
 }
 
-func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
-	pod, err := GetPodFromTemplate(template, object, controllerRef)
-	if err != nil {
-		return err
-	}
-	if len(nodeName) != 0 {
-		pod.Spec.NodeName = nodeName
-	}
-	if labels.Set(pod.Labels).AsSelectorPreValidated().Empty() {
+func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v1.Pod, object runtime.Object) error {
+	if len(labels.Set(pod.Labels)) == 0 {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
-	if newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(pod); err != nil {
-		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
-		return err
-	} else {
-		accessor, err := meta.Accessor(object)
-		if err != nil {
-			klog.Errorf("parentObject does not have ObjectMeta, %v", err)
-			return nil
+	newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		// only send an event if the namespace isn't terminating
+		if !apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+			r.Recorder.Eventf(object, v1.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
 		}
-		klog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
-		r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulCreatePodReason, "Created pod: %v", newPod.Name)
+		return err
 	}
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		klog.Errorf("parentObject does not have ObjectMeta, %v", err)
+		return nil
+	}
+	klog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
+	r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulCreatePodReason, "Created pod: %v", newPod.Name)
+
 	return nil
 }
 
-func (r RealPodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
+func (r RealPodControl) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error {
 	accessor, err := meta.Accessor(object)
 	if err != nil {
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
-	klog.V(2).Infof("Controller %v deleting pod %v/%v", accessor.GetName(), namespace, podID)
-	if err := r.KubeClient.CoreV1().Pods(namespace).Delete(podID, nil); err != nil && !apierrors.IsNotFound(err) {
+	klog.V(2).InfoS("Deleting pod", "controller", accessor.GetName(), "pod", klog.KRef(namespace, podID))
+	if err := r.KubeClient.CoreV1().Pods(namespace).Delete(ctx, podID, metav1.DeleteOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			klog.V(4).Infof("pod %v/%v has already been deleted.", namespace, podID)
+			return err
+		}
 		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedDeletePodReason, "Error deleting: %v", err)
 		return fmt.Errorf("unable to delete pods: %v", err)
-	} else {
-		r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulDeletePodReason, "Deleted pod: %v", podID)
 	}
+	r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulDeletePodReason, "Deleted pod: %v", podID)
+
 	return nil
 }
 
@@ -618,7 +616,7 @@ type FakePodControl struct {
 
 var _ PodControlInterface = &FakePodControl{}
 
-func (f *FakePodControl) PatchPod(namespace, name string, data []byte) error {
+func (f *FakePodControl) PatchPod(ctx context.Context, namespace, name string, data []byte) error {
 	f.Lock()
 	defer f.Unlock()
 	f.Patches = append(f.Patches, data)
@@ -628,27 +626,18 @@ func (f *FakePodControl) PatchPod(namespace, name string, data []byte) error {
 	return nil
 }
 
-func (f *FakePodControl) CreatePods(namespace string, spec *v1.PodTemplateSpec, object runtime.Object) error {
-	f.Lock()
-	defer f.Unlock()
-	f.CreateCallCount++
-	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
-		return fmt.Errorf("Not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
-	}
-	f.Templates = append(f.Templates, *spec)
-	if f.Err != nil {
-		return f.Err
-	}
-	return nil
+func (f *FakePodControl) CreatePods(ctx context.Context, namespace string, spec *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+	return f.CreatePodsWithGenerateName(ctx, namespace, spec, object, controllerRef, "")
 }
 
-func (f *FakePodControl) CreatePodsWithControllerRef(namespace string, spec *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+func (f *FakePodControl) CreatePodsWithGenerateName(ctx context.Context, namespace string, spec *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference, generateNamePrefix string) error {
 	f.Lock()
 	defer f.Unlock()
 	f.CreateCallCount++
 	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
-		return fmt.Errorf("Not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
+		return fmt.Errorf("not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
 	}
+	spec.GenerateName = generateNamePrefix
 	f.Templates = append(f.Templates, *spec)
 	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
 	if f.Err != nil {
@@ -657,22 +646,7 @@ func (f *FakePodControl) CreatePodsWithControllerRef(namespace string, spec *v1.
 	return nil
 }
 
-func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
-	f.Lock()
-	defer f.Unlock()
-	f.CreateCallCount++
-	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
-		return fmt.Errorf("Not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
-	}
-	f.Templates = append(f.Templates, *template)
-	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
-	if f.Err != nil {
-		return f.Err
-	}
-	return nil
-}
-
-func (f *FakePodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
+func (f *FakePodControl) DeletePod(ctx context.Context, namespace string, podID string, object runtime.Object) error {
 	f.Lock()
 	defer f.Unlock()
 	f.DeletePodName = append(f.DeletePodName, podID)
@@ -705,9 +679,8 @@ func (s ByLogging) Less(i, j int) bool {
 		return len(s[i].Spec.NodeName) > 0
 	}
 	// 2. PodRunning < PodUnknown < PodPending
-	m := map[v1.PodPhase]int{v1.PodRunning: 0, v1.PodUnknown: 1, v1.PodPending: 2}
-	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
-		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
+	if s[i].Status.Phase != s[j].Status.Phase {
+		return podPhaseToOrdinal[s[i].Status.Phase] > podPhaseToOrdinal[s[j].Status.Phase]
 	}
 	// 3. ready < not ready
 	if podutil.IsPodReady(s[i]) != podutil.IsPodReady(s[j]) {
@@ -716,8 +689,12 @@ func (s ByLogging) Less(i, j int) bool {
 	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
 	// 4. Been ready for more time < less time < empty time
-	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
-		return afterOrZero(podReadyTime(s[j]), podReadyTime(s[i]))
+	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) {
+		readyTime1 := podReadyTime(s[i])
+		readyTime2 := podReadyTime(s[j])
+		if !readyTime1.Equal(readyTime2) {
+			return afterOrZero(readyTime2, readyTime1)
+		}
 	}
 	// 5. Pods with containers with higher restart counts < lower restart counts
 	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
@@ -743,9 +720,8 @@ func (s ActivePods) Less(i, j int) bool {
 		return len(s[i].Spec.NodeName) == 0
 	}
 	// 2. PodPending < PodUnknown < PodRunning
-	m := map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 1, v1.PodRunning: 2}
-	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
-		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
+	if podPhaseToOrdinal[s[i].Status.Phase] != podPhaseToOrdinal[s[j].Status.Phase] {
+		return podPhaseToOrdinal[s[i].Status.Phase] < podPhaseToOrdinal[s[j].Status.Phase]
 	}
 	// 3. Not ready < ready
 	// If only one of the pods is not ready, the not ready one is smaller
@@ -756,8 +732,12 @@ func (s ActivePods) Less(i, j int) bool {
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
 	// 4. Been ready for empty time < less time < more time
 	// If both pods are ready, the latest ready one is smaller
-	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
-		return afterOrZero(podReadyTime(s[i]), podReadyTime(s[j]))
+	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) {
+		readyTime1 := podReadyTime(s[i])
+		readyTime2 := podReadyTime(s[j])
+		if !readyTime1.Equal(readyTime2) {
+			return afterOrZero(readyTime1, readyTime2)
+		}
 	}
 	// 5. Pods with containers with higher restart counts < lower restart counts
 	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
@@ -770,6 +750,139 @@ func (s ActivePods) Less(i, j int) bool {
 	return false
 }
 
+// ActivePodsWithRanks is a sortable list of pods and a list of corresponding
+// ranks which will be considered during sorting.  The two lists must have equal
+// length.  After sorting, the pods will be ordered as follows, applying each
+// rule in turn until one matches:
+//
+// 1. If only one of the pods is assigned to a node, the pod that is not
+//    assigned comes before the pod that is.
+// 2. If the pods' phases differ, a pending pod comes before a pod whose phase
+//    is unknown, and a pod whose phase is unknown comes before a running pod.
+// 3. If exactly one of the pods is ready, the pod that is not ready comes
+//    before the ready pod.
+// 4. If controller.kubernetes.io/pod-deletion-cost annotation is set, then
+//    the pod with the lower value will come first.
+// 5. If the pods' ranks differ, the pod with greater rank comes before the pod
+//    with lower rank.
+// 6. If both pods are ready but have not been ready for the same amount of
+//    time, the pod that has been ready for a shorter amount of time comes
+//    before the pod that has been ready for longer.
+// 7. If one pod has a container that has restarted more than any container in
+//    the other pod, the pod with the container with more restarts comes
+//    before the other pod.
+// 8. If the pods' creation times differ, the pod that was created more recently
+//    comes before the older pod.
+//
+// In 6 and 8, times are compared in a logarithmic scale. This allows a level
+// of randomness among equivalent Pods when sorting. If two pods have the same
+// logarithmic rank, they are sorted by UUID to provide a pseudorandom order.
+//
+// If none of these rules matches, the second pod comes before the first pod.
+//
+// The intention of this ordering is to put pods that should be preferred for
+// deletion first in the list.
+type ActivePodsWithRanks struct {
+	// Pods is a list of pods.
+	Pods []*v1.Pod
+
+	// Rank is a ranking of pods.  This ranking is used during sorting when
+	// comparing two pods that are both scheduled, in the same phase, and
+	// having the same ready status.
+	Rank []int
+
+	// Now is a reference timestamp for doing logarithmic timestamp comparisons.
+	// If zero, comparison happens without scaling.
+	Now metav1.Time
+}
+
+func (s ActivePodsWithRanks) Len() int {
+	return len(s.Pods)
+}
+
+func (s ActivePodsWithRanks) Swap(i, j int) {
+	s.Pods[i], s.Pods[j] = s.Pods[j], s.Pods[i]
+	s.Rank[i], s.Rank[j] = s.Rank[j], s.Rank[i]
+}
+
+// Less compares two pods with corresponding ranks and returns true if the first
+// one should be preferred for deletion.
+func (s ActivePodsWithRanks) Less(i, j int) bool {
+	// 1. Unassigned < assigned
+	// If only one of the pods is unassigned, the unassigned one is smaller
+	if s.Pods[i].Spec.NodeName != s.Pods[j].Spec.NodeName && (len(s.Pods[i].Spec.NodeName) == 0 || len(s.Pods[j].Spec.NodeName) == 0) {
+		return len(s.Pods[i].Spec.NodeName) == 0
+	}
+	// 2. PodPending < PodUnknown < PodRunning
+	if podPhaseToOrdinal[s.Pods[i].Status.Phase] != podPhaseToOrdinal[s.Pods[j].Status.Phase] {
+		return podPhaseToOrdinal[s.Pods[i].Status.Phase] < podPhaseToOrdinal[s.Pods[j].Status.Phase]
+	}
+	// 3. Not ready < ready
+	// If only one of the pods is not ready, the not ready one is smaller
+	if podutil.IsPodReady(s.Pods[i]) != podutil.IsPodReady(s.Pods[j]) {
+		return !podutil.IsPodReady(s.Pods[i])
+	}
+
+	// 4. lower pod-deletion-cost < higher pod-deletion cost
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost) {
+		pi, _ := helper.GetDeletionCostFromPodAnnotations(s.Pods[i].Annotations)
+		pj, _ := helper.GetDeletionCostFromPodAnnotations(s.Pods[j].Annotations)
+		if pi != pj {
+			return pi < pj
+		}
+	}
+
+	// 5. Doubled up < not doubled up
+	// If one of the two pods is on the same node as one or more additional
+	// ready pods that belong to the same replicaset, whichever pod has more
+	// colocated ready pods is less
+	if s.Rank[i] != s.Rank[j] {
+		return s.Rank[i] > s.Rank[j]
+	}
+	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
+	//       see https://github.com/kubernetes/kubernetes/issues/22065
+	// 6. Been ready for empty time < less time < more time
+	// If both pods are ready, the latest ready one is smaller
+	if podutil.IsPodReady(s.Pods[i]) && podutil.IsPodReady(s.Pods[j]) {
+		readyTime1 := podReadyTime(s.Pods[i])
+		readyTime2 := podReadyTime(s.Pods[j])
+		if !readyTime1.Equal(readyTime2) {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.LogarithmicScaleDown) {
+				return afterOrZero(readyTime1, readyTime2)
+			} else {
+				if s.Now.IsZero() || readyTime1.IsZero() || readyTime2.IsZero() {
+					return afterOrZero(readyTime1, readyTime2)
+				}
+				rankDiff := logarithmicRankDiff(*readyTime1, *readyTime2, s.Now)
+				if rankDiff == 0 {
+					return s.Pods[i].UID < s.Pods[j].UID
+				}
+				return rankDiff < 0
+			}
+		}
+	}
+	// 7. Pods with containers with higher restart counts < lower restart counts
+	if maxContainerRestarts(s.Pods[i]) != maxContainerRestarts(s.Pods[j]) {
+		return maxContainerRestarts(s.Pods[i]) > maxContainerRestarts(s.Pods[j])
+	}
+	// 8. Empty creation time pods < newer pods < older pods
+	if !s.Pods[i].CreationTimestamp.Equal(&s.Pods[j].CreationTimestamp) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.LogarithmicScaleDown) {
+			return afterOrZero(&s.Pods[i].CreationTimestamp, &s.Pods[j].CreationTimestamp)
+		} else {
+			if s.Now.IsZero() || s.Pods[i].CreationTimestamp.IsZero() || s.Pods[j].CreationTimestamp.IsZero() {
+				return afterOrZero(&s.Pods[i].CreationTimestamp, &s.Pods[j].CreationTimestamp)
+			}
+			rankDiff := logarithmicRankDiff(s.Pods[i].CreationTimestamp, s.Pods[j].CreationTimestamp, s.Now)
+			if rankDiff == 0 {
+				return s.Pods[i].UID < s.Pods[j].UID
+			}
+			return rankDiff < 0
+		}
+	}
+	return false
+}
+
 // afterOrZero checks if time t1 is after time t2; if one of them
 // is zero, the zero time is seen as after non-zero time.
 func afterOrZero(t1, t2 *metav1.Time) bool {
@@ -777,6 +890,22 @@ func afterOrZero(t1, t2 *metav1.Time) bool {
 		return t1.Time.IsZero()
 	}
 	return t1.After(t2.Time)
+}
+
+// logarithmicRankDiff calculates the base-2 logarithmic ranks of 2 timestamps,
+// compared to the current timestamp
+func logarithmicRankDiff(t1, t2, now metav1.Time) int64 {
+	d1 := now.Sub(t1.Time)
+	d2 := now.Sub(t2.Time)
+	r1 := int64(-1)
+	r2 := int64(-1)
+	if d1 > 0 {
+		r1 = int64(math.Log2(float64(d1)))
+	}
+	if d2 > 0 {
+		r2 = int64(math.Log2(float64(d2)))
+	}
+	return r1 - r2
 }
 
 func podReadyTime(pod *v1.Pod) *metav1.Time {
@@ -900,7 +1029,7 @@ func (o ReplicaSetsBySizeNewer) Less(i, j int) bool {
 
 // AddOrUpdateTaintOnNode add taints to the node. If taint was added into node, it'll issue API calls
 // to update nodes; otherwise, no API calls. Return error if any.
-func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v1.Taint) error {
+func AddOrUpdateTaintOnNode(ctx context.Context, c clientset.Interface, nodeName string, taints ...*v1.Taint) error {
 	if len(taints) == 0 {
 		return nil
 	}
@@ -911,10 +1040,10 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
 		if firstTry {
-			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{ResourceVersion: "0"})
 			firstTry = false
 		} else {
-			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		}
 		if err != nil {
 			return err
@@ -926,7 +1055,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		for _, taint := range taints {
 			curNewNode, ok, err := taintutils.AddOrUpdateTaint(oldNodeCopy, taint)
 			if err != nil {
-				return fmt.Errorf("Failed to update taint of node!")
+				return fmt.Errorf("failed to update taint of node")
 			}
 			updated = updated || ok
 			newNode = curNewNode
@@ -935,7 +1064,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		if !updated {
 			return nil
 		}
-		return PatchNodeTaints(c, nodeName, oldNode, newNode)
+		return PatchNodeTaints(ctx, c, nodeName, oldNode, newNode)
 	})
 }
 
@@ -943,7 +1072,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 // won't fail if target taint doesn't exist or has been removed.
 // If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
 // any API calls.
-func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
+func RemoveTaintOffNode(ctx context.Context, c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
 	if len(taints) == 0 {
 		return nil
 	}
@@ -968,10 +1097,10 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
 		if firstTry {
-			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{ResourceVersion: "0"})
 			firstTry = false
 		} else {
-			oldNode, err = c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		}
 		if err != nil {
 			return err
@@ -983,7 +1112,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 		for _, taint := range taints {
 			curNewNode, ok, err := taintutils.RemoveTaint(oldNodeCopy, taint)
 			if err != nil {
-				return fmt.Errorf("Failed to remove taint of node!")
+				return fmt.Errorf("failed to remove taint of node")
 			}
 			updated = updated || ok
 			newNode = curNewNode
@@ -992,12 +1121,12 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 		if !updated {
 			return nil
 		}
-		return PatchNodeTaints(c, nodeName, oldNode, newNode)
+		return PatchNodeTaints(ctx, c, nodeName, oldNode, newNode)
 	})
 }
 
 // PatchNodeTaints patches node's taints.
-func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, newNode *v1.Node) error {
+func PatchNodeTaints(ctx context.Context, c clientset.Interface, nodeName string, oldNode *v1.Node, newNode *v1.Node) error {
 	oldData, err := json.Marshal(oldNode)
 	if err != nil {
 		return fmt.Errorf("failed to marshal old node %#v for node %q: %v", oldNode, nodeName, err)
@@ -1016,23 +1145,8 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 		return fmt.Errorf("failed to create patch for node %q: %v", nodeName, err)
 	}
 
-	_, err = c.CoreV1().Nodes().Patch(nodeName, types.StrategicMergePatchType, patchBytes)
+	_, err = c.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	return err
-}
-
-// WaitForCacheSync is a wrapper around cache.WaitForCacheSync that generates log messages
-// indicating that the controller identified by controllerName is waiting for syncs, followed by
-// either a successful or failed sync.
-func WaitForCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs ...cache.InformerSynced) bool {
-	klog.Infof("Waiting for caches to sync for %s controller", controllerName)
-
-	if !cache.WaitForCacheSync(stopCh, cacheSyncs...) {
-		utilruntime.HandleError(fmt.Errorf("Unable to sync caches for %s controller", controllerName))
-		return false
-	}
-
-	klog.Infof("Caches are synced for %s controller", controllerName)
-	return true
 }
 
 // ComputeHash returns a hash value calculated from pod template and
@@ -1050,4 +1164,49 @@ func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int32) string {
 	}
 
 	return rand.SafeEncodeString(fmt.Sprint(podTemplateSpecHasher.Sum32()))
+}
+
+func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, labelsToUpdate map[string]string) error {
+	firstTry := true
+	return clientretry.RetryOnConflict(UpdateLabelBackoff, func() error {
+		var err error
+		var node *v1.Node
+		// First we try getting node from the API server cache, as it's cheaper. If it fails
+		// we get it from etcd to be sure to have fresh data.
+		if firstTry {
+			node, err = kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			firstTry = false
+		} else {
+			node, err = kubeClient.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		}
+		if err != nil {
+			return err
+		}
+
+		// Make a copy of the node and update the labels.
+		newNode := node.DeepCopy()
+		if newNode.Labels == nil {
+			newNode.Labels = make(map[string]string)
+		}
+		for key, value := range labelsToUpdate {
+			newNode.Labels[key] = value
+		}
+
+		oldData, err := json.Marshal(node)
+		if err != nil {
+			return fmt.Errorf("failed to marshal the existing node %#v: %v", node, err)
+		}
+		newData, err := json.Marshal(newNode)
+		if err != nil {
+			return fmt.Errorf("failed to marshal the new node %#v: %v", newNode, err)
+		}
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Node{})
+		if err != nil {
+			return fmt.Errorf("failed to create a two-way merge patch: %v", err)
+		}
+		if _, err := kubeClient.CoreV1().Nodes().Patch(context.TODO(), node.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+			return fmt.Errorf("failed to patch the node: %v", err)
+		}
+		return nil
+	})
 }

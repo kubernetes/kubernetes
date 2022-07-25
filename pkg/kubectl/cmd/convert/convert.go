@@ -20,24 +20,24 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/i18n"
+	"k8s.io/kubectl/pkg/util/templates"
+	"k8s.io/kubectl/pkg/validation"
 	scheme "k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
-	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 var (
-	convert_long = templates.LongDesc(i18n.T(`
+	convertLong = templates.LongDesc(i18n.T(`
 		Convert config files between different API versions. Both YAML
 		and JSON formats are accepted.
 
@@ -48,7 +48,7 @@ var (
 		The default output will be printed to stdout in YAML format. One can use -o option
 		to change to output destination.`))
 
-	convert_example = templates.Examples(i18n.T(`
+	convertExample = templates.Examples(i18n.T(`
 		# Convert 'pod.yaml' to latest version and print to stdout.
 		kubectl convert -f pod.yaml
 
@@ -93,8 +93,8 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 		Use:                   "convert -f FILENAME",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Convert config files between different API versions"),
-		Long:                  convert_long,
-		Example:               convert_example,
+		Long:                  convertLong,
+		Example:               convertExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
 			cmdutil.CheckErr(o.RunConvert())
@@ -107,12 +107,15 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "to need to get converted.")
-	cmd.MarkFlagRequired("filename")
 	return cmd
 }
 
 // Complete collects information required to run Convert command from command line.
 func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err error) {
+	err = o.FilenameOptions.RequireFilenameOrKustomize()
+	if err != nil {
+		return err
+	}
 	o.builder = f.NewBuilder
 
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
@@ -121,7 +124,16 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 	}
 
 	o.validator = func() (validation.Schema, error) {
-		return f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
+		directive, err := cmdutil.GetValidationDirective(cmd)
+		if err != nil {
+			return nil, err
+		}
+		dynamicClient, err := f.DynamicClient()
+		if err != nil {
+			return nil, err
+		}
+		verifier := resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
+		return f.Validator(directive, verifier)
 	}
 
 	// build the printer
@@ -134,14 +146,6 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 
 // RunConvert implements the generic Convert command
 func (o *ConvertOptions) RunConvert() error {
-
-	// Convert must be removed from kubectl, since kubectl can not depend on
-	// Kubernetes "internal" dependencies. These "internal" dependencies can
-	// not be removed from convert. Another way to convert a resource is to
-	// "kubectl apply" it to the cluster, then "kubectl get" at the desired version.
-	// Another possible solution is to make convert a plugin.
-	fmt.Fprintf(o.ErrOut, "kubectl convert is DEPRECATED and will be removed in a future version.\nIn order to convert, kubectl apply the object to the cluster, then kubectl get at the desired version.\n")
-
 	b := o.builder().
 		WithScheme(scheme.Scheme).
 		LocalParam(o.local)
@@ -183,7 +187,7 @@ func (o *ConvertOptions) RunConvert() error {
 	}
 
 	internalEncoder := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	internalVersionJSONEncoder := unstructured.JSONFallbackEncoder{Encoder: internalEncoder}
+	internalVersionJSONEncoder := unstructured.NewJSONFallbackEncoder(internalEncoder)
 	objects, err := asVersionedObject(infos, !singleItemImplied, specifiedOutputVersion, internalVersionJSONEncoder)
 	if err != nil {
 		return err
@@ -260,9 +264,7 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 			gvks, _, err := scheme.Scheme.ObjectKinds(info.Object)
 			if err == nil {
 				for _, gvk := range gvks {
-					for _, version := range scheme.Scheme.PrioritizedVersionsForGroup(gvk.Group) {
-						targetVersions = append(targetVersions, version)
-					}
+					targetVersions = append(targetVersions, scheme.Scheme.PrioritizedVersionsForGroup(gvk.Group)...)
 				}
 			}
 		}

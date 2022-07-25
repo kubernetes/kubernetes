@@ -21,10 +21,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 OPENAPI_ROOT_DIR="${KUBE_ROOT}/api/openapi-spec"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::util::require-jq
 kube::golang::setup_env
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
@@ -32,8 +33,8 @@ make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 function cleanup()
 {
     if [[ -n ${APISERVER_PID-} ]]; then
-      kill ${APISERVER_PID} 1>&2 2>/dev/null
-      wait ${APISERVER_PID} || true
+      kill "${APISERVER_PID}" 1>&2 2>/dev/null
+      wait "${APISERVER_PID}" || true
     fi
     unset APISERVER_PID
 
@@ -55,35 +56,65 @@ API_LOGFILE=${API_LOGFILE:-/tmp/openapi-api-server.log}
 
 kube::etcd::start
 
-echo "dummy_token,admin,admin" > $TMP_DIR/tokenauth.csv
+echo "dummy_token,admin,admin" > "${TMP_DIR}/tokenauth.csv"
+
+# setup envs for TokenRequest required flags
+SERVICE_ACCOUNT_LOOKUP=${SERVICE_ACCOUNT_LOOKUP:-true}
+SERVICE_ACCOUNT_KEY=${SERVICE_ACCOUNT_KEY:-/tmp/kube-serviceaccount.key}
+# Generate ServiceAccount key if needed
+if [[ ! -f "${SERVICE_ACCOUNT_KEY}" ]]; then
+  mkdir -p "$(dirname "${SERVICE_ACCOUNT_KEY}")"
+  openssl genrsa -out "${SERVICE_ACCOUNT_KEY}" 2048 2>/dev/null
+fi
 
 # Start kube-apiserver
+# omit enums from static openapi snapshots used to generate clients until #109177 is resolved
 kube::log::status "Starting kube-apiserver"
 "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
-  --insecure-bind-address="${API_HOST}" \
   --bind-address="${API_HOST}" \
-  --insecure-port="${API_PORT}" \
+  --secure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
+  --feature-gates=AllAlpha=true,OpenAPIEnums=false \
   --runtime-config="api/all=true" \
-  --token-auth-file=$TMP_DIR/tokenauth.csv \
+  --token-auth-file="${TMP_DIR}/tokenauth.csv" \
+  --authorization-mode=RBAC \
+  --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
+  --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
+  --service-account-issuer="https://kubernetes.default.svc" \
+  --service-account-signing-key-file="${SERVICE_ACCOUNT_KEY}" \
   --logtostderr \
   --v=2 \
   --service-cluster-ip-range="10.0.0.0/24" >"${API_LOGFILE}" 2>&1 &
 APISERVER_PID=$!
 
-if ! kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "; then
+if ! kube::util::wait_for_url "https://${API_HOST}:${API_PORT}/healthz" "apiserver: "; then
   kube::log::error "Here are the last 10 lines from kube-apiserver (${API_LOGFILE})"
   kube::log::error "=== BEGIN OF LOG ==="
-  tail -10 "${API_LOGFILE}" || :
+  tail -10 "${API_LOGFILE}" >&2 || :
   kube::log::error "=== END OF LOG ==="
   exit 1
 fi
 
-kube::log::status "Updating " ${OPENAPI_ROOT_DIR}
+kube::log::status "Updating " "${OPENAPI_ROOT_DIR} for OpenAPI v2"
 
-curl -w "\n" -fs "${API_HOST}:${API_PORT}/swagger.json" > "${OPENAPI_ROOT_DIR}/swagger.json"
+curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v2" | jq -S '.info.version="unversioned"' > "${OPENAPI_ROOT_DIR}/swagger.json"
+
+kube::log::status "Updating " "${OPENAPI_ROOT_DIR}/v3 for OpenAPI v3"
+
+mkdir -p "${OPENAPI_ROOT_DIR}/v3"
+# clean up folder, note that some files start with dot like
+# ".well-known__openid-configuration_openapi.json"
+rm -r "${OPENAPI_ROOT_DIR}"/v3/{*,.*} || true
+
+curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v3" | jq -r '.paths | to_entries | .[].key' | while read -r group; do
+    kube::log::status "Updating OpenAPI spec for group ${group}"
+    OPENAPI_FILENAME="${group}_openapi.json"
+    OPENAPI_FILENAME_ESCAPED="${OPENAPI_FILENAME//\//__}"
+    OPENAPI_PATH="${OPENAPI_ROOT_DIR}/v3/${OPENAPI_FILENAME_ESCAPED}"
+    curl -w "\n" -kfsS -H 'Authorization: Bearer dummy_token' "https://${API_HOST}:${API_PORT}/openapi/v3/{$group}" | jq -S '.info.version="unversioned"' > "$OPENAPI_PATH"
+done
 
 kube::log::status "SUCCESS"
 

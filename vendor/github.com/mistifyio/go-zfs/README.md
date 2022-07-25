@@ -29,7 +29,7 @@ The tests have decent examples for most functions.
 
 ```go
 //assuming a zpool named test
-//error handling ommitted
+//error handling omitted
 
 
 f, err := zfs.CreateFilesystem("test/snapshot-test", nil)

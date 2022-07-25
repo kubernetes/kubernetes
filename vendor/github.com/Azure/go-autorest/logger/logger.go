@@ -55,6 +55,10 @@ const (
 
 	// LogDebug tells a logger to log all LogDebug, LogInfo, LogWarning, LogError, LogPanic and LogFatal entries passed to it.
 	LogDebug
+
+	// LogAuth is a special case of LogDebug, it tells a logger to also log the body of an authentication request and response.
+	// NOTE: this can disclose sensitive information, use with care.
+	LogAuth
 )
 
 const (
@@ -65,6 +69,7 @@ const (
 	logWarning = "WARNING"
 	logInfo    = "INFO"
 	logDebug   = "DEBUG"
+	logAuth    = "AUTH"
 	logUnknown = "UNKNOWN"
 )
 
@@ -83,6 +88,8 @@ func ParseLevel(s string) (lt LevelType, err error) {
 		lt = LogInfo
 	case logDebug:
 		lt = LogDebug
+	case logAuth:
+		lt = LogAuth
 	default:
 		err = fmt.Errorf("bad log level '%s'", s)
 	}
@@ -106,6 +113,8 @@ func (lt LevelType) String() string {
 		return logInfo
 	case LogDebug:
 		return logDebug
+	case LogAuth:
+		return logAuth
 	default:
 		return logUnknown
 	}
@@ -162,7 +171,7 @@ type Writer interface {
 	// WriteResponse writes the specified HTTP response to the logger if the log level is greater than
 	// or equal to LogInfo.  The response body, if set, is logged at level LogDebug or higher.
 	// Custom filters can be specified to exclude URL, header, and/or body content from the log.
-	// By default no respone content is excluded.
+	// By default no response content is excluded.
 	WriteResponse(resp *http.Response, filter Filter)
 }
 
@@ -318,7 +327,7 @@ func (fl fileLogger) WriteResponse(resp *http.Response, filter Filter) {
 // returns true if the provided body should be included in the log
 func (fl fileLogger) shouldLogBody(header http.Header, body io.ReadCloser) bool {
 	ct := header.Get("Content-Type")
-	return fl.logLevel >= LogDebug && body != nil && strings.Index(ct, "application/octet-stream") == -1
+	return fl.logLevel >= LogDebug && body != nil && !strings.Contains(ct, "application/octet-stream")
 }
 
 // creates standard header for log entries, it contains a timestamp and the log level

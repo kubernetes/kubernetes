@@ -22,9 +22,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 )
 
+// FileNameFlags are flags for processing files.
 // Usage of this struct by itself is discouraged.
 // These flags are composed by ResourceBuilderFlags
 // which should be used instead.
@@ -32,9 +33,11 @@ type FileNameFlags struct {
 	Usage string
 
 	Filenames *[]string
+	Kustomize *string
 	Recursive *bool
 }
 
+// ToOptions creates a new FileNameOptions struct and sets FilenameOptions based on FileNameflags
 func (o *FileNameFlags) ToOptions() resource.FilenameOptions {
 	options := resource.FilenameOptions{}
 
@@ -48,10 +51,14 @@ func (o *FileNameFlags) ToOptions() resource.FilenameOptions {
 	if o.Filenames != nil {
 		options.Filenames = *o.Filenames
 	}
+	if o.Kustomize != nil {
+		options.Kustomize = *o.Kustomize
+	}
 
 	return options
 }
 
+// AddFlags binds file name flags to a given flagset
 func (o *FileNameFlags) AddFlags(flags *pflag.FlagSet) {
 	if o == nil {
 		return
@@ -67,5 +74,9 @@ func (o *FileNameFlags) AddFlags(flags *pflag.FlagSet) {
 			annotations = append(annotations, strings.TrimLeft(ext, "."))
 		}
 		flags.SetAnnotation("filename", cobra.BashCompFilenameExt, annotations)
+	}
+	if o.Kustomize != nil {
+		flags.StringVarP(o.Kustomize, "kustomize", "k", *o.Kustomize,
+			"Process a kustomization directory. This flag can't be used together with -f or -R.")
 	}
 }

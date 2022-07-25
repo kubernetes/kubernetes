@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -18,42 +21,68 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
+	"regexp"
+	"strings"
+	"sync"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry"
-	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
-	"sigs.k8s.io/yaml"
 
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/legacy-cloud-providers/azure/auth"
+	"sigs.k8s.io/yaml"
 )
 
 var flagConfigFile = pflag.String("azure-container-registry-config", "",
 	"Path to the file containing Azure container registry configuration information.")
 
-const dummyRegistryEmail = "name@contoso.com"
+const (
+	dummyRegistryEmail = "name@contoso.com"
+	maxReadLength      = 10 * 1 << 20 // 10MB
+)
 
-var containerRegistryUrls = []string{"*.azurecr.io", "*.azurecr.cn", "*.azurecr.de", "*.azurecr.us"}
+var (
+	containerRegistryUrls = []string{"*.azurecr.io", "*.azurecr.cn", "*.azurecr.de", "*.azurecr.us"}
+	acrRE                 = regexp.MustCompile(`.*\.azurecr\.io|.*\.azurecr\.cn|.*\.azurecr\.de|.*\.azurecr\.us`)
+	warnOnce              sync.Once
+)
 
 // init registers the various means by which credentials may
 // be resolved on Azure.
 func init() {
-	credentialprovider.RegisterCredentialProvider("azure",
-		&credentialprovider.CachingDockerConfigProvider{
-			Provider: NewACRProvider(flagConfigFile),
-			Lifetime: 1 * time.Minute,
-		})
+	credentialprovider.RegisterCredentialProvider(
+		"azure",
+		NewACRProvider(flagConfigFile),
+	)
 }
 
-func getContextWithCancel() (context.Context, context.CancelFunc) {
-	return context.WithCancel(context.Background())
+type cacheEntry struct {
+	expiresAt   time.Time
+	credentials credentialprovider.DockerConfigEntry
+	registry    string
+}
+
+// acrExpirationPolicy implements ExpirationPolicy from client-go.
+type acrExpirationPolicy struct{}
+
+// stringKeyFunc returns the cache key as a string
+func stringKeyFunc(obj interface{}) (string, error) {
+	key := obj.(*cacheEntry).registry
+	return key, nil
+}
+
+// IsExpired checks if the ACR credentials are expired.
+func (p *acrExpirationPolicy) IsExpired(entry *cache.TimestampedEntry) bool {
+	return time.Now().After(entry.Obj.(*cacheEntry).expiresAt)
 }
 
 // RegistriesClient is a testable interface for the ACR client List operation.
@@ -61,43 +90,11 @@ type RegistriesClient interface {
 	List(ctx context.Context) ([]containerregistry.Registry, error)
 }
 
-// azRegistriesClient implements RegistriesClient.
-type azRegistriesClient struct {
-	client containerregistry.RegistriesClient
-}
-
-func newAzRegistriesClient(subscriptionID, endpoint string, token *adal.ServicePrincipalToken) *azRegistriesClient {
-	registryClient := containerregistry.NewRegistriesClient(subscriptionID)
-	registryClient.BaseURI = endpoint
-	registryClient.Authorizer = autorest.NewBearerAuthorizer(token)
-
-	return &azRegistriesClient{
-		client: registryClient,
-	}
-}
-
-func (az *azRegistriesClient) List(ctx context.Context) ([]containerregistry.Registry, error) {
-	iterator, err := az.client.ListComplete(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]containerregistry.Registry, 0)
-	for ; iterator.NotDone(); err = iterator.Next() {
-		if err != nil {
-			return nil, err
-		}
-
-		result = append(result, iterator.Value())
-	}
-
-	return result, nil
-}
-
 // NewACRProvider parses the specified configFile and returns a DockerConfigProvider
 func NewACRProvider(configFile *string) credentialprovider.DockerConfigProvider {
 	return &acrProvider{
-		file: configFile,
+		file:  configFile,
+		cache: cache.NewExpirationStore(stringKeyFunc, &acrExpirationPolicy{}),
 	}
 }
 
@@ -105,8 +102,8 @@ type acrProvider struct {
 	file                  *string
 	config                *auth.AzureAuthConfig
 	environment           *azure.Environment
-	registryClient        RegistriesClient
 	servicePrincipalToken *adal.ServicePrincipalToken
+	cache                 cache.Store
 }
 
 // ParseConfig returns a parsed configuration for an Azure cloudprovider config file
@@ -117,9 +114,13 @@ func parseConfig(configReader io.Reader) (*auth.AzureAuthConfig, error) {
 		return &config, nil
 	}
 
-	configContents, err := ioutil.ReadAll(configReader)
+	limitedReader := &io.LimitedReader{R: configReader, N: maxReadLength}
+	configContents, err := ioutil.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
+	}
+	if limitedReader.N <= 0 {
+		return nil, errors.New("the read limit is reached")
 	}
 	err = yaml.Unmarshal(configContents, &config)
 	if err != nil {
@@ -136,7 +137,7 @@ func (a *acrProvider) loadConfig(rdr io.Reader) error {
 		klog.Errorf("Failed to load azure credential file: %v", err)
 	}
 
-	a.environment, err = auth.ParseAzureEnvironment(a.config.Cloud)
+	a.environment, err = auth.ParseAzureEnvironment(a.config.Cloud, a.config.ResourceManagerEndpoint, a.config.IdentitySystem)
 	if err != nil {
 		return err
 	}
@@ -147,6 +148,13 @@ func (a *acrProvider) loadConfig(rdr io.Reader) error {
 func (a *acrProvider) Enabled() bool {
 	if a.file == nil || len(*a.file) == 0 {
 		klog.V(5).Infof("Azure config unspecified, disabling")
+		return false
+	}
+
+	if credentialprovider.AreLegacyCloudCredentialProvidersDisabled() {
+		warnOnce.Do(func() {
+			klog.V(4).Infof("Azure credential provider is now disabled. Please refer to sig-cloud-provider for guidance on external credential provider integration for Azure")
+		})
 		return false
 	}
 
@@ -166,34 +174,67 @@ func (a *acrProvider) Enabled() bool {
 	a.servicePrincipalToken, err = auth.GetServicePrincipalToken(a.config, a.environment)
 	if err != nil {
 		klog.Errorf("Failed to create service principal token: %v", err)
-		return false
 	}
-
-	a.registryClient = newAzRegistriesClient(a.config.SubscriptionID, a.environment.ResourceManagerEndpoint, a.servicePrincipalToken)
 	return true
 }
 
-func (a *acrProvider) Provide() credentialprovider.DockerConfig {
+// getFromCache attempts to get credentials from the cache
+func (a *acrProvider) getFromCache(loginServer string) (credentialprovider.DockerConfig, bool) {
 	cfg := credentialprovider.DockerConfig{}
-	ctx, cancel := getContextWithCancel()
-	defer cancel()
+	obj, exists, err := a.cache.GetByKey(loginServer)
+	if err != nil {
+		klog.Errorf("error getting ACR credentials from cache: %v", err)
+		return cfg, false
+	}
+	if !exists {
+		return cfg, false
+	}
 
-	if a.config.UseManagedIdentityExtension {
-		klog.V(4).Infof("listing registries")
-		result, err := a.registryClient.List(ctx)
-		if err != nil {
-			klog.Errorf("Failed to list registries: %v", err)
-			return cfg
-		}
+	entry := obj.(*cacheEntry)
+	cfg[entry.registry] = entry.credentials
+	return cfg, true
+}
 
-		for ix := range result {
-			loginServer := getLoginServer(result[ix])
-			klog.V(2).Infof("loginServer: %s", loginServer)
-			cred, err := getACRDockerEntryFromARMToken(a, loginServer)
+// getFromACR gets credentials from ACR since they are not in the cache
+func (a *acrProvider) getFromACR(loginServer string) (credentialprovider.DockerConfig, error) {
+	cfg := credentialprovider.DockerConfig{}
+	cred, err := getACRDockerEntryFromARMToken(a, loginServer)
+	if err != nil {
+		return cfg, err
+	}
+
+	entry := &cacheEntry{
+		expiresAt:   time.Now().Add(10 * time.Minute),
+		credentials: *cred,
+		registry:    loginServer,
+	}
+	if err := a.cache.Add(entry); err != nil {
+		return cfg, err
+	}
+	cfg[loginServer] = *cred
+	return cfg, nil
+}
+
+func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
+	loginServer := a.parseACRLoginServerFromImage(image)
+	if loginServer == "" {
+		klog.V(2).Infof("image(%s) is not from ACR, return empty authentication", image)
+		return credentialprovider.DockerConfig{}
+	}
+
+	cfg := credentialprovider.DockerConfig{}
+	if a.config != nil && a.config.UseManagedIdentityExtension {
+		var exists bool
+		cfg, exists = a.getFromCache(loginServer)
+		if exists {
+			klog.V(4).Infof("Got ACR credentials from cache for %s", loginServer)
+		} else {
+			klog.V(2).Infof("unable to get ACR credentials from cache for %s, checking ACR API", loginServer)
+			var err error
+			cfg, err = a.getFromACR(loginServer)
 			if err != nil {
-				continue
+				klog.Errorf("error getting credentials from ACR for %s %v", loginServer, err)
 			}
-			cfg[loginServer] = *cred
 		}
 	} else {
 		// Add our entry for each of the supported container registry URLs
@@ -205,7 +246,37 @@ func (a *acrProvider) Provide() credentialprovider.DockerConfig {
 			}
 			cfg[url] = *cred
 		}
+
+		// Handle the custom cloud case
+		// In clouds where ACR is not yet deployed, the string will be empty
+		if a.environment != nil && strings.Contains(a.environment.ContainerRegistryDNSSuffix, ".azurecr.") {
+			customAcrSuffix := "*" + a.environment.ContainerRegistryDNSSuffix
+			hasBeenAdded := false
+			for _, url := range containerRegistryUrls {
+				if strings.EqualFold(url, customAcrSuffix) {
+					hasBeenAdded = true
+					break
+				}
+			}
+
+			if !hasBeenAdded {
+				cred := &credentialprovider.DockerConfigEntry{
+					Username: a.config.AADClientID,
+					Password: a.config.AADClientSecret,
+					Email:    dummyRegistryEmail,
+				}
+				cfg[customAcrSuffix] = *cred
+			}
+		}
 	}
+
+	// add ACR anonymous repo support: use empty username and password for anonymous access
+	defaultConfigEntry := credentialprovider.DockerConfigEntry{
+		Username: "",
+		Password: "",
+		Email:    dummyRegistryEmail,
+	}
+	cfg["*.azurecr.*"] = defaultConfigEntry
 	return cfg
 }
 
@@ -214,6 +285,21 @@ func getLoginServer(registry containerregistry.Registry) string {
 }
 
 func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credentialprovider.DockerConfigEntry, error) {
+	if a.servicePrincipalToken == nil {
+		token, err := auth.GetServicePrincipalToken(a.config, a.environment)
+		if err != nil {
+			klog.Errorf("Failed to create service principal token: %v", err)
+			return nil, err
+		}
+		a.servicePrincipalToken = token
+	} else {
+		// Run EnsureFresh to make sure the token is valid and does not expire
+		if err := a.servicePrincipalToken.EnsureFresh(); err != nil {
+			klog.Errorf("Failed to ensure fresh service principal token: %v", err)
+			return nil, err
+		}
+	}
+
 	armAccessToken := a.servicePrincipalToken.OAuthToken()
 
 	klog.V(4).Infof("discovering auth redirects for: %s", loginServer)
@@ -239,6 +325,27 @@ func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credent
 	}, nil
 }
 
-func (a *acrProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
-	return nil
+// parseACRLoginServerFromImage takes image as parameter and returns login server of it.
+// Parameter `image` is expected in following format: foo.azurecr.io/bar/imageName:version
+// If the provided image is not an acr image, this function will return an empty string.
+func (a *acrProvider) parseACRLoginServerFromImage(image string) string {
+	match := acrRE.FindAllString(image, -1)
+	if len(match) == 1 {
+		return match[0]
+	}
+
+	// handle the custom cloud case
+	if a != nil && a.environment != nil {
+		cloudAcrSuffix := a.environment.ContainerRegistryDNSSuffix
+		cloudAcrSuffixLength := len(cloudAcrSuffix)
+		if cloudAcrSuffixLength > 0 {
+			customAcrSuffixIndex := strings.Index(image, cloudAcrSuffix)
+			if customAcrSuffixIndex != -1 {
+				endIndex := customAcrSuffixIndex + cloudAcrSuffixLength
+				return image[0:endIndex]
+			}
+		}
+	}
+
+	return ""
 }

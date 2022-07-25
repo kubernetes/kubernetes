@@ -1,8 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-- piosz
-- x13n
+  - sig-instrumentation-approvers
 reviewers:
-- piosz
-- x13n
+  - sig-instrumentation-reviewers
 labels:
-- sig/gcp
+  - area/provider/gcp
+  - sig/instrumentation
+emeritus_approvers:
+  - x13n

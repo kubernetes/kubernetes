@@ -12,8 +12,8 @@
 // are kept together in words or runs that are rotated sideways in vertical text
 // layout.
 //
-// For more information, see http://unicode.org/reports/tr11/.
-package width
+// For more information, see https://unicode.org/reports/tr11/.
+package width // import "golang.org/x/text/width"
 
 import (
 	"unicode/utf8"
@@ -27,7 +27,7 @@ import (
 //    (approximation, fixed pitch only).
 // 3) Implement display length.
 
-// Kind indicates the type of width property as defined in http://unicode.org/reports/tr11/.
+// Kind indicates the type of width property as defined in https://unicode.org/reports/tr11/.
 type Kind int
 
 const (
@@ -106,7 +106,7 @@ func (e elem) kind() Kind {
 }
 
 // Kind returns the Kind of a rune as defined in Unicode TR #11.
-// See http://unicode.org/reports/tr11/ for more details.
+// See https://unicode.org/reports/tr11/ for more details.
 func (p Properties) Kind() Kind {
 	return p.elem.kind()
 }

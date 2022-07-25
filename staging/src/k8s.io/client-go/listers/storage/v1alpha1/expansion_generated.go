@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
+// CSIStorageCapacityListerExpansion allows custom methods to be added to
+// CSIStorageCapacityLister.
+type CSIStorageCapacityListerExpansion interface{}
+
+// CSIStorageCapacityNamespaceListerExpansion allows custom methods to be added to
+// CSIStorageCapacityNamespaceLister.
+type CSIStorageCapacityNamespaceListerExpansion interface{}
+
 // VolumeAttachmentListerExpansion allows custom methods to be added to
 // VolumeAttachmentLister.
 type VolumeAttachmentListerExpansion interface{}

@@ -42,6 +42,11 @@ type CustomArgs struct {
 	// generator pick up manually written conversion funcs from external packages.
 	ExtraPeerDirs []string
 
+	// Additional dirs to parse and load, but not consider for peers.  This is
+	// useful when packages depend on other packages and want to call
+	// conversions across them.
+	ExtraDirs []string
+
 	// SkipUnsafe indicates whether to generate unsafe conversions to improve the efficiency
 	// of these operations. The unsafe operation is a direct pointer assignment via unsafe
 	// (within the allowed uses of unsafe) and is equivalent to a proposed Golang change to
@@ -67,6 +72,8 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 		"Comma-separated list of apimachinery import paths which are considered, after tag-specified peers, for conversions. Only change these if you have very good reasons.")
 	pflag.CommandLine.StringSliceVar(&ca.ExtraPeerDirs, "extra-peer-dirs", ca.ExtraPeerDirs,
 		"Application specific comma-separated list of import paths which are considered, after tag-specified peers and base-peer-dirs, for conversions.")
+	pflag.CommandLine.StringSliceVar(&ca.ExtraDirs, "extra-dirs", ca.ExtraDirs,
+		"Application specific comma-separated list of import paths which are loaded and considered for callable conversions, but are not considered peers for conversion.")
 	pflag.CommandLine.BoolVar(&ca.SkipUnsafe, "skip-unsafe", ca.SkipUnsafe,
 		"If true, will not generate code using unsafe pointer conversions; resulting code may be slower.")
 }

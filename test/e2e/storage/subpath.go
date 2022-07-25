@@ -17,42 +17,43 @@ limitations under the License.
 package storage
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	"github.com/onsi/ginkgo/v2"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = utils.SIGDescribe("Subpath", func() {
 	f := framework.NewDefaultFramework("subpath")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
-	Context("Atomic writer volumes", func() {
+	ginkgo.Context("Atomic writer volumes", func() {
 		var err error
 		var privilegedSecurityContext bool = false
 
-		BeforeEach(func() {
-			By("Setting up data")
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Setting up data")
 			secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "my-secret"}, Data: map[string][]byte{"secret-key": []byte("secret-value")}}
-			secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
+			_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{})
 			if err != nil && !apierrors.IsAlreadyExists(err) {
-				Expect(err).ToNot(HaveOccurred(), "while creating secret")
+				framework.ExpectNoError(err, "while creating secret")
 			}
 
 			configmap := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "my-configmap"}, Data: map[string]string{"configmap-key": "configmap-value"}}
-			configmap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
+			_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), configmap, metav1.CreateOptions{})
 			if err != nil && !apierrors.IsAlreadyExists(err) {
-				Expect(err).ToNot(HaveOccurred(), "while creating configmap")
+				framework.ExpectNoError(err, "while creating configmap")
 			}
-
 		})
 
 		/*
-		  Release : v1.12
+		  Release: v1.12
 		  Testname: SubPath: Reading content from a secret volume.
 		  Description: Containers in a pod can read content from a secret mounted volume which was configured with a subpath.
 		*/
@@ -62,7 +63,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		})
 
 		/*
-		  Release : v1.12
+		  Release: v1.12
 		  Testname: SubPath: Reading content from a configmap volume.
 		  Description: Containers in a pod can read content from a configmap mounted volume which was configured with a subpath.
 		*/
@@ -72,7 +73,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		})
 
 		/*
-		  Release : v1.12
+		  Release: v1.12
 		  Testname: SubPath: Reading content from a configmap volume.
 		  Description: Containers in a pod can read content from a configmap mounted volume which was configured with a subpath and also using a mountpath that is a specific file.
 		*/
@@ -84,7 +85,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		})
 
 		/*
-		  Release : v1.12
+		  Release: v1.12
 		  Testname: SubPath: Reading content from a downwardAPI volume.
 		  Description: Containers in a pod can read content from a downwardAPI mounted volume which was configured with a subpath.
 		*/
@@ -98,7 +99,7 @@ var _ = utils.SIGDescribe("Subpath", func() {
 		})
 
 		/*
-		  Release : v1.12
+		  Release: v1.12
 		  Testname: SubPath: Reading content from a projected volume.
 		  Description: Containers in a pod can read content from a projected mounted volume which was configured with a subpath.
 		*/
@@ -114,6 +115,15 @@ var _ = utils.SIGDescribe("Subpath", func() {
 				},
 			}, privilegedSecurityContext)
 			testsuites.TestBasicSubpath(f, "configmap-value", pod)
+		})
+
+	})
+
+	ginkgo.Context("Container restart", func() {
+		ginkgo.It("should verify that container can restart successfully after configmaps modified", func() {
+			configmapToModify := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "my-configmap-to-modify"}, Data: map[string]string{"configmap-key": "configmap-value"}}
+			configmapModified := &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "my-configmap-to-modify"}, Data: map[string]string{"configmap-key": "configmap-modified-value"}}
+			testsuites.TestPodContainerRestartWithConfigmapModified(f, configmapToModify, configmapModified)
 		})
 	})
 })

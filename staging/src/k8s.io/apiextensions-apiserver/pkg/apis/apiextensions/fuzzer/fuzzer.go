@@ -20,11 +20,12 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/utils/pointer"
 )
 
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
@@ -45,6 +46,10 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(obj.Names.ListKind) == 0 && len(obj.Names.Kind) > 0 {
 				obj.Names.ListKind = obj.Names.Kind + "List"
 			}
+			if len(obj.Versions) == 0 && len(obj.Version) == 0 {
+				// internal object must have a version to roundtrip all fields
+				obj.Version = "v1"
+			}
 			if len(obj.Versions) == 0 && len(obj.Version) != 0 {
 				obj.Versions = []apiextensions.CustomResourceDefinitionVersion{
 					{
@@ -64,6 +69,29 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if obj.Conversion == nil {
 				obj.Conversion = &apiextensions.CustomResourceConversion{
 					Strategy: apiextensions.NoneConverter,
+				}
+			}
+			if obj.Conversion.Strategy == apiextensions.WebhookConverter && len(obj.Conversion.ConversionReviewVersions) == 0 {
+				obj.Conversion.ConversionReviewVersions = []string{"v1beta1"}
+			}
+			if obj.PreserveUnknownFields == nil {
+				obj.PreserveUnknownFields = pointer.BoolPtr(true)
+			}
+
+			// Move per-version schema, subresources, additionalPrinterColumns to the top-level.
+			// This is required by validation in v1beta1, and by round-tripping in v1.
+			if len(obj.Versions) == 1 {
+				if obj.Versions[0].Schema != nil {
+					obj.Validation = obj.Versions[0].Schema
+					obj.Versions[0].Schema = nil
+				}
+				if obj.Versions[0].AdditionalPrinterColumns != nil {
+					obj.AdditionalPrinterColumns = obj.Versions[0].AdditionalPrinterColumns
+					obj.Versions[0].AdditionalPrinterColumns = nil
+				}
+				if obj.Versions[0].Subresources != nil {
+					obj.Subresources = obj.Versions[0].Subresources
+					obj.Versions[0].Subresources = nil
 				}
 			}
 		},
@@ -90,7 +118,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				default:
 					isValue := true
 					switch field.Type.Kind() {
-					case reflect.Interface, reflect.Map, reflect.Slice, reflect.Ptr:
+					case reflect.Interface, reflect.Map, reflect.Slice, reflect.Pointer:
 						isValue = false
 					}
 					if isValue || c.Intn(10) == 0 {
@@ -112,6 +140,12 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if c.RandBool() {
 				validRef := "validRef"
 				obj.Ref = &validRef
+			}
+			if len(obj.Type) == 0 {
+				obj.Nullable = false // because this does not roundtrip through go-openapi
+			}
+			if obj.XIntOrString {
+				obj.Type = ""
 			}
 		},
 		func(obj *apiextensions.JSONSchemaPropsOrBool, c fuzz.Continue) {
@@ -142,6 +176,10 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			} else {
 				c.Fuzz(&obj.Property)
 			}
+		},
+		func(obj *int64, c fuzz.Continue) {
+			// JSON only supports 53 bits because everything is a float
+			*obj = int64(c.Uint64()) & ((int64(1) << 53) - 1)
 		},
 	}
 }

@@ -21,13 +21,12 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	"k8s.io/utils/keymutex"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/keymutex"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -99,7 +98,7 @@ func (attacher *iscsiAttacher) GetDeviceMountPath(
 	return attacher.manager.MakeGlobalPDName(*mounter.iscsiDisk), nil
 }
 
-func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	mounter := attacher.host.GetMounter(iscsiPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -176,6 +175,14 @@ func (detacher *iscsiDetacher) UnmountDevice(deviceMountPath string) error {
 	return nil
 }
 
+func (plugin *iscsiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *iscsiPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
 func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, targetLocks keymutex.KeyMutex, pod *v1.Pod) (*iscsiDiskMounter, error) {
 	var secret map[string]string
 	readOnly, fsType, err := getISCSIVolumeInfo(spec)
@@ -200,26 +207,17 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost, targetLocks 
 		return nil, err
 	}
 	exec := host.GetExec(iscsiPluginName)
-	// TODO: remove feature gate check after no longer needed
-	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		volumeMode, err := volumeutil.GetVolumeMode(spec)
-		if err != nil {
-			return nil, err
-		}
-		klog.V(5).Infof("iscsi: VolumeSpecToMounter volumeMode %s", volumeMode)
-		return &iscsiDiskMounter{
-			iscsiDisk:  iscsiDisk,
-			fsType:     fsType,
-			volumeMode: volumeMode,
-			readOnly:   readOnly,
-			mounter:    &mount.SafeFormatAndMount{Interface: host.GetMounter(iscsiPluginName), Exec: exec},
-			exec:       exec,
-			deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
-		}, nil
+
+	volumeMode, err := volumeutil.GetVolumeMode(spec)
+	if err != nil {
+		return nil, err
 	}
+
+	klog.V(5).Infof("iscsi: VolumeSpecToMounter volumeMode %s", volumeMode)
 	return &iscsiDiskMounter{
 		iscsiDisk:  iscsiDisk,
 		fsType:     fsType,
+		volumeMode: volumeMode,
 		readOnly:   readOnly,
 		mounter:    &mount.SafeFormatAndMount{Interface: host.GetMounter(iscsiPluginName), Exec: exec},
 		exec:       exec,

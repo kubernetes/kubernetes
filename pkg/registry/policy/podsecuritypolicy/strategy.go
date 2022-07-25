@@ -58,15 +58,14 @@ func (strategy) AllowUnconditionalUpdate() bool {
 func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	psp := obj.(*policy.PodSecurityPolicy)
 
-	psputil.DropDisabledAlphaFields(&psp.Spec)
+	psputil.DropDisabledFields(&psp.Spec, nil)
 }
 
 func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPsp := obj.(*policy.PodSecurityPolicy)
 	oldPsp := old.(*policy.PodSecurityPolicy)
 
-	psputil.DropDisabledAlphaFields(&newPsp.Spec)
-	psputil.DropDisabledAlphaFields(&oldPsp.Spec)
+	psputil.DropDisabledFields(&newPsp.Spec, &oldPsp.Spec)
 }
 
 func (strategy) Canonicalize(obj runtime.Object) {
@@ -76,6 +75,14 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	return validation.ValidatePodSecurityPolicy(obj.(*policy.PodSecurityPolicy))
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePodSecurityPolicyUpdate(old.(*policy.PodSecurityPolicy), obj.(*policy.PodSecurityPolicy))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

@@ -14,11 +14,12 @@
 
 # TODO: get rid of bash dependency and switch to plain busybox.
 # The tar in busybox also doesn't seem to understand compression.
-FROM BASEIMAGE
+ARG BASEIMAGE
+FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
-RUN clean-install wget netcat
+RUN clean-install wget bash netcat
 
 ADD on-start.sh /
 
@@ -30,4 +31,4 @@ RUN wget -q -O /zookeeper-3.5.0-alpha.tar.gz http://archive.apache.org/dist/zook
 
 ADD install.sh /
 RUN chmod -c 755 /install.sh /on-start.sh /peer-finder
-Entrypoint ["/install.sh"]
+ENTRYPOINT ["/install.sh"]

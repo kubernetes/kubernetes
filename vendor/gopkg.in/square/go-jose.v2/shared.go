@@ -58,6 +58,11 @@ var (
 	// an RSA private key with more than two primes.
 	ErrUnsupportedKeyType = errors.New("square/go-jose: unsupported key type/format")
 
+	// ErrInvalidKeySize indicates that the given key is not the correct size
+	// for the selected algorithm. This can occur, for example, when trying to
+	// encrypt with AES-256 but passing only a 128-bit key as input.
+	ErrInvalidKeySize = errors.New("square/go-jose: invalid key size for algorithm")
+
 	// ErrNotSupported serialization of object is not supported. This occurs when
 	// trying to compact-serialize an object which can't be represented in
 	// compact form.
@@ -148,6 +153,10 @@ const (
 	headerJWK   = "jwk"   // *JSONWebKey
 	headerKeyID = "kid"   // string
 	headerNonce = "nonce" // string
+
+	headerP2C = "p2c" // *byteBuffer (int)
+	headerP2S = "p2s" // *byteBuffer ([]byte)
+
 )
 
 // rawHeader represents the JOSE header for JWE/JWS objects (used for parsing).
@@ -206,7 +215,7 @@ func (parsed rawHeader) set(k HeaderKey, v interface{}) error {
 // getString gets a string from the raw JSON, defaulting to "".
 func (parsed rawHeader) getString(k HeaderKey) string {
 	v, ok := parsed[k]
-	if !ok {
+	if !ok || v == nil {
 		return ""
 	}
 	var s string
@@ -318,6 +327,26 @@ func (parsed rawHeader) getCritical() ([]string, error) {
 		return nil, err
 	}
 	return q, nil
+}
+
+// getS2C extracts parsed "p2c" from the raw JSON.
+func (parsed rawHeader) getP2C() (int, error) {
+	v := parsed[headerP2C]
+	if v == nil {
+		return 0, nil
+	}
+
+	var p2c int
+	err := json.Unmarshal(*v, &p2c)
+	if err != nil {
+		return 0, err
+	}
+	return p2c, nil
+}
+
+// getS2S extracts parsed "p2s" from the raw JSON.
+func (parsed rawHeader) getP2S() (*byteBuffer, error) {
+	return parsed.getByteBuffer(headerP2S)
 }
 
 // sanitized produces a cleaned-up header object from the raw JSON.

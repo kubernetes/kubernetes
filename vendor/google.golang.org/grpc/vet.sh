@@ -1,44 +1,63 @@
 #!/bin/bash
 
-if [[ `uname -a` = *"Darwin"* ]]; then
-  echo "It seems you are running on Mac. This script does not work on Mac. See https://github.com/grpc/grpc-go/issues/2047"
-  exit 1
-fi
-
 set -ex  # Exit on error; debugging enabled.
 set -o pipefail  # Fail a pipe if any sub-command fails.
+
+# not makes sure the command passed to it does not exit with a return code of 0.
+not() {
+  # This is required instead of the earlier (! $COMMAND) because subshells and
+  # pipefail don't work the same on Darwin as in Linux.
+  ! "$@"
+}
 
 die() {
   echo "$@" >&2
   exit 1
 }
 
-PATH="$GOPATH/bin:$GOROOT/bin:$PATH"
+fail_on_output() {
+  tee /dev/stderr | not read
+}
 
-# Check proto in manual runs or cron runs.
-if [[ "$TRAVIS" != "true" || "$TRAVIS_EVENT_TYPE" = "cron" ]]; then
-  check_proto="true"
-fi
+# Check to make sure it's safe to modify the user's git repo.
+git status --porcelain | fail_on_output
 
-if [ "$1" = "-install" ]; then
-  go get -d \
-    google.golang.org/grpc/...
-  go get -u \
-    github.com/golang/lint/golint \
+# Undo any edits made by this script.
+cleanup() {
+  git reset --hard HEAD
+}
+trap cleanup EXIT
+
+PATH="${HOME}/go/bin:${GOROOT}/bin:${PATH}"
+go version
+
+if [[ "$1" = "-install" ]]; then
+  # Install the pinned versions as defined in module tools.
+  pushd ./test/tools
+  go install \
+    golang.org/x/lint/golint \
     golang.org/x/tools/cmd/goimports \
     honnef.co/go/tools/cmd/staticcheck \
-    github.com/client9/misspell/cmd/misspell \
-    github.com/golang/protobuf/protoc-gen-go
-  if [[ "$check_proto" = "true" ]]; then
-    if [[ "$TRAVIS" = "true" ]]; then
-      PROTOBUF_VERSION=3.3.0
+    github.com/client9/misspell/cmd/misspell
+  popd
+  if [[ -z "${VET_SKIP_PROTO}" ]]; then
+    if [[ "${TRAVIS}" = "true" ]]; then
+      PROTOBUF_VERSION=3.14.0
       PROTOC_FILENAME=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
       pushd /home/travis
       wget https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOC_FILENAME}
       unzip ${PROTOC_FILENAME}
       bin/protoc --version
       popd
-    elif ! which protoc > /dev/null; then
+    elif [[ "${GITHUB_ACTIONS}" = "true" ]]; then
+      PROTOBUF_VERSION=3.14.0
+      PROTOC_FILENAME=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
+      pushd /home/runner/go
+      wget https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOC_FILENAME}
+      unzip ${PROTOC_FILENAME}
+      bin/protoc --version
+      popd
+    elif not which protoc > /dev/null; then
       die "Please install protoc into your path"
     fi
   fi
@@ -47,48 +66,146 @@ elif [[ "$#" -ne 0 ]]; then
   die "Unknown argument(s): $*"
 fi
 
-# TODO: Remove this check and the mangling below once "context" is imported
-# directly.
-if git status --porcelain | read; then
-  die "Uncommitted or untracked files found; commit changes first"
-fi
+# - Ensure all source files contain a copyright message.
+not git grep -L "\(Copyright [0-9]\{4,\} gRPC authors\)\|DO NOT EDIT" -- '*.go'
 
-git ls-files "*.go" | xargs grep -L "\(Copyright [0-9]\{4,\} gRPC authors\)\|DO NOT EDIT" 2>&1 | tee /dev/stderr | (! read)
-git ls-files "*.go" | xargs grep -l '"unsafe"' 2>&1 | (! grep -v '_test.go') | tee /dev/stderr | (! read)
-git ls-files "*.go" | xargs grep -l '"math/rand"' 2>&1 | (! grep -v '^examples\|^stress\|grpcrand') | tee /dev/stderr | (! read)
-gofmt -s -d -l . 2>&1 | tee /dev/stderr | (! read)
-goimports -l . 2>&1 | tee /dev/stderr | (! read)
-golint ./... 2>&1 | (grep -vE "(_mock|\.pb)\.go:" || true) | tee /dev/stderr | (! read)
+# - Make sure all tests in grpc and grpc/test use leakcheck via Teardown.
+not grep 'func Test[^(]' *_test.go
+not grep 'func Test[^(]' test/*.go
 
-# Undo any edits made by this script.
-cleanup() {
-  git reset --hard HEAD
-}
-trap cleanup EXIT
+# - Do not import x/net/context.
+not git grep -l 'x/net/context' -- "*.go"
 
-# Rewrite golang.org/x/net/context -> context imports (see grpc/grpc-go#1484).
-# TODO: Remove this mangling once "context" is imported directly (grpc/grpc-go#711).
-git ls-files "*.go" | xargs sed -i 's:"golang.org/x/net/context":"context":'
-set +o pipefail
-# TODO: Stop filtering pb.go files once golang/protobuf#214 is fixed.
-go tool vet -all . 2>&1 | grep -vE '(clientconn|transport\/transport_test).go:.*cancel (function|var)' | grep -vF '.pb.go:' | tee /dev/stderr | (! read)
-set -o pipefail
-git reset --hard HEAD
+# - Do not import math/rand for real library code.  Use internal/grpcrand for
+#   thread safety.
+git grep -l '"math/rand"' -- "*.go" 2>&1 | not grep -v '^examples\|^stress\|grpcrand\|^benchmark\|wrr_test'
 
-if [[ "$check_proto" = "true" ]]; then
-  PATH="/home/travis/bin:$PATH" make proto && \
-    git status --porcelain 2>&1 | (! read) || \
+# - Do not call grpclog directly. Use grpclog.Component instead.
+git grep -l 'grpclog.I\|grpclog.W\|grpclog.E\|grpclog.F\|grpclog.V' -- "*.go" | not grep -v '^grpclog/component.go\|^internal/grpctest/tlogger_test.go'
+
+# - Ensure all ptypes proto packages are renamed when importing.
+not git grep "\(import \|^\s*\)\"github.com/golang/protobuf/ptypes/" -- "*.go"
+
+# - Ensure all xds proto imports are renamed to *pb or *grpc.
+git grep '"github.com/envoyproxy/go-control-plane/envoy' -- '*.go' ':(exclude)*.pb.go' | not grep -v 'pb "\|grpc "'
+
+misspell -error .
+
+# - Check that generated proto files are up to date.
+if [[ -z "${VET_SKIP_PROTO}" ]]; then
+  PATH="/home/travis/bin:${PATH}" make proto && \
+    git status --porcelain 2>&1 | fail_on_output || \
     (git status; git --no-pager diff; exit 1)
 fi
 
-# TODO(menghanl): fix errors in transport_test.
-staticcheck -ignore '
-google.golang.org/grpc/transport/transport_test.go:SA2002
-google.golang.org/grpc/benchmark/benchmain/main.go:SA1019
-google.golang.org/grpc/stats/stats_test.go:SA1019
-google.golang.org/grpc/test/end2end_test.go:SA1019
-google.golang.org/grpc/balancer_test.go:SA1019
-google.golang.org/grpc/balancer.go:SA1019
-google.golang.org/grpc/clientconn_test.go:SA1019
-' ./...
-misspell -error .
+# - gofmt, goimports, golint (with exceptions for generated code), go vet,
+# go mod tidy.
+# Perform these checks on each module inside gRPC.
+for MOD_FILE in $(find . -name 'go.mod'); do
+  MOD_DIR=$(dirname ${MOD_FILE})
+  pushd ${MOD_DIR}
+  go vet -all ./... | fail_on_output
+  gofmt -s -d -l . 2>&1 | fail_on_output
+  goimports -l . 2>&1 | not grep -vE "\.pb\.go"
+  golint ./... 2>&1 | not grep -vE "/grpc_testing_not_regenerate/.*\.pb\.go:"
+
+  go mod tidy
+  git status --porcelain 2>&1 | fail_on_output || \
+    (git status; git --no-pager diff; exit 1)
+  popd
+done
+
+# - Collection of static analysis checks
+#
+# TODO(dfawley): don't use deprecated functions in examples or first-party
+# plugins.
+SC_OUT="$(mktemp)"
+staticcheck -go 1.9 -checks 'inherit,-ST1015' ./... > "${SC_OUT}" || true
+# Error if anything other than deprecation warnings are printed.
+not grep -v "is deprecated:.*SA1019" "${SC_OUT}"
+# Only ignore the following deprecated types/fields/functions.
+not grep -Fv '.CredsBundle
+.HeaderMap
+.Metadata is deprecated: use Attributes
+.NewAddress
+.NewServiceConfig
+.Type is deprecated: use Attributes
+BuildVersion is deprecated
+balancer.ErrTransientFailure
+balancer.Picker
+extDesc.Filename is deprecated
+github.com/golang/protobuf/jsonpb is deprecated
+grpc.CallCustomCodec
+grpc.Code
+grpc.Compressor
+grpc.CustomCodec
+grpc.Decompressor
+grpc.MaxMsgSize
+grpc.MethodConfig
+grpc.NewGZIPCompressor
+grpc.NewGZIPDecompressor
+grpc.RPCCompressor
+grpc.RPCDecompressor
+grpc.ServiceConfig
+grpc.WithBalancerName
+grpc.WithCompressor
+grpc.WithDecompressor
+grpc.WithDialer
+grpc.WithMaxMsgSize
+grpc.WithServiceConfig
+grpc.WithTimeout
+http.CloseNotifier
+info.SecurityVersion
+proto is deprecated
+proto.InternalMessageInfo is deprecated
+proto.EnumName is deprecated
+proto.ErrInternalBadWireType is deprecated
+proto.FileDescriptor is deprecated
+proto.Marshaler is deprecated
+proto.MessageType is deprecated
+proto.RegisterEnum is deprecated
+proto.RegisterFile is deprecated
+proto.RegisterType is deprecated
+proto.RegisterExtension is deprecated
+proto.RegisteredExtension is deprecated
+proto.RegisteredExtensions is deprecated
+proto.RegisterMapType is deprecated
+proto.Unmarshaler is deprecated
+resolver.Backend
+resolver.GRPCLB
+Target is deprecated: Use the Target field in the BuildOptions instead.
+xxx_messageInfo_
+' "${SC_OUT}"
+
+# - special golint on package comments.
+lint_package_comment_per_package() {
+  # Number of files in this go package.
+  fileCount=$(go list -f '{{len .GoFiles}}' $1)
+  if [ ${fileCount} -eq 0 ]; then
+    return 0
+  fi
+  # Number of package errors generated by golint.
+  lintPackageCommentErrorsCount=$(golint --min_confidence 0 $1 | grep -c "should have a package comment")
+  # golint complains about every file that's missing the package comment. If the
+  # number of files for this package is greater than the number of errors, there's
+  # at least one file with package comment, good. Otherwise, fail.
+  if [ ${fileCount} -le ${lintPackageCommentErrorsCount} ]; then
+    echo "Package $1 (with ${fileCount} files) is missing package comment"
+    return 1
+  fi
+}
+lint_package_comment() {
+  set +ex
+
+  count=0
+  for i in $(go list ./...); do
+    lint_package_comment_per_package "$i"
+    ((count += $?))
+  done
+
+  set -ex
+  return $count
+}
+lint_package_comment
+
+echo SUCCESS

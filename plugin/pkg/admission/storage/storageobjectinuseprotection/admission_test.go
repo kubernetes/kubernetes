@@ -17,6 +17,7 @@ limitations under the License.
 package storageobjectinuseprotection
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -26,10 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -63,7 +61,6 @@ func TestAdmit(t *testing.T) {
 		resource       schema.GroupVersionResource
 		object         runtime.Object
 		expectedObject runtime.Object
-		featureEnabled bool
 		namespace      string
 	}{
 		{
@@ -71,7 +68,6 @@ func TestAdmit(t *testing.T) {
 			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			claim,
 			claimWithFinalizer,
-			true,
 			claim.Namespace,
 		},
 		{
@@ -79,23 +75,13 @@ func TestAdmit(t *testing.T) {
 			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
 			claimWithFinalizer,
 			claimWithFinalizer,
-			true,
 			claimWithFinalizer.Namespace,
-		},
-		{
-			"disabled feature -> no finalizer",
-			api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
-			claim,
-			claim,
-			false,
-			claim.Namespace,
 		},
 		{
 			"create -> add finalizer",
 			api.SchemeGroupVersion.WithResource("persistentvolumes"),
 			pv,
 			pvWithFinalizer,
-			true,
 			pv.Namespace,
 		},
 		{
@@ -103,24 +89,14 @@ func TestAdmit(t *testing.T) {
 			api.SchemeGroupVersion.WithResource("persistentvolumes"),
 			pvWithFinalizer,
 			pvWithFinalizer,
-			true,
 			pvWithFinalizer.Namespace,
-		},
-		{
-			"disabled feature -> no finalizer",
-			api.SchemeGroupVersion.WithResource("persistentvolumes"),
-			pv,
-			pv,
-			false,
-			pv.Namespace,
 		},
 	}
 
-	ctrl := newPlugin()
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, test.featureEnabled)()
+			ctrl := newPlugin()
+
 			obj := test.object.DeepCopyObject()
 			attrs := admission.NewAttributesRecord(
 				obj,                  // new object
@@ -131,11 +107,12 @@ func TestAdmit(t *testing.T) {
 				test.resource,
 				"", // subresource
 				admission.Create,
+				&metav1.CreateOptions{},
 				false, // dryRun
 				nil,   // userInfo
 			)
 
-			err := ctrl.Admit(attrs)
+			err := ctrl.Admit(context.TODO(), attrs, nil)
 			if err != nil {
 				t.Errorf("Test %q: got unexpected error: %v", test.name, err)
 			}

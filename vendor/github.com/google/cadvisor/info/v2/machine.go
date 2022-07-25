@@ -18,7 +18,7 @@ import (
 	// TODO(rjnagal): Move structs from v1.
 	"time"
 
-	"github.com/google/cadvisor/info/v1"
+	v1 "github.com/google/cadvisor/info/v1"
 )
 
 type Attributes struct {
@@ -87,6 +87,7 @@ func GetAttributes(mi *v1.MachineInfo, vi *v1.VersionInfo) Attributes {
 		MemoryCapacity:     mi.MemoryCapacity,
 		MachineID:          mi.MachineID,
 		SystemUUID:         mi.SystemUUID,
+		HugePages:          mi.HugePages,
 		Filesystems:        mi.Filesystems,
 		DiskMap:            mi.DiskMap,
 		NetworkDevices:     mi.NetworkDevices,

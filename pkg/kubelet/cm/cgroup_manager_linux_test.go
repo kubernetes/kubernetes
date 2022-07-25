@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -142,6 +143,28 @@ func TestCgroupNameToCgroupfs(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		if actual := testCase.input.ToCgroupfs(); actual != testCase.expected {
+			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
+		}
+	}
+}
+
+func TestParseSystemdToCgroupName(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected CgroupName
+	}{
+		{
+			input:    "/test",
+			expected: []string{"test"},
+		},
+		{
+			input:    "/test.slice",
+			expected: []string{"test"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		if actual := ParseSystemdToCgroupName(testCase.input); !reflect.DeepEqual(actual, testCase.expected) {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
 	}

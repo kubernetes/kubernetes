@@ -24,6 +24,7 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/pointer"
 )
 
 // Funcs returns the fuzzer functions for the autoscaling api group.
@@ -40,8 +41,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(s *autoscaling.HorizontalPodAutoscalerSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
-			minReplicas := int32(c.Rand.Int31())
-			s.MinReplicas = &minReplicas
+			s.MinReplicas = pointer.Int32(c.Rand.Int31())
 
 			randomQuantity := func() resource.Quantity {
 				var q resource.Quantity
@@ -86,6 +86,43 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 						Target: autoscaling.MetricTarget{
 							Type:               autoscaling.UtilizationMetricType,
 							AverageUtilization: &targetUtilization,
+						},
+					},
+				},
+			}
+			stabilizationWindow := int32(c.RandUint64())
+			maxPolicy := autoscaling.MaxPolicySelect
+			minPolicy := autoscaling.MinPolicySelect
+			s.Behavior = &autoscaling.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscaling.HPAScalingRules{
+					StabilizationWindowSeconds: &stabilizationWindow,
+					SelectPolicy:               &maxPolicy,
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							Value:         int32(c.RandUint64()),
+							PeriodSeconds: int32(c.RandUint64()),
+						},
+						{
+							Type:          autoscaling.PercentScalingPolicy,
+							Value:         int32(c.RandUint64()),
+							PeriodSeconds: int32(c.RandUint64()),
+						},
+					},
+				},
+				ScaleDown: &autoscaling.HPAScalingRules{
+					StabilizationWindowSeconds: &stabilizationWindow,
+					SelectPolicy:               &minPolicy,
+					Policies: []autoscaling.HPAScalingPolicy{
+						{
+							Type:          autoscaling.PodsScalingPolicy,
+							Value:         int32(c.RandUint64()),
+							PeriodSeconds: int32(c.RandUint64()),
+						},
+						{
+							Type:          autoscaling.PercentScalingPolicy,
+							Value:         int32(c.RandUint64()),
+							PeriodSeconds: int32(c.RandUint64()),
 						},
 					},
 				},

@@ -11,6 +11,8 @@ type Clock interface {
 	After(d time.Duration) <-chan time.Time
 	Sleep(d time.Duration)
 	Now() time.Time
+	Since(t time.Time) time.Duration
+	NewTicker(d time.Duration) Ticker
 }
 
 // FakeClock provides an interface for a clock which can be
@@ -32,10 +34,17 @@ func NewRealClock() Clock {
 }
 
 // NewFakeClock returns a FakeClock implementation which can be
-// manually advanced through time for testing.
+// manually advanced through time for testing. The initial time of the
+// FakeClock will be an arbitrary non-zero time.
 func NewFakeClock() FakeClock {
+	// use a fixture that does not fulfill Time.IsZero()
+	return NewFakeClockAt(time.Date(1984, time.April, 4, 0, 0, 0, 0, time.UTC))
+}
+
+// NewFakeClockAt returns a FakeClock initialised at the given time.Time.
+func NewFakeClockAt(t time.Time) FakeClock {
 	return &fakeClock{
-		l: sync.RWMutex{},
+		time: t,
 	}
 }
 
@@ -51,6 +60,14 @@ func (rc *realClock) Sleep(d time.Duration) {
 
 func (rc *realClock) Now() time.Time {
 	return time.Now()
+}
+
+func (rc *realClock) Since(t time.Time) time.Duration {
+	return rc.Now().Sub(t)
+}
+
+func (rc *realClock) NewTicker(d time.Duration) Ticker {
+	return &realTicker{time.NewTicker(d)}
 }
 
 type fakeClock struct {
@@ -80,7 +97,7 @@ func (fc *fakeClock) After(d time.Duration) <-chan time.Time {
 	defer fc.l.Unlock()
 	now := fc.time
 	done := make(chan time.Time, 1)
-	if d.Nanoseconds() == 0 {
+	if d.Nanoseconds() <= 0 {
 		// special case - trigger immediately
 		done <- now
 	} else {
@@ -117,9 +134,26 @@ func (fc *fakeClock) Sleep(d time.Duration) {
 
 // Time returns the current time of the fakeClock
 func (fc *fakeClock) Now() time.Time {
-	fc.l.Lock()
-	defer fc.l.Unlock()
-	return fc.time
+	fc.l.RLock()
+	t := fc.time
+	fc.l.RUnlock()
+	return t
+}
+
+// Since returns the duration that has passed since the given time on the fakeClock
+func (fc *fakeClock) Since(t time.Time) time.Duration {
+	return fc.Now().Sub(t)
+}
+
+func (fc *fakeClock) NewTicker(d time.Duration) Ticker {
+	ft := &fakeTicker{
+		c:      make(chan time.Time, 1),
+		stop:   make(chan bool, 1),
+		clock:  fc,
+		period: d,
+	}
+	ft.runTickThread()
+	return ft
 }
 
 // Advance advances fakeClock to a new point in time, ensuring channels from any

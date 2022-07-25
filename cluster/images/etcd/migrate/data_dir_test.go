@@ -17,12 +17,11 @@ limitations under the License.
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/blang/semver"
+	"github.com/blang/semver/v4"
 )
 
 var (
@@ -88,6 +87,7 @@ func TestExistingDataDirWithoutVersionFile(t *testing.T) {
 func TestNonexistingDataDir(t *testing.T) {
 	targetVersion := &EtcdVersionPair{&EtcdVersion{latestVersion}, storageEtcd3}
 	path := newTestPath(t)
+	defer os.RemoveAll(path)
 	d, err := OpenOrCreateDataDirectory(filepath.Join(path, "data-dir"))
 	if err != nil {
 		t.Fatalf("Failed to open data dir: %v", err)
@@ -128,9 +128,14 @@ func TestNonexistingDataDir(t *testing.T) {
 
 func TestBackup(t *testing.T) {
 	path := newTestPath(t)
+	defer os.RemoveAll(path)
 	d, err := OpenOrCreateDataDirectory(filepath.Join(path, "data-dir"))
 	if err != nil {
 		t.Fatalf("Failed to open data dir: %v", err)
+	}
+	_, err = os.Create(filepath.Join(path, "data-dir", "empty.txt"))
+	if err != nil {
+		t.Fatal(err)
 	}
 	err = d.Backup()
 	if err != nil {
@@ -150,10 +155,13 @@ func TestBackup(t *testing.T) {
 }
 
 func newTestPath(t *testing.T) string {
-	path, err := ioutil.TempDir("", "etcd-migrate-test-")
-	os.Chmod(path, 0777)
+	path, err := os.MkdirTemp("", "etcd-migrate-test-")
 	if err != nil {
 		t.Fatalf("Failed to create tmp dir for test: %v", err)
+	}
+	err = os.Chmod(path, 0777)
+	if err != nil {
+		t.Fatalf("Failed to granting permission to tmp dir for test: %v", err)
 	}
 	return path
 }

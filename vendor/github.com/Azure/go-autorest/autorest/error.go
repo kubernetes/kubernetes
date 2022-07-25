@@ -96,3 +96,8 @@ func (e DetailedError) Error() string {
 	}
 	return fmt.Sprintf("%s#%s: %s: StatusCode=%d -- Original Error: %v", e.PackageType, e.Method, e.Message, e.StatusCode, e.Original)
 }
+
+// Unwrap returns the original error.
+func (e DetailedError) Unwrap() error {
+	return e.Original
+}

@@ -19,20 +19,26 @@ package metrics
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 func TestVolumesInUseMetricCollection(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
 	fakeVolumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	fakeClient := &fake.Clientset{}
 
@@ -107,13 +113,16 @@ func TestVolumesInUseMetricCollection(t *testing.T) {
 	pvcLister := pvcInformer.Lister()
 	pvLister := pvInformer.Lister()
 
+	csiTranslator := csitrans.New()
 	metricCollector := newAttachDetachStateCollector(
 		pvcLister,
 		fakePodInformer.Lister(),
 		pvLister,
 		nil,
 		nil,
-		fakeVolumePluginMgr)
+		fakeVolumePluginMgr,
+		csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
+		csiTranslator)
 	nodeUseMap := metricCollector.getVolumeInUseCount()
 	if len(nodeUseMap) < 1 {
 		t.Errorf("Expected one volume in use got %d", len(nodeUseMap))
@@ -143,15 +152,18 @@ func TestTotalVolumesMetricCollection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
-	asw.AddVolumeNode(volumeName, volumeSpec, nodeName, "")
+	asw.AddVolumeNode(volumeName, volumeSpec, nodeName, "", true)
 
+	csiTranslator := csitrans.New()
 	metricCollector := newAttachDetachStateCollector(
 		nil,
 		nil,
 		nil,
 		asw,
 		dsw,
-		fakeVolumePluginMgr)
+		fakeVolumePluginMgr,
+		csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
+		csiTranslator)
 
 	totalVolumesMap := metricCollector.getTotalVolumesCount()
 	if len(totalVolumesMap) != 2 {

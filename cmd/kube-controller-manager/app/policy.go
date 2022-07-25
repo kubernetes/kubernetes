@@ -21,33 +21,34 @@ limitations under the License.
 package app
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"context"
+
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/scale"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/disruption"
-
-	"net/http"
-
-	"k8s.io/klog"
 )
 
-func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {
-	var group = "policy"
-	var version = "v1beta1"
-	var resource = "poddisruptionbudgets"
-
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: group, Version: version, Resource: resource}] {
-		klog.Infof(
-			"Refusing to start disruption because resource %q in group %q is not available.",
-			resource, group+"/"+version)
-		return nil, false, nil
+func startDisruptionController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	client := controllerContext.ClientBuilder.ClientOrDie("disruption-controller")
+	config := controllerContext.ClientBuilder.ConfigOrDie("disruption-controller")
+	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())
+	scaleClient, err := scale.NewForConfig(config, controllerContext.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	if err != nil {
+		return nil, false, err
 	}
+
 	go disruption.NewDisruptionController(
-		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		ctx.InformerFactory.Core().V1().ReplicationControllers(),
-		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
-		ctx.InformerFactory.Extensions().V1beta1().Deployments(),
-		ctx.InformerFactory.Apps().V1beta1().StatefulSets(),
-		ctx.ClientBuilder.ClientOrDie("disruption-controller"),
-	).Run(ctx.Stop)
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Policy().V1().PodDisruptionBudgets(),
+		controllerContext.InformerFactory.Core().V1().ReplicationControllers(),
+		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
+		controllerContext.InformerFactory.Apps().V1().Deployments(),
+		controllerContext.InformerFactory.Apps().V1().StatefulSets(),
+		client,
+		controllerContext.RESTMapper,
+		scaleClient,
+		client.Discovery(),
+	).Run(ctx)
 	return nil, true, nil
 }

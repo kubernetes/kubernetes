@@ -22,12 +22,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -60,11 +60,19 @@ func TestDecodeSinglePod(t *testing.T) {
 				SecurityContext:          securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
 			SecurityContext:    &v1.PodSecurityContext{},
-			SchedulerName:      core.DefaultSchedulerName,
+			SchedulerName:      v1.DefaultSchedulerName,
 			EnableServiceLinks: &enableServiceLinks,
 		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "1.2.3.4",
+				},
+			},
+		},
 	}
-	json, err := runtime.Encode(testapi.Default.Codec(), pod)
+	json, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -125,14 +133,22 @@ func TestDecodePodList(t *testing.T) {
 				SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
 			SecurityContext:    &v1.PodSecurityContext{},
-			SchedulerName:      core.DefaultSchedulerName,
+			SchedulerName:      v1.DefaultSchedulerName,
 			EnableServiceLinks: &enableServiceLinks,
+		},
+		Status: v1.PodStatus{
+			PodIP: "1.2.3.4",
+			PodIPs: []v1.PodIP{
+				{
+					IP: "1.2.3.4",
+				},
+			},
 		},
 	}
 	podList := &v1.PodList{
 		Items: []v1.Pod{*pod},
 	}
-	json, err := runtime.Encode(testapi.Default.Codec(), podList)
+	json, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), podList)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -166,34 +182,6 @@ func TestDecodePodList(t *testing.T) {
 		}
 		if !reflect.DeepEqual(podList, &podListOut) {
 			t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", pod, &podListOut, string(yaml))
-		}
-	}
-}
-
-func TestGetSelfLink(t *testing.T) {
-	var testCases = []struct {
-		desc             string
-		name             string
-		namespace        string
-		expectedSelfLink string
-	}{
-		{
-			desc:             "No namespace specified",
-			name:             "foo",
-			namespace:        "",
-			expectedSelfLink: "/api/v1/namespaces/default/pods/foo",
-		},
-		{
-			desc:             "Namespace specified",
-			name:             "foo",
-			namespace:        "bar",
-			expectedSelfLink: "/api/v1/namespaces/bar/pods/foo",
-		},
-	}
-	for _, testCase := range testCases {
-		selfLink := getSelfLink(testCase.name, testCase.namespace)
-		if testCase.expectedSelfLink != selfLink {
-			t.Errorf("%s: getSelfLink error, expected: %s, got: %s", testCase.desc, testCase.expectedSelfLink, selfLink)
 		}
 	}
 }
@@ -235,7 +223,7 @@ func TestStaticPodNameGenerate(t *testing.T) {
 		if c.overwrite != "" {
 			pod.Name = c.overwrite
 		}
-		errs := validation.ValidatePod(pod)
+		errs := validation.ValidatePodCreate(pod, validation.PodValidationOptions{})
 		if c.shouldErr {
 			specNameErrored := false
 			for _, err := range errs {

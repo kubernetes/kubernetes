@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -186,15 +186,17 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.UID = types.UID(c.RandString())
 
-			var sec, nsec int64
+			// Fuzzing sec and nsec in a smaller range (uint32 instead of int64),
+			// so that the result Unix time is a valid date and can be parsed into RFC3339 format.
+			var sec, nsec uint32
 			c.Fuzz(&sec)
 			c.Fuzz(&nsec)
-			j.CreationTimestamp = metav1.Unix(sec, nsec).Rfc3339Copy()
+			j.CreationTimestamp = metav1.Unix(int64(sec), int64(nsec)).Rfc3339Copy()
 
 			if j.DeletionTimestamp != nil {
 				c.Fuzz(&sec)
 				c.Fuzz(&nsec)
-				t := metav1.Unix(sec, nsec).Rfc3339Copy()
+				t := metav1.Unix(int64(sec), int64(nsec)).Rfc3339Copy()
 				j.DeletionTimestamp = &t
 			}
 
@@ -215,11 +217,9 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.Finalizers = nil
 			}
 		},
-		func(j *metav1.Initializers, c fuzz.Continue) {
-			c.FuzzNoCustom(j)
-			if len(j.Pending) == 0 {
-				j.Pending = nil
-			}
+		func(j *metav1.ResourceVersionMatch, c fuzz.Continue) {
+			matches := []metav1.ResourceVersionMatch{"", metav1.ResourceVersionMatchExact, metav1.ResourceVersionMatchNotOlderThan}
+			*j = matches[c.Rand.Intn(len(matches))]
 		},
 		func(j *metav1.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
@@ -276,11 +276,21 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				sort.Slice(j.MatchExpressions, func(a, b int) bool { return j.MatchExpressions[a].Key < j.MatchExpressions[b].Key })
 			}
 		},
+		func(j *metav1.ManagedFieldsEntry, c fuzz.Continue) {
+			c.FuzzNoCustom(j)
+			j.FieldsV1 = nil
+		},
 	}
 }
 
-func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
+func v1beta1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
+		func(r *metav1beta1.TableOptions, c fuzz.Continue) {
+			c.FuzzNoCustom(r)
+			// NoHeaders is not serialized to the wire but is allowed within the versioned
+			// type because we don't use meta internal types in the client and API server.
+			r.NoHeaders = false
+		},
 		func(r *metav1beta1.TableRow, c fuzz.Continue) {
 			c.Fuzz(&r.Object)
 			c.Fuzz(&r.Conditions)
@@ -323,5 +333,5 @@ func v1alpha1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 var Funcs = fuzzer.MergeFuzzerFuncs(
 	genericFuzzerFuncs,
 	v1FuzzerFuncs,
-	v1alpha1FuzzerFuncs,
+	v1beta1FuzzerFuncs,
 )

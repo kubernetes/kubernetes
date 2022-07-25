@@ -17,45 +17,10 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// LeaderElectionConfiguration defines the configuration of leader election
-// clients for components that can run with leader election enabled.
-type LeaderElectionConfiguration struct {
-	// leaderElect enables a leader election client to gain leadership
-	// before executing the main loop. Enable this when running replicated
-	// components for high availability.
-	LeaderElect bool
-	// leaseDuration is the duration that non-leader candidates will wait
-	// after observing a leadership renewal until attempting to acquire
-	// leadership of a led but unrenewed leader slot. This is effectively the
-	// maximum duration that a leader can be stopped before it is replaced
-	// by another candidate. This is only applicable if leader election is
-	// enabled.
-	LeaseDuration metav1.Duration
-	// renewDeadline is the interval between attempts by the acting master to
-	// renew a leadership slot before it stops leading. This must be less
-	// than or equal to the lease duration. This is only applicable if leader
-	// election is enabled.
-	RenewDeadline metav1.Duration
-	// retryPeriod is the duration the clients should wait between attempting
-	// acquisition and renewal of a leadership. This is only applicable if
-	// leader election is enabled.
-	RetryPeriod metav1.Duration
-	// resourceLock indicates the resource object type that will be used to lock
-	// during leader election cycles.
-	ResourceLock string
-}
-
-// DebuggingConfiguration holds configuration for Debugging related features.
-type DebuggingConfiguration struct {
-	// enableProfiling enables profiling via web interface host:port/debug/pprof/
-	EnableProfiling bool
-	// enableContentionProfiling enables lock contention profiling, if
-	// enableProfiling is true.
-	EnableContentionProfiling bool
-}
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -111,6 +76,11 @@ type Key struct {
 	Secret string
 }
 
+// String implements Stringer interface in a log safe way.
+func (k Key) String() string {
+	return fmt.Sprintf("Name: %s, Secret: [REDACTED]", k.Name)
+}
+
 // IdentityConfiguration is an empty struct to allow identity transformer in provider configuration.
 type IdentityConfiguration struct{}
 
@@ -118,9 +88,13 @@ type IdentityConfiguration struct{}
 type KMSConfiguration struct {
 	// name is the name of the KMS plugin to be used.
 	Name string
-	// cacheSize is the maximum number of secrets which are cached in memory. The default value is 1000.
+	// cachesize is the maximum number of secrets which are cached in memory. The default value is 1000.
+	// Set to a negative value to disable caching.
 	// +optional
-	CacheSize int32
+	CacheSize *int32
 	// endpoint is the gRPC server listening address, for example "unix:///var/run/kms-provider.sock".
 	Endpoint string
+	// timeout for gRPC calls to kms-plugin (ex. 5s). The default is 3 seconds.
+	// +optional
+	Timeout *metav1.Duration
 }

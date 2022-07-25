@@ -14,25 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	admissionapi "k8s.io/pod-security-admission/api"
+
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e_node/perf/workloads"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 // makeNodePerfPod returns a pod with the information provided from the workload.
-func makeNodePerfPod(w workloads.NodePerfWorkload) *corev1.Pod {
-	return &corev1.Pod{
+func makeNodePerfPod(w workloads.NodePerfWorkload) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s-pod", w.Name()),
 		},
@@ -42,67 +49,149 @@ func makeNodePerfPod(w workloads.NodePerfWorkload) *corev1.Pod {
 
 func setKubeletConfig(f *framework.Framework, cfg *kubeletconfig.KubeletConfiguration) {
 	if cfg != nil {
-		framework.ExpectNoError(setKubeletConfiguration(f, cfg))
+		// Update the Kubelet configuration.
+		ginkgo.By("Stopping the kubelet")
+		startKubelet := stopKubelet()
+
+		// wait until the kubelet health check will fail
+		gomega.Eventually(func() bool {
+			return kubeletHealthCheck(kubeletHealthCheckURL)
+		}, time.Minute, time.Second).Should(gomega.BeFalse())
+
+		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(cfg))
+
+		ginkgo.By("Starting the kubelet")
+		startKubelet()
+
+		// wait until the kubelet health check will succeed
+		gomega.Eventually(func() bool {
+			return kubeletHealthCheck(kubeletHealthCheckURL)
+		}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrue())
 	}
 
 	// Wait for the Kubelet to be ready.
-	Eventually(func() bool {
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		return len(nodeList.Items) == 1
-	}, time.Minute, time.Second).Should(BeTrue())
+	gomega.Eventually(func() bool {
+		nodes, err := e2enode.TotalReady(f.ClientSet)
+		framework.ExpectNoError(err)
+		return nodes == 1
+	}, time.Minute, time.Second).Should(gomega.BeTrue())
 }
 
 // Serial because the test updates kubelet configuration.
 // Slow by design.
 var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 	f := framework.NewDefaultFramework("node-performance-testing")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	var (
+		wl     workloads.NodePerfWorkload
+		oldCfg *kubeletconfig.KubeletConfiguration
+		newCfg *kubeletconfig.KubeletConfiguration
+		pod    *v1.Pod
+	)
+	ginkgo.JustBeforeEach(func() {
+		err := wl.PreTestExec()
+		framework.ExpectNoError(err)
+		oldCfg, err = getCurrentKubeletConfig()
+		framework.ExpectNoError(err)
+		newCfg, err = wl.KubeletConfig(oldCfg)
+		framework.ExpectNoError(err)
+		setKubeletConfig(f, newCfg)
+	})
 
-	Context("Run node performance testing with pre-defined workloads", func() {
-		It("run each pre-defined workload", func() {
-			By("running the workloads")
-			for _, workload := range workloads.NodePerfWorkloads {
-				By("running the pre test exec from the workload")
-				err := workload.PreTestExec()
-				framework.ExpectNoError(err)
+	cleanup := func() {
+		gp := int64(0)
+		delOpts := metav1.DeleteOptions{
+			GracePeriodSeconds: &gp,
+		}
+		f.PodClient().DeleteSync(pod.Name, delOpts, framework.DefaultPodDeletionTimeout)
 
-				By("restarting kubelet with required configuration")
-				// Get the Kubelet config required for this workload.
-				oldCfg, err := getCurrentKubeletConfig()
-				framework.ExpectNoError(err)
+		// We are going to give some more time for the CPU manager to do any clean
+		// up it needs to do now that the pod has been deleted. Otherwise we may
+		// run into a data race condition in which the PostTestExec function
+		// deletes the CPU manager's checkpoint file while the CPU manager is still
+		// doing work and we end with a new checkpoint file after PosttestExec has
+		// finished. This issues would result in the kubelet panicking after we try
+		// and set the kubelet config.
+		time.Sleep(15 * time.Second)
+		ginkgo.By("running the post test exec from the workload")
+		err := wl.PostTestExec()
+		framework.ExpectNoError(err)
+		setKubeletConfig(f, oldCfg)
+	}
 
-				newCfg, err := workload.KubeletConfig(oldCfg)
-				framework.ExpectNoError(err)
-				// Set the Kubelet config required for this workload.
-				setKubeletConfig(f, newCfg)
-
-				By("running the workload and waiting for success")
-				// Make the pod for the workload.
-				pod := makeNodePerfPod(workload)
-
-				// Create the pod.
-				pod = f.PodClient().CreateSync(pod)
-				// Wait for pod success.
-				f.PodClient().WaitForSuccess(pod.Name, workload.Timeout())
-				podLogs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-				framework.ExpectNoError(err)
-				perf, err := workload.ExtractPerformanceFromLogs(podLogs)
-				framework.ExpectNoError(err)
-				framework.Logf("Time to complete workload %s: %v", workload.Name(), perf)
-
-				// Delete the pod.
-				gp := int64(0)
-				delOpts := metav1.DeleteOptions{
-					GracePeriodSeconds: &gp,
+	runWorkload := func() {
+		ginkgo.By("running the workload and waiting for success")
+		// Make the pod for the workload.
+		pod = makeNodePerfPod(wl)
+		// Create the pod.
+		pod = f.PodClient().CreateSync(pod)
+		// Wait for pod success.
+		// but avoid using WaitForSuccess because we want the container logs upon failure #109295
+		podErr := e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), wl.Timeout(),
+			func(pod *v1.Pod) (bool, error) {
+				switch pod.Status.Phase {
+				case v1.PodFailed:
+					return true, fmt.Errorf("pod %q failed with reason: %q, message: %q", pod.Name, pod.Status.Reason, pod.Status.Message)
+				case v1.PodSucceeded:
+					return true, nil
+				default:
+					return false, nil
 				}
-				f.PodClient().DeleteSync(pod.Name, &delOpts, framework.DefaultPodDeletionTimeout)
+			},
+		)
+		podLogs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+		framework.ExpectNoError(err)
+		if podErr != nil {
+			framework.Logf("dumping pod logs due to pod error detected: \n%s", podLogs)
+			framework.Failf("pod error: %v", podErr)
+		}
+		perf, err := wl.ExtractPerformanceFromLogs(podLogs)
+		framework.ExpectNoError(err)
+		framework.Logf("Time to complete workload %s: %v", wl.Name(), perf)
+		// using framework.ExpectNoError for consistency would cause changes the output format
+		gomega.Expect(podErr).To(gomega.Succeed(), "wait for pod %q to succeed", pod.Name)
+	}
 
-				By("running the post test exec from the workload")
-				err = workload.PostTestExec()
-				framework.ExpectNoError(err)
+	ginkgo.BeforeEach(func() {
+		ginkgo.By("ensure environment has enough CPU + Memory to run")
+		minimumRequiredCPU := resource.MustParse("15")
+		minimumRequiredMemory := resource.MustParse("48Gi")
+		localNodeCap := getLocalNode(f).Status.Allocatable
+		cpuCap := localNodeCap[v1.ResourceCPU]
+		memCap := localNodeCap[v1.ResourceMemory]
+		if cpuCap.Cmp(minimumRequiredCPU) == -1 {
+			e2eskipper.Skipf("Skipping Node Performance Tests due to lack of CPU. Required %v is less than capacity %v.", minimumRequiredCPU, cpuCap)
+		}
+		if memCap.Cmp(minimumRequiredMemory) == -1 {
+			e2eskipper.Skipf("Skipping Node Performance Tests due to lack of memory. Required %v is less than capacity %v.", minimumRequiredMemory, memCap)
+		}
+	})
 
-				// Set the Kubelet config back to the old one.
-				setKubeletConfig(f, oldCfg)
-			}
+	ginkgo.Context("Run node performance testing with pre-defined workloads", func() {
+		ginkgo.BeforeEach(func() {
+			wl = workloads.NodePerfWorkloads[0]
+		})
+		ginkgo.It("NAS parallel benchmark (NPB) suite - Integer Sort (IS) workload", func() {
+			defer cleanup()
+			runWorkload()
+		})
+	})
+	ginkgo.Context("Run node performance testing with pre-defined workloads", func() {
+		ginkgo.BeforeEach(func() {
+			wl = workloads.NodePerfWorkloads[1]
+		})
+		ginkgo.It("NAS parallel benchmark (NPB) suite - Embarrassingly Parallel (EP) workload", func() {
+			defer cleanup()
+			runWorkload()
+		})
+	})
+	ginkgo.Context("Run node performance testing with pre-defined workloads", func() {
+		ginkgo.BeforeEach(func() {
+			wl = workloads.NodePerfWorkloads[2]
+		})
+		ginkgo.It("TensorFlow workload", func() {
+			defer cleanup()
+			runWorkload()
 		})
 	})
 })

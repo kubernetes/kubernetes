@@ -103,20 +103,16 @@ func newPid(pid int) (c Capabilities, err error) {
 	case linuxCapVer1:
 		p := new(capsV1)
 		p.hdr.version = capVers
-		p.hdr.pid = pid
+		p.hdr.pid = int32(pid)
 		c = p
 	case linuxCapVer2, linuxCapVer3:
 		p := new(capsV3)
 		p.hdr.version = capVers
-		p.hdr.pid = pid
+		p.hdr.pid = int32(pid)
 		c = p
 	default:
 		err = errUnknownVers
 		return
-	}
-	err = c.Load()
-	if err != nil {
-		c = nil
 	}
 	return
 }
@@ -428,11 +424,11 @@ func (c *capsV3) Load() (err error) {
 		}
 		if strings.HasPrefix(line, "CapB") {
 			fmt.Sscanf(line[4:], "nd:  %08x%08x", &c.bounds[1], &c.bounds[0])
-			break
+			continue
 		}
 		if strings.HasPrefix(line, "CapA") {
 			fmt.Sscanf(line[4:], "mb:  %08x%08x", &c.ambient[1], &c.ambient[0])
-			break
+			continue
 		}
 	}
 	f.Close()
@@ -492,10 +488,6 @@ func (c *capsV3) Apply(kind CapType) (err error) {
 
 func newFile(path string) (c Capabilities, err error) {
 	c = &capsFile{path: path}
-	err = c.Load()
-	if err != nil {
-		c = nil
-	}
 	return
 }
 

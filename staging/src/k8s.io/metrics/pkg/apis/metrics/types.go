@@ -27,9 +27,12 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// resource usage metrics of a node.
+// NodeMetrics sets resource usage metrics of a node.
 type NodeMetrics struct {
 	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta
 
 	// The following fields define time interval from which metrics were
@@ -47,7 +50,7 @@ type NodeMetrics struct {
 type NodeMetricsList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	metav1.ListMeta
 
 	// List of node metrics.
@@ -59,9 +62,12 @@ type NodeMetricsList struct {
 // +genclient:readonly
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// resource usage metrics of a pod.
+// PodMetrics sets resource usage metrics of a pod.
 type PodMetrics struct {
 	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta
 
 	// The following fields define time interval from which metrics were
@@ -79,14 +85,14 @@ type PodMetrics struct {
 type PodMetricsList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	metav1.ListMeta
 
 	// List of pod metrics.
 	Items []PodMetrics
 }
 
-// resource usage metrics of a container.
+// ContainerMetrics sets resource usage metrics of a container.
 type ContainerMetrics struct {
 	// Container name corresponding to the one from pod.spec.containers.
 	Name string

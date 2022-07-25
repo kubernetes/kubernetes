@@ -28,8 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/warning"
 )
 
 // RESTUpdateStrategy defines the minimum validation, accepted input, and
@@ -51,6 +53,26 @@ type RESTUpdateStrategy interface {
 	// filled in before the object is persisted.  This method should not mutate
 	// the object.
 	ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList
+	// WarningsOnUpdate returns warnings to the client performing the update.
+	// WarningsOnUpdate is invoked after default fields in the object have been filled in
+	// and after ValidateUpdate has passed, before Canonicalize is called, and before the object is persisted.
+	// This method must not mutate either object.
+	//
+	// Be brief; limit warnings to 120 characters if possible.
+	// Don't include a "Warning:" prefix in the message (that is added by clients on output).
+	// Warnings returned about a specific field should be formatted as "path.to.field: message".
+	// For example: `spec.imagePullSecrets[0].name: invalid empty name ""`
+	//
+	// Use warning messages to describe problems the client making the API request should correct or be aware of.
+	// For example:
+	// - use of deprecated fields/labels/annotations that will stop working in a future release
+	// - use of obsolete fields/labels/annotations that are non-functional
+	// - malformed or invalid specifications that prevent successful handling of the submitted object,
+	//   but are not rejected by validation for compatibility reasons
+	//
+	// Warnings should not be returned for fields which cannot be resolved by the caller.
+	// For example, do not warn about spec fields in a status update.
+	WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string
 	// Canonicalize allows an object to be mutated into a canonical form. This
 	// ensures that code that operates on these objects can rely on the common
 	// form for things like comparison.  Canonicalize is invoked after
@@ -89,12 +111,14 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	if kerr != nil {
 		return kerr
 	}
-	if strategy.NamespaceScoped() {
-		if !ValidNamespace(ctx, objectMeta) {
-			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
-		}
-	} else if len(objectMeta.GetNamespace()) > 0 {
-		objectMeta.SetNamespace(metav1.NamespaceNone)
+
+	// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
+	requestNamespace, ok := genericapirequest.NamespaceFrom(ctx)
+	if !ok {
+		return errors.NewInternalError(fmt.Errorf("no namespace information found in request context"))
+	}
+	if err := EnsureObjectNamespaceMatchesRequestNamespace(ExpectedNamespaceForScope(requestNamespace, strategy.NamespaceScoped()), objectMeta); err != nil {
+		return err
 	}
 
 	// Ensure requests cannot update generation
@@ -104,18 +128,14 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	}
 	objectMeta.SetGeneration(oldMeta.GetGeneration())
 
-	// Ensure Initializers are not set unless the feature is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
-		oldMeta.SetInitializers(nil)
-		objectMeta.SetInitializers(nil)
+	// Ensure managedFields state is removed unless ServerSideApply is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		oldMeta.SetManagedFields(nil)
+		objectMeta.SetManagedFields(nil)
 	}
 
 	strategy.PrepareForUpdate(ctx, obj, old)
 
-	// ClusterName is ignored and should not be saved
-	if len(objectMeta.GetClusterName()) > 0 {
-		objectMeta.SetClusterName("")
-	}
 	// Use the existing UID if none is provided
 	if len(objectMeta.GetUID()) == 0 {
 		objectMeta.SetUID(oldMeta.GetUID())
@@ -142,6 +162,10 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
 	if len(errs) > 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
+	}
+
+	for _, w := range strategy.WarningsOnUpdate(ctx, obj, old) {
+		warning.AddWarning(ctx, "", w)
 	}
 
 	strategy.Canonicalize(obj)
@@ -252,12 +276,12 @@ func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj run
 }
 
 // AdmissionToValidateObjectUpdateFunc converts validating admission to a rest validate object update func
-func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttributes admission.Attributes) ValidateObjectUpdateFunc {
+func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttributes admission.Attributes, o admission.ObjectInterfaces) ValidateObjectUpdateFunc {
 	validatingAdmission, ok := admit.(admission.ValidationInterface)
 	if !ok {
-		return func(obj, old runtime.Object) error { return nil }
+		return func(ctx context.Context, obj, old runtime.Object) error { return nil }
 	}
-	return func(obj, old runtime.Object) error {
+	return func(ctx context.Context, obj, old runtime.Object) error {
 		finalAttributes := admission.NewAttributesRecord(
 			obj,
 			old,
@@ -267,12 +291,13 @@ func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttrib
 			staticAttributes.GetResource(),
 			staticAttributes.GetSubresource(),
 			staticAttributes.GetOperation(),
+			staticAttributes.GetOperationOptions(),
 			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
 		)
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
 			return nil
 		}
-		return validatingAdmission.Validate(finalAttributes)
+		return validatingAdmission.Validate(ctx, finalAttributes, o)
 	}
 }

@@ -17,16 +17,17 @@ limitations under the License.
 package status
 
 import (
+	"context"
 	"fmt"
 	"sync"
+
+	"k8s.io/klog/v2"
 
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	nodeutil "k8s.io/component-helpers/node/util"
 )
 
 const (
@@ -142,7 +143,7 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 		return
 	}
 
-	utillog.Infof("updating Node.Status.Config")
+	klog.InfoS("Kubelet config controller updating Node.Status.Config")
 
 	// grab the lock
 	s.mux.Lock()
@@ -152,13 +153,13 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 	var err error
 	defer func() {
 		if err != nil {
-			utillog.Errorf(err.Error())
+			klog.ErrorS(err, "Kubelet config controller")
 			s.sync()
 		}
 	}()
 
 	// get the Node so we can check the current status
-	oldNode, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+	oldNode, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		err = fmt.Errorf("could not get Node %q, will not sync status, error: %v", nodeName, err)
 		return
@@ -173,30 +174,12 @@ func (s *nodeConfigStatus) Sync(client clientset.Interface, nodeName string) {
 		status.Error = s.errorOverride
 	}
 
-	// update metrics based on the status we will sync
-	metrics.SetConfigError(len(status.Error) > 0)
-	err = metrics.SetAssignedConfig(status.Assigned)
-	if err != nil {
-		err = fmt.Errorf("failed to update Assigned config metric, error: %v", err)
-		return
-	}
-	err = metrics.SetActiveConfig(status.Active)
-	if err != nil {
-		err = fmt.Errorf("failed to update Active config metric, error: %v", err)
-		return
-	}
-	err = metrics.SetLastKnownGoodConfig(status.LastKnownGood)
-	if err != nil {
-		err = fmt.Errorf("failed to update LastKnownGood config metric, error: %v", err)
-		return
-	}
-
 	// apply the status to a copy of the node so we don't modify the object in the informer's store
 	newNode := oldNode.DeepCopy()
 	newNode.Status.Config = status
 
 	// patch the node with the new status
 	if _, _, err := nodeutil.PatchNodeStatus(client.CoreV1(), types.NodeName(nodeName), oldNode, newNode); err != nil {
-		utillog.Errorf("failed to patch node status, error: %v", err)
+		klog.ErrorS(err, "Kubelet config controller failed to patch node status")
 	}
 }

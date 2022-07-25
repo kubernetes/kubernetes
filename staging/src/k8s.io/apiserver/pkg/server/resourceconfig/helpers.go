@@ -18,13 +18,14 @@ package resourceconfig
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 // GroupVersionRegistry provides access to registered group versions.
@@ -50,51 +51,80 @@ func MergeResourceEncodingConfigs(
 	return resourceEncodingConfig
 }
 
-// MergeGroupEncodingConfigs merges the given defaultResourceConfig with specific GroupVersion overrides.
-func MergeGroupEncodingConfigs(
-	defaultResourceEncoding *serverstore.DefaultResourceEncodingConfig,
-	storageEncodingOverrides map[string]schema.GroupVersion,
-) *serverstore.DefaultResourceEncodingConfig {
-	resourceEncodingConfig := defaultResourceEncoding
-	for group, storageEncodingVersion := range storageEncodingOverrides {
-		resourceEncodingConfig.SetVersionEncoding(group, storageEncodingVersion, schema.GroupVersion{Group: group, Version: runtime.APIVersionInternal})
+// Recognized values for the --runtime-config parameter to enable/disable groups of APIs
+const (
+	APIAll   = "api/all"
+	APIGA    = "api/ga"
+	APIBeta  = "api/beta"
+	APIAlpha = "api/alpha"
+)
+
+var (
+	gaPattern    = regexp.MustCompile(`^v\d+$`)
+	betaPattern  = regexp.MustCompile(`^v\d+beta\d+$`)
+	alphaPattern = regexp.MustCompile(`^v\d+alpha\d+$`)
+
+	groupVersionMatchers = map[string]func(gv schema.GroupVersion) bool{
+		// allows users to address all api versions
+		APIAll: func(gv schema.GroupVersion) bool { return true },
+		// allows users to address all api versions in the form v[0-9]+
+		APIGA: func(gv schema.GroupVersion) bool { return gaPattern.MatchString(gv.Version) },
+		// allows users to address all beta api versions
+		APIBeta: func(gv schema.GroupVersion) bool { return betaPattern.MatchString(gv.Version) },
+		// allows users to address all alpha api versions
+		APIAlpha: func(gv schema.GroupVersion) bool { return alphaPattern.MatchString(gv.Version) },
 	}
-	return resourceEncodingConfig
-}
+
+	groupVersionMatchersOrder = []string{APIAll, APIGA, APIBeta, APIAlpha}
+)
 
 // MergeAPIResourceConfigs merges the given defaultAPIResourceConfig with the given resourceConfigOverrides.
 // Exclude the groups not registered in registry, and check if version is
 // not registered in group, then it will fail.
 func MergeAPIResourceConfigs(
 	defaultAPIResourceConfig *serverstore.ResourceConfig,
-	resourceConfigOverrides utilflag.ConfigurationMap,
+	resourceConfigOverrides cliflag.ConfigurationMap,
 	registry GroupVersionRegistry,
 ) (*serverstore.ResourceConfig, error) {
 	resourceConfig := defaultAPIResourceConfig
 	overrides := resourceConfigOverrides
 
-	// "api/all=false" allows users to selectively enable specific api versions.
-	allAPIFlagValue, ok := overrides["api/all"]
-	if ok {
-		if allAPIFlagValue == "false" {
-			// Disable all group versions.
-			resourceConfig.DisableAll()
-		} else if allAPIFlagValue == "true" {
-			resourceConfig.EnableAll()
+	for _, flag := range groupVersionMatchersOrder {
+		if value, ok := overrides[flag]; ok {
+			if value == "false" {
+				resourceConfig.DisableMatchingVersions(groupVersionMatchers[flag])
+			} else if value == "true" {
+				resourceConfig.EnableMatchingVersions(groupVersionMatchers[flag])
+			} else {
+				return nil, fmt.Errorf("invalid value %v=%v", flag, value)
+			}
 		}
 	}
+
+	type versionEnablementPreference struct {
+		key          string
+		enabled      bool
+		groupVersion schema.GroupVersion
+	}
+	type resourceEnablementPreference struct {
+		key                  string
+		enabled              bool
+		groupVersionResource schema.GroupVersionResource
+	}
+	versionPreferences := []versionEnablementPreference{}
+	resourcePreferences := []resourceEnablementPreference{}
 
 	// "<resourceSpecifier>={true|false} allows users to enable/disable API.
 	// This takes preference over api/all, if specified.
 	// Iterate through all group/version overrides specified in runtimeConfig.
 	for key := range overrides {
 		// Have already handled them above. Can skip them here.
-		if key == "api/all" {
+		if _, ok := groupVersionMatchers[key]; ok {
 			continue
 		}
 
 		tokens := strings.Split(key, "/")
-		if len(tokens) != 2 {
+		if len(tokens) < 2 || len(tokens) > 3 {
 			continue
 		}
 		groupVersionString := tokens[0] + "/" + tokens[1]
@@ -116,17 +146,52 @@ func MergeAPIResourceConfigs(
 		if err != nil {
 			return nil, err
 		}
-		if enabled {
-			resourceConfig.EnableVersions(groupVersion)
+
+		switch len(tokens) {
+		case 2:
+			versionPreferences = append(versionPreferences, versionEnablementPreference{
+				key:          key,
+				enabled:      enabled,
+				groupVersion: groupVersion,
+			})
+		case 3:
+			if strings.ToLower(tokens[2]) != tokens[2] {
+				return nil, fmt.Errorf("invalid key %v: group/version/resource and resource is always lowercase plural, not %q", key, tokens[2])
+			}
+			resourcePreferences = append(resourcePreferences, resourceEnablementPreference{
+				key:                  key,
+				enabled:              enabled,
+				groupVersionResource: groupVersion.WithResource(tokens[2]),
+			})
+		}
+	}
+
+	// apply version preferences first, so that we can remove the hardcoded resource preferences that are being overridden
+	for _, versionPreference := range versionPreferences {
+		if versionPreference.enabled {
+			// enable the groupVersion for "group/version=true"
+			resourceConfig.EnableVersions(versionPreference.groupVersion)
+
 		} else {
-			resourceConfig.DisableVersions(groupVersion)
+			// disable the groupVersion only for "group/version=false"
+			resourceConfig.DisableVersions(versionPreference.groupVersion)
+		}
+	}
+
+	// apply resource preferences last, so they have the highest priority
+	for _, resourcePreference := range resourcePreferences {
+		if resourcePreference.enabled {
+			// enable the resource for "group/version/resource=true"
+			resourceConfig.EnableResources(resourcePreference.groupVersionResource)
+		} else {
+			resourceConfig.DisableResources(resourcePreference.groupVersionResource)
 		}
 	}
 
 	return resourceConfig, nil
 }
 
-func getRuntimeConfigValue(overrides utilflag.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
+func getRuntimeConfigValue(overrides cliflag.ConfigurationMap, apiKey string, defaultValue bool) (bool, error) {
 	flagValue, ok := overrides[apiKey]
 	if ok {
 		if flagValue == "" {
@@ -142,10 +207,10 @@ func getRuntimeConfigValue(overrides utilflag.ConfigurationMap, apiKey string, d
 }
 
 // ParseGroups takes in resourceConfig and returns parsed groups.
-func ParseGroups(resourceConfig utilflag.ConfigurationMap) ([]string, error) {
+func ParseGroups(resourceConfig cliflag.ConfigurationMap) ([]string, error) {
 	groups := []string{}
 	for key := range resourceConfig {
-		if key == "api/all" {
+		if _, ok := groupVersionMatchers[key]; ok {
 			continue
 		}
 		tokens := strings.Split(key, "/")

@@ -17,20 +17,271 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
 
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificatesv1 "k8s.io/api/certificates/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes/fake"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	restclient "k8s.io/client-go/rest"
-	certutil "k8s.io/client-go/util/cert"
+	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/certificate"
+	"k8s.io/client-go/util/keyutil"
 )
+
+func copyFile(src, dst string) (err error) {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		cerr := out.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+	_, err = io.Copy(out, in)
+	return err
+}
+
+func TestLoadClientConfig(t *testing.T) {
+	//Create a temporary folder under tmp to store the required certificate files and configuration files.
+	fileDir := t.TempDir()
+	//Copy the required certificate file to the temporary directory.
+	copyFile("./testdata/mycertinvalid.crt", fileDir+"/mycertinvalid.crt")
+	copyFile("./testdata/mycertvalid.crt", fileDir+"/mycertvalid.crt")
+	copyFile("./testdata/mycertinvalid.key", fileDir+"/mycertinvalid.key")
+	copyFile("./testdata/mycertvalid.key", fileDir+"/mycertvalid.key")
+	testDataValid := []byte(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: ca-a.crt
+    server: https://cluster-a.com
+  name: cluster-a
+- cluster:
+    server: https://cluster-b.com
+  name: cluster-b
+contexts:
+- context:
+    cluster: cluster-a
+    namespace: ns-a
+    user: user-a
+  name: context-a
+- context:
+    cluster: cluster-b
+    namespace: ns-b
+    user: user-b
+  name: context-b
+current-context: context-b
+users:
+- name: user-a
+  user:
+    client-certificate: mycertvalid.crt
+    client-key: mycertvalid.key
+- name: user-b
+  user:
+    client-certificate: mycertvalid.crt
+    client-key: mycertvalid.key
+
+`)
+	filevalid, err := ioutil.TempFile(fileDir, "kubeconfigvalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ioutil.WriteFile(filevalid.Name(), testDataValid, os.FileMode(0755))
+
+	testDataInvalid := []byte(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: ca-a.crt
+    server: https://cluster-a.com
+  name: cluster-a
+- cluster:
+    server: https://cluster-b.com
+  name: cluster-b
+contexts:
+- context:
+    cluster: cluster-a
+    namespace: ns-a
+    user: user-a
+  name: context-a
+- context:
+    cluster: cluster-b
+    namespace: ns-b
+    user: user-b
+  name: context-b
+current-context: context-b
+users:
+- name: user-a
+  user:
+    client-certificate: mycertinvalid.crt
+    client-key: mycertinvalid.key
+- name: user-b
+  user:
+    client-certificate: mycertinvalid.crt
+    client-key: mycertinvalid.key
+
+`)
+	fileinvalid, err := ioutil.TempFile(fileDir, "kubeconfiginvalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ioutil.WriteFile(fileinvalid.Name(), testDataInvalid, os.FileMode(0755))
+
+	testDatabootstrap := []byte(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: ca-a.crt
+    server: https://cluster-a.com
+  name: cluster-a
+- cluster:
+    server: https://cluster-b.com
+  name: cluster-b
+contexts:
+- context:
+    cluster: cluster-a
+    namespace: ns-a
+    user: user-a
+  name: context-a
+- context:
+    cluster: cluster-b
+    namespace: ns-b
+    user: user-b
+  name: context-b
+current-context: context-b
+users:
+- name: user-a
+  user:
+   token: mytoken-b
+- name: user-b
+  user:
+   token: mytoken-b
+`)
+	fileboot, err := ioutil.TempFile(fileDir, "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ioutil.WriteFile(fileboot.Name(), testDatabootstrap, os.FileMode(0755))
+
+	dir, err := ioutil.TempDir(fileDir, "k8s-test-certstore-current")
+	if err != nil {
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
+	}
+
+	store, err := certificate.NewFileStore("kubelet-client", dir, dir, "", "")
+	if err != nil {
+		t.Errorf("unable to build bootstrap cert store")
+	}
+
+	tests := []struct {
+		name                 string
+		kubeconfigPath       string
+		bootstrapPath        string
+		certDir              string
+		expectedCertConfig   *restclient.Config
+		expectedClientConfig *restclient.Config
+	}{
+		{
+			name:           "bootstrapPath is empty",
+			kubeconfigPath: filevalid.Name(),
+			bootstrapPath:  "",
+			certDir:        dir,
+			expectedCertConfig: &restclient.Config{
+				Host: "https://cluster-b.com",
+				TLSClientConfig: restclient.TLSClientConfig{
+					CertFile: fileDir + "/mycertvalid.crt",
+					KeyFile:  fileDir + "/mycertvalid.key",
+				},
+				BearerToken: "",
+			},
+			expectedClientConfig: &restclient.Config{
+				Host: "https://cluster-b.com",
+				TLSClientConfig: restclient.TLSClientConfig{
+					CertFile: fileDir + "/mycertvalid.crt",
+					KeyFile:  fileDir + "/mycertvalid.key",
+				},
+				BearerToken: "",
+			},
+		},
+		{
+			name:           "bootstrap path is set and the contents of kubeconfigPath are valid",
+			kubeconfigPath: filevalid.Name(),
+			bootstrapPath:  fileboot.Name(),
+			certDir:        dir,
+			expectedCertConfig: &restclient.Config{
+				Host: "https://cluster-b.com",
+				TLSClientConfig: restclient.TLSClientConfig{
+					CertFile: fileDir + "/mycertvalid.crt",
+					KeyFile:  fileDir + "/mycertvalid.key",
+				},
+				BearerToken: "",
+			},
+			expectedClientConfig: &restclient.Config{
+				Host: "https://cluster-b.com",
+				TLSClientConfig: restclient.TLSClientConfig{
+					CertFile: fileDir + "/mycertvalid.crt",
+					KeyFile:  fileDir + "/mycertvalid.key",
+				},
+				BearerToken: "",
+			},
+		},
+		{
+			name:           "bootstrap path is set and the contents of kubeconfigPath are not valid",
+			kubeconfigPath: fileinvalid.Name(),
+			bootstrapPath:  fileboot.Name(),
+			certDir:        dir,
+			expectedCertConfig: &restclient.Config{
+				Host:            "https://cluster-b.com",
+				TLSClientConfig: restclient.TLSClientConfig{},
+				BearerToken:     "mytoken-b",
+			},
+			expectedClientConfig: &restclient.Config{
+				Host: "https://cluster-b.com",
+				TLSClientConfig: restclient.TLSClientConfig{
+					CertFile: store.CurrentPath(),
+					KeyFile:  store.CurrentPath(),
+				},
+				BearerToken: "",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			certConfig, clientConfig, err := LoadClientConfig(test.kubeconfigPath, test.bootstrapPath, test.certDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(certConfig, test.expectedCertConfig) {
+				t.Errorf("Unexpected certConfig: %s", diff.ObjectDiff(certConfig, test.expectedCertConfig))
+			}
+			if !reflect.DeepEqual(clientConfig, test.expectedClientConfig) {
+				t.Errorf("Unexpected clientConfig: %s", diff.ObjectDiff(clientConfig, test.expectedClientConfig))
+			}
+		})
+	}
+}
 
 func TestLoadRESTClientConfig(t *testing.T) {
 	testData := []byte(`
@@ -91,7 +342,7 @@ users:
 }
 
 func TestRequestNodeCertificateNoKeyData(t *testing.T) {
-	certData, err := requestNodeCertificate(&fakeClient{}, []byte{}, "fake-node-name")
+	certData, err := requestNodeCertificate(context.TODO(), newClientset(fakeClient{}), []byte{}, "fake-node-name")
 	if err == nil {
 		t.Errorf("Got no error, wanted error an error because there was an empty private key passed in.")
 	}
@@ -101,15 +352,15 @@ func TestRequestNodeCertificateNoKeyData(t *testing.T) {
 }
 
 func TestRequestNodeCertificateErrorCreatingCSR(t *testing.T) {
-	client := &fakeClient{
+	client := newClientset(fakeClient{
 		failureType: createError,
-	}
-	privateKeyData, err := certutil.MakeEllipticPrivateKeyPEM()
+	})
+	privateKeyData, err := keyutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
 		t.Fatalf("Unable to generate a new private key: %v", err)
 	}
 
-	certData, err := requestNodeCertificate(client, privateKeyData, "fake-node-name")
+	certData, err := requestNodeCertificate(context.TODO(), client, privateKeyData, "fake-node-name")
 	if err == nil {
 		t.Errorf("Got no error, wanted error an error because client.Create failed.")
 	}
@@ -119,12 +370,12 @@ func TestRequestNodeCertificateErrorCreatingCSR(t *testing.T) {
 }
 
 func TestRequestNodeCertificate(t *testing.T) {
-	privateKeyData, err := certutil.MakeEllipticPrivateKeyPEM()
+	privateKeyData, err := keyutil.MakeEllipticPrivateKeyPEM()
 	if err != nil {
 		t.Fatalf("Unable to generate a new private key: %v", err)
 	}
 
-	certData, err := requestNodeCertificate(&fakeClient{}, privateKeyData, "fake-node-name")
+	certData, err := requestNodeCertificate(context.TODO(), newClientset(fakeClient{}), privateKeyData, "fake-node-name")
 	if err != nil {
 		t.Errorf("Got %v, wanted no error.", err)
 	}
@@ -136,62 +387,84 @@ func TestRequestNodeCertificate(t *testing.T) {
 type failureType int
 
 const (
-	noError failureType = iota
+	noError failureType = iota //nolint:deadcode,varcheck
 	createError
 	certificateSigningRequestDenied
 )
 
 type fakeClient struct {
 	certificatesclient.CertificateSigningRequestInterface
-	watch       *watch.FakeWatcher
 	failureType failureType
 }
 
-func (c *fakeClient) Create(*certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
-	if c.failureType == createError {
-		return nil, fmt.Errorf("fakeClient failed creating request")
+func newClientset(opts fakeClient) *fake.Clientset {
+	f := fake.NewSimpleClientset()
+	switch opts.failureType {
+	case createError:
+		f.PrependReactor("create", "certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			switch action.GetResource().Version {
+			case "v1":
+				return true, nil, fmt.Errorf("create error")
+			default:
+				return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
+			}
+		})
+	default:
+		f.PrependReactor("create", "certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			switch action.GetResource().Version {
+			case "v1":
+				return true, &certificatesv1.CertificateSigningRequest{ObjectMeta: metav1.ObjectMeta{Name: "fake-certificate-signing-request-name", UID: "fake-uid"}}, nil
+			default:
+				return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
+			}
+		})
+		f.PrependReactor("list", "certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+			switch action.GetResource().Version {
+			case "v1":
+				return true, &certificatesv1.CertificateSigningRequestList{Items: []certificatesv1.CertificateSigningRequest{{ObjectMeta: metav1.ObjectMeta{Name: "fake-certificate-signing-request-name", UID: "fake-uid"}}}}, nil
+			default:
+				return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
+			}
+		})
+		f.PrependWatchReactor("certificatesigningrequests", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+			switch action.GetResource().Version {
+			case "v1":
+				w := watch.NewFakeWithChanSize(1, false)
+				w.Add(opts.generateCSR())
+				w.Stop()
+				return true, w, nil
+
+			default:
+				return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
+			}
+		})
 	}
-	csr := certificates.CertificateSigningRequest{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:  "fake-uid",
-			Name: "fake-certificate-signing-request-name",
-		},
-	}
-	return &csr, nil
+	return f
 }
 
-func (c *fakeClient) List(opts metav1.ListOptions) (*certificates.CertificateSigningRequestList, error) {
-	return &certificates.CertificateSigningRequestList{}, nil
-}
-
-func (c *fakeClient) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	c.watch = watch.NewFakeWithChanSize(1, false)
-	c.watch.Add(c.generateCSR())
-	c.watch.Stop()
-	return c.watch, nil
-}
-
-func (c *fakeClient) generateCSR() *certificates.CertificateSigningRequest {
-	var condition certificates.CertificateSigningRequestCondition
+func (c fakeClient) generateCSR() runtime.Object {
+	var condition certificatesv1.CertificateSigningRequestCondition
+	var certificateData []byte
 	if c.failureType == certificateSigningRequestDenied {
-		condition = certificates.CertificateSigningRequestCondition{
-			Type: certificates.CertificateDenied,
+		condition = certificatesv1.CertificateSigningRequestCondition{
+			Type: certificatesv1.CertificateDenied,
 		}
 	} else {
-		condition = certificates.CertificateSigningRequestCondition{
-			Type: certificates.CertificateApproved,
+		condition = certificatesv1.CertificateSigningRequestCondition{
+			Type: certificatesv1.CertificateApproved,
 		}
+		certificateData = []byte(`issued certificate`)
 	}
 
-	csr := certificates.CertificateSigningRequest{
+	csr := certificatesv1.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: "fake-uid",
 		},
-		Status: certificates.CertificateSigningRequestStatus{
-			Conditions: []certificates.CertificateSigningRequestCondition{
+		Status: certificatesv1.CertificateSigningRequestStatus{
+			Conditions: []certificatesv1.CertificateSigningRequestCondition{
 				condition,
 			},
-			Certificate: []byte{},
+			Certificate: certificateData,
 		},
 	}
 	return &csr

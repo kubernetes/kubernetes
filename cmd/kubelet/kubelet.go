@@ -16,32 +16,23 @@ limitations under the License.
 
 // The kubelet binary is responsible for maintaining a set of containers on a particular host VM.
 // It syncs data from both configuration file(s) as well as from a quorum of etcd servers.
-// It then queries Docker to see what is currently running.  It synchronizes the configuration data,
-// with the running set of containers by starting or stopping Docker containers.
+// It then communicates with the container runtime (or a CRI shim for the runtime) to see what is
+// currently running.  It synchronizes the configuration data, with the running set of containers
+// by starting or stopping containers.
 package main
 
 import (
-	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
-	"k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/util/logs"
+	"k8s.io/component-base/cli"
+	_ "k8s.io/component-base/logs/json/register" // for JSON log format registration
+	_ "k8s.io/component-base/metrics/prometheus/restclient"
+	_ "k8s.io/component-base/metrics/prometheus/version" // for version metric registration
 	"k8s.io/kubernetes/cmd/kubelet/app"
-	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
-	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
-	command := app.NewKubeletCommand(server.SetupSignalHandler())
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
-	if err := command.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
+	command := app.NewKubeletCommand()
+	code := cli.Run(command)
+	os.Exit(code)
 }

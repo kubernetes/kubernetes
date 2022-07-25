@@ -47,6 +47,12 @@ func (r *REST) New() runtime.Object {
 	return &authorizationapi.SelfSubjectAccessReview{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *REST) Destroy() {
+	// Given no underlying store, we don't destroy anything
+	// here explicitly.
+}
+
 func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	selfSAR, ok := obj.(*authorizationapi.SelfSubjectAccessReview)
 	if !ok {
@@ -60,6 +66,12 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		return nil, apierrors.NewBadRequest("no user present on request")
 	}
 
+	if createValidation != nil {
+		if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
+	}
+
 	var authorizationAttributes authorizer.AttributesRecord
 	if selfSAR.Spec.ResourceAttributes != nil {
 		authorizationAttributes = authorizationutil.ResourceAttributesFrom(userToCheck, *selfSAR.Spec.ResourceAttributes)
@@ -67,7 +79,7 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 		authorizationAttributes = authorizationutil.NonResourceAttributesFrom(userToCheck, *selfSAR.Spec.NonResourceAttributes)
 	}
 
-	decision, reason, evaluationErr := r.authorizer.Authorize(authorizationAttributes)
+	decision, reason, evaluationErr := r.authorizer.Authorize(ctx, authorizationAttributes)
 
 	selfSAR.Status = authorizationapi.SubjectAccessReviewStatus{
 		Allowed: (decision == authorizer.DecisionAllow),

@@ -22,13 +22,11 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // PreconditionFunc returns true if the condition has been reached, false if it has not been reached yet,
@@ -95,6 +93,25 @@ func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions 
 	return lastEvent, nil
 }
 
+// Until wraps the watcherClient's watch function with RetryWatcher making sure that watcher gets restarted in case of errors.
+// The initialResourceVersion will be given to watch method when first called. It shall not be "" or "0"
+// given the underlying WATCH call issues (#74022).
+// Remaining behaviour is identical to function UntilWithoutRetry. (See above.)
+// Until can deal with API timeouts and lost connections.
+// It guarantees you to see all events and in the order they happened.
+// Due to this guarantee there is no way it can deal with 'Resource version too old error'. It will fail in this case.
+// (See `UntilWithSync` if you'd prefer to recover from all the errors including RV too old by re-listing
+//  those items. In normal code you should care about being level driven so you'd not care about not seeing all the edges.)
+// The most frequent usage for Until would be a test where you want to verify exact order of events ("edges").
+func Until(ctx context.Context, initialResourceVersion string, watcherClient cache.Watcher, conditions ...ConditionFunc) (*watch.Event, error) {
+	w, err := NewRetryWatcher(initialResourceVersion, watcherClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return UntilWithoutRetry(ctx, w, conditions...)
+}
+
 // UntilWithSync creates an informer from lw, optionally checks precondition when the store is synced,
 // and watches the output until each provided condition succeeds, in a way that is identical
 // to function UntilWithoutRetry. (See above.)
@@ -108,7 +125,10 @@ func UntilWithoutRetry(ctx context.Context, watcher watch.Interface, conditions 
 // The most frequent usage would be a command that needs to watch the "state of the world" and should't fail, like:
 // waiting for object reaching a state, "small" controllers, ...
 func UntilWithSync(ctx context.Context, lw cache.ListerWatcher, objType runtime.Object, precondition PreconditionFunc, conditions ...ConditionFunc) (*watch.Event, error) {
-	indexer, informer, watcher := NewIndexerInformerWatcher(lw, objType)
+	indexer, informer, watcher, done := NewIndexerInformerWatcher(lw, objType)
+	// We need to wait for the internal informers to fully stop so it's easier to reason about
+	// and it works with non-thread safe clients.
+	defer func() { <-done }()
 	// Proxy watcher can be stopped multiple times so it's fine to use defer here to cover alternative branches and
 	// let UntilWithoutRetry to stop it
 	defer watcher.Stop()
@@ -144,82 +164,4 @@ func ContextWithOptionalTimeout(parent context.Context, timeout time.Duration) (
 	}
 
 	return context.WithTimeout(parent, timeout)
-}
-
-// ListWatchUntil checks the provided conditions against the items returned by the list watcher, returning wait.ErrWaitTimeout
-// if timeout is exceeded without all conditions returning true, or an error if an error occurs.
-// TODO: check for watch expired error and retry watch from latest point?  Same issue exists for Until.
-// TODO: remove when no longer used
-//
-// Deprecated: Use UntilWithSync instead.
-func ListWatchUntil(timeout time.Duration, lw cache.ListerWatcher, conditions ...ConditionFunc) (*watch.Event, error) {
-	if len(conditions) == 0 {
-		return nil, nil
-	}
-
-	list, err := lw.List(metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	initialItems, err := meta.ExtractList(list)
-	if err != nil {
-		return nil, err
-	}
-
-	// use the initial items as simulated "adds"
-	var lastEvent *watch.Event
-	currIndex := 0
-	passedConditions := 0
-	for _, condition := range conditions {
-		// check the next condition against the previous event and short circuit waiting for the next watch
-		if lastEvent != nil {
-			done, err := condition(*lastEvent)
-			if err != nil {
-				return lastEvent, err
-			}
-			if done {
-				passedConditions = passedConditions + 1
-				continue
-			}
-		}
-
-	ConditionSucceeded:
-		for currIndex < len(initialItems) {
-			lastEvent = &watch.Event{Type: watch.Added, Object: initialItems[currIndex]}
-			currIndex++
-
-			done, err := condition(*lastEvent)
-			if err != nil {
-				return lastEvent, err
-			}
-			if done {
-				passedConditions = passedConditions + 1
-				break ConditionSucceeded
-			}
-		}
-	}
-	if passedConditions == len(conditions) {
-		return lastEvent, nil
-	}
-	remainingConditions := conditions[passedConditions:]
-
-	metaObj, err := meta.ListAccessor(list)
-	if err != nil {
-		return nil, err
-	}
-	currResourceVersion := metaObj.GetResourceVersion()
-
-	watchInterface, err := lw.Watch(metav1.ListOptions{ResourceVersion: currResourceVersion})
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, cancel := ContextWithOptionalTimeout(context.Background(), timeout)
-	defer cancel()
-	evt, err := UntilWithoutRetry(ctx, watchInterface, remainingConditions...)
-	if err == ErrWatchClosed {
-		// present a consistent error interface to callers
-		err = wait.ErrWaitTimeout
-	}
-	return evt, err
 }

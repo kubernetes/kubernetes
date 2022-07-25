@@ -1,0 +1,212 @@
+{
+  "kind": "PodStatusResult",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "nameValue",
+    "generateName": "generateNameValue",
+    "namespace": "namespaceValue",
+    "selfLink": "selfLinkValue",
+    "uid": "uidValue",
+    "resourceVersion": "resourceVersionValue",
+    "generation": 7,
+    "creationTimestamp": "2008-01-01T01:01:01Z",
+    "deletionTimestamp": "2009-01-01T01:01:01Z",
+    "deletionGracePeriodSeconds": 10,
+    "labels": {
+      "labelsKey": "labelsValue"
+    },
+    "annotations": {
+      "annotationsKey": "annotationsValue"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "apiVersionValue",
+        "kind": "kindValue",
+        "name": "nameValue",
+        "uid": "uidValue",
+        "controller": true,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "finalizers": [
+      "finalizersValue"
+    ],
+    "managedFields": [
+      {
+        "manager": "managerValue",
+        "operation": "operationValue",
+        "apiVersion": "apiVersionValue",
+        "time": "2004-01-01T01:01:01Z",
+        "fieldsType": "fieldsTypeValue",
+        "fieldsV1": {},
+        "subresource": "subresourceValue"
+      }
+    ]
+  },
+  "status": {
+    "phase": "phaseValue",
+    "conditions": [
+      {
+        "type": "typeValue",
+        "status": "statusValue",
+        "lastProbeTime": "2003-01-01T01:01:01Z",
+        "lastTransitionTime": "2004-01-01T01:01:01Z",
+        "reason": "reasonValue",
+        "message": "messageValue"
+      }
+    ],
+    "message": "messageValue",
+    "reason": "reasonValue",
+    "nominatedNodeName": "nominatedNodeNameValue",
+    "hostIP": "hostIPValue",
+    "podIP": "podIPValue",
+    "podIPs": [
+      {
+        "ip": "ipValue"
+      }
+    ],
+    "startTime": "2007-01-01T01:01:01Z",
+    "initContainerStatuses": [
+      {
+        "name": "nameValue",
+        "state": {
+          "waiting": {
+            "reason": "reasonValue",
+            "message": "messageValue"
+          },
+          "running": {
+            "startedAt": "2001-01-01T01:01:01Z"
+          },
+          "terminated": {
+            "exitCode": 1,
+            "signal": 2,
+            "reason": "reasonValue",
+            "message": "messageValue",
+            "startedAt": "2005-01-01T01:01:01Z",
+            "finishedAt": "2006-01-01T01:01:01Z",
+            "containerID": "containerIDValue"
+          }
+        },
+        "lastState": {
+          "waiting": {
+            "reason": "reasonValue",
+            "message": "messageValue"
+          },
+          "running": {
+            "startedAt": "2001-01-01T01:01:01Z"
+          },
+          "terminated": {
+            "exitCode": 1,
+            "signal": 2,
+            "reason": "reasonValue",
+            "message": "messageValue",
+            "startedAt": "2005-01-01T01:01:01Z",
+            "finishedAt": "2006-01-01T01:01:01Z",
+            "containerID": "containerIDValue"
+          }
+        },
+        "ready": true,
+        "restartCount": 5,
+        "image": "imageValue",
+        "imageID": "imageIDValue",
+        "containerID": "containerIDValue",
+        "started": true
+      }
+    ],
+    "containerStatuses": [
+      {
+        "name": "nameValue",
+        "state": {
+          "waiting": {
+            "reason": "reasonValue",
+            "message": "messageValue"
+          },
+          "running": {
+            "startedAt": "2001-01-01T01:01:01Z"
+          },
+          "terminated": {
+            "exitCode": 1,
+            "signal": 2,
+            "reason": "reasonValue",
+            "message": "messageValue",
+            "startedAt": "2005-01-01T01:01:01Z",
+            "finishedAt": "2006-01-01T01:01:01Z",
+            "containerID": "containerIDValue"
+          }
+        },
+        "lastState": {
+          "waiting": {
+            "reason": "reasonValue",
+            "message": "messageValue"
+          },
+          "running": {
+            "startedAt": "2001-01-01T01:01:01Z"
+          },
+          "terminated": {
+            "exitCode": 1,
+            "signal": 2,
+            "reason": "reasonValue",
+            "message": "messageValue",
+            "startedAt": "2005-01-01T01:01:01Z",
+            "finishedAt": "2006-01-01T01:01:01Z",
+            "containerID": "containerIDValue"
+          }
+        },
+        "ready": true,
+        "restartCount": 5,
+        "image": "imageValue",
+        "imageID": "imageIDValue",
+        "containerID": "containerIDValue",
+        "started": true
+      }
+    ],
+    "qosClass": "qosClassValue",
+    "ephemeralContainerStatuses": [
+      {
+        "name": "nameValue",
+        "state": {
+          "waiting": {
+            "reason": "reasonValue",
+            "message": "messageValue"
+          },
+          "running": {
+            "startedAt": "2001-01-01T01:01:01Z"
+          },
+          "terminated": {
+            "exitCode": 1,
+            "signal": 2,
+            "reason": "reasonValue",
+            "message": "messageValue",
+            "startedAt": "2005-01-01T01:01:01Z",
+            "finishedAt": "2006-01-01T01:01:01Z",
+            "containerID": "containerIDValue"
+          }
+        },
+        "lastState": {
+          "waiting": {
+            "reason": "reasonValue",
+            "message": "messageValue"
+          },
+          "running": {
+            "startedAt": "2001-01-01T01:01:01Z"
+          },
+          "terminated": {
+            "exitCode": 1,
+            "signal": 2,
+            "reason": "reasonValue",
+            "message": "messageValue",
+            "startedAt": "2005-01-01T01:01:01Z",
+            "finishedAt": "2006-01-01T01:01:01Z",
+            "containerID": "containerIDValue"
+          }
+        },
+        "ready": true,
+        "restartCount": 5,
+        "image": "imageValue",
+        "imageID": "imageIDValue",
+        "containerID": "containerIDValue",
+        "started": true
+      }
+    ]
+  }
+}

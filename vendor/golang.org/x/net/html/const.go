@@ -4,7 +4,7 @@
 
 package html
 
-// Section 12.2.3.2 of the HTML5 specification says "The following elements
+// Section 12.2.4.2 of the HTML5 specification says "The following elements
 // have varying levels of special parsing rules".
 // https://html.spec.whatwg.org/multipage/syntax.html#the-stack-of-open-elements
 var isSpecialElementMap = map[string]bool{
@@ -52,8 +52,7 @@ var isSpecialElementMap = map[string]bool{
 	"iframe":     true,
 	"img":        true,
 	"input":      true,
-	"isindex":    true, // The 'isindex' element has been removed, but keep it for backwards compatibility.
-	"keygen":     true,
+	"keygen":     true, // "keygen" has been removed from the spec, but are kept here for backwards compatibility.
 	"li":         true,
 	"link":       true,
 	"listing":    true,
@@ -97,8 +96,16 @@ func isSpecialElement(element *Node) bool {
 	switch element.Namespace {
 	case "", "html":
 		return isSpecialElementMap[element.Data]
+	case "math":
+		switch element.Data {
+		case "mi", "mo", "mn", "ms", "mtext", "annotation-xml":
+			return true
+		}
 	case "svg":
-		return element.Data == "foreignObject"
+		switch element.Data {
+		case "foreignObject", "desc", "title":
+			return true
+		}
 	}
 	return false
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"reflect"
 	"testing"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -30,12 +31,15 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
-func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
@@ -43,7 +47,10 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "persistentvolumeclaims",
 	}
-	persistentVolumeClaimStorage, statusStorage := NewREST(restOptions)
+	persistentVolumeClaimStorage, statusStorage, err := NewREST(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return persistentVolumeClaimStorage, statusStorage, server
 }
 
@@ -160,6 +167,9 @@ func TestUpdateStatus(t *testing.T) {
 	key, _ := storage.KeyFunc(ctx, "foo")
 	pvcStart := validNewPersistentVolumeClaim("foo", metav1.NamespaceDefault)
 	err := storage.Storage.Create(ctx, key, pvcStart, nil, 0, false)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	pvc := &api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -200,4 +210,96 @@ func TestShortNames(t *testing.T) {
 	defer storage.Store.DestroyFunc()
 	expected := []string{"pvc"}
 	registrytest.AssertShortNames(t, storage, expected)
+}
+
+func TestDefaultOnReadPvc(t *testing.T) {
+	storage, _, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+
+	dataSource := api.TypedLocalObjectReference{
+		Kind: "PersistentVolumeClaim",
+		Name: "my-pvc",
+	}
+
+	var tests = map[string]struct {
+		anyEnabled    bool
+		dataSource    bool
+		dataSourceRef bool
+		want          bool
+		wantRef       bool
+	}{
+		"any disabled with empty ds": {
+			anyEnabled: false,
+		},
+		"any disabled with volume ds": {
+			dataSource: true,
+			want:       true,
+		},
+		"any disabled with volume ds ref": {
+			dataSourceRef: true,
+			wantRef:       true,
+		},
+		"any disabled with both data sources": {
+			dataSource:    true,
+			dataSourceRef: true,
+			want:          true,
+			wantRef:       true,
+		},
+		"any enabled with empty ds": {
+			anyEnabled: true,
+		},
+		"any enabled with volume ds": {
+			anyEnabled: true,
+			dataSource: true,
+			want:       true,
+			wantRef:    true,
+		},
+		"any enabled with volume ds ref": {
+			anyEnabled:    true,
+			dataSourceRef: true,
+			want:          true,
+			wantRef:       true,
+		},
+		"any enabled with both data sources": {
+			anyEnabled:    true,
+			dataSource:    true,
+			dataSourceRef: true,
+			want:          true,
+			wantRef:       true,
+		},
+	}
+
+	for testName, test := range tests {
+		t.Run(testName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnyVolumeDataSource, test.anyEnabled)()
+			pvc := new(api.PersistentVolumeClaim)
+			if test.dataSource {
+				pvc.Spec.DataSource = dataSource.DeepCopy()
+			}
+			if test.dataSourceRef {
+				pvc.Spec.DataSourceRef = dataSource.DeepCopy()
+			}
+			var expectDataSource *api.TypedLocalObjectReference
+			if test.want {
+				expectDataSource = &dataSource
+			}
+			var expectDataSourceRef *api.TypedLocalObjectReference
+			if test.wantRef {
+				expectDataSourceRef = &dataSource
+			}
+
+			// Method under test
+			storage.defaultOnReadPvc(pvc)
+
+			if !reflect.DeepEqual(pvc.Spec.DataSource, expectDataSource) {
+				t.Errorf("data source does not match, test: %s, anyEnabled: %v, dataSource: %v, expected: %v",
+					testName, test.anyEnabled, test.dataSource, test.want)
+			}
+			if !reflect.DeepEqual(pvc.Spec.DataSourceRef, expectDataSourceRef) {
+				t.Errorf("data source ref does not match, test: %s, anyEnabled: %v, dataSourceRef: %v, expected: %v",
+					testName, test.anyEnabled, test.dataSourceRef, test.wantRef)
+			}
+		})
+	}
 }

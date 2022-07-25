@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/cadvisor/fs"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type FsHandler interface {
@@ -51,7 +51,6 @@ type realFsHandler struct {
 }
 
 const (
-	timeout          = 2 * time.Minute
 	maxBackoffFactor = 20
 )
 
@@ -74,17 +73,16 @@ func NewFsHandler(period time.Duration, rootfs, extraDir string, fsInfo fs.FsInf
 
 func (fh *realFsHandler) update() error {
 	var (
-		baseUsage, extraDirUsage, inodeUsage    uint64
-		rootDiskErr, rootInodeErr, extraDiskErr error
+		rootUsage, extraUsage fs.UsageInfo
+		rootErr, extraErr     error
 	)
 	// TODO(vishh): Add support for external mounts.
 	if fh.rootfs != "" {
-		baseUsage, rootDiskErr = fh.fsInfo.GetDirDiskUsage(fh.rootfs, timeout)
-		inodeUsage, rootInodeErr = fh.fsInfo.GetDirInodeUsage(fh.rootfs, timeout)
+		rootUsage, rootErr = fh.fsInfo.GetDirUsage(fh.rootfs)
 	}
 
 	if fh.extraDir != "" {
-		extraDirUsage, extraDiskErr = fh.fsInfo.GetDirDiskUsage(fh.extraDir, timeout)
+		extraUsage, extraErr = fh.fsInfo.GetDirUsage(fh.extraDir)
 	}
 
 	// Wait to handle errors until after all operartions are run.
@@ -92,48 +90,52 @@ func (fh *realFsHandler) update() error {
 	fh.Lock()
 	defer fh.Unlock()
 	fh.lastUpdate = time.Now()
-	if rootInodeErr == nil && fh.rootfs != "" {
-		fh.usage.InodeUsage = inodeUsage
+	if fh.rootfs != "" && rootErr == nil {
+		fh.usage.InodeUsage = rootUsage.Inodes
+		fh.usage.BaseUsageBytes = rootUsage.Bytes
+		fh.usage.TotalUsageBytes = rootUsage.Bytes
 	}
-	if rootDiskErr == nil && fh.rootfs != "" {
-		fh.usage.TotalUsageBytes = baseUsage + extraDirUsage
+	if fh.extraDir != "" && extraErr == nil {
+		if fh.rootfs != "" {
+			fh.usage.TotalUsageBytes += extraUsage.Bytes
+		} else {
+			// rootfs is empty, totalUsageBytes use extra usage bytes
+			fh.usage.TotalUsageBytes = extraUsage.Bytes
+		}
 	}
-	if extraDiskErr == nil && fh.extraDir != "" {
-		fh.usage.BaseUsageBytes = baseUsage
-	}
+
 	// Combine errors into a single error to return
-	if rootDiskErr != nil || rootInodeErr != nil || extraDiskErr != nil {
-		return fmt.Errorf("rootDiskErr: %v, rootInodeErr: %v, extraDiskErr: %v", rootDiskErr, rootInodeErr, extraDiskErr)
+	if rootErr != nil || extraErr != nil {
+		return fmt.Errorf("rootDiskErr: %v, extraDiskErr: %v", rootErr, extraErr)
 	}
 	return nil
 }
 
 func (fh *realFsHandler) trackUsage() {
-	fh.update()
 	longOp := time.Second
 	for {
+		start := time.Now()
+		if err := fh.update(); err != nil {
+			klog.Errorf("failed to collect filesystem stats - %v", err)
+			fh.period = fh.period * 2
+			if fh.period > maxBackoffFactor*fh.minPeriod {
+				fh.period = maxBackoffFactor * fh.minPeriod
+			}
+		} else {
+			fh.period = fh.minPeriod
+		}
+		duration := time.Since(start)
+		if duration > longOp {
+			// adapt longOp time so that message doesn't continue to print
+			// if the long duration is persistent either because of slow
+			// disk or lots of containers.
+			longOp = longOp + time.Second
+			klog.V(2).Infof("fs: disk usage and inodes count on following dirs took %v: %v; will not log again for this container unless duration exceeds %v", duration, []string{fh.rootfs, fh.extraDir}, longOp)
+		}
 		select {
 		case <-fh.stopChan:
 			return
 		case <-time.After(fh.period):
-			start := time.Now()
-			if err := fh.update(); err != nil {
-				klog.Errorf("failed to collect filesystem stats - %v", err)
-				fh.period = fh.period * 2
-				if fh.period > maxBackoffFactor*fh.minPeriod {
-					fh.period = maxBackoffFactor * fh.minPeriod
-				}
-			} else {
-				fh.period = fh.minPeriod
-			}
-			duration := time.Since(start)
-			if duration > longOp {
-				// adapt longOp time so that message doesn't continue to print
-				// if the long duration is persistent either because of slow
-				// disk or lots of containers.
-				longOp = longOp + time.Second
-				klog.V(2).Infof("du and find on following dirs took %v: %v; will not log again for this container unless duration exceeds %v", duration, []string{fh.rootfs, fh.extraDir}, longOp)
-			}
 		}
 	}
 }

@@ -17,10 +17,11 @@ limitations under the License.
 package cleaner
 
 import (
+	"context"
 	"testing"
 	"time"
 
-	capi "k8s.io/api/certificates/v1beta1"
+	capi "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -125,6 +126,38 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 			[]string{"delete"},
 		},
 		{
+			"no delete failed not passed deadline",
+			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
+			nil,
+			[]capi.CertificateSigningRequestCondition{
+				{
+					Type:           capi.CertificateApproved,
+					LastUpdateTime: metav1.NewTime(time.Now().Add(-2 * time.Hour)),
+				},
+				{
+					Type:           capi.CertificateFailed,
+					LastUpdateTime: metav1.NewTime(time.Now().Add(-50 * time.Minute)),
+				},
+			},
+			[]string{},
+		},
+		{
+			"delete failed passed deadline",
+			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
+			nil,
+			[]capi.CertificateSigningRequestCondition{
+				{
+					Type:           capi.CertificateApproved,
+					LastUpdateTime: metav1.NewTime(time.Now().Add(-2 * time.Hour)),
+				},
+				{
+					Type:           capi.CertificateFailed,
+					LastUpdateTime: metav1.NewTime(time.Now().Add(-2 * time.Hour)),
+				},
+			},
+			[]string{"delete"},
+		},
+		{
 			"no delete pending not passed deadline",
 			metav1.NewTime(time.Now().Add(-5 * time.Hour)),
 			nil,
@@ -162,6 +195,18 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 			},
 			[]string{"delete"},
 		},
+		{
+			"delete approved passed deadline unparseable",
+			metav1.NewTime(time.Now().Add(-1 * time.Minute)),
+			[]byte(`garbage`),
+			[]capi.CertificateSigningRequestCondition{
+				{
+					Type:           capi.CertificateApproved,
+					LastUpdateTime: metav1.NewTime(time.Now().Add(-2 * time.Hour)),
+				},
+			},
+			[]string{"delete"},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -179,10 +224,10 @@ func TestCleanerWithApprovedExpiredCSR(t *testing.T) {
 
 			client := fake.NewSimpleClientset(csr)
 			s := &CSRCleanerController{
-				csrClient: client.CertificatesV1beta1().CertificateSigningRequests(),
+				csrClient: client.CertificatesV1().CertificateSigningRequests(),
 			}
-
-			err := s.handle(csr)
+			ctx := context.TODO()
+			err := s.handle(ctx, csr)
 			if err != nil {
 				t.Fatalf("failed to clean CSR: %v", err)
 			}

@@ -17,9 +17,7 @@ limitations under the License.
 package server
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -36,31 +34,35 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/remotecommand"
-	utiltesting "k8s.io/client-go/util/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	"k8s.io/utils/pointer"
 
 	// Do some initialization to decode the query parameters correctly.
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
-	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
+	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
-	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -103,6 +105,10 @@ func (fk *fakeKubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	return fk.podByNameFunc(namespace, name)
 }
 
+func (fk *fakeKubelet) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+	return map[string]*cadvisorapi.ContainerInfo{}, nil
+}
+
 func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
 	return fk.containerInfoFunc(podFullName, uid, containerName, req)
 }
@@ -115,7 +121,7 @@ func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error) 
 	return fk.machineInfoFunc()
 }
 
-func (_ *fakeKubelet) GetVersionInfo() (*cadvisorapi.VersionInfo, error) {
+func (*fakeKubelet) GetVersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return &cadvisorapi.VersionInfo{}, nil
 }
 
@@ -141,6 +147,13 @@ func (fk *fakeKubelet) GetHostname() string {
 
 func (fk *fakeKubelet) RunInContainer(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
 	return fk.runFunc(podFullName, uid, containerName, cmd)
+}
+
+func (fk *fakeKubelet) CheckpointContainer(podUID types.UID, podFullName, containerName string, options *runtimeapi.CheckpointContainerRequest) error {
+	if containerName == "checkpointingFailure" {
+		return fmt.Errorf("Returning error for test")
+	}
+	return nil
 }
 
 type fakeRuntime struct {
@@ -249,23 +262,28 @@ func (fk *fakeKubelet) GetPortForward(podName, podNamespace string, podUID types
 }
 
 // Unused functions
-func (_ *fakeKubelet) GetNode() (*v1.Node, error)                       { return nil, nil }
-func (_ *fakeKubelet) GetNodeConfig() cm.NodeConfig                     { return cm.NodeConfig{} }
-func (_ *fakeKubelet) GetPodCgroupRoot() string                         { return "" }
-func (_ *fakeKubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) { return nil, false }
+func (*fakeKubelet) GetNode() (*v1.Node, error)                       { return nil, nil }
+func (*fakeKubelet) GetNodeConfig() cm.NodeConfig                     { return cm.NodeConfig{} }
+func (*fakeKubelet) GetPodCgroupRoot() string                         { return "" }
+func (*fakeKubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) { return nil, false }
 func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool) {
 	return map[string]volume.Volume{}, true
 }
-
-func (_ *fakeKubelet) RootFsStats() (*statsapi.FsStats, error)                { return nil, nil }
-func (_ *fakeKubelet) ListPodStats() ([]statsapi.PodStats, error)             { return nil, nil }
-func (_ *fakeKubelet) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) { return nil, nil }
-func (_ *fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)               { return nil, nil }
-func (_ *fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)            { return nil, nil }
-func (_ *fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+func (*fakeKubelet) ListBlockVolumesForPod(podUID types.UID) (map[string]volume.BlockVolume, bool) {
+	return map[string]volume.BlockVolume{}, true
+}
+func (*fakeKubelet) RootFsStats() (*statsapi.FsStats, error)    { return nil, nil }
+func (*fakeKubelet) ListPodStats() ([]statsapi.PodStats, error) { return nil, nil }
+func (*fakeKubelet) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+	return nil, nil
+}
+func (*fakeKubelet) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) { return nil, nil }
+func (*fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)               { return nil, nil }
+func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)            { return nil, nil }
+func (*fakeKubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	return nil, nil, nil
 }
-func (_ *fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
+func (*fakeKubelet) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, error) {
 	return nil, nil
 }
 
@@ -281,25 +299,33 @@ func (f *fakeAuth) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 func (f *fakeAuth) GetRequestAttributes(u user.Info, req *http.Request) authorizer.Attributes {
 	return f.attributesFunc(u, req)
 }
-func (f *fakeAuth) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+func (f *fakeAuth) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return f.authorizeFunc(a)
 }
 
 type serverTestFramework struct {
-	serverUnderTest         *Server
-	fakeKubelet             *fakeKubelet
-	fakeAuth                *fakeAuth
-	testHTTPServer          *httptest.Server
-	fakeRuntime             *fakeRuntime
-	testStreamingHTTPServer *httptest.Server
-	criHandler              *utiltesting.FakeHandler
+	serverUnderTest *Server
+	fakeKubelet     *fakeKubelet
+	fakeAuth        *fakeAuth
+	testHTTPServer  *httptest.Server
 }
 
 func newServerTest() *serverTestFramework {
-	return newServerTestWithDebug(true, false, nil)
+	return newServerTestWithDebug(true, nil)
 }
 
-func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, streamingServer streaming.Server) *serverTestFramework {
+func newServerTestWithDebug(enableDebugging bool, streamingServer streaming.Server) *serverTestFramework {
+	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+		EnableDebuggingHandlers: enableDebugging,
+		EnableSystemLogHandler:  enableDebugging,
+		EnableProfilingHandler:  enableDebugging,
+		EnableDebugFlagsHandler: enableDebugging,
+	}
+	return newServerTestWithDebuggingHandlers(kubeCfg, streamingServer)
+}
+
+func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletConfiguration, streamingServer streaming.Server) *serverTestFramework {
+
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
 		hostnameFunc: func() string {
@@ -328,17 +354,12 @@ func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, st
 			return authorizer.DecisionAllow, "", nil
 		},
 	}
-	fw.criHandler = &utiltesting.FakeHandler{
-		StatusCode: http.StatusOK,
-	}
 	server := NewServer(
 		fw.fakeKubelet,
-		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute),
+		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
 		fw.fakeAuth,
-		enableDebugging,
-		false,
-		redirectContainerStreaming,
-		fw.criHandler)
+		kubeCfg,
+	)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
@@ -350,185 +371,6 @@ func getPodName(name, namespace string) string {
 		namespace = metav1.NamespaceDefault
 	}
 	return name + "_" + namespace
-}
-
-func TestContainerInfo(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	expectedInfo := &cadvisorapi.ContainerInfo{}
-	podID := "somepod"
-	expectedPodID := getPodName(podID, "")
-	expectedContainerName := "goodcontainer"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-		if podID != expectedPodID || containerName != expectedContainerName {
-			return nil, fmt.Errorf("bad podID or containerName: podID=%v; containerName=%v", podID, containerName)
-		}
-		return expectedInfo, nil
-	}
-
-	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v", podID, expectedContainerName))
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	var receivedInfo cadvisorapi.ContainerInfo
-	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
-	if err != nil {
-		t.Fatalf("received invalid json data: %v", err)
-	}
-	if !receivedInfo.Eq(expectedInfo) {
-		t.Errorf("received wrong data: %#v", receivedInfo)
-	}
-}
-
-func TestContainerInfoWithUidNamespace(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	expectedInfo := &cadvisorapi.ContainerInfo{}
-	podID := "somepod"
-	expectedNamespace := "custom"
-	expectedPodID := getPodName(podID, expectedNamespace)
-	expectedContainerName := "goodcontainer"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-		if podID != expectedPodID || string(uid) != testUID || containerName != expectedContainerName {
-			return nil, fmt.Errorf("bad podID or uid or containerName: podID=%v; uid=%v; containerName=%v", podID, uid, containerName)
-		}
-		return expectedInfo, nil
-	}
-
-	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v/%v/%v", expectedNamespace, podID, testUID, expectedContainerName))
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	var receivedInfo cadvisorapi.ContainerInfo
-	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
-	if err != nil {
-		t.Fatalf("received invalid json data: %v", err)
-	}
-	if !receivedInfo.Eq(expectedInfo) {
-		t.Errorf("received wrong data: %#v", receivedInfo)
-	}
-}
-
-func TestContainerNotFound(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	podID := "somepod"
-	expectedNamespace := "custom"
-	expectedContainerName := "slowstartcontainer"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-		return nil, kubecontainer.ErrContainerNotFound
-	}
-	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v/%v/%v", expectedNamespace, podID, testUID, expectedContainerName))
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("Received status %d expecting %d", resp.StatusCode, http.StatusNotFound)
-	}
-	defer resp.Body.Close()
-}
-
-func TestRootInfo(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	expectedInfo := &cadvisorapi.ContainerInfo{
-		ContainerReference: cadvisorapi.ContainerReference{
-			Name: "/",
-		},
-	}
-	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
-		return map[string]*cadvisorapi.ContainerInfo{
-			expectedInfo.Name: expectedInfo,
-		}, nil
-	}
-
-	resp, err := http.Get(fw.testHTTPServer.URL + "/stats")
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	var receivedInfo cadvisorapi.ContainerInfo
-	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
-	if err != nil {
-		t.Fatalf("received invalid json data: %v", err)
-	}
-	if !receivedInfo.Eq(expectedInfo) {
-		t.Errorf("received wrong data: %#v, expected %#v", receivedInfo, expectedInfo)
-	}
-}
-
-func TestSubcontainerContainerInfo(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	const kubeletContainer = "/kubelet"
-	const kubeletSubContainer = "/kubelet/sub"
-	expectedInfo := map[string]*cadvisorapi.ContainerInfo{
-		kubeletContainer: {
-			ContainerReference: cadvisorapi.ContainerReference{
-				Name: kubeletContainer,
-			},
-		},
-		kubeletSubContainer: {
-			ContainerReference: cadvisorapi.ContainerReference{
-				Name: kubeletSubContainer,
-			},
-		},
-	}
-	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
-		return expectedInfo, nil
-	}
-
-	request := fmt.Sprintf("{\"containerName\":%q, \"subcontainers\": true}", kubeletContainer)
-	resp, err := http.Post(fw.testHTTPServer.URL+"/stats/container", "application/json", bytes.NewBuffer([]byte(request)))
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	var receivedInfo map[string]*cadvisorapi.ContainerInfo
-	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
-	if err != nil {
-		t.Fatalf("Received invalid json data: %v", err)
-	}
-	if len(receivedInfo) != len(expectedInfo) {
-		t.Errorf("Received wrong data: %#v, expected %#v", receivedInfo, expectedInfo)
-	}
-
-	for _, containerName := range []string{kubeletContainer, kubeletSubContainer} {
-		if _, ok := receivedInfo[containerName]; !ok {
-			t.Errorf("Expected container %q to be present in result: %#v", containerName, receivedInfo)
-		}
-		if !receivedInfo[containerName].Eq(expectedInfo[containerName]) {
-			t.Errorf("Invalid result for %q: Expected %#v, received %#v", containerName, expectedInfo[containerName], receivedInfo[containerName])
-		}
-	}
-}
-
-func TestMachineInfo(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	expectedInfo := &cadvisorapi.MachineInfo{
-		NumCores:       4,
-		MemoryCapacity: 1024,
-	}
-	fw.fakeKubelet.machineInfoFunc = func() (*cadvisorapi.MachineInfo, error) {
-		return expectedInfo, nil
-	}
-
-	resp, err := http.Get(fw.testHTTPServer.URL + "/spec")
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	var receivedInfo cadvisorapi.MachineInfo
-	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
-	if err != nil {
-		t.Fatalf("received invalid json data: %v", err)
-	}
-	if !reflect.DeepEqual(&receivedInfo, expectedInfo) {
-		t.Errorf("received wrong data: %#v", receivedInfo)
-	}
 }
 
 func TestServeLogs(t *testing.T) {
@@ -628,7 +470,6 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 	}
 
 	resp, err := http.Post(fw.testHTTPServer.URL+"/run/"+podNamespace+"/"+podName+"/"+testUID+"/"+expectedContainerName+"?cmd=ls%20-a", "", nil)
-
 	if err != nil {
 		t.Fatalf("Got error POSTing: %v", err)
 	}
@@ -673,149 +514,93 @@ func assertHealthFails(t *testing.T, httpURL string, expectedErrorCode int) {
 	}
 }
 
-type authTestCase struct {
-	Method string
-	Path   string
-}
-
-func TestAuthFilters(t *testing.T) {
+// Ensure all registered handlers & services have an associated testcase.
+func TestAuthzCoverage(t *testing.T) {
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
 
-	testcases := []authTestCase{}
-
-	// This is a sanity check that the Handle->HandleWithFilter() delegation is working
-	// Ideally, these would move to registered web services and this list would get shorter
-	expectedPaths := []string{"/healthz", "/metrics", "/metrics/cadvisor"}
-	paths := sets.NewString(fw.serverUnderTest.restfulCont.RegisteredHandlePaths()...)
-	for _, expectedPath := range expectedPaths {
-		if !paths.Has(expectedPath) {
-			t.Errorf("Expected registered handle path %s was missing", expectedPath)
-		}
-	}
+	// method:path -> has coverage
+	expectedCases := map[string]bool{}
 
 	// Test all the non-web-service handlers
 	for _, path := range fw.serverUnderTest.restfulCont.RegisteredHandlePaths() {
-		testcases = append(testcases, authTestCase{"GET", path})
-		testcases = append(testcases, authTestCase{"POST", path})
-		// Test subpaths for directory handlers
-		if strings.HasSuffix(path, "/") {
-			testcases = append(testcases, authTestCase{"GET", path + "foo"})
-			testcases = append(testcases, authTestCase{"POST", path + "foo"})
-		}
+		expectedCases["GET:"+path] = false
+		expectedCases["POST:"+path] = false
 	}
 
 	// Test all the generated web-service paths
 	for _, ws := range fw.serverUnderTest.restfulCont.RegisteredWebServices() {
 		for _, r := range ws.Routes() {
-			testcases = append(testcases, authTestCase{r.Method, r.Path})
+			expectedCases[r.Method+":"+r.Path] = false
 		}
 	}
 
-	methodToAPIVerb := map[string]string{"GET": "get", "POST": "create", "PUT": "update"}
-	pathToSubresource := func(path string) string {
-		switch {
-		// Cases for subpaths we expect specific subresources for
-		case isSubpath(path, statsPath):
-			return "stats"
-		case isSubpath(path, specPath):
-			return "spec"
-		case isSubpath(path, logsPath):
-			return "log"
-		case isSubpath(path, metricsPath):
-			return "metrics"
-
-		// Cases for subpaths we expect to map to the "proxy" subresource
-		case isSubpath(path, "/attach"),
-			isSubpath(path, "/configz"),
-			isSubpath(path, "/containerLogs"),
-			isSubpath(path, "/debug"),
-			isSubpath(path, "/exec"),
-			isSubpath(path, "/healthz"),
-			isSubpath(path, "/pods"),
-			isSubpath(path, "/portForward"),
-			isSubpath(path, "/run"),
-			isSubpath(path, "/runningpods"),
-			isSubpath(path, "/cri"):
-			return "proxy"
-
-		default:
-			panic(fmt.Errorf(`unexpected kubelet API path %s.
-The kubelet API has likely registered a handler for a new path.
-If the new path has a use case for partitioned authorization when requested from the kubelet API,
-add a specific subresource for it in auth.go#GetRequestAttributes() and in TestAuthFilters().
-Otherwise, add it to the expected list of paths that map to the "proxy" subresource in TestAuthFilters().`, path))
+	// This is a sanity check that the Handle->HandleWithFilter() delegation is working
+	// Ideally, these would move to registered web services and this list would get shorter
+	expectedPaths := []string{"/healthz", "/metrics", "/metrics/cadvisor"}
+	for _, expectedPath := range expectedPaths {
+		if _, expected := expectedCases["GET:"+expectedPath]; !expected {
+			t.Errorf("Expected registered handle path %s was missing", expectedPath)
 		}
 	}
-	attributesGetter := NewNodeAuthorizerAttributesGetter(types.NodeName("test"))
 
-	for _, tc := range testcases {
-		var (
-			expectedUser       = &user.DefaultInfo{Name: "test"}
-			expectedAttributes = authorizer.AttributesRecord{
-				User:            expectedUser,
-				APIGroup:        "",
-				APIVersion:      "v1",
-				Verb:            methodToAPIVerb[tc.Method],
-				Resource:        "nodes",
-				Name:            "test",
-				Subresource:     pathToSubresource(tc.Path),
-				ResourceRequest: true,
-				Path:            tc.Path,
+	for _, tc := range AuthzTestCases() {
+		expectedCases[tc.Method+":"+tc.Path] = true
+	}
+
+	for tc, found := range expectedCases {
+		if !found {
+			t.Errorf("Missing authz test case for %s", tc)
+		}
+	}
+}
+
+func TestAuthFilters(t *testing.T) {
+	// Enable features.ContainerCheckpoint during test
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
+
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	attributesGetter := NewNodeAuthorizerAttributesGetter(authzTestNodeName)
+
+	for _, tc := range AuthzTestCases() {
+		t.Run(tc.Method+":"+tc.Path, func(t *testing.T) {
+			var (
+				expectedUser = AuthzTestUser()
+
+				calledAuthenticate = false
+				calledAuthorize    = false
+				calledAttributes   = false
+			)
+
+			fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
+				calledAuthenticate = true
+				return &authenticator.Response{User: expectedUser}, true, nil
+			}
+			fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+				calledAttributes = true
+				require.Equal(t, expectedUser, u)
+				return attributesGetter.GetRequestAttributes(u, req)
+			}
+			fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
+				calledAuthorize = true
+				tc.AssertAttributes(t, a)
+				return authorizer.DecisionNoOpinion, "", nil
 			}
 
-			calledAuthenticate = false
-			calledAuthorize    = false
-			calledAttributes   = false
-		)
+			req, err := http.NewRequest(tc.Method, fw.testHTTPServer.URL+tc.Path, nil)
+			require.NoError(t, err)
 
-		fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
-			calledAuthenticate = true
-			return &authenticator.Response{User: expectedUser}, true, nil
-		}
-		fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
-			calledAttributes = true
-			if u != expectedUser {
-				t.Fatalf("%s: expected user %v, got %v", tc.Path, expectedUser, u)
-			}
-			return attributesGetter.GetRequestAttributes(u, req)
-		}
-		fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
-			calledAuthorize = true
-			if a != expectedAttributes {
-				t.Fatalf("%s: expected attributes\n\t%#v\ngot\n\t%#v", tc.Path, expectedAttributes, a)
-			}
-			return authorizer.DecisionNoOpinion, "", nil
-		}
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
 
-		req, err := http.NewRequest(tc.Method, fw.testHTTPServer.URL+tc.Path, nil)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.Path, err)
-			continue
-		}
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.Path, err)
-			continue
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusForbidden {
-			t.Errorf("%s: unexpected status code %d", tc.Path, resp.StatusCode)
-			continue
-		}
-
-		if !calledAuthenticate {
-			t.Errorf("%s: Authenticate was not called", tc.Path)
-			continue
-		}
-		if !calledAttributes {
-			t.Errorf("%s: Attributes were not called", tc.Path)
-			continue
-		}
-		if !calledAuthorize {
-			t.Errorf("%s: Authorize was not called", tc.Path)
-			continue
-		}
+			assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+			assert.True(t, calledAuthenticate, "Authenticate was not called")
+			assert.True(t, calledAttributes, "Attributes were not called")
+			assert.True(t, calledAuthorize, "Authorize was not called")
+		})
 	}
 }
 
@@ -1006,110 +791,45 @@ func setGetContainerLogsFunc(fw *serverTestFramework, t *testing.T, expectedPodN
 	}
 }
 
-// TODO: I really want to be a table driven test
 func TestContainerLogs(t *testing.T) {
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
-	output := "foo bar"
-	podNamespace := "other"
-	podName := "foo"
-	expectedPodName := getPodName(podName, podNamespace)
-	expectedContainerName := "baz"
-	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
-	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{}, output)
-	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName)
-	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Errorf("Error reading container logs: %v", err)
+	tests := map[string]struct {
+		query        string
+		podLogOption *v1.PodLogOptions
+	}{
+		"without tail":     {"", &v1.PodLogOptions{}},
+		"with tail":        {"?tailLines=5", &v1.PodLogOptions{TailLines: pointer.Int64Ptr(5)}},
+		"with legacy tail": {"?tail=5", &v1.PodLogOptions{TailLines: pointer.Int64Ptr(5)}},
+		"with tail all":    {"?tail=all", &v1.PodLogOptions{}},
+		"with follow":      {"?follow=1", &v1.PodLogOptions{Follow: true}},
 	}
-	result := string(body)
-	if result != output {
-		t.Errorf("Expected: '%v', got: '%v'", output, result)
-	}
-}
 
-func TestContainerLogsWithTail(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	output := "foo bar"
-	podNamespace := "other"
-	podName := "foo"
-	expectedPodName := getPodName(podName, podNamespace)
-	expectedContainerName := "baz"
-	expectedTail := int64(5)
-	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
-	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{TailLines: &expectedTail}, output)
-	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?tailLines=5")
-	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
+	for desc, test := range tests {
+		t.Run(desc, func(t *testing.T) {
+			output := "foo bar"
+			podNamespace := "other"
+			podName := "foo"
+			expectedPodName := getPodName(podName, podNamespace)
+			expectedContainerName := "baz"
+			setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+			setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, test.podLogOption, output)
+			resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + test.query)
+			if err != nil {
+				t.Errorf("Got error GETing: %v", err)
+			}
+			defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Errorf("Error reading container logs: %v", err)
-	}
-	result := string(body)
-	if result != output {
-		t.Errorf("Expected: '%v', got: '%v'", output, result)
-	}
-}
-
-func TestContainerLogsWithLegacyTail(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	output := "foo bar"
-	podNamespace := "other"
-	podName := "foo"
-	expectedPodName := getPodName(podName, podNamespace)
-	expectedContainerName := "baz"
-	expectedTail := int64(5)
-	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
-	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{TailLines: &expectedTail}, output)
-	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?tail=5")
-	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Errorf("Error reading container logs: %v", err)
-	}
-	result := string(body)
-	if result != output {
-		t.Errorf("Expected: '%v', got: '%v'", output, result)
-	}
-}
-
-func TestContainerLogsWithTailAll(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	output := "foo bar"
-	podNamespace := "other"
-	podName := "foo"
-	expectedPodName := getPodName(podName, podNamespace)
-	expectedContainerName := "baz"
-	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
-	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{}, output)
-	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?tail=all")
-	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Errorf("Error reading container logs: %v", err)
-	}
-	result := string(body)
-	if result != output {
-		t.Errorf("Expected: '%v', got: '%v'", output, result)
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				t.Errorf("Error reading container logs: %v", err)
+			}
+			result := string(body)
+			if result != output {
+				t.Errorf("Expected: '%v', got: '%v'", output, result)
+			}
+		})
 	}
 }
 
@@ -1133,37 +853,93 @@ func TestContainerLogsWithInvalidTail(t *testing.T) {
 	}
 }
 
-func TestContainerLogsWithFollow(t *testing.T) {
+func TestCheckpointContainer(t *testing.T) {
+	// Enable features.ContainerCheckpoint during test
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)()
+
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
-	output := "foo bar"
 	podNamespace := "other"
 	podName := "foo"
-	expectedPodName := getPodName(podName, podNamespace)
 	expectedContainerName := "baz"
+	// GetPodByName() should always fail
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+		return nil, false
+	}
+	t.Run("wrong pod namespace", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/"+expectedContainerName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Unexpected non-error checkpointing container: %#v", resp)
+		}
+	})
+	// let GetPodByName() return a result, but our container "wrongContainerName" is not part of the Pod
 	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
-	setGetContainerLogsFunc(fw, t, expectedPodName, expectedContainerName, &v1.PodLogOptions{Follow: true}, output)
-	resp, err := http.Get(fw.testHTTPServer.URL + "/containerLogs/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?follow=1")
-	if err != nil {
-		t.Errorf("Got error GETing: %v", err)
+	t.Run("wrong container name", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/wrongContainerName", "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Unexpected non-error checkpointing container: %#v", resp)
+		}
+	})
+	// Now the checkpointing of the container fails
+	fw.fakeKubelet.podByNameFunc = func(namespace, name string) (*v1.Pod, bool) {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: podNamespace,
+				Name:      podName,
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "checkpointingFailure",
+					},
+				},
+			},
+		}, true
 	}
-	defer resp.Body.Close()
+	t.Run("checkpointing fails", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/checkpointingFailure", "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		defer resp.Body.Close()
+		assert.Equal(t, resp.StatusCode, 500)
+		body, _ := ioutil.ReadAll(resp.Body)
+		assert.Equal(t, string(body), "checkpointing of other/foo/checkpointingFailure failed (Returning error for test)")
+	})
+	// Now test a successful checkpoint succeeds
+	setPodByNameFunc(fw, podNamespace, podName, expectedContainerName)
+	t.Run("checkpointing succeeds", func(t *testing.T) {
+		resp, err := http.Post(fw.testHTTPServer.URL+"/checkpoint/"+podNamespace+"/"+podName+"/"+expectedContainerName, "", nil)
+		if err != nil {
+			t.Errorf("Got error POSTing: %v", err)
+		}
+		assert.Equal(t, resp.StatusCode, 200)
+	})
+}
 
-	body, err := ioutil.ReadAll(resp.Body)
+func makeReq(t *testing.T, method, url, clientProtocol string) *http.Request {
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
-		t.Errorf("Error reading container logs: %v", err)
+		t.Fatalf("error creating request: %v", err)
 	}
-	result := string(body)
-	if result != output {
-		t.Errorf("Expected: '%v', got: '%v'", output, result)
-	}
+	req.Header.Set("Content-Type", "")
+	req.Header.Add("X-Stream-Protocol-Version", clientProtocol)
+	return req
 }
 
 func TestServeExecInContainerIdleTimeout(t *testing.T) {
 	ss, err := newTestStreamingServer(100 * time.Millisecond)
 	require.NoError(t, err)
 	defer ss.testHTTPServer.Close()
-	fw := newServerTestWithDebug(true, false, ss)
+	fw := newServerTestWithDebug(true, ss)
 	defer fw.testHTTPServer.Close()
 
 	podNamespace := "other"
@@ -1172,10 +948,10 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/exec/" + podNamespace + "/" + podName + "/" + expectedContainerName + "?c=ls&c=-a&" + api.ExecStdinParam + "=1"
 
-	upgradeRoundTripper := spdy.NewSpdyRoundTripper(nil, true, true)
+	upgradeRoundTripper := spdy.NewRoundTripper(nil)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
-	resp, err := c.Post(url, "", nil)
+	resp, err := c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
 	if err != nil {
 		t.Fatalf("Got error POSTing: %v", err)
 	}
@@ -1204,26 +980,23 @@ func testExecAttach(t *testing.T, verb string) {
 		tty                bool
 		responseStatusCode int
 		uid                bool
-		redirect           bool
 	}{
 		"no input or output":           {responseStatusCode: http.StatusBadRequest},
 		"stdin":                        {stdin: true, responseStatusCode: http.StatusSwitchingProtocols},
 		"stdout":                       {stdout: true, responseStatusCode: http.StatusSwitchingProtocols},
 		"stderr":                       {stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
 		"stdout and stderr":            {stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
-		"stdout stderr and tty":        {stdout: true, stderr: true, tty: true, responseStatusCode: http.StatusSwitchingProtocols},
 		"stdin stdout and stderr":      {stdin: true, stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
 		"stdin stdout stderr with uid": {stdin: true, stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols, uid: true},
-		"stdout with redirect":         {stdout: true, responseStatusCode: http.StatusFound, redirect: true},
 	}
 
-	for desc, test := range tests {
-		test := test
+	for desc := range tests {
+		test := tests[desc]
 		t.Run(desc, func(t *testing.T) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
 			defer ss.testHTTPServer.Close()
-			fw := newServerTestWithDebug(true, test.redirect, ss)
+			fw := newServerTestWithDebug(true, ss)
 			defer fw.testHTTPServer.Close()
 			fmt.Println(desc)
 
@@ -1331,18 +1104,10 @@ func testExecAttach(t *testing.T, verb string) {
 				upgradeRoundTripper httpstream.UpgradeRoundTripper
 				c                   *http.Client
 			)
-			if test.redirect {
-				c = &http.Client{}
-				// Don't follow redirects, since we want to inspect the redirect response.
-				c.CheckRedirect = func(*http.Request, []*http.Request) error {
-					return http.ErrUseLastResponse
-				}
-			} else {
-				upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
-				c = &http.Client{Transport: upgradeRoundTripper}
-			}
+			upgradeRoundTripper = spdy.NewRoundTripper(nil)
+			c = &http.Client{Transport: upgradeRoundTripper}
 
-			resp, err = c.Post(url, "", nil)
+			resp, err = c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
 			require.NoError(t, err, "POSTing")
 			defer resp.Body.Close()
 
@@ -1427,7 +1192,7 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 	ss, err := newTestStreamingServer(100 * time.Millisecond)
 	require.NoError(t, err)
 	defer ss.testHTTPServer.Close()
-	fw := newServerTestWithDebug(true, false, ss)
+	fw := newServerTestWithDebug(true, ss)
 	defer fw.testHTTPServer.Close()
 
 	podNamespace := "other"
@@ -1435,10 +1200,11 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 
 	url := fw.testHTTPServer.URL + "/portForward/" + podNamespace + "/" + podName
 
-	upgradeRoundTripper := spdy.NewRoundTripper(nil, true, true)
+	upgradeRoundTripper := spdy.NewRoundTripper(nil)
 	c := &http.Client{Transport: upgradeRoundTripper}
 
-	resp, err := c.Post(url, "", nil)
+	req := makeReq(t, "POST", url, "portforward.k8s.io")
+	resp, err := c.Do(req)
 	if err != nil {
 		t.Fatalf("Got error POSTing: %v", err)
 	}
@@ -1462,7 +1228,6 @@ func TestServePortForward(t *testing.T) {
 		uid           bool
 		clientData    string
 		containerData string
-		redirect      bool
 		shouldError   bool
 	}{
 		"no port":                       {port: "", shouldError: true},
@@ -1475,19 +1240,18 @@ func TestServePortForward(t *testing.T) {
 		"normal port with data forward": {port: "8000", clientData: "client data", containerData: "container data", shouldError: false},
 		"max port":                      {port: "65535", shouldError: false},
 		"normal port with uid":          {port: "8000", uid: true, shouldError: false},
-		"normal port with redirect":     {port: "8000", redirect: true, shouldError: false},
 	}
 
 	podNamespace := "other"
 	podName := "foo"
 
-	for desc, test := range tests {
-		test := test
+	for desc := range tests {
+		test := tests[desc]
 		t.Run(desc, func(t *testing.T) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
 			defer ss.testHTTPServer.Close()
-			fw := newServerTestWithDebug(true, test.redirect, ss)
+			fw := newServerTestWithDebug(true, ss)
 			defer fw.testHTTPServer.Close()
 
 			portForwardFuncDone := make(chan struct{})
@@ -1535,27 +1299,15 @@ func TestServePortForward(t *testing.T) {
 				c                   *http.Client
 			)
 
-			if test.redirect {
-				c = &http.Client{}
-				// Don't follow redirects, since we want to inspect the redirect response.
-				c.CheckRedirect = func(*http.Request, []*http.Request) error {
-					return http.ErrUseLastResponse
-				}
-			} else {
-				upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
-				c = &http.Client{Transport: upgradeRoundTripper}
-			}
+			upgradeRoundTripper = spdy.NewRoundTripper(nil)
+			c = &http.Client{Transport: upgradeRoundTripper}
 
-			resp, err := c.Post(url, "", nil)
+			req := makeReq(t, "POST", url, "portforward.k8s.io")
+			resp, err := c.Do(req)
 			require.NoError(t, err, "POSTing")
 			defer resp.Body.Close()
 
-			if test.redirect {
-				assert.Equal(t, http.StatusFound, resp.StatusCode, "status code")
-				return
-			} else {
-				assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "status code")
-			}
+			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "status code")
 
 			conn, err := upgradeRoundTripper.NewConnection(resp)
 			require.NoError(t, err, "creating streaming connection")
@@ -1593,24 +1345,81 @@ func TestServePortForward(t *testing.T) {
 	}
 }
 
-func TestCRIHandler(t *testing.T) {
+func TestMetricBuckets(t *testing.T) {
+	tests := map[string]struct {
+		url    string
+		bucket string
+	}{
+		"healthz endpoint":                {url: "/healthz", bucket: "healthz"},
+		"attach":                          {url: "/attach/podNamespace/podID/containerName", bucket: "attach"},
+		"attach with uid":                 {url: "/attach/podNamespace/podID/uid/containerName", bucket: "attach"},
+		"configz":                         {url: "/configz", bucket: "configz"},
+		"containerLogs":                   {url: "/containerLogs/podNamespace/podID/containerName", bucket: "containerLogs"},
+		"debug v flags":                   {url: "/debug/flags/v", bucket: "debug"},
+		"pprof with sub":                  {url: "/debug/pprof/subpath", bucket: "debug"},
+		"exec":                            {url: "/exec/podNamespace/podID/containerName", bucket: "exec"},
+		"exec with uid":                   {url: "/exec/podNamespace/podID/uid/containerName", bucket: "exec"},
+		"healthz":                         {url: "/healthz/", bucket: "healthz"},
+		"healthz log sub":                 {url: "/healthz/log", bucket: "healthz"},
+		"healthz ping":                    {url: "/healthz/ping", bucket: "healthz"},
+		"healthz sync loop":               {url: "/healthz/syncloop", bucket: "healthz"},
+		"logs":                            {url: "/logs/", bucket: "logs"},
+		"logs with path":                  {url: "/logs/logpath", bucket: "logs"},
+		"metrics":                         {url: "/metrics", bucket: "metrics"},
+		"metrics cadvisor sub":            {url: "/metrics/cadvisor", bucket: "metrics/cadvisor"},
+		"metrics probes sub":              {url: "/metrics/probes", bucket: "metrics/probes"},
+		"metrics resource sub":            {url: "/metrics/resource", bucket: "metrics/resource"},
+		"pods":                            {url: "/pods/", bucket: "pods"},
+		"portForward":                     {url: "/portForward/podNamespace/podID", bucket: "portForward"},
+		"portForward with uid":            {url: "/portForward/podNamespace/podID/uid", bucket: "portForward"},
+		"run":                             {url: "/run/podNamespace/podID/containerName", bucket: "run"},
+		"run with uid":                    {url: "/run/podNamespace/podID/uid/containerName", bucket: "run"},
+		"runningpods":                     {url: "/runningpods/", bucket: "runningpods"},
+		"stats":                           {url: "/stats/", bucket: "stats"},
+		"stats summary sub":               {url: "/stats/summary", bucket: "stats"},
+		"invalid path":                    {url: "/junk", bucket: "other"},
+		"invalid path starting with good": {url: "/healthzjunk", bucket: "other"},
+	}
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
 
-	const (
-		path  = "/cri/exec/123456abcdef"
-		query = "cmd=echo+foo"
-	)
-	resp, err := http.Get(fw.testHTTPServer.URL + path + "?" + query)
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "GET", fw.criHandler.RequestReceived.Method)
-	assert.Equal(t, path, fw.criHandler.RequestReceived.URL.Path)
-	assert.Equal(t, query, fw.criHandler.RequestReceived.URL.RawQuery)
+	for _, test := range tests {
+		path := test.url
+		bucket := test.bucket
+		require.Equal(t, fw.serverUnderTest.getMetricBucket(path), bucket)
+	}
+}
+
+func TestMetricMethodBuckets(t *testing.T) {
+	tests := map[string]struct {
+		method string
+		bucket string
+	}{
+		"normal GET":     {method: "GET", bucket: "GET"},
+		"normal POST":    {method: "POST", bucket: "POST"},
+		"invalid method": {method: "WEIRD", bucket: "other"},
+	}
+
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	for _, test := range tests {
+		method := test.method
+		bucket := test.bucket
+		require.Equal(t, fw.serverUnderTest.getMetricMethodBucket(method), bucket)
+	}
 }
 
 func TestDebuggingDisabledHandlers(t *testing.T) {
-	fw := newServerTestWithDebug(false, false, nil)
+	// for backward compatibility even if enablesystemLogHandler or enableProfilingHandler is set but not
+	// enableDebuggingHandler then /logs, /pprof and /flags shouldn't be served.
+	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+		EnableDebuggingHandlers: false,
+		EnableSystemLogHandler:  true,
+		EnableDebugFlagsHandler: true,
+		EnableProfilingHandler:  true,
+	}
+	fw := newServerTestWithDebuggingHandlers(kubeCfg, nil)
 	defer fw.testHTTPServer.Close()
 
 	paths := []string{
@@ -1620,47 +1429,69 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 	}
 
 	for _, p := range paths {
-		resp, err := http.Get(fw.testHTTPServer.URL + p)
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-		body, err := ioutil.ReadAll(resp.Body)
-		require.NoError(t, err)
-		assert.Equal(t, "Debug endpoints are disabled.\n", string(body))
-
-		resp, err = http.Post(fw.testHTTPServer.URL+p, "", nil)
-		require.NoError(t, err)
-		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
-		body, err = ioutil.ReadAll(resp.Body)
-		require.NoError(t, err)
-		assert.Equal(t, "Debug endpoints are disabled.\n", string(body))
+		verifyEndpointResponse(t, fw, p, "Debug endpoints are disabled.\n")
 	}
+}
 
-	// test some other paths, make sure they're working
-	containerInfo := &cadvisorapi.ContainerInfo{
-		ContainerReference: cadvisorapi.ContainerReference{
-			Name: "/",
-		},
+func TestDisablingLogAndProfilingHandler(t *testing.T) {
+	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+		EnableDebuggingHandlers: true,
 	}
-	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
-		return map[string]*cadvisorapi.ContainerInfo{
-			containerInfo.Name: containerInfo,
-		}, nil
-	}
+	fw := newServerTestWithDebuggingHandlers(kubeCfg, nil)
+	defer fw.testHTTPServer.Close()
 
-	resp, err := http.Get(fw.testHTTPServer.URL + "/stats")
+	// verify debug endpoints are disabled
+	verifyEndpointResponse(t, fw, "/logs/kubelet.log", "logs endpoint is disabled.\n")
+	verifyEndpointResponse(t, fw, "/debug/pprof/profile?seconds=2", "profiling endpoint is disabled.\n")
+	verifyEndpointResponse(t, fw, "/debug/flags/v", "flags endpoint is disabled.\n")
+}
+
+func TestFailedParseParamsSummaryHandler(t *testing.T) {
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	resp, err := http.Post(fw.testHTTPServer.URL+"/stats/summary", "invalid/content/type", nil)
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+	v, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	assert.Contains(t, string(v), "parse form failed")
+}
+
+func verifyEndpointResponse(t *testing.T, fw *serverTestFramework, path string, expectedResponse string) {
+	resp, err := http.Get(fw.testHTTPServer.URL + path)
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	machineInfo := &cadvisorapi.MachineInfo{
-		NumCores:       4,
-		MemoryCapacity: 1024,
-	}
-	fw.fakeKubelet.machineInfoFunc = func() (*cadvisorapi.MachineInfo, error) {
-		return machineInfo, nil
-	}
-
-	resp, err = http.Get(fw.testHTTPServer.URL + "/spec")
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+	body, err := ioutil.ReadAll(resp.Body)
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, expectedResponse, string(body))
 
+	resp, err = http.Post(fw.testHTTPServer.URL+path, "", nil)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+	body, err = ioutil.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, expectedResponse, string(body))
+}
+
+func TestTrimURLPath(t *testing.T) {
+	tests := []struct {
+		path, expected string
+	}{
+		{"", ""},
+		{"//", ""},
+		{"/pods", "pods"},
+		{"pods", "pods"},
+		{"pods/", "pods"},
+		{"good/", "good"},
+		{"pods/probes", "pods"},
+		{"metrics", "metrics"},
+		{"metrics/resource", "metrics/resource"},
+		{"metrics/hello", "metrics/hello"},
+	}
+
+	for _, test := range tests {
+		assert.Equal(t, test.expected, getURLRootPath(test.path), fmt.Sprintf("path is: %s", test.path))
+	}
 }

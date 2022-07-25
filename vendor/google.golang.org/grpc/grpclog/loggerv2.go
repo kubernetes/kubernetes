@@ -19,11 +19,16 @@
 package grpclog
 
 import (
+	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
+	"strings"
+
+	"google.golang.org/grpc/internal/grpclog"
 )
 
 // LoggerV2 does underlying logging work for grpclog.
@@ -65,7 +70,11 @@ type LoggerV2 interface {
 // SetLoggerV2 sets logger that is used in grpc to a V2 logger.
 // Not mutex-protected, should be called before any gRPC functions.
 func SetLoggerV2(l LoggerV2) {
-	logger = l
+	if _, ok := l.(*componentData); ok {
+		panic("cannot use component logger as grpclog logger")
+	}
+	grpclog.Logger = l
+	grpclog.DepthLogger, _ = l.(grpclog.DepthLoggerV2)
 }
 
 const (
@@ -89,8 +98,9 @@ var severityName = []string{
 
 // loggerT is the default logger used by grpclog.
 type loggerT struct {
-	m []*log.Logger
-	v int
+	m          []*log.Logger
+	v          int
+	jsonFormat bool
 }
 
 // NewLoggerV2 creates a loggerV2 with the provided writers.
@@ -99,19 +109,32 @@ type loggerT struct {
 // Warning logs will be written to warningW and infoW.
 // Info logs will be written to infoW.
 func NewLoggerV2(infoW, warningW, errorW io.Writer) LoggerV2 {
-	return NewLoggerV2WithVerbosity(infoW, warningW, errorW, 0)
+	return newLoggerV2WithConfig(infoW, warningW, errorW, loggerV2Config{})
 }
 
 // NewLoggerV2WithVerbosity creates a loggerV2 with the provided writers and
 // verbosity level.
 func NewLoggerV2WithVerbosity(infoW, warningW, errorW io.Writer, v int) LoggerV2 {
+	return newLoggerV2WithConfig(infoW, warningW, errorW, loggerV2Config{verbose: v})
+}
+
+type loggerV2Config struct {
+	verbose    int
+	jsonFormat bool
+}
+
+func newLoggerV2WithConfig(infoW, warningW, errorW io.Writer, c loggerV2Config) LoggerV2 {
 	var m []*log.Logger
-	m = append(m, log.New(infoW, severityName[infoLog]+": ", log.LstdFlags))
-	m = append(m, log.New(io.MultiWriter(infoW, warningW), severityName[warningLog]+": ", log.LstdFlags))
+	flag := log.LstdFlags
+	if c.jsonFormat {
+		flag = 0
+	}
+	m = append(m, log.New(infoW, "", flag))
+	m = append(m, log.New(io.MultiWriter(infoW, warningW), "", flag))
 	ew := io.MultiWriter(infoW, warningW, errorW) // ew will be used for error and fatal.
-	m = append(m, log.New(ew, severityName[errorLog]+": ", log.LstdFlags))
-	m = append(m, log.New(ew, severityName[fatalLog]+": ", log.LstdFlags))
-	return &loggerT{m: m, v: v}
+	m = append(m, log.New(ew, "", flag))
+	m = append(m, log.New(ew, "", flag))
+	return &loggerT{m: m, v: c.verbose, jsonFormat: c.jsonFormat}
 }
 
 // newLoggerV2 creates a loggerV2 to be used as default logger.
@@ -136,60 +159,101 @@ func newLoggerV2() LoggerV2 {
 	if vl, err := strconv.Atoi(vLevel); err == nil {
 		v = vl
 	}
-	return NewLoggerV2WithVerbosity(infoW, warningW, errorW, v)
+
+	jsonFormat := strings.EqualFold(os.Getenv("GRPC_GO_LOG_FORMATTER"), "json")
+
+	return newLoggerV2WithConfig(infoW, warningW, errorW, loggerV2Config{
+		verbose:    v,
+		jsonFormat: jsonFormat,
+	})
+}
+
+func (g *loggerT) output(severity int, s string) {
+	sevStr := severityName[severity]
+	if !g.jsonFormat {
+		g.m[severity].Output(2, fmt.Sprintf("%v: %v", sevStr, s))
+		return
+	}
+	// TODO: we can also include the logging component, but that needs more
+	// (API) changes.
+	b, _ := json.Marshal(map[string]string{
+		"severity": sevStr,
+		"message":  s,
+	})
+	g.m[severity].Output(2, string(b))
 }
 
 func (g *loggerT) Info(args ...interface{}) {
-	g.m[infoLog].Print(args...)
+	g.output(infoLog, fmt.Sprint(args...))
 }
 
 func (g *loggerT) Infoln(args ...interface{}) {
-	g.m[infoLog].Println(args...)
+	g.output(infoLog, fmt.Sprintln(args...))
 }
 
 func (g *loggerT) Infof(format string, args ...interface{}) {
-	g.m[infoLog].Printf(format, args...)
+	g.output(infoLog, fmt.Sprintf(format, args...))
 }
 
 func (g *loggerT) Warning(args ...interface{}) {
-	g.m[warningLog].Print(args...)
+	g.output(warningLog, fmt.Sprint(args...))
 }
 
 func (g *loggerT) Warningln(args ...interface{}) {
-	g.m[warningLog].Println(args...)
+	g.output(warningLog, fmt.Sprintln(args...))
 }
 
 func (g *loggerT) Warningf(format string, args ...interface{}) {
-	g.m[warningLog].Printf(format, args...)
+	g.output(warningLog, fmt.Sprintf(format, args...))
 }
 
 func (g *loggerT) Error(args ...interface{}) {
-	g.m[errorLog].Print(args...)
+	g.output(errorLog, fmt.Sprint(args...))
 }
 
 func (g *loggerT) Errorln(args ...interface{}) {
-	g.m[errorLog].Println(args...)
+	g.output(errorLog, fmt.Sprintln(args...))
 }
 
 func (g *loggerT) Errorf(format string, args ...interface{}) {
-	g.m[errorLog].Printf(format, args...)
+	g.output(errorLog, fmt.Sprintf(format, args...))
 }
 
 func (g *loggerT) Fatal(args ...interface{}) {
-	g.m[fatalLog].Fatal(args...)
-	// No need to call os.Exit() again because log.Logger.Fatal() calls os.Exit().
+	g.output(fatalLog, fmt.Sprint(args...))
+	os.Exit(1)
 }
 
 func (g *loggerT) Fatalln(args ...interface{}) {
-	g.m[fatalLog].Fatalln(args...)
-	// No need to call os.Exit() again because log.Logger.Fatal() calls os.Exit().
+	g.output(fatalLog, fmt.Sprintln(args...))
+	os.Exit(1)
 }
 
 func (g *loggerT) Fatalf(format string, args ...interface{}) {
-	g.m[fatalLog].Fatalf(format, args...)
-	// No need to call os.Exit() again because log.Logger.Fatal() calls os.Exit().
+	g.output(fatalLog, fmt.Sprintf(format, args...))
+	os.Exit(1)
 }
 
 func (g *loggerT) V(l int) bool {
 	return l <= g.v
+}
+
+// DepthLoggerV2 logs at a specified call frame. If a LoggerV2 also implements
+// DepthLoggerV2, the below functions will be called with the appropriate stack
+// depth set for trivial functions the logger may ignore.
+//
+// Experimental
+//
+// Notice: This type is EXPERIMENTAL and may be changed or removed in a
+// later release.
+type DepthLoggerV2 interface {
+	LoggerV2
+	// InfoDepth logs to INFO log at the specified depth. Arguments are handled in the manner of fmt.Println.
+	InfoDepth(depth int, args ...interface{})
+	// WarningDepth logs to WARNING log at the specified depth. Arguments are handled in the manner of fmt.Println.
+	WarningDepth(depth int, args ...interface{})
+	// ErrorDepth logs to ERROR log at the specified depth. Arguments are handled in the manner of fmt.Println.
+	ErrorDepth(depth int, args ...interface{})
+	// FatalDepth logs to FATAL log at the specified depth. Arguments are handled in the manner of fmt.Println.
+	FatalDepth(depth int, args ...interface{})
 }

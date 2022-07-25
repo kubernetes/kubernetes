@@ -20,7 +20,7 @@
 ARCH:=amd64
 GOLANG_VERSION?=1.8.3
 REGISTRY?=staging-k8s.gcr.io
-TAG?=0.1.2
+TAG?=0.1.3
 IMAGE:=$(REGISTRY)/etcd-version-monitor:$(TAG)
 CURRENT_DIR:=$(pwd)
 TEMP_DIR:=$(shell mktemp -d)
@@ -30,7 +30,7 @@ build:
 	cp etcd-version-monitor.go Dockerfile $(TEMP_DIR)
 
 	# Compile etcd-version-monitor.
-	docker run -it \
+	docker run --rm -it \
 	    -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes \
 	    -v $(TEMP_DIR):/build \
 	    -e GOARCH=$(ARCH) \

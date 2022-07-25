@@ -18,21 +18,35 @@ package httplog
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
 	"runtime"
+	"strings"
+	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
+	"k8s.io/klog/v2"
 )
 
 // StacktracePred returns true if a stacktrace should be logged for this status.
 type StacktracePred func(httpStatus int) (logStacktrace bool)
 
+// ShouldLogRequestPred returns true if logging should be enabled for this request
+type ShouldLogRequestPred func() bool
+
 type logger interface {
 	Addf(format string, data ...interface{})
 }
+
+type respLoggerContextKeyType int
+
+// respLoggerContextKey is used to store the respLogger pointer in the request context.
+const respLoggerContextKey respLoggerContextKeyType = iota
 
 // Add a layer on top of ResponseWriter, so we can track latency and error
 // message sources.
@@ -45,15 +59,27 @@ type respLogger struct {
 	statusRecorded bool
 	status         int
 	statusStack    string
-	addedInfo      string
-	startTime      time.Time
+	// mutex is used when accessing addedInfo and addedKeyValuePairs.
+	// They can be modified by other goroutine when logging happens (in case of request timeout)
+	mutex              sync.Mutex
+	addedInfo          strings.Builder
+	addedKeyValuePairs []interface{}
+	startTime          time.Time
 
 	captureErrorOutput bool
 
-	req *http.Request
-	w   http.ResponseWriter
+	req       *http.Request
+	userAgent string
+	w         http.ResponseWriter
 
 	logStacktracePred StacktracePred
+}
+
+var _ http.ResponseWriter = &respLogger{}
+var _ responsewriter.UserProvidedDecorator = &respLogger{}
+
+func (rl *respLogger) Unwrap() http.ResponseWriter {
+	return rl.w
 }
 
 // Simple logger that logs immediately when Addf is called
@@ -69,47 +95,84 @@ func DefaultStacktracePred(status int) bool {
 	return (status < http.StatusOK || status >= http.StatusInternalServerError) && status != http.StatusSwitchingProtocols
 }
 
-// NewLogged turns a normal response writer into a logged response writer.
-//
-// Usage:
-//
-// defer NewLogged(req, &w).StacktraceWhen(StatusIsNot(200, 202)).Log()
-//
-// (Only the call to Log() is deferred, so you can set everything up in one line!)
-//
-// Note that this *changes* your writer, to route response writing actions
-// through the logger.
-//
-// Use LogOf(w).Addf(...) to log something along with the response result.
-func NewLogged(req *http.Request, w *http.ResponseWriter) *respLogger {
-	if _, ok := (*w).(*respLogger); ok {
-		// Don't double-wrap!
-		panic("multiple NewLogged calls!")
+const withLoggingLevel = 3
+
+// WithLogging wraps the handler with logging.
+func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
+	return withLogging(handler, pred, func() bool {
+		return klog.V(withLoggingLevel).Enabled()
+	})
+}
+
+func withLogging(handler http.Handler, stackTracePred StacktracePred, shouldLogRequest ShouldLogRequestPred) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !shouldLogRequest() {
+			handler.ServeHTTP(w, req)
+			return
+		}
+
+		ctx := req.Context()
+		if old := respLoggerFromRequest(req); old != nil {
+			panic("multiple WithLogging calls!")
+		}
+
+		startTime := time.Now()
+		if receivedTimestamp, ok := request.ReceivedTimestampFrom(ctx); ok {
+			startTime = receivedTimestamp
+		}
+
+		rl := newLoggedWithStartTime(req, w, startTime)
+		rl.StacktraceWhen(stackTracePred)
+		req = req.WithContext(context.WithValue(ctx, respLoggerContextKey, rl))
+		defer rl.Log()
+
+		w = responsewriter.WrapForHTTP1Or2(rl)
+		handler.ServeHTTP(w, req)
+	})
+}
+
+// respLoggerFromContext returns the respLogger or nil.
+func respLoggerFromContext(ctx context.Context) *respLogger {
+	val := ctx.Value(respLoggerContextKey)
+	if rl, ok := val.(*respLogger); ok {
+		return rl
 	}
-	rl := &respLogger{
-		startTime:         time.Now(),
+	return nil
+}
+
+func respLoggerFromRequest(req *http.Request) *respLogger {
+	return respLoggerFromContext(req.Context())
+}
+
+func newLoggedWithStartTime(req *http.Request, w http.ResponseWriter, startTime time.Time) *respLogger {
+	logger := &respLogger{
+		startTime:         startTime,
 		req:               req,
-		w:                 *w,
+		userAgent:         req.UserAgent(),
+		w:                 w,
 		logStacktracePred: DefaultStacktracePred,
 	}
-	*w = rl // hijack caller's writer!
-	return rl
+	return logger
+}
+
+// newLogged turns a normal response writer into a logged response writer.
+func newLogged(req *http.Request, w http.ResponseWriter) *respLogger {
+	return newLoggedWithStartTime(req, w, time.Now())
 }
 
 // LogOf returns the logger hiding in w. If there is not an existing logger
 // then a passthroughLogger will be created which will log to stdout immediately
 // when Addf is called.
 func LogOf(req *http.Request, w http.ResponseWriter) logger {
-	if rl, ok := w.(*respLogger); ok {
+	if rl := respLoggerFromRequest(req); rl != nil {
 		return rl
 	}
-
 	return &passthroughLogger{}
 }
 
 // Unlogged returns the original ResponseWriter, or w if it is not our inserted logger.
-func Unlogged(w http.ResponseWriter) http.ResponseWriter {
-	if rl, ok := w.(*respLogger); ok {
+func Unlogged(req *http.Request, w http.ResponseWriter) http.ResponseWriter {
+	if rl := respLoggerFromRequest(req); rl != nil {
 		return rl.w
 	}
 	return w
@@ -125,31 +188,101 @@ func (rl *respLogger) StacktraceWhen(pred StacktracePred) *respLogger {
 // StatusIsNot returns a StacktracePred which will cause stacktraces to be logged
 // for any status *not* in the given list.
 func StatusIsNot(statuses ...int) StacktracePred {
+	statusesNoTrace := map[int]bool{}
+	for _, s := range statuses {
+		statusesNoTrace[s] = true
+	}
 	return func(status int) bool {
-		for _, s := range statuses {
-			if status == s {
-				return false
-			}
-		}
-		return true
+		_, ok := statusesNoTrace[status]
+		return !ok
 	}
 }
 
 // Addf adds additional data to be logged with this request.
 func (rl *respLogger) Addf(format string, data ...interface{}) {
-	rl.addedInfo += "\n" + fmt.Sprintf(format, data...)
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
+	rl.addedInfo.WriteString("\n")
+	rl.addedInfo.WriteString(fmt.Sprintf(format, data...))
+}
+
+func AddInfof(ctx context.Context, format string, data ...interface{}) {
+	if rl := respLoggerFromContext(ctx); rl != nil {
+		rl.Addf(format, data...)
+	}
+}
+
+func (rl *respLogger) AddKeyValue(key string, value interface{}) {
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
+	rl.addedKeyValuePairs = append(rl.addedKeyValuePairs, key, value)
+}
+
+// AddKeyValue adds a (key, value) pair to the httplog associated
+// with the request.
+// Use this function if you want your data to show up in httplog
+// in a more structured and readable way.
+func AddKeyValue(ctx context.Context, key string, value interface{}) {
+	if rl := respLoggerFromContext(ctx); rl != nil {
+		rl.AddKeyValue(key, value)
+	}
+}
+
+// SetStacktracePredicate sets a custom stacktrace predicate for the
+// logger associated with the given request context.
+func SetStacktracePredicate(ctx context.Context, pred StacktracePred) {
+	if rl := respLoggerFromContext(ctx); rl != nil {
+		rl.StacktraceWhen(pred)
+	}
 }
 
 // Log is intended to be called once at the end of your request handler, via defer
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
-	if klog.V(3) {
-		if !rl.hijacked {
-			klog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo, rl.req.UserAgent(), rl.req.RemoteAddr))
-		} else {
-			klog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) hijacked [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.req.UserAgent(), rl.req.RemoteAddr))
+	auditID := request.GetAuditIDTruncated(rl.req.Context())
+
+	verb := rl.req.Method
+	if requestInfo, ok := request.RequestInfoFrom(rl.req.Context()); ok {
+		// If we can find a requestInfo, we can get a scope, and then
+		// we can convert GETs to LISTs when needed.
+		scope := metrics.CleanScope(requestInfo)
+		verb = metrics.CanonicalVerb(strings.ToUpper(verb), scope)
+	}
+	// mark APPLY requests and WATCH requests correctly.
+	verb = metrics.CleanVerb(verb, rl.req)
+
+	keysAndValues := []interface{}{
+		"verb", verb,
+		"URI", rl.req.RequestURI,
+		"latency", latency,
+		// We can't get UserAgent from rl.req.UserAgent() here as it accesses headers map,
+		// which can be modified in another goroutine when apiserver request times out.
+		// For example authentication filter modifies request's headers,
+		// This can cause apiserver to crash with unrecoverable fatal error.
+		// More info about concurrent read and write for maps: https://golang.org/doc/go1.6#runtime
+		"userAgent", rl.userAgent,
+		"audit-ID", auditID,
+		"srcIP", rl.req.RemoteAddr,
+	}
+	// Lock for accessing addedKeyValuePairs and addedInfo
+	rl.mutex.Lock()
+	defer rl.mutex.Unlock()
+	keysAndValues = append(keysAndValues, rl.addedKeyValuePairs...)
+
+	if rl.hijacked {
+		keysAndValues = append(keysAndValues, "hijacked", true)
+	} else {
+		keysAndValues = append(keysAndValues, "resp", rl.status)
+		if len(rl.statusStack) > 0 {
+			keysAndValues = append(keysAndValues, "statusStack", rl.statusStack)
+		}
+		info := rl.addedInfo.String()
+		if len(info) > 0 {
+			keysAndValues = append(keysAndValues, "addedInfo", info)
 		}
 	}
+
+	klog.V(withLoggingLevel).InfoSDepth(1, "HTTP", keysAndValues...)
 }
 
 // Header implements http.ResponseWriter.
@@ -168,31 +301,18 @@ func (rl *respLogger) Write(b []byte) (int, error) {
 	return rl.w.Write(b)
 }
 
-// Flush implements http.Flusher even if the underlying http.Writer doesn't implement it.
-// Flush is used for streaming purposes and allows to flush buffered data to the client.
-func (rl *respLogger) Flush() {
-	if flusher, ok := rl.w.(http.Flusher); ok {
-		flusher.Flush()
-	} else if klog.V(2) {
-		klog.InfoDepth(1, fmt.Sprintf("Unable to convert %+v into http.Flusher", rl.w))
-	}
-}
-
 // WriteHeader implements http.ResponseWriter.
 func (rl *respLogger) WriteHeader(status int) {
 	rl.recordStatus(status)
 	rl.w.WriteHeader(status)
 }
 
-// Hijack implements http.Hijacker.
 func (rl *respLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	rl.hijacked = true
-	return rl.w.(http.Hijacker).Hijack()
-}
 
-// CloseNotify implements http.CloseNotifier
-func (rl *respLogger) CloseNotify() <-chan bool {
-	return rl.w.(http.CloseNotifier).CloseNotify()
+	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
+	// http.Hijacker if the inner object (rl.w) implements http.Hijacker.
+	return rl.w.(http.Hijacker).Hijack()
 }
 
 func (rl *respLogger) recordStatus(status int) {

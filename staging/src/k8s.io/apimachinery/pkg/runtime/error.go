@@ -19,6 +19,7 @@ package runtime
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -119,4 +120,53 @@ func IsMissingVersion(err error) bool {
 	}
 	_, ok := err.(*missingVersionErr)
 	return ok
+}
+
+// strictDecodingError is a base error type that is returned by a strict Decoder such
+// as UniversalStrictDecoder.
+type strictDecodingError struct {
+	errors []error
+}
+
+// NewStrictDecodingError creates a new strictDecodingError object.
+func NewStrictDecodingError(errors []error) error {
+	return &strictDecodingError{
+		errors: errors,
+	}
+}
+
+func (e *strictDecodingError) Error() string {
+	var s strings.Builder
+	s.WriteString("strict decoding error: ")
+	for i, err := range e.errors {
+		if i != 0 {
+			s.WriteString(", ")
+		}
+		s.WriteString(err.Error())
+	}
+	return s.String()
+}
+
+func (e *strictDecodingError) Errors() []error {
+	return e.errors
+}
+
+// IsStrictDecodingError returns true if the error indicates that the provided object
+// strictness violations.
+func IsStrictDecodingError(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*strictDecodingError)
+	return ok
+}
+
+// AsStrictDecodingError returns a strict decoding error
+// containing all the strictness violations.
+func AsStrictDecodingError(err error) (*strictDecodingError, bool) {
+	if err == nil {
+		return nil, false
+	}
+	strictErr, ok := err.(*strictDecodingError)
+	return strictErr, ok
 }

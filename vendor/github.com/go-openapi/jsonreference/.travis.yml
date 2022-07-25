@@ -1,16 +1,24 @@
 after_success:
 - bash <(curl -s https://codecov.io/bash)
 go:
-- '1.9'
-- 1.10.x
-- 1.11.x
+- 1.14.x
+- 1.x
 install:
-- go get -u github.com/stretchr/testify/assert
-- go get -u github.com/PuerkitoBio/purell
-- go get -u github.com/go-openapi/jsonpointer
+- go get gotest.tools/gotestsum
+jobs:
+  include:
+  # include linting job, but only for latest go version and amd64 arch
+  - go: 1.x
+    arch: amd64
+    install:
+      go get github.com/golangci/golangci-lint/cmd/golangci-lint
+    script:
+    - golangci-lint run --new-from-rev master
+env:
+- GO111MODULE=on
 language: go
 notifications:
   slack:
     secure: OpQG/36F7DSF00HLm9WZMhyqFCYYyYTsVDObW226cWiR8PWYiNfLZiSEvIzT1Gx4dDjhigKTIqcLhG34CkL5iNXDjm9Yyo2RYhQPlK8NErNqUEXuBqn4RqYHW48VGhEhOyDd4Ei0E2FN5ZbgpvHgtpkdZ6XDi64r3Ac89isP9aPHXQTuv2Jog6b4/OKKiUTftLcTIst0p4Cp3gqOJWf1wnoj+IadWiECNVQT6zb47IYjtyw6+uV8iUjTzdKcRB6Zc6b4Dq7JAg1Zd7Jfxkql3hlKp4PNlRf9Cy7y5iA3G7MLyg3FcPX5z2kmcyPt2jOTRMBWUJ5zIQpOxizAcN8WsT3WWBL5KbuYK6k0PzujrIDLqdxGpNmjkkMfDBT9cKmZpm2FdW+oZgPFJP+oKmAo4u4KJz/vjiPTXgQlN5bmrLuRMCp+AwC5wkIohTqWZVPE2TK6ZSnMYcg/W39s+RP/9mJoyryAvPSpBOLTI+biCgaUCTOAZxNTWpMFc3tPYntc41WWkdKcooZ9JA5DwfcaVFyTGQ3YXz+HvX6G1z/gW0Q/A4dBi9mj2iE1xm7tRTT+4VQ2AXFvSEI1HJpfPgYnwAtwOD1v3Qm2EUHk9sCdtEDR4wVGEPIVn44GnwFMnGKx9JWppMPYwFu3SVDdHt+E+LOlhZUply11Aa+IVrT2KUQ=
 script:
-- go test -v -race -cover -coverprofile=coverage.txt -covermode=atomic ./...
+- gotestsum -f short-verbose -- -race -coverprofile=coverage.txt -covermode=atomic ./...

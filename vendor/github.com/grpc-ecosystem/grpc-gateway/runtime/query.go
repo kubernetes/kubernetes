@@ -1,9 +1,11 @@
 package runtime
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/url"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -13,10 +15,32 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
-// PopulateQueryParameters populates "values" into "msg".
-// A value is ignored if its key starts with one of the elements in "filter".
+var valuesKeyRegexp = regexp.MustCompile("^(.*)\\[(.*)\\]$")
+
+var currentQueryParser QueryParameterParser = &defaultQueryParser{}
+
+// QueryParameterParser defines interface for all query parameter parsers
+type QueryParameterParser interface {
+	Parse(msg proto.Message, values url.Values, filter *utilities.DoubleArray) error
+}
+
+// PopulateQueryParameters parses query parameters
+// into "msg" using current query parser
 func PopulateQueryParameters(msg proto.Message, values url.Values, filter *utilities.DoubleArray) error {
+	return currentQueryParser.Parse(msg, values, filter)
+}
+
+type defaultQueryParser struct{}
+
+// Parse populates "values" into "msg".
+// A value is ignored if its key starts with one of the elements in "filter".
+func (*defaultQueryParser) Parse(msg proto.Message, values url.Values, filter *utilities.DoubleArray) error {
 	for key, values := range values {
+		match := valuesKeyRegexp.FindStringSubmatch(key)
+		if len(match) == 3 {
+			key = match[1]
+			values = append([]string{match[2]}, values...)
+		}
 		fieldPath := strings.Split(key, ".")
 		if filter.HasCommonPrefix(fieldPath) {
 			continue
@@ -53,7 +77,7 @@ func populateFieldValueFromPath(msg proto.Message, fieldPath []string, values []
 		if err != nil {
 			return err
 		} else if !f.IsValid() {
-			grpclog.Printf("field not found in %T: %s", msg, strings.Join(fieldPath, "."))
+			grpclog.Infof("field not found in %T: %s", msg, strings.Join(fieldPath, "."))
 			return nil
 		}
 
@@ -64,9 +88,13 @@ func populateFieldValueFromPath(msg proto.Message, fieldPath []string, values []
 			}
 			m = f
 		case reflect.Slice:
-			// TODO(yugui) Support []byte
 			if !isLast {
 				return fmt.Errorf("unexpected repeated field in %s", strings.Join(fieldPath, "."))
+			}
+			// Handle []byte
+			if f.Type().Elem().Kind() == reflect.Uint8 {
+				m = f
+				break
 			}
 			return populateRepeatedField(f, values, props)
 		case reflect.Ptr:
@@ -79,6 +107,11 @@ func populateFieldValueFromPath(msg proto.Message, fieldPath []string, values []
 		case reflect.Struct:
 			m = f
 			continue
+		case reflect.Map:
+			if !isLast {
+				return fmt.Errorf("unexpected nested field %s in %s", fieldPath[i+1], strings.Join(fieldPath[:i+1], "."))
+			}
+			return populateMapField(f, values, props)
 		default:
 			return fmt.Errorf("unexpected type %s in %T", f.Type(), msg)
 		}
@@ -88,7 +121,7 @@ func populateFieldValueFromPath(msg proto.Message, fieldPath []string, values []
 		return fmt.Errorf("no value of field: %s", strings.Join(fieldPath, "."))
 	case 1:
 	default:
-		grpclog.Printf("too many field values: %s", strings.Join(fieldPath, "."))
+		grpclog.Infof("too many field values: %s", strings.Join(fieldPath, "."))
 	}
 	return populateField(m, values[0], props)
 }
@@ -99,14 +132,16 @@ func fieldByProtoName(m reflect.Value, name string) (reflect.Value, *proto.Prope
 	props := proto.GetProperties(m.Type())
 
 	// look up field name in oneof map
-	if op, ok := props.OneofTypes[name]; ok {
-		v := reflect.New(op.Type.Elem())
-		field := m.Field(op.Field)
-		if !field.IsNil() {
-			return reflect.Value{}, nil, fmt.Errorf("field already set for %s oneof", props.Prop[op.Field].OrigName)
+	for _, op := range props.OneofTypes {
+		if name == op.Prop.OrigName || name == op.Prop.JSONName {
+			v := reflect.New(op.Type.Elem())
+			field := m.Field(op.Field)
+			if !field.IsNil() {
+				return reflect.Value{}, nil, fmt.Errorf("field already set for %s oneof", props.Prop[op.Field].OrigName)
+			}
+			field.Set(v)
+			return v.Elem().Field(0), op.Prop, nil
 		}
-		field.Set(v)
-		return v.Elem().Field(0), op.Prop, nil
 	}
 
 	for _, p := range props.Prop {
@@ -118,6 +153,41 @@ func fieldByProtoName(m reflect.Value, name string) (reflect.Value, *proto.Prope
 		}
 	}
 	return reflect.Value{}, nil, nil
+}
+
+func populateMapField(f reflect.Value, values []string, props *proto.Properties) error {
+	if len(values) != 2 {
+		return fmt.Errorf("more than one value provided for key %s in map %s", values[0], props.Name)
+	}
+
+	key, value := values[0], values[1]
+	keyType := f.Type().Key()
+	valueType := f.Type().Elem()
+	if f.IsNil() {
+		f.Set(reflect.MakeMap(f.Type()))
+	}
+
+	keyConv, ok := convFromType[keyType.Kind()]
+	if !ok {
+		return fmt.Errorf("unsupported key type %s in map %s", keyType, props.Name)
+	}
+	valueConv, ok := convFromType[valueType.Kind()]
+	if !ok {
+		return fmt.Errorf("unsupported value type %s in map %s", valueType, props.Name)
+	}
+
+	keyV := keyConv.Call([]reflect.Value{reflect.ValueOf(key)})
+	if err := keyV[1].Interface(); err != nil {
+		return err.(error)
+	}
+	valueV := valueConv.Call([]reflect.Value{reflect.ValueOf(value)})
+	if err := valueV[1].Interface(); err != nil {
+		return err.(error)
+	}
+
+	f.SetMapIndex(keyV[0].Convert(keyType), valueV[0].Convert(valueType))
+
+	return nil
 }
 
 func populateRepeatedField(f reflect.Value, values []string, props *proto.Properties) error {
@@ -144,66 +214,123 @@ func populateRepeatedField(f reflect.Value, values []string, props *proto.Proper
 }
 
 func populateField(f reflect.Value, value string, props *proto.Properties) error {
-	// Handle well known type
-	type wkt interface {
-		XXX_WellKnownType() string
-	}
-	if wkt, ok := f.Addr().Interface().(wkt); ok {
-		switch wkt.XXX_WellKnownType() {
-		case "Timestamp":
-			if value == "null" {
-				f.Field(0).SetInt(0)
-				f.Field(1).SetInt(0)
-				return nil
-			}
+	i := f.Addr().Interface()
 
-			t, err := time.Parse(time.RFC3339Nano, value)
-			if err != nil {
-				return fmt.Errorf("bad Timestamp: %v", err)
-			}
-			f.Field(0).SetInt(int64(t.Unix()))
-			f.Field(1).SetInt(int64(t.Nanosecond()))
-			return nil
-		case "DoubleValue":
-			fallthrough
-		case "FloatValue":
-			float64Val, err := strconv.ParseFloat(value, 64)
-			if err != nil {
-				return fmt.Errorf("bad DoubleValue: %s", value)
-			}
-			f.Field(0).SetFloat(float64Val)
-			return nil
-		case "Int64Value":
-			fallthrough
-		case "Int32Value":
-			int64Val, err := strconv.ParseInt(value, 10, 64)
-			if err != nil {
-				return fmt.Errorf("bad DoubleValue: %s", value)
-			}
-			f.Field(0).SetInt(int64Val)
-			return nil
-		case "UInt64Value":
-			fallthrough
-		case "UInt32Value":
-			uint64Val, err := strconv.ParseUint(value, 10, 64)
-			if err != nil {
-				return fmt.Errorf("bad DoubleValue: %s", value)
-			}
-			f.Field(0).SetUint(uint64Val)
-			return nil
-		case "BoolValue":
-			if value == "true" {
-				f.Field(0).SetBool(true)
-			} else if value == "false" {
-				f.Field(0).SetBool(false)
-			} else {
-				return fmt.Errorf("bad BoolValue: %s", value)
-			}
-			return nil
-		case "StringValue":
-			f.Field(0).SetString(value)
+	// Handle protobuf well known types
+	var name string
+	switch m := i.(type) {
+	case interface{ XXX_WellKnownType() string }:
+		name = m.XXX_WellKnownType()
+	case proto.Message:
+		const wktPrefix = "google.protobuf."
+		if fullName := proto.MessageName(m); strings.HasPrefix(fullName, wktPrefix) {
+			name = fullName[len(wktPrefix):]
+		}
+	}
+	switch name {
+	case "Timestamp":
+		if value == "null" {
+			f.FieldByName("Seconds").SetInt(0)
+			f.FieldByName("Nanos").SetInt(0)
 			return nil
 		}
+
+		t, err := time.Parse(time.RFC3339Nano, value)
+		if err != nil {
+			return fmt.Errorf("bad Timestamp: %v", err)
+		}
+		f.FieldByName("Seconds").SetInt(int64(t.Unix()))
+		f.FieldByName("Nanos").SetInt(int64(t.Nanosecond()))
+		return nil
+	case "Duration":
+		if value == "null" {
+			f.FieldByName("Seconds").SetInt(0)
+			f.FieldByName("Nanos").SetInt(0)
+			return nil
+		}
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("bad Duration: %v", err)
+		}
+
+		ns := d.Nanoseconds()
+		s := ns / 1e9
+		ns %= 1e9
+		f.FieldByName("Seconds").SetInt(s)
+		f.FieldByName("Nanos").SetInt(ns)
+		return nil
+	case "DoubleValue":
+		fallthrough
+	case "FloatValue":
+		float64Val, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return fmt.Errorf("bad DoubleValue: %s", value)
+		}
+		f.FieldByName("Value").SetFloat(float64Val)
+		return nil
+	case "Int64Value":
+		fallthrough
+	case "Int32Value":
+		int64Val, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("bad DoubleValue: %s", value)
+		}
+		f.FieldByName("Value").SetInt(int64Val)
+		return nil
+	case "UInt64Value":
+		fallthrough
+	case "UInt32Value":
+		uint64Val, err := strconv.ParseUint(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("bad DoubleValue: %s", value)
+		}
+		f.FieldByName("Value").SetUint(uint64Val)
+		return nil
+	case "BoolValue":
+		if value == "true" {
+			f.FieldByName("Value").SetBool(true)
+		} else if value == "false" {
+			f.FieldByName("Value").SetBool(false)
+		} else {
+			return fmt.Errorf("bad BoolValue: %s", value)
+		}
+		return nil
+	case "StringValue":
+		f.FieldByName("Value").SetString(value)
+		return nil
+	case "BytesValue":
+		bytesVal, err := base64.StdEncoding.DecodeString(value)
+		if err != nil {
+			return fmt.Errorf("bad BytesValue: %s", value)
+		}
+		f.FieldByName("Value").SetBytes(bytesVal)
+		return nil
+	case "FieldMask":
+		p := f.FieldByName("Paths")
+		for _, v := range strings.Split(value, ",") {
+			if v != "" {
+				p.Set(reflect.Append(p, reflect.ValueOf(v)))
+			}
+		}
+		return nil
+	}
+
+	// Handle Time and Duration stdlib types
+	switch t := i.(type) {
+	case *time.Time:
+		pt, err := time.Parse(time.RFC3339Nano, value)
+		if err != nil {
+			return fmt.Errorf("bad Timestamp: %v", err)
+		}
+		*t = pt
+		return nil
+	case *time.Duration:
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("bad Duration: %v", err)
+		}
+		*t = d
+		return nil
 	}
 
 	// is the destination field an enumeration type?
@@ -213,7 +340,7 @@ func populateField(f reflect.Value, value string, props *proto.Properties) error
 
 	conv, ok := convFromType[f.Kind()]
 	if !ok {
-		return fmt.Errorf("unsupported field type %T", f)
+		return fmt.Errorf("field type %T is not supported in query parameters", i)
 	}
 	result := conv.Call([]reflect.Value{reflect.ValueOf(value)})
 	if err := result[1].Interface(); err != nil {
@@ -274,6 +401,6 @@ var (
 		reflect.Int32:   reflect.ValueOf(Int32),
 		reflect.Uint64:  reflect.ValueOf(Uint64),
 		reflect.Uint32:  reflect.ValueOf(Uint32),
-		// TODO(yugui) Support []byte
+		reflect.Slice:   reflect.ValueOf(Bytes),
 	}
 )

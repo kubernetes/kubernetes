@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 type testcase struct {
@@ -87,6 +87,16 @@ func TestConvertObject(t *testing.T) {
 				},
 				{
 					expected: "targetCPUUtilizationPercentage: 50",
+				},
+			},
+		},
+		{
+			name:          "v1beta1 Ingress to extensions Ingress",
+			file:          "../../../../test/fixtures/pkg/kubectl/cmd/convert/v1beta1ingress.yaml",
+			outputVersion: "extensions/v1beta1",
+			fields: []checkField{
+				{
+					expected: "apiVersion: extensions/v1beta1",
 				},
 			},
 		},

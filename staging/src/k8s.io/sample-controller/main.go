@@ -23,12 +23,12 @@ import (
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
-	clientset "k8s.io/sample-controller/pkg/client/clientset/versioned"
-	informers "k8s.io/sample-controller/pkg/client/informers/externalversions"
+	clientset "k8s.io/sample-controller/pkg/generated/clientset/versioned"
+	informers "k8s.io/sample-controller/pkg/generated/informers/externalversions"
 	"k8s.io/sample-controller/pkg/signals"
 )
 
@@ -38,6 +38,7 @@ var (
 )
 
 func main() {
+	klog.InitFlags(nil)
 	flag.Parse()
 
 	// set up signals so we handle the first shutdown signal gracefully

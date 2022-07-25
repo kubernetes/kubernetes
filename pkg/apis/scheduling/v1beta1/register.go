@@ -34,12 +34,13 @@ func Resource(resource string) schema.GroupResource {
 
 var (
 	localSchemeBuilder = &schedulingv1beta1.SchemeBuilder
-	AddToScheme        = localSchemeBuilder.AddToScheme
+	// AddToScheme is a common registration function for mapping packaged scoped group & version keys to a scheme
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
 func init() {
 	// We only register manually written functions here. The registration of the
 	// generated functions takes place in the generated files. The separation
 	// makes the code compile even when the generated files are missing.
-	localSchemeBuilder.Register(RegisterDefaults)
+	localSchemeBuilder.Register(addDefaultingFuncs)
 }

@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -19,17 +22,19 @@ package cinder
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/mount-utils"
+
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/openstack"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -39,11 +44,11 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != "kubernetes.io/cinder" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
@@ -63,7 +68,7 @@ type fakePDManager struct {
 }
 
 func getFakeDeviceName(host volume.VolumeHost, pdName string) string {
-	return path.Join(host.GetPluginDir(cinderVolumePluginName), "device", pdName)
+	return filepath.Join(host.GetPluginDir(cinderVolumePluginName), "device", pdName)
 }
 
 // Real Cinder AttachDisk attaches a cinder volume. If it is not yet mounted,
@@ -92,7 +97,7 @@ func (fake *fakePDManager) AttachDisk(b *cinderVolumeMounter, globalPDPath strin
 		}
 	}
 	if notmnt {
-		err = b.mounter.Mount(fakeDeviceName, globalPath, "", []string{"bind"})
+		err = b.mounter.MountSensitiveWithoutSystemd(fakeDeviceName, globalPath, "", []string{"bind"}, nil)
 		if err != nil {
 			return err
 		}
@@ -119,7 +124,7 @@ func (fake *fakePDManager) DetachDisk(c *cinderVolumeUnmounter) error {
 
 func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
-	labels[kubeletapis.LabelZoneFailureDomain] = "nova"
+	labels[v1.LabelTopologyZone] = "nova"
 	return "test-volume-name", 1, labels, "", nil
 }
 
@@ -137,7 +142,7 @@ func TestPlugin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
 	if err != nil {
@@ -152,20 +157,20 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 	}
-	mounter, err := plug.(*cinderPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakePDManager{0}, &mount.FakeMounter{})
+	mounter, err := plug.(*cinderPlugin).newMounterInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakePDManager{0}, mount.NewFakeMounter(nil))
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
 		t.Errorf("Got a nil Mounter")
 	}
-	volPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~cinder/vol1")
+	volPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~cinder/vol1")
 	path := mounter.GetPath()
 	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {
@@ -176,7 +181,7 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
-	unmounter, err := plug.(*cinderPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &fakePDManager{0}, &mount.FakeMounter{})
+	unmounter, err := plug.(*cinderPlugin).newUnmounterInternal("vol1", types.UID("poduid"), &fakePDManager{0}, mount.NewFakeMounter(nil))
 	if err != nil {
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
@@ -199,6 +204,9 @@ func TestPlugin(t *testing.T) {
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*cinderPlugin).newProvisionerInternal(options, &fakePDManager{0})
+	if err != nil {
+		t.Errorf("ProvisionerInternal() failed: %v", err)
+	}
 	persistentSpec, err := provisioner.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
@@ -234,7 +242,7 @@ func TestPlugin(t *testing.T) {
 
 	req := persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0]
 
-	if req.Key != kubeletapis.LabelZoneFailureDomain {
+	if req.Key != v1.LabelTopologyZone {
 		t.Errorf("Provision() returned unexpected requirement key in NodeAffinity %v", req.Key)
 	}
 
@@ -251,8 +259,107 @@ func TestPlugin(t *testing.T) {
 		PersistentVolume: persistentSpec,
 	}
 	deleter, err := plug.(*cinderPlugin).newDeleterInternal(volSpec, &fakePDManager{0})
+	if err != nil {
+		t.Errorf("DeleterInternal() failed: %v", err)
+	}
 	err = deleter.Delete()
 	if err != nil {
 		t.Errorf("Deleter() failed: %v", err)
+	}
+}
+
+func TestGetVolumeLimit(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("cinderTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+
+	cloud, err := getOpenstackCloudProvider()
+	if err != nil {
+		t.Fatalf("can not instantiate openstack cloudprovider : %v", err)
+	}
+
+	defer os.RemoveAll(tmpDir)
+	plugMgr := volume.VolumePluginMgr{}
+	volumeHost := volumetest.NewFakeKubeletVolumeHostWithCloudProvider(t, tmpDir, nil, nil, cloud)
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumeHost)
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
+	if err != nil {
+		t.Fatalf("Can't find the plugin by name")
+	}
+	attachablePlugin, ok := plug.(volume.VolumePluginWithAttachLimits)
+	if !ok {
+		t.Fatalf("plugin %s is not of attachable type", plug.GetPluginName())
+	}
+
+	limits, err := attachablePlugin.GetVolumeLimits()
+	if err != nil {
+		t.Errorf("error fetching limits : %v", err)
+	}
+	if len(limits) == 0 {
+		t.Fatalf("expecting limit from openstack got none")
+	}
+	limit, _ := limits[util.CinderVolumeLimitKey]
+	if limit != 10 {
+		t.Fatalf("expected volume limit to be 10 got %d", limit)
+	}
+}
+
+func getOpenstackCloudProvider() (*openstack.OpenStack, error) {
+	cfg := getOpenstackConfig()
+	return openstack.NewFakeOpenStackCloud(cfg)
+}
+
+func getOpenstackConfig() openstack.Config {
+	cfg := openstack.Config{
+		Global: struct {
+			AuthURL         string `gcfg:"auth-url"`
+			Username        string
+			UserID          string `gcfg:"user-id"`
+			Password        string `datapolicy:"password"`
+			TenantID        string `gcfg:"tenant-id"`
+			TenantName      string `gcfg:"tenant-name"`
+			TrustID         string `gcfg:"trust-id"`
+			DomainID        string `gcfg:"domain-id"`
+			DomainName      string `gcfg:"domain-name"`
+			Region          string
+			CAFile          string `gcfg:"ca-file"`
+			SecretName      string `gcfg:"secret-name"`
+			SecretNamespace string `gcfg:"secret-namespace"`
+			KubeconfigPath  string `gcfg:"kubeconfig-path"`
+		}{
+			Username:   "user",
+			Password:   "pass",
+			TenantID:   "foobar",
+			DomainID:   "2a73b8f597c04551a0fdc8e95544be8a",
+			DomainName: "local",
+			AuthURL:    "http://auth.url",
+			UserID:     "user",
+		},
+		BlockStorage: openstack.BlockStorageOpts{
+			NodeVolumeAttachLimit: 10,
+		},
+	}
+	return cfg
+}
+
+func TestUnsupportedVolumeHost(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("cinderTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/cinder")
+	if err != nil {
+		t.Fatal("Can't find the plugin by name")
+	}
+
+	_, err = plug.ConstructVolumeSpec("", "")
+	if err == nil {
+		t.Errorf("Expected failure constructing volume spec with unsupported VolumeHost")
 	}
 }

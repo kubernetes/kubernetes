@@ -17,14 +17,12 @@ limitations under the License.
 package storageobjectinuseprotection
 
 import (
+	"context"
 	"io"
 
-	"k8s.io/klog"
-
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -65,11 +63,7 @@ var (
 //
 // This prevents users from deleting a PVC that's used by a running pod.
 // This also prevents admin from deleting a PV that's bound by a PVC
-func (c *storageProtectionPlugin) Admit(a admission.Attributes) error {
-	if !feature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
-		return nil
-	}
-
+func (c *storageProtectionPlugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	switch a.GetResource().GroupResource() {
 	case pvResource:
 		return c.admitPV(a)

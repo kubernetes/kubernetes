@@ -23,12 +23,15 @@ import (
 	"strconv"
 	"strings"
 
-	apimachineryconfig "k8s.io/apimachinery/pkg/apis/config"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/metrics"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	netutils "k8s.io/utils/net"
 )
 
 // Validate validates the configuration of kube-proxy
@@ -36,6 +39,11 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	newPath := field.NewPath("KubeProxyConfiguration")
+
+	effectiveFeatures := utilfeature.DefaultFeatureGate.DeepCopy()
+	if err := effectiveFeatures.SetFromMap(config.FeatureGates); err != nil {
+		allErrs = append(allErrs, field.Invalid(newPath.Child("featureGates"), config.FeatureGates, err.Error()))
+	}
 
 	allErrs = append(allErrs, validateKubeProxyIPTablesConfiguration(config.IPTables, newPath.Child("KubeProxyIPTablesConfiguration"))...)
 	if config.Mode == kubeproxyconfig.ProxyModeIPVS {
@@ -57,7 +65,7 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("ConfigSyncPeriod"), config.ConfigSyncPeriod, "must be greater than 0"))
 	}
 
-	if net.ParseIP(config.BindAddress) == nil {
+	if netutils.ParseIPSloppy(config.BindAddress) == nil {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("BindAddress"), config.BindAddress, "not a valid textual representation of an IP address"))
 	}
 
@@ -67,8 +75,24 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
 
 	if config.ClusterCIDR != "" {
-		if _, _, err := net.ParseCIDR(config.ClusterCIDR); err != nil {
-			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid CIDR block (e.g. 10.100.0.0/16)"))
+		cidrs := strings.Split(config.ClusterCIDR, ",")
+		switch {
+		case len(cidrs) > 2:
+			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "only one CIDR allowed or a valid DualStack CIDR (e.g. 10.100.0.0/16,fde4:8dba:82e1::/48)"))
+		// if DualStack and two cidrs validate if there is at least one of each IP family
+		case len(cidrs) == 2:
+			isDual, err := netutils.IsDualStackCIDRStrings(cidrs)
+			if err != nil || !isDual {
+				allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid DualStack CIDR (e.g. 10.100.0.0/16,fde4:8dba:82e1::/48)"))
+			}
+		// if not DualStack only one CIDR allowed
+		case len(cidrs) > 1:
+			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "only one CIDR allowed (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)"))
+		// if we are here means that len(cidrs) == 1, we need to validate it
+		default:
+			if _, _, err := netutils.ParseCIDRSloppy(config.ClusterCIDR); err != nil {
+				allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid CIDR block (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)"))
+			}
 		}
 	}
 
@@ -77,6 +101,13 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	}
 
 	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
+	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, newPath.Child("ShowHiddenMetricsForVersion"))...)
+	if config.DetectLocalMode == kubeproxyconfig.LocalModeBridgeInterface {
+		allErrs = append(allErrs, validateInterface(config.DetectLocal.BridgeInterface, newPath.Child("InterfaceName"))...)
+	}
+	if config.DetectLocalMode == kubeproxyconfig.LocalModeInterfaceNamePrefix {
+		allErrs = append(allErrs, validateInterface(config.DetectLocal.InterfaceNamePrefix, newPath.Child("InterfacePrefix"))...)
+	}
 
 	return allErrs
 }
@@ -118,6 +149,7 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("SyncPeriod"), config.MinSyncPeriod, fmt.Sprintf("must be greater than or equal to %s", fldPath.Child("MinSyncPeriod").String())))
 	}
 
+	allErrs = append(allErrs, validateIPVSTimeout(config, fldPath)...)
 	allErrs = append(allErrs, validateIPVSSchedulerMethod(kubeproxyconfig.IPVSSchedulerMethod(config.Scheduler), fldPath.Child("Scheduler"))...)
 	allErrs = append(allErrs, validateIPVSExcludeCIDRs(config.ExcludeCIDRs, fldPath.Child("ExcludeCidrs"))...)
 
@@ -126,10 +158,6 @@ func validateKubeProxyIPVSConfiguration(config kubeproxyconfig.KubeProxyIPVSConf
 
 func validateKubeProxyConntrackConfiguration(config kubeproxyconfig.KubeProxyConntrackConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-
-	if config.Max != nil && *config.Max < 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("Max"), config.Max, "must be greater than or equal to 0"))
-	}
 
 	if config.MaxPerCore != nil && *config.MaxPerCore < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("MaxPerCore"), config.MaxPerCore, "must be greater than or equal to 0"))
@@ -183,11 +211,11 @@ func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Pat
 		return nil
 	}
 
-	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace])", strings.Join(validModes.List(), ","))
+	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace(will be 'kernelspace' in a future release)])", strings.Join(validModes.List(), ","))
 	return field.ErrorList{field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg)}
 }
 
-func validateClientConnectionConfiguration(config apimachineryconfig.ClientConnectionConfiguration, fldPath *field.Path) field.ErrorList {
+func validateClientConnectionConfiguration(config componentbaseconfig.ClientConnectionConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(config.Burst), fldPath.Child("Burst"))...)
 	return allErrs
@@ -202,7 +230,7 @@ func validateHostPort(input string, fldPath *field.Path) field.ErrorList {
 		return allErrs
 	}
 
-	if ip := net.ParseIP(hostIP); ip == nil {
+	if ip := netutils.ParseIPSloppy(hostIP); ip == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, hostIP, "must be a valid IP"))
 	}
 
@@ -249,10 +277,27 @@ func validateKubeProxyNodePortAddress(nodePortAddresses []string, fldPath *field
 	allErrs := field.ErrorList{}
 
 	for i := range nodePortAddresses {
-		if _, _, err := net.ParseCIDR(nodePortAddresses[i]); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, nodePortAddresses, "must be a valid IP block"))
-			break
+		if _, _, err := netutils.ParseCIDRSloppy(nodePortAddresses[i]); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), nodePortAddresses[i], "must be a valid CIDR"))
 		}
+	}
+
+	return allErrs
+}
+
+func validateIPVSTimeout(config kubeproxyconfig.KubeProxyIPVSConfiguration, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if config.TCPTimeout.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPTimeout"), config.TCPTimeout, "must be greater than or equal to 0"))
+	}
+
+	if config.TCPFinTimeout.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPFinTimeout"), config.TCPFinTimeout, "must be greater than or equal to 0"))
+	}
+
+	if config.UDPTimeout.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("UDPTimeout"), config.UDPTimeout, "must be greater than or equal to 0"))
 	}
 
 	return allErrs
@@ -262,9 +307,27 @@ func validateIPVSExcludeCIDRs(excludeCIDRs []string, fldPath *field.Path) field.
 	allErrs := field.ErrorList{}
 
 	for i := range excludeCIDRs {
-		if _, _, err := net.ParseCIDR(excludeCIDRs[i]); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath, excludeCIDRs, "must be a valid IP block"))
+		if _, _, err := netutils.ParseCIDRSloppy(excludeCIDRs[i]); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), excludeCIDRs[i], "must be a valid CIDR"))
 		}
+	}
+	return allErrs
+}
+
+func validateShowHiddenMetricsVersion(version string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	errs := metrics.ValidateShowHiddenMetricsVersion(version)
+	for _, e := range errs {
+		allErrs = append(allErrs, field.Invalid(fldPath, version, e.Error()))
+	}
+
+	return allErrs
+}
+
+func validateInterface(iface string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(iface) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, iface, "must not be empty"))
 	}
 	return allErrs
 }

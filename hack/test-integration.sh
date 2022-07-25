@@ -14,13 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script is a vestigial redirection.  Please do not add "real" logic.
+# This script has been replaced by `make test-integration`.
+# `make test-integration` runs all integration tests.
+# Usage: `make test-integration`.
+# Note: This script is a vestigial redirection. Please do not add "real" logic.
 
 set -o errexit
 set -o nounset
 set -o pipefail
-
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 echo "$0 has been replaced by 'make test-integration'"
 echo

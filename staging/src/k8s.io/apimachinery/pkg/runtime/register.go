@@ -29,33 +29,3 @@ func (obj *TypeMeta) GroupVersionKind() schema.GroupVersionKind {
 }
 
 func (obj *TypeMeta) GetObjectKind() schema.ObjectKind { return obj }
-
-// GetObjectKind implements Object for VersionedObjects, returning an empty ObjectKind
-// interface if no objects are provided, or the ObjectKind interface of the object in the
-// highest array position.
-func (obj *VersionedObjects) GetObjectKind() schema.ObjectKind {
-	last := obj.Last()
-	if last == nil {
-		return schema.EmptyObjectKind
-	}
-	return last.GetObjectKind()
-}
-
-// First returns the leftmost object in the VersionedObjects array, which is usually the
-// object as serialized on the wire.
-func (obj *VersionedObjects) First() Object {
-	if len(obj.Objects) == 0 {
-		return nil
-	}
-	return obj.Objects[0]
-}
-
-// Last is the rightmost object in the VersionedObjects array, which is the object after
-// all transformations have been applied. This is the same object that would be returned
-// by Decode in a normal invocation (without VersionedObjects in the into argument).
-func (obj *VersionedObjects) Last() Object {
-	if len(obj.Objects) == 0 {
-		return nil
-	}
-	return obj.Objects[len(obj.Objects)-1]
-}

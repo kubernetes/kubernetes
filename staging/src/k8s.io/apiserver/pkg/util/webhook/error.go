@@ -16,7 +16,11 @@ limitations under the License.
 
 package webhook
 
-import "fmt"
+import (
+	"fmt"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+)
 
 // ErrCallingWebhook is returned for transport-layer errors calling webhooks. It
 // represents a failure to talk to the webhook, not the webhook rejecting a
@@ -24,6 +28,7 @@ import "fmt"
 type ErrCallingWebhook struct {
 	WebhookName string
 	Reason      error
+	Status      *apierrors.StatusError
 }
 
 func (e *ErrCallingWebhook) Error() string {
@@ -31,4 +36,13 @@ func (e *ErrCallingWebhook) Error() string {
 		return fmt.Sprintf("failed calling webhook %q: %v", e.WebhookName, e.Reason)
 	}
 	return fmt.Sprintf("failed calling webhook %q; no further details available", e.WebhookName)
+}
+
+// ErrWebhookRejection represents a webhook properly rejecting a request.
+type ErrWebhookRejection struct {
+	Status *apierrors.StatusError
+}
+
+func (e *ErrWebhookRejection) Error() string {
+	return e.Status.Error()
 }

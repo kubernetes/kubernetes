@@ -18,34 +18,18 @@ type Pool struct {
 	// provisioned without a pool specified.  There can only be one default pool.
 	Default bool `json:"default"`
 
-	// DefaultDriver specifies the storage driver to use by default if there are
-	// multiple drivers in the pool and no driver was specified in the
-	// provisioning request or assigned by rules.  If no driver was specified and
-	// no default set, driver weight is used to determine the default.
-	DefaultDriver string `json:"defaultDriver"`
+	NodeSelector string `json:"nodeSelector"`
 
-	// ControllerNames is a list of controller names that are participating in the
-	// storage pool.
-	ControllerNames []string `json:"controllerNames"`
+	// DeviceSelector - specifies a selector to filter node devices based on their labels.
+	// Only devices from nodes that are in the 'NodeNames' list can be selected
+	DeviceSelector string `json:"deviceSelector"`
 
-	// DriverNames is a list of backend storage drivers that are available in the
-	// storage pool.
-	DriverNames []string `json:"driverNames"`
-
-	// DriverInstances is used to track instances of each driver.  Drivers have a
-	// default configuration, which can then be customised for each pool where
-	// they are used, which is representated as a DriverInstance.
-	// Read Only: true
-	DriverInstances []*DriverInstance `json:"driverInstances"`
-
-	// Flag describing whether the template is active.
-	// Default: false
-	Active bool `json:"active"`
-
-	// CapacityStats are used to track aggregate capacity usage information across
-	// all controllers and driver instances.
-	// Read Only: true
+	// Populated by the system. Read-only.
 	CapacityStats CapacityStats `json:"capacityStats"`
+
+	// This field is computed based on NodeSelector value
+	// Populated by the system. Read-only.
+	Nodes []*Node `json:"nodes"`
 
 	// Labels define a list of labels that describe the pool.
 	Labels map[string]string `json:"labels"`

@@ -18,13 +18,10 @@ package constants
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/util/version"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 func TestGetStaticPodDirectory(t *testing.T) {
@@ -100,130 +97,181 @@ func TestGetStaticPodFilepath(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		actual := GetStaticPodFilepath(rt.componentName, rt.manifestsDir)
-		if actual != rt.expected {
-			t.Errorf(
-				"failed GetStaticPodFilepath:\n\texpected: %s\n\t  actual: %s",
-				rt.expected,
-				actual,
-			)
-		}
-	}
-}
-
-func TestAddSelfHostedPrefix(t *testing.T) {
-	var tests = []struct {
-		componentName, expected string
-	}{
-		{
-			componentName: "kube-apiserver",
-			expected:      "self-hosted-kube-apiserver",
-		},
-		{
-			componentName: "kube-controller-manager",
-			expected:      "self-hosted-kube-controller-manager",
-		},
-		{
-			componentName: "kube-scheduler",
-			expected:      "self-hosted-kube-scheduler",
-		},
-		{
-			componentName: "foo",
-			expected:      "self-hosted-foo",
-		},
-	}
-	for _, rt := range tests {
-		actual := AddSelfHostedPrefix(rt.componentName)
-		if actual != rt.expected {
-			t.Errorf(
-				"failed AddSelfHostedPrefix:\n\texpected: %s\n\t  actual: %s",
-				rt.expected,
-				actual,
-			)
-		}
+		t.Run(rt.componentName, func(t *testing.T) {
+			actual := GetStaticPodFilepath(rt.componentName, rt.manifestsDir)
+			if actual != rt.expected {
+				t.Errorf(
+					"failed GetStaticPodFilepath:\n\texpected: %s\n\t  actual: %s",
+					rt.expected,
+					actual,
+				)
+			}
+		})
 	}
 }
 
 func TestEtcdSupportedVersion(t *testing.T) {
+	var supportedEtcdVersion = map[uint8]string{
+		13: "3.2.24",
+		14: "3.3.10",
+		15: "3.3.10",
+		16: "3.3.17-0",
+		17: "3.4.3-0",
+		18: "3.4.3-0",
+	}
 	var tests = []struct {
 		kubernetesVersion string
 		expectedVersion   *version.Version
-		expectedError     error
+		expectedWarning   bool
+		expectedError     bool
 	}{
 		{
-			kubernetesVersion: "1.99.0",
+			kubernetesVersion: "1.x.1",
 			expectedVersion:   nil,
-			expectedError:     errors.New("Unsupported or unknown Kubernetes version(1.99.0)"),
+			expectedWarning:   false,
+			expectedError:     true,
 		},
 		{
-			kubernetesVersion: "1.10.0",
-			expectedVersion:   version.MustParseSemantic("3.1.12"),
-			expectedError:     nil,
-		},
-		{
-			kubernetesVersion: "1.10.2",
-			expectedVersion:   version.MustParseSemantic("3.1.12"),
-			expectedError:     nil,
-		},
-		{
-			kubernetesVersion: "1.11.0",
-			expectedVersion:   version.MustParseSemantic("3.2.18"),
-			expectedError:     nil,
-		},
-		{
-			kubernetesVersion: "1.12.1",
+			kubernetesVersion: "1.10.1",
 			expectedVersion:   version.MustParseSemantic("3.2.24"),
-			expectedError:     nil,
+			expectedWarning:   true,
+			expectedError:     false,
+		},
+		{
+			kubernetesVersion: "1.99.0",
+			expectedVersion:   version.MustParseSemantic("3.4.3-0"),
+			expectedWarning:   true,
+			expectedError:     false,
+		},
+		{
+			kubernetesVersion: "v1.16.0",
+			expectedVersion:   version.MustParseSemantic("3.3.17-0"),
+			expectedWarning:   false,
+			expectedError:     false,
+		},
+		{
+			kubernetesVersion: "1.17.2",
+			expectedVersion:   version.MustParseSemantic("3.4.3-0"),
+			expectedWarning:   false,
+			expectedError:     false,
 		},
 	}
 	for _, rt := range tests {
-		actualVersion, actualError := EtcdSupportedVersion(rt.kubernetesVersion)
-		if actualError != nil {
-			if rt.expectedError == nil {
-				t.Errorf("failed EtcdSupportedVersion:\n\texpected no error, but got: %v", actualError)
-			} else if actualError.Error() != rt.expectedError.Error() {
-				t.Errorf(
-					"failed EtcdSupportedVersion:\n\texpected error: %v\n\t  actual error: %v",
-					rt.expectedError,
-					actualError,
-				)
+		t.Run(rt.kubernetesVersion, func(t *testing.T) {
+			actualVersion, actualWarning, actualError := EtcdSupportedVersion(supportedEtcdVersion, rt.kubernetesVersion)
+			if (actualError != nil) != rt.expectedError {
+				t.Fatalf("expected error %v, got %v", rt.expectedError, actualError != nil)
 			}
-		} else {
-			if rt.expectedError != nil {
-				t.Errorf("failed EtcdSupportedVersion:\n\texpected error: %v, but got no error", rt.expectedError)
-			} else if strings.Compare(actualVersion.String(), rt.expectedVersion.String()) != 0 {
-				t.Errorf(
-					"failed EtcdSupportedVersion:\n\texpected version: %s\n\t  actual version: %s",
-					rt.expectedVersion.String(),
-					actualVersion.String(),
-				)
+			if (actualWarning != nil) != rt.expectedWarning {
+				t.Fatalf("expected warning %v, got %v", rt.expectedWarning, actualWarning != nil)
 			}
-		}
+			if actualError == nil && actualVersion.String() != rt.expectedVersion.String() {
+				t.Errorf("expected version %s, got %s", rt.expectedVersion.String(), actualVersion.String())
+			}
+		})
 	}
 }
 
-func TestGetKubeDNSVersion(t *testing.T) {
+func TestGetKubernetesServiceCIDR(t *testing.T) {
 	var tests = []struct {
-		dns      kubeadmapi.DNSAddOnType
-		expected string
+		svcSubnetList string
+		isDualStack   bool
+		expected      string
+		expectedError bool
+		name          string
 	}{
 		{
-			dns:      kubeadmapi.KubeDNS,
-			expected: KubeDNSVersion,
+			svcSubnetList: "192.168.10.0/24",
+			expected:      "192.168.10.0/24",
+			expectedError: false,
+			name:          "valid: valid IPv4 range from single-stack",
 		},
 		{
-			dns:      kubeadmapi.CoreDNS,
-			expected: CoreDNSVersion,
+			svcSubnetList: "fd03::/112",
+			expected:      "fd03::/112",
+			expectedError: false,
+			name:          "valid: valid IPv6 range from single-stack",
+		},
+		{
+			svcSubnetList: "192.168.10.0/24,fd03::/112",
+			expected:      "192.168.10.0/24",
+			expectedError: false,
+			name:          "valid: valid <IPv4,IPv6> ranges from dual-stack",
+		},
+		{
+			svcSubnetList: "fd03::/112,192.168.10.0/24",
+			expected:      "fd03::/112",
+			expectedError: false,
+			name:          "valid: valid <IPv6,IPv4> ranges from dual-stack",
+		},
+		{
+			svcSubnetList: "192.168.10.0/24,fd03:x::/112",
+			expected:      "",
+			expectedError: true,
+			name:          "invalid: failed to parse subnet range for dual-stack",
 		},
 	}
+
 	for _, rt := range tests {
-		actualDNSVersion := GetDNSVersion(rt.dns)
-		if actualDNSVersion != rt.expected {
-			t.Errorf(
-				"failed GetDNSVersion:\n\texpected: %s\n\t  actual: %s",
-				rt.expected,
-				actualDNSVersion,
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual, actualError := GetKubernetesServiceCIDR(rt.svcSubnetList)
+			if rt.expectedError {
+				if actualError == nil {
+					t.Errorf("failed GetKubernetesServiceCIDR:\n\texpected error, but got no error")
+				}
+			} else if !rt.expectedError && actualError != nil {
+				t.Errorf("failed GetKubernetesServiceCIDR:\n\texpected no error, but got: %v", actualError)
+			} else {
+				if actual.String() != rt.expected {
+					t.Errorf(
+						"failed GetKubernetesServiceCIDR:\n\texpected: %s\n\t  actual: %s",
+						rt.expected,
+						actual.String(),
+					)
+				}
+			}
+		})
+	}
+}
+
+func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
+	tests := []struct {
+		name           string
+		versionInfo    *apimachineryversion.Info
+		n              int
+		expectedResult *version.Version
+	}{
+		{
+			name:           "invalid versionInfo; placeholder version is returned",
+			versionInfo:    &apimachineryversion.Info{},
+			expectedResult: defaultKubernetesPlaceholderVersion,
+		},
+		{
+			name:           "valid skew of -1",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			n:              -1,
+			expectedResult: version.MustParseSemantic("v1.22.0"),
+		},
+		{
+			name:           "valid skew of 0",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			n:              0,
+			expectedResult: version.MustParseSemantic("v1.23.0"),
+		},
+		{
+			name:           "valid skew of +1",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			n:              1,
+			expectedResult: version.MustParseSemantic("v1.24.0"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := getSkewedKubernetesVersionImpl(tc.versionInfo, tc.n)
+			if cmp, _ := result.Compare(tc.expectedResult.String()); cmp != 0 {
+				t.Errorf("expected result: %v, got %v", tc.expectedResult, result)
+			}
+		})
 	}
 }

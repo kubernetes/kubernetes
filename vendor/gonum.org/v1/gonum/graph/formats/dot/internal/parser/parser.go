@@ -13,8 +13,8 @@
 package parser
 
 import (
-	"bytes"
 	"fmt"
+	"strings"
 
 	parseError "gonum.org/v1/gonum/graph/formats/dot/internal/errors"
 	"gonum.org/v1/gonum/graph/formats/dot/internal/token"
@@ -76,7 +76,7 @@ func (s *stack) popN(items int) []Attrib {
 }
 
 func (s *stack) String() string {
-	w := new(bytes.Buffer)
+	w := new(strings.Builder)
 	fmt.Fprintf(w, "stack:\n")
 	for i, st := range s.state {
 		fmt.Fprintf(w, "\t%d: %d , ", i, st)

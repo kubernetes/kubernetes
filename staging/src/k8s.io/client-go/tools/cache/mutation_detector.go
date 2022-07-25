@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -36,17 +36,22 @@ func init() {
 	mutationDetectionEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_CACHE_MUTATION_DETECTOR"))
 }
 
-type CacheMutationDetector interface {
+// MutationDetector is able to monitor objects for mutation within a limited window of time
+type MutationDetector interface {
+	// AddObject adds the given object to the set being monitored for a while from now
 	AddObject(obj interface{})
+
+	// Run starts the monitoring and does not return until the monitoring is stopped.
 	Run(stopCh <-chan struct{})
 }
 
-func NewCacheMutationDetector(name string) CacheMutationDetector {
+// NewCacheMutationDetector creates a new instance for the defaultCacheMutationDetector.
+func NewCacheMutationDetector(name string) MutationDetector {
 	if !mutationDetectionEnabled {
 		return dummyMutationDetector{}
 	}
 	klog.Warningln("Mutation detector is enabled, this will result in memory leakage.")
-	return &defaultCacheMutationDetector{name: name, period: 1 * time.Second}
+	return &defaultCacheMutationDetector{name: name, period: 1 * time.Second, retainDuration: 2 * time.Minute}
 }
 
 type dummyMutationDetector struct{}
@@ -63,8 +68,18 @@ type defaultCacheMutationDetector struct {
 	name   string
 	period time.Duration
 
-	lock       sync.Mutex
+	// compareLock ensures only a single call to CompareObjects runs at a time
+	compareObjectsLock sync.Mutex
+
+	// addLock guards addedObjs between AddObject and CompareObjects
+	addedObjsLock sync.Mutex
+	addedObjs     []cacheObj
+
 	cachedObjs []cacheObj
+
+	retainDuration     time.Duration
+	lastRotated        time.Time
+	retainedCachedObjs []cacheObj
 
 	// failureFunc is injectable for unit testing.  If you don't have it, the process will panic.
 	// This panic is intentional, since turning on this detection indicates you want a strong
@@ -82,6 +97,14 @@ type cacheObj struct {
 func (d *defaultCacheMutationDetector) Run(stopCh <-chan struct{}) {
 	// we DON'T want protection from panics.  If we're running this code, we want to die
 	for {
+		if d.lastRotated.IsZero() {
+			d.lastRotated = time.Now()
+		} else if time.Since(d.lastRotated) > d.retainDuration {
+			d.retainedCachedObjs = d.cachedObjs
+			d.cachedObjs = nil
+			d.lastRotated = time.Now()
+		}
+
 		d.CompareObjects()
 
 		select {
@@ -101,20 +124,33 @@ func (d *defaultCacheMutationDetector) AddObject(obj interface{}) {
 	if obj, ok := obj.(runtime.Object); ok {
 		copiedObj := obj.DeepCopyObject()
 
-		d.lock.Lock()
-		defer d.lock.Unlock()
-		d.cachedObjs = append(d.cachedObjs, cacheObj{cached: obj, copied: copiedObj})
+		d.addedObjsLock.Lock()
+		defer d.addedObjsLock.Unlock()
+		d.addedObjs = append(d.addedObjs, cacheObj{cached: obj, copied: copiedObj})
 	}
 }
 
 func (d *defaultCacheMutationDetector) CompareObjects() {
-	d.lock.Lock()
-	defer d.lock.Unlock()
+	d.compareObjectsLock.Lock()
+	defer d.compareObjectsLock.Unlock()
+
+	// move addedObjs into cachedObjs under lock
+	// this keeps the critical section small to avoid blocking AddObject while we compare cachedObjs
+	d.addedObjsLock.Lock()
+	d.cachedObjs = append(d.cachedObjs, d.addedObjs...)
+	d.addedObjs = nil
+	d.addedObjsLock.Unlock()
 
 	altered := false
 	for i, obj := range d.cachedObjs {
 		if !reflect.DeepEqual(obj.cached, obj.copied) {
-			fmt.Printf("CACHE %s[%d] ALTERED!\n%v\n", d.name, i, diff.ObjectDiff(obj.cached, obj.copied))
+			fmt.Printf("CACHE %s[%d] ALTERED!\n%v\n", d.name, i, diff.ObjectGoPrintSideBySide(obj.cached, obj.copied))
+			altered = true
+		}
+	}
+	for i, obj := range d.retainedCachedObjs {
+		if !reflect.DeepEqual(obj.cached, obj.copied) {
+			fmt.Printf("CACHE %s[%d] ALTERED!\n%v\n", d.name, i, diff.ObjectGoPrintSideBySide(obj.cached, obj.copied))
 			altered = true
 		}
 	}

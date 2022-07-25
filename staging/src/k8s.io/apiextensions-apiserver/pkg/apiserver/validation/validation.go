@@ -17,11 +17,16 @@ limitations under the License.
 package validation
 
 import (
-	"github.com/go-openapi/spec"
-	"github.com/go-openapi/strfmt"
-	"github.com/go-openapi/validate"
+	"encoding/json"
+	"strings"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	openapierrors "k8s.io/kube-openapi/pkg/validation/errors"
+	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
+	"k8s.io/kube-openapi/pkg/validation/validate"
 )
 
 // NewSchemaValidator creates an openapi schema validator for the given CRD validation.
@@ -29,7 +34,8 @@ func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceVa
 	// Convert CRD schema to openapi schema
 	openapiSchema := &spec.Schema{}
 	if customResourceValidation != nil {
-		if err := ConvertJSONSchemaProps(customResourceValidation.OpenAPIV3Schema, openapiSchema); err != nil {
+		// TODO: replace with NewStructural(...).ToGoOpenAPI
+		if err := ConvertJSONSchemaPropsWithPostProcess(customResourceValidation.OpenAPIV3Schema, openapiSchema, StripUnsupportedFormatsPostProcess); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -38,20 +44,107 @@ func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceVa
 
 // ValidateCustomResource validates the Custom Resource against the schema in the CustomResourceDefinition.
 // CustomResource is a JSON data structure.
-func ValidateCustomResource(customResource interface{}, validator *validate.SchemaValidator) error {
+func ValidateCustomResource(fldPath *field.Path, customResource interface{}, validator *validate.SchemaValidator) field.ErrorList {
 	if validator == nil {
 		return nil
 	}
 
 	result := validator.Validate(customResource)
-	if result.AsError() != nil {
-		return result.AsError()
+	if result.IsValid() {
+		return nil
 	}
-	return nil
+	var allErrs field.ErrorList
+	for _, err := range result.Errors {
+		switch err := err.(type) {
+
+		case *openapierrors.Validation:
+			errPath := fldPath
+			if len(err.Name) > 0 && err.Name != "." {
+				errPath = errPath.Child(strings.TrimPrefix(err.Name, "."))
+			}
+
+			switch err.Code() {
+			case openapierrors.RequiredFailCode:
+				allErrs = append(allErrs, field.Required(errPath, ""))
+
+			case openapierrors.EnumFailCode:
+				values := []string{}
+				for _, allowedValue := range err.Values {
+					if s, ok := allowedValue.(string); ok {
+						values = append(values, s)
+					} else {
+						allowedJSON, _ := json.Marshal(allowedValue)
+						values = append(values, string(allowedJSON))
+					}
+				}
+				allErrs = append(allErrs, field.NotSupported(errPath, err.Value, values))
+
+			case openapierrors.TooLongFailCode:
+				value := interface{}("")
+				if err.Value != nil {
+					value = err.Value
+				}
+				max := int64(-1)
+				if i, ok := err.Valid.(int64); ok {
+					max = i
+				}
+				allErrs = append(allErrs, field.TooLongMaxLength(errPath, value, int(max)))
+
+			case openapierrors.MaxItemsFailCode:
+				actual := int64(-1)
+				if i, ok := err.Value.(int64); ok {
+					actual = i
+				}
+				max := int64(-1)
+				if i, ok := err.Valid.(int64); ok {
+					max = i
+				}
+				allErrs = append(allErrs, field.TooMany(errPath, int(actual), int(max)))
+
+			case openapierrors.TooManyPropertiesCode:
+				actual := int64(-1)
+				if i, ok := err.Value.(int64); ok {
+					actual = i
+				}
+				max := int64(-1)
+				if i, ok := err.Valid.(int64); ok {
+					max = i
+				}
+				allErrs = append(allErrs, field.TooMany(errPath, int(actual), int(max)))
+
+			case openapierrors.InvalidTypeCode:
+				value := interface{}("")
+				if err.Value != nil {
+					value = err.Value
+				}
+				allErrs = append(allErrs, field.TypeInvalid(errPath, value, err.Error()))
+
+			default:
+				value := interface{}("")
+				if err.Value != nil {
+					value = err.Value
+				}
+				allErrs = append(allErrs, field.Invalid(errPath, value, err.Error()))
+			}
+
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath, "", err.Error()))
+		}
+	}
+	return allErrs
 }
 
-// ConvertJSONSchemaProps converts the schema from apiextensions.JSONSchemaPropos to go-openapi/spec.Schema
+// ConvertJSONSchemaProps converts the schema from apiextensions.JSONSchemaPropos to go-openapi/spec.Schema.
 func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema) error {
+	return ConvertJSONSchemaPropsWithPostProcess(in, out, nil)
+}
+
+// PostProcessFunc post-processes one node of a spec.Schema.
+type PostProcessFunc func(*spec.Schema) error
+
+// ConvertJSONSchemaPropsWithPostProcess converts the schema from apiextensions.JSONSchemaPropos to go-openapi/spec.Schema
+// and run a post process step on each JSONSchemaProps node. postProcess is never called for nil schemas.
+func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, out *spec.Schema, postProcess PostProcessFunc) error {
 	if in == nil {
 		return nil
 	}
@@ -62,6 +155,11 @@ func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 	if in.Type != "" {
 		out.Type = spec.StringOrArray([]string{in.Type})
 	}
+	if in.XIntOrString {
+		out.VendorExtensible.AddExtension("x-kubernetes-int-or-string", true)
+		out.Type = spec.StringOrArray{"integer", "string"}
+	}
+	out.Nullable = in.Nullable
 	out.Format = in.Format
 	out.Title = in.Title
 	out.Maximum = in.Maximum
@@ -86,41 +184,43 @@ func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 		out.Example = *(in.Example)
 	}
 
-	out.Enum = make([]interface{}, len(in.Enum))
-	for k, v := range in.Enum {
-		out.Enum[k] = v
+	if in.Enum != nil {
+		out.Enum = make([]interface{}, len(in.Enum))
+		for k, v := range in.Enum {
+			out.Enum[k] = v
+		}
 	}
 
-	if err := convertSliceOfJSONSchemaProps(&in.AllOf, &out.AllOf); err != nil {
+	if err := convertSliceOfJSONSchemaProps(&in.AllOf, &out.AllOf, postProcess); err != nil {
 		return err
 	}
-	if err := convertSliceOfJSONSchemaProps(&in.OneOf, &out.OneOf); err != nil {
+	if err := convertSliceOfJSONSchemaProps(&in.OneOf, &out.OneOf, postProcess); err != nil {
 		return err
 	}
-	if err := convertSliceOfJSONSchemaProps(&in.AnyOf, &out.AnyOf); err != nil {
+	if err := convertSliceOfJSONSchemaProps(&in.AnyOf, &out.AnyOf, postProcess); err != nil {
 		return err
 	}
 
 	if in.Not != nil {
 		in, out := &in.Not, &out.Not
 		*out = new(spec.Schema)
-		if err := ConvertJSONSchemaProps(*in, *out); err != nil {
+		if err := ConvertJSONSchemaPropsWithPostProcess(*in, *out, postProcess); err != nil {
 			return err
 		}
 	}
 
 	var err error
-	out.Properties, err = convertMapOfJSONSchemaProps(in.Properties)
+	out.Properties, err = convertMapOfJSONSchemaProps(in.Properties, postProcess)
 	if err != nil {
 		return err
 	}
 
-	out.PatternProperties, err = convertMapOfJSONSchemaProps(in.PatternProperties)
+	out.PatternProperties, err = convertMapOfJSONSchemaProps(in.PatternProperties, postProcess)
 	if err != nil {
 		return err
 	}
 
-	out.Definitions, err = convertMapOfJSONSchemaProps(in.Definitions)
+	out.Definitions, err = convertMapOfJSONSchemaProps(in.Definitions, postProcess)
 	if err != nil {
 		return err
 	}
@@ -135,7 +235,7 @@ func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 	if in.AdditionalProperties != nil {
 		in, out := &in.AdditionalProperties, &out.AdditionalProperties
 		*out = new(spec.SchemaOrBool)
-		if err := convertJSONSchemaPropsorBool(*in, *out); err != nil {
+		if err := convertJSONSchemaPropsorBool(*in, *out, postProcess); err != nil {
 			return err
 		}
 	}
@@ -143,7 +243,7 @@ func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 	if in.AdditionalItems != nil {
 		in, out := &in.AdditionalItems, &out.AdditionalItems
 		*out = new(spec.SchemaOrBool)
-		if err := convertJSONSchemaPropsorBool(*in, *out); err != nil {
+		if err := convertJSONSchemaPropsorBool(*in, *out, postProcess); err != nil {
 			return err
 		}
 	}
@@ -151,7 +251,7 @@ func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = new(spec.SchemaOrArray)
-		if err := convertJSONSchemaPropsOrArray(*in, *out); err != nil {
+		if err := convertJSONSchemaPropsOrArray(*in, *out, postProcess); err != nil {
 			return err
 		}
 	}
@@ -161,7 +261,7 @@ func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 		*out = make(spec.Dependencies, len(*in))
 		for key, val := range *in {
 			newVal := new(spec.SchemaOrStringArray)
-			if err := convertJSONSchemaPropsOrStringArray(&val, newVal); err != nil {
+			if err := convertJSONSchemaPropsOrStringArray(&val, newVal, postProcess); err != nil {
 				return err
 			}
 			(*out)[key] = *newVal
@@ -174,14 +274,42 @@ func ConvertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 		out.ExternalDocs.URL = in.ExternalDocs.URL
 	}
 
+	if postProcess != nil {
+		if err := postProcess(out); err != nil {
+			return err
+		}
+	}
+
+	if in.XPreserveUnknownFields != nil {
+		out.VendorExtensible.AddExtension("x-kubernetes-preserve-unknown-fields", *in.XPreserveUnknownFields)
+	}
+	if in.XEmbeddedResource {
+		out.VendorExtensible.AddExtension("x-kubernetes-embedded-resource", true)
+	}
+	if len(in.XListMapKeys) != 0 {
+		out.VendorExtensible.AddExtension("x-kubernetes-list-map-keys", in.XListMapKeys)
+	}
+	if in.XListType != nil {
+		out.VendorExtensible.AddExtension("x-kubernetes-list-type", *in.XListType)
+	}
+	if in.XMapType != nil {
+		out.VendorExtensible.AddExtension("x-kubernetes-map-type", *in.XMapType)
+	}
+	if len(in.XValidations) != 0 {
+		var serializationValidationRules apiextensionsv1.ValidationRules
+		if err := apiextensionsv1.Convert_apiextensions_ValidationRules_To_v1_ValidationRules(&in.XValidations, &serializationValidationRules, nil); err != nil {
+			return err
+		}
+		out.VendorExtensible.AddExtension("x-kubernetes-validations", serializationValidationRules)
+	}
 	return nil
 }
 
-func convertSliceOfJSONSchemaProps(in *[]apiextensions.JSONSchemaProps, out *[]spec.Schema) error {
+func convertSliceOfJSONSchemaProps(in *[]apiextensions.JSONSchemaProps, out *[]spec.Schema, postProcess PostProcessFunc) error {
 	if in != nil {
 		for _, jsonSchemaProps := range *in {
 			schema := spec.Schema{}
-			if err := ConvertJSONSchemaProps(&jsonSchemaProps, &schema); err != nil {
+			if err := ConvertJSONSchemaPropsWithPostProcess(&jsonSchemaProps, &schema, postProcess); err != nil {
 				return err
 			}
 			*out = append(*out, schema)
@@ -190,25 +318,27 @@ func convertSliceOfJSONSchemaProps(in *[]apiextensions.JSONSchemaProps, out *[]s
 	return nil
 }
 
-func convertMapOfJSONSchemaProps(in map[string]apiextensions.JSONSchemaProps) (map[string]spec.Schema, error) {
+func convertMapOfJSONSchemaProps(in map[string]apiextensions.JSONSchemaProps, postProcess PostProcessFunc) (map[string]spec.Schema, error) {
+	if in == nil {
+		return nil, nil
+	}
+
 	out := make(map[string]spec.Schema)
-	if len(in) != 0 {
-		for k, jsonSchemaProps := range in {
-			schema := spec.Schema{}
-			if err := ConvertJSONSchemaProps(&jsonSchemaProps, &schema); err != nil {
-				return nil, err
-			}
-			out[k] = schema
+	for k, jsonSchemaProps := range in {
+		schema := spec.Schema{}
+		if err := ConvertJSONSchemaPropsWithPostProcess(&jsonSchemaProps, &schema, postProcess); err != nil {
+			return nil, err
 		}
+		out[k] = schema
 	}
 	return out, nil
 }
 
-func convertJSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out *spec.SchemaOrArray) error {
+func convertJSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out *spec.SchemaOrArray, postProcess PostProcessFunc) error {
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(spec.Schema)
-		if err := ConvertJSONSchemaProps(*in, *out); err != nil {
+		if err := ConvertJSONSchemaPropsWithPostProcess(*in, *out, postProcess); err != nil {
 			return err
 		}
 	}
@@ -216,7 +346,7 @@ func convertJSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out
 		in, out := &in.JSONSchemas, &out.Schemas
 		*out = make([]spec.Schema, len(*in))
 		for i := range *in {
-			if err := ConvertJSONSchemaProps(&(*in)[i], &(*out)[i]); err != nil {
+			if err := ConvertJSONSchemaPropsWithPostProcess(&(*in)[i], &(*out)[i], postProcess); err != nil {
 				return err
 			}
 		}
@@ -224,24 +354,24 @@ func convertJSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out
 	return nil
 }
 
-func convertJSONSchemaPropsorBool(in *apiextensions.JSONSchemaPropsOrBool, out *spec.SchemaOrBool) error {
+func convertJSONSchemaPropsorBool(in *apiextensions.JSONSchemaPropsOrBool, out *spec.SchemaOrBool, postProcess PostProcessFunc) error {
 	out.Allows = in.Allows
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(spec.Schema)
-		if err := ConvertJSONSchemaProps(*in, *out); err != nil {
+		if err := ConvertJSONSchemaPropsWithPostProcess(*in, *out, postProcess); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func convertJSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStringArray, out *spec.SchemaOrStringArray) error {
+func convertJSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStringArray, out *spec.SchemaOrStringArray, postProcess PostProcessFunc) error {
 	out.Property = in.Property
 	if in.Schema != nil {
 		in, out := &in.Schema, &out.Schema
 		*out = new(spec.Schema)
-		if err := ConvertJSONSchemaProps(*in, *out); err != nil {
+		if err := ConvertJSONSchemaPropsWithPostProcess(*in, *out, postProcess); err != nil {
 			return err
 		}
 	}

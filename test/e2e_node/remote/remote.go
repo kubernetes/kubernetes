@@ -19,7 +19,7 @@ package remote
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,21 +28,58 @@ import (
 	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
-var testTimeoutSeconds = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
+var testTimeout = flag.Duration("test-timeout", 45*time.Minute, "How long (in golang duration format) to wait for ginkgo tests to complete.")
 var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
 
 const archiveName = "e2e_node_test.tar.gz"
 
-func CreateTestArchive(suite TestSuite, systemSpecName string) (string, error) {
-	klog.V(2).Infof("Building archive...")
-	tardir, err := ioutil.TempDir("", "node-e2e-archive")
+func copyKubeletConfigIfExists(kubeletConfigFile, dstDir string) error {
+	srcStat, err := os.Stat(kubeletConfigFile)
 	if err != nil {
-		return "", fmt.Errorf("failed to create temporary directory %v.", err)
+		if os.IsNotExist(err) {
+			return nil
+		} else {
+			return err
+		}
+	}
+
+	if !srcStat.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", kubeletConfigFile)
+	}
+
+	source, err := os.Open(kubeletConfigFile)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	dst := filepath.Join(dstDir, "kubeletconfig.yaml")
+	destination, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+
+	_, err = io.Copy(destination, source)
+	return err
+}
+
+// CreateTestArchive creates the archive package for the node e2e test.
+func CreateTestArchive(suite TestSuite, systemSpecName, kubeletConfigFile string) (string, error) {
+	klog.V(2).Infof("Building archive...")
+	tardir, err := os.MkdirTemp("", "node-e2e-archive")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary directory %v", err)
 	}
 	defer os.RemoveAll(tardir)
+
+	err = copyKubeletConfigIfExists(kubeletConfigFile, tardir)
+	if err != nil {
+		return "", fmt.Errorf("failed to copy kubelet config: %v", err)
+	}
 
 	// Call the suite function to setup the test package.
 	err = suite.SetupTestPackage(tardir, systemSpecName)
@@ -58,18 +95,17 @@ func CreateTestArchive(suite TestSuite, systemSpecName string) (string, error) {
 
 	dir, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("failed to get working directory %v.", err)
+		return "", fmt.Errorf("failed to get working directory %v", err)
 	}
 	return filepath.Join(dir, archiveName), nil
 }
 
-// Returns the command output, whether the exit was ok, and any errors
-// TODO(random-liu): junitFilePrefix is not prefix actually, the file name is junit-junitFilePrefix.xml. Change the variable name.
-func RunRemote(suite TestSuite, archive string, host string, cleanup bool, imageDesc, junitFilePrefix string, testArgs string, ginkgoArgs string, systemSpecName string) (string, bool, error) {
+// RunRemote returns the command output, whether the exit was ok, and any errors
+func RunRemote(suite TestSuite, archive string, host string, cleanup bool, imageDesc, junitFileName, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig string) (string, bool, error) {
 	// Create the temp staging directory
 	klog.V(2).Infof("Staging test binaries on %q", host)
 	workspace := newWorkspaceDir()
-	// Do not sudo here, so that we can use scp to copy test archive to the directdory.
+	// Do not sudo here, so that we can use scp to copy test archive to the directory.
 	if output, err := SSHNoSudo(host, "mkdir", workspace); err != nil {
 		// Exit failure with the error
 		return "", false, fmt.Errorf("failed to create workspace directory %q on host %q: %v output: %q", workspace, host, err, output)
@@ -84,7 +120,7 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 	}
 
 	// Copy the archive to the staging directory
-	if output, err := runSSHCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIp(host), workspace)); err != nil {
+	if output, err := runSSHCommand("scp", archive, fmt.Sprintf("%s:%s/", GetHostnameOrIP(host), workspace)); err != nil {
 		// Exit failure with the error
 		return "", false, fmt.Errorf("failed to copy test archive: %v, output: %q", err, output)
 	}
@@ -110,7 +146,7 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 	}
 
 	klog.V(2).Infof("Running test on %q", host)
-	output, err := suite.RunTest(host, workspace, resultDir, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, *testTimeoutSeconds)
+	output, err := suite.RunTest(host, workspace, resultDir, imageDesc, junitFileName, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig, *testTimeout)
 
 	aggErrs := []error{}
 	// Do not log the output here, let the caller deal with the test output.
@@ -136,14 +172,14 @@ const (
 )
 
 func getTimestamp() string {
-	return fmt.Sprintf(time.Now().Format(timestampFormat))
+	return fmt.Sprint(time.Now().Format(timestampFormat))
 }
 
 func newWorkspaceDir() string {
 	return filepath.Join("/tmp", workspaceDirPrefix+getTimestamp())
 }
 
-// Parses the workspace directory name and gets the timestamp part of it.
+// GetTimestampFromWorkspaceDir parses the workspace directory name and gets the timestamp part of it.
 // This can later be used to name other artifacts (such as the
 // kubelet-${instance}.service systemd transient service used to launch
 // Kubelet) so that they can be matched to each other.
@@ -163,18 +199,18 @@ func getTestArtifacts(host, testDir string) error {
 		return fmt.Errorf("failed to create log directory %q: %v", logPath, err)
 	}
 	// Copy logs to artifacts/hostname
-	if _, err := runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIp(host), testDir), logPath); err != nil {
+	if _, err := runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.log", GetHostnameOrIP(host), testDir), logPath); err != nil {
 		return err
 	}
 	// Copy json files (if any) to artifacts.
 	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/*.json", testDir)); err == nil {
-		if _, err = runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.json", GetHostnameOrIp(host), testDir), *resultsDir); err != nil {
+		if _, err = runSSHCommand("scp", "-r", fmt.Sprintf("%s:%s/results/*.json", GetHostnameOrIP(host), testDir), *resultsDir); err != nil {
 			return err
 		}
 	}
 	if _, err := SSH(host, "ls", fmt.Sprintf("%s/results/junit*", testDir)); err == nil {
 		// Copy junit (if any) to the top of artifacts
-		if _, err = runSSHCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIp(host), testDir), *resultsDir); err != nil {
+		if _, err = runSSHCommand("scp", fmt.Sprintf("%s:%s/results/junit*", GetHostnameOrIP(host), testDir), *resultsDir); err != nil {
 			return err
 		}
 	}
@@ -200,7 +236,7 @@ func collectSystemLog(host string) {
 	// it could've be been removed if the node was rebooted.
 	if output, err := SSH(host, "sh", "-c", fmt.Sprintf("'journalctl --system --all > %s'", logPath)); err == nil {
 		klog.V(2).Infof("Got the system logs from journald; copying it back...")
-		if output, err := runSSHCommand("scp", fmt.Sprintf("%s:%s", GetHostnameOrIp(host), logPath), destPath); err != nil {
+		if output, err := runSSHCommand("scp", fmt.Sprintf("%s:%s", GetHostnameOrIP(host), logPath), destPath); err != nil {
 			klog.V(2).Infof("Failed to copy the log: err: %v, output: %q", err, output)
 		}
 	} else {

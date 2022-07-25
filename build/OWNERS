@@ -1,14 +1,29 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
+  - bentheelder
   - cblecker
-  - ixdy
-  - jbeda
+  - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
+  - dims
+  - fejta
+  - jeremyrickard # SIG Technical Lead / RelEng subproject owner
+  #- justaugustus # SIG Chair / RelEng subproject owner / Release Manager - approvals only
   - lavalamp
+  - palnabarun # Release Manager
+  - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
+  - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
   - spiffxp
-  - zmerlynn
+  - Verolop # Release Manager
+  - xmudrii # Release Manager
 approvers:
+  - bentheelder
   - cblecker
-  - ixdy
-  - jbeda
+  - dims
+  - fejta
+  - justaugustus
   - lavalamp
-  - zmerlynn
   - mikedanese
+  - spiffxp
+emeritus_approvers:
+  - jbeda
+  - zmerlynn

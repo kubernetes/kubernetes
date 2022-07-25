@@ -28,7 +28,7 @@ type Int map[int]Empty
 
 // NewInt creates a Int from a list of values.
 func NewInt(items ...int) Int {
-	ss := Int{}
+	ss := make(Int, len(items))
 	ss.Insert(items...)
 	return ss
 }
@@ -46,17 +46,19 @@ func IntKeySet(theMap interface{}) Int {
 }
 
 // Insert adds items to the set.
-func (s Int) Insert(items ...int) {
+func (s Int) Insert(items ...int) Int {
 	for _, item := range items {
 		s[item] = Empty{}
 	}
+	return s
 }
 
 // Delete removes all items from the set.
-func (s Int) Delete(items ...int) {
+func (s Int) Delete(items ...int) Int {
 	for _, item := range items {
 		delete(s, item)
 	}
+	return s
 }
 
 // Has returns true if and only if item is contained in the set.
@@ -85,6 +87,15 @@ func (s Int) HasAny(items ...int) bool {
 	return false
 }
 
+// Clone returns a new set which is a copy of the current set.
+func (s Int) Clone() Int {
+	result := make(Int, len(s))
+	for key := range s {
+		result.Insert(key)
+	}
+	return result
+}
+
 // Difference returns a set of objects that are not in s2
 // For example:
 // s1 = {a1, a2, a3}
@@ -108,10 +119,7 @@ func (s Int) Difference(s2 Int) Int {
 // s1.Union(s2) = {a1, a2, a3, a4}
 // s2.Union(s1) = {a1, a2, a3, a4}
 func (s1 Int) Union(s2 Int) Int {
-	result := NewInt()
-	for key := range s1 {
-		result.Insert(key)
-	}
+	result := s1.Clone()
 	for key := range s2 {
 		result.Insert(key)
 	}

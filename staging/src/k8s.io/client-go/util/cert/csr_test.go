@@ -23,6 +23,9 @@ import (
 	"io/ioutil"
 	"net"
 	"testing"
+
+	"k8s.io/client-go/util/keyutil"
+	netutils "k8s.io/utils/net"
 )
 
 func TestMakeCSR(t *testing.T) {
@@ -31,13 +34,13 @@ func TestMakeCSR(t *testing.T) {
 		CommonName: "kube-worker",
 	}
 	dnsSANs := []string{"localhost"}
-	ipSANs := []net.IP{net.ParseIP("127.0.0.1")}
+	ipSANs := []net.IP{netutils.ParseIPSloppy("127.0.0.1")}
 
 	keyData, err := ioutil.ReadFile(keyFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	key, err := ParsePrivateKeyPEM(keyData)
+	key, err := keyutil.ParsePrivateKeyPEM(keyData)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +50,7 @@ func TestMakeCSR(t *testing.T) {
 	}
 	csrBlock, rest := pem.Decode(csrPEM)
 	if csrBlock == nil {
-		t.Error("Unable to decode MakeCSR result.")
+		t.Fatal("Unable to decode MakeCSR result.")
 	}
 	if len(rest) != 0 {
 		t.Error("Found more than one PEM encoded block in the result.")

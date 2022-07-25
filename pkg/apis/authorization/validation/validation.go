@@ -23,6 +23,8 @@ import (
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
+// ValidateSubjectAccessReviewSpec validates a SubjectAccessReviewSpec and returns an
+// ErrorList with any errors.
 func ValidateSubjectAccessReviewSpec(spec authorizationapi.SubjectAccessReviewSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if spec.ResourceAttributes != nil && spec.NonResourceAttributes != nil {
@@ -38,6 +40,8 @@ func ValidateSubjectAccessReviewSpec(spec authorizationapi.SubjectAccessReviewSp
 	return allErrs
 }
 
+// ValidateSelfSubjectAccessReviewSpec validates a SelfSubjectAccessReviewSpec and returns an
+// ErrorList with any errors.
 func ValidateSelfSubjectAccessReviewSpec(spec authorizationapi.SelfSubjectAccessReviewSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if spec.ResourceAttributes != nil && spec.NonResourceAttributes != nil {
@@ -50,31 +54,44 @@ func ValidateSelfSubjectAccessReviewSpec(spec authorizationapi.SelfSubjectAccess
 	return allErrs
 }
 
+// ValidateSelfSubjectRulesReview validates a SelfSubjectRulesReview and returns an
+// ErrorList with any errors.
 func ValidateSelfSubjectRulesReview(review *authorizationapi.SelfSubjectRulesReview) field.ErrorList {
 	return field.ErrorList{}
 }
 
+// ValidateSubjectAccessReview validates a SubjectAccessReview and returns an
+// ErrorList with any errors.
 func ValidateSubjectAccessReview(sar *authorizationapi.SubjectAccessReview) field.ErrorList {
 	allErrs := ValidateSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, sar.ObjectMeta) {
+	objectMetaShallowCopy := sar.ObjectMeta
+	objectMetaShallowCopy.ManagedFields = nil
+	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty`))
 	}
 	return allErrs
 }
 
+// ValidateSelfSubjectAccessReview validates a SelfSubjectAccessReview and returns an
+// ErrorList with any errors.
 func ValidateSelfSubjectAccessReview(sar *authorizationapi.SelfSubjectAccessReview) field.ErrorList {
 	allErrs := ValidateSelfSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
-	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, sar.ObjectMeta) {
+	objectMetaShallowCopy := sar.ObjectMeta
+	objectMetaShallowCopy.ManagedFields = nil
+	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty`))
 	}
 	return allErrs
 }
 
+// ValidateLocalSubjectAccessReview validates a LocalSubjectAccessReview and returns an
+// ErrorList with any errors.
 func ValidateLocalSubjectAccessReview(sar *authorizationapi.LocalSubjectAccessReview) field.ErrorList {
 	allErrs := ValidateSubjectAccessReviewSpec(sar.Spec, field.NewPath("spec"))
 
 	objectMetaShallowCopy := sar.ObjectMeta
 	objectMetaShallowCopy.Namespace = ""
+	objectMetaShallowCopy.ManagedFields = nil
 	if !apiequality.Semantic.DeepEqual(metav1.ObjectMeta{}, objectMetaShallowCopy) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata"), sar.ObjectMeta, `must be empty except for namespace`))
 	}

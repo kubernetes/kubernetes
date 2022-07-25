@@ -36,6 +36,25 @@
 #    * amd64 [default]
 #    * arm
 #    * arm64
+#    * ppc64le
+#
+#  Set KUBERNETES_NODE_PLATFORM to choose the platform for which to download
+#  the node binaries. If none of KUBERNETES_NODE_PLATFORM and
+#  KUBERNETES_NODE_ARCH is set, no node binaries will be downloaded. If only
+#  one of the two is set, the other will be defaulted to the
+#  KUBERNETES_SERVER_PLATFORM/ARCH.
+#    * linux
+#    * windows
+#
+#  Set KUBERNETES_NODE_ARCH to choose the node architecture to download the
+#  node binaries. If none of KUBERNETES_NODE_PLATFORM and
+#  KUBERNETES_NODE_ARCH is set, no node binaries will be downloaded. If only
+#  one of the two is set, the other will be defaulted to the
+#  KUBERNETES_SERVER_PLATFORM/ARCH.
+#    * amd64 [default]
+#    * arm
+#    * arm64
+#    * ppc64le
 #
 #  Set KUBERNETES_SKIP_DOWNLOAD to skip downloading a release.
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
@@ -68,10 +87,11 @@ KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a
 #   KUBE_VERSION
 function set_binary_version() {
   if [[ "${1}" =~ "/" ]]; then
-    export KUBE_VERSION=$(curl -fsSL --retry 5 "https://dl.k8s.io/${1}.txt")
+    KUBE_VERSION=$(curl -fsSL --retry 5 "https://dl.k8s.io/${1}.txt")
   else
-    export KUBE_VERSION=${1}
+    KUBE_VERSION=${1}
   fi
+  export KUBE_VERSION
 }
 
 # Use the script from inside the Kubernetes tarball to fetch the client and
@@ -104,6 +124,10 @@ function create_cluster {
   )
 }
 
+function valid-storage-scope {
+  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -E "auth/devstorage|auth/cloud-platform"
+}
+
 if [[ -n "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
   create_cluster
   exit 0
@@ -112,7 +136,7 @@ fi
 if [[ -d "./kubernetes" ]]; then
   if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
     echo "'kubernetes' directory already exist. Should we skip download step and start to create cluster based on it? [Y]/n"
-    read confirm
+    read -r confirm
     if [[ ! "${confirm}" =~ ^[nN]$ ]]; then
       echo "Skipping download step."
       create_cluster
@@ -126,10 +150,8 @@ fi
 kernel=$(uname -s)
 case "${kernel}" in
   Darwin)
-    platform="darwin"
     ;;
   Linux)
-    platform="linux"
     ;;
   *)
     echo "Unknown, unsupported platform: ${kernel}." >&2
@@ -141,20 +163,18 @@ esac
 machine=$(uname -m)
 case "${machine}" in
   x86_64*|i?86_64*|amd64*)
-    arch="amd64"
     ;;
   aarch64*|arm64*)
-    arch="arm64"
+    ;;
+  ppc64le*)
     ;;
   arm*)
-    arch="arm"
     ;;
   i?86*)
-    arch="386"
     ;;
   *)
     echo "Unknown, unsupported architecture (${machine})." >&2
-    echo "Supported architectures x86_64, i686, arm, arm64." >&2
+    echo "Supported architectures x86_64, i686, arm, arm64, ppc64le." >&2
     echo "Bailing out." >&2
     exit 3
     ;;
@@ -167,11 +187,16 @@ release=${KUBERNETES_RELEASE:-"release/stable"}
 # Translate a published version <bucket>/<version> (e.g. "release/stable") to version number.
 set_binary_version "${release}"
 if [[ -z "${KUBERNETES_SKIP_RELEASE_VALIDATION-}" ]]; then
-  if [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
+  if [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
+    # Use KUBERNETES_RELEASE_URL for Releases and Pre-Releases
+    # ie. 1.18.0 or 1.19.0-beta.0
+    KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL}"
+  elif [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
     # Override KUBERNETES_RELEASE_URL to point to the CI bucket;
     # this will be used by get-kube-binaries.sh.
+    # ie. v1.19.0-beta.0.318+b618411f1edb98
     KUBERNETES_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL}"
-  elif ! [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
+  else
     echo "Version doesn't match regexp" >&2
     exit 1
   fi
@@ -207,7 +232,7 @@ fi
 
 if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
   echo "Is this ok? [Y]/n"
-  read confirm
+  read -r confirm
   if [[ "${confirm}" =~ ^[nN]$ ]]; then
     echo "Aborting."
     exit 0
@@ -215,12 +240,20 @@ if [[ -z "${KUBERNETES_SKIP_CONFIRM-}" ]]; then
 fi
 
 if "${need_download}"; then
-  if [[ $(which curl) ]]; then
-    curl -fL --retry 5 --keepalive-time 2 "${kubernetes_tar_url}" -o "${file}"
+  if [[ $(which gsutil) ]] && [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com/.* ]]; then
+    gsutil cp "${kubernetes_tar_url//'https://storage.googleapis.com/'/gs://}" "${file}"
+  elif [[ $(which curl) ]]; then
+    # if the url belongs to GCS API we should use oauth2_token in the headers
+    curl_headers=""
+    if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
+       [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com.* ]] ; then
+      curl_headers="Authorization: Bearer $(gcloud auth print-access-token)"
+    fi
+    curl ${curl_headers:+-H "${curl_headers}"} -fL --retry 3 --keepalive-time 2 "${kubernetes_tar_url}" -o "${file}"
   elif [[ $(which wget) ]]; then
     wget "${kubernetes_tar_url}"
   else
-    echo "Couldn't find curl or wget.  Bailing out."
+    echo "Couldn't find gsutil, curl, or wget.  Bailing out."
     exit 1
   fi
 fi

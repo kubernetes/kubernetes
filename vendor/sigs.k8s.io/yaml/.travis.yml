@@ -1,14 +1,13 @@
 language: go
 dist: xenial
 go:
-  - 1.9.x
-  - 1.10.x
-  - 1.11.x
+  - 1.12.x
+  - 1.13.x
 script:
-  - go get -t -v ./...
-  - diff -u <(echo -n) <(gofmt -d .)
+  - diff -u <(echo -n) <(gofmt -d *.go)
   - diff -u <(echo -n) <(golint $(go list -e ./...) | grep -v YAMLToJSON)
-  - go tool vet .
-  - go test -v -race ./...
+  - GO111MODULE=on go vet .
+  - GO111MODULE=on go test -v -race ./...
+  - git diff --exit-code
 install:
-  - go get golang.org/x/lint/golint
+  - GO111MODULE=off go get golang.org/x/lint/golint

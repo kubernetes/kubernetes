@@ -144,6 +144,7 @@ func (c *test) run(t *testing.T, fs utilfs.Filesystem) {
 	if err != nil {
 		t.Fatalf("error creating temporary directory for test: %v", err)
 	}
+	defer os.RemoveAll(dir)
 	c.write(t, fs, dir)
 	// if fn exists, check errors from fn, then check expected files
 	if c.fn != nil {
@@ -204,7 +205,7 @@ func TestHelpers(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			c.run(t, utilfs.DefaultFs{})
+			c.run(t, &utilfs.DefaultFs{})
 		})
 	}
 }
@@ -240,7 +241,7 @@ func TestFileExists(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			c.run(t, utilfs.DefaultFs{})
+			c.run(t, &utilfs.DefaultFs{})
 		})
 	}
 }
@@ -275,7 +276,7 @@ func TestEnsureFile(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			c.run(t, utilfs.DefaultFs{})
+			c.run(t, &utilfs.DefaultFs{})
 		})
 	}
 }
@@ -316,7 +317,7 @@ func TestReplaceFile(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			c.run(t, utilfs.DefaultFs{})
+			c.run(t, &utilfs.DefaultFs{})
 		})
 	}
 }
@@ -352,7 +353,7 @@ func TestDirExists(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			c.run(t, utilfs.DefaultFs{})
+			c.run(t, &utilfs.DefaultFs{})
 		})
 	}
 }
@@ -387,7 +388,7 @@ func TestEnsureDir(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			c.run(t, utilfs.DefaultFs{})
+			c.run(t, &utilfs.DefaultFs{})
 		})
 	}
 }
@@ -404,7 +405,7 @@ func TestWriteTempDir(t *testing.T) {
 			return nil
 		},
 	}
-	c.run(t, utilfs.DefaultFs{})
+	c.run(t, &utilfs.DefaultFs{})
 }
 
 func TestReplaceDir(t *testing.T) {
@@ -470,7 +471,7 @@ func TestReplaceDir(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			c.run(t, utilfs.DefaultFs{})
+			c.run(t, &utilfs.DefaultFs{})
 		})
 	}
 }

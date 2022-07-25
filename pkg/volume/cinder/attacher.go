@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -24,11 +27,12 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -99,7 +103,7 @@ func (attacher *cinderDiskAttacher) waitOperationFinished(volumeID string) error
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
+		err = fmt.Errorf("volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
 	}
 
 	return err
@@ -121,7 +125,7 @@ func (attacher *cinderDiskAttacher) waitDiskAttached(instanceID, volumeID string
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q failed to be attached within the alloted time", volumeID)
+		err = fmt.Errorf("volume %q failed to be attached within the alloted time", volumeID)
 	}
 
 	return err
@@ -212,7 +216,7 @@ func (attacher *cinderDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nod
 }
 
 func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
-	// NOTE: devicePath is is path as reported by Cinder, which may be incorrect and should not be used. See Issue #33128
+	// NOTE: devicePath is path as reported by Cinder, which may be incorrect and should not be used. See Issue #33128
 	volumeID, _, _, err := getVolumeInfo(spec)
 	if err != nil {
 		return "", err
@@ -237,7 +241,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 				// Using the Cinder volume ID, find the real device path (See Issue #33128)
 				devicePath = attacher.cinderProvider.GetDevicePath(volumeID)
 			}
-			exists, err := volumeutil.PathExists(devicePath)
+			exists, err := mount.PathExists(devicePath)
 			if exists && err == nil {
 				klog.Infof("Successfully found attached Cinder disk %q at %v.", volumeID, devicePath)
 				return devicePath, nil
@@ -265,7 +269,7 @@ func (attacher *cinderDiskAttacher) GetDeviceMountPath(
 }
 
 // FIXME: this method can be further pruned.
-func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *cinderDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	mounter := attacher.host.GetMounter(cinderVolumePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -343,7 +347,7 @@ func (detacher *cinderDiskDetacher) waitOperationFinished(volumeID string) error
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
+		err = fmt.Errorf("volume %q is %s, can't finish within the alloted time", volumeID, volumeStatus)
 	}
 
 	return err
@@ -365,7 +369,7 @@ func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string
 	})
 
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("Volume %q failed to detach within the alloted time", volumeID)
+		err = fmt.Errorf("volume %q failed to detach within the alloted time", volumeID)
 	}
 
 	return err
@@ -403,7 +407,15 @@ func (detacher *cinderDiskDetacher) Detach(volumeName string, nodeName types.Nod
 }
 
 func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
+}
+
+func (plugin *cinderPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *cinderPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func (attacher *cinderDiskAttacher) nodeInstanceID(nodeName types.NodeName) (string, error) {

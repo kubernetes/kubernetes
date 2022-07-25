@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -58,27 +59,33 @@ func NewDesiredStateOfWorldPopulator(
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	volumePluginMgr *volume.VolumePluginMgr,
 	pvcLister corelisters.PersistentVolumeClaimLister,
-	pvLister corelisters.PersistentVolumeLister) DesiredStateOfWorldPopulator {
+	pvLister corelisters.PersistentVolumeLister,
+	csiMigratedPluginManager csimigration.PluginManager,
+	intreeToCSITranslator csimigration.InTreeToCSITranslator) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
-		loopSleepDuration:     loopSleepDuration,
-		listPodsRetryDuration: listPodsRetryDuration,
-		podLister:             podLister,
-		desiredStateOfWorld:   desiredStateOfWorld,
-		volumePluginMgr:       volumePluginMgr,
-		pvcLister:             pvcLister,
-		pvLister:              pvLister,
+		loopSleepDuration:        loopSleepDuration,
+		listPodsRetryDuration:    listPodsRetryDuration,
+		podLister:                podLister,
+		desiredStateOfWorld:      desiredStateOfWorld,
+		volumePluginMgr:          volumePluginMgr,
+		pvcLister:                pvcLister,
+		pvLister:                 pvLister,
+		csiMigratedPluginManager: csiMigratedPluginManager,
+		intreeToCSITranslator:    intreeToCSITranslator,
 	}
 }
 
 type desiredStateOfWorldPopulator struct {
-	loopSleepDuration     time.Duration
-	podLister             corelisters.PodLister
-	desiredStateOfWorld   cache.DesiredStateOfWorld
-	volumePluginMgr       *volume.VolumePluginMgr
-	pvcLister             corelisters.PersistentVolumeClaimLister
-	pvLister              corelisters.PersistentVolumeLister
-	listPodsRetryDuration time.Duration
-	timeOfLastListPods    time.Time
+	loopSleepDuration        time.Duration
+	podLister                corelisters.PodLister
+	desiredStateOfWorld      cache.DesiredStateOfWorld
+	volumePluginMgr          *volume.VolumePluginMgr
+	pvcLister                corelisters.PersistentVolumeClaimLister
+	pvLister                 corelisters.PersistentVolumeLister
+	listPodsRetryDuration    time.Duration
+	timeOfLastListPods       time.Time
+	csiMigratedPluginManager csimigration.PluginManager
+	intreeToCSITranslator    csimigration.InTreeToCSITranslator
 }
 
 func (dswp *desiredStateOfWorldPopulator) Run(stopCh <-chan struct{}) {
@@ -147,6 +154,22 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		klog.V(1).Infof("Removing pod %q (UID %q) from dsw because it does not exist in pod informer.", dswPodKey, dswPodUID)
 		dswp.desiredStateOfWorld.DeletePod(dswPodUID, dswPodToAdd.VolumeName, dswPodToAdd.NodeName)
 	}
+
+	// check if the existing volumes changes its attachability
+	for _, volumeToAttach := range dswp.desiredStateOfWorld.GetVolumesToAttach() {
+		// IsAttachableVolume() will result in a fetch of CSIDriver object if the volume plugin type is CSI.
+		// The result is returned from CSIDriverLister which is from local cache. So this is not an expensive call.
+		volumeAttachable := volutil.IsAttachableVolume(volumeToAttach.VolumeSpec, dswp.volumePluginMgr)
+		if !volumeAttachable {
+			klog.Infof("Volume %v changes from attachable to non-attachable.", volumeToAttach.VolumeName)
+			for _, scheduledPod := range volumeToAttach.ScheduledPods {
+				podUID := volutil.GetUniquePodName(scheduledPod)
+				dswp.desiredStateOfWorld.DeletePod(podUID, volumeToAttach.VolumeName, volumeToAttach.NodeName)
+				klog.V(4).Infof("Removing podUID: %v, volume: %v on node: %v from desired state of world"+
+					" because of the change of volume attachability.", podUID, volumeToAttach.VolumeName, volumeToAttach.NodeName)
+			}
+		}
+	}
 }
 
 func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
@@ -163,7 +186,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
 			continue
 		}
 		util.ProcessPodVolumes(pod, true,
-			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister)
+			dswp.desiredStateOfWorld, dswp.volumePluginMgr, dswp.pvcLister, dswp.pvLister, dswp.csiMigratedPluginManager, dswp.intreeToCSITranslator)
 
 	}
 

@@ -28,7 +28,7 @@ type String map[string]Empty
 
 // NewString creates a String from a list of values.
 func NewString(items ...string) String {
-	ss := String{}
+	ss := make(String, len(items))
 	ss.Insert(items...)
 	return ss
 }
@@ -46,17 +46,19 @@ func StringKeySet(theMap interface{}) String {
 }
 
 // Insert adds items to the set.
-func (s String) Insert(items ...string) {
+func (s String) Insert(items ...string) String {
 	for _, item := range items {
 		s[item] = Empty{}
 	}
+	return s
 }
 
 // Delete removes all items from the set.
-func (s String) Delete(items ...string) {
+func (s String) Delete(items ...string) String {
 	for _, item := range items {
 		delete(s, item)
 	}
+	return s
 }
 
 // Has returns true if and only if item is contained in the set.
@@ -85,6 +87,15 @@ func (s String) HasAny(items ...string) bool {
 	return false
 }
 
+// Clone returns a new set which is a copy of the current set.
+func (s String) Clone() String {
+	result := make(String, len(s))
+	for key := range s {
+		result.Insert(key)
+	}
+	return result
+}
+
 // Difference returns a set of objects that are not in s2
 // For example:
 // s1 = {a1, a2, a3}
@@ -108,10 +119,7 @@ func (s String) Difference(s2 String) String {
 // s1.Union(s2) = {a1, a2, a3, a4}
 // s2.Union(s1) = {a1, a2, a3, a4}
 func (s1 String) Union(s2 String) String {
-	result := NewString()
-	for key := range s1 {
-		result.Insert(key)
-	}
+	result := s1.Clone()
 	for key := range s2 {
 		result.Insert(key)
 	}

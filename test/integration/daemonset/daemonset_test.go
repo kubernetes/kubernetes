@@ -17,130 +17,90 @@ limitations under the License.
 package daemonset
 
 import (
+	"context"
 	"fmt"
-	"net/http/httptest"
 	"testing"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	appstyped "k8s.io/client-go/kubernetes/typed/apps/v1"
-	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
+	"k8s.io/kubernetes/pkg/scheduler/profile"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 var zero = int64(0)
 
-func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, server, closeFn := framework.RunAMaster(masterConfig)
+func setup(t *testing.T) (context.Context, kubeapiservertesting.TearDownFunc, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
 
-	config := restclient.Config{Host: server.URL}
-	clientSet, err := clientset.NewForConfig(&config)
+	config := restclient.CopyConfig(server.ClientConfig)
+	clientSet, err := clientset.NewForConfig(config)
 	if err != nil {
 		t.Fatalf("Error in creating clientset: %v", err)
 	}
 	resyncPeriod := 12 * time.Hour
-	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-informers")), resyncPeriod)
+	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "daemonset-informers")), resyncPeriod)
 	dc, err := daemon.NewDaemonSetsController(
 		informers.Apps().V1().DaemonSets(),
 		informers.Apps().V1().ControllerRevisions(),
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-controller")),
+		clientset.NewForConfigOrDie(restclient.AddUserAgent(config, "daemonset-controller")),
 		flowcontrol.NewBackOff(5*time.Second, 15*time.Minute),
 	)
 	if err != nil {
 		t.Fatalf("error creating DaemonSets controller: %v", err)
 	}
 
-	return server, closeFn, dc, informers, clientSet
-}
+	ctx, cancel := context.WithCancel(context.Background())
 
-func setupScheduler(
-	t *testing.T,
-	cs clientset.Interface,
-	informerFactory informers.SharedInformerFactory,
-	stopCh chan struct{},
-) {
-	// If ScheduleDaemonSetPods is disabled, do not start scheduler.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
-		return
-	}
-
-	// Enable Features.
-	algorithmprovider.ApplyFeatureGates()
-
-	schedulerConfigFactory := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
-		SchedulerName:                  v1.DefaultSchedulerName,
-		Client:                         cs,
-		NodeInformer:                   informerFactory.Core().V1().Nodes(),
-		PodInformer:                    informerFactory.Core().V1().Pods(),
-		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
-		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
-		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
-		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
-		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
-		ServiceInformer:                informerFactory.Core().V1().Services(),
-		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-		EnableEquivalenceClassCache:    false,
-		DisablePreemption:              false,
-		PercentageOfNodesToScore:       100,
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
+		Interface: clientSet.EventsV1(),
 	})
 
-	schedulerConfig, err := schedulerConfigFactory.Create()
-	if err != nil {
-		t.Fatalf("Couldn't create scheduler config: %v", err)
-	}
-
-	schedulerConfig.StopEverything = stopCh
-
-	eventBroadcaster := record.NewBroadcaster()
-	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(
-		legacyscheme.Scheme,
-		v1.EventSource{Component: v1.DefaultSchedulerName},
+	sched, err := scheduler.New(
+		clientSet,
+		informers,
+		nil,
+		profile.NewRecorderFactory(eventBroadcaster),
+		ctx.Done(),
 	)
-	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{
-		Interface: cs.CoreV1().Events(""),
-	})
-
-	sched, err := scheduler.NewFromConfigurator(
-		&scheduler.FakeConfigurator{Config: schedulerConfig}, nil...)
 	if err != nil {
-		t.Fatalf("error creating scheduler: %v", err)
+		t.Fatalf("Couldn't create scheduler: %v", err)
 	}
 
-	algorithmprovider.ApplyFeatureGates()
+	eventBroadcaster.StartRecordingToSink(ctx.Done())
+	go sched.Run(ctx)
 
-	go sched.Run()
+	tearDownFn := func() {
+		cancel()
+		server.TearDownFn()
+		eventBroadcaster.Shutdown()
+	}
+
+	return ctx, tearDownFn, dc, informers, clientSet
 }
 
 func testLabels() map[string]string {
@@ -178,7 +138,7 @@ func newDaemonSet(name, namespace string) *apps.DaemonSet {
 }
 
 func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet) {
-	ds, err := cs.AppsV1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
+	ds, err := cs.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Failed to get DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
 		return
@@ -194,14 +154,14 @@ func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet)
 	// force update to avoid version conflict
 	ds.ResourceVersion = ""
 
-	if ds, err = cs.AppsV1().DaemonSets(ds.Namespace).Update(ds); err != nil {
+	if ds, err = cs.AppsV1().DaemonSets(ds.Namespace).Update(context.TODO(), ds, metav1.UpdateOptions{}); err != nil {
 		t.Errorf("Failed to update DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
 		return
 	}
 
 	// Wait for the daemon set controller to kill all the daemon pods.
 	if err := wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		updatedDS, err := cs.AppsV1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
+		updatedDS, err := cs.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
@@ -212,8 +172,8 @@ func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet)
 	}
 
 	falseVar := false
-	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &falseVar}
-	if err := cs.AppsV1().DaemonSets(ds.Namespace).Delete(ds.Name, deleteOptions); err != nil {
+	deleteOptions := metav1.DeleteOptions{OrphanDependents: &falseVar}
+	if err := cs.AppsV1().DaemonSets(ds.Namespace).Delete(context.TODO(), ds.Name, deleteOptions); err != nil {
 		t.Errorf("Failed to delete DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
 	}
 }
@@ -234,12 +194,6 @@ func newOnDeleteStrategy() *apps.DaemonSetUpdateStrategy {
 
 func updateStrategies() []*apps.DaemonSetUpdateStrategy {
 	return []*apps.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollbackStrategy()}
-}
-
-func featureGates() []utilfeature.Feature {
-	return []utilfeature.Feature{
-		features.ScheduleDaemonSetPods,
-	}
 }
 
 func allocatableResources(memory, cpu string) v1.ResourceList {
@@ -278,7 +232,7 @@ func newNode(name string, label map[string]string) *v1.Node {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Labels:    label,
-			Namespace: metav1.NamespaceDefault,
+			Namespace: metav1.NamespaceNone,
 		},
 		Status: v1.NodeStatus{
 			Conditions:  []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
@@ -287,9 +241,9 @@ func newNode(name string, label map[string]string) *v1.Node {
 	}
 }
 
-func addNodes(nodeClient corev1typed.NodeInterface, startIndex, numNodes int, label map[string]string, t *testing.T) {
+func addNodes(nodeClient corev1client.NodeInterface, startIndex, numNodes int, label map[string]string, t *testing.T) {
 	for i := startIndex; i < startIndex+numNodes; i++ {
-		_, err := nodeClient.Create(newNode(fmt.Sprintf("node-%d", i), label))
+		_, err := nodeClient.Create(context.TODO(), newNode(fmt.Sprintf("node-%d", i), label), metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create node: %v", err)
 		}
@@ -297,12 +251,12 @@ func addNodes(nodeClient corev1typed.NodeInterface, startIndex, numNodes int, la
 }
 
 func validateDaemonSetPodsAndMarkReady(
-	podClient corev1typed.PodInterface,
+	podClient corev1client.PodInterface,
 	podInformer cache.SharedIndexInformer,
 	numberPods int,
 	t *testing.T,
 ) {
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) != numberPods {
 			return false, nil
@@ -329,7 +283,7 @@ func validateDaemonSetPodsAndMarkReady(
 					Phase:      v1.PodRunning,
 					Conditions: []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}},
 				}
-				_, err := podClient.UpdateStatus(podCopy)
+				_, err := podClient.UpdateStatus(context.TODO(), podCopy, metav1.UpdateOptions{})
 				if err != nil {
 					return false, err
 				}
@@ -346,8 +300,8 @@ func validateDaemonSetPodsAndMarkReady(
 // gets unschedulable status.
 func podUnschedulable(c clientset.Interface, podNamespace, podName string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(podNamespace).Get(podName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		pod, err := c.CoreV1().Pods(podNamespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		if err != nil {
@@ -382,7 +336,7 @@ func waitForPodsCreated(podInformer cache.SharedIndexInformer, num int) error {
 
 func waitForDaemonSetAndControllerRevisionCreated(c clientset.Interface, name string, namespace string) error {
 	return wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
-		ds, err := c.AppsV1().DaemonSets(namespace).Get(name, metav1.GetOptions{})
+		ds, err := c.AppsV1().DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -390,7 +344,7 @@ func waitForDaemonSetAndControllerRevisionCreated(c clientset.Interface, name st
 			return false, nil
 		}
 
-		revs, err := c.AppsV1().ControllerRevisions(namespace).List(metav1.ListOptions{})
+		revs, err := c.AppsV1().ControllerRevisions(namespace).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -416,7 +370,7 @@ func hashAndNameForDaemonSet(ds *apps.DaemonSet) (string, string) {
 }
 
 func validateDaemonSetCollisionCount(dsClient appstyped.DaemonSetInterface, dsName string, expCount int32, t *testing.T) {
-	ds, err := dsClient.Get(dsName, metav1.GetOptions{})
+	ds, err := dsClient.Get(context.TODO(), dsName, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to look up DaemonSet: %v", err)
 	}
@@ -431,8 +385,8 @@ func validateDaemonSetStatus(
 	dsName string,
 	expectedNumberReady int32,
 	t *testing.T) {
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-		ds, err := dsClient.Get(dsName, metav1.GetOptions{})
+	if err := wait.Poll(time.Second, 60*time.Second, func() (bool, error) {
+		ds, err := dsClient.Get(context.TODO(), dsName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -442,40 +396,15 @@ func validateDaemonSetStatus(
 	}
 }
 
-func validateFailedPlacementEvent(eventClient corev1typed.EventInterface, t *testing.T) {
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-		eventList, err := eventClient.List(metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-		if len(eventList.Items) == 0 {
-			return false, nil
-		}
-		if len(eventList.Items) > 1 {
-			t.Errorf("Expected 1 event got %d", len(eventList.Items))
-		}
-		event := eventList.Items[0]
-		if event.Type != v1.EventTypeWarning {
-			t.Errorf("Event type expected %s got %s", v1.EventTypeWarning, event.Type)
-		}
-		if event.Reason != daemon.FailedPlacementReason {
-			t.Errorf("Event reason expected %s got %s", daemon.FailedPlacementReason, event.Reason)
-		}
-		return true, nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func updateDS(t *testing.T, dsClient appstyped.DaemonSetInterface, dsName string, updateFunc func(*apps.DaemonSet)) *apps.DaemonSet {
 	var ds *apps.DaemonSet
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newDS, err := dsClient.Get(dsName, metav1.GetOptions{})
+		newDS, err := dsClient.Get(context.TODO(), dsName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		updateFunc(newDS)
-		ds, err = dsClient.Update(newDS)
+		ds, err = dsClient.Update(context.TODO(), newDS, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		t.Fatalf("Failed to update DaemonSet: %v", err)
@@ -483,207 +412,157 @@ func updateDS(t *testing.T, dsClient appstyped.DaemonSetInterface, dsName string
 	return ds
 }
 
-func forEachFeatureGate(t *testing.T, tf func(t *testing.T)) {
-	for _, fg := range featureGates() {
-		func() {
-			enabled := utilfeature.DefaultFeatureGate.Enabled(fg)
-			defer func() {
-				if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, enabled)); err != nil {
-					t.Fatalf("Failed to set FeatureGate %v to %t", fg, enabled)
-				}
-			}()
-
-			for _, f := range []bool{true, false} {
-				if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=%t", fg, f)); err != nil {
-					t.Fatalf("Failed to set FeatureGate %v to %t", fg, f)
-				}
-				t.Run(fmt.Sprintf("%v (%t)", fg, f), tf)
-			}
-		}()
-	}
-}
-
 func forEachStrategy(t *testing.T, tf func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy)) {
 	for _, strategy := range updateStrategies() {
-		t.Run(fmt.Sprintf("%s (%v)", t.Name(), strategy),
+		t.Run(fmt.Sprintf("%s_%s", t.Name(), strategy.Type),
 			func(tt *testing.T) { tf(tt, strategy) })
 	}
 }
 
 func TestOneNodeDaemonLaunchesPod(t *testing.T) {
-	forEachFeatureGate(t, func(t *testing.T) {
-		forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-			server, closeFn, dc, informers, clientset := setup(t)
-			defer closeFn()
-			ns := framework.CreateTestingNamespace("one-node-daemonset-test", server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
-
-			dsClient := clientset.AppsV1().DaemonSets(ns.Name)
-			podClient := clientset.CoreV1().Pods(ns.Name)
-			nodeClient := clientset.CoreV1().Nodes()
-			podInformer := informers.Core().V1().Pods().Informer()
-
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-
-			informers.Start(stopCh)
-			go dc.Run(5, stopCh)
-
-			// Start Scheduler
-			setupScheduler(t, clientset, informers, stopCh)
-
-			ds := newDaemonSet("foo", ns.Name)
-			ds.Spec.UpdateStrategy = *strategy
-			_, err := dsClient.Create(ds)
-			if err != nil {
-				t.Fatalf("Failed to create DaemonSet: %v", err)
-			}
-			defer cleanupDaemonSets(t, clientset, ds)
-
-			_, err = nodeClient.Create(newNode("single-node", nil))
-			if err != nil {
-				t.Fatalf("Failed to create node: %v", err)
-			}
-
-			validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
-			validateDaemonSetStatus(dsClient, ds.Name, 1, t)
-		})
-	})
-}
-
-func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
-	forEachFeatureGate(t, func(t *testing.T) {
-		forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-			server, closeFn, dc, informers, clientset := setup(t)
-			defer closeFn()
-			ns := framework.CreateTestingNamespace("simple-daemonset-test", server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
-
-			dsClient := clientset.AppsV1().DaemonSets(ns.Name)
-			podClient := clientset.CoreV1().Pods(ns.Name)
-			nodeClient := clientset.CoreV1().Nodes()
-			podInformer := informers.Core().V1().Pods().Informer()
-
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-
-			informers.Start(stopCh)
-			go dc.Run(5, stopCh)
-
-			// Start Scheduler
-			setupScheduler(t, clientset, informers, stopCh)
-
-			ds := newDaemonSet("foo", ns.Name)
-			ds.Spec.UpdateStrategy = *strategy
-			_, err := dsClient.Create(ds)
-			if err != nil {
-				t.Fatalf("Failed to create DaemonSet: %v", err)
-			}
-			defer cleanupDaemonSets(t, clientset, ds)
-
-			addNodes(nodeClient, 0, 5, nil, t)
-
-			validateDaemonSetPodsAndMarkReady(podClient, podInformer, 5, t)
-			validateDaemonSetStatus(dsClient, ds.Name, 5, t)
-		})
-	})
-}
-
-func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
-	forEachFeatureGate(t, func(t *testing.T) {
-		forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-			server, closeFn, dc, informers, clientset := setup(t)
-			defer closeFn()
-			ns := framework.CreateTestingNamespace("simple-daemonset-test", server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
-
-			dsClient := clientset.AppsV1().DaemonSets(ns.Name)
-			podClient := clientset.CoreV1().Pods(ns.Name)
-			nodeClient := clientset.CoreV1().Nodes()
-			podInformer := informers.Core().V1().Pods().Informer()
-
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-
-			informers.Start(stopCh)
-			go dc.Run(5, stopCh)
-
-			// Start Scheduler
-			setupScheduler(t, clientset, informers, stopCh)
-
-			ds := newDaemonSet("foo", ns.Name)
-			ds.Spec.UpdateStrategy = *strategy
-
-			ds.Spec.Template.Spec.Affinity = &v1.Affinity{
-				NodeAffinity: &v1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{
-							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
-									{
-										Key:      "zone",
-										Operator: v1.NodeSelectorOpIn,
-										Values:   []string{"test"},
-									},
-								},
-							},
-							{
-								MatchFields: []v1.NodeSelectorRequirement{
-									{
-										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
-										Operator: v1.NodeSelectorOpIn,
-										Values:   []string{"node-1"},
-									},
-								},
-							},
-						},
-					},
-				},
-			}
-
-			_, err := dsClient.Create(ds)
-			if err != nil {
-				t.Fatalf("Failed to create DaemonSet: %v", err)
-			}
-			defer cleanupDaemonSets(t, clientset, ds)
-
-			addNodes(nodeClient, 0, 2, nil, t)
-			// Two nodes with labels
-			addNodes(nodeClient, 2, 2, map[string]string{
-				"zone": "test",
-			}, t)
-			addNodes(nodeClient, 4, 2, nil, t)
-
-			validateDaemonSetPodsAndMarkReady(podClient, podInformer, 3, t)
-			validateDaemonSetStatus(dsClient, ds.Name, 3, t)
-		})
-	})
-}
-
-func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-		server, closeFn, dc, informers, clientset := setup(t)
+		ctx, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
-		ns := framework.CreateTestingNamespace("simple-daemonset-test", server, t)
-		defer framework.DeleteTestingNamespace(ns, server, t)
+		ns := framework.CreateNamespaceOrDie(clientset, "one-node-daemonset-test", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		podClient := clientset.CoreV1().Pods(ns.Name)
 		nodeClient := clientset.CoreV1().Nodes()
 		podInformer := informers.Core().V1().Pods().Informer()
 
-		stopCh := make(chan struct{})
-		defer close(stopCh)
-
-		informers.Start(stopCh)
-		go dc.Run(5, stopCh)
-
-		// Start Scheduler
-		setupScheduler(t, clientset, informers, stopCh)
+		informers.Start(ctx.Done())
+		go dc.Run(ctx, 2)
 
 		ds := newDaemonSet("foo", ns.Name)
 		ds.Spec.UpdateStrategy = *strategy
-		_, err := dsClient.Create(ds)
+		_, err := dsClient.Create(context.TODO(), ds, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create DaemonSet: %v", err)
+		}
+		defer cleanupDaemonSets(t, clientset, ds)
+
+		_, err = nodeClient.Create(context.TODO(), newNode("single-node", nil), metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+
+		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
+		validateDaemonSetStatus(dsClient, ds.Name, 1, t)
+	})
+}
+
+func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
+	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+		ctx, closeFn, dc, informers, clientset := setup(t)
+		defer closeFn()
+		ns := framework.CreateNamespaceOrDie(clientset, "simple-daemonset-test", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
+
+		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
+		podClient := clientset.CoreV1().Pods(ns.Name)
+		nodeClient := clientset.CoreV1().Nodes()
+		podInformer := informers.Core().V1().Pods().Informer()
+
+		informers.Start(ctx.Done())
+		go dc.Run(ctx, 2)
+
+		ds := newDaemonSet("foo", ns.Name)
+		ds.Spec.UpdateStrategy = *strategy
+		_, err := dsClient.Create(context.TODO(), ds, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create DaemonSet: %v", err)
+		}
+		defer cleanupDaemonSets(t, clientset, ds)
+
+		addNodes(nodeClient, 0, 5, nil, t)
+
+		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 5, t)
+		validateDaemonSetStatus(dsClient, ds.Name, 5, t)
+	})
+}
+
+func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
+	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+		ctx, closeFn, dc, informers, clientset := setup(t)
+		defer closeFn()
+		ns := framework.CreateNamespaceOrDie(clientset, "simple-daemonset-test", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
+
+		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
+		podClient := clientset.CoreV1().Pods(ns.Name)
+		nodeClient := clientset.CoreV1().Nodes()
+		podInformer := informers.Core().V1().Pods().Informer()
+
+		informers.Start(ctx.Done())
+		go dc.Run(ctx, 2)
+
+		ds := newDaemonSet("foo", ns.Name)
+		ds.Spec.UpdateStrategy = *strategy
+
+		ds.Spec.Template.Spec.Affinity = &v1.Affinity{
+			NodeAffinity: &v1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+					NodeSelectorTerms: []v1.NodeSelectorTerm{
+						{
+							MatchExpressions: []v1.NodeSelectorRequirement{
+								{
+									Key:      "zone",
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"test"},
+								},
+							},
+						},
+						{
+							MatchFields: []v1.NodeSelectorRequirement{
+								{
+									Key:      metav1.ObjectNameField,
+									Operator: v1.NodeSelectorOpIn,
+									Values:   []string{"node-1"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		_, err := dsClient.Create(context.TODO(), ds, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create DaemonSet: %v", err)
+		}
+		defer cleanupDaemonSets(t, clientset, ds)
+
+		addNodes(nodeClient, 0, 2, nil, t)
+		// Two nodes with labels
+		addNodes(nodeClient, 2, 2, map[string]string{
+			"zone": "test",
+		}, t)
+		addNodes(nodeClient, 4, 2, nil, t)
+
+		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 3, t)
+		validateDaemonSetStatus(dsClient, ds.Name, 3, t)
+	})
+}
+
+func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
+	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+		ctx, closeFn, dc, informers, clientset := setup(t)
+		defer closeFn()
+		ns := framework.CreateNamespaceOrDie(clientset, "simple-daemonset-test", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
+
+		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
+		podClient := clientset.CoreV1().Pods(ns.Name)
+		nodeClient := clientset.CoreV1().Nodes()
+		podInformer := informers.Core().V1().Pods().Informer()
+
+		informers.Start(ctx.Done())
+		go dc.Run(ctx, 2)
+
+		ds := newDaemonSet("foo", ns.Name)
+		ds.Spec.UpdateStrategy = *strategy
+		_, err := dsClient.Create(context.TODO(), ds, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create DaemonSet: %v", err)
 		}
@@ -694,7 +573,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 		node.Status.Conditions = []v1.NodeCondition{
 			{Type: v1.NodeReady, Status: v1.ConditionFalse},
 		}
-		_, err = nodeClient.Create(node)
+		_, err = nodeClient.Create(context.TODO(), node, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create node: %v", err)
 		}
@@ -704,98 +583,28 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 	})
 }
 
-func setFeatureGate(t *testing.T, feature utilfeature.Feature, enabled bool) {
-	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", feature, enabled)); err != nil {
-		t.Fatalf("Failed to set FeatureGate %v to %t: %v", feature, enabled, err)
-	}
-}
-
-// When ScheduleDaemonSetPods is disabled, DaemonSets should not launch onto nodes with insufficient capacity.
-// Look for TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled, we don't need this test anymore.
-func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods)
-	// Rollback feature gate.
-	defer func() {
-		if enabled {
-			setFeatureGate(t, features.ScheduleDaemonSetPods, true)
-		}
-	}()
-	setFeatureGate(t, features.ScheduleDaemonSetPods, false)
+// TestInsufficientCapacityNodeDaemonSetCreateButNotLaunchPod tests thaat the DaemonSet should create
+// Pods for all the nodes regardless of available resource on the nodes, and kube-scheduler should
+// not schedule Pods onto the nodes with insufficient resource.
+func TestInsufficientCapacityNode(t *testing.T) {
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-		server, closeFn, dc, informers, clientset := setup(t)
+		ctx, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
-		ns := framework.CreateTestingNamespace("insufficient-capacity", server, t)
-		defer framework.DeleteTestingNamespace(ns, server, t)
-
-		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
-		nodeClient := clientset.CoreV1().Nodes()
-		eventClient := clientset.CoreV1().Events(ns.Namespace)
-
-		stopCh := make(chan struct{})
-		defer close(stopCh)
-
-		informers.Start(stopCh)
-		go dc.Run(5, stopCh)
-
-		ds := newDaemonSet("foo", ns.Name)
-		ds.Spec.Template.Spec = resourcePodSpec("node-with-limited-memory", "120M", "75m")
-		ds.Spec.UpdateStrategy = *strategy
-		_, err := dsClient.Create(ds)
-		if err != nil {
-			t.Fatalf("Failed to create DaemonSet: %v", err)
-		}
-		defer cleanupDaemonSets(t, clientset, ds)
-
-		node := newNode("node-with-limited-memory", nil)
-		node.Status.Allocatable = allocatableResources("100M", "200m")
-		_, err = nodeClient.Create(node)
-		if err != nil {
-			t.Fatalf("Failed to create node: %v", err)
-		}
-
-		validateFailedPlacementEvent(eventClient, t)
-	})
-}
-
-// TestInsufficientCapacityNodeDaemonSetCreateButNotLaunchPod tests that when "ScheduleDaemonSetPods"
-// feature is enabled, the DaemonSet should create Pods for all the nodes regardless of available resource
-// on the nodes, and kube-scheduler should not schedule Pods onto the nodes with insufficient resource.
-func TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled(t *testing.T) {
-	enabled := utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods)
-	defer func() {
-		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t",
-			features.ScheduleDaemonSetPods, enabled)); err != nil {
-			t.Fatalf("Failed to set FeatureGate %v to %t", features.ScheduleDaemonSetPods, enabled)
-		}
-	}()
-
-	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.ScheduleDaemonSetPods, true)); err != nil {
-		t.Fatalf("Failed to set FeatureGate %v to %t", features.ScheduleDaemonSetPods, true)
-	}
-
-	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-		server, closeFn, dc, informers, clientset := setup(t)
-		defer closeFn()
-		ns := framework.CreateTestingNamespace("insufficient-capacity", server, t)
-		defer framework.DeleteTestingNamespace(ns, server, t)
+		ns := framework.CreateNamespaceOrDie(clientset, "insufficient-capacity", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 		podClient := clientset.CoreV1().Pods(ns.Name)
 		podInformer := informers.Core().V1().Pods().Informer()
 		nodeClient := clientset.CoreV1().Nodes()
-		stopCh := make(chan struct{})
-		defer close(stopCh)
 
-		informers.Start(stopCh)
-		go dc.Run(5, stopCh)
-
-		// Start Scheduler
-		setupScheduler(t, clientset, informers, stopCh)
+		informers.Start(ctx.Done())
+		go dc.Run(ctx, 2)
 
 		ds := newDaemonSet("foo", ns.Name)
 		ds.Spec.Template.Spec = resourcePodSpec("", "120M", "75m")
 		ds.Spec.UpdateStrategy = *strategy
-		ds, err := dsClient.Create(ds)
+		ds, err := dsClient.Create(context.TODO(), ds, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create DaemonSet: %v", err)
 		}
@@ -804,7 +613,7 @@ func TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled(t *testing.T) 
 
 		node := newNode("node-with-limited-memory", nil)
 		node.Status.Allocatable = allocatableResources("100M", "200m")
-		_, err = nodeClient.Create(node)
+		_, err = nodeClient.Create(context.TODO(), node, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create node: %v", err)
 		}
@@ -823,13 +632,12 @@ func TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled(t *testing.T) 
 
 		node1 := newNode("node-with-enough-memory", nil)
 		node1.Status.Allocatable = allocatableResources("200M", "2000m")
-		_, err = nodeClient.Create(node1)
+		_, err = nodeClient.Create(context.TODO(), node1, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed to create node: %v", err)
 		}
 
-		// When ScheduleDaemonSetPods enabled, 2 pods are created. But only one
-		// of two Pods is scheduled by default scheduler.
+		// 2 pods are created. But only one of two Pods is scheduled by default scheduler.
 		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 2, t)
 		validateDaemonSetStatus(dsClient, ds.Name, 1, t)
 	})
@@ -838,25 +646,20 @@ func TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled(t *testing.T) 
 // TestLaunchWithHashCollision tests that a DaemonSet can be updated even if there is a
 // hash collision with an existing ControllerRevision
 func TestLaunchWithHashCollision(t *testing.T) {
-	server, closeFn, dc, informers, clientset := setup(t)
+	ctx, closeFn, dc, informers, clientset := setup(t)
 	defer closeFn()
-	ns := framework.CreateTestingNamespace("one-node-daemonset-test", server, t)
-	defer framework.DeleteTestingNamespace(ns, server, t)
+	ns := framework.CreateNamespaceOrDie(clientset, "one-node-daemonset-test", t)
+	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
 	dsClient := clientset.AppsV1().DaemonSets(ns.Name)
 	podInformer := informers.Core().V1().Pods().Informer()
 	nodeClient := clientset.CoreV1().Nodes()
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
-	informers.Start(stopCh)
-	go dc.Run(1, stopCh)
-
-	setupScheduler(t, clientset, informers, stopCh)
+	informers.Start(ctx.Done())
+	go dc.Run(ctx, 2)
 
 	// Create single node
-	_, err := nodeClient.Create(newNode("single-node", nil))
+	_, err := nodeClient.Create(context.TODO(), newNode("single-node", nil), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create node: %v", err)
 	}
@@ -870,7 +673,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 			MaxUnavailable: &oneIntString,
 		},
 	}
-	ds, err := dsClient.Create(orgDs)
+	ds, err := dsClient.Create(context.TODO(), orgDs, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create DaemonSet: %v", err)
 	}
@@ -881,7 +684,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 		t.Fatalf("Failed to create DaemonSet: %v", err)
 	}
 
-	ds, err = dsClient.Get(ds.Name, metav1.GetOptions{})
+	ds, err = dsClient.Get(context.TODO(), ds.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get DaemonSet: %v", err)
 	}
@@ -892,7 +695,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 
 	// Look up the ControllerRevision for the DaemonSet
 	_, name := hashAndNameForDaemonSet(ds)
-	revision, err := clientset.AppsV1().ControllerRevisions(ds.Namespace).Get(name, metav1.GetOptions{})
+	revision, err := clientset.AppsV1().ControllerRevisions(ds.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil || revision == nil {
 		t.Fatalf("Failed to look up ControllerRevision: %v", err)
 	}
@@ -914,7 +717,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 		Data:     revision.Data,
 		Revision: revision.Revision + 1,
 	}
-	_, err = clientset.AppsV1().ControllerRevisions(ds.Namespace).Create(newRevision)
+	_, err = clientset.AppsV1().ControllerRevisions(ds.Namespace).Create(context.TODO(), newRevision, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create ControllerRevision: %v", err)
 	}
@@ -943,152 +746,249 @@ func TestLaunchWithHashCollision(t *testing.T) {
 	validateDaemonSetCollisionCount(dsClient, ds.Name, orgCollisionCount+1, t)
 }
 
-// TestTaintedNode tests that no matter "ScheduleDaemonSetPods" feature is enabled or not
-// tainted node isn't expected to have pod scheduled
+// Test DaemonSet Controller updates label of the pod after "DedupCurHistories". The scenario is
+// 1. Create an another controllerrevision owned by the daemonset but with higher revision and different hash
+// 2. Add a node to ensure the controller sync
+// 3. The dsc is expected to "PATCH" the existing pod label with new hash and deletes the old controllerrevision once finishes the update
+func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
+	ctx, closeFn, dc, informers, clientset := setup(t)
+	defer closeFn()
+	ns := framework.CreateNamespaceOrDie(clientset, "one-node-daemonset-test", t)
+	defer framework.DeleteNamespaceOrDie(clientset, ns, t)
+
+	dsClient := clientset.AppsV1().DaemonSets(ns.Name)
+	podInformer := informers.Core().V1().Pods().Informer()
+	nodeClient := clientset.CoreV1().Nodes()
+
+	informers.Start(ctx.Done())
+	go dc.Run(ctx, 2)
+
+	// Create single node
+	_, err := nodeClient.Create(context.TODO(), newNode("single-node", nil), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+
+	// Create new DaemonSet with RollingUpdate strategy
+	orgDs := newDaemonSet("foo", ns.Name)
+	oneIntString := intstr.FromInt(1)
+	orgDs.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
+		Type: apps.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &apps.RollingUpdateDaemonSet{
+			MaxUnavailable: &oneIntString,
+		},
+	}
+	ds, err := dsClient.Create(context.TODO(), orgDs, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create DaemonSet: %v", err)
+	}
+	t.Logf("ds created")
+	// Wait for the DaemonSet to be created before proceeding
+	err = waitForDaemonSetAndControllerRevisionCreated(clientset, ds.Name, ds.Namespace)
+	if err != nil {
+		t.Fatalf("Failed to create DaemonSet: %v", err)
+	}
+
+	ds, err = dsClient.Get(context.TODO(), ds.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get DaemonSet: %v", err)
+	}
+
+	// Look up the ControllerRevision for the DaemonSet
+	_, name := hashAndNameForDaemonSet(ds)
+	revision, err := clientset.AppsV1().ControllerRevisions(ds.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil || revision == nil {
+		t.Fatalf("Failed to look up ControllerRevision: %v", err)
+	}
+	t.Logf("revision: %v", revision.Name)
+
+	// Create a "fake" ControllerRevision which is owned by the same daemonset
+	one := int64(1)
+	ds.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
+
+	newHash, newName := hashAndNameForDaemonSet(ds)
+	newRevision := &apps.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            newName,
+			Namespace:       ds.Namespace,
+			Labels:          labelsutil.CloneAndAddLabel(ds.Spec.Template.Labels, apps.DefaultDaemonSetUniqueLabelKey, newHash),
+			Annotations:     ds.Annotations,
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(ds, apps.SchemeGroupVersion.WithKind("DaemonSet"))},
+		},
+		Data:     revision.Data,
+		Revision: revision.Revision + 1,
+	}
+	_, err = clientset.AppsV1().ControllerRevisions(ds.Namespace).Create(context.TODO(), newRevision, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create ControllerRevision: %v", err)
+	}
+	t.Logf("revision: %v", newName)
+
+	// ensure the daemonset to be synced
+	_, err = nodeClient.Create(context.TODO(), newNode("second-node", nil), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create node: %v", err)
+	}
+
+	// check whether the pod label is updated after controllerrevision is created
+	err = wait.PollImmediate(100*time.Millisecond, 10*time.Second, func() (bool, error) {
+		objects := podInformer.GetIndexer().List()
+		for _, object := range objects {
+			pod := object.(*v1.Pod)
+			t.Logf("newHash: %v, label: %v", newHash, pod.ObjectMeta.Labels[apps.DefaultDaemonSetUniqueLabelKey])
+			for _, oref := range pod.OwnerReferences {
+				if oref.Name == ds.Name && oref.UID == ds.UID && oref.Kind == "DaemonSet" {
+					if pod.ObjectMeta.Labels[apps.DefaultDaemonSetUniqueLabelKey] != newHash {
+						return false, nil
+					}
+				}
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("Failed to update the pod label after new controllerrevision is created: %v", err)
+	}
+
+	revs, err := clientset.AppsV1().ControllerRevisions(ds.Namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("Failed to list controllerrevision: %v", err)
+	}
+	if revs.Size() == 0 {
+		t.Fatalf("No avaialable controllerrevision")
+	}
+
+	for _, rev := range revs.Items {
+		t.Logf("revision: %v;hash: %v", rev.Name, rev.ObjectMeta.Labels[apps.DefaultDaemonSetUniqueLabelKey])
+		for _, oref := range rev.OwnerReferences {
+			if oref.Kind == "DaemonSet" && oref.UID == ds.UID {
+				if rev.Name != newName {
+					t.Fatalf("duplicate controllerrevision is not deleted")
+				}
+			}
+		}
+	}
+}
+
+// TestTaintedNode tests tainted node isn't expected to have pod scheduled
 func TestTaintedNode(t *testing.T) {
-	forEachFeatureGate(t, func(t *testing.T) {
-		forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-			server, closeFn, dc, informers, clientset := setup(t)
-			defer closeFn()
-			ns := framework.CreateTestingNamespace("tainted-node", server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
+	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+		ctx, closeFn, dc, informers, clientset := setup(t)
+		defer closeFn()
+		ns := framework.CreateNamespaceOrDie(clientset, "tainted-node", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
 
-			dsClient := clientset.AppsV1().DaemonSets(ns.Name)
-			podClient := clientset.CoreV1().Pods(ns.Name)
-			podInformer := informers.Core().V1().Pods().Informer()
-			nodeClient := clientset.CoreV1().Nodes()
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
+		podClient := clientset.CoreV1().Pods(ns.Name)
+		podInformer := informers.Core().V1().Pods().Informer()
+		nodeClient := clientset.CoreV1().Nodes()
 
-			informers.Start(stopCh)
-			go dc.Run(5, stopCh)
+		informers.Start(ctx.Done())
+		go dc.Run(ctx, 2)
 
-			// Start Scheduler
-			setupScheduler(t, clientset, informers, stopCh)
+		ds := newDaemonSet("foo", ns.Name)
+		ds.Spec.UpdateStrategy = *strategy
+		ds, err := dsClient.Create(context.TODO(), ds, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create DaemonSet: %v", err)
+		}
 
-			ds := newDaemonSet("foo", ns.Name)
-			ds.Spec.UpdateStrategy = *strategy
-			ds, err := dsClient.Create(ds)
-			if err != nil {
-				t.Fatalf("Failed to create DaemonSet: %v", err)
-			}
+		defer cleanupDaemonSets(t, clientset, ds)
 
-			defer cleanupDaemonSets(t, clientset, ds)
+		nodeWithTaint := newNode("node-with-taint", nil)
+		nodeWithTaint.Spec.Taints = []v1.Taint{{Key: "key1", Value: "val1", Effect: "NoSchedule"}}
+		_, err = nodeClient.Create(context.TODO(), nodeWithTaint, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create nodeWithTaint: %v", err)
+		}
 
-			nodeWithTaint := newNode("node-with-taint", nil)
-			nodeWithTaint.Spec.Taints = []v1.Taint{{Key: "key1", Value: "val1", Effect: "NoSchedule"}}
-			_, err = nodeClient.Create(nodeWithTaint)
-			if err != nil {
-				t.Fatalf("Failed to create nodeWithTaint: %v", err)
-			}
+		nodeWithoutTaint := newNode("node-without-taint", nil)
+		_, err = nodeClient.Create(context.TODO(), nodeWithoutTaint, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create nodeWithoutTaint: %v", err)
+		}
 
-			nodeWithoutTaint := newNode("node-without-taint", nil)
-			_, err = nodeClient.Create(nodeWithoutTaint)
-			if err != nil {
-				t.Fatalf("Failed to create nodeWithoutTaint: %v", err)
-			}
+		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
+		validateDaemonSetStatus(dsClient, ds.Name, 1, t)
 
-			validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
-			validateDaemonSetStatus(dsClient, ds.Name, 1, t)
+		// remove taint from nodeWithTaint
+		nodeWithTaint, err = nodeClient.Get(context.TODO(), "node-with-taint", metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Failed to retrieve nodeWithTaint: %v", err)
+		}
+		nodeWithTaintCopy := nodeWithTaint.DeepCopy()
+		nodeWithTaintCopy.Spec.Taints = []v1.Taint{}
+		_, err = nodeClient.Update(context.TODO(), nodeWithTaintCopy, metav1.UpdateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to update nodeWithTaint: %v", err)
+		}
 
-			// remove taint from nodeWithTaint
-			nodeWithTaint, err = nodeClient.Get("node-with-taint", metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("Failed to retrieve nodeWithTaint: %v", err)
-			}
-			nodeWithTaintCopy := nodeWithTaint.DeepCopy()
-			nodeWithTaintCopy.Spec.Taints = []v1.Taint{}
-			_, err = nodeClient.Update(nodeWithTaintCopy)
-			if err != nil {
-				t.Fatalf("Failed to update nodeWithTaint: %v", err)
-			}
-
-			validateDaemonSetPodsAndMarkReady(podClient, podInformer, 2, t)
-			validateDaemonSetStatus(dsClient, ds.Name, 2, t)
-		})
+		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 2, t)
+		validateDaemonSetStatus(dsClient, ds.Name, 2, t)
 	})
 }
 
 // TestUnschedulableNodeDaemonDoesLaunchPod tests that the DaemonSet Pods can still be scheduled
-// to the Unschedulable nodes when TaintNodesByCondition are enabled.
+// to the Unschedulable nodes.
 func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
-	enabledTaint := utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition)
-	defer func() {
-		if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t",
-			features.TaintNodesByCondition, enabledTaint)); err != nil {
-			t.Fatalf("Failed to set FeatureGate %v to %t", features.TaintNodesByCondition, enabledTaint)
+	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+		ctx, closeFn, dc, informers, clientset := setup(t)
+		defer closeFn()
+		ns := framework.CreateNamespaceOrDie(clientset, "daemonset-unschedulable-test", t)
+		defer framework.DeleteNamespaceOrDie(clientset, ns, t)
+
+		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
+		podClient := clientset.CoreV1().Pods(ns.Name)
+		nodeClient := clientset.CoreV1().Nodes()
+		podInformer := informers.Core().V1().Pods().Informer()
+
+		informers.Start(ctx.Done())
+		go dc.Run(ctx, 2)
+
+		ds := newDaemonSet("foo", ns.Name)
+		ds.Spec.UpdateStrategy = *strategy
+		ds.Spec.Template.Spec.HostNetwork = true
+		_, err := dsClient.Create(ctx, ds, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create DaemonSet: %v", err)
 		}
-	}()
-	if err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=%t", features.TaintNodesByCondition, true)); err != nil {
-		t.Fatalf("Failed to set FeatureGate %v to %t", features.TaintNodesByCondition, true)
-	}
 
-	forEachFeatureGate(t, func(t *testing.T) {
-		forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-			server, closeFn, dc, informers, clientset := setup(t)
-			defer closeFn()
-			ns := framework.CreateTestingNamespace("daemonset-unschedulable-test", server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
+		defer cleanupDaemonSets(t, clientset, ds)
 
-			dsClient := clientset.AppsV1().DaemonSets(ns.Name)
-			podClient := clientset.CoreV1().Pods(ns.Name)
-			nodeClient := clientset.CoreV1().Nodes()
-			podInformer := informers.Core().V1().Pods().Informer()
+		// Creates unschedulable node.
+		node := newNode("unschedulable-node", nil)
+		node.Spec.Unschedulable = true
+		node.Spec.Taints = []v1.Taint{
+			{
+				Key:    v1.TaintNodeUnschedulable,
+				Effect: v1.TaintEffectNoSchedule,
+			},
+		}
 
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+		_, err = nodeClient.Create(ctx, node, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
 
-			informers.Start(stopCh)
-			go dc.Run(5, stopCh)
+		// Creates network-unavailable node.
+		nodeNU := newNode("network-unavailable-node", nil)
+		nodeNU.Status.Conditions = []v1.NodeCondition{
+			{Type: v1.NodeReady, Status: v1.ConditionFalse},
+			{Type: v1.NodeNetworkUnavailable, Status: v1.ConditionTrue},
+		}
+		nodeNU.Spec.Taints = []v1.Taint{
+			{
+				Key:    v1.TaintNodeNetworkUnavailable,
+				Effect: v1.TaintEffectNoSchedule,
+			},
+		}
 
-			// Start Scheduler
-			setupScheduler(t, clientset, informers, stopCh)
+		_, err = nodeClient.Create(ctx, nodeNU, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
 
-			ds := newDaemonSet("foo", ns.Name)
-			ds.Spec.UpdateStrategy = *strategy
-			ds.Spec.Template.Spec.HostNetwork = true
-			_, err := dsClient.Create(ds)
-			if err != nil {
-				t.Fatalf("Failed to create DaemonSet: %v", err)
-			}
-
-			defer cleanupDaemonSets(t, clientset, ds)
-
-			// Creates unschedulable node.
-			node := newNode("unschedulable-node", nil)
-			node.Spec.Unschedulable = true
-			node.Spec.Taints = []v1.Taint{
-				{
-					Key:    schedulerapi.TaintNodeUnschedulable,
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			}
-
-			_, err = nodeClient.Create(node)
-			if err != nil {
-				t.Fatalf("Failed to create node: %v", err)
-			}
-
-			// Creates network-unavailable node.
-			nodeNU := newNode("network-unavailable-node", nil)
-			nodeNU.Status.Conditions = []v1.NodeCondition{
-				{Type: v1.NodeReady, Status: v1.ConditionFalse},
-				{Type: v1.NodeNetworkUnavailable, Status: v1.ConditionTrue},
-			}
-			nodeNU.Spec.Taints = []v1.Taint{
-				{
-					Key:    schedulerapi.TaintNodeNetworkUnavailable,
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			}
-
-			_, err = nodeClient.Create(nodeNU)
-			if err != nil {
-				t.Fatalf("Failed to create node: %v", err)
-			}
-
-			validateDaemonSetPodsAndMarkReady(podClient, podInformer, 2, t)
-			validateDaemonSetStatus(dsClient, ds.Name, 2, t)
-		})
+		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 2, t)
+		validateDaemonSetStatus(dsClient, ds.Name, 2, t)
 	})
 }

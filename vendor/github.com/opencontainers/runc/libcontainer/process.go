@@ -1,13 +1,15 @@
 package libcontainer
 
 import (
-	"fmt"
+	"errors"
 	"io"
 	"math"
 	"os"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
+
+var errInvalidProcess = errors.New("invalid process")
 
 type processOperations interface {
 	wait() (*os.ProcessState, error)
@@ -72,14 +74,28 @@ type Process struct {
 	// ConsoleSocket provides the masterfd console.
 	ConsoleSocket *os.File
 
+	// Init specifies whether the process is the first process in the container.
+	Init bool
+
 	ops processOperations
+
+	LogLevel string
+
+	// SubCgroupPaths specifies sub-cgroups to run the process in.
+	// Map keys are controller names, map values are paths (relative to
+	// container's top-level cgroup).
+	//
+	// If empty, the default top-level container's cgroup is used.
+	//
+	// For cgroup v2, the only key allowed is "".
+	SubCgroupPaths map[string]string
 }
 
 // Wait waits for the process to exit.
 // Wait releases any resources associated with the Process
 func (p Process) Wait() (*os.ProcessState, error) {
 	if p.ops == nil {
-		return nil, newGenericError(fmt.Errorf("invalid process"), NoProcessOps)
+		return nil, errInvalidProcess
 	}
 	return p.ops.wait()
 }
@@ -89,7 +105,7 @@ func (p Process) Pid() (int, error) {
 	// math.MinInt32 is returned here, because it's invalid value
 	// for the kill() system call.
 	if p.ops == nil {
-		return math.MinInt32, newGenericError(fmt.Errorf("invalid process"), NoProcessOps)
+		return math.MinInt32, errInvalidProcess
 	}
 	return p.ops.pid(), nil
 }
@@ -97,7 +113,7 @@ func (p Process) Pid() (int, error) {
 // Signal sends a signal to the Process.
 func (p Process) Signal(sig os.Signal) error {
 	if p.ops == nil {
-		return newGenericError(fmt.Errorf("invalid process"), NoProcessOps)
+		return errInvalidProcess
 	}
 	return p.ops.signal(sig)
 }

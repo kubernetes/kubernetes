@@ -1,3 +1,6 @@
+//go:build !providerless
+// +build !providerless
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -17,6 +20,7 @@ limitations under the License.
 package cinder
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -25,12 +29,12 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
@@ -74,7 +78,7 @@ func (util *DiskUtil) AttachDisk(b *cinderVolumeMounter, globalPDPath string) er
 		}
 		numTries++
 		if numTries == 10 {
-			return errors.New("Could not attach disk: Timeout after 60s")
+			return errors.New("could not attach disk: Timeout after 60s")
 		}
 		time.Sleep(time.Second * 6)
 	}
@@ -147,13 +151,13 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 	// TODO: caching, currently it is overkill because it calls this function
 	// only when it creates dynamic PV
 	zones := make(sets.String)
-	nodes, err := kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodes, err := kubeClient.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		klog.V(2).Infof("Error listing nodes")
 		return zones, err
 	}
 	for _, node := range nodes.Items {
-		if zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]; ok {
+		if zone, ok := node.Labels[v1.LabelTopologyZone]; ok {
 			zones.Insert(zone)
 		}
 	}
@@ -170,7 +174,7 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGiB, err := volutil.RoundUpToGiBInt(capacity)
+	volSizeGiB, err := volumehelpers.RoundUpToGiBInt(capacity)
 	if err != nil {
 		return "", 0, nil, "", err
 	}
@@ -207,7 +211,7 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 		// if we did not get any zones, lets leave it blank and gophercloud will
 		// use zone "nova" as default
 		if len(zones) > 0 {
-			availability, err = volutil.SelectZoneForVolume(false, false, "", nil, zones, node, allowedTopologies, c.options.PVC.Name)
+			availability, err = volumehelpers.SelectZoneForVolume(false, false, "", nil, zones, node, allowedTopologies, c.options.PVC.Name)
 			if err != nil {
 				klog.V(2).Infof("error selecting zone for volume: %v", err)
 				return "", 0, nil, "", err
@@ -226,10 +230,10 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 	volumeLabels = make(map[string]string)
 	if IgnoreVolumeAZ == false {
 		if volumeAZ != "" {
-			volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
+			volumeLabels[v1.LabelTopologyZone] = volumeAZ
 		}
 		if volumeRegion != "" {
-			volumeLabels[kubeletapis.LabelZoneRegion] = volumeRegion
+			volumeLabels[v1.LabelTopologyRegion] = volumeRegion
 		}
 	}
 	return volumeID, volSizeGiB, volumeLabels, fstype, nil

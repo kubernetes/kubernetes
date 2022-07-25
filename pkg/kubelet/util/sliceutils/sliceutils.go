@@ -21,6 +21,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
+// StringInSlice returns true if s is in list
 func StringInSlice(s string, list []string) bool {
 	for _, v := range list {
 		if v == s {
@@ -52,6 +53,9 @@ func (s PodsByCreationTime) Less(i, j int) bool {
 type ByImageSize []kubecontainer.Image
 
 func (a ByImageSize) Less(i, j int) bool {
+	if a[i].Size == a[j].Size {
+		return a[i].ID > a[j].ID
+	}
 	return a[i].Size > a[j].Size
 }
 func (a ByImageSize) Len() int      { return len(a) }

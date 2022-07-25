@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+ARG BASEIMAGE
+FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
@@ -23,4 +24,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /usr/local/cuda/samples/0_Simple/vectorAdd
 RUN make
 
-CMD ./vectorAdd
+CMD nvidia-smi && ./vectorAdd

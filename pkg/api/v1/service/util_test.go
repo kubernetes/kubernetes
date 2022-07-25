@@ -20,8 +20,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	netsets "k8s.io/kubernetes/pkg/util/net/sets"
+	v1 "k8s.io/api/core/v1"
+	utilnet "k8s.io/utils/net"
 )
 
 func TestGetLoadBalancerSourceRanges(t *testing.T) {
@@ -48,18 +48,18 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 	checkError("10.0.0.1/32, ")
 	checkError("10.0.0.1")
 
-	checkOK := func(v string) netsets.IPNet {
+	checkOK := func(v string) utilnet.IPNetSet {
 		annotations := make(map[string]string)
 		annotations[v1.AnnotationLoadBalancerSourceRangesKey] = v
 		svc := v1.Service{}
 		svc.Annotations = annotations
-		cidrs, err := GetLoadBalancerSourceRanges(&svc)
+		_, err := GetLoadBalancerSourceRanges(&svc)
 		if err != nil {
 			t.Errorf("Unexpected error parsing: %q", v)
 		}
 		svc = v1.Service{}
 		svc.Spec.LoadBalancerSourceRanges = strings.Split(v, ",")
-		cidrs, err = GetLoadBalancerSourceRanges(&svc)
+		cidrs, err := GetLoadBalancerSourceRanges(&svc)
 		if err != nil {
 			t.Errorf("Unexpected error parsing: %q", v)
 		}
@@ -112,7 +112,7 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 
 func TestAllowAll(t *testing.T) {
 	checkAllowAll := func(allowAll bool, cidrs ...string) {
-		ipnets, err := netsets.ParseIPNets(cidrs...)
+		ipnets, err := utilnet.ParseIPNets(cidrs...)
 		if err != nil {
 			t.Errorf("Unexpected error parsing cidrs: %v", cidrs)
 		}
@@ -129,45 +129,45 @@ func TestAllowAll(t *testing.T) {
 	checkAllowAll(true, "192.168.0.1/32", "0.0.0.0/0")
 }
 
-func TestRequestsOnlyLocalTraffic(t *testing.T) {
-	checkRequestsOnlyLocalTraffic := func(requestsOnlyLocalTraffic bool, service *v1.Service) {
-		res := RequestsOnlyLocalTraffic(service)
+func TestExternalPolicyLocal(t *testing.T) {
+	checkExternalPolicyLocal := func(requestsOnlyLocalTraffic bool, service *v1.Service) {
+		res := ExternalPolicyLocal(service)
 		if res != requestsOnlyLocalTraffic {
 			t.Errorf("Expected requests OnlyLocal traffic = %v, got %v",
 				requestsOnlyLocalTraffic, res)
 		}
 	}
 
-	checkRequestsOnlyLocalTraffic(false, &v1.Service{})
-	checkRequestsOnlyLocalTraffic(false, &v1.Service{
+	checkExternalPolicyLocal(false, &v1.Service{})
+	checkExternalPolicyLocal(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeClusterIP,
 		},
 	})
-	checkRequestsOnlyLocalTraffic(false, &v1.Service{
+	checkExternalPolicyLocal(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeNodePort,
 		},
 	})
-	checkRequestsOnlyLocalTraffic(false, &v1.Service{
+	checkExternalPolicyLocal(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	})
-	checkRequestsOnlyLocalTraffic(true, &v1.Service{
+	checkExternalPolicyLocal(true, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	})
-	checkRequestsOnlyLocalTraffic(false, &v1.Service{
+	checkExternalPolicyLocal(false, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeLoadBalancer,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	})
-	checkRequestsOnlyLocalTraffic(true, &v1.Service{
+	checkExternalPolicyLocal(true, &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeLoadBalancer,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
@@ -211,6 +211,33 @@ func TestNeedsHealthCheck(t *testing.T) {
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeLoadBalancer,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+		},
+	})
+}
+
+func TestInternalPolicyLocal(t *testing.T) {
+	checkInternalPolicyLocal := func(expected bool, service *v1.Service) {
+		res := InternalPolicyLocal(service)
+		if res != expected {
+			t.Errorf("Expected internal local traffic = %v, got %v",
+				expected, res)
+		}
+	}
+
+	// default InternalTrafficPolicy is nil
+	checkInternalPolicyLocal(false, &v1.Service{})
+
+	local := v1.ServiceInternalTrafficPolicyLocal
+	checkInternalPolicyLocal(true, &v1.Service{
+		Spec: v1.ServiceSpec{
+			InternalTrafficPolicy: &local,
+		},
+	})
+
+	cluster := v1.ServiceInternalTrafficPolicyCluster
+	checkInternalPolicyLocal(false, &v1.Service{
+		Spec: v1.ServiceSpec{
+			InternalTrafficPolicy: &cluster,
 		},
 	})
 }

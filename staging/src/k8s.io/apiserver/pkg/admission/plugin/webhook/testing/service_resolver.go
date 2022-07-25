@@ -33,10 +33,23 @@ func NewServiceResolver(base url.URL) webhook.ServiceResolver {
 	return &serviceResolver{base}
 }
 
-func (f serviceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+func (f serviceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	if namespace == "failResolve" {
 		return nil, fmt.Errorf("couldn't resolve service location")
 	}
 	u := f.base
 	return &u, nil
+}
+
+type panickingResolver struct {
+	panicMessage string
+}
+
+// NewPanickingServiceResolver returns a static service resolver that panics.
+func NewPanickingServiceResolver(panicMessage string) webhook.ServiceResolver {
+	return &panickingResolver{panicMessage}
+}
+
+func (f panickingResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
+	panic(f.panicMessage)
 }

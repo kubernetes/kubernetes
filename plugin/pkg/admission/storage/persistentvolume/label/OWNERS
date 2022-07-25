@@ -1,0 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - andrewsykim
+  - dims
+  - msau42
+approvers:
+  - andrewsykim
+  - dims
+  - msau42

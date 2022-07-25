@@ -17,6 +17,7 @@ limitations under the License.
 package dynamicinformer
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -42,9 +43,10 @@ func NewFilteredDynamicSharedInformerFactory(client dynamic.Interface, defaultRe
 	return &dynamicSharedInformerFactory{
 		client:           client,
 		defaultResync:    defaultResync,
-		namespace:        metav1.NamespaceAll,
+		namespace:        namespace,
 		informers:        map[schema.GroupVersionResource]informers.GenericInformer{},
 		startedInformers: make(map[schema.GroupVersionResource]bool),
+		tweakListOptions: tweakListOptions,
 	}
 }
 
@@ -58,6 +60,7 @@ type dynamicSharedInformerFactory struct {
 	// startedInformers is used for tracking which informers have been started.
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[schema.GroupVersionResource]bool
+	tweakListOptions TweakListOptionsFunc
 }
 
 var _ DynamicSharedInformerFactory = &dynamicSharedInformerFactory{}
@@ -72,7 +75,7 @@ func (f *dynamicSharedInformerFactory) ForResource(gvr schema.GroupVersionResour
 		return informer
 	}
 
-	informer = NewFilteredDynamicInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, nil)
+	informer = NewFilteredDynamicInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 	f.informers[key] = informer
 
 	return informer
@@ -123,13 +126,13 @@ func NewFilteredDynamicInformer(client dynamic.Interface, gvr schema.GroupVersio
 					if tweakListOptions != nil {
 						tweakListOptions(&options)
 					}
-					return client.Resource(gvr).Namespace(namespace).List(options)
+					return client.Resource(gvr).Namespace(namespace).List(context.TODO(), options)
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					if tweakListOptions != nil {
 						tweakListOptions(&options)
 					}
-					return client.Resource(gvr).Namespace(namespace).Watch(options)
+					return client.Resource(gvr).Namespace(namespace).Watch(context.TODO(), options)
 				},
 			},
 			&unstructured.Unstructured{},

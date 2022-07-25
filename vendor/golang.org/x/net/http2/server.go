@@ -28,6 +28,7 @@ package http2
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -46,14 +47,16 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2/hpack"
 )
 
 const (
-	prefaceTimeout        = 10 * time.Second
-	firstSettingsTimeout  = 2 * time.Second // should be in-flight with preface anyway
-	handlerChunkWriteSize = 4 << 10
-	defaultMaxStreams     = 250 // TODO: make this 100 as the GFE seems to?
+	prefaceTimeout         = 10 * time.Second
+	firstSettingsTimeout   = 2 * time.Second // should be in-flight with preface anyway
+	handlerChunkWriteSize  = 4 << 10
+	defaultMaxStreams      = 250 // TODO: make this 100 as the GFE seems to?
+	maxQueuedControlFrames = 10000
 )
 
 var (
@@ -127,6 +130,12 @@ type Server struct {
 	// If nil, a default scheduler is chosen.
 	NewWriteScheduler func() WriteScheduler
 
+	// CountError, if non-nil, is called on HTTP/2 server errors.
+	// It's intended to increment a metric for monitoring, such
+	// as an expvar or Prometheus metric.
+	// The errType consists of only ASCII word characters.
+	CountError func(errType string)
+
 	// Internal state. This is a pointer (rather than embedded directly)
 	// so that we don't embed a Mutex in this struct, which will make the
 	// struct non-copyable, which might break some callers.
@@ -159,6 +168,15 @@ func (s *Server) maxConcurrentStreams() uint32 {
 		return v
 	}
 	return defaultMaxStreams
+}
+
+// maxQueuedControlFrames is the maximum number of control frames like
+// SETTINGS, PING and RST_STREAM that will be queued for writing before
+// the connection is closed to prevent memory exhaustion attacks.
+func (s *Server) maxQueuedControlFrames() int {
+	// TODO: if anybody asks, add a Server field, and remember to define the
+	// behavior of negative values.
+	return maxQueuedControlFrames
 }
 
 type serverInternalState struct {
@@ -208,22 +226,23 @@ func ConfigureServer(s *http.Server, conf *Server) error {
 		conf = new(Server)
 	}
 	conf.state = &serverInternalState{activeConns: make(map[*serverConn]struct{})}
-	if err := configureServer18(s, conf); err != nil {
-		return err
+	if h1, h2 := s, conf; h2.IdleTimeout == 0 {
+		if h1.IdleTimeout != 0 {
+			h2.IdleTimeout = h1.IdleTimeout
+		} else {
+			h2.IdleTimeout = h1.ReadTimeout
+		}
 	}
-	if err := configureServer19(s, conf); err != nil {
-		return err
-	}
+	s.RegisterOnShutdown(conf.state.startGracefulShutdown)
 
 	if s.TLSConfig == nil {
 		s.TLSConfig = new(tls.Config)
-	} else if s.TLSConfig.CipherSuites != nil {
-		// If they already provided a CipherSuite list, return
-		// an error if it has a bad order or is missing
-		// ECDHE_RSA_WITH_AES_128_GCM_SHA256 or ECDHE_ECDSA_WITH_AES_128_GCM_SHA256.
+	} else if s.TLSConfig.CipherSuites != nil && s.TLSConfig.MinVersion < tls.VersionTLS13 {
+		// If they already provided a TLS 1.0–1.2 CipherSuite list, return an
+		// error if it is missing ECDHE_RSA_WITH_AES_128_GCM_SHA256 or
+		// ECDHE_ECDSA_WITH_AES_128_GCM_SHA256.
 		haveRequired := false
-		sawBad := false
-		for i, cs := range s.TLSConfig.CipherSuites {
+		for _, cs := range s.TLSConfig.CipherSuites {
 			switch cs {
 			case tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
 				// Alternative MTI cipher to not discourage ECDSA-only servers.
@@ -231,14 +250,9 @@ func ConfigureServer(s *http.Server, conf *Server) error {
 				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:
 				haveRequired = true
 			}
-			if isBadCipher(cs) {
-				sawBad = true
-			} else if sawBad {
-				return fmt.Errorf("http2: TLSConfig.CipherSuites index %d contains an HTTP/2-approved cipher suite (%#04x), but it comes after unapproved cipher suites. With this configuration, clients that don't support previous, approved cipher suites may be given an unapproved one and reject the connection.", i, cs)
-			}
 		}
 		if !haveRequired {
-			return fmt.Errorf("http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher.")
+			return fmt.Errorf("http2: TLSConfig.CipherSuites is missing an HTTP/2-required AES_128_GCM_SHA256 cipher (need at least one of TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 or TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)")
 		}
 	}
 
@@ -251,15 +265,11 @@ func ConfigureServer(s *http.Server, conf *Server) error {
 
 	s.TLSConfig.PreferServerCipherSuites = true
 
-	haveNPN := false
-	for _, p := range s.TLSConfig.NextProtos {
-		if p == NextProtoTLS {
-			haveNPN = true
-			break
-		}
-	}
-	if !haveNPN {
+	if !strSliceContains(s.TLSConfig.NextProtos, NextProtoTLS) {
 		s.TLSConfig.NextProtos = append(s.TLSConfig.NextProtos, NextProtoTLS)
+	}
+	if !strSliceContains(s.TLSConfig.NextProtos, "http/1.1") {
+		s.TLSConfig.NextProtos = append(s.TLSConfig.NextProtos, "http/1.1")
 	}
 
 	if s.TLSNextProto == nil {
@@ -269,7 +279,20 @@ func ConfigureServer(s *http.Server, conf *Server) error {
 		if testHookOnConn != nil {
 			testHookOnConn()
 		}
+		// The TLSNextProto interface predates contexts, so
+		// the net/http package passes down its per-connection
+		// base context via an exported but unadvertised
+		// method on the Handler. This is for internal
+		// net/http<=>http2 use only.
+		var ctx context.Context
+		type baseContexter interface {
+			BaseContext() context.Context
+		}
+		if bc, ok := h.(baseContexter); ok {
+			ctx = bc.BaseContext()
+		}
 		conf.ServeConn(c, &ServeConnOpts{
+			Context:    ctx,
 			Handler:    h,
 			BaseConfig: hs,
 		})
@@ -280,6 +303,10 @@ func ConfigureServer(s *http.Server, conf *Server) error {
 
 // ServeConnOpts are options for the Server.ServeConn method.
 type ServeConnOpts struct {
+	// Context is the base context to use.
+	// If nil, context.Background is used.
+	Context context.Context
+
 	// BaseConfig optionally sets the base configuration
 	// for values. If nil, defaults are used.
 	BaseConfig *http.Server
@@ -288,6 +315,13 @@ type ServeConnOpts struct {
 	// requests. If nil, BaseConfig.Handler is used. If BaseConfig
 	// or BaseConfig.Handler is nil, http.DefaultServeMux is used.
 	Handler http.Handler
+}
+
+func (o *ServeConnOpts) context() context.Context {
+	if o != nil && o.Context != nil {
+		return o.Context
+	}
+	return context.Background()
 }
 
 func (o *ServeConnOpts) baseConfig() *http.Server {
@@ -377,6 +411,9 @@ func (s *Server) ServeConn(c net.Conn, opts *ServeConnOpts) {
 	sc.hpackEncoder = hpack.NewEncoder(&sc.headerWriteBuf)
 
 	fr := NewFramer(sc.bw, c)
+	if s.CountError != nil {
+		fr.countError = s.CountError
+	}
 	fr.ReadMetaHeaders = hpack.NewDecoder(initialHeaderTableSize, nil)
 	fr.MaxHeaderListSize = sc.maxHeaderListSize()
 	fr.SetMaxReadFrameSize(s.maxReadFrameSize())
@@ -406,7 +443,7 @@ func (s *Server) ServeConn(c net.Conn, opts *ServeConnOpts) {
 			// addresses during development.
 			//
 			// TODO: optionally enforce? Or enforce at the time we receive
-			// a new request, and verify the the ServerName matches the :authority?
+			// a new request, and verify the ServerName matches the :authority?
 			// But that precludes proxy situations, perhaps.
 			//
 			// So for now, do nothing here again.
@@ -434,6 +471,15 @@ func (s *Server) ServeConn(c net.Conn, opts *ServeConnOpts) {
 	sc.serve()
 }
 
+func serverConnBaseContext(c net.Conn, opts *ServeConnOpts) (ctx context.Context, cancel func()) {
+	ctx, cancel = context.WithCancel(opts.context())
+	ctx = context.WithValue(ctx, http.LocalAddrContextKey, c.LocalAddr())
+	if hs := opts.baseConfig(); hs != nil {
+		ctx = context.WithValue(ctx, http.ServerContextKey, hs)
+	}
+	return
+}
+
 func (sc *serverConn) rejectConn(err ErrCode, debug string) {
 	sc.vlogf("http2: server rejecting conn: %v, %s", err, debug)
 	// ignoring errors. hanging up anyway.
@@ -449,7 +495,7 @@ type serverConn struct {
 	conn             net.Conn
 	bw               *bufferedWriter // writing to conn
 	handler          http.Handler
-	baseCtx          contextContext
+	baseCtx          context.Context
 	framer           *Framer
 	doneServing      chan struct{}          // closed when serverConn.serve ends
 	readFrameCh      chan readFrameResult   // written by serverConn.readFrames
@@ -469,6 +515,7 @@ type serverConn struct {
 	sawFirstSettings            bool // got the initial SETTINGS frame after the preface
 	needToSendSettingsAck       bool
 	unackedSettings             int    // how many SETTINGS have we sent without ACKs?
+	queuedControlFrames         int    // control frames in the writeSched queue
 	clientMaxStreams            uint32 // SETTINGS_MAX_CONCURRENT_STREAMS from client (our PUSH_PROMISE limit)
 	advMaxStreams               uint32 // our SETTINGS_MAX_CONCURRENT_STREAMS advertised the client
 	curClientStreams            uint32 // number of open streams initiated by the client
@@ -529,17 +576,14 @@ type stream struct {
 	id        uint32
 	body      *pipe       // non-nil if expecting DATA frames
 	cw        closeWaiter // closed wait stream transitions to closed state
-	ctx       contextContext
+	ctx       context.Context
 	cancelCtx func()
 
 	// owned by serverConn's serve loop:
-	bodyBytes        int64   // body bytes seen so far
-	declBodyBytes    int64   // or -1 if undeclared
-	flow             flow    // limits writing from Handler to client
-	inflow           flow    // what the client is allowed to POST/etc to us
-	parent           *stream // or nil
-	numTrailerValues int64
-	weight           uint8
+	bodyBytes        int64 // body bytes seen so far
+	declBodyBytes    int64 // or -1 if undeclared
+	flow             flow  // limits writing from Handler to client
+	inflow           flow  // what the client is allowed to POST/etc to us
 	state            streamState
 	resetQueued      bool        // RST_STREAM queued for write; set by sc.resetStream
 	gotTrailerHeader bool        // HEADER frame for trailers was seen
@@ -662,6 +706,7 @@ func (sc *serverConn) condlogf(err error, format string, args ...interface{}) {
 
 func (sc *serverConn) canonicalHeader(v string) string {
 	sc.serveG.check()
+	buildCommonHeaderMapsOnce()
 	cv, ok := commonCanonHeader[v]
 	if ok {
 		return cv
@@ -674,7 +719,15 @@ func (sc *serverConn) canonicalHeader(v string) string {
 		sc.canonHeader = make(map[string]string)
 	}
 	cv = http.CanonicalHeaderKey(v)
-	sc.canonHeader[v] = cv
+	// maxCachedCanonicalHeaders is an arbitrarily-chosen limit on the number of
+	// entries in the canonHeader cache. This should be larger than the number
+	// of unique, uncommon header keys likely to be sent by the peer, while not
+	// so high as to permit unreasonable memory usage if the peer sends an unbounded
+	// number of unique header keys.
+	const maxCachedCanonicalHeaders = 32
+	if len(sc.canonHeader) < maxCachedCanonicalHeaders {
+		sc.canonHeader[v] = cv
+	}
 	return cv
 }
 
@@ -715,6 +768,7 @@ func (sc *serverConn) readFrames() {
 
 // frameWriteResult is the message passed from writeFrameAsync to the serve goroutine.
 type frameWriteResult struct {
+	_   incomparable
 	wr  FrameWriteRequest // what was written (or attempted)
 	err error             // result of the writeFrame call
 }
@@ -725,7 +779,7 @@ type frameWriteResult struct {
 // serverConn.
 func (sc *serverConn) writeFrameAsync(wr FrameWriteRequest) {
 	err := wr.write.writeFrame(sc)
-	sc.wroteFrameCh <- frameWriteResult{wr, err}
+	sc.wroteFrameCh <- frameWriteResult{wr: wr, err: err}
 }
 
 func (sc *serverConn) closeAllStreamsOnConnClose() {
@@ -779,7 +833,7 @@ func (sc *serverConn) serve() {
 	})
 	sc.unackedSettings++
 
-	// Each connection starts with intialWindowSize inflow tokens.
+	// Each connection starts with initialWindowSize inflow tokens.
 	// If a higher value is configured, we add more tokens.
 	if diff := sc.srv.initialConnRecvWindowSize() - initialWindowSize; diff > 0 {
 		sc.sendWindowUpdate(nil, int(diff))
@@ -819,6 +873,15 @@ func (sc *serverConn) serve() {
 		case res := <-sc.wroteFrameCh:
 			sc.wroteFrame(res)
 		case res := <-sc.readFrameCh:
+			// Process any written frames before reading new frames from the client since a
+			// written frame could have triggered a new stream to be started.
+			if sc.writingFrameAsync {
+				select {
+				case wroteRes := <-sc.wroteFrameCh:
+					sc.wroteFrame(wroteRes)
+				default:
+				}
+			}
 			if !sc.processFrameFromReader(res) {
 				return
 			}
@@ -854,6 +917,14 @@ func (sc *serverConn) serve() {
 			default:
 				panic(fmt.Sprintf("unexpected type %T", v))
 			}
+		}
+
+		// If the peer is causing us to generate a lot of control frames,
+		// but not reading them from us, assume they are trying to make us
+		// run out of memory.
+		if sc.queuedControlFrames > sc.srv.maxQueuedControlFrames() {
+			sc.vlogf("http2: too many control frames in send queue, closing connection")
+			return
 		}
 
 		// Start the shutdown timer after sending a GOAWAY. When sending GOAWAY
@@ -1055,6 +1126,14 @@ func (sc *serverConn) writeFrame(wr FrameWriteRequest) {
 	}
 
 	if !ignoreWrite {
+		if wr.isControl() {
+			sc.queuedControlFrames++
+			// For extra safety, detect wraparounds, which should not happen,
+			// and pull the plug.
+			if sc.queuedControlFrames < 0 {
+				sc.conn.Close()
+			}
+		}
 		sc.writeSched.Push(wr)
 	}
 	sc.scheduleFrameWrite()
@@ -1099,7 +1178,7 @@ func (sc *serverConn) startFrameWrite(wr FrameWriteRequest) {
 	if wr.write.staysWithinBuffer(sc.bw.Available()) {
 		sc.writingFrameAsync = false
 		err := wr.write.writeFrame(sc)
-		sc.wroteFrame(frameWriteResult{wr, err})
+		sc.wroteFrame(frameWriteResult{wr: wr, err: err})
 	} else {
 		sc.writingFrameAsync = true
 		go sc.writeFrameAsync(wr)
@@ -1108,7 +1187,7 @@ func (sc *serverConn) startFrameWrite(wr FrameWriteRequest) {
 
 // errHandlerPanicked is the error given to any callers blocked in a read from
 // Request.Body when the main goroutine panics. Since most handlers read in the
-// the main ServeHTTP goroutine, this will show up rarely.
+// main ServeHTTP goroutine, this will show up rarely.
 var errHandlerPanicked = errors.New("http2: handler panicked")
 
 // wroteFrame is called on the serve goroutine with the result of
@@ -1172,10 +1251,8 @@ func (sc *serverConn) wroteFrame(res frameWriteResult) {
 // If a frame is already being written, nothing happens. This will be called again
 // when the frame is done being written.
 //
-// If a frame isn't being written we need to send one, the best frame
-// to send is selected, preferring first things that aren't
-// stream-specific (e.g. ACKing settings), and then finding the
-// highest priority stream.
+// If a frame isn't being written and we need to send one, the best frame
+// to send is selected by writeSched.
 //
 // If a frame isn't being written and there's nothing else to send, we
 // flush the write buffer.
@@ -1203,6 +1280,9 @@ func (sc *serverConn) scheduleFrameWrite() {
 		}
 		if !sc.inGoAway || sc.goAwayCode == ErrCodeNo {
 			if wr, ok := sc.writeSched.Pop(); ok {
+				if wr.isControl() {
+					sc.queuedControlFrames--
+				}
 				sc.startFrameWrite(wr)
 				continue
 			}
@@ -1229,7 +1309,9 @@ func (sc *serverConn) startGracefulShutdown() {
 	sc.shutdownOnce.Do(func() { sc.sendServeMsg(gracefulShutdownMsg) })
 }
 
-// After sending GOAWAY, the connection will close after goAwayTimeout.
+// After sending GOAWAY with an error code (non-graceful shutdown), the
+// connection will close after goAwayTimeout.
+//
 // If we close the connection immediately after sending GOAWAY, there may
 // be unsent data in our kernel receive buffer, which will cause the kernel
 // to send a TCP RST on close() instead of a FIN. This RST will abort the
@@ -1334,7 +1416,7 @@ func (sc *serverConn) processFrame(f Frame) error {
 	// First frame received must be SETTINGS.
 	if !sc.sawFirstSettings {
 		if _, ok := f.(*SettingsFrame); !ok {
-			return ConnectionError(ErrCodeProtocol)
+			return sc.countError("first_settings", ConnectionError(ErrCodeProtocol))
 		}
 		sc.sawFirstSettings = true
 	}
@@ -1359,7 +1441,7 @@ func (sc *serverConn) processFrame(f Frame) error {
 	case *PushPromiseFrame:
 		// A client cannot push. Thus, servers MUST treat the receipt of a PUSH_PROMISE
 		// frame as a connection error (Section 5.4.1) of type PROTOCOL_ERROR.
-		return ConnectionError(ErrCodeProtocol)
+		return sc.countError("push_promise", ConnectionError(ErrCodeProtocol))
 	default:
 		sc.vlogf("http2: server ignoring frame: %v", f.Header())
 		return nil
@@ -1379,7 +1461,7 @@ func (sc *serverConn) processPing(f *PingFrame) error {
 		// identifier field value other than 0x0, the recipient MUST
 		// respond with a connection error (Section 5.4.1) of type
 		// PROTOCOL_ERROR."
-		return ConnectionError(ErrCodeProtocol)
+		return sc.countError("ping_on_stream", ConnectionError(ErrCodeProtocol))
 	}
 	if sc.inGoAway && sc.goAwayCode != ErrCodeNo {
 		return nil
@@ -1398,7 +1480,7 @@ func (sc *serverConn) processWindowUpdate(f *WindowUpdateFrame) error {
 			// or PRIORITY on a stream in this state MUST be
 			// treated as a connection error (Section 5.4.1) of
 			// type PROTOCOL_ERROR."
-			return ConnectionError(ErrCodeProtocol)
+			return sc.countError("stream_idle", ConnectionError(ErrCodeProtocol))
 		}
 		if st == nil {
 			// "WINDOW_UPDATE can be sent by a peer that has sent a
@@ -1409,7 +1491,7 @@ func (sc *serverConn) processWindowUpdate(f *WindowUpdateFrame) error {
 			return nil
 		}
 		if !st.flow.add(int32(f.Increment)) {
-			return streamError(f.StreamID, ErrCodeFlowControl)
+			return sc.countError("bad_flow", streamError(f.StreamID, ErrCodeFlowControl))
 		}
 	default: // connection-level flow control
 		if !sc.flow.add(int32(f.Increment)) {
@@ -1430,7 +1512,7 @@ func (sc *serverConn) processResetStream(f *RSTStreamFrame) error {
 		// identifying an idle stream is received, the
 		// recipient MUST treat this as a connection error
 		// (Section 5.4.1) of type PROTOCOL_ERROR.
-		return ConnectionError(ErrCodeProtocol)
+		return sc.countError("reset_idle_stream", ConnectionError(ErrCodeProtocol))
 	}
 	if st != nil {
 		st.cancelCtx()
@@ -1482,13 +1564,21 @@ func (sc *serverConn) processSettings(f *SettingsFrame) error {
 			// Why is the peer ACKing settings we never sent?
 			// The spec doesn't mention this case, but
 			// hang up on them anyway.
-			return ConnectionError(ErrCodeProtocol)
+			return sc.countError("ack_mystery", ConnectionError(ErrCodeProtocol))
 		}
 		return nil
+	}
+	if f.NumSettings() > 100 || f.HasDuplicates() {
+		// This isn't actually in the spec, but hang up on
+		// suspiciously large settings frames or those with
+		// duplicate entries.
+		return sc.countError("settings_big_or_dups", ConnectionError(ErrCodeProtocol))
 	}
 	if err := f.ForeachSetting(sc.processSetting); err != nil {
 		return err
 	}
+	// TODO: judging by RFC 7540, Section 6.5.3 each SETTINGS frame should be
+	// acknowledged individually, even if multiple are received before the ACK.
 	sc.needToSendSettingsAck = true
 	sc.scheduleFrameWrite()
 	return nil
@@ -1549,7 +1639,7 @@ func (sc *serverConn) processSettingInitialWindowSize(val uint32) error {
 			// control window to exceed the maximum size as a
 			// connection error (Section 5.4.1) of type
 			// FLOW_CONTROL_ERROR."
-			return ConnectionError(ErrCodeFlowControl)
+			return sc.countError("setting_win_size", ConnectionError(ErrCodeFlowControl))
 		}
 	}
 	return nil
@@ -1557,23 +1647,37 @@ func (sc *serverConn) processSettingInitialWindowSize(val uint32) error {
 
 func (sc *serverConn) processData(f *DataFrame) error {
 	sc.serveG.check()
-	if sc.inGoAway && sc.goAwayCode != ErrCodeNo {
+	id := f.Header().StreamID
+	if sc.inGoAway && (sc.goAwayCode != ErrCodeNo || id > sc.maxClientStreamID) {
+		// Discard all DATA frames if the GOAWAY is due to an
+		// error, or:
+		//
+		// Section 6.8: After sending a GOAWAY frame, the sender
+		// can discard frames for streams initiated by the
+		// receiver with identifiers higher than the identified
+		// last stream.
 		return nil
 	}
-	data := f.Data()
 
-	// "If a DATA frame is received whose stream is not in "open"
-	// or "half closed (local)" state, the recipient MUST respond
-	// with a stream error (Section 5.4.2) of type STREAM_CLOSED."
-	id := f.Header().StreamID
+	data := f.Data()
 	state, st := sc.state(id)
 	if id == 0 || state == stateIdle {
+		// Section 6.1: "DATA frames MUST be associated with a
+		// stream. If a DATA frame is received whose stream
+		// identifier field is 0x0, the recipient MUST respond
+		// with a connection error (Section 5.4.1) of type
+		// PROTOCOL_ERROR."
+		//
 		// Section 5.1: "Receiving any frame other than HEADERS
 		// or PRIORITY on a stream in this state MUST be
 		// treated as a connection error (Section 5.4.1) of
 		// type PROTOCOL_ERROR."
-		return ConnectionError(ErrCodeProtocol)
+		return sc.countError("data_on_idle", ConnectionError(ErrCodeProtocol))
 	}
+
+	// "If a DATA frame is received whose stream is not in "open"
+	// or "half closed (local)" state, the recipient MUST respond
+	// with a stream error (Section 5.4.2) of type STREAM_CLOSED."
 	if st == nil || state != stateOpen || st.gotTrailerHeader || st.resetQueued {
 		// This includes sending a RST_STREAM if the stream is
 		// in stateHalfClosedLocal (which currently means that
@@ -1585,7 +1689,7 @@ func (sc *serverConn) processData(f *DataFrame) error {
 		// and return any flow control bytes since we're not going
 		// to consume them.
 		if sc.inflow.available() < int32(f.Length) {
-			return streamError(id, ErrCodeFlowControl)
+			return sc.countError("data_flow", streamError(id, ErrCodeFlowControl))
 		}
 		// Deduct the flow control from inflow, since we're
 		// going to immediately add it back in
@@ -1598,7 +1702,7 @@ func (sc *serverConn) processData(f *DataFrame) error {
 			// Already have a stream error in flight. Don't send another.
 			return nil
 		}
-		return streamError(id, ErrCodeStreamClosed)
+		return sc.countError("closed", streamError(id, ErrCodeStreamClosed))
 	}
 	if st.body == nil {
 		panic("internal error: should have a body in this state")
@@ -1607,19 +1711,23 @@ func (sc *serverConn) processData(f *DataFrame) error {
 	// Sender sending more than they'd declared?
 	if st.declBodyBytes != -1 && st.bodyBytes+int64(len(data)) > st.declBodyBytes {
 		st.body.CloseWithError(fmt.Errorf("sender tried to send more than declared Content-Length of %d bytes", st.declBodyBytes))
-		return streamError(id, ErrCodeStreamClosed)
+		// RFC 7540, sec 8.1.2.6: A request or response is also malformed if the
+		// value of a content-length header field does not equal the sum of the
+		// DATA frame payload lengths that form the body.
+		return sc.countError("send_too_much", streamError(id, ErrCodeProtocol))
 	}
 	if f.Length > 0 {
 		// Check whether the client has flow control quota.
 		if st.inflow.available() < int32(f.Length) {
-			return streamError(id, ErrCodeFlowControl)
+			return sc.countError("flow_on_data_length", streamError(id, ErrCodeFlowControl))
 		}
 		st.inflow.take(int32(f.Length))
 
 		if len(data) > 0 {
 			wrote, err := st.body.Write(data)
 			if err != nil {
-				return streamError(id, ErrCodeStreamClosed)
+				sc.sendWindowUpdate(nil, int(f.Length)-wrote)
+				return sc.countError("body_write_err", streamError(id, ErrCodeStreamClosed))
 			}
 			if wrote != len(data) {
 				panic("internal error: bad Writer")
@@ -1705,7 +1813,7 @@ func (sc *serverConn) processHeaders(f *MetaHeadersFrame) error {
 	// stream identifier MUST respond with a connection error
 	// (Section 5.4.1) of type PROTOCOL_ERROR.
 	if id%2 != 1 {
-		return ConnectionError(ErrCodeProtocol)
+		return sc.countError("headers_even", ConnectionError(ErrCodeProtocol))
 	}
 	// A HEADERS frame can be used to create a new stream or
 	// send a trailer for an open one. If we already have a stream
@@ -1717,6 +1825,13 @@ func (sc *serverConn) processHeaders(f *MetaHeadersFrame) error {
 			// processing this frame.
 			return nil
 		}
+		// RFC 7540, sec 5.1: If an endpoint receives additional frames, other than
+		// WINDOW_UPDATE, PRIORITY, or RST_STREAM, for a stream that is in
+		// this state, it MUST respond with a stream error (Section 5.4.2) of
+		// type STREAM_CLOSED.
+		if st.state == stateHalfClosedRemote {
+			return sc.countError("headers_half_closed", streamError(id, ErrCodeStreamClosed))
+		}
 		return st.processTrailerHeaders(f)
 	}
 
@@ -1726,7 +1841,7 @@ func (sc *serverConn) processHeaders(f *MetaHeadersFrame) error {
 	// receives an unexpected stream identifier MUST respond with
 	// a connection error (Section 5.4.1) of type PROTOCOL_ERROR.
 	if id <= sc.maxClientStreamID {
-		return ConnectionError(ErrCodeProtocol)
+		return sc.countError("stream_went_down", ConnectionError(ErrCodeProtocol))
 	}
 	sc.maxClientStreamID = id
 
@@ -1743,14 +1858,14 @@ func (sc *serverConn) processHeaders(f *MetaHeadersFrame) error {
 	if sc.curClientStreams+1 > sc.advMaxStreams {
 		if sc.unackedSettings == 0 {
 			// They should know better.
-			return streamError(id, ErrCodeProtocol)
+			return sc.countError("over_max_streams", streamError(id, ErrCodeProtocol))
 		}
 		// Assume it's a network race, where they just haven't
 		// received our last SETTINGS update. But actually
 		// this can't happen yet, because we don't yet provide
 		// a way for users to adjust server parameters at
 		// runtime.
-		return streamError(id, ErrCodeRefusedStream)
+		return sc.countError("over_max_streams_race", streamError(id, ErrCodeRefusedStream))
 	}
 
 	initialState := stateOpen
@@ -1760,7 +1875,7 @@ func (sc *serverConn) processHeaders(f *MetaHeadersFrame) error {
 	st := sc.newStream(id, 0, initialState)
 
 	if f.HasPriority() {
-		if err := checkPriority(f.StreamID, f.Priority); err != nil {
+		if err := sc.checkPriority(f.StreamID, f.Priority); err != nil {
 			return err
 		}
 		sc.writeSched.AdjustStream(st.id, f.Priority)
@@ -1804,24 +1919,24 @@ func (st *stream) processTrailerHeaders(f *MetaHeadersFrame) error {
 	sc := st.sc
 	sc.serveG.check()
 	if st.gotTrailerHeader {
-		return ConnectionError(ErrCodeProtocol)
+		return sc.countError("dup_trailers", ConnectionError(ErrCodeProtocol))
 	}
 	st.gotTrailerHeader = true
 	if !f.StreamEnded() {
-		return streamError(st.id, ErrCodeProtocol)
+		return sc.countError("trailers_not_ended", streamError(st.id, ErrCodeProtocol))
 	}
 
 	if len(f.PseudoFields()) > 0 {
-		return streamError(st.id, ErrCodeProtocol)
+		return sc.countError("trailers_pseudo", streamError(st.id, ErrCodeProtocol))
 	}
 	if st.trailer != nil {
 		for _, hf := range f.RegularFields() {
 			key := sc.canonicalHeader(hf.Name)
-			if !ValidTrailerHeader(key) {
+			if !httpguts.ValidTrailerHeader(key) {
 				// TODO: send more details to the peer somehow. But http2 has
 				// no way to send debug data at a stream level. Discuss with
 				// HTTP folk.
-				return streamError(st.id, ErrCodeProtocol)
+				return sc.countError("trailers_bogus", streamError(st.id, ErrCodeProtocol))
 			}
 			st.trailer[key] = append(st.trailer[key], hf.Value)
 		}
@@ -1830,13 +1945,13 @@ func (st *stream) processTrailerHeaders(f *MetaHeadersFrame) error {
 	return nil
 }
 
-func checkPriority(streamID uint32, p PriorityParam) error {
+func (sc *serverConn) checkPriority(streamID uint32, p PriorityParam) error {
 	if streamID == p.StreamDep {
 		// Section 5.3.1: "A stream cannot depend on itself. An endpoint MUST treat
 		// this as a stream error (Section 5.4.2) of type PROTOCOL_ERROR."
 		// Section 5.3.3 says that a stream can depend on one of its dependencies,
 		// so it's only self-dependencies that are forbidden.
-		return streamError(streamID, ErrCodeProtocol)
+		return sc.countError("priority", streamError(streamID, ErrCodeProtocol))
 	}
 	return nil
 }
@@ -1845,7 +1960,7 @@ func (sc *serverConn) processPriority(f *PriorityFrame) error {
 	if sc.inGoAway {
 		return nil
 	}
-	if err := checkPriority(f.StreamID, f.PriorityParam); err != nil {
+	if err := sc.checkPriority(f.StreamID, f.PriorityParam); err != nil {
 		return err
 	}
 	sc.writeSched.AdjustStream(f.StreamID, f.PriorityParam)
@@ -1858,7 +1973,7 @@ func (sc *serverConn) newStream(id, pusherID uint32, state streamState) *stream 
 		panic("internal error: cannot create stream with id 0")
 	}
 
-	ctx, cancelCtx := contextWithCancel(sc.baseCtx)
+	ctx, cancelCtx := context.WithCancel(sc.baseCtx)
 	st := &stream{
 		sc:        sc,
 		id:        id,
@@ -1902,7 +2017,7 @@ func (sc *serverConn) newWriterAndRequest(st *stream, f *MetaHeadersFrame) (*res
 	isConnect := rp.method == "CONNECT"
 	if isConnect {
 		if rp.path != "" || rp.scheme != "" || rp.authority == "" {
-			return nil, nil, streamError(f.StreamID, ErrCodeProtocol)
+			return nil, nil, sc.countError("bad_connect", streamError(f.StreamID, ErrCodeProtocol))
 		}
 	} else if rp.method == "" || rp.path == "" || (rp.scheme != "https" && rp.scheme != "http") {
 		// See 8.1.2.6 Malformed Requests and Responses:
@@ -1915,13 +2030,13 @@ func (sc *serverConn) newWriterAndRequest(st *stream, f *MetaHeadersFrame) (*res
 		// "All HTTP/2 requests MUST include exactly one valid
 		// value for the :method, :scheme, and :path
 		// pseudo-header fields"
-		return nil, nil, streamError(f.StreamID, ErrCodeProtocol)
+		return nil, nil, sc.countError("bad_path_method", streamError(f.StreamID, ErrCodeProtocol))
 	}
 
 	bodyOpen := !f.StreamEnded()
 	if rp.method == "HEAD" && bodyOpen {
 		// HEAD requests can't have bodies
-		return nil, nil, streamError(f.StreamID, ErrCodeProtocol)
+		return nil, nil, sc.countError("head_body", streamError(f.StreamID, ErrCodeProtocol))
 	}
 
 	rp.header = make(http.Header)
@@ -1938,7 +2053,11 @@ func (sc *serverConn) newWriterAndRequest(st *stream, f *MetaHeadersFrame) (*res
 	}
 	if bodyOpen {
 		if vv, ok := rp.header["Content-Length"]; ok {
-			req.ContentLength, _ = strconv.ParseInt(vv[0], 10, 64)
+			if cl, err := strconv.ParseUint(vv[0], 10, 63); err == nil {
+				req.ContentLength = int64(cl)
+			} else {
+				req.ContentLength = 0
+			}
 		} else {
 			req.ContentLength = -1
 		}
@@ -1976,7 +2095,7 @@ func (sc *serverConn) newWriterAndRequestNoBody(st *stream, rp requestParam) (*r
 	var trailer http.Header
 	for _, v := range rp.header["Trailer"] {
 		for _, key := range strings.Split(v, ",") {
-			key = http.CanonicalHeaderKey(strings.TrimSpace(key))
+			key = http.CanonicalHeaderKey(textproto.TrimString(key))
 			switch key {
 			case "Transfer-Encoding", "Trailer", "Content-Length":
 				// Bogus. (copy of http1 rules)
@@ -2000,7 +2119,7 @@ func (sc *serverConn) newWriterAndRequestNoBody(st *stream, rp requestParam) (*r
 		var err error
 		url_, err = url.ParseRequestURI(rp.path)
 		if err != nil {
-			return nil, nil, streamError(st.id, ErrCodeProtocol)
+			return nil, nil, sc.countError("bad_path", streamError(st.id, ErrCodeProtocol))
 		}
 		requestURI = rp.path
 	}
@@ -2024,7 +2143,7 @@ func (sc *serverConn) newWriterAndRequestNoBody(st *stream, rp requestParam) (*r
 		Body:       body,
 		Trailer:    trailer,
 	}
-	req = requestWithContext(req, st.ctx)
+	req = req.WithContext(st.ctx)
 
 	rws := responseWriterStatePool.Get().(*responseWriterState)
 	bwSave := rws.bw
@@ -2052,7 +2171,7 @@ func (sc *serverConn) runHandler(rw *responseWriter, req *http.Request, handler 
 				stream: rw.rws.stream,
 			})
 			// Same as net/http:
-			if shouldLogPanic(e) {
+			if e != nil && e != http.ErrAbortHandler {
 				const size = 64 << 10
 				buf := make([]byte, size)
 				buf = buf[:runtime.Stack(buf, false)]
@@ -2194,6 +2313,7 @@ func (sc *serverConn) sendWindowUpdate32(st *stream, n int32) {
 // requestBody is the Handler's Request.Body type.
 // Read and Close may be called concurrently.
 type requestBody struct {
+	_             incomparable
 	stream        *stream
 	conn          *serverConn
 	closed        bool  // for use by Close only
@@ -2277,15 +2397,24 @@ type chunkWriter struct{ rws *responseWriterState }
 
 func (cw chunkWriter) Write(p []byte) (n int, err error) { return cw.rws.writeChunk(p) }
 
-func (rws *responseWriterState) hasTrailers() bool { return len(rws.trailers) != 0 }
+func (rws *responseWriterState) hasTrailers() bool { return len(rws.trailers) > 0 }
+
+func (rws *responseWriterState) hasNonemptyTrailers() bool {
+	for _, trailer := range rws.trailers {
+		if _, ok := rws.handlerHeader[trailer]; ok {
+			return true
+		}
+	}
+	return false
+}
 
 // declareTrailer is called for each Trailer header when the
 // response header is written. It notes that a header will need to be
 // written in the trailers at the end of the response.
 func (rws *responseWriterState) declareTrailer(k string) {
 	k = http.CanonicalHeaderKey(k)
-	if !ValidTrailerHeader(k) {
-		// Forbidden by RFC 2616 14.40.
+	if !httpguts.ValidTrailerHeader(k) {
+		// Forbidden by RFC 7230, section 4.1.2.
 		rws.conn.logf("ignoring invalid trailer %q", k)
 		return
 	}
@@ -2311,9 +2440,8 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 		var ctype, clen string
 		if clen = rws.snapHeader.Get("Content-Length"); clen != "" {
 			rws.snapHeader.Del("Content-Length")
-			clen64, err := strconv.ParseInt(clen, 10, 64)
-			if err == nil && clen64 >= 0 {
-				rws.sentContentLen = clen64
+			if cl, err := strconv.ParseUint(clen, 10, 63); err == nil {
+				rws.sentContentLen = int64(cl)
 			} else {
 				clen = ""
 			}
@@ -2322,7 +2450,11 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 			clen = strconv.Itoa(len(p))
 		}
 		_, hasContentType := rws.snapHeader["Content-Type"]
-		if !hasContentType && bodyAllowedForStatus(rws.status) && len(p) > 0 {
+		// If the Content-Encoding is non-blank, we shouldn't
+		// sniff the body. See Issue golang.org/issue/31753.
+		ce := rws.snapHeader.Get("Content-Encoding")
+		hasCE := len(ce) > 0
+		if !hasCE && !hasContentType && bodyAllowedForStatus(rws.status) && len(p) > 0 {
 			ctype = http.DetectContentType(p)
 		}
 		var date string
@@ -2333,6 +2465,19 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 
 		for _, v := range rws.snapHeader["Trailer"] {
 			foreachHeaderElement(v, rws.declareTrailer)
+		}
+
+		// "Connection" headers aren't allowed in HTTP/2 (RFC 7540, 8.1.2.2),
+		// but respect "Connection" == "close" to mean sending a GOAWAY and tearing
+		// down the TCP connection when idle, like we do for HTTP/1.
+		// TODO: remove more Connection-specific header fields here, in addition
+		// to "Connection".
+		if _, ok := rws.snapHeader["Connection"]; ok {
+			v := rws.snapHeader.Get("Connection")
+			delete(rws.snapHeader, "Connection")
+			if v == "close" {
+				rws.conn.startGracefulShutdown()
+			}
 		}
 
 		endStream := (rws.handlerDone && !rws.hasTrailers() && len(p) == 0) || isHeadResp
@@ -2364,7 +2509,10 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 		rws.promoteUndeclaredTrailers()
 	}
 
-	endStream := rws.handlerDone && !rws.hasTrailers()
+	// only send trailers if they have actually been defined by the
+	// server handler.
+	hasNonemptyTrailers := rws.hasNonemptyTrailers()
+	endStream := rws.handlerDone && !hasNonemptyTrailers
 	if len(p) > 0 || endStream {
 		// only send a 0 byte DATA frame if we're ending the stream.
 		if err := rws.conn.writeDataFromHandler(rws.stream, p, endStream); err != nil {
@@ -2373,7 +2521,7 @@ func (rws *responseWriterState) writeChunk(p []byte) (n int, err error) {
 		}
 	}
 
-	if rws.handlerDone && rws.hasTrailers() {
+	if rws.handlerDone && hasNonemptyTrailers {
 		err = rws.conn.writeHeaders(rws.stream, &writeResHeaders{
 			streamID:  rws.stream.id,
 			h:         rws.handlerHeader,
@@ -2406,7 +2554,7 @@ const TrailerPrefix = "Trailer:"
 // after the header has already been flushed. Because the Go
 // ResponseWriter interface has no way to set Trailers (only the
 // Header), and because we didn't want to expand the ResponseWriter
-// interface, and because nobody used trailers, and because RFC 2616
+// interface, and because nobody used trailers, and because RFC 7230
 // says you SHOULD (but not must) predeclare any trailers in the
 // header, the official ResponseWriter rules said trailers in Go must
 // be predeclared, and then we reuse the same ResponseWriter.Header()
@@ -2415,7 +2563,7 @@ const TrailerPrefix = "Trailer:"
 // trailers. That worked for a while, until we found the first major
 // user of Trailers in the wild: gRPC (using them only over http2),
 // and gRPC libraries permit setting trailers mid-stream without
-// predeclarnig them. So: change of plans. We still permit the old
+// predeclaring them. So: change of plans. We still permit the old
 // way, but we also permit this hack: if a Header() key begins with
 // "Trailer:", the suffix of that key is a Trailer. Because ':' is an
 // invalid token byte anyway, there is no ambiguity. (And it's already
@@ -2601,14 +2749,9 @@ var (
 	ErrPushLimitReached = errors.New("http2: push would exceed peer's SETTINGS_MAX_CONCURRENT_STREAMS")
 )
 
-// pushOptions is the internal version of http.PushOptions, which we
-// cannot include here because it's only defined in Go 1.8 and later.
-type pushOptions struct {
-	Method string
-	Header http.Header
-}
+var _ http.Pusher = (*responseWriter)(nil)
 
-func (w *responseWriter) push(target string, opts pushOptions) error {
+func (w *responseWriter) Push(target string, opts *http.PushOptions) error {
 	st := w.rws.stream
 	sc := st.sc
 	sc.serveG.checkNotOn()
@@ -2617,6 +2760,10 @@ func (w *responseWriter) push(target string, opts pushOptions) error {
 	// http://tools.ietf.org/html/rfc7540#section-6.6
 	if st.isPushed() {
 		return ErrRecursivePush
+	}
+
+	if opts == nil {
+		opts = new(http.PushOptions)
 	}
 
 	// Default options.
@@ -2658,8 +2805,12 @@ func (w *responseWriter) push(target string, opts pushOptions) error {
 		// but PUSH_PROMISE requests cannot have a body.
 		// http://tools.ietf.org/html/rfc7540#section-8.2
 		// Also disallow Host, since the promised URL must be absolute.
-		switch strings.ToLower(k) {
-		case "content-length", "content-encoding", "trailer", "te", "expect", "host":
+		if asciiEqualFold(k, "content-length") ||
+			asciiEqualFold(k, "content-encoding") ||
+			asciiEqualFold(k, "trailer") ||
+			asciiEqualFold(k, "te") ||
+			asciiEqualFold(k, "expect") ||
+			asciiEqualFold(k, "host") {
 			return fmt.Errorf("promised request headers cannot include %q", k)
 		}
 	}
@@ -2716,7 +2867,7 @@ func (sc *serverConn) startPush(msg *startPushRequest) {
 	// PUSH_PROMISE frames MUST only be sent on a peer-initiated stream that
 	// is in either the "open" or "half-closed (remote)" state.
 	if msg.parent.state != stateOpen && msg.parent.state != stateHalfClosedRemote {
-		// responseWriter.Push checks that the stream is peer-initiaed.
+		// responseWriter.Push checks that the stream is peer-initiated.
 		msg.done <- errStreamClosed
 		return
 	}
@@ -2790,7 +2941,7 @@ func (sc *serverConn) startPush(msg *startPushRequest) {
 }
 
 // foreachHeaderElement splits v according to the "#rule" construction
-// in RFC 2616 section 2.1 and calls fn for each non-empty element.
+// in RFC 7230 section 7 and calls fn for each non-empty element.
 func foreachHeaderElement(v string, fn func(string)) {
 	v = textproto.TrimString(v)
 	if v == "" {
@@ -2838,41 +2989,6 @@ func new400Handler(err error) http.HandlerFunc {
 	}
 }
 
-// ValidTrailerHeader reports whether name is a valid header field name to appear
-// in trailers.
-// See: http://tools.ietf.org/html/rfc7230#section-4.1.2
-func ValidTrailerHeader(name string) bool {
-	name = http.CanonicalHeaderKey(name)
-	if strings.HasPrefix(name, "If-") || badTrailer[name] {
-		return false
-	}
-	return true
-}
-
-var badTrailer = map[string]bool{
-	"Authorization":       true,
-	"Cache-Control":       true,
-	"Connection":          true,
-	"Content-Encoding":    true,
-	"Content-Length":      true,
-	"Content-Range":       true,
-	"Content-Type":        true,
-	"Expect":              true,
-	"Host":                true,
-	"Keep-Alive":          true,
-	"Max-Forwards":        true,
-	"Pragma":              true,
-	"Proxy-Authenticate":  true,
-	"Proxy-Authorization": true,
-	"Proxy-Connection":    true,
-	"Range":               true,
-	"Realm":               true,
-	"Te":                  true,
-	"Trailer":             true,
-	"Transfer-Encoding":   true,
-	"Www-Authenticate":    true,
-}
-
 // h1ServerKeepAlivesDisabled reports whether hs has its keep-alives
 // disabled. See comments on h1ServerShutdownChan above for why
 // the code is written this way.
@@ -2885,4 +3001,32 @@ func h1ServerKeepAlivesDisabled(hs *http.Server) bool {
 		return !hs.doKeepAlives()
 	}
 	return false
+}
+
+func (sc *serverConn) countError(name string, err error) error {
+	if sc == nil || sc.srv == nil {
+		return err
+	}
+	f := sc.srv.CountError
+	if f == nil {
+		return err
+	}
+	var typ string
+	var code ErrCode
+	switch e := err.(type) {
+	case ConnectionError:
+		typ = "conn"
+		code = ErrCode(e)
+	case StreamError:
+		typ = "stream"
+		code = ErrCode(e.Code)
+	default:
+		return err
+	}
+	codeStr := errCodeName[code]
+	if codeStr == "" {
+		codeStr = strconv.Itoa(int(code))
+	}
+	f(fmt.Sprintf("%s_%s_%s", typ, codeStr, name))
+	return err
 }

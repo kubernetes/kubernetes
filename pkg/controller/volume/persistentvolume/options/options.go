@@ -38,11 +38,14 @@ type VolumeConfigFlags struct {
 	EnableDynamicProvisioning                           bool
 }
 
+// PersistentVolumeControllerOptions holds the PersistentVolumeController options.
 type PersistentVolumeControllerOptions struct {
 	PVClaimBinderSyncPeriod time.Duration
 	VolumeConfigFlags       VolumeConfigFlags
 }
 
+// NewPersistentVolumeControllerOptions creates a new PersistentVolumeControllerOptions with
+// default values.
 func NewPersistentVolumeControllerOptions() PersistentVolumeControllerOptions {
 	return PersistentVolumeControllerOptions{
 		PVClaimBinderSyncPeriod: 15 * time.Second,
@@ -59,6 +62,7 @@ func NewPersistentVolumeControllerOptions() PersistentVolumeControllerOptions {
 	}
 }
 
+// AddFlags adds flags related to PersistentVolumeControllerOptions to the specified FlagSet.
 func (o *PersistentVolumeControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.PVClaimBinderSyncPeriod, "pvclaimbinder-sync-period", o.PVClaimBinderSyncPeriod,
 		"The period for syncing persistent volumes and persistent volume claims")

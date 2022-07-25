@@ -18,6 +18,7 @@ package storage
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -30,17 +31,9 @@ type Ignored struct {
 	ID string
 }
 
-type IgnoredList struct {
-	Items []Ignored
-}
-
-func (obj *Ignored) GetObjectKind() schema.ObjectKind     { return schema.EmptyObjectKind }
-func (obj *IgnoredList) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *Ignored) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 func (obj *Ignored) DeepCopyObject() runtime.Object {
 	panic("Ignored does not support DeepCopy")
-}
-func (obj *IgnoredList) DeepCopyObject() runtime.Object {
-	panic("IgnoredList does not support DeepCopy")
 }
 
 func TestSelectionPredicate(t *testing.T) {
@@ -48,7 +41,6 @@ func TestSelectionPredicate(t *testing.T) {
 		labelSelector, fieldSelector string
 		labels                       labels.Set
 		fields                       fields.Set
-		uninitialized                bool
 		err                          error
 		shouldMatch                  bool
 		matchSingleKey               string
@@ -81,14 +73,6 @@ func TestSelectionPredicate(t *testing.T) {
 			shouldMatch:    true,
 			matchSingleKey: "12345",
 		},
-		"E": {
-			fieldSelector:  "metadata.name=12345",
-			labels:         labels.Set{},
-			fields:         fields.Set{"metadata.name": "12345"},
-			uninitialized:  true,
-			shouldMatch:    false,
-			matchSingleKey: "12345",
-		},
 		"error": {
 			labelSelector: "name=foo",
 			fieldSelector: "uid=12345",
@@ -109,8 +93,8 @@ func TestSelectionPredicate(t *testing.T) {
 		sp := &SelectionPredicate{
 			Label: parsedLabel,
 			Field: parsedField,
-			GetAttrs: func(runtime.Object) (label labels.Set, field fields.Set, uninitialized bool, err error) {
-				return item.labels, item.fields, item.uninitialized, item.err
+			GetAttrs: func(runtime.Object) (label labels.Set, field fields.Set, err error) {
+				return item.labels, item.fields, item.err
 			},
 		}
 		got, err := sp.Matches(&Ignored{})
@@ -118,6 +102,10 @@ func TestSelectionPredicate(t *testing.T) {
 			t.Errorf("%v: expected %v, got %v", name, e, a)
 			continue
 		}
+		if e, a := item.shouldMatch, got; e != a {
+			t.Errorf("%v: expected %v, got %v", name, e, a)
+		}
+		got = sp.MatchesObjectAttributes(item.labels, item.fields)
 		if e, a := item.shouldMatch, got; e != a {
 			t.Errorf("%v: expected %v, got %v", name, e, a)
 		}
@@ -129,6 +117,86 @@ func TestSelectionPredicate(t *testing.T) {
 			if e, a := key, got; e != a {
 				t.Errorf("%v: expected %v, got %v", name, e, a)
 			}
+		}
+	}
+}
+
+func TestSelectionPredicateMatcherIndex(t *testing.T) {
+	testCases := map[string]struct {
+		labelSelector, fieldSelector string
+		indexLabels                  []string
+		indexFields                  []string
+		expected                     []MatchValue
+	}{
+		"Match nil": {
+			labelSelector: "name=foo",
+			fieldSelector: "uid=12345",
+			indexLabels:   []string{"bar"},
+			indexFields:   []string{},
+			expected:      nil,
+		},
+		"Match field": {
+			labelSelector: "name=foo",
+			fieldSelector: "uid=12345",
+			indexLabels:   []string{},
+			indexFields:   []string{"uid"},
+			expected:      []MatchValue{{IndexName: FieldIndex("uid"), Value: "12345"}},
+		},
+		"Match label": {
+			labelSelector: "name=foo",
+			fieldSelector: "uid=12345",
+			indexLabels:   []string{"name"},
+			indexFields:   []string{},
+			expected:      []MatchValue{{IndexName: LabelIndex("name"), Value: "foo"}},
+		},
+		"Match field and label": {
+			labelSelector: "name=foo",
+			fieldSelector: "uid=12345",
+			indexLabels:   []string{"name"},
+			indexFields:   []string{"uid"},
+			expected:      []MatchValue{{IndexName: FieldIndex("uid"), Value: "12345"}, {IndexName: LabelIndex("name"), Value: "foo"}},
+		},
+		"Negative match field and label": {
+			labelSelector: "name!=foo",
+			fieldSelector: "uid!=12345",
+			indexLabels:   []string{"name"},
+			indexFields:   []string{"uid"},
+			expected:      nil,
+		},
+		"Negative match field and match label": {
+			labelSelector: "name=foo",
+			fieldSelector: "uid!=12345",
+			indexLabels:   []string{"name"},
+			indexFields:   []string{"uid"},
+			expected:      []MatchValue{{IndexName: LabelIndex("name"), Value: "foo"}},
+		},
+		"Negative match label and match field": {
+			labelSelector: "name!=foo",
+			fieldSelector: "uid=12345",
+			indexLabels:   []string{"name"},
+			indexFields:   []string{"uid"},
+			expected:      []MatchValue{{IndexName: FieldIndex("uid"), Value: "12345"}},
+		},
+	}
+	for name, testCase := range testCases {
+		parsedLabel, err := labels.Parse(testCase.labelSelector)
+		if err != nil {
+			panic(err)
+		}
+		parsedField, err := fields.ParseSelector(testCase.fieldSelector)
+		if err != nil {
+			panic(err)
+		}
+
+		sp := &SelectionPredicate{
+			Label:       parsedLabel,
+			Field:       parsedField,
+			IndexLabels: testCase.indexLabels,
+			IndexFields: testCase.indexFields,
+		}
+		actual := sp.MatcherIndex()
+		if !reflect.DeepEqual(testCase.expected, actual) {
+			t.Errorf("%v: expected %v, got %v", name, testCase.expected, actual)
 		}
 	}
 }

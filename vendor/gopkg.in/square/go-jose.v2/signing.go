@@ -297,6 +297,13 @@ func (obj JSONWebSignature) Verify(verificationKey interface{}) ([]byte, error) 
 	return obj.payload, nil
 }
 
+// UnsafePayloadWithoutVerification returns the payload without
+// verifying it. The content returned from this function cannot be
+// trusted.
+func (obj JSONWebSignature) UnsafePayloadWithoutVerification() []byte {
+	return obj.payload
+}
+
 // DetachedVerify validates a detached signature on the given payload. In
 // most cases, you will probably want to use Verify instead. DetachedVerify
 // is only useful if you have a payload and signature that are separated from

@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // thinLsClient knows how to run a thin_ls very specific to CoW usage for

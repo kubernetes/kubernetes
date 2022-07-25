@@ -24,7 +24,7 @@ import (
 	"strings"
 )
 
-// Version is an opqaue representation of a version number
+// Version is an opaque representation of a version number
 type Version struct {
 	components    []uint
 	semver        bool
@@ -154,10 +154,50 @@ func (v *Version) Components() []uint {
 	return v.components
 }
 
+// WithMajor returns copy of the version object with requested major number
+func (v *Version) WithMajor(major uint) *Version {
+	result := *v
+	result.components = []uint{major, v.Minor(), v.Patch()}
+	return &result
+}
+
+// WithMinor returns copy of the version object with requested minor number
+func (v *Version) WithMinor(minor uint) *Version {
+	result := *v
+	result.components = []uint{v.Major(), minor, v.Patch()}
+	return &result
+}
+
+// WithPatch returns copy of the version object with requested patch number
+func (v *Version) WithPatch(patch uint) *Version {
+	result := *v
+	result.components = []uint{v.Major(), v.Minor(), patch}
+	return &result
+}
+
+// WithPreRelease returns copy of the version object with requested prerelease
+func (v *Version) WithPreRelease(preRelease string) *Version {
+	result := *v
+	result.components = []uint{v.Major(), v.Minor(), v.Patch()}
+	result.preRelease = preRelease
+	return &result
+}
+
+// WithBuildMetadata returns copy of the version object with requested buildMetadata
+func (v *Version) WithBuildMetadata(buildMetadata string) *Version {
+	result := *v
+	result.components = []uint{v.Major(), v.Minor(), v.Patch()}
+	result.buildMetadata = buildMetadata
+	return &result
+}
+
 // String converts a Version back to a string; note that for versions parsed with
 // ParseGeneric, this will not include the trailing uninterpreted portion of the version
 // number.
 func (v *Version) String() string {
+	if v == nil {
+		return "<nil>"
+	}
 	var buffer bytes.Buffer
 
 	for i, comp := range v.components {

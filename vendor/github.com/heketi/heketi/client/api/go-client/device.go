@@ -17,7 +17,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
@@ -54,7 +53,7 @@ func (c *Client) DeviceAdd(request *api.DeviceAddRequest) error {
 	}
 
 	// Wait for response
-	r, err = c.waitForResponseWithTimer(r, time.Second)
+	r, err = c.pollResponse(r)
 	if err != nil {
 		return err
 	}
@@ -138,7 +137,7 @@ func (c *Client) DeviceDeleteWithOptions(
 	}
 
 	// Wait for response
-	r, err = c.waitForResponseWithTimer(r, time.Second)
+	r, err = c.pollResponse(r)
 	if err != nil {
 		return err
 	}
@@ -184,7 +183,7 @@ func (c *Client) DeviceState(id string,
 	}
 
 	// Wait for response
-	r, err = c.waitForResponseWithTimer(r, time.Second)
+	r, err = c.pollResponse(r)
 	if err != nil {
 		return err
 	}
@@ -220,7 +219,7 @@ func (c *Client) DeviceResync(id string) error {
 	}
 
 	// Wait for response
-	r, err = c.waitForResponseWithTimer(r, time.Millisecond*250)
+	r, err = c.pollResponse(r)
 	if err != nil {
 		return err
 	}

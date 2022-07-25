@@ -19,29 +19,24 @@ package cert
 import (
 	"bytes"
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"io/ioutil"
-	"math"
 	"math/big"
 	"net"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
+
+	"k8s.io/client-go/util/keyutil"
+	netutils "k8s.io/utils/net"
 )
 
-const (
-	rsaKeySize   = 2048
-	duration365d = time.Hour * 24 * 365
-)
+const duration365d = time.Hour * 24 * 365
 
 // Config contains the basic fields required for creating a certificate
 type Config struct {
@@ -59,11 +54,6 @@ type AltNames struct {
 	IPs      []net.IP
 }
 
-// NewPrivateKey creates an RSA private key
-func NewPrivateKey() (*rsa.PrivateKey, error) {
-	return rsa.GenerateKey(cryptorand.Reader, rsaKeySize)
-}
-
 // NewSelfSignedCACert creates a CA certificate
 func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, error) {
 	now := time.Now()
@@ -73,6 +63,7 @@ func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, erro
 			CommonName:   cfg.CommonName,
 			Organization: cfg.Organization,
 		},
+		DNSNames:              []string{cfg.CommonName},
 		NotBefore:             now.UTC(),
 		NotAfter:              now.Add(duration365d * 10).UTC(),
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
@@ -85,58 +76,6 @@ func NewSelfSignedCACert(cfg Config, key crypto.Signer) (*x509.Certificate, erro
 		return nil, err
 	}
 	return x509.ParseCertificate(certDERBytes)
-}
-
-// NewSignedCert creates a signed certificate using the given CA certificate and key
-func NewSignedCert(cfg Config, key crypto.Signer, caCert *x509.Certificate, caKey crypto.Signer) (*x509.Certificate, error) {
-	serial, err := rand.Int(rand.Reader, new(big.Int).SetInt64(math.MaxInt64))
-	if err != nil {
-		return nil, err
-	}
-	if len(cfg.CommonName) == 0 {
-		return nil, errors.New("must specify a CommonName")
-	}
-	if len(cfg.Usages) == 0 {
-		return nil, errors.New("must specify at least one ExtKeyUsage")
-	}
-
-	certTmpl := x509.Certificate{
-		Subject: pkix.Name{
-			CommonName:   cfg.CommonName,
-			Organization: cfg.Organization,
-		},
-		DNSNames:     cfg.AltNames.DNSNames,
-		IPAddresses:  cfg.AltNames.IPs,
-		SerialNumber: serial,
-		NotBefore:    caCert.NotBefore,
-		NotAfter:     time.Now().Add(duration365d).UTC(),
-		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  cfg.Usages,
-	}
-	certDERBytes, err := x509.CreateCertificate(cryptorand.Reader, &certTmpl, caCert, key.Public(), caKey)
-	if err != nil {
-		return nil, err
-	}
-	return x509.ParseCertificate(certDERBytes)
-}
-
-// MakeEllipticPrivateKeyPEM creates an ECDSA private key
-func MakeEllipticPrivateKeyPEM() ([]byte, error) {
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
-	if err != nil {
-		return nil, err
-	}
-
-	derBytes, err := x509.MarshalECPrivateKey(privateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	privateKeyPemBlock := &pem.Block{
-		Type:  ECPrivateKeyBlockType,
-		Bytes: derBytes,
-	}
-	return pem.EncodeToMemory(privateKeyPemBlock), nil
 }
 
 // GenerateSelfSignedCertKey creates a self-signed certificate and key for the given host.
@@ -159,8 +98,8 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 	maxAge := time.Hour * 24 * 365          // one year self-signed certs
 
 	baseName := fmt.Sprintf("%s_%s_%s", host, strings.Join(ipsToStrings(alternateIPs), "-"), strings.Join(alternateDNS, "-"))
-	certFixturePath := path.Join(fixtureDirectory, baseName+".crt")
-	keyFixturePath := path.Join(fixtureDirectory, baseName+".key")
+	certFixturePath := filepath.Join(fixtureDirectory, baseName+".crt")
+	keyFixturePath := filepath.Join(fixtureDirectory, baseName+".key")
 	if len(fixtureDirectory) > 0 {
 		cert, err := ioutil.ReadFile(certFixturePath)
 		if err == nil {
@@ -219,7 +158,7 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 		BasicConstraintsValid: true,
 	}
 
-	if ip := net.ParseIP(host); ip != nil {
+	if ip := netutils.ParseIPSloppy(host); ip != nil {
 		template.IPAddresses = append(template.IPAddresses, ip)
 	} else {
 		template.DNSNames = append(template.DNSNames, host)
@@ -244,7 +183,7 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 
 	// Generate key
 	keyBuffer := bytes.Buffer{}
-	if err := pem.Encode(&keyBuffer, &pem.Block{Type: RSAPrivateKeyBlockType, Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
+	if err := pem.Encode(&keyBuffer, &pem.Block{Type: keyutil.RSAPrivateKeyBlockType, Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
 		return nil, nil, err
 	}
 

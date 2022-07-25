@@ -1,8 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-- kawych
-- piosz
-- x13n
+  - sig-instrumentation-approvers
 reviewers:
-- kawych
-- piosz
-- x13n
+  - sig-instrumentation-reviewers
+labels:
+  - sig/instrumentation
+emeritus_approvers:
+  - kawych
+  - x13n

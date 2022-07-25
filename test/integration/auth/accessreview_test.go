@@ -17,28 +17,27 @@ limitations under the License.
 package auth
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
 	"testing"
 
+	authorizationapi "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-// Inject into master an authorizer that uses user info.
+// Inject into control plane an authorizer that uses user info.
 // TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
 type sarAuthorizer struct{}
 
-func (sarAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (sarAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	if a.GetUser().GetName() == "dave" {
 		return authorizer.DecisionNoOpinion, "no", errors.New("I'm sorry, Dave")
 	}
@@ -49,19 +48,23 @@ func (sarAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, st
 func alwaysAlice(req *http.Request) (*authenticator.Response, bool, error) {
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
-			Name: "alice",
+			Name:   "alice",
+			UID:    "alice",
+			Groups: []string{user.AllAuthenticated},
 		},
 	}, true, nil
 }
 
 func TestSubjectAccessReview(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAMaster(masterConfig)
-	defer closeFn()
-
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+	clientset, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Unset BearerToken to disable BearerToken authenticator.
+			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
+			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+			config.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
 	tests := []struct {
 		name           string
@@ -123,7 +126,7 @@ func TestSubjectAccessReview(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		response, err := clientset.Authorization().SubjectAccessReviews().Create(test.sar)
+		response, err := clientset.AuthorizationV1().SubjectAccessReviews().Create(context.TODO(), test.sar, metav1.CreateOptions{})
 		switch {
 		case err == nil && len(test.expectedError) == 0:
 
@@ -146,17 +149,25 @@ func TestSubjectAccessReview(t *testing.T) {
 
 func TestSelfSubjectAccessReview(t *testing.T) {
 	username := "alice"
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+	authenticatorFunc := func(req *http.Request) (*authenticator.Response, bool, error) {
 		return &authenticator.Response{
-			User: &user.DefaultInfo{Name: username},
+			User: &user.DefaultInfo{
+				Name:   username,
+				UID:    username,
+				Groups: []string{user.AllAuthenticated},
+			},
 		}, true, nil
-	})
-	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAMaster(masterConfig)
-	defer closeFn()
+	}
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+	clientset, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Unset BearerToken to disable BearerToken authenticator.
+			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
+			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(authenticatorFunc)
+			config.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
 	tests := []struct {
 		name           string
@@ -207,7 +218,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 	for _, test := range tests {
 		username = test.username
 
-		response, err := clientset.Authorization().SelfSubjectAccessReviews().Create(test.sar)
+		response, err := clientset.AuthorizationV1().SelfSubjectAccessReviews().Create(context.TODO(), test.sar, metav1.CreateOptions{})
 		switch {
 		case err == nil && len(test.expectedError) == 0:
 
@@ -229,13 +240,15 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 }
 
 func TestLocalSubjectAccessReview(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
-	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
-	_, s, closeFn := framework.RunAMaster(masterConfig)
-	defer closeFn()
-
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
+	clientset, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerConfig: func(config *controlplane.Config) {
+			// Unset BearerToken to disable BearerToken authenticator.
+			config.GenericConfig.LoopbackClientConfig.BearerToken = ""
+			config.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+			config.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
+		},
+	})
+	defer tearDownFn()
 
 	tests := []struct {
 		name           string
@@ -325,7 +338,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		response, err := clientset.Authorization().LocalSubjectAccessReviews(test.namespace).Create(test.sar)
+		response, err := clientset.AuthorizationV1().LocalSubjectAccessReviews(test.namespace).Create(context.TODO(), test.sar, metav1.CreateOptions{})
 		switch {
 		case err == nil && len(test.expectedError) == 0:
 

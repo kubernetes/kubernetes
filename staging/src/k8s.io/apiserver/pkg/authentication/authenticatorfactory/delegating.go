@@ -18,11 +18,9 @@ package authenticatorfactory
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
-	"github.com/go-openapi/spec"
-
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/anonymous"
@@ -32,9 +30,10 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/websocket"
 	"k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/token/cache"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	webhooktoken "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
-	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
-	"k8s.io/client-go/util/cert"
+	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // DelegatingAuthenticatorConfig is the minimal configuration needed to create an authenticator
@@ -43,13 +42,23 @@ type DelegatingAuthenticatorConfig struct {
 	Anonymous bool
 
 	// TokenAccessReviewClient is a client to do token review. It can be nil. Then every token is ignored.
-	TokenAccessReviewClient authenticationclient.TokenReviewInterface
+	TokenAccessReviewClient authenticationclient.AuthenticationV1Interface
+
+	// TokenAccessReviewTimeout specifies a time limit for requests made by the authorization webhook client.
+	TokenAccessReviewTimeout time.Duration
+
+	// WebhookRetryBackoff specifies the backoff parameters for the authentication webhook retry logic.
+	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
+	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
+	WebhookRetryBackoff *wait.Backoff
 
 	// CacheTTL is the length of time that a token authentication answer will be cached.
 	CacheTTL time.Duration
 
-	// ClientCAFile is the CA bundle file used to authenticate client certificates
-	ClientCAFile string
+	// CAContentProvider are the options for verifying incoming connections using mTLS and directly assigning to users.
+	// Generally this is the CA bundle file used to authenticate client certificates
+	// If this is nil, then mTLS will not be used.
+	ClientCertificateCAContentProvider dynamiccertificates.CAContentProvider
 
 	APIAudiences authenticator.Audiences
 
@@ -63,32 +72,29 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 	// front-proxy first, then remote
 	// Add the front proxy authenticator if requested
 	if c.RequestHeaderConfig != nil {
-		requestHeaderAuthenticator, err := headerrequest.NewSecure(
-			c.RequestHeaderConfig.ClientCA,
+		requestHeaderAuthenticator := headerrequest.NewDynamicVerifyOptionsSecure(
+			c.RequestHeaderConfig.CAContentProvider.VerifyOptions,
 			c.RequestHeaderConfig.AllowedClientNames,
 			c.RequestHeaderConfig.UsernameHeaders,
 			c.RequestHeaderConfig.GroupHeaders,
 			c.RequestHeaderConfig.ExtraHeaderPrefixes,
 		)
-		if err != nil {
-			return nil, nil, err
-		}
 		authenticators = append(authenticators, requestHeaderAuthenticator)
 	}
 
 	// x509 client cert auth
-	if len(c.ClientCAFile) > 0 {
-		clientCAs, err := cert.NewPool(c.ClientCAFile)
-		if err != nil {
-			return nil, nil, fmt.Errorf("unable to load client CA file %s: %v", c.ClientCAFile, err)
-		}
-		verifyOpts := x509.DefaultVerifyOptions()
-		verifyOpts.Roots = clientCAs
-		authenticators = append(authenticators, x509.New(verifyOpts, x509.CommonNameUserConversion))
+	if c.ClientCertificateCAContentProvider != nil {
+		authenticators = append(authenticators, x509.NewDynamic(c.ClientCertificateCAContentProvider.VerifyOptions, x509.CommonNameUserConversion))
 	}
 
 	if c.TokenAccessReviewClient != nil {
-		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences)
+		if c.WebhookRetryBackoff == nil {
+			return nil, nil, errors.New("retry backoff parameters for delegating authentication webhook has not been specified")
+		}
+		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences, *c.WebhookRetryBackoff, c.TokenAccessReviewTimeout, webhooktoken.AuthenticatorMetrics{
+			RecordRequestTotal:   RecordRequestTotal,
+			RecordRequestLatency: RecordRequestLatency,
+		})
 		if err != nil {
 			return nil, nil, err
 		}

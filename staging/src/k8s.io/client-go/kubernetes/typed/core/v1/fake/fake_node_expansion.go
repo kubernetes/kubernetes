@@ -17,13 +17,15 @@ limitations under the License.
 package fake
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
 )
 
 // TODO: Should take a PatchType as an argument probably.
-func (c *FakeNodes) PatchStatus(nodeName string, data []byte) (*v1.Node, error) {
+func (c *FakeNodes) PatchStatus(_ context.Context, nodeName string, data []byte) (*v1.Node, error) {
 	// TODO: Should be configurable to support additional patch strategies.
 	pt := types.StrategicMergePatchType
 	obj, err := c.Fake.Invokes(

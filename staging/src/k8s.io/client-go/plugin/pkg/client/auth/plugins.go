@@ -17,9 +17,6 @@ limitations under the License.
 package auth
 
 import (
-	// Initialize all known client auth plugins.
-	_ "k8s.io/client-go/plugin/pkg/client/auth/azure"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	// Initialize common client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 )

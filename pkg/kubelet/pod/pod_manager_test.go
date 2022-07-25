@@ -34,7 +34,7 @@ func newTestManager() (*basicManager, *podtest.FakeMirrorClient) {
 	fakeMirrorClient := podtest.NewFakeMirrorClient()
 	secretManager := secret.NewFakeManager()
 	configMapManager := configmap.NewFakeManager()
-	manager := NewBasicPodManager(fakeMirrorClient, secretManager, configMapManager, podtest.NewMockCheckpointManager()).(*basicManager)
+	manager := NewBasicPodManager(fakeMirrorClient, secretManager, configMapManager).(*basicManager)
 	return manager, fakeMirrorClient
 }
 
@@ -158,7 +158,7 @@ func TestDeletePods(t *testing.T) {
 		t.Fatalf("Run DeletePod() error, expected %d pods, got %d pods; ", len(expectedPods)-1, len(actualPods))
 	}
 
-	orphanedMirrorPodNames := podManager.getOrphanedMirrorPodNames()
+	orphanedMirrorPodNames := podManager.GetOrphanedMirrorPodNames()
 	expectedOrphanedMirrorPodNameNum := 1
 	if len(orphanedMirrorPodNames) != expectedOrphanedMirrorPodNameNum {
 		t.Fatalf("Run getOrphanedMirrorPodNames() error, expected %d orphaned mirror pods, got %d orphaned mirror pods; ", expectedOrphanedMirrorPodNameNum, len(orphanedMirrorPodNames))

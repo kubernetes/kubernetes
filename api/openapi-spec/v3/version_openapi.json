@@ -1,0 +1,98 @@
+{
+  "components": {
+    "schemas": {
+      "io.k8s.apimachinery.pkg.version.Info": {
+        "description": "Info contains versioning information. how we'll want to distribute that information.",
+        "properties": {
+          "buildDate": {
+            "default": "",
+            "type": "string"
+          },
+          "compiler": {
+            "default": "",
+            "type": "string"
+          },
+          "gitCommit": {
+            "default": "",
+            "type": "string"
+          },
+          "gitTreeState": {
+            "default": "",
+            "type": "string"
+          },
+          "gitVersion": {
+            "default": "",
+            "type": "string"
+          },
+          "goVersion": {
+            "default": "",
+            "type": "string"
+          },
+          "major": {
+            "default": "",
+            "type": "string"
+          },
+          "minor": {
+            "default": "",
+            "type": "string"
+          },
+          "platform": {
+            "default": "",
+            "type": "string"
+          }
+        },
+        "required": [
+          "major",
+          "minor",
+          "gitVersion",
+          "gitCommit",
+          "gitTreeState",
+          "buildDate",
+          "goVersion",
+          "compiler",
+          "platform"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "BearerToken": {
+        "description": "Bearer Token authentication",
+        "in": "header",
+        "name": "authorization",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "title": "Kubernetes",
+    "version": "unversioned"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/version/": {
+      "get": {
+        "description": "get the code version",
+        "operationId": "getCodeVersion",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.version.Info"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "version"
+        ]
+      }
+    }
+  }
+}

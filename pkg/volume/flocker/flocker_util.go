@@ -22,10 +22,10 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 
-	volutil "k8s.io/kubernetes/pkg/volume/util"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 
 	flockerapi "github.com/clusterhq/flocker-go"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type flockerUtil struct{}
@@ -72,7 +72,7 @@ func (util *flockerUtil) CreateVolume(c *flockerVolumeProvisioner) (datasetUUID 
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	requestBytes := capacity.Value()
-	volumeSizeGiB, err = volutil.RoundUpToGiBInt(capacity)
+	volumeSizeGiB, err = volumehelpers.RoundUpToGiBInt(capacity)
 	if err != nil {
 		return
 	}

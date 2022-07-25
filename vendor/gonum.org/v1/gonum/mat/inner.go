@@ -11,9 +11,12 @@ import (
 )
 
 // Inner computes the generalized inner product
-//   x^T A y
-// between column vectors x and y with matrix A. This is only a true inner product if
-// A is symmetric positive definite, though the operation works for any matrix A.
+//  xᵀ A y
+// between the vectors x and y with matrix A, where x and y are treated as
+// column vectors.
+//
+// This is only a true inner product if A is symmetric positive definite, though
+// the operation works for any matrix A.
 //
 // Inner panics if x.Len != m or y.Len != n when A is an m x n matrix.
 func Inner(x Vector, a Matrix, y Vector) float64 {

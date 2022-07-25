@@ -24,7 +24,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/printers"
 )
 
 // templates are logically optional for specifying a format.
@@ -47,6 +47,7 @@ type GoTemplatePrintFlags struct {
 	TemplateArgument *string
 }
 
+// AllowedFormats returns slice of string of allowed GoTemplatePrint printing format
 func (f *GoTemplatePrintFlags) AllowedFormats() []string {
 	formats := make([]string, 0, len(templateFormats))
 	for format := range templateFormats {
@@ -90,7 +91,7 @@ func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (printers.Resour
 	if templateFormat == "templatefile" || templateFormat == "go-template-file" {
 		data, err := ioutil.ReadFile(templateValue)
 		if err != nil {
-			return nil, fmt.Errorf("error reading --template %s, %v\n", templateValue, err)
+			return nil, fmt.Errorf("error reading --template %s, %v", templateValue, err)
 		}
 
 		templateValue = string(data)
@@ -98,7 +99,7 @@ func (f *GoTemplatePrintFlags) ToPrinter(templateFormat string) (printers.Resour
 
 	p, err := printers.NewGoTemplatePrinter([]byte(templateValue))
 	if err != nil {
-		return nil, fmt.Errorf("error parsing template %s, %v\n", templateValue, err)
+		return nil, fmt.Errorf("error parsing template %s, %v", templateValue, err)
 	}
 
 	allowMissingKeys := true

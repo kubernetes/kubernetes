@@ -1,11 +1,10 @@
 language: go
 go_import_path: github.com/pkg/errors
 go:
-  - 1.4.3
-  - 1.5.4
-  - 1.6.2
-  - 1.7.1
+  - 1.11.x
+  - 1.12.x
+  - 1.13.x
   - tip
 
 script:
-  - go test -v ./...
+  - make check

@@ -14,13 +14,13 @@ type Deployment struct {
 	// Read Only: true
 	Inode uint32 `json:"inode"`
 
-	// Controller ID
+	// Node ID
 	// Read Only: true
-	Controller string `json:"controller"`
+	Node string `json:"node"`
 
-	// Controller name
+	// Node name
 	// Read Only: true
-	ControllerName string `json:"controllerName"`
+	NodeName string `json:"nodeName"`
 
 	// Health
 	// Read Only: true

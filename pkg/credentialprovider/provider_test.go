@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,21 @@ import (
 	"time"
 )
 
+type testProvider struct {
+	Count int
+}
+
+// Enabled implements dockerConfigProvider
+func (d *testProvider) Enabled() bool {
+	return true
+}
+
+// Provide implements dockerConfigProvider
+func (d *testProvider) Provide(image string) DockerConfig {
+	d.Count++
+	return DockerConfig{}
+}
+
 func TestCachingProvider(t *testing.T) {
 	provider := &testProvider{
 		Count: 0,
@@ -31,31 +46,33 @@ func TestCachingProvider(t *testing.T) {
 		Lifetime: 1 * time.Second,
 	}
 
+	image := "image"
+
 	if provider.Count != 0 {
 		t.Errorf("Unexpected number of Provide calls: %v", provider.Count)
 	}
-	cache.Provide()
-	cache.Provide()
-	cache.Provide()
-	cache.Provide()
+	cache.Provide(image)
+	cache.Provide(image)
+	cache.Provide(image)
+	cache.Provide(image)
 	if provider.Count != 1 {
 		t.Errorf("Unexpected number of Provide calls: %v", provider.Count)
 	}
 
 	time.Sleep(cache.Lifetime)
-	cache.Provide()
-	cache.Provide()
-	cache.Provide()
-	cache.Provide()
+	cache.Provide(image)
+	cache.Provide(image)
+	cache.Provide(image)
+	cache.Provide(image)
 	if provider.Count != 2 {
 		t.Errorf("Unexpected number of Provide calls: %v", provider.Count)
 	}
 
 	time.Sleep(cache.Lifetime)
-	cache.Provide()
-	cache.Provide()
-	cache.Provide()
-	cache.Provide()
+	cache.Provide(image)
+	cache.Provide(image)
+	cache.Provide(image)
+	cache.Provide(image)
 	if provider.Count != 3 {
 		t.Errorf("Unexpected number of Provide calls: %v", provider.Count)
 	}

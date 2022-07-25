@@ -51,7 +51,7 @@ type ejUnmarshaler interface {
 	UnmarshalEasyJSON(w *jlexer.Lexer)
 }
 
-// WriteJSON writes json data, prefers finding an appropriate interface to short-circuit the marshaller
+// WriteJSON writes json data, prefers finding an appropriate interface to short-circuit the marshaler
 // so it takes the fastest option available.
 func WriteJSON(data interface{}) ([]byte, error) {
 	if d, ok := data.(ejMarshaler); ok {
@@ -65,18 +65,19 @@ func WriteJSON(data interface{}) ([]byte, error) {
 	return json.Marshal(data)
 }
 
-// ReadJSON reads json data, prefers finding an appropriate interface to short-circuit the unmarshaller
-// so it takes the fastes option available
+// ReadJSON reads json data, prefers finding an appropriate interface to short-circuit the unmarshaler
+// so it takes the fastest option available
 func ReadJSON(data []byte, value interface{}) error {
+	trimmedData := bytes.Trim(data, "\x00")
 	if d, ok := value.(ejUnmarshaler); ok {
-		jl := &jlexer.Lexer{Data: data}
+		jl := &jlexer.Lexer{Data: trimmedData}
 		d.UnmarshalEasyJSON(jl)
 		return jl.Error()
 	}
 	if d, ok := value.(json.Unmarshaler); ok {
-		return d.UnmarshalJSON(data)
+		return d.UnmarshalJSON(trimmedData)
 	}
-	return json.Unmarshal(data, value)
+	return json.Unmarshal(trimmedData, value)
 }
 
 // DynamicJSONToStruct converts an untyped json structure into a struct
@@ -98,7 +99,7 @@ func ConcatJSON(blobs ...[]byte) []byte {
 	last := len(blobs) - 1
 	for blobs[last] == nil || bytes.Equal(blobs[last], nullJSON) {
 		// strips trailing null objects
-		last = last - 1
+		last--
 		if last < 0 {
 			// there was nothing but "null"s or nil...
 			return nil
@@ -188,7 +189,7 @@ func FromDynamicJSON(data, target interface{}) error {
 	return json.Unmarshal(b, target)
 }
 
-// NameProvider represents an object capabale of translating from go property names
+// NameProvider represents an object capable of translating from go property names
 // to json property names
 // This type is thread-safe.
 type NameProvider struct {

@@ -1,6 +1,6 @@
 # code-generator
 
-Golang code-generators used to implement [Kubernetes-style API types](https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md).
+Golang code-generators used to implement [Kubernetes-style API types](https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md).
 
 ## Purpose
 
@@ -22,3 +22,4 @@ HEAD of this repo will match HEAD of k8s.io/apiserver, k8s.io/apimachinery, and 
 
 `code-generator` is synced from https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/code-generator.
 Code changes are made in that location, merged into `k8s.io/kubernetes` and later synced here.
+

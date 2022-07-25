@@ -25,6 +25,9 @@ const (
 	// ImpersonateUserHeader is used to impersonate a particular user during an API server request
 	ImpersonateUserHeader = "Impersonate-User"
 
+	// ImpersonateUIDHeader is used to impersonate a particular UID during an API server request.
+	ImpersonateUidHeader = "Impersonate-Uid"
+
 	// ImpersonateGroupHeader is used to impersonate a particular group during an API server request.
 	// It can be repeated multiplied times for multiple groups.
 	ImpersonateGroupHeader = "Impersonate-Group"
@@ -36,9 +39,6 @@ const (
 	ImpersonateUserExtraHeaderPrefix = "Impersonate-Extra-"
 )
 
-// +genclient
-// +genclient:nonNamespaced
-// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // TokenReview attempts to authenticate a token to a known user.
@@ -58,7 +58,7 @@ type TokenReview struct {
 // TokenReviewSpec is a description of the token authentication request.
 type TokenReviewSpec struct {
 	// Token is the opaque bearer token.
-	Token string
+	Token string `datapolicy:"token"`
 	// Audiences is a list of the identifiers that the resource server presented
 	// with the token identifies as. Audience-aware token authenticators will
 	// verify that the token was intended for at least one of the audiences in
@@ -121,8 +121,8 @@ type TokenRequest struct {
 
 // TokenRequestSpec contains client provided parameters of a token request.
 type TokenRequestSpec struct {
-	// Audiences are the intendend audiences of the token. A recipient of a
-	// token must identitfy themself with an identifier in the list of
+	// Audiences are the intended audiences of the token. A recipient of a
+	// token must identify themself with an identifier in the list of
 	// audiences of the token, and otherwise should reject the token. A
 	// token issued for multiple audiences may be used to authenticate
 	// against any of the audiences listed but implies a high degree of
@@ -135,14 +135,17 @@ type TokenRequestSpec struct {
 	ExpirationSeconds int64
 
 	// BoundObjectRef is a reference to an object that the token will be bound to.
-	// The token will only be valid for as long as the bound objet exists.
+	// The token will only be valid for as long as the bound object exists.
+	// NOTE: The API server's TokenReview endpoint will validate the
+	// BoundObjectRef, but other audiences may not. Keep ExpirationSeconds
+	// small if you want prompt revocation.
 	BoundObjectRef *BoundObjectReference
 }
 
 // TokenRequestStatus is the result of a token request.
 type TokenRequestStatus struct {
 	// Token is the opaque bearer token.
-	Token string
+	Token string `datapolicy:"token"`
 	// ExpirationTimestamp is the time of expiration of the returned token.
 	ExpirationTimestamp metav1.Time
 }

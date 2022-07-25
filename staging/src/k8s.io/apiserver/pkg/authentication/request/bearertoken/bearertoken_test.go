@@ -25,6 +25,8 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/warning"
 )
 
 func TestAuthenticateRequest(t *testing.T) {
@@ -39,6 +41,28 @@ func TestAuthenticateRequest(t *testing.T) {
 	})
 	if !ok || resp == nil || err != nil {
 		t.Errorf("expected valid user")
+	}
+}
+
+func TestAuthenticateRequestIncludingValueAfterToken(t *testing.T) {
+	testCases := []struct {
+		Req *http.Request
+	}{
+		{Req: &http.Request{Header: http.Header{"Authorization": []string{"Bearer token a"}}}},
+		{Req: &http.Request{Header: http.Header{"Authorization": []string{"Bearer token a b c"}}}},
+		{Req: &http.Request{Header: http.Header{"Authorization": []string{"Bearer token   a"}}}},
+	}
+	for i, testCase := range testCases {
+		auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+			if token != "token" {
+				t.Errorf("unexpected token: %s", token)
+			}
+			return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
+		}))
+		resp, ok, err := auth.AuthenticateRequest(testCase.Req)
+		if !ok || resp == nil || err != nil {
+			t.Errorf("%d: expected valid user", i)
+		}
 	}
 }
 
@@ -106,6 +130,23 @@ func TestAuthenticateRequestBadValue(t *testing.T) {
 	}
 }
 
+type dummyRecorder struct {
+	agent string
+	text  string
+}
+
+func (r *dummyRecorder) AddWarning(agent, text string) {
+	r.agent = agent
+	r.text = text
+	return
+}
+
+func (r *dummyRecorder) getWarning() string {
+	return r.text
+}
+
+var _ warning.Recorder = &dummyRecorder{}
+
 func TestBearerToken(t *testing.T) {
 	tests := map[string]struct {
 		AuthorizationHeaders []string
@@ -115,6 +156,7 @@ func TestBearerToken(t *testing.T) {
 		ExpectedOK                   bool
 		ExpectedErr                  bool
 		ExpectedAuthorizationHeaders []string
+		ExpectedRecordedWarning      string
 	}{
 		"no header": {
 			AuthorizationHeaders:         nil,
@@ -162,6 +204,14 @@ func TestBearerToken(t *testing.T) {
 			ExpectedErr:                  true,
 			ExpectedAuthorizationHeaders: []string{"Bearer 123"},
 		},
+		"valid bearer token with a space": {
+			AuthorizationHeaders:         []string{"Bearer  token"},
+			ExpectedUserName:             "",
+			ExpectedOK:                   false,
+			ExpectedErr:                  false,
+			ExpectedAuthorizationHeaders: []string{"Bearer  token"},
+			ExpectedRecordedWarning:      invalidTokenWithSpaceWarning,
+		},
 		"error bearer token": {
 			AuthorizationHeaders: []string{"Bearer 123"},
 			TokenAuth: authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, error) {
@@ -175,7 +225,10 @@ func TestBearerToken(t *testing.T) {
 	}
 
 	for k, tc := range tests {
-		req, _ := http.NewRequest("GET", "/", nil)
+		dc := dummyRecorder{agent: "", text: ""}
+		ctx := genericapirequest.NewDefaultContext()
+		ctxWithRecorder := warning.WithWarningRecorder(ctx, &dc)
+		req, _ := http.NewRequestWithContext(ctxWithRecorder, "GET", "/", nil)
 		for _, h := range tc.AuthorizationHeaders {
 			req.Header.Add("Authorization", h)
 		}
@@ -192,6 +245,10 @@ func TestBearerToken(t *testing.T) {
 		}
 		if ok && resp.User.GetName() != tc.ExpectedUserName {
 			t.Errorf("%s: Expected username=%v, got %v", k, tc.ExpectedUserName, resp.User.GetName())
+			continue
+		}
+		if len(tc.ExpectedRecordedWarning) > 0 && tc.ExpectedRecordedWarning != dc.getWarning() {
+			t.Errorf("%s: Expected recorded warning=%v, got %v", k, tc.ExpectedRecordedWarning, dc.getWarning())
 			continue
 		}
 		if !reflect.DeepEqual(req.Header["Authorization"], tc.ExpectedAuthorizationHeaders) {

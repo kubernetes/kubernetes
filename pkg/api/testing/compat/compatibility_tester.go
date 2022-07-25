@@ -114,17 +114,17 @@ func getJSONValue(data map[string]interface{}, keys ...string) (interface{}, boo
 	// Look up the value
 	value, ok := data[key]
 	if !ok {
-		return nil, false, fmt.Errorf("No key %s found", key)
+		return nil, false, fmt.Errorf("no key %s found", key)
 	}
 
 	// Get the indexed value if an index is specified
 	if index >= 0 {
 		valueSlice, ok := value.([]interface{})
 		if !ok {
-			return nil, false, fmt.Errorf("Key %s did not hold a slice", key)
+			return nil, false, fmt.Errorf("key %s did not hold a slice", key)
 		}
 		if index >= len(valueSlice) {
-			return nil, false, fmt.Errorf("Index %d out of bounds for slice at key: %v", index, key)
+			return nil, false, fmt.Errorf("index %d out of bounds for slice at key: %v", index, key)
 		}
 		value = valueSlice[index]
 	}
@@ -135,7 +135,7 @@ func getJSONValue(data map[string]interface{}, keys ...string) (interface{}, boo
 
 	childData, ok := value.(map[string]interface{})
 	if !ok {
-		return nil, false, fmt.Errorf("Key %s did not hold a map", keys[0])
+		return nil, false, fmt.Errorf("key %s did not hold a map", keys[0])
 	}
 	return getJSONValue(childData, keys[1:]...)
 }

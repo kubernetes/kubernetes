@@ -26,8 +26,10 @@ import (
 )
 
 // StatefulSetLister helps list StatefulSets.
+// All objects returned here must be treated as read-only.
 type StatefulSetLister interface {
 	// List lists all StatefulSets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.StatefulSet, err error)
 	// StatefulSets returns an object that can list and get StatefulSets.
 	StatefulSets(namespace string) StatefulSetNamespaceLister
@@ -58,10 +60,13 @@ func (s *statefulSetLister) StatefulSets(namespace string) StatefulSetNamespaceL
 }
 
 // StatefulSetNamespaceLister helps list and get StatefulSets.
+// All objects returned here must be treated as read-only.
 type StatefulSetNamespaceLister interface {
 	// List lists all StatefulSets in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.StatefulSet, err error)
 	// Get retrieves the StatefulSet from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1beta1.StatefulSet, error)
 	StatefulSetNamespaceListerExpansion
 }

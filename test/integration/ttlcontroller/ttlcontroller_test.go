@@ -17,8 +17,8 @@ limitations under the License.
 package ttlcontroller
 
 import (
+	"context"
 	"fmt"
-	"net/http/httptest"
 	"strconv"
 	"sync"
 	"testing"
@@ -32,17 +32,16 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	listers "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func createClientAndInformers(t *testing.T, server *httptest.Server) (*clientset.Clientset, informers.SharedInformerFactory) {
-	config := restclient.Config{
-		Host:  server.URL,
-		QPS:   500,
-		Burst: 500,
-	}
-	testClient := clientset.NewForConfigOrDie(&config)
+func createClientAndInformers(t *testing.T, server *kubeapiservertesting.TestServer) (*clientset.Clientset, informers.SharedInformerFactory) {
+	config := restclient.CopyConfig(server.ClientConfig)
+	config.QPS = 500
+	config.Burst = 500
+	testClient := clientset.NewForConfigOrDie(config)
 
 	informers := informers.NewSharedInformerFactory(testClient, time.Second)
 	return testClient, informers
@@ -50,6 +49,7 @@ func createClientAndInformers(t *testing.T, server *httptest.Server) (*clientset
 
 func createNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex int) {
 	var wg sync.WaitGroup
+	errs := make(chan error, endIndex-startIndex)
 	for i := startIndex; i < endIndex; i++ {
 		wg.Add(1)
 		go func(idx int) {
@@ -59,27 +59,50 @@ func createNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex
 					Name: fmt.Sprintf("node-%d", idx),
 				},
 			}
-			if _, err := client.Core().Nodes().Create(node); err != nil {
-				t.Fatalf("Failed to create node: %v", err)
+			_, err := client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+			if err != nil {
+				errs <- err
 			}
 		}(i)
 	}
-	wg.Wait()
+
+	go func() { // wait in another go-routine to close channel
+		wg.Wait()
+		close(errs)
+	}()
+
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("Failed to create node: %v", err)
+		}
+	}
 }
 
 func deleteNodes(t *testing.T, client *clientset.Clientset, startIndex, endIndex int) {
 	var wg sync.WaitGroup
+	errs := make(chan error, endIndex-startIndex)
 	for i := startIndex; i < endIndex; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
 			name := fmt.Sprintf("node-%d", idx)
-			if err := client.Core().Nodes().Delete(name, &metav1.DeleteOptions{}); err != nil {
-				t.Fatalf("Failed to delete node: %v", err)
+			err := client.CoreV1().Nodes().Delete(context.TODO(), name, metav1.DeleteOptions{})
+			if err != nil {
+				errs <- err
 			}
 		}(i)
 	}
-	wg.Wait()
+
+	go func() { // wait in another go-routine to close channel
+		wg.Wait()
+		close(errs)
+	}()
+
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("Failed to delete node: %v", err)
+		}
+	}
 }
 
 func waitForNodesWithTTLAnnotation(t *testing.T, nodeLister listers.NodeLister, numNodes, ttlSeconds int) {
@@ -109,17 +132,17 @@ func waitForNodesWithTTLAnnotation(t *testing.T, nodeLister listers.NodeLister, 
 
 // Test whether ttlcontroller sets correct ttl annotations.
 func TestTTLAnnotations(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
 
 	testClient, informers := createClientAndInformers(t, server)
 	nodeInformer := informers.Core().V1().Nodes()
 	ttlc := ttl.NewTTLController(nodeInformer, testClient)
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	go nodeInformer.Informer().Run(stopCh)
-	go ttlc.Run(1, stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go nodeInformer.Informer().Run(ctx.Done())
+	go ttlc.Run(ctx, 1)
 
 	// Create 100 nodes all should have annotation equal to 0.
 	createNodes(t, testClient, 0, 100)

@@ -17,14 +17,16 @@ limitations under the License.
 package utils
 
 import (
+	"context"
 	"fmt"
 
-	api_v1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/util/integer"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	"k8s.io/utils/integer"
 )
 
 // EnsureLoggingAgentDeployment checks that logging agent is present on each
@@ -40,7 +42,10 @@ func EnsureLoggingAgentDeployment(f *framework.Framework, appName string) error 
 		agentPerNode[pod.Spec.NodeName]++
 	}
 
-	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	if err != nil {
+		return fmt.Errorf("failed to get nodes: %v", err)
+	}
 	for _, node := range nodeList.Items {
 		agentPodsCount, ok := agentPerNode[node.Name]
 
@@ -84,8 +89,8 @@ func EnsureLoggingAgentRestartsCount(f *framework.Framework, appName string, max
 	return nil
 }
 
-func getLoggingAgentPods(f *framework.Framework, appName string) (*api_v1.PodList, error) {
+func getLoggingAgentPods(f *framework.Framework, appName string) (*v1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"k8s-app": appName}))
 	options := meta_v1.ListOptions{LabelSelector: label.String()}
-	return f.ClientSet.CoreV1().Pods(api.NamespaceSystem).List(options)
+	return f.ClientSet.CoreV1().Pods(api.NamespaceSystem).List(context.TODO(), options)
 }

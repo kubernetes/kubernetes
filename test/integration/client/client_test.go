@@ -17,16 +17,23 @@ limitations under the License.
 package client
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"reflect"
 	rt "runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	"github.com/google/go-cmp/cmp"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,10 +42,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	appsv1ac "k8s.io/client-go/applyconfigurations/apps/v1"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+
+	"k8s.io/component-base/version"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -57,7 +68,7 @@ func TestClient(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", e, a)
 	}
 
-	pods, err := client.CoreV1().Pods("default").List(metav1.ListOptions{})
+	pods, err := client.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -80,14 +91,14 @@ func TestClient(t *testing.T) {
 		},
 	}
 
-	got, err := client.CoreV1().Pods("default").Create(pod)
+	got, err := client.CoreV1().Pods("default").Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err == nil {
 		t.Fatalf("unexpected non-error: %v", got)
 	}
 
 	// get a created pod
 	pod.Spec.Containers[0].Image = "an-image"
-	got, err = client.CoreV1().Pods("default").Create(pod)
+	got, err = client.CoreV1().Pods("default").Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -96,7 +107,7 @@ func TestClient(t *testing.T) {
 	}
 
 	// pod is shown, but not scheduled
-	pods, err = client.CoreV1().Pods("default").List(metav1.ListOptions{})
+	pods, err = client.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -149,7 +160,7 @@ func TestAtomicPut(t *testing.T) {
 		},
 	}
 	rcs := c.CoreV1().ReplicationControllers("default")
-	rc, err := rcs.Create(&rcBody)
+	rc, err := rcs.Create(context.TODO(), &rcBody, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed creating atomicRC: %v", err)
 	}
@@ -166,7 +177,7 @@ func TestAtomicPut(t *testing.T) {
 		go func(l, v string) {
 			defer wg.Done()
 			for {
-				tmpRC, err := rcs.Get(rc.Name, metav1.GetOptions{})
+				tmpRC, err := rcs.Get(context.TODO(), rc.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Errorf("Error getting atomicRC: %v", err)
 					continue
@@ -178,7 +189,7 @@ func TestAtomicPut(t *testing.T) {
 					tmpRC.Spec.Selector[l] = v
 					tmpRC.Spec.Template.Labels[l] = v
 				}
-				tmpRC, err = rcs.Update(tmpRC)
+				_, err = rcs.Update(context.TODO(), tmpRC, metav1.UpdateOptions{})
 				if err != nil {
 					if apierrors.IsConflict(err) {
 						// This is what we expect.
@@ -192,7 +203,7 @@ func TestAtomicPut(t *testing.T) {
 		}(label, value)
 	}
 	wg.Wait()
-	rc, err = rcs.Get(rc.Name, metav1.GetOptions{})
+	rc, err = rcs.Get(context.TODO(), rc.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed getting atomicRC after writers are complete: %v", err)
 	}
@@ -225,7 +236,7 @@ func TestPatch(t *testing.T) {
 		},
 	}
 	pods := c.CoreV1().Pods("default")
-	pod, err := pods.Create(&podBody)
+	_, err := pods.Create(context.TODO(), &podBody, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed creating patchpods: %v", err)
 	}
@@ -262,7 +273,7 @@ func TestPatch(t *testing.T) {
 			Namespace("default").
 			Name(name).
 			Body(body).
-			Do()
+			Do(context.TODO())
 		if result.Error() != nil {
 			return result.Error()
 		}
@@ -284,7 +295,7 @@ func TestPatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
 		}
-		pod, err = pods.Get(name, metav1.GetOptions{})
+		pod, err := pods.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed getting patchpod: %v", err)
 		}
@@ -297,7 +308,7 @@ func TestPatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
 		}
-		pod, err = pods.Get(name, metav1.GetOptions{})
+		pod, err = pods.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed getting patchpod: %v", err)
 		}
@@ -310,7 +321,7 @@ func TestPatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed updating patchpod with patch type %s: %v", k, err)
 		}
-		pod, err = pods.Get(name, metav1.GetOptions{})
+		pod, err = pods.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed getting patchpod: %v", err)
 		}
@@ -340,7 +351,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	}
 
 	patchEndpoint := func(json []byte) (runtime.Object, error) {
-		return c.CoreV1().RESTClient().Patch(types.MergePatchType).Resource("endpoints").Namespace("default").Name("patchendpoint").Body(json).Do().Get()
+		return c.CoreV1().RESTClient().Patch(types.MergePatchType).Resource("endpoints").Namespace("default").Name("patchendpoint").Body(json).Do(context.TODO()).Get()
 	}
 
 	// Make sure patch doesn't get to CreateOnUpdate
@@ -355,7 +366,7 @@ func TestPatchWithCreateOnUpdate(t *testing.T) {
 	}
 
 	// Create the endpoint (endpoints set AllowCreateOnUpdate=true) to get a UID and resource version
-	createdEndpoint, err := c.CoreV1().Endpoints("default").Update(endpointTemplate)
+	createdEndpoint, err := c.CoreV1().Endpoints("default").Update(context.TODO(), endpointTemplate, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed creating endpoint: %v", err)
 	}
@@ -450,6 +461,224 @@ func TestAPIVersions(t *testing.T) {
 	t.Errorf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", versions, clientVersion)
 }
 
+func TestEventValidation(t *testing.T) {
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer result.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(result.ClientConfig)
+
+	createNamespace := func(namespace string) string {
+		if namespace == "" {
+			namespace = metav1.NamespaceDefault
+		}
+		return namespace
+	}
+
+	mkCoreEvent := func(ver string, ns string) *v1.Event {
+		name := fmt.Sprintf("%v-%v-event", ver, ns)
+		namespace := createNamespace(ns)
+		return &v1.Event{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+			},
+			InvolvedObject: v1.ObjectReference{
+				Namespace: ns,
+				Name:      name,
+			},
+			Count:               2,
+			Type:                "Normal",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-1",
+			Reason:              fmt.Sprintf("event %v test", name),
+			Action:              "Testing",
+		}
+	}
+	mkV1Event := func(ver string, ns string) *eventsv1.Event {
+		name := fmt.Sprintf("%v-%v-event", ver, ns)
+		namespace := createNamespace(ns)
+		return &eventsv1.Event{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: namespace,
+				Name:      name,
+			},
+			Regarding: v1.ObjectReference{
+				Namespace: ns,
+				Name:      name,
+			},
+			Series: &eventsv1.EventSeries{
+				Count:            2,
+				LastObservedTime: metav1.MicroTime{Time: time.Now()},
+			},
+			Type:                "Normal",
+			EventTime:           metav1.MicroTime{Time: time.Now()},
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-2",
+			Reason:              fmt.Sprintf("event %v test", name),
+			Action:              "Testing",
+		}
+	}
+
+	testcases := []struct {
+		name      string
+		namespace string
+		hasError  bool
+	}{
+		{
+			name:      "Involved object is namespaced",
+			namespace: "kube-system",
+			hasError:  false,
+		},
+		{
+			name:      "Involved object is cluster-scoped",
+			namespace: "",
+			hasError:  false,
+		},
+	}
+
+	for _, test := range testcases {
+		// create test
+		oldEventObj := mkCoreEvent("corev1", test.namespace)
+		corev1Event, err := client.CoreV1().Events(oldEventObj.Namespace).Create(context.TODO(), oldEventObj, metav1.CreateOptions{})
+		if err != nil && !test.hasError {
+			t.Errorf("%v, call Create failed, expect has error: %v, but got: %v", test.name, test.hasError, err)
+		}
+		newEventObj := mkV1Event("eventsv1", test.namespace)
+		eventsv1Event, err := client.EventsV1().Events(newEventObj.Namespace).Create(context.TODO(), newEventObj, metav1.CreateOptions{})
+		if err != nil && !test.hasError {
+			t.Errorf("%v, call Create failed, expect has error: %v, but got: %v", test.name, test.hasError, err)
+		}
+		if corev1Event.Namespace != eventsv1Event.Namespace {
+			t.Errorf("%v, events created by different api client have different namespaces that isn't expected", test.name)
+		}
+		// update test
+		corev1Event.Count++
+		corev1Event, err = client.CoreV1().Events(corev1Event.Namespace).Update(context.TODO(), corev1Event, metav1.UpdateOptions{})
+		if err != nil && !test.hasError {
+			t.Errorf("%v, call Update failed, expect has error: %v, but got: %v", test.name, test.hasError, err)
+		}
+		eventsv1Event.Series.Count++
+		eventsv1Event.Series.LastObservedTime = metav1.MicroTime{Time: time.Now()}
+		eventsv1Event, err = client.EventsV1().Events(eventsv1Event.Namespace).Update(context.TODO(), eventsv1Event, metav1.UpdateOptions{})
+		if err != nil && !test.hasError {
+			t.Errorf("%v, call Update failed, expect has error: %v, but got: %v", test.name, test.hasError, err)
+		}
+		if corev1Event.Namespace != eventsv1Event.Namespace {
+			t.Errorf("%v, events updated by different api client have different namespaces that isn't expected", test.name)
+		}
+	}
+}
+
+func TestEventCompatibility(t *testing.T) {
+	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer result.TearDownFn()
+
+	client := clientset.NewForConfigOrDie(result.ClientConfig)
+
+	coreevents := []*v1.Event{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pass-core-default-cluster-scoped",
+				Namespace: "default",
+			},
+			Type:                "Normal",
+			Reason:              "event test",
+			Action:              "Testing",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-controller-1",
+			InvolvedObject:      v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "fail-core-kube-system-cluster-scoped",
+				Namespace: "kube-system",
+			},
+			Type:                "Normal",
+			Reason:              "event test",
+			Action:              "Testing",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-controller-1",
+			InvolvedObject:      v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "fail-core-other-ns-cluster-scoped",
+				Namespace: "test-ns",
+			},
+			Type:                "Normal",
+			Reason:              "event test",
+			Action:              "Testing",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-controller-1",
+			InvolvedObject:      v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
+		},
+	}
+	for _, e := range coreevents {
+		t.Run(e.Name, func(t *testing.T) {
+			_, err := client.CoreV1().Events(e.Namespace).Create(context.TODO(), e, metav1.CreateOptions{})
+			if err == nil && !strings.HasPrefix(e.Name, "pass-") {
+				t.Fatalf("unexpected pass")
+			}
+			if err != nil && !strings.HasPrefix(e.Name, "fail-") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+
+	v1events := []*eventsv1.Event{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pass-events-default-cluster-scoped",
+				Namespace: "default",
+			},
+			EventTime:           metav1.MicroTime{Time: time.Now()},
+			Type:                "Normal",
+			Reason:              "event test",
+			Action:              "Testing",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-controller-1",
+			Regarding:           v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pass-events-kube-system-cluster-scoped",
+				Namespace: "kube-system",
+			},
+			EventTime:           metav1.MicroTime{Time: time.Now()},
+			Type:                "Normal",
+			Reason:              "event test",
+			Action:              "Testing",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-controller-1",
+			Regarding:           v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "fail-events-other-ns-cluster-scoped",
+				Namespace: "test-ns",
+			},
+			EventTime:           metav1.MicroTime{Time: time.Now()},
+			Type:                "Normal",
+			Reason:              "event test",
+			Action:              "Testing",
+			ReportingController: "test-controller",
+			ReportingInstance:   "test-controller-1",
+			Regarding:           v1.ObjectReference{Kind: "Node", Name: "foo", Namespace: ""},
+		},
+	}
+	for _, e := range v1events {
+		t.Run(e.Name, func(t *testing.T) {
+			_, err := client.EventsV1().Events(e.Namespace).Create(context.TODO(), e, metav1.CreateOptions{})
+			if err == nil && !strings.HasPrefix(e.Name, "pass-") {
+				t.Fatalf("unexpected pass")
+			}
+			if err != nil && !strings.HasPrefix(e.Name, "fail-") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 func TestSingleWatch(t *testing.T) {
 	result := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer result.TearDownFn()
@@ -474,7 +703,7 @@ func TestSingleWatch(t *testing.T) {
 	rv1 := ""
 	for i := 0; i < 10; i++ {
 		event := mkEvent(i)
-		got, err := client.CoreV1().Events("default").Create(event)
+		got, err := client.CoreV1().Events("default").Create(context.TODO(), event, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatalf("Failed creating event %#q: %v", event, err)
 		}
@@ -495,7 +724,7 @@ func TestSingleWatch(t *testing.T) {
 			Watch:           true,
 			FieldSelector:   fields.OneTermEqualSelector("metadata.name", "event-9").String(),
 		}, metav1.ParameterCodec).
-		Watch()
+		Watch(context.TODO())
 
 	if err != nil {
 		t.Fatalf("Failed watch: %v", err)
@@ -567,7 +796,7 @@ func TestMultiWatch(t *testing.T) {
 	for i := 0; i < watcherCount; i++ {
 		watchesStarted.Add(1)
 		name := fmt.Sprintf("multi-watch-%v", i)
-		got, err := client.CoreV1().Pods("default").Create(&v1.Pod{
+		got, err := client.CoreV1().Pods("default").Create(context.TODO(), &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   name,
 				Labels: labels.Set{"watchlabel": name},
@@ -578,7 +807,7 @@ func TestMultiWatch(t *testing.T) {
 					Image: imageutils.GetPauseImageName(),
 				}},
 			},
-		})
+		}, metav1.CreateOptions{})
 
 		if err != nil {
 			t.Fatalf("Couldn't make %v: %v", name, err)
@@ -588,7 +817,7 @@ func TestMultiWatch(t *testing.T) {
 				LabelSelector:   labels.Set{"watchlabel": name}.AsSelector().String(),
 				ResourceVersion: rv,
 			}
-			w, err := client.CoreV1().Pods("default").Watch(options)
+			w, err := client.CoreV1().Pods("default").Watch(context.TODO(), options)
 			if err != nil {
 				panic(fmt.Sprintf("watch error for %v: %v", name, err))
 			}
@@ -637,7 +866,7 @@ func TestMultiWatch(t *testing.T) {
 					if !ok {
 						return
 					}
-					if _, err := client.CoreV1().Events("default").Create(dummyEvent(i)); err != nil {
+					if _, err := client.CoreV1().Events("default").Create(context.TODO(), dummyEvent(i), metav1.CreateOptions{}); err != nil {
 						panic(fmt.Sprintf("couldn't make an event: %v", err))
 					}
 					changeMade <- i
@@ -674,7 +903,7 @@ func TestMultiWatch(t *testing.T) {
 						return
 					}
 					name := fmt.Sprintf("unrelated-%v", i)
-					_, err := client.CoreV1().Pods("default").Create(&v1.Pod{
+					_, err := client.CoreV1().Pods("default").Create(context.TODO(), &v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: name,
 						},
@@ -684,7 +913,7 @@ func TestMultiWatch(t *testing.T) {
 								Image: imageutils.GetPauseImageName(),
 							}},
 						},
-					})
+					}, metav1.CreateOptions{})
 
 					if err != nil {
 						panic(fmt.Sprintf("couldn't make unrelated pod: %v", err))
@@ -708,13 +937,13 @@ func TestMultiWatch(t *testing.T) {
 	for i := 0; i < watcherCount; i++ {
 		go func(i int) {
 			name := fmt.Sprintf("multi-watch-%v", i)
-			pod, err := client.CoreV1().Pods("default").Get(name, metav1.GetOptions{})
+			pod, err := client.CoreV1().Pods("default").Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				panic(fmt.Sprintf("Couldn't get %v: %v", name, err))
 			}
 			pod.Spec.Containers[0].Image = imageutils.GetPauseImageName()
 			sentTimes <- timePair{time.Now(), name}
-			if _, err := client.CoreV1().Pods("default").Update(pod); err != nil {
+			if _, err := client.CoreV1().Pods("default").Update(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
 				panic(fmt.Sprintf("Couldn't make %v: %v", name, err))
 			}
 		}(i)
@@ -737,61 +966,378 @@ func TestMultiWatch(t *testing.T) {
 	t.Errorf("durations: %v", dur)
 }
 
-func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace string) {
-	podBody := v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "selflinktest",
-			Namespace: namespace,
-			Labels: map[string]string{
-				"name": "selflinktest",
-			},
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{Name: "name", Image: "image"},
-			},
-		},
-	}
-	pod, err := c.CoreV1().Pods(namespace).Create(&podBody)
+func TestApplyWithApplyConfiguration(t *testing.T) {
+	deployment := appsv1ac.Deployment("nginx-deployment-3", "default").
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithSelector(metav1ac.LabelSelector().
+				WithMatchLabels(map[string]string{"app": "nginx"}),
+			).
+			WithTemplate(corev1ac.PodTemplateSpec().
+				WithLabels(map[string]string{"app": "nginx"}).
+				WithSpec(corev1ac.PodSpec().
+					WithContainers(corev1ac.Container().
+						WithName("nginx").
+						WithImage("nginx:1.14.2").
+						WithStdin(true).
+						WithPorts(corev1ac.ContainerPort().
+							WithContainerPort(8080).
+							WithProtocol(v1.ProtocolTCP),
+						).
+						WithResources(corev1ac.ResourceRequirements().
+							WithLimits(v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("4"),
+								v1.ResourceMemory: resource.MustParse("32Gi"),
+							}),
+						),
+					),
+				),
+			),
+		)
+	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	defer testServer.TearDownFn()
+
+	c := clientset.NewForConfigOrDie(testServer.ClientConfig)
+
+	// Test apply to spec
+	obj, err := c.AppsV1().Deployments("default").Apply(context.TODO(), deployment, metav1.ApplyOptions{FieldManager: "test-mgr", Force: true})
 	if err != nil {
-		t.Fatalf("Failed creating selflinktest pod: %v", err)
+		t.Fatalf("unexpected error when applying manifest for Deployment: %v", err)
 	}
-	if err = c.CoreV1().RESTClient().Get().RequestURI(pod.SelfLink).Do().Into(pod); err != nil {
-		t.Errorf("Failed listing pod with supplied self link '%v': %v", pod.SelfLink, err)
+	if obj.Spec.Template.Spec.Containers[0].Image != "nginx:1.14.2" {
+		t.Errorf("expected image %s but got %s", "nginx:1.14.2", obj.Spec.Template.Spec.Containers[0].Image)
+	}
+	cpu := obj.Spec.Template.Spec.Containers[0].Resources.Limits[v1.ResourceCPU]
+	if cpu.Value() != int64(4) {
+		t.Errorf("expected resourceCPU limit %d but got %d", 4, cpu.Value())
 	}
 
-	podList, err := c.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+	// Test apply to status
+	statusApply := appsv1ac.Deployment("nginx-deployment-3", "default").
+		WithStatus(appsv1ac.DeploymentStatus().
+			WithConditions(
+				appsv1ac.DeploymentCondition().
+					WithType(appsv1.DeploymentReplicaFailure).
+					WithStatus(v1.ConditionUnknown).
+					WithLastTransitionTime(metav1.Now()).
+					WithLastUpdateTime(metav1.Now()).
+					WithMessage("apply status test").
+					WithReason("TestApplyWithApplyConfiguration"),
+			),
+		)
+	obj, err = c.AppsV1().Deployments("default").ApplyStatus(context.TODO(), statusApply, metav1.ApplyOptions{FieldManager: "test-mgr", Force: true})
 	if err != nil {
-		t.Errorf("Failed listing pods: %v", err)
+		t.Fatalf("unexpected error when applying manifest for Deployment: %v", err)
 	}
-
-	if err = c.CoreV1().RESTClient().Get().RequestURI(podList.SelfLink).Do().Into(podList); err != nil {
-		t.Errorf("Failed listing pods with supplied self link '%v': %v", podList.SelfLink, err)
-	}
-
-	found := false
-	for i := range podList.Items {
-		item := &podList.Items[i]
-		if item.Name != "selflinktest" {
-			continue
+	var found bool
+	for _, c := range obj.Status.Conditions {
+		if c.Type == appsv1.DeploymentReplicaFailure && c.Status == v1.ConditionUnknown &&
+			c.Message == "apply status test" && c.Reason == "TestApplyWithApplyConfiguration" {
+			found = true
+			break
 		}
-		found = true
-		err = c.CoreV1().RESTClient().Get().RequestURI(item.SelfLink).Do().Into(pod)
-		if err != nil {
-			t.Errorf("Failed listing pod with supplied self link '%v': %v", item.SelfLink, err)
-		}
-		break
 	}
 	if !found {
-		t.Errorf("never found selflinktest pod in namespace %s", namespace)
+		t.Error("expected status to contain DeploymentReplicaFailure condition set by apply")
 	}
 }
 
-func TestSelfLinkOnNamespace(t *testing.T) {
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
-	defer result.TearDownFn()
+func TestExtractModifyApply(t *testing.T) {
+	testCases := []struct {
+		name string
+		// modifyFunc modifies deployApply, defined below, after it is applied and "extracted"
+		// apply is skipped if this func is nil
+		modifyFunc       func(apply *appsv1ac.DeploymentApplyConfiguration)
+		modifyStatusFunc func(apply *appsv1ac.DeploymentApplyConfiguration) // same but for status
+		// verifyAppliedFunc verifies the results of applying the applied
+		// configuration after modifyFunc modifies it. Only called if modifyFunc is provided.
+		verifyAppliedFunc       func(applied *appsv1ac.DeploymentApplyConfiguration)
+		verifyStatusAppliedFunc func(applied *appsv1ac.DeploymentApplyConfiguration) // same but for status
+	}{
+		{
+			// With<fieldname>() on a scalar field replaces it with the given value
+			name: "modify-scalar",
+			modifyFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
+				apply.Spec.WithReplicas(2)
+			},
+			verifyAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
+				if *applied.Spec.Replicas != 2 {
+					t.Errorf("Expected 2 replicas but got: %d", *applied.Spec.Replicas)
+				}
+			},
+		},
+		{
+			// With<fieldname>() on a non-empty struct field replaces the entire struct
+			name: "modify-struct",
+			modifyFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
+				apply.Spec.Template.WithSpec(corev1ac.PodSpec(). // replace the Spec of the existing Template
+											WithContainers(
+						corev1ac.Container().
+							WithName("modify-struct").
+							WithImage("nginx:1.14.3"),
+					),
+				)
+			},
+			verifyAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
+				containers := applied.Spec.Template.Spec.Containers
+				if len(containers) != 1 {
+					t.Errorf("Expected 1 container but got %d", len(containers))
+				}
+				if *containers[0].Name != "modify-struct" {
+					t.Errorf("Expected container name modify-struct but got: %s", *containers[0].Name)
+				}
+			},
+		},
+		{
+			// With<fieldname>() on a non-empty map field puts all the given entries into the existing map
+			name: "modify-map",
+			modifyFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
+				apply.WithLabels(map[string]string{"label2": "value2"})
+			},
+			verifyAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
+				labels := applied.Labels
+				if len(labels) != 2 {
+					t.Errorf("Expected 2 label but got %d", len(labels))
+				}
+				if labels["label2"] != "value2" {
+					t.Errorf("Expected container name value2 but got: %s", labels["label2"])
+				}
+			},
+		},
+		{
+			// With<fieldname>() on a non-empty slice field appends all the given items to the existing slice
+			name: "modify-slice",
+			modifyFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
+				apply.Spec.Template.Spec.WithContainers(corev1ac.Container().
+					WithName("modify-slice").
+					WithImage("nginx:1.14.2"),
+				)
+			},
+			verifyAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
+				containers := applied.Spec.Template.Spec.Containers
+				if len(containers) != 2 {
+					t.Errorf("Expected 2 containers but got %d", len(containers))
+				}
+				if *containers[0].Name != "initial-container" {
+					t.Errorf("Expected container name initial-container but got: %s", *containers[0].Name)
+				}
+				if *containers[1].Name != "modify-slice" {
+					t.Errorf("Expected container name modify-slice but got: %s", *containers[1].Name)
+				}
+			},
+		},
+		{
+			// Append a condition to the status if the object
+			name: "modify-status-conditions",
+			modifyStatusFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
+				apply.WithStatus(appsv1ac.DeploymentStatus().
+					WithConditions(appsv1ac.DeploymentCondition().
+						WithType(appsv1.DeploymentProgressing).
+						WithStatus(v1.ConditionUnknown).
+						WithLastTransitionTime(metav1.Now()).
+						WithLastUpdateTime(metav1.Now()).
+						WithMessage("progressing").
+						WithReason("TestExtractModifyApply_Status"),
+					),
+				)
+			},
+			verifyStatusAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
+				conditions := applied.Status.Conditions
+				if len(conditions) != 1 {
+					t.Errorf("Expected 1 conditions but got %d", len(conditions))
+				}
+				if *conditions[0].Type != appsv1.DeploymentProgressing {
+					t.Errorf("Expected condition name DeploymentProgressing but got: %s", *conditions[0].Type)
+				}
+			},
+		},
+	}
 
-	c := clientset.NewForConfigOrDie(result.ClientConfig)
+	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	defer testServer.TearDownFn()
+	c := clientset.NewForConfigOrDie(testServer.ClientConfig)
+	deploymentClient := c.AppsV1().Deployments("default")
+	fieldMgr := "test-mgr"
 
-	runSelfLinkTestOnNamespace(t, c, "default")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Applied at the started of each test
+			deployApply := appsv1ac.Deployment(tc.name, "default").
+				WithLabels(map[string]string{"label1": "value1"}).
+				WithSpec(appsv1ac.DeploymentSpec().
+					WithSelector(metav1ac.LabelSelector().
+						WithMatchLabels(map[string]string{"app": tc.name}),
+					).
+					WithTemplate(corev1ac.PodTemplateSpec().
+						WithLabels(map[string]string{"app": tc.name}).
+						WithSpec(corev1ac.PodSpec().
+							WithContainers(
+								corev1ac.Container().
+									WithName("initial-container").
+									WithImage("nginx:1.14.2"),
+							),
+						),
+					),
+				)
+			actual, err := deploymentClient.Apply(context.TODO(), deployApply, metav1.ApplyOptions{FieldManager: fieldMgr})
+			if err != nil {
+				t.Fatalf("Failed to apply: %v", err)
+			}
+			if tc.modifyFunc != nil {
+				extractedDeployment, err := appsv1ac.ExtractDeployment(actual, fieldMgr)
+				if err != nil {
+					t.Fatalf("Failed to extract: %v", err)
+				}
+				tc.modifyFunc(extractedDeployment)
+				result, err := deploymentClient.Apply(context.TODO(), extractedDeployment, metav1.ApplyOptions{FieldManager: fieldMgr})
+				if err != nil {
+					t.Fatalf("Failed to apply extracted apply configuration: %v", err)
+				}
+				extractedResult, err := appsv1ac.ExtractDeployment(result, fieldMgr)
+				if err != nil {
+					t.Fatalf("Failed to extract: %v", err)
+				}
+				if tc.verifyAppliedFunc != nil {
+					tc.verifyAppliedFunc(extractedResult)
+				}
+			}
+
+			if tc.modifyStatusFunc != nil {
+				extractedDeployment, err := appsv1ac.ExtractDeploymentStatus(actual, fieldMgr)
+				if err != nil {
+					t.Fatalf("Failed to extract: %v", err)
+				}
+				tc.modifyStatusFunc(extractedDeployment)
+				result, err := deploymentClient.ApplyStatus(context.TODO(), extractedDeployment, metav1.ApplyOptions{FieldManager: fieldMgr})
+				if err != nil {
+					t.Fatalf("Failed to apply extracted apply configuration to status: %v", err)
+				}
+				extractedResult, err := appsv1ac.ExtractDeploymentStatus(result, fieldMgr)
+				if err != nil {
+					t.Fatalf("Failed to extract: %v", err)
+				}
+				if tc.verifyStatusAppliedFunc != nil {
+					tc.verifyStatusAppliedFunc(extractedResult)
+				}
+			}
+		})
+	}
+}
+
+func TestExtractModifyApply_ForceOwnership(t *testing.T) {
+	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
+	defer testServer.TearDownFn()
+	c := clientset.NewForConfigOrDie(testServer.ClientConfig)
+	deploymentClient := c.AppsV1().Deployments("default")
+
+	// apply an initial state with one field manager
+	createApply := appsv1ac.Deployment("nginx-apply", "default").
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithSelector(metav1ac.LabelSelector().
+				WithMatchLabels(map[string]string{"app": "nginx"}),
+			).
+			WithTemplate(corev1ac.PodTemplateSpec().
+				WithLabels(map[string]string{"app": "nginx"}).
+				WithSpec(corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().
+							WithName("nginx").
+							WithImage("nginx:1.14.2").
+							WithWorkingDir("/tmp/v1"),
+					),
+				),
+			),
+		)
+
+	_, err := deploymentClient.Apply(context.TODO(), createApply, metav1.ApplyOptions{FieldManager: "create-mgr", Force: true})
+	if err != nil {
+		t.Fatalf("Error creating createApply: %v", err)
+	}
+
+	// apply some non-overlapping fields with another field manager
+	sidecarApply := appsv1ac.Deployment("nginx-apply", "default").
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithTemplate(corev1ac.PodTemplateSpec().
+				WithSpec(corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().
+							WithName("sidecar").
+							WithImage("nginx:1.14.2"),
+					),
+				),
+			),
+		)
+
+	applied, err := deploymentClient.Apply(context.TODO(), sidecarApply, metav1.ApplyOptions{FieldManager: "sidecar-mgr", Force: true})
+	if err != nil {
+		t.Fatalf("Error applying createApply: %v", err)
+	}
+	sidecarExtracted, err := appsv1ac.ExtractDeployment(applied, "sidecar-mgr")
+	if err != nil {
+		t.Fatalf("Error extracting createApply apply configuration: %v", err)
+	}
+	if !equality.Semantic.DeepEqual(sidecarApply, sidecarExtracted) {
+		t.Errorf("Expected sidecarExtracted apply configuration to match original, but got:\n%s\n", cmp.Diff(sidecarApply, sidecarExtracted))
+	}
+
+	// modify the extracted apply configuration that was just applied and add some fields that overlap
+	// with the fields owned by the other field manager to force ownership of them
+	sidecarExtracted.Spec.Template.Spec.Containers[0].WithImage("nginx:1.14.3")
+	sidecarExtracted.Spec.Template.Spec.WithContainers(corev1ac.Container().
+		WithName("nginx").
+		WithWorkingDir("/tmp/v2"),
+	)
+	reapplied, err := deploymentClient.Apply(context.TODO(), sidecarExtracted, metav1.ApplyOptions{FieldManager: "sidecar-mgr", Force: true})
+	if err != nil {
+		t.Fatalf("Unexpected error when applying manifest for Deployment: %v", err)
+	}
+
+	// extract apply configurations for both field managers and check that they are what we expect
+	reappliedExtracted, err := appsv1ac.ExtractDeployment(reapplied, "sidecar-mgr")
+	if err != nil {
+		t.Fatalf("Error extracting sidecarExtracted apply configuration: %v", err)
+	}
+
+	expectedReappliedExtracted := appsv1ac.Deployment("nginx-apply", "default").
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithTemplate(corev1ac.PodTemplateSpec().
+				WithSpec(corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().
+							WithName("sidecar").
+							WithImage("nginx:1.14.3"),
+						corev1ac.Container().
+							WithName("nginx").
+							WithWorkingDir("/tmp/v2"),
+					),
+				),
+			),
+		)
+	if !equality.Semantic.DeepEqual(expectedReappliedExtracted, reappliedExtracted) {
+		t.Errorf("Reapplied apply configuration did not match expected, got:\n%s\n", cmp.Diff(expectedReappliedExtracted, reappliedExtracted))
+	}
+
+	createMgrExtracted, err := appsv1ac.ExtractDeployment(reapplied, "create-mgr")
+	if err != nil {
+		t.Fatalf("Error extracting createApply apply configuration: %v", err)
+	}
+
+	expectedCreateExtracted := appsv1ac.Deployment("nginx-apply", "default").
+		WithSpec(appsv1ac.DeploymentSpec().
+			WithSelector(metav1ac.LabelSelector().
+				WithMatchLabels(map[string]string{"app": "nginx"}),
+			).
+			WithTemplate(corev1ac.PodTemplateSpec().
+				WithLabels(map[string]string{"app": "nginx"}).
+				WithSpec(corev1ac.PodSpec().
+					WithContainers(
+						corev1ac.Container().
+							WithName("nginx").
+							WithImage("nginx:1.14.2"),
+					),
+				),
+			),
+		)
+	if !equality.Semantic.DeepEqual(expectedCreateExtracted, createMgrExtracted) {
+		t.Errorf("createMgrExtracted apply configuration did not match expected, got:\n%s\n", cmp.Diff(expectedCreateExtracted, createMgrExtracted))
+	}
 }

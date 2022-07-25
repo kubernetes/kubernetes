@@ -23,7 +23,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StatefulSet represents a set of pods with consistent identities.
@@ -59,7 +58,7 @@ const (
 	// ParallelPodManagement will create and delete pods as soon as the stateful set
 	// replica count is changed, and will not wait for pods to be ready or complete
 	// termination.
-	ParallelPodManagement = "Parallel"
+	ParallelPodManagement PodManagementPolicyType = "Parallel"
 )
 
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet
@@ -82,20 +81,65 @@ const (
 	// ordering constraints. When a scale operation is performed with this
 	// strategy, new Pods will be created from the specification version indicated
 	// by the StatefulSet's updateRevision.
-	RollingUpdateStatefulSetStrategyType = "RollingUpdate"
+	RollingUpdateStatefulSetStrategyType StatefulSetUpdateStrategyType = "RollingUpdate"
 	// OnDeleteStatefulSetStrategyType triggers the legacy behavior. Version
 	// tracking and ordered rolling restarts are disabled. Pods are recreated
 	// from the StatefulSetSpec when they are manually deleted. When a scale
 	// operation is performed with this strategy,specification version indicated
 	// by the StatefulSet's currentRevision.
-	OnDeleteStatefulSetStrategyType = "OnDelete"
+	OnDeleteStatefulSetStrategyType StatefulSetUpdateStrategyType = "OnDelete"
 )
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 type RollingUpdateStatefulSetStrategy struct {
-	// Partition indicates the ordinal at which the StatefulSet should be
-	// partitioned.
+	// Partition indicates the ordinal at which the StatefulSet should be partitioned
+	// for updates. During a rolling update, all pods from ordinal Replicas-1 to
+	// Partition are updated. All pods from ordinal Partition-1 to 0 remain untouched.
+	// This is helpful in being able to do a canary based deployment. The default value is 0.
 	Partition int32
+	// The maximum number of pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Defaults to 1. This field is alpha-level and is only honored by servers that enable the
+	// MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to
+	// Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
+	// will be counted towards MaxUnavailable.
+	// +optional
+	MaxUnavailable *intstr.IntOrString
+}
+
+// PersistentVolumeClaimRetentionPolicyType is a string enumeration of the policies that will determine
+// when volumes from the VolumeClaimTemplates will be deleted when the controlling StatefulSet is
+// deleted or scaled down.
+type PersistentVolumeClaimRetentionPolicyType string
+
+const (
+	// RetainPersistentVolumeClaimRetentionPolicyType is the default
+	// PersistentVolumeClaimRetentionPolicy and specifies that
+	// PersistentVolumeClaims associated with StatefulSet VolumeClaimTemplates
+	// will not be deleted.
+	RetainPersistentVolumeClaimRetentionPolicyType PersistentVolumeClaimRetentionPolicyType = "Retain"
+	// DeletePersistentVolumeClaimRetentionPolicyType specifies that
+	// PersistentVolumeClaims associated with StatefulSet VolumeClaimTemplates
+	// will be deleted in the scenario specified in
+	// StatefulSetPersistentVolumeClaimPolicy.
+	DeletePersistentVolumeClaimRetentionPolicyType PersistentVolumeClaimRetentionPolicyType = "Delete"
+)
+
+// StatefulSetPersistentVolumeClaimRetentionPolicy describes the policy used for PVCs
+// created from the StatefulSet VolumeClaimTemplates.
+type StatefulSetPersistentVolumeClaimRetentionPolicy struct {
+	// WhenDeleted specifies what happens to PVCs created from StatefulSet
+	// VolumeClaimTemplates when the StatefulSet is deleted. The default policy
+	// of `Retain` causes PVCs to not be affected by StatefulSet deletion. The
+	// `Delete` policy causes those PVCs to be deleted.
+	WhenDeleted PersistentVolumeClaimRetentionPolicyType
+	// WhenScaled specifies what happens to PVCs created from StatefulSet
+	// VolumeClaimTemplates when the StatefulSet is scaled down. The default
+	// policy of `Retain` causes PVCs to not be affected by a scaledown. The
+	// `Delete` policy causes the associated PVCs for any excess pods above
+	// the replica count to be deleted.
+	WhenScaled PersistentVolumeClaimRetentionPolicyType
 }
 
 // A StatefulSetSpec is the specification of a StatefulSet.
@@ -158,6 +202,18 @@ type StatefulSetSpec struct {
 	// consists of all revisions not represented by a currently applied
 	// StatefulSetSpec version. The default value is 10.
 	RevisionHistoryLimit *int32
+
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	// +optional
+	MinReadySeconds int32
+
+	// PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from
+	// the StatefulSet VolumeClaimTemplates. This requires the
+	// StatefulSetAutoDeletePVC feature gate to be enabled, which is alpha.
+	// +optional
+	PersistentVolumeClaimRetentionPolicy *StatefulSetPersistentVolumeClaimRetentionPolicy
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
@@ -197,8 +253,13 @@ type StatefulSetStatus struct {
 
 	// Represents the latest available observations of a statefulset's current state.
 	Conditions []StatefulSetCondition
+
+	// Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.
+	// +optional
+	AvailableReplicas int32
 }
 
+// StatefulSetConditionType describes the condition types of StatefulSets.
 type StatefulSetConditionType string
 
 // TODO: Add valid condition types for Statefulsets.
@@ -227,7 +288,6 @@ type StatefulSetList struct {
 	Items []StatefulSet
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ControllerRevision implements an immutable snapshot of state data. Clients
@@ -239,7 +299,7 @@ type StatefulSetList struct {
 type ControllerRevision struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
@@ -262,9 +322,9 @@ type ControllerRevisionList struct {
 	Items []ControllerRevision
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Deployment provides declarative updates for Pods and ReplicaSets.
 type Deployment struct {
 	metav1.TypeMeta
 	// +optional
@@ -279,6 +339,7 @@ type Deployment struct {
 	Status DeploymentStatus
 }
 
+// DeploymentSpec specifies the state of a Deployment.
 type DeploymentSpec struct {
 	// Number of desired pods. This is a pointer to distinguish between explicit
 	// zero and not specified. Defaults to 1.
@@ -332,8 +393,8 @@ type DeploymentSpec struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// DEPRECATED.
 // DeploymentRollback stores the information required to rollback a deployment.
+// DEPRECATED.
 type DeploymentRollback struct {
 	metav1.TypeMeta
 	// Required: This must match the Name of a deployment.
@@ -345,6 +406,7 @@ type DeploymentRollback struct {
 	RollbackTo RollbackConfig
 }
 
+// RollbackConfig specifies the state of a revision to roll back to.
 // DEPRECATED.
 type RollbackConfig struct {
 	// The revision to rollback to. If set to 0, rollback to the last revision.
@@ -359,6 +421,8 @@ const (
 	DefaultDeploymentUniqueLabelKey string = "pod-template-hash"
 )
 
+// DeploymentStrategy stores information about the strategy and rolling-update
+// behavior of a deployment.
 type DeploymentStrategy struct {
 	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
 	// +optional
@@ -373,17 +437,18 @@ type DeploymentStrategy struct {
 	RollingUpdate *RollingUpdateDeployment
 }
 
+// DeploymentStrategyType defines strategies with a deployment.
 type DeploymentStrategyType string
 
 const (
-	// Kill all existing pods before creating new ones.
+	// RecreateDeploymentStrategyType - kill all existing pods before creating new ones.
 	RecreateDeploymentStrategyType DeploymentStrategyType = "Recreate"
 
-	// Replace the old RCs by new one using rolling update i.e gradually scale down the old RCs and scale up the new one.
+	// RollingUpdateDeploymentStrategyType - Replace the old RCs by new one using rolling update i.e gradually scale down the old RCs and scale up the new one.
 	RollingUpdateDeploymentStrategyType DeploymentStrategyType = "RollingUpdate"
 )
 
-// Spec to control the desired behavior of rolling update.
+// RollingUpdateDeployment is the spec to control the desired behavior of rolling update.
 type RollingUpdateDeployment struct {
 	// The maximum number of pods that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of total pods at the start of update (ex: 10%).
@@ -407,11 +472,12 @@ type RollingUpdateDeployment struct {
 	// Example: when this is set to 30%, the new RC can be scaled up by 30%
 	// immediately when the rolling update starts. Once old pods have been killed,
 	// new RC can be scaled up further, ensuring that total number of pods running
-	// at any time during the update is atmost 130% of original pods.
+	// at any time during the update is at most 130% of original pods.
 	// +optional
 	MaxSurge intstr.IntOrString
 }
 
+// DeploymentStatus holds information about the observed status of a deployment.
 type DeploymentStatus struct {
 	// The generation observed by the deployment controller.
 	// +optional
@@ -449,6 +515,7 @@ type DeploymentStatus struct {
 	CollisionCount *int32
 }
 
+// DeploymentConditionType defines conditions of a deployment.
 type DeploymentConditionType string
 
 // These are valid conditions of a deployment.
@@ -484,6 +551,7 @@ type DeploymentCondition struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DeploymentList defines multiple deployments.
 type DeploymentList struct {
 	metav1.TypeMeta
 	// +optional
@@ -493,9 +561,9 @@ type DeploymentList struct {
 	Items []Deployment
 }
 
+// DaemonSetUpdateStrategy defines a strategy to update a daemon set.
 type DaemonSetUpdateStrategy struct {
 	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
-	// Default is OnDelete.
 	// +optional
 	Type DaemonSetUpdateStrategyType
 
@@ -508,34 +576,58 @@ type DaemonSetUpdateStrategy struct {
 	RollingUpdate *RollingUpdateDaemonSet
 }
 
+// DaemonSetUpdateStrategyType is a strategy according to which a daemon set
+// gets updated.
 type DaemonSetUpdateStrategyType string
 
 const (
-	// Replace the old daemons by new ones using rolling update i.e replace them on each node one after the other.
+	// RollingUpdateDaemonSetStrategyType - Replace the old daemons by new ones using rolling update i.e replace them on each node one after the other.
 	RollingUpdateDaemonSetStrategyType DaemonSetUpdateStrategyType = "RollingUpdate"
 
-	// Replace the old daemons only when it's killed
+	// OnDeleteDaemonSetStrategyType - Replace the old daemons only when it's killed
 	OnDeleteDaemonSetStrategyType DaemonSetUpdateStrategyType = "OnDelete"
 )
 
-// Spec to control the desired behavior of daemon set rolling update.
+// RollingUpdateDaemonSet is the spec to control the desired behavior of daemon set rolling update.
 type RollingUpdateDaemonSet struct {
 	// The maximum number of DaemonSet pods that can be unavailable during the
 	// update. Value can be an absolute number (ex: 5) or a percentage of total
 	// number of DaemonSet pods at the start of the update (ex: 10%). Absolute
 	// number is calculated from percentage by rounding up.
-	// This cannot be 0.
+	// This cannot be 0 if MaxSurge is 0
 	// Default value is 1.
 	// Example: when this is set to 30%, at most 30% of the total number of nodes
 	// that should be running the daemon pod (i.e. status.desiredNumberScheduled)
-	// can have their pods stopped for an update at any given
-	// time. The update starts by stopping at most 30% of those DaemonSet pods
-	// and then brings up new DaemonSet pods in their place. Once the new pods
-	// are available, it then proceeds onto other DaemonSet pods, thus ensuring
-	// that at least 70% of original number of DaemonSet pods are available at
-	// all times during the update.
+	// can have their pods stopped for an update at any given time. The update
+	// starts by stopping at most 30% of those DaemonSet pods and then brings
+	// up new DaemonSet pods in their place. Once the new pods are available,
+	// it then proceeds onto other DaemonSet pods, thus ensuring that at least
+	// 70% of original number of DaemonSet pods are available at all times during
+	// the update.
 	// +optional
 	MaxUnavailable intstr.IntOrString
+
+	// The maximum number of nodes with an existing available DaemonSet pod that
+	// can have an updated DaemonSet pod during during an update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// This can not be 0 if MaxUnavailable is 0.
+	// Absolute number is calculated from percentage by rounding up to a minimum of 1.
+	// Default value is 0.
+	// Example: when this is set to 30%, at most 30% of the total number of nodes
+	// that should be running the daemon pod (i.e. status.desiredNumberScheduled)
+	// can have their a new pod created before the old pod is marked as deleted.
+	// The update starts by launching new pods on 30% of nodes. Once an updated
+	// pod is available (Ready for at least minReadySeconds) the old DaemonSet pod
+	// on that node is marked deleted. If the old pod becomes unavailable for any
+	// reason (Ready transitions to false, is evicted, or is drained) an updated
+	// pod is immediately created on that node without considering surge limits.
+	// Allowing surge implies the possibility that the resources consumed by the
+	// daemonset on any given node can double if the readiness check fails, and
+	// so resource intensive daemonsets should take into account that they may
+	// cause evictions during disruption.
+	// This is beta field and enabled/disabled by DaemonSetUpdateSurge feature gate.
+	// +optional
+	MaxSurge intstr.IntOrString
 }
 
 // DaemonSetSpec is the specification of a daemon set.
@@ -626,6 +718,7 @@ type DaemonSetStatus struct {
 	Conditions []DaemonSetCondition
 }
 
+// DaemonSetConditionType defines a daemon set condition.
 type DaemonSetConditionType string
 
 // TODO: Add valid condition types of a DaemonSet.
@@ -644,19 +737,18 @@ type DaemonSetCondition struct {
 	Message string
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DaemonSet represents the configuration of a daemon set.
 type DaemonSet struct {
 	metav1.TypeMeta
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// The desired behavior of this daemon set.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Spec DaemonSetSpec
 
@@ -664,16 +756,16 @@ type DaemonSet struct {
 	// out of date by some window of time.
 	// Populated by the system.
 	// Read-only.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +optional
 	Status DaemonSetStatus
 }
 
 const (
-	// DEPRECATED: DefaultDaemonSetUniqueLabelKey is used instead.
 	// DaemonSetTemplateGenerationKey is the key of the labels that is added
 	// to daemon set pods to distinguish between old and new pod templates
 	// during DaemonSet template update.
+	// DEPRECATED: DefaultDaemonSetUniqueLabelKey is used instead.
 	DaemonSetTemplateGenerationKey string = "pod-template-generation"
 )
 
@@ -683,7 +775,7 @@ const (
 type DaemonSetList struct {
 	metav1.TypeMeta
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -691,7 +783,6 @@ type DaemonSetList struct {
 	Items []DaemonSet
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
@@ -773,6 +864,7 @@ type ReplicaSetStatus struct {
 	Conditions []ReplicaSetCondition
 }
 
+// ReplicaSetConditionType is a condition of a replica set.
 type ReplicaSetConditionType string
 
 // These are valid conditions of a replica set.

@@ -19,6 +19,8 @@ package errors
 import (
 	"errors"
 	"fmt"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // MessageCountMap contains occurrence for each error message.
@@ -26,9 +28,14 @@ type MessageCountMap map[string]int
 
 // Aggregate represents an object that contains multiple errors, but does not
 // necessarily have singular semantic meaning.
+// The aggregate can be used with `errors.Is()` to check for the occurrence of
+// a specific error type.
+// Errors.As() is not supported, because the caller presumably cares about a
+// specific error of potentially multiple that match the given type.
 type Aggregate interface {
 	error
 	Errors() []error
+	Is(error) bool
 }
 
 // NewAggregate converts a slice of errors into an Aggregate interface, which
@@ -67,12 +74,53 @@ func (agg aggregate) Error() string {
 	if len(agg) == 1 {
 		return agg[0].Error()
 	}
-	result := fmt.Sprintf("[%s", agg[0].Error())
-	for i := 1; i < len(agg); i++ {
-		result += fmt.Sprintf(", %s", agg[i].Error())
+	seenerrs := sets.NewString()
+	result := ""
+	agg.visit(func(err error) bool {
+		msg := err.Error()
+		if seenerrs.Has(msg) {
+			return false
+		}
+		seenerrs.Insert(msg)
+		if len(seenerrs) > 1 {
+			result += ", "
+		}
+		result += msg
+		return false
+	})
+	if len(seenerrs) == 1 {
+		return result
 	}
-	result += "]"
-	return result
+	return "[" + result + "]"
+}
+
+func (agg aggregate) Is(target error) bool {
+	return agg.visit(func(err error) bool {
+		return errors.Is(err, target)
+	})
+}
+
+func (agg aggregate) visit(f func(err error) bool) bool {
+	for _, err := range agg {
+		switch err := err.(type) {
+		case aggregate:
+			if match := err.visit(f); match {
+				return match
+			}
+		case Aggregate:
+			for _, nestedErr := range err.Errors() {
+				if match := f(nestedErr); match {
+					return match
+				}
+			}
+		default:
+			if match := f(err); match {
+				return match
+			}
+		}
+	}
+
+	return false
 }
 
 // Errors is part of the Aggregate interface.
@@ -115,7 +163,7 @@ func matchesError(err error, fns ...Matcher) bool {
 
 // filterErrors returns any errors (or nested errors, if the list contains
 // nested Errors) for which all fns return false. If no errors
-// remain a nil list is returned. The resulting silec will have all
+// remain a nil list is returned. The resulting slice will have all
 // nested slices flattened as a side effect.
 func filterErrors(list []error, fns ...Matcher) []error {
 	result := []error{}

@@ -21,37 +21,33 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
 
-	"net/http"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
 )
 
-func startJobController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}] {
-		return nil, false, nil
-	}
-	go job.NewJobController(
-		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.InformerFactory.Batch().V1().Jobs(),
-		ctx.ClientBuilder.ClientOrDie("job-controller"),
-	).Run(int(ctx.ComponentConfig.JobController.ConcurrentJobSyncs), ctx.Stop)
+func startJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	go job.NewController(
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Batch().V1().Jobs(),
+		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
+	).Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs))
 	return nil, true, nil
 }
 
-func startCronJobController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}] {
-		return nil, false, nil
-	}
-	cjc, err := cronjob.NewCronJobController(
-		ctx.ClientBuilder.ClientOrDie("cronjob-controller"),
+func startCronJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+
+	cj2c, err := cronjob.NewControllerV2(controllerContext.InformerFactory.Batch().V1().Jobs(),
+		controllerContext.InformerFactory.Batch().V1().CronJobs(),
+		controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating CronJob controller: %v", err)
+		return nil, true, fmt.Errorf("error creating CronJob controller V2: %v", err)
 	}
-	go cjc.Run(ctx.Stop)
+
+	go cj2c.Run(ctx, int(controllerContext.ComponentConfig.CronJobController.ConcurrentCronJobSyncs))
 	return nil, true, nil
 }

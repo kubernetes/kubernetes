@@ -169,7 +169,7 @@ func (t Band) From(a BandCols) {
 	}
 }
 
-// TriangularBandCols represents a symmetric matrix using the band column-major storage scheme.
+// TriangularBandCols represents a triangular matrix using the band column-major storage scheme.
 type TriangularBandCols TriangularBand
 
 // From fills the receiver with elements from a. The receiver

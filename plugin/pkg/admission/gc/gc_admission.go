@@ -17,6 +17,7 @@ limitations under the License.
 package gc
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
@@ -84,7 +86,7 @@ func (a *gcPermissionsEnforcement) isWhiteListed(groupResource schema.GroupResou
 	return false
 }
 
-func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes) (err error) {
+func (a *gcPermissionsEnforcement) Validate(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	// // if the request is in the whitelist, we skip mutation checks for this resource.
 	if a.isWhiteListed(attributes.GetResource().GroupResource(), attributes.GetSubresource()) {
 		return nil
@@ -111,7 +113,7 @@ func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes) (er
 			ResourceRequest: true,
 			Path:            "",
 		}
-		decision, reason, err := a.authorizer.Authorize(deleteAttributes)
+		decision, reason, err := a.authorizer.Authorize(ctx, deleteAttributes)
 		if decision != authorizer.DecisionAllow {
 			return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", reason, err))
 		}
@@ -121,6 +123,18 @@ func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes) (er
 	// true. If so, only allows the change if the user has delete permission of
 	// the _OWNER_
 	newBlockingRefs := newBlockingOwnerDeletionRefs(attributes.GetObject(), attributes.GetOldObject())
+	if len(newBlockingRefs) == 0 {
+		return nil
+	}
+
+	// There can be a case where a restMapper tries to hit discovery endpoints and times out if the network is inaccessible.
+	// This can prevent creating the pod to run the network to be able to do discovery and it appears as a timeout, not a rejection.
+	// Because the timeout is wrapper on admission/request, we can run a single check to see if the user can finalize any
+	// possible resource.
+	if decision, _, _ := a.authorizer.Authorize(ctx, finalizeAnythingRecord(attributes.GetUserInfo())); decision == authorizer.DecisionAllow {
+		return nil
+	}
+
 	for _, ref := range newBlockingRefs {
 		records, err := a.ownerRefToDeleteAttributeRecords(ref, attributes)
 		if err != nil {
@@ -130,7 +144,7 @@ func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes) (er
 		// resources. User needs to have delete permission on all the
 		// matched Resources.
 		for _, record := range records {
-			decision, reason, err := a.authorizer.Authorize(record)
+			decision, reason, err := a.authorizer.Authorize(ctx, record)
 			if decision != authorizer.DecisionAllow {
 				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: %v, %v", reason, err))
 			}
@@ -170,6 +184,20 @@ func isChangingOwnerReference(newObj, oldObj runtime.Object) bool {
 	}
 
 	return false
+}
+
+func finalizeAnythingRecord(userInfo user.Info) authorizer.AttributesRecord {
+	return authorizer.AttributesRecord{
+		User:            userInfo,
+		Verb:            "update",
+		APIGroup:        "*",
+		APIVersion:      "*",
+		Resource:        "*",
+		Subresource:     "finalizers",
+		Name:            "*",
+		ResourceRequest: true,
+		Path:            "",
+	}
 }
 
 // Translates ref to a DeleteAttribute deleting the object referred by the ref.

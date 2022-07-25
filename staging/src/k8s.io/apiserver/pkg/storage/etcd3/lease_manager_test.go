@@ -34,7 +34,7 @@ func TestGetReuseDurationSeconds(t *testing.T) {
 			duration: 50,
 		},
 	}
-	lm := newDefaultLeaseManager(nil)
+	lm := newDefaultLeaseManager(nil, NewDefaultLeaseManagerConfig())
 	for i := 0; i < len(testCases); i++ {
 		dur := lm.getReuseDurationSecondsLocked(testCases[i].ttl)
 		if dur != testCases[i].duration {

@@ -25,7 +25,11 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/storage/volumeattachment"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // VolumeAttachmentStorage includes storage for VolumeAttachments and all subresources
@@ -40,7 +44,7 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against VolumeAttachments
-func NewStorage(optsGetter generic.RESTOptionsGetter) *VolumeAttachmentStorage {
+func NewStorage(optsGetter generic.RESTOptionsGetter) (*VolumeAttachmentStorage, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &storageapi.VolumeAttachment{} },
 		NewListFunc:              func() runtime.Object { return &storageapi.VolumeAttachmentList{} },
@@ -49,20 +53,24 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) *VolumeAttachmentStorage {
 		CreateStrategy:      volumeattachment.Strategy,
 		UpdateStrategy:      volumeattachment.Strategy,
 		DeleteStrategy:      volumeattachment.Strategy,
+		ResetFieldsStrategy: volumeattachment.Strategy,
 		ReturnDeletedObject: true,
+
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = volumeattachment.StatusStrategy
+	statusStore.ResetFieldsStrategy = volumeattachment.StatusStrategy
 
 	return &VolumeAttachmentStorage{
 		VolumeAttachment: &REST{store},
 		Status:           &StatusREST{store: &statusStore},
-	}
+	}, nil
 }
 
 // StatusREST implements the REST endpoint for changing the status of a VolumeAttachment
@@ -70,9 +78,17 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+var _ = rest.Patcher(&StatusREST{})
+
 // New creates a new VolumeAttachment resource
 func (r *StatusREST) New() runtime.Object {
 	return &storageapi.VolumeAttachment{}
+}
+
+// Destroy cleans up resources on shutdown.
+func (r *StatusREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
@@ -85,4 +101,13 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
+}
+
+func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
 }

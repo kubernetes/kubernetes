@@ -20,26 +20,32 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
-// NewTestServer returns a webhook test HTTPS server with fixed webhook test certs.
-func NewTestServer(t *testing.T) *httptest.Server {
+// NewTestServerWithHandler returns a webhook test HTTPS server
+// which uses given handler function to handle requests
+func NewTestServerWithHandler(t testing.TB, handler func(http.ResponseWriter, *http.Request)) *httptest.Server {
 	// Create the test webhook server
 	sCert, err := tls.X509KeyPair(testcerts.ServerCert, testcerts.ServerKey)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		t.FailNow()
 	}
 	rootCAs := x509.NewCertPool()
 	rootCAs.AppendCertsFromPEM(testcerts.CACert)
-	testServer := httptest.NewUnstartedServer(http.HandlerFunc(webhookHandler))
+	testServer := httptest.NewUnstartedServer(http.HandlerFunc(handler))
 	testServer.TLS = &tls.Config{
 		Certificates: []tls.Certificate{sCert},
 		ClientCAs:    rootCAs,
@@ -48,8 +54,13 @@ func NewTestServer(t *testing.T) *httptest.Server {
 	return testServer
 }
 
+// NewTestServer returns a webhook test HTTPS server with fixed webhook test certs.
+func NewTestServer(t testing.TB) *httptest.Server {
+	return NewTestServerWithHandler(t, webhookHandler)
+}
+
 func webhookHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("got req: %v\n", r.URL.Path)
+	// fmt.Printf("got req: %v\n", r.URL.Path)
 	switch r.URL.Path {
 	case "/internalErr":
 		http.Error(w, "webhook internal server error", http.StatusInternalServerError)
@@ -66,6 +77,9 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
 			Response: &v1beta1.AdmissionResponse{
 				Allowed: false,
+				Result: &metav1.Status{
+					Code: http.StatusForbidden,
+				},
 			},
 		})
 	case "/disallowReason":
@@ -75,6 +89,18 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 				Allowed: false,
 				Result: &metav1.Status{
 					Message: "you shall not pass",
+					Code:    http.StatusForbidden,
+				},
+			},
+		})
+	case "/shouldNotBeCalled":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Message: "doesn't expect labels to match object selector",
+					Code:    http.StatusForbidden,
 				},
 			},
 		})
@@ -134,7 +160,52 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 				},
 			},
 		})
+	case "/noop":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed: true,
+			},
+		})
 	default:
 		http.NotFound(w, r)
+	}
+}
+
+// ClockSteppingWebhookHandler given a fakeClock returns a request handler
+// that moves time in given clock by an amount specified in the webhook request
+func ClockSteppingWebhookHandler(t testing.TB, fakeClock *testingclock.FakeClock) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		validPath := regexp.MustCompile(`^/(?:allow|disallow)/(\d{1,10})$`)
+
+		if !validPath.MatchString(path) {
+			t.Errorf("error in test case, wrong webhook url path: '%q' expected to match: '%q'", path, validPath.String())
+			t.FailNow()
+		}
+
+		delay, _ := strconv.ParseInt(validPath.FindStringSubmatch(path)[1], 0, 64)
+		fakeClock.Step(time.Duration(delay))
+		w.Header().Set("Content-Type", "application/json")
+
+		if strings.HasPrefix(path, "/allow/") {
+			json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+				Response: &v1beta1.AdmissionResponse{
+					Allowed: true,
+					AuditAnnotations: map[string]string{
+						"key1": "value1",
+					},
+				},
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Code: http.StatusForbidden,
+				},
+			},
+		})
 	}
 }

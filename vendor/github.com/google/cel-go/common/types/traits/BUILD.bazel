@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "comparer.go",
+        "container.go",
+        "field_tester.go",
+        "indexer.go",
+        "iterator.go",
+        "lister.go",
+        "mapper.go",
+        "matcher.go",
+        "math.go",
+        "receiver.go",
+        "sizer.go",
+        "traits.go",
+    ],
+    importpath = "github.com/google/cel-go/common/types/traits",
+    deps = [
+        "//common/types/ref:go_default_library",
+    ],
+)

@@ -17,8 +17,9 @@ limitations under the License.
 package config
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -54,6 +55,24 @@ const (
 	// WatchChangeDetectionStrategy is a mode in which kubelet uses
 	// watches to observe changes to objects that are in its interest.
 	WatchChangeDetectionStrategy ResourceChangeDetectionStrategy = "Watch"
+	// RestrictedTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with optimal NUMA node alignment for requested resources
+	RestrictedTopologyManagerPolicy = "restricted"
+	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
+	// pods with NUMA alignment of CPU and device resources.
+	BestEffortTopologyManagerPolicy = "best-effort"
+	// NoneTopologyManagerPolicy is a mode in which kubelet has no knowledge
+	// of NUMA alignment of a pod's CPU and device resources.
+	NoneTopologyManagerPolicy = "none"
+	// SingleNumaNodeTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with a single NUMA alignment of CPU and device resources.
+	SingleNumaNodeTopologyManagerPolicy = "single-numa-node"
+	// ContainerTopologyManagerScope represents that
+	// topology policy is applied on a per-container basis.
+	ContainerTopologyManagerScope = "container"
+	// PodTopologyManagerScope represents that
+	// topology policy is applied on a per-pod basis.
+	PodTopologyManagerScope = "pod"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -62,6 +81,9 @@ const (
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
+	// enableServer enables Kubelet's secured server.
+	// Note: Kubelet's insecure port is controlled by the readOnlyPort option.
+	EnableServer bool
 	// staticPodPath is the path to the directory containing local (static) pods to
 	// run, or the path to a single static pod file.
 	StaticPodPath string
@@ -76,7 +98,7 @@ type KubeletConfiguration struct {
 	// staticPodURL is the URL for accessing static pods to run
 	StaticPodURL string
 	// staticPodURLHeader is a map of slices with HTTP headers to use when accessing the podURL
-	StaticPodURLHeader map[string][]string
+	StaticPodURLHeader map[string][]string `datapolicy:"token"`
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces)
 	Address string
@@ -85,6 +107,12 @@ type KubeletConfiguration struct {
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
 	ReadOnlyPort int32
+	// volumePluginDir is the full path of the directory in which to search
+	// for additional third party volume plugins.
+	VolumePluginDir string
+	// providerID, if set, sets the unique id of the instance that an external provider (i.e. cloudprovider)
+	// can use to identify a specific node
+	ProviderID string
 	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
@@ -101,8 +129,7 @@ type KubeletConfiguration struct {
 	TLSMinVersion string
 	// rotateCertificates enables client certificate rotation. The Kubelet will request a
 	// new certificate from the certificates.k8s.io API. This requires an approver to approve the
-	// certificate signing requests. The RotateKubeletClientCertificate feature
-	// must be enabled.
+	// certificate signing requests.
 	RotateCertificates bool
 	// serverTLSBootstrap enables server certificate bootstrap. Instead of self
 	// signing a serving certificate, the Kubelet will request a certificate from
@@ -194,9 +221,25 @@ type KubeletConfiguration struct {
 	// CPUManagerPolicy is the name of the policy to use.
 	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerPolicy string
+	// CPUManagerPolicyOptions is a set of key=value which 	allows to set extra options
+	// to fine tune the behaviour of the cpu manager policies.
+	// Requires  both the "CPUManager" and "CPUManagerPolicyOptions" feature gates to be enabled.
+	CPUManagerPolicyOptions map[string]string
 	// CPU Manager reconciliation period.
 	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerReconcilePeriod metav1.Duration
+	// MemoryManagerPolicy is the name of the policy to use.
+	// Requires the MemoryManager feature gate to be enabled.
+	MemoryManagerPolicy string
+	// TopologyManagerPolicy is the name of the policy to use.
+	// Policies other than "none" require the TopologyManager feature gate to be enabled.
+	TopologyManagerPolicy string
+	// TopologyManagerScope represents the scope of topology hint generation
+	// that topology manager requests and hint providers generate.
+	// "pod" scope requires the TopologyManager feature gate to be enabled.
+	// Default: "container"
+	// +optional
+	TopologyManagerScope string
 	// Map of QoS resource reservation percentages (memory only for now).
 	// Requires the QOSReserved feature gate to be enabled.
 	QOSReserved map[string]string
@@ -218,11 +261,14 @@ type KubeletConfiguration struct {
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string
-	// PodPidsLimit is the maximum number of pids in any pod.
+	// The maximum number of processes per pod.  If -1, the kubelet defaults to the node allocatable pid capacity.
 	PodPidsLimit int64
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration.
 	ResolverConfig string
+	// RunOnce causes the Kubelet to check the API server once for pods,
+	// run those in addition to the pods specified by static pod files, and exit.
+	RunOnce bool
 	// cpuCFSQuota enables CPU CFS quota enforcement for containers that
 	// specify CPU limits
 	CPUCFSQuota bool
@@ -230,6 +276,8 @@ type KubeletConfiguration struct {
 	CPUCFSQuotaPeriod metav1.Duration
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64
+	// nodeStatusMaxImages caps the number of images reported in Node.Status.Images.
+	NodeStatusMaxImages int32
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
@@ -282,23 +330,36 @@ type KubeletConfiguration struct {
 	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
+	// memorySwap configures swap memory available to container workloads.
+	// +featureGate=NodeSwap
+	// +optional
+	MemorySwap MemorySwapConfiguration
 	// A quantity defines the maximum size of the container log file before it is rotated. For example: "5Mi" or "256Ki".
 	ContainerLogMaxSize string
 	// Maximum number of container log files that can be present for a container.
 	ContainerLogMaxFiles int32
 	// ConfigMapAndSecretChangeDetectionStrategy is a mode in which config map and secret managers are running.
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy
+	// A comma separated allowlist of unsafe sysctls or sysctl patterns (ending in `*`).
+	// Unsafe sysctl groups are `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`, and `net.*`.
+	// These sysctls are namespaced but not allowed by default.
+	// For example: "`kernel.msg*,net.ipv4.route.min_pmtu`"
+	// +optional
+	AllowedUnsafeSysctls []string
+	// kernelMemcgNotification if enabled, the kubelet will integrate with the kernel memcg
+	// notification to determine if memory eviction thresholds are crossed rather than polling.
+	KernelMemcgNotification bool
 
 	/* the following fields are meant for Node Allocatable */
 
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,ephemeral-storage=1G,pid=100) pairs
 	// that describe resources reserved for non-kubernetes components.
-	// Currently only cpu and memory are supported.
+	// Currently only cpu, memory and local ephemeral storage for root file system are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	SystemReserved map[string]string
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,ephemeral-storage=1G,pid=100) pairs
 	// that describe resources reserved for kubernetes system components.
-	// Currently cpu, memory and local ephemeral storage for root file system are supported.
+	// Currently only cpu, memory and local ephemeral storage for root file system are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	KubeReserved map[string]string
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
@@ -311,8 +372,82 @@ type KubeletConfiguration struct {
 	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved` & `kube-reserved`.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	EnforceNodeAllocatable []string
+	// This option specifies the cpu list reserved for the host level system threads and kubernetes related threads.
+	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
+	// This option overwrites CPUs provided by system-reserved and kube-reserved.
+	ReservedSystemCPUs string
+	// The previous version for which you want to show hidden metrics.
+	// Only the previous minor version is meaningful, other values will not be allowed.
+	// The format is <major>.<minor>, e.g.: '1.16'.
+	// The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics,
+	// rather than being surprised when they are permanently removed in the release after that.
+	ShowHiddenMetricsForVersion string
+	// Logging specifies the options of logging.
+	// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
+	Logging logsapi.LoggingConfiguration
+	// EnableSystemLogHandler enables /logs handler.
+	EnableSystemLogHandler bool
+	// ShutdownGracePeriod specifies the total duration that the node should delay the shutdown and total grace period for pod termination during a node shutdown.
+	// Defaults to 0 seconds.
+	// +featureGate=GracefulNodeShutdown
+	// +optional
+	ShutdownGracePeriod metav1.Duration
+	// ShutdownGracePeriodCriticalPods specifies the duration used to terminate critical pods during a node shutdown. This should be less than ShutdownGracePeriod.
+	// Defaults to 0 seconds.
+	// For example, if ShutdownGracePeriod=30s, and ShutdownGracePeriodCriticalPods=10s, during a node shutdown the first 20 seconds would be reserved for gracefully terminating normal pods, and the last 10 seconds would be reserved for terminating critical pods.
+	// +featureGate=GracefulNodeShutdown
+	// +optional
+	ShutdownGracePeriodCriticalPods metav1.Duration
+	// ShutdownGracePeriodByPodPriority specifies the shutdown grace period for Pods based
+	// on their associated priority class value.
+	// When a shutdown request is received, the Kubelet will initiate shutdown on all pods
+	// running on the node with a grace period that depends on the priority of the pod,
+	// and then wait for all pods to exit.
+	// Each entry in the array represents the graceful shutdown time a pod with a priority
+	// class value that lies in the range of that value and the next higher entry in the
+	// list when the node is shutting down.
+	ShutdownGracePeriodByPodPriority []ShutdownGracePeriodByPodPriority
+	// ReservedMemory specifies a comma-separated list of memory reservations for NUMA nodes.
+	// The parameter makes sense only in the context of the memory manager feature. The memory manager will not allocate reserved memory for container workloads.
+	// For example, if you have a NUMA0 with 10Gi of memory and the ReservedMemory was specified to reserve 1Gi of memory at NUMA0,
+	// the memory manager will assume that only 9Gi is available for allocation.
+	// You can specify a different amount of NUMA node and memory types.
+	// You can omit this parameter at all, but you should be aware that the amount of reserved memory from all NUMA nodes
+	// should be equal to the amount of memory specified by the node allocatable features(https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable).
+	// If at least one node allocatable parameter has a non-zero value, you will need to specify at least one NUMA node.
+	// Also, avoid specifying:
+	// 1. Duplicates, the same NUMA node, and memory type, but with a different value.
+	// 2. zero limits for any memory type.
+	// 3. NUMAs nodes IDs that do not exist under the machine.
+	// 4. memory types except for memory and hugepages-<size>
+	ReservedMemory []MemoryReservation
+	// EnableProfiling enables /debug/pprof handler.
+	EnableProfilingHandler bool
+	// EnableDebugFlagsHandler enables/debug/flags/v handler.
+	EnableDebugFlagsHandler bool
+	// SeccompDefault enables the use of `RuntimeDefault` as the default seccomp profile for all workloads.
+	SeccompDefault bool
+	// MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory
+	// when setting the cgroupv2 memory.high value to enforce MemoryQoS.
+	// Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure
+	// while increasing will put less reclaim pressure.
+	// See http://kep.k8s.io/2570 for more details.
+	// Default: 0.8
+	// +featureGate=MemoryQoS
+	// +optional
+	MemoryThrottlingFactor *float64
+	// registerWithTaints are an array of taints to add to a node object when
+	// the kubelet registers itself. This only takes effect when registerNode
+	// is true and upon the initial registration of the node.
+	// +optional
+	RegisterWithTaints []v1.Taint
+
+	// registerNode enables automatic registration with the apiserver.
+	// +optional
+	RegisterNode bool
 }
 
+// KubeletAuthorizationMode denotes the authorization mode for the kubelet
 type KubeletAuthorizationMode string
 
 const (
@@ -322,6 +457,7 @@ const (
 	KubeletAuthorizationModeWebhook KubeletAuthorizationMode = "Webhook"
 )
 
+// KubeletAuthorization holds the state related to the authorization in the kublet.
 type KubeletAuthorization struct {
 	// mode is the authorization mode to apply to requests to the kubelet server.
 	// Valid values are AlwaysAllow and Webhook.
@@ -332,6 +468,8 @@ type KubeletAuthorization struct {
 	Webhook KubeletWebhookAuthorization
 }
 
+// KubeletWebhookAuthorization holds the state related to the Webhook
+// Authorization in the Kubelet.
 type KubeletWebhookAuthorization struct {
 	// cacheAuthorizedTTL is the duration to cache 'authorized' responses from the webhook authorizer.
 	CacheAuthorizedTTL metav1.Duration
@@ -339,6 +477,7 @@ type KubeletWebhookAuthorization struct {
 	CacheUnauthorizedTTL metav1.Duration
 }
 
+// KubeletAuthentication holds the Kubetlet Authentication setttings.
 type KubeletAuthentication struct {
 	// x509 contains settings related to x509 client certificate authentication
 	X509 KubeletX509Authentication
@@ -348,6 +487,7 @@ type KubeletAuthentication struct {
 	Anonymous KubeletAnonymousAuthentication
 }
 
+// KubeletX509Authentication contains settings related to x509 client certificate authentication
 type KubeletX509Authentication struct {
 	// clientCAFile is the path to a PEM-encoded certificate bundle. If set, any request presenting a client certificate
 	// signed by one of the authorities in the bundle is authenticated with a username corresponding to the CommonName,
@@ -355,6 +495,7 @@ type KubeletX509Authentication struct {
 	ClientCAFile string
 }
 
+// KubeletWebhookAuthentication contains settings related to webhook authentication
 type KubeletWebhookAuthentication struct {
 	// enabled allows bearer token authentication backed by the tokenreviews.authentication.k8s.io API
 	Enabled bool
@@ -362,6 +503,7 @@ type KubeletWebhookAuthentication struct {
 	CacheTTL metav1.Duration
 }
 
+// KubeletAnonymousAuthentication enables anonymous requests to the kubelet server.
 type KubeletAnonymousAuthentication struct {
 	// enabled allows anonymous requests to the kubelet server.
 	// Requests that are not rejected by another authentication method are treated as anonymous requests.
@@ -379,4 +521,104 @@ type SerializedNodeConfigSource struct {
 	// Source is the source that we are serializing
 	// +optional
 	Source v1.NodeConfigSource
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CredentialProviderConfig is the configuration containing information about
+// each exec credential provider. Kubelet reads this configuration from disk and enables
+// each provider as specified by the CredentialProvider type.
+type CredentialProviderConfig struct {
+	metav1.TypeMeta
+
+	// providers is a list of credential provider plugins that will be enabled by the kubelet.
+	// Multiple providers may match against a single image, in which case credentials
+	// from all providers will be returned to the kubelet. If multiple providers are called
+	// for a single image, the results are combined. If providers return overlapping
+	// auth keys, the value from the provider earlier in this list is used.
+	Providers []CredentialProvider
+}
+
+// CredentialProvider represents an exec plugin to be invoked by the kubelet. The plugin is only
+// invoked when an image being pulled matches the images handled by the plugin (see matchImages).
+type CredentialProvider struct {
+	// name is the required name of the credential provider. It must match the name of the
+	// provider executable as seen by the kubelet. The executable must be in the kubelet's
+	// bin directory (set by the --credential-provider-bin-dir flag).
+	Name string
+
+	// matchImages is a required list of strings used to match against images in order to
+	// determine if this provider should be invoked. If one of the strings matches the
+	// requested image from the kubelet, the plugin will be invoked and given a chance
+	// to provide credentials. Images are expected to contain the registry domain
+	// and URL path.
+	//
+	// Each entry in matchImages is a pattern which can optionally contain a port and a path.
+	// Globs can be used in the domain, but not in the port or the path. Globs are supported
+	// as subdomains like `*.k8s.io` or `k8s.*.io`, and top-level-domains such as `k8s.*`.
+	// Matching partial subdomains like `app*.k8s.io` is also supported. Each glob can only match
+	// a single subdomain segment, so `*.io` does not match *.k8s.io.
+	//
+	// A match exists between an image and a matchImage when all of the below are true:
+	// - Both contain the same number of domain parts and each part matches.
+	// - The URL path of an imageMatch must be a prefix of the target image URL path.
+	// - If the imageMatch contains a port, then the port must match in the image as well.
+	//
+	// Example values of matchImages:
+	//   - `123456789.dkr.ecr.us-east-1.amazonaws.com`
+	//   - `*.azurecr.io`
+	//   - `gcr.io`
+	//   - `*.*.registry.io`
+	//   - `registry.io:8080/path`
+	MatchImages []string
+
+	// defaultCacheDuration is the default duration the plugin will cache credentials in-memory
+	// if a cache duration is not provided in the plugin response. This field is required.
+	DefaultCacheDuration *metav1.Duration
+
+	// Required input version of the exec CredentialProviderRequest. The returned CredentialProviderResponse
+	// MUST use the same encoding version as the input. Current supported values are:
+	// - credentialprovider.kubelet.k8s.io/v1alpha1
+	// - credentialprovider.kubelet.k8s.io/v1beta1
+	APIVersion string
+
+	// Arguments to pass to the command when executing it.
+	// +optional
+	Args []string
+
+	// Env defines additional environment variables to expose to the process. These
+	// are unioned with the host's environment, as well as variables client-go uses
+	// to pass argument to the plugin.
+	// +optional
+	Env []ExecEnvVar
+}
+
+// ExecEnvVar is used for setting environment variables when executing an exec-based
+// credential plugin.
+type ExecEnvVar struct {
+	Name  string
+	Value string
+}
+
+// MemoryReservation specifies the memory reservation of different types for each NUMA node
+type MemoryReservation struct {
+	NumaNode int32
+	Limits   v1.ResourceList
+}
+
+// ShutdownGracePeriodByPodPriority specifies the shutdown grace period for Pods based on their associated priority class value
+type ShutdownGracePeriodByPodPriority struct {
+	// priority is the priority value associated with the shutdown grace period
+	Priority int32
+	// shutdownGracePeriodSeconds is the shutdown grace period in seconds
+	ShutdownGracePeriodSeconds int64
+}
+
+type MemorySwapConfiguration struct {
+	// swapBehavior configures swap memory available to container workloads. May be one of
+	// "", "LimitedSwap": workload combined memory and swap usage cannot exceed pod memory limit
+	// "UnlimitedSwap": workloads can use unlimited swap, up to the allocatable limit.
+	// +featureGate=NodeSwap
+	// +optional
+	SwapBehavior string
 }

@@ -23,7 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 
 	clientauth "k8s.io/client-go/tools/auth"
 )
@@ -51,10 +51,10 @@ func (a *PromptingAuthLoader) LoadAuth(path string) (*clientauth.Info, error) {
 	// Prompt for user/pass and write a file if none exists.
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		authPtr, err := a.Prompt()
-		auth := *authPtr
 		if err != nil {
 			return nil, err
 		}
+		auth := *authPtr
 		data, err := json.Marshal(auth)
 		if err != nil {
 			return &auth, err
@@ -90,8 +90,8 @@ func promptForString(field string, r io.Reader, show bool) (result string, err e
 		_, err = fmt.Fscan(r, &result)
 	} else {
 		var data []byte
-		if terminal.IsTerminal(int(os.Stdin.Fd())) {
-			data, err = terminal.ReadPassword(int(os.Stdin.Fd()))
+		if term.IsTerminal(int(os.Stdin.Fd())) {
+			data, err = term.ReadPassword(int(os.Stdin.Fd()))
 			result = string(data)
 		} else {
 			return "", fmt.Errorf("error reading input for %s", field)

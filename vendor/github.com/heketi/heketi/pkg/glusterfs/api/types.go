@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/go-ozzo/ozzo-validation"
+	validation "github.com/go-ozzo/ozzo-validation"
 	"github.com/go-ozzo/ozzo-validation/is"
 )
 
@@ -86,12 +86,35 @@ func ValidateDurabilityType(value interface{}) error {
 	return nil
 }
 
+type HealInfoCheck string
+
+const (
+	HealCheckUnknown HealInfoCheck = ""
+	HealCheckEnable  HealInfoCheck = "enable"
+	HealCheckDisable HealInfoCheck = "disable"
+)
+
+func ValidateHealCheck(value interface{}) error {
+	h, _ := value.(HealInfoCheck)
+	err := validation.Validate(h, validation.In(HealCheckUnknown, HealCheckEnable, HealCheckDisable))
+	if err != nil {
+		return fmt.Errorf("%v is not valid heal info check", h)
+	}
+	return nil
+}
+
 // Common
 type StateRequest struct {
-	State EntryState `json:"state"`
+	State     EntryState    `json:"state"`
+	HealCheck HealInfoCheck `json:"healcheck"`
 }
 
 func (statereq StateRequest) Validate() error {
+	if err := validation.ValidateStruct(&statereq,
+		validation.Field(&statereq.HealCheck, validation.By(ValidateHealCheck))); err != nil {
+		return err
+	}
+
 	return validation.ValidateStruct(&statereq,
 		validation.Field(&statereq.State, validation.Required, validation.By(ValidateEntryState)),
 	)
@@ -181,6 +204,8 @@ type DeviceInfo struct {
 	Device
 	Storage StorageSize `json:"storage"`
 	Id      string      `json:"id"`
+	Paths   []string    `json:"paths,omitempty"`
+	PvUUID  string      `json:"pv_uuid,omitempty"`
 }
 
 type DeviceInfoResponse struct {
@@ -226,8 +251,10 @@ type ClusterFlags struct {
 
 type Cluster struct {
 	Volumes []VolumeInfoResponse `json:"volumes"`
-	Nodes   []NodeInfoResponse   `json:"nodes"`
-	Id      string               `json:"id"`
+	//currently BlockVolumes will be used only for metrics
+	BlockVolumes []BlockVolumeInfoResponse `json:"blockvolumes,omitempty"`
+	Nodes        []NodeInfoResponse        `json:"nodes"`
+	Id           string                    `json:"id"`
 	ClusterFlags
 }
 
@@ -418,6 +445,7 @@ type BlockVolumeInfo struct {
 	} `json:"blockvolume"`
 	Cluster            string `json:"cluster,omitempty"`
 	BlockHostingVolume string `json:"blockhostingvolume,omitempty"`
+	UsableSize         int    `json:"usablesize,omitempty"`
 }
 
 type BlockVolumeInfoResponse struct {
@@ -426,6 +454,16 @@ type BlockVolumeInfoResponse struct {
 
 type BlockVolumeListResponse struct {
 	BlockVolumes []string `json:"blockvolumes"`
+}
+
+type BlockVolumeExpandRequest struct {
+	Size int `json:"new_size"`
+}
+
+func (blockVolExpandReq BlockVolumeExpandRequest) Validate() error {
+	return validation.ValidateStruct(&blockVolExpandReq,
+		validation.Field(&blockVolExpandReq.Size, validation.Required, validation.Min(1)),
+	)
 }
 
 type LogLevelInfo struct {
@@ -535,23 +573,6 @@ func (v *VolumeInfoResponse) String() string {
 		s += fmt.Sprintf("Snapshot Factor: %.2f\n",
 			v.Snapshot.Factor)
 	}
-
-	/*
-		s += "\nBricks:\n"
-		for _, b := range v.Bricks {
-			s += fmt.Sprintf("Id: %v\n"+
-				"Path: %v\n"+
-				"Size (GiB): %v\n"+
-				"Node: %v\n"+
-				"Device: %v\n\n",
-				b.Id,
-				b.Path,
-				b.Size/(1024*1024),
-				b.NodeId,
-				b.DeviceId)
-		}
-	*/
-
 	return s
 }
 
@@ -567,6 +588,7 @@ func NewBlockVolumeInfoResponse() *BlockVolumeInfoResponse {
 func (v *BlockVolumeInfoResponse) String() string {
 	s := fmt.Sprintf("Name: %v\n"+
 		"Size: %v\n"+
+		"UsableSize: %v\n"+
 		"Volume Id: %v\n"+
 		"Cluster Id: %v\n"+
 		"Hosts: %v\n"+
@@ -578,6 +600,7 @@ func (v *BlockVolumeInfoResponse) String() string {
 		"Block Hosting Volume: %v\n",
 		v.Name,
 		v.Size,
+		v.UsableSize,
 		v.Id,
 		v.Cluster,
 		v.BlockVolume.Hosts,
@@ -611,8 +634,9 @@ type OperationsInfo struct {
 	Total    uint64 `json:"total"`
 	InFlight uint64 `json:"in_flight"`
 	// state based counts:
-	Stale uint64 `json:"stale"`
-	New   uint64 `json:"new"`
+	Stale  uint64 `json:"stale"`
+	Failed uint64 `json:"failed"`
+	New    uint64 `json:"new"`
 }
 
 type AdminState string
@@ -640,4 +664,65 @@ type DeviceDeleteOptions struct {
 	// force heketi to forget about a device, possibly
 	// orphaning metadata on the node
 	ForceForget bool `json:"forceforget"`
+}
+
+// PendingOperationInfo contains metadata to summarize a pending
+// operation.
+type PendingOperationInfo struct {
+	Id        string `json:"id"`
+	TypeName  string `json:"type_name"`
+	Status    string `json:"status"`
+	SubStatus string `json:"sub_status"`
+	// TODO label, timestamp?
+}
+
+type PendingChangeInfo struct {
+	Id          string `json:"id"`
+	Description string `json:"description"`
+}
+
+type PendingOperationDetails struct {
+	PendingOperationInfo
+	Changes []PendingChangeInfo `json:"changes"`
+}
+
+type PendingOperationListResponse struct {
+	PendingOperations []PendingOperationInfo `json:"pendingoperations"`
+}
+
+type PendingOperationsCleanRequest struct {
+	Operations []string `json:"operations,omitempty"`
+}
+
+func (pocr PendingOperationsCleanRequest) Validate() error {
+	return validation.ValidateStruct(&pocr,
+		validation.Field(&pocr.Operations, validation.By(ValidateIds)),
+	)
+}
+
+func ValidateIds(v interface{}) error {
+	ids, ok := v.([]string)
+	if !ok {
+		return fmt.Errorf("must be a list of strings")
+	}
+	if len(ids) > 32 {
+		return fmt.Errorf("too many ids specified (%v), up to %v supported",
+			len(ids), 32)
+	}
+	for _, id := range ids {
+		if err := ValidateUUID(id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// reserving a type for future options for brick evict
+type BrickEvictOptions struct {
+	HealCheck HealInfoCheck `json:"healcheck"`
+}
+
+func (brickops BrickEvictOptions) Validate() error {
+	return validation.ValidateStruct(&brickops,
+		validation.Field(&brickops.HealCheck, validation.By(ValidateHealCheck)))
 }

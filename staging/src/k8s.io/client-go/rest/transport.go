@@ -21,9 +21,31 @@ import (
 	"errors"
 	"net/http"
 
+	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/plugin/pkg/client/auth/exec"
 	"k8s.io/client-go/transport"
 )
+
+// HTTPClientFor returns an http.Client that will provide the authentication
+// or transport level security defined by the provided Config. Will return the
+// default http.DefaultClient if no special case behavior is needed.
+func HTTPClientFor(config *Config) (*http.Client, error) {
+	transport, err := TransportFor(config)
+	if err != nil {
+		return nil, err
+	}
+	var httpClient *http.Client
+	if transport != http.DefaultTransport || config.Timeout > 0 {
+		httpClient = &http.Client{
+			Transport: transport,
+			Timeout:   config.Timeout,
+		}
+	} else {
+		httpClient = http.DefaultClient
+	}
+
+	return httpClient, nil
+}
 
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
 // by the provided Config. Will return nil if no transport level security is requested.
@@ -61,9 +83,10 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 // TransportConfig converts a client config to an appropriate transport config.
 func (c *Config) TransportConfig() (*transport.Config, error) {
 	conf := &transport.Config{
-		UserAgent:     c.UserAgent,
-		Transport:     c.Transport,
-		WrapTransport: c.WrapTransport,
+		UserAgent:          c.UserAgent,
+		Transport:          c.Transport,
+		WrapTransport:      c.WrapTransport,
+		DisableCompression: c.DisableCompression,
 		TLS: transport.TLSConfig{
 			Insecure:   c.Insecure,
 			ServerName: c.ServerName,
@@ -73,16 +96,20 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			CertData:   c.CertData,
 			KeyFile:    c.KeyFile,
 			KeyData:    c.KeyData,
+			NextProtos: c.NextProtos,
 		},
-		Username:    c.Username,
-		Password:    c.Password,
-		BearerToken: c.BearerToken,
+		Username:        c.Username,
+		Password:        c.Password,
+		BearerToken:     c.BearerToken,
+		BearerTokenFile: c.BearerTokenFile,
 		Impersonate: transport.ImpersonationConfig{
 			UserName: c.Impersonate.UserName,
+			UID:      c.Impersonate.UID,
 			Groups:   c.Impersonate.Groups,
 			Extra:    c.Impersonate.Extra,
 		},
-		Dial: c.Dial,
+		Dial:  c.Dial,
+		Proxy: c.Proxy,
 	}
 
 	if c.ExecProvider != nil && c.AuthProvider != nil {
@@ -90,7 +117,15 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 	}
 
 	if c.ExecProvider != nil {
-		provider, err := exec.GetAuthenticator(c.ExecProvider)
+		var cluster *clientauthentication.Cluster
+		if c.ExecProvider.ProvideClusterInfo {
+			var err error
+			cluster, err = ConfigToExecCluster(c)
+			if err != nil {
+				return nil, err
+			}
+		}
+		provider, err := exec.GetAuthenticator(c.ExecProvider, cluster)
 		if err != nil {
 			return nil, err
 		}
@@ -103,14 +138,15 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		wt := conf.WrapTransport
-		if wt != nil {
-			conf.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
-				return provider.WrapTransport(wt(rt))
-			}
-		} else {
-			conf.WrapTransport = provider.WrapTransport
-		}
+		conf.Wrap(provider.WrapTransport)
 	}
 	return conf, nil
+}
+
+// Wrap adds a transport middleware function that will give the caller
+// an opportunity to wrap the underlying http.RoundTripper prior to the
+// first API call being made. The provided function is invoked after any
+// existing transport wrappers are invoked.
+func (c *Config) Wrap(fn transport.WrapperFunc) {
+	c.WrapTransport = transport.Wrappers(c.WrapTransport, fn)
 }

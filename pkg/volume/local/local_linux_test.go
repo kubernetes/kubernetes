@@ -1,3 +1,4 @@
+//go:build linux || darwin
 // +build linux darwin
 
 /*
@@ -37,7 +38,7 @@ func TestFSGroupMount(t *testing.T) {
 	}
 	s := info.Sys().(*syscall.Stat_t)
 	if s == nil {
-		t.Errorf("Error getting stats for %s (%v)", tmpDir, err)
+		t.Fatalf("Error getting stats for %s (%v)", tmpDir, err)
 	}
 	fsGroup1 := int64(s.Gid)
 	fsGroup2 := fsGroup1 + 1
@@ -60,7 +61,7 @@ func TestFSGroupMount(t *testing.T) {
 	//Checking if GID of tmpDir has not been changed by mounting it by second pod
 	s = info.Sys().(*syscall.Stat_t)
 	if s == nil {
-		t.Errorf("Error getting stats for %s (%v)", tmpDir, err)
+		t.Fatalf("Error getting stats for %s (%v)", tmpDir, err)
 	}
 	if fsGroup1 != int64(s.Gid) {
 		t.Errorf("Old Gid %d for volume %s got overwritten by new Gid %d", fsGroup1, tmpDir, int64(s.Gid))

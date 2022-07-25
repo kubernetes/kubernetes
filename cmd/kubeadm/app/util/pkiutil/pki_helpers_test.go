@@ -17,148 +17,172 @@ limitations under the License.
 package pkiutil
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/x509"
-	"io/ioutil"
+	"fmt"
 	"net"
 	"os"
+	"reflect"
 	"testing"
 
 	certutil "k8s.io/client-go/util/cert"
+	netutils "k8s.io/utils/net"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-// certificateRequest is an x509 certificate request in PEM encoded format
-// openssl req -new -key rsa2048.pem -sha256 -nodes -out x509certrequest.pem -subj "/C=US/CN=not-valid"
-const certificateRequest = `-----BEGIN CERTIFICATE REQUEST-----
-MIICZjCCAU4CAQAwITELMAkGA1UEBhMCVVMxEjAQBgNVBAMMCW5vdC12YWxpZDCC
-ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMdoBxV0SbSS+7XrgVDF/P4x
-tqyun+DLxeRF5265ZOFRJDXCJgYH7wKlxlkEaHZQhnNmnqFiy96MHSKaiQmlkEm4
-EhlqTf38yEWx+t98A0CDbHsIPZ0/+MPCjb2kf+OfBXJJl908io0grs02jxN9lceL
-RFrKT6vaB+6i7LxbPQcOmjF7OUqWS6S2qSpShw2GY+mJz4HM7OFb9RcN4izh+GF6
-7hajYgt7pAFyWF1ua/H98Ysn4FVgIYk30rHCNBkQpJnna7EyGYuj08VuFa088W9g
-c/DCpL+VgBDwTel9tfeMxRAoLIPF9iJ8Ftr7dsRZ/Y/SnxfUJo2ed8y7dgIiLuEC
-AwEAAaAAMA0GCSqGSIb3DQEBCwUAA4IBAQCOjPB/4LKa2G7LarMMLAeNqvWF9SIG
-y2VGQoTn9D5blXMvnfzWSYgU6nBzf/E/32q26OwiCriuOPXfxM/cxEMOJ62u7b50
-OR52JFvQdONsCZaLgylGWppl0YeqylbTosHjsWJNlp+zjXcQHjCQ9OoLgfmrwYyD
-2MsYJR4p7JZ2ZN8FF1hgMUrDzypZ0NSBKAiQMU9TFhxgyk75RNDtmX+2K35zqLyr
-0otimyYwPCGPD2GHwNfvu1oP0A+/cT+rCPz6AlXhWEbz2JkLo6/muRfRl0QSRgHE
-Q3+eWlA1YdqEBwvp3NEQI9BtMnzxJVWA5dvYluMNllsV/q8s2IEEAFG9
------END CERTIFICATE REQUEST-----`
+var (
+	// TestMain generates the bellow certs and keys so that
+	// they are reused in tests whenever possible
 
-func TestNewCertificateAuthority(t *testing.T) {
-	cert, key, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
+	rootCACert, servCert *x509.Certificate
+	rootCAKey, servKey   crypto.Signer
 
-	if cert == nil {
-		t.Errorf(
-			"failed NewCertificateAuthority, cert == nil",
-		)
-	}
-	if key == nil {
-		t.Errorf(
-			"failed NewCertificateAuthority, key == nil",
-		)
-	}
+	ecdsaKey *ecdsa.PrivateKey
+)
+
+func TestMain(m *testing.M) {
+	var err error
+
+	rootCACert, rootCAKey, err = NewCertificateAuthority(&CertConfig{
+		Config: certutil.Config{
+			CommonName: "Root CA 1",
+		},
+		PublicKeyAlgorithm: x509.RSA,
+	})
 	if err != nil {
-		t.Errorf(
-			"failed NewCertificateAuthority with an error: %v",
-			err,
-		)
+		panic(fmt.Sprintf("Failed generating Root CA: %v", err))
 	}
+	if !rootCACert.IsCA {
+		panic("rootCACert is not a valid CA")
+	}
+
+	servCert, servKey, err = NewCertAndKey(rootCACert, rootCAKey, &CertConfig{
+		Config: certutil.Config{
+			CommonName: "kubernetes",
+			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		},
+	})
+	if err != nil {
+		panic(fmt.Sprintf("Failed generating serving cert/key: %v", err))
+	}
+
+	ecdsaKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic("Could not generate ECDSA key")
+	}
+
+	os.Exit(m.Run())
 }
 
 func TestNewCertAndKey(t *testing.T) {
 	var tests = []struct {
-		caKeySize int
-		expected  bool
+		name string
+		key  crypto.Signer
 	}{
 		{
-			// RSA key too small
-			caKeySize: 128,
-			expected:  false,
-		},
-		{
-			// Should succeed
-			caKeySize: 2048,
-			expected:  true,
+			name: "ECDSA should succeed",
+			key:  ecdsaKey,
 		},
 	}
 
 	for _, rt := range tests {
-		caKey, err := rsa.GenerateKey(rand.Reader, rt.caKeySize)
-		if err != nil {
-			t.Fatalf("Couldn't create rsa Private Key")
-		}
-		caCert := &x509.Certificate{}
-		config := &certutil.Config{
-			CommonName:   "test",
-			Organization: []string{"test"},
-			Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-		}
-		_, _, actual := NewCertAndKey(caCert, caKey, config)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed NewCertAndKey:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(actual == nil),
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			caCert := &x509.Certificate{}
+			config := &CertConfig{
+				Config: certutil.Config{
+					CommonName:   "test",
+					Organization: []string{"test"},
+					Usages:       []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+				},
+			}
+			_, _, err := NewCertAndKey(caCert, rt.key, config)
+			if err != nil {
+				t.Errorf("failed NewCertAndKey: %v", err)
+			}
+		})
 	}
 }
 
 func TestHasServerAuth(t *testing.T) {
-	caCert, caKey, _ := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
+	// Override NewPrivateKey to reuse the same key for all certs
+	// since this test is only checking cert.ExtKeyUsage
+	privateKeyFunc := NewPrivateKey
+	NewPrivateKey = func(x509.PublicKeyAlgorithm) (crypto.Signer, error) {
+		return rootCAKey, nil
+	}
+	defer func() {
+		NewPrivateKey = privateKeyFunc
+	}()
 
 	var tests = []struct {
-		config   certutil.Config
+		name     string
+		config   CertConfig
 		expected bool
 	}{
 		{
-			config: certutil.Config{
-				CommonName: "test",
-				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			name: "has ServerAuth",
+			config: CertConfig{
+				Config: certutil.Config{
+					CommonName: "test",
+					Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+				},
 			},
 			expected: true,
 		},
 		{
-			config: certutil.Config{
-				CommonName: "test",
-				Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			name: "has ServerAuth ECDSA",
+			config: CertConfig{
+				Config: certutil.Config{
+					CommonName: "test",
+					Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+				},
+				PublicKeyAlgorithm: x509.ECDSA,
+			},
+			expected: true,
+		},
+		{
+			name: "doesn't have ServerAuth",
+			config: CertConfig{
+				Config: certutil.Config{
+					CommonName: "test",
+					Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+				},
 			},
 			expected: false,
 		},
 	}
 
 	for _, rt := range tests {
-		cert, _, err := NewCertAndKey(caCert, caKey, &rt.config)
-		if err != nil {
-			t.Fatalf("Couldn't create cert: %v", err)
-		}
-		actual := HasServerAuth(cert)
-		if actual != rt.expected {
-			t.Errorf(
-				"failed HasServerAuth:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				actual,
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			cert, _, err := NewCertAndKey(rootCACert, rootCAKey, &rt.config)
+			if err != nil {
+				t.Fatalf("Couldn't create cert: %v", err)
+			}
+			actual := HasServerAuth(cert)
+			if actual != rt.expected {
+				t.Errorf(
+					"failed HasServerAuth:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					actual,
+				)
+			}
+		})
 	}
 }
 
 func TestWriteCertAndKey(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
 	defer os.RemoveAll(tmpdir)
 
-	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("Couldn't create rsa Private Key")
-	}
 	caCert := &x509.Certificate{}
-	actual := WriteCertAndKey(tmpdir, "foo", caCert, caKey)
+	actual := WriteCertAndKey(tmpdir, "foo", caCert, rootCAKey)
 	if actual != nil {
 		t.Errorf(
 			"failed WriteCertAndKey with an error: %v",
@@ -168,7 +192,7 @@ func TestWriteCertAndKey(t *testing.T) {
 }
 
 func TestWriteCert(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -178,24 +202,35 @@ func TestWriteCert(t *testing.T) {
 	actual := WriteCert(tmpdir, "foo", caCert)
 	if actual != nil {
 		t.Errorf(
-			"failed WriteCertAndKey with an error: %v",
+			"failed WriteCert with an error: %v",
 			actual,
 		)
 	}
 }
 
-func TestWriteKey(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+func TestWriteCertBundle(t *testing.T) {
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
 	defer os.RemoveAll(tmpdir)
 
-	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("Couldn't create rsa Private Key")
+	certs := []*x509.Certificate{{}, {}}
+
+	actual := WriteCertBundle(tmpdir, "foo", certs)
+	if actual != nil {
+		t.Errorf("failed WriteCertBundle with an error: %v", actual)
 	}
-	actual := WriteKey(tmpdir, "foo", caKey)
+}
+
+func TestWriteKey(t *testing.T) {
+	tmpdir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	actual := WriteKey(tmpdir, "foo", rootCAKey)
 	if actual != nil {
 		t.Errorf(
 			"failed WriteCertAndKey with an error: %v",
@@ -205,17 +240,13 @@ func TestWriteKey(t *testing.T) {
 }
 
 func TestWritePublicKey(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
 	defer os.RemoveAll(tmpdir)
 
-	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("Couldn't create rsa Private Key")
-	}
-	actual := WritePublicKey(tmpdir, "foo", &caKey.PublicKey)
+	actual := WritePublicKey(tmpdir, "foo", rootCAKey.Public())
 	if actual != nil {
 		t.Errorf(
 			"failed WriteCertAndKey with an error: %v",
@@ -225,200 +256,283 @@ func TestWritePublicKey(t *testing.T) {
 }
 
 func TestCertOrKeyExist(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
 	defer os.RemoveAll(tmpdir)
 
-	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("Couldn't create rsa Private Key")
-	}
-	caCert := &x509.Certificate{}
-	actual := WriteCertAndKey(tmpdir, "foo", caCert, caKey)
-	if actual != nil {
+	if err = WriteCertAndKey(tmpdir, "foo-0", rootCACert, rootCAKey); err != nil {
 		t.Errorf(
 			"failed WriteCertAndKey with an error: %v",
-			actual,
+			err,
+		)
+	}
+	if err = WriteCert(tmpdir, "foo-1", rootCACert); err != nil {
+		t.Errorf(
+			"failed WriteCert with an error: %v",
+			err,
 		)
 	}
 
 	var tests = []struct {
+		desc     string
 		path     string
 		name     string
 		expected bool
 	}{
 		{
+			desc:     "empty path and name",
 			path:     "",
 			name:     "",
 			expected: false,
 		},
 		{
+			desc:     "valid path and name, both cert and key exist",
 			path:     tmpdir,
-			name:     "foo",
+			name:     "foo-0",
+			expected: true,
+		},
+		{
+			desc:     "valid path and name, only cert exist",
+			path:     tmpdir,
+			name:     "foo-1",
 			expected: true,
 		},
 	}
 	for _, rt := range tests {
-		actual := CertOrKeyExist(rt.path, rt.name)
-		if actual != rt.expected {
-			t.Errorf(
-				"failed CertOrKeyExist:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				actual,
-			)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual := CertOrKeyExist(rt.path, rt.name)
+			if actual != rt.expected {
+				t.Errorf(
+					"failed CertOrKeyExist:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					actual,
+				)
+			}
+		})
 	}
 }
 
 func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
 	defer os.RemoveAll(tmpdir)
 
-	caCert, caKey, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
+	err = WriteCertAndKey(tmpdir, "foo", rootCACert, rootCAKey)
 	if err != nil {
-		t.Errorf(
-			"failed to create cert and key with an error: %v",
-			err,
-		)
-	}
-	err = WriteCertAndKey(tmpdir, "foo", caCert, caKey)
-	if err != nil {
-		t.Errorf(
+		t.Fatalf(
 			"failed to write cert and key with an error: %v",
 			err,
 		)
 	}
 
 	var tests = []struct {
+		desc     string
 		path     string
 		name     string
 		expected bool
 	}{
 		{
+			desc:     "empty path and name",
 			path:     "",
 			name:     "",
 			expected: false,
 		},
 		{
+			desc:     "valid path and name",
 			path:     tmpdir,
 			name:     "foo",
 			expected: true,
 		},
 	}
 	for _, rt := range tests {
-		_, _, actual := TryLoadCertAndKeyFromDisk(rt.path, rt.name)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(actual == nil),
-			)
-		}
+		t.Run(rt.desc, func(t *testing.T) {
+			_, _, actual := TryLoadCertAndKeyFromDisk(rt.path, rt.name)
+			if (actual == nil) != rt.expected {
+				t.Errorf(
+					"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					(actual == nil),
+				)
+			}
+		})
 	}
 }
 
 func TestTryLoadCertFromDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
 	defer os.RemoveAll(tmpdir)
 
-	caCert, _, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
+	err = WriteCert(tmpdir, "foo", rootCACert)
 	if err != nil {
-		t.Errorf(
-			"failed to create cert and key with an error: %v",
-			err,
-		)
-	}
-	err = WriteCert(tmpdir, "foo", caCert)
-	if err != nil {
-		t.Errorf(
+		t.Fatalf(
 			"failed to write cert and key with an error: %v",
 			err,
 		)
 	}
 
 	var tests = []struct {
+		desc     string
 		path     string
 		name     string
 		expected bool
 	}{
 		{
+			desc:     "empty path and name",
 			path:     "",
 			name:     "",
 			expected: false,
 		},
 		{
+			desc:     "valid path and name",
 			path:     tmpdir,
 			name:     "foo",
 			expected: true,
 		},
 	}
 	for _, rt := range tests {
-		_, actual := TryLoadCertFromDisk(rt.path, rt.name)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(actual == nil),
-			)
-		}
+		t.Run(rt.desc, func(t *testing.T) {
+			_, actual := TryLoadCertFromDisk(rt.path, rt.name)
+			if (actual == nil) != rt.expected {
+				t.Errorf(
+					"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					(actual == nil),
+				)
+			}
+		})
+	}
+}
+
+func TestTryLoadCertChainFromDisk(t *testing.T) {
+	tmpdir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	err = WriteCert(tmpdir, "leaf", servCert)
+	if err != nil {
+		t.Fatalf("failed to write cert: %v", err)
+	}
+
+	// rootCACert is treated as an intermediate CA here
+	bundle := []*x509.Certificate{servCert, rootCACert}
+	err = WriteCertBundle(tmpdir, "bundle", bundle)
+	if err != nil {
+		t.Fatalf("failed to write cert bundle: %v", err)
+	}
+
+	var tests = []struct {
+		desc          string
+		path          string
+		name          string
+		expected      bool
+		intermediates int
+	}{
+		{
+			desc:          "empty path and name",
+			path:          "",
+			name:          "",
+			expected:      false,
+			intermediates: 0,
+		},
+		{
+			desc:          "leaf certificate",
+			path:          tmpdir,
+			name:          "leaf",
+			expected:      true,
+			intermediates: 0,
+		},
+		{
+			desc:          "certificate bundle",
+			path:          tmpdir,
+			name:          "bundle",
+			expected:      true,
+			intermediates: 1,
+		},
+	}
+	for _, rt := range tests {
+		t.Run(rt.desc, func(t *testing.T) {
+			_, intermediates, actual := TryLoadCertChainFromDisk(rt.path, rt.name)
+			if (actual == nil) != rt.expected {
+				t.Errorf(
+					"failed TryLoadCertChainFromDisk:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					(actual == nil),
+				)
+			}
+			if len(intermediates) != rt.intermediates {
+				t.Errorf(
+					"TryLoadCertChainFromDisk returned the wrong number of intermediate certificates:\n\texpected: %d\n\t  actual: %d",
+					rt.intermediates,
+					len(intermediates),
+				)
+			}
+		})
 	}
 }
 
 func TestTryLoadKeyFromDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("Couldn't create tmpdir")
-	}
-	defer os.RemoveAll(tmpdir)
-
-	_, caKey, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
-	if err != nil {
-		t.Errorf(
-			"failed to create cert and key with an error: %v",
-			err,
-		)
-	}
-	err = WriteKey(tmpdir, "foo", caKey)
-	if err != nil {
-		t.Errorf(
-			"failed to write cert and key with an error: %v",
-			err,
-		)
-	}
-
 	var tests = []struct {
-		path     string
-		name     string
-		expected bool
+		desc       string
+		pathSuffix string
+		name       string
+		caKey      crypto.Signer
+		expected   bool
 	}{
 		{
-			path:     "",
-			name:     "",
-			expected: false,
+			desc:       "empty path and name",
+			pathSuffix: "somegarbage",
+			name:       "",
+			caKey:      rootCAKey,
+			expected:   false,
 		},
 		{
-			path:     tmpdir,
-			name:     "foo",
-			expected: true,
+			desc:       "RSA valid path and name",
+			pathSuffix: "",
+			name:       "foo",
+			caKey:      rootCAKey,
+			expected:   true,
+		},
+		{
+			desc:       "ECDSA valid path and name",
+			pathSuffix: "",
+			name:       "foo",
+			caKey:      ecdsaKey,
+			expected:   true,
 		},
 	}
 	for _, rt := range tests {
-		_, actual := TryLoadKeyFromDisk(rt.path, rt.name)
-		if (actual == nil) != rt.expected {
-			t.Errorf(
-				"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
-				rt.expected,
-				(actual == nil),
-			)
-		}
+		t.Run(rt.desc, func(t *testing.T) {
+			tmpdir, err := os.MkdirTemp("", "")
+			if err != nil {
+				t.Fatalf("Couldn't create tmpdir")
+			}
+			defer os.RemoveAll(tmpdir)
+
+			err = WriteKey(tmpdir, "foo", rt.caKey)
+			if err != nil {
+				t.Errorf(
+					"failed to write key with an error: %v",
+					err,
+				)
+			}
+			_, actual := TryLoadKeyFromDisk(tmpdir+rt.pathSuffix, rt.name)
+			if (actual == nil) != rt.expected {
+				t.Errorf(
+					"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					(actual == nil),
+				)
+			}
+		})
 	}
 }
 
@@ -463,12 +577,14 @@ func TestPathForCSR(t *testing.T) {
 func TestGetAPIServerAltNames(t *testing.T) {
 
 	var tests = []struct {
+		desc                string
 		name                string
 		cfg                 *kubeadmapi.InitConfiguration
 		expectedDNSNames    []string
 		expectedIPAddresses []string
 	}{
 		{
+			desc: "empty name",
 			name: "",
 			cfg: &kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
@@ -485,6 +601,7 @@ func TestGetAPIServerAltNames(t *testing.T) {
 			expectedIPAddresses: []string{"10.96.0.1", "1.2.3.4", "10.1.245.94", "10.1.245.95"},
 		},
 		{
+			desc: "ControlPlaneEndpoint IP",
 			name: "ControlPlaneEndpoint IP",
 			cfg: &kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
@@ -503,38 +620,40 @@ func TestGetAPIServerAltNames(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		altNames, err := GetAPIServerAltNames(rt.cfg)
-		if err != nil {
-			t.Fatalf("failed calling GetAPIServerAltNames: %s: %v", rt.name, err)
-		}
+		t.Run(rt.desc, func(t *testing.T) {
+			altNames, err := GetAPIServerAltNames(rt.cfg)
+			if err != nil {
+				t.Fatalf("failed calling GetAPIServerAltNames: %s: %v", rt.name, err)
+			}
 
-		for _, DNSName := range rt.expectedDNSNames {
-			found := false
-			for _, val := range altNames.DNSNames {
-				if val == DNSName {
-					found = true
-					break
+			for _, DNSName := range rt.expectedDNSNames {
+				found := false
+				for _, val := range altNames.DNSNames {
+					if val == DNSName {
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					t.Errorf("%s: altNames does not contain DNSName %s but %v", rt.name, DNSName, altNames.DNSNames)
 				}
 			}
 
-			if !found {
-				t.Errorf("%s: altNames does not contain DNSName %s but %v", rt.name, DNSName, altNames.DNSNames)
-			}
-		}
+			for _, IPAddress := range rt.expectedIPAddresses {
+				found := false
+				for _, val := range altNames.IPs {
+					if val.Equal(netutils.ParseIPSloppy(IPAddress)) {
+						found = true
+						break
+					}
+				}
 
-		for _, IPAddress := range rt.expectedIPAddresses {
-			found := false
-			for _, val := range altNames.IPs {
-				if val.Equal(net.ParseIP(IPAddress)) {
-					found = true
-					break
+				if !found {
+					t.Errorf("%s: altNames does not contain IPAddress %s but %v", rt.name, IPAddress, altNames.IPs)
 				}
 			}
-
-			if !found {
-				t.Errorf("%s: altNames does not contain IPAddress %s but %v", rt.name, IPAddress, altNames.IPs)
-			}
-		}
+		})
 	}
 }
 
@@ -569,32 +688,36 @@ func TestGetEtcdAltNames(t *testing.T) {
 
 	expectedDNSNames := []string{"myNode", "localhost", proxy}
 	for _, DNSName := range expectedDNSNames {
-		found := false
-		for _, val := range altNames.DNSNames {
-			if val == DNSName {
-				found = true
-				break
+		t.Run(DNSName, func(t *testing.T) {
+			found := false
+			for _, val := range altNames.DNSNames {
+				if val == DNSName {
+					found = true
+					break
+				}
 			}
-		}
 
-		if !found {
-			t.Errorf("altNames does not contain DNSName %s", DNSName)
-		}
+			if !found {
+				t.Errorf("altNames does not contain DNSName %s", DNSName)
+			}
+		})
 	}
 
 	expectedIPAddresses := []string{"1.2.3.4", "127.0.0.1", net.IPv6loopback.String(), proxyIP}
 	for _, IPAddress := range expectedIPAddresses {
-		found := false
-		for _, val := range altNames.IPs {
-			if val.Equal(net.ParseIP(IPAddress)) {
-				found = true
-				break
+		t.Run(IPAddress, func(t *testing.T) {
+			found := false
+			for _, val := range altNames.IPs {
+				if val.Equal(netutils.ParseIPSloppy(IPAddress)) {
+					found = true
+					break
+				}
 			}
-		}
 
-		if !found {
-			t.Errorf("altNames does not contain IPAddress %s", IPAddress)
-		}
+			if !found {
+				t.Errorf("altNames does not contain IPAddress %s", IPAddress)
+			}
+		})
 	}
 }
 
@@ -627,31 +750,186 @@ func TestGetEtcdPeerAltNames(t *testing.T) {
 
 	expectedDNSNames := []string{hostname, proxy}
 	for _, DNSName := range expectedDNSNames {
-		found := false
-		for _, val := range altNames.DNSNames {
-			if val == DNSName {
-				found = true
-				break
+		t.Run(DNSName, func(t *testing.T) {
+			found := false
+			for _, val := range altNames.DNSNames {
+				if val == DNSName {
+					found = true
+					break
+				}
 			}
-		}
 
-		if !found {
-			t.Errorf("altNames does not contain DNSName %s", DNSName)
+			if !found {
+				t.Errorf("altNames does not contain DNSName %s", DNSName)
+			}
+
+			expectedIPAddresses := []string{advertiseIP, proxyIP}
+			for _, IPAddress := range expectedIPAddresses {
+				found := false
+				for _, val := range altNames.IPs {
+					if val.Equal(netutils.ParseIPSloppy(IPAddress)) {
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					t.Errorf("altNames does not contain IPAddress %s", IPAddress)
+				}
+			}
+		})
+	}
+}
+
+func TestAppendSANsToAltNames(t *testing.T) {
+	var tests = []struct {
+		sans     []string
+		expected int
+	}{
+		{[]string{}, 0},
+		{[]string{"abc"}, 1},
+		{[]string{"*.abc"}, 1},
+		{[]string{"**.abc"}, 0},
+		{[]string{"a.*.bc"}, 0},
+		{[]string{"a.*.bc", "abc.def"}, 1},
+		{[]string{"a*.bc", "abc.def"}, 1},
+	}
+	for _, rt := range tests {
+		altNames := certutil.AltNames{}
+		appendSANsToAltNames(&altNames, rt.sans, "foo")
+		actual := len(altNames.DNSNames)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed AppendSANsToAltNames Numbers:\n\texpected: %d\n\t  actual: %d",
+				rt.expected,
+				actual,
+			)
 		}
 	}
 
-	expectedIPAddresses := []string{advertiseIP, proxyIP}
-	for _, IPAddress := range expectedIPAddresses {
-		found := false
-		for _, val := range altNames.IPs {
-			if val.Equal(net.ParseIP(IPAddress)) {
-				found = true
-				break
-			}
-		}
+}
 
-		if !found {
-			t.Errorf("altNames does not contain IPAddress %s", IPAddress)
+func TestRemoveDuplicateAltNames(t *testing.T) {
+	tests := []struct {
+		args *certutil.AltNames
+		want *certutil.AltNames
+	}{
+		{
+			&certutil.AltNames{},
+			&certutil.AltNames{},
+		},
+		{
+			&certutil.AltNames{
+				DNSNames: []string{"a", "a"},
+				IPs:      []net.IP{{127, 0, 0, 1}},
+			},
+			&certutil.AltNames{
+				DNSNames: []string{"a"},
+				IPs:      []net.IP{{127, 0, 0, 1}},
+			},
+		},
+		{
+			&certutil.AltNames{
+				DNSNames: []string{"a"},
+				IPs:      []net.IP{{127, 0, 0, 1}, {127, 0, 0, 1}},
+			},
+			&certutil.AltNames{
+				DNSNames: []string{"a"},
+				IPs:      []net.IP{{127, 0, 0, 1}},
+			},
+		},
+		{
+			&certutil.AltNames{
+				DNSNames: []string{"a", "a"},
+				IPs:      []net.IP{{127, 0, 0, 1}, {127, 0, 0, 1}},
+			},
+			&certutil.AltNames{
+				DNSNames: []string{"a"},
+				IPs:      []net.IP{{127, 0, 0, 1}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		RemoveDuplicateAltNames(tt.args)
+		if !reflect.DeepEqual(tt.args, tt.want) {
+			t.Errorf("Wanted %v, got %v", tt.want, tt.args)
 		}
+	}
+}
+
+func TestVerifyCertChain(t *testing.T) {
+	tmpdir, err := os.MkdirTemp("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	rootCert2, rootKey2, err := NewCertificateAuthority(&CertConfig{
+		Config: certutil.Config{CommonName: "Root CA 2"},
+	})
+	if err != nil {
+		t.Errorf("failed to create root CA cert and key with an error: %v", err)
+	}
+
+	intCert2, intKey2, err := NewIntermediateCertificateAuthority(rootCert2, rootKey2, &CertConfig{
+		Config: certutil.Config{
+			CommonName: "Intermediate CA 2",
+			Usages:     []x509.ExtKeyUsage{},
+		},
+	})
+	if err != nil {
+		t.Errorf("failed to create intermediate CA cert and key with an error: %v", err)
+	}
+
+	leafCert2, _, err := NewCertAndKey(intCert2, intKey2, &CertConfig{
+		Config: certutil.Config{
+			CommonName: "Leaf Certificate 2",
+			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		},
+	})
+	if err != nil {
+		t.Errorf("failed to create leaf cert and key with an error: %v", err)
+	}
+
+	var tests = []struct {
+		desc          string
+		leaf          *x509.Certificate
+		intermediates []*x509.Certificate
+		root          *x509.Certificate
+		expected      bool
+	}{
+		{
+			desc:          "without any intermediate CAs",
+			leaf:          servCert,
+			intermediates: []*x509.Certificate{},
+			root:          rootCACert,
+			expected:      true,
+		},
+		{
+			desc:          "missing intermediate CA",
+			leaf:          leafCert2,
+			intermediates: []*x509.Certificate{},
+			root:          rootCert2,
+			expected:      false,
+		},
+		{
+			desc:          "with one intermediate CA",
+			leaf:          leafCert2,
+			intermediates: []*x509.Certificate{intCert2},
+			root:          rootCert2,
+			expected:      true,
+		},
+	}
+	for _, rt := range tests {
+		t.Run(rt.desc, func(t *testing.T) {
+			actual := VerifyCertChain(rt.leaf, rt.intermediates, rt.root)
+			if (actual == nil) != rt.expected {
+				t.Errorf(
+					"failed VerifyCertChain:\n\texpected: %t\n\t  actual: %t",
+					rt.expected,
+					(actual == nil),
+				)
+			}
+		})
 	}
 }

@@ -19,7 +19,8 @@ type randomWriteScheduler struct {
 	zero writeQueue
 
 	// sq contains the stream-specific queues, keyed by stream ID.
-	// When a stream is idle or closed, it's deleted from the map.
+	// When a stream is idle, closed, or emptied, it's deleted
+	// from the map.
 	sq map[uint32]*writeQueue
 
 	// pool of empty queues for reuse.
@@ -44,11 +45,11 @@ func (ws *randomWriteScheduler) AdjustStream(streamID uint32, priority PriorityP
 }
 
 func (ws *randomWriteScheduler) Push(wr FrameWriteRequest) {
-	id := wr.StreamID()
-	if id == 0 {
+	if wr.isControl() {
 		ws.zero.push(wr)
 		return
 	}
+	id := wr.StreamID()
 	q, ok := ws.sq[id]
 	if !ok {
 		q = ws.queuePool.get()
@@ -58,13 +59,17 @@ func (ws *randomWriteScheduler) Push(wr FrameWriteRequest) {
 }
 
 func (ws *randomWriteScheduler) Pop() (FrameWriteRequest, bool) {
-	// Control frames first.
+	// Control and RST_STREAM frames first.
 	if !ws.zero.empty() {
 		return ws.zero.shift(), true
 	}
 	// Iterate over all non-idle streams until finding one that can be consumed.
-	for _, q := range ws.sq {
+	for streamID, q := range ws.sq {
 		if wr, ok := q.consume(math.MaxInt32); ok {
+			if q.empty() {
+				delete(ws.sq, streamID)
+				ws.queuePool.put(q)
+			}
 			return wr, true
 		}
 	}

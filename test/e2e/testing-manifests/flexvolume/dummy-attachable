@@ -81,8 +81,6 @@ domountdevice() {
 
 unmountdevice() {
 	debug "unmountdevice $@"
-	MNTDEVICE=$2
-	validateMountDeviceOrDie "$MNTDEVICE" "unmountdevice"
 	MNTPATH=$1
 	rm "${MNTPATH}/index.html" >/dev/null 2>&1
 	umount ${MNTPATH} >/dev/null 2>&1

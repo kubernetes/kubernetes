@@ -40,7 +40,7 @@ func TestGetServersToValidate(t *testing.T) {
 
 type fakeStorageFactory struct{}
 
-func (f fakeStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.Config, error) {
+func (f fakeStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.ConfigForResource, error) {
 	return nil, nil
 }
 

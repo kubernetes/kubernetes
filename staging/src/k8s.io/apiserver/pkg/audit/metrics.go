@@ -17,67 +17,81 @@ limitations under the License.
 package audit
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/prometheus/client_golang/prometheus"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-	"k8s.io/klog"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog/v2"
 )
 
 const (
 	subsystem = "apiserver_audit"
 )
 
+/*
+ * By default, all the following metrics are defined as falling under
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/kubernetes-control-plane-metrics-stability.md#stability-classes)
+ *
+ * Promoting the stability level of the metric is a responsibility of the component owner, since it
+ * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
+ * the metric stability policy.
+ */
 var (
-	eventCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Subsystem: subsystem,
-			Name:      "event_total",
-			Help:      "Counter of audit events generated and sent to the audit backend.",
+	eventCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      subsystem,
+			Name:           "event_total",
+			Help:           "Counter of audit events generated and sent to the audit backend.",
+			StabilityLevel: metrics.ALPHA,
 		})
-	errorCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
+	errorCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
 			Subsystem: subsystem,
 			Name:      "error_total",
 			Help: "Counter of audit events that failed to be audited properly. " +
 				"Plugin identifies the plugin affected by the error.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin"},
 	)
-	levelCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: subsystem,
-			Name:      "level_total",
-			Help:      "Counter of policy levels for audit events (1 per request).",
+	levelCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      subsystem,
+			Name:           "level_total",
+			Help:           "Counter of policy levels for audit events (1 per request).",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"level"},
 	)
 
-	ApiserverAuditDroppedCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
+	ApiserverAuditDroppedCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
 			Subsystem: subsystem,
 			Name:      "requests_rejected_total",
 			Help: "Counter of apiserver requests rejected due to an error " +
 				"in audit logging backend.",
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
 )
 
 func init() {
-	prometheus.MustRegister(eventCounter)
-	prometheus.MustRegister(errorCounter)
-	prometheus.MustRegister(levelCounter)
-	prometheus.MustRegister(ApiserverAuditDroppedCounter)
+	legacyregistry.MustRegister(eventCounter)
+	legacyregistry.MustRegister(errorCounter)
+	legacyregistry.MustRegister(levelCounter)
+	legacyregistry.MustRegister(ApiserverAuditDroppedCounter)
 }
 
 // ObserveEvent updates the relevant prometheus metrics for the generated audit event.
-func ObserveEvent() {
-	eventCounter.Inc()
+func ObserveEvent(ctx context.Context) {
+	eventCounter.WithContext(ctx).Inc()
 }
 
 // ObservePolicyLevel updates the relevant prometheus metrics with the audit level for a request.
-func ObservePolicyLevel(level auditinternal.Level) {
-	levelCounter.WithLabelValues(string(level)).Inc()
+func ObservePolicyLevel(ctx context.Context, level auditinternal.Level) {
+	levelCounter.WithContext(ctx).WithLabelValues(string(level)).Inc()
 }
 
 // HandlePluginError handles an error that occurred in an audit plugin. This method should only be

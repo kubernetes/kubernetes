@@ -9,6 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awsutil"
 	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/private/protocol"
+	"github.com/aws/aws-sdk-go/private/protocol/query"
 )
 
 const opAddTags = "AddTags"
@@ -16,7 +18,7 @@ const opAddTags = "AddTags"
 // AddTagsRequest generates a "aws/request.Request" representing the
 // client's request for the AddTags operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -50,6 +52,7 @@ func (c *ELB) AddTagsRequest(input *AddTagsInput) (req *request.Request, output 
 
 	output = &AddTagsOutput{}
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Swap(query.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
 	return
 }
 
@@ -61,8 +64,8 @@ func (c *ELB) AddTagsRequest(input *AddTagsInput) (req *request.Request, output 
 // Each tag consists of a key and an optional value. If a tag with the same
 // key is already associated with the load balancer, AddTags updates its value.
 //
-// For more information, see Tag Your Classic Load Balancer (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/add-remove-tags.html)
-// in the Classic Load Balancer Guide.
+// For more information, see Tag Your Classic Load Balancer (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/add-remove-tags.html)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -109,7 +112,7 @@ const opApplySecurityGroupsToLoadBalancer = "ApplySecurityGroupsToLoadBalancer"
 // ApplySecurityGroupsToLoadBalancerRequest generates a "aws/request.Request" representing the
 // client's request for the ApplySecurityGroupsToLoadBalancer operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -152,8 +155,8 @@ func (c *ELB) ApplySecurityGroupsToLoadBalancerRequest(input *ApplySecurityGroup
 // private cloud (VPC). The specified security groups override the previously
 // associated security groups.
 //
-// For more information, see Security Groups for Load Balancers in a VPC (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-security-groups.html#elb-vpc-security-groups)
-// in the Classic Load Balancer Guide.
+// For more information, see Security Groups for Load Balancers in a VPC (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-security-groups.html#elb-vpc-security-groups)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -199,7 +202,7 @@ const opAttachLoadBalancerToSubnets = "AttachLoadBalancerToSubnets"
 // AttachLoadBalancerToSubnetsRequest generates a "aws/request.Request" representing the
 // client's request for the AttachLoadBalancerToSubnets operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -243,8 +246,8 @@ func (c *ELB) AttachLoadBalancerToSubnetsRequest(input *AttachLoadBalancerToSubn
 //
 // The load balancer evenly distributes requests across all registered subnets.
 // For more information, see Add or Remove Subnets for Your Load Balancer in
-// a VPC (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-manage-subnets.html)
-// in the Classic Load Balancer Guide.
+// a VPC (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-manage-subnets.html)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -293,7 +296,7 @@ const opConfigureHealthCheck = "ConfigureHealthCheck"
 // ConfigureHealthCheckRequest generates a "aws/request.Request" representing the
 // client's request for the ConfigureHealthCheck operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -336,8 +339,8 @@ func (c *ELB) ConfigureHealthCheckRequest(input *ConfigureHealthCheckInput) (req
 // of your EC2 instances.
 //
 // For more information, see Configure Health Checks for Your Load Balancer
-// (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-healthchecks.html)
-// in the Classic Load Balancer Guide.
+// (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-healthchecks.html)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -377,7 +380,7 @@ const opCreateAppCookieStickinessPolicy = "CreateAppCookieStickinessPolicy"
 // CreateAppCookieStickinessPolicyRequest generates a "aws/request.Request" representing the
 // client's request for the CreateAppCookieStickinessPolicy operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -411,6 +414,7 @@ func (c *ELB) CreateAppCookieStickinessPolicyRequest(input *CreateAppCookieStick
 
 	output = &CreateAppCookieStickinessPolicyOutput{}
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Swap(query.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
 	return
 }
 
@@ -429,8 +433,8 @@ func (c *ELB) CreateAppCookieStickinessPolicyRequest(input *CreateAppCookieStick
 // If the application cookie is explicitly removed or expires, the session stops
 // being sticky until a new application cookie is issued.
 //
-// For more information, see Application-Controlled Session Stickiness (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-sticky-sessions.html#enable-sticky-sessions-application)
-// in the Classic Load Balancer Guide.
+// For more information, see Application-Controlled Session Stickiness (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-sticky-sessions.html#enable-sticky-sessions-application)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -479,7 +483,7 @@ const opCreateLBCookieStickinessPolicy = "CreateLBCookieStickinessPolicy"
 // CreateLBCookieStickinessPolicyRequest generates a "aws/request.Request" representing the
 // client's request for the CreateLBCookieStickinessPolicy operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -513,6 +517,7 @@ func (c *ELB) CreateLBCookieStickinessPolicyRequest(input *CreateLBCookieStickin
 
 	output = &CreateLBCookieStickinessPolicyOutput{}
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Swap(query.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
 	return
 }
 
@@ -533,8 +538,8 @@ func (c *ELB) CreateLBCookieStickinessPolicyRequest(input *CreateLBCookieStickin
 // the same user to that server. The validity of the cookie is based on the
 // cookie expiration time, which is specified in the policy configuration.
 //
-// For more information, see Duration-Based Session Stickiness (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-sticky-sessions.html#enable-sticky-sessions-duration)
-// in the Classic Load Balancer Guide.
+// For more information, see Duration-Based Session Stickiness (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-sticky-sessions.html#enable-sticky-sessions-duration)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -583,7 +588,7 @@ const opCreateLoadBalancer = "CreateLoadBalancer"
 // CreateLoadBalancerRequest generates a "aws/request.Request" representing the
 // client's request for the CreateLoadBalancer operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -633,8 +638,8 @@ func (c *ELB) CreateLoadBalancerRequest(input *CreateLoadBalancerInput) (req *re
 //
 // You can create up to 20 load balancers per region per account. You can request
 // an increase for the number of load balancers for your account. For more information,
-// see Limits for Your Classic Load Balancer (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-limits.html)
-// in the Classic Load Balancer Guide.
+// see Limits for Your Classic Load Balancer (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-limits.html)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -712,7 +717,7 @@ const opCreateLoadBalancerListeners = "CreateLoadBalancerListeners"
 // CreateLoadBalancerListenersRequest generates a "aws/request.Request" representing the
 // client's request for the CreateLoadBalancerListeners operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -746,6 +751,7 @@ func (c *ELB) CreateLoadBalancerListenersRequest(input *CreateLoadBalancerListen
 
 	output = &CreateLoadBalancerListenersOutput{}
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Swap(query.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
 	return
 }
 
@@ -756,8 +762,8 @@ func (c *ELB) CreateLoadBalancerListenersRequest(input *CreateLoadBalancerListen
 // the properties of the new listener must match the properties of the existing
 // listener.
 //
-// For more information, see Listeners for Your Classic Load Balancer (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-listener-config.html)
-// in the Classic Load Balancer Guide.
+// For more information, see Listeners for Your Classic Load Balancer (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-listener-config.html)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -813,7 +819,7 @@ const opCreateLoadBalancerPolicy = "CreateLoadBalancerPolicy"
 // CreateLoadBalancerPolicyRequest generates a "aws/request.Request" representing the
 // client's request for the CreateLoadBalancerPolicy operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -847,6 +853,7 @@ func (c *ELB) CreateLoadBalancerPolicyRequest(input *CreateLoadBalancerPolicyInp
 
 	output = &CreateLoadBalancerPolicyOutput{}
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Swap(query.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
 	return
 }
 
@@ -908,7 +915,7 @@ const opDeleteLoadBalancer = "DeleteLoadBalancer"
 // DeleteLoadBalancerRequest generates a "aws/request.Request" representing the
 // client's request for the DeleteLoadBalancer operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -942,6 +949,7 @@ func (c *ELB) DeleteLoadBalancerRequest(input *DeleteLoadBalancerInput) (req *re
 
 	output = &DeleteLoadBalancerOutput{}
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Swap(query.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
 	return
 }
 
@@ -991,7 +999,7 @@ const opDeleteLoadBalancerListeners = "DeleteLoadBalancerListeners"
 // DeleteLoadBalancerListenersRequest generates a "aws/request.Request" representing the
 // client's request for the DeleteLoadBalancerListeners operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -1025,6 +1033,7 @@ func (c *ELB) DeleteLoadBalancerListenersRequest(input *DeleteLoadBalancerListen
 
 	output = &DeleteLoadBalancerListenersOutput{}
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Swap(query.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
 	return
 }
 
@@ -1070,7 +1079,7 @@ const opDeleteLoadBalancerPolicy = "DeleteLoadBalancerPolicy"
 // DeleteLoadBalancerPolicyRequest generates a "aws/request.Request" representing the
 // client's request for the DeleteLoadBalancerPolicy operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -1104,6 +1113,7 @@ func (c *ELB) DeleteLoadBalancerPolicyRequest(input *DeleteLoadBalancerPolicyInp
 
 	output = &DeleteLoadBalancerPolicyOutput{}
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Swap(query.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
 	return
 }
 
@@ -1153,7 +1163,7 @@ const opDeregisterInstancesFromLoadBalancer = "DeregisterInstancesFromLoadBalanc
 // DeregisterInstancesFromLoadBalancerRequest generates a "aws/request.Request" representing the
 // client's request for the DeregisterInstancesFromLoadBalancer operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -1199,8 +1209,8 @@ func (c *ELB) DeregisterInstancesFromLoadBalancerRequest(input *DeregisterInstan
 // You can use DescribeLoadBalancers to verify that the instance is deregistered
 // from the load balancer.
 //
-// For more information, see Register or De-Register EC2 Instances (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-deregister-register-instances.html)
-// in the Classic Load Balancer Guide.
+// For more information, see Register or De-Register EC2 Instances (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-deregister-register-instances.html)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1243,7 +1253,7 @@ const opDescribeAccountLimits = "DescribeAccountLimits"
 // DescribeAccountLimitsRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeAccountLimits operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -1285,8 +1295,8 @@ func (c *ELB) DescribeAccountLimitsRequest(input *DescribeAccountLimitsInput) (r
 // Describes the current Elastic Load Balancing resource limits for your AWS
 // account.
 //
-// For more information, see Limits for Your Classic Load Balancer (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-limits.html)
-// in the Classic Load Balancer Guide.
+// For more information, see Limits for Your Classic Load Balancer (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-limits.html)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1321,7 +1331,7 @@ const opDescribeInstanceHealth = "DescribeInstanceHealth"
 // DescribeInstanceHealthRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeInstanceHealth operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -1408,7 +1418,7 @@ const opDescribeLoadBalancerAttributes = "DescribeLoadBalancerAttributes"
 // DescribeLoadBalancerAttributesRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeLoadBalancerAttributes operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -1490,7 +1500,7 @@ const opDescribeLoadBalancerPolicies = "DescribeLoadBalancerPolicies"
 // DescribeLoadBalancerPoliciesRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeLoadBalancerPolicies operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -1579,7 +1589,7 @@ const opDescribeLoadBalancerPolicyTypes = "DescribeLoadBalancerPolicyTypes"
 // DescribeLoadBalancerPolicyTypesRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeLoadBalancerPolicyTypes operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -1669,7 +1679,7 @@ const opDescribeLoadBalancers = "DescribeLoadBalancers"
 // DescribeLoadBalancersRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeLoadBalancers operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -1729,6 +1739,8 @@ func (c *ELB) DescribeLoadBalancersRequest(input *DescribeLoadBalancersInput) (r
 //   The specified load balancer does not exist.
 //
 //   * ErrCodeDependencyThrottleException "DependencyThrottle"
+//   A request made by Elastic Load Balancing to another service exceeds the maximum
+//   request rate permitted for your account.
 //
 // See also, https://docs.aws.amazon.com/goto/WebAPI/elasticloadbalancing-2012-06-01/DescribeLoadBalancers
 func (c *ELB) DescribeLoadBalancers(input *DescribeLoadBalancersInput) (*DescribeLoadBalancersOutput, error) {
@@ -1763,7 +1775,7 @@ func (c *ELB) DescribeLoadBalancersWithContext(ctx aws.Context, input *DescribeL
 //    // Example iterating over at most 3 pages of a DescribeLoadBalancers operation.
 //    pageNum := 0
 //    err := client.DescribeLoadBalancersPages(params,
-//        func(page *DescribeLoadBalancersOutput, lastPage bool) bool {
+//        func(page *elb.DescribeLoadBalancersOutput, lastPage bool) bool {
 //            pageNum++
 //            fmt.Println(page)
 //            return pageNum <= 3
@@ -1795,10 +1807,12 @@ func (c *ELB) DescribeLoadBalancersPagesWithContext(ctx aws.Context, input *Desc
 		},
 	}
 
-	cont := true
-	for p.Next() && cont {
-		cont = fn(p.Page().(*DescribeLoadBalancersOutput), !p.HasNextPage())
+	for p.Next() {
+		if !fn(p.Page().(*DescribeLoadBalancersOutput), !p.HasNextPage()) {
+			break
+		}
 	}
+
 	return p.Err()
 }
 
@@ -1807,7 +1821,7 @@ const opDescribeTags = "DescribeTags"
 // DescribeTagsRequest generates a "aws/request.Request" representing the
 // client's request for the DescribeTags operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -1886,7 +1900,7 @@ const opDetachLoadBalancerFromSubnets = "DetachLoadBalancerFromSubnets"
 // DetachLoadBalancerFromSubnetsRequest generates a "aws/request.Request" representing the
 // client's request for the DetachLoadBalancerFromSubnets operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -1973,7 +1987,7 @@ const opDisableAvailabilityZonesForLoadBalancer = "DisableAvailabilityZonesForLo
 // DisableAvailabilityZonesForLoadBalancerRequest generates a "aws/request.Request" representing the
 // client's request for the DisableAvailabilityZonesForLoadBalancer operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -2013,7 +2027,9 @@ func (c *ELB) DisableAvailabilityZonesForLoadBalancerRequest(input *DisableAvail
 // DisableAvailabilityZonesForLoadBalancer API operation for Elastic Load Balancing.
 //
 // Removes the specified Availability Zones from the set of Availability Zones
-// for the specified load balancer.
+// for the specified load balancer in EC2-Classic or a default VPC.
+//
+// For load balancers in a non-default VPC, use DetachLoadBalancerFromSubnets.
 //
 // There must be at least one Availability Zone registered with a load balancer
 // at all times. After an Availability Zone is removed, all instances registered
@@ -2021,8 +2037,8 @@ func (c *ELB) DisableAvailabilityZonesForLoadBalancerRequest(input *DisableAvail
 // the OutOfService state. Then, the load balancer attempts to equally balance
 // the traffic among its remaining Availability Zones.
 //
-// For more information, see Add or Remove Availability Zones (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-az.html)
-// in the Classic Load Balancer Guide.
+// For more information, see Add or Remove Availability Zones (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-az.html)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2065,7 +2081,7 @@ const opEnableAvailabilityZonesForLoadBalancer = "EnableAvailabilityZonesForLoad
 // EnableAvailabilityZonesForLoadBalancerRequest generates a "aws/request.Request" representing the
 // client's request for the EnableAvailabilityZonesForLoadBalancer operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -2105,13 +2121,14 @@ func (c *ELB) EnableAvailabilityZonesForLoadBalancerRequest(input *EnableAvailab
 // EnableAvailabilityZonesForLoadBalancer API operation for Elastic Load Balancing.
 //
 // Adds the specified Availability Zones to the set of Availability Zones for
-// the specified load balancer.
+// the specified load balancer in EC2-Classic or a default VPC.
+//
+// For load balancers in a non-default VPC, use AttachLoadBalancerToSubnets.
 //
 // The load balancer evenly distributes requests across all its registered Availability
-// Zones that contain instances.
-//
-// For more information, see Add or Remove Availability Zones (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-az.html)
-// in the Classic Load Balancer Guide.
+// Zones that contain instances. For more information, see Add or Remove Availability
+// Zones (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-az.html)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2151,7 +2168,7 @@ const opModifyLoadBalancerAttributes = "ModifyLoadBalancerAttributes"
 // ModifyLoadBalancerAttributesRequest generates a "aws/request.Request" representing the
 // client's request for the ModifyLoadBalancerAttributes operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -2197,15 +2214,15 @@ func (c *ELB) ModifyLoadBalancerAttributesRequest(input *ModifyLoadBalancerAttri
 // can modify the load balancer attribute ConnectionSettings by specifying an
 // idle connection timeout value for your load balancer.
 //
-// For more information, see the following in the Classic Load Balancer Guide:
+// For more information, see the following in the Classic Load Balancers Guide:
 //
-//    * Cross-Zone Load Balancing (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-crosszone-lb.html)
+//    * Cross-Zone Load Balancing (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-crosszone-lb.html)
 //
-//    * Connection Draining (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/config-conn-drain.html)
+//    * Connection Draining (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/config-conn-drain.html)
 //
-//    * Access Logs (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/access-log-collection.html)
+//    * Access Logs (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/access-log-collection.html)
 //
-//    * Idle Connection Timeout (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/config-idle-timeout.html)
+//    * Idle Connection Timeout (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/config-idle-timeout.html)
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2251,7 +2268,7 @@ const opRegisterInstancesWithLoadBalancer = "RegisterInstancesWithLoadBalancer"
 // RegisterInstancesWithLoadBalancerRequest generates a "aws/request.Request" representing the
 // client's request for the RegisterInstancesWithLoadBalancer operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -2311,8 +2328,8 @@ func (c *ELB) RegisterInstancesWithLoadBalancerRequest(input *RegisterInstancesW
 //
 // To deregister instances from a load balancer, use DeregisterInstancesFromLoadBalancer.
 //
-// For more information, see Register or De-Register EC2 Instances (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-deregister-register-instances.html)
-// in the Classic Load Balancer Guide.
+// For more information, see Register or De-Register EC2 Instances (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-deregister-register-instances.html)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2355,7 +2372,7 @@ const opRemoveTags = "RemoveTags"
 // RemoveTagsRequest generates a "aws/request.Request" representing the
 // client's request for the RemoveTags operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -2389,6 +2406,7 @@ func (c *ELB) RemoveTagsRequest(input *RemoveTagsInput) (req *request.Request, o
 
 	output = &RemoveTagsOutput{}
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Swap(query.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
 	return
 }
 
@@ -2434,7 +2452,7 @@ const opSetLoadBalancerListenerSSLCertificate = "SetLoadBalancerListenerSSLCerti
 // SetLoadBalancerListenerSSLCertificateRequest generates a "aws/request.Request" representing the
 // client's request for the SetLoadBalancerListenerSSLCertificate operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -2468,6 +2486,7 @@ func (c *ELB) SetLoadBalancerListenerSSLCertificateRequest(input *SetLoadBalance
 
 	output = &SetLoadBalancerListenerSSLCertificateOutput{}
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Swap(query.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
 	return
 }
 
@@ -2478,8 +2497,8 @@ func (c *ELB) SetLoadBalancerListenerSSLCertificateRequest(input *SetLoadBalance
 // the same load balancer and port.
 //
 // For more information about updating your SSL certificate, see Replace the
-// SSL Certificate for Your Load Balancer (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-update-ssl-cert.html)
-// in the Classic Load Balancer Guide.
+// SSL Certificate for Your Load Balancer (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-update-ssl-cert.html)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2534,7 +2553,7 @@ const opSetLoadBalancerPoliciesForBackendServer = "SetLoadBalancerPoliciesForBac
 // SetLoadBalancerPoliciesForBackendServerRequest generates a "aws/request.Request" representing the
 // client's request for the SetLoadBalancerPoliciesForBackendServer operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -2568,6 +2587,7 @@ func (c *ELB) SetLoadBalancerPoliciesForBackendServerRequest(input *SetLoadBalan
 
 	output = &SetLoadBalancerPoliciesForBackendServerOutput{}
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Swap(query.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
 	return
 }
 
@@ -2585,10 +2605,10 @@ func (c *ELB) SetLoadBalancerPoliciesForBackendServerRequest(input *SetLoadBalan
 // that the policy is associated with the EC2 instance.
 //
 // For more information about enabling back-end instance authentication, see
-// Configure Back-end Instance Authentication (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-create-https-ssl-load-balancer.html#configure_backendauth_clt)
-// in the Classic Load Balancer Guide. For more information about Proxy Protocol,
-// see Configure Proxy Protocol Support (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-proxy-protocol.html)
-// in the Classic Load Balancer Guide.
+// Configure Back-end Instance Authentication (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-create-https-ssl-load-balancer.html#configure_backendauth_clt)
+// in the Classic Load Balancers Guide. For more information about Proxy Protocol,
+// see Configure Proxy Protocol Support (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-proxy-protocol.html)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2634,7 +2654,7 @@ const opSetLoadBalancerPoliciesOfListener = "SetLoadBalancerPoliciesOfListener"
 // SetLoadBalancerPoliciesOfListenerRequest generates a "aws/request.Request" representing the
 // client's request for the SetLoadBalancerPoliciesOfListener operation. The "output" return
 // value will be populated with the request's response once the request completes
-// successfuly.
+// successfully.
 //
 // Use "Send" method on the returned Request to send the API call to the service.
 // the "output" return value is not valid until after Send returns without error.
@@ -2668,6 +2688,7 @@ func (c *ELB) SetLoadBalancerPoliciesOfListenerRequest(input *SetLoadBalancerPol
 
 	output = &SetLoadBalancerPoliciesOfListenerOutput{}
 	req = c.newRequest(op, input, output)
+	req.Handlers.Unmarshal.Swap(query.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
 	return
 }
 
@@ -2679,10 +2700,10 @@ func (c *ELB) SetLoadBalancerPoliciesOfListenerRequest(input *SetLoadBalancerPol
 // To enable back-end server authentication, use SetLoadBalancerPoliciesForBackendServer.
 //
 // For more information about setting policies, see Update the SSL Negotiation
-// Configuration (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/ssl-config-update.html),
-// Duration-Based Session Stickiness (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-sticky-sessions.html#enable-sticky-sessions-duration),
-// and Application-Controlled Session Stickiness (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-sticky-sessions.html#enable-sticky-sessions-application)
-// in the Classic Load Balancer Guide.
+// Configuration (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/ssl-config-update.html),
+// Duration-Based Session Stickiness (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-sticky-sessions.html#enable-sticky-sessions-duration),
+// and Application-Controlled Session Stickiness (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-sticky-sessions.html#enable-sticky-sessions-application)
+// in the Classic Load Balancers Guide.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -2878,14 +2899,20 @@ func (s AddTagsOutput) GoString() string {
 	return s.String()
 }
 
-// This data type is reserved.
+// Information about additional load balancer attributes.
 type AdditionalAttribute struct {
 	_ struct{} `type:"structure"`
 
-	// This parameter is reserved.
+	// The name of the attribute.
+	//
+	// The following attribute is supported.
+	//
+	//    * elb.http.desyncmitigationmode - Determines how the load balancer handles
+	//    requests that might pose a security risk to your application. The possible
+	//    values are monitor, defensive, and strictest. The default is defensive.
 	Key *string `type:"string"`
 
-	// This parameter is reserved.
+	// This value of the attribute.
 	Value *string `type:"string"`
 }
 
@@ -3488,8 +3515,8 @@ type CreateLoadBalancerInput struct {
 
 	// The listeners.
 	//
-	// For more information, see Listeners for Your Classic Load Balancer (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-listener-config.html)
-	// in the Classic Load Balancer Guide.
+	// For more information, see Listeners for Your Classic Load Balancer (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-listener-config.html)
+	// in the Classic Load Balancers Guide.
 	//
 	// Listeners is a required field
 	Listeners []*Listener `type:"list" required:"true"`
@@ -3508,7 +3535,7 @@ type CreateLoadBalancerInput struct {
 	// By default, Elastic Load Balancing creates an Internet-facing load balancer
 	// with a DNS name that resolves to public IP addresses. For more information
 	// about Internet-facing and Internal load balancers, see Load Balancer Scheme
-	// (http://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html#load-balancer-scheme)
+	// (https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html#load-balancer-scheme)
 	// in the Elastic Load Balancing User Guide.
 	//
 	// Specify internal to create a load balancer with a DNS name that resolves
@@ -3525,8 +3552,8 @@ type CreateLoadBalancerInput struct {
 	// A list of tags to assign to the load balancer.
 	//
 	// For more information about tagging your load balancer, see Tag Your Classic
-	// Load Balancer (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/add-remove-tags.html)
-	// in the Classic Load Balancer Guide.
+	// Load Balancer (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/add-remove-tags.html)
+	// in the Classic Load Balancers Guide.
 	Tags []*Tag `min:"1" type:"list"`
 }
 
@@ -5115,6 +5142,8 @@ type Limit struct {
 	//    * classic-listeners
 	//
 	//    * classic-load-balancers
+	//
+	//    * classic-registered-instances
 	Name *string `type:"string"`
 }
 
@@ -5143,8 +5172,8 @@ func (s *Limit) SetName(v string) *Limit {
 // Information about a listener.
 //
 // For information about the protocols and the ports supported by Elastic Load
-// Balancing, see Listeners for Your Classic Load Balancer (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-listener-config.html)
-// in the Classic Load Balancer Guide.
+// Balancing, see Listeners for Your Classic Load Balancer (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-listener-config.html)
+// in the Classic Load Balancers Guide.
 type Listener struct {
 	_ struct{} `type:"structure"`
 
@@ -5156,8 +5185,9 @@ type Listener struct {
 	// The protocol to use for routing traffic to instances: HTTP, HTTPS, TCP, or
 	// SSL.
 	//
-	// If the front-end protocol is HTTP, HTTPS, TCP, or SSL, InstanceProtocol must
-	// be at the same protocol.
+	// If the front-end protocol is TCP or SSL, the back-end protocol must be TCP
+	// or SSL. If the front-end protocol is HTTP or HTTPS, the back-end protocol
+	// must be HTTP or HTTPS.
 	//
 	// If there is another listener with the same InstancePort whose InstanceProtocol
 	// is secure, (HTTPS or SSL), the listener's InstanceProtocol must also be secure.
@@ -5285,18 +5315,18 @@ type LoadBalancerAttributes struct {
 	// If enabled, the load balancer captures detailed information of all requests
 	// and delivers the information to the Amazon S3 bucket that you specify.
 	//
-	// For more information, see Enable Access Logs (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-access-logs.html)
-	// in the Classic Load Balancer Guide.
+	// For more information, see Enable Access Logs (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-access-logs.html)
+	// in the Classic Load Balancers Guide.
 	AccessLog *AccessLog `type:"structure"`
 
-	// This parameter is reserved.
+	// Any additional attributes.
 	AdditionalAttributes []*AdditionalAttribute `type:"list"`
 
 	// If enabled, the load balancer allows existing requests to complete before
 	// the load balancer shifts traffic away from a deregistered or unhealthy instance.
 	//
-	// For more information, see Configure Connection Draining (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/config-conn-drain.html)
-	// in the Classic Load Balancer Guide.
+	// For more information, see Configure Connection Draining (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/config-conn-drain.html)
+	// in the Classic Load Balancers Guide.
 	ConnectionDraining *ConnectionDraining `type:"structure"`
 
 	// If enabled, the load balancer allows the connections to remain idle (no data
@@ -5304,15 +5334,15 @@ type LoadBalancerAttributes struct {
 	//
 	// By default, Elastic Load Balancing maintains a 60-second idle connection
 	// timeout for both front-end and back-end connections of your load balancer.
-	// For more information, see Configure Idle Connection Timeout (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/config-idle-timeout.html)
-	// in the Classic Load Balancer Guide.
+	// For more information, see Configure Idle Connection Timeout (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/config-idle-timeout.html)
+	// in the Classic Load Balancers Guide.
 	ConnectionSettings *ConnectionSettings `type:"structure"`
 
 	// If enabled, the load balancer routes the request traffic evenly across all
 	// instances regardless of the Availability Zones.
 	//
-	// For more information, see Configure Cross-Zone Load Balancing (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-crosszone-lb.html)
-	// in the Classic Load Balancer Guide.
+	// For more information, see Configure Cross-Zone Load Balancing (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-crosszone-lb.html)
+	// in the Classic Load Balancers Guide.
 	CrossZoneLoadBalancing *CrossZoneLoadBalancing `type:"structure"`
 }
 
@@ -5398,15 +5428,15 @@ type LoadBalancerDescription struct {
 
 	// The DNS name of the load balancer.
 	//
-	// For more information, see Configure a Custom Domain Name (http://docs.aws.amazon.com/elasticloadbalancing/latest/classic/using-domain-names-with-elb.html)
-	// in the Classic Load Balancer Guide.
+	// For more information, see Configure a Custom Domain Name (https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/using-domain-names-with-elb.html)
+	// in the Classic Load Balancers Guide.
 	CanonicalHostedZoneName *string `type:"string"`
 
 	// The ID of the Amazon Route 53 hosted zone for the load balancer.
 	CanonicalHostedZoneNameID *string `type:"string"`
 
 	// The date and time the load balancer was created.
-	CreatedTime *time.Time `type:"timestamp" timestampFormat:"iso8601"`
+	CreatedTime *time.Time `type:"timestamp"`
 
 	// The DNS name of the load balancer.
 	DNSName *string `type:"string"`

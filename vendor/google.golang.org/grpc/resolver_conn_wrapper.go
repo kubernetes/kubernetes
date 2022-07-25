@@ -19,140 +19,158 @@
 package grpc
 
 import (
-	"fmt"
 	"strings"
+	"sync"
 
-	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/balancer"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/internal/channelz"
+	"google.golang.org/grpc/internal/grpcsync"
+	"google.golang.org/grpc/internal/pretty"
 	"google.golang.org/grpc/resolver"
+	"google.golang.org/grpc/serviceconfig"
 )
 
 // ccResolverWrapper is a wrapper on top of cc for resolvers.
-// It implements resolver.ClientConnection interface.
+// It implements resolver.ClientConn interface.
 type ccResolverWrapper struct {
-	cc       *ClientConn
-	resolver resolver.Resolver
-	addrCh   chan []resolver.Address
-	scCh     chan string
-	done     chan struct{}
+	cc         *ClientConn
+	resolverMu sync.Mutex
+	resolver   resolver.Resolver
+	done       *grpcsync.Event
+	curState   resolver.State
+
+	incomingMu sync.Mutex // Synchronizes all the incoming calls.
 }
 
-// split2 returns the values from strings.SplitN(s, sep, 2).
-// If sep is not found, it returns ("", s, false) instead.
-func split2(s, sep string) (string, string, bool) {
-	spl := strings.SplitN(s, sep, 2)
-	if len(spl) < 2 {
-		return "", "", false
-	}
-	return spl[0], spl[1], true
-}
-
-// parseTarget splits target into a struct containing scheme, authority and
-// endpoint.
-//
-// If target is not a valid scheme://authority/endpoint, it returns {Endpoint:
-// target}.
-func parseTarget(target string) (ret resolver.Target) {
-	var ok bool
-	ret.Scheme, ret.Endpoint, ok = split2(target, "://")
-	if !ok {
-		return resolver.Target{Endpoint: target}
-	}
-	ret.Authority, ret.Endpoint, ok = split2(ret.Endpoint, "/")
-	if !ok {
-		return resolver.Target{Endpoint: target}
-	}
-	return ret
-}
-
-// newCCResolverWrapper parses cc.target for scheme and gets the resolver
-// builder for this scheme and builds the resolver. The monitoring goroutine
-// for it is not started yet and can be created by calling start().
-//
-// If withResolverBuilder dial option is set, the specified resolver will be
-// used instead.
-func newCCResolverWrapper(cc *ClientConn) (*ccResolverWrapper, error) {
-	rb := cc.dopts.resolverBuilder
-	if rb == nil {
-		return nil, fmt.Errorf("could not get resolver for scheme: %q", cc.parsedTarget.Scheme)
-	}
-
+// newCCResolverWrapper uses the resolver.Builder to build a Resolver and
+// returns a ccResolverWrapper object which wraps the newly built resolver.
+func newCCResolverWrapper(cc *ClientConn, rb resolver.Builder) (*ccResolverWrapper, error) {
 	ccr := &ccResolverWrapper{
-		cc:     cc,
-		addrCh: make(chan []resolver.Address, 1),
-		scCh:   make(chan string, 1),
-		done:   make(chan struct{}),
+		cc:   cc,
+		done: grpcsync.NewEvent(),
+	}
+
+	var credsClone credentials.TransportCredentials
+	if creds := cc.dopts.copts.TransportCredentials; creds != nil {
+		credsClone = creds.Clone()
+	}
+	rbo := resolver.BuildOptions{
+		DisableServiceConfig: cc.dopts.disableServiceConfig,
+		DialCreds:            credsClone,
+		CredsBundle:          cc.dopts.copts.CredsBundle,
+		Dialer:               cc.dopts.copts.Dialer,
 	}
 
 	var err error
-	ccr.resolver, err = rb.Build(cc.parsedTarget, ccr, resolver.BuildOption{DisableServiceConfig: cc.dopts.disableServiceConfig})
+	// We need to hold the lock here while we assign to the ccr.resolver field
+	// to guard against a data race caused by the following code path,
+	// rb.Build-->ccr.ReportError-->ccr.poll-->ccr.resolveNow, would end up
+	// accessing ccr.resolver which is being assigned here.
+	ccr.resolverMu.Lock()
+	defer ccr.resolverMu.Unlock()
+	ccr.resolver, err = rb.Build(cc.parsedTarget, ccr, rbo)
 	if err != nil {
 		return nil, err
 	}
 	return ccr, nil
 }
 
-func (ccr *ccResolverWrapper) start() {
-	go ccr.watcher()
-}
-
-// watcher processes address updates and service config updates sequentially.
-// Otherwise, we need to resolve possible races between address and service
-// config (e.g. they specify different balancer types).
-func (ccr *ccResolverWrapper) watcher() {
-	for {
-		select {
-		case <-ccr.done:
-			return
-		default:
-		}
-
-		select {
-		case addrs := <-ccr.addrCh:
-			select {
-			case <-ccr.done:
-				return
-			default:
-			}
-			grpclog.Infof("ccResolverWrapper: sending new addresses to cc: %v", addrs)
-			ccr.cc.handleResolvedAddrs(addrs, nil)
-		case sc := <-ccr.scCh:
-			select {
-			case <-ccr.done:
-				return
-			default:
-			}
-			grpclog.Infof("ccResolverWrapper: got new service config: %v", sc)
-			ccr.cc.handleServiceConfig(sc)
-		case <-ccr.done:
-			return
-		}
+func (ccr *ccResolverWrapper) resolveNow(o resolver.ResolveNowOptions) {
+	ccr.resolverMu.Lock()
+	if !ccr.done.HasFired() {
+		ccr.resolver.ResolveNow(o)
 	}
-}
-
-func (ccr *ccResolverWrapper) resolveNow(o resolver.ResolveNowOption) {
-	ccr.resolver.ResolveNow(o)
+	ccr.resolverMu.Unlock()
 }
 
 func (ccr *ccResolverWrapper) close() {
+	ccr.resolverMu.Lock()
 	ccr.resolver.Close()
-	close(ccr.done)
+	ccr.done.Fire()
+	ccr.resolverMu.Unlock()
 }
 
-// NewAddress is called by the resolver implemenetion to send addresses to gRPC.
-func (ccr *ccResolverWrapper) NewAddress(addrs []resolver.Address) {
-	select {
-	case <-ccr.addrCh:
-	default:
+func (ccr *ccResolverWrapper) UpdateState(s resolver.State) error {
+	ccr.incomingMu.Lock()
+	defer ccr.incomingMu.Unlock()
+	if ccr.done.HasFired() {
+		return nil
 	}
-	ccr.addrCh <- addrs
+	ccr.addChannelzTraceEvent(s)
+	ccr.curState = s
+	if err := ccr.cc.updateResolverState(ccr.curState, nil); err == balancer.ErrBadResolverState {
+		return balancer.ErrBadResolverState
+	}
+	return nil
 }
 
-// NewServiceConfig is called by the resolver implemenetion to send service
+func (ccr *ccResolverWrapper) ReportError(err error) {
+	ccr.incomingMu.Lock()
+	defer ccr.incomingMu.Unlock()
+	if ccr.done.HasFired() {
+		return
+	}
+	channelz.Warningf(logger, ccr.cc.channelzID, "ccResolverWrapper: reporting error to cc: %v", err)
+	ccr.cc.updateResolverState(resolver.State{}, err)
+}
+
+// NewAddress is called by the resolver implementation to send addresses to gRPC.
+func (ccr *ccResolverWrapper) NewAddress(addrs []resolver.Address) {
+	ccr.incomingMu.Lock()
+	defer ccr.incomingMu.Unlock()
+	if ccr.done.HasFired() {
+		return
+	}
+	ccr.addChannelzTraceEvent(resolver.State{Addresses: addrs, ServiceConfig: ccr.curState.ServiceConfig})
+	ccr.curState.Addresses = addrs
+	ccr.cc.updateResolverState(ccr.curState, nil)
+}
+
+// NewServiceConfig is called by the resolver implementation to send service
 // configs to gRPC.
 func (ccr *ccResolverWrapper) NewServiceConfig(sc string) {
-	select {
-	case <-ccr.scCh:
-	default:
+	ccr.incomingMu.Lock()
+	defer ccr.incomingMu.Unlock()
+	if ccr.done.HasFired() {
+		return
 	}
-	ccr.scCh <- sc
+	channelz.Infof(logger, ccr.cc.channelzID, "ccResolverWrapper: got new service config: %s", sc)
+	if ccr.cc.dopts.disableServiceConfig {
+		channelz.Info(logger, ccr.cc.channelzID, "Service config lookups disabled; ignoring config")
+		return
+	}
+	scpr := parseServiceConfig(sc)
+	if scpr.Err != nil {
+		channelz.Warningf(logger, ccr.cc.channelzID, "ccResolverWrapper: error parsing service config: %v", scpr.Err)
+		return
+	}
+	ccr.addChannelzTraceEvent(resolver.State{Addresses: ccr.curState.Addresses, ServiceConfig: scpr})
+	ccr.curState.ServiceConfig = scpr
+	ccr.cc.updateResolverState(ccr.curState, nil)
+}
+
+func (ccr *ccResolverWrapper) ParseServiceConfig(scJSON string) *serviceconfig.ParseResult {
+	return parseServiceConfig(scJSON)
+}
+
+func (ccr *ccResolverWrapper) addChannelzTraceEvent(s resolver.State) {
+	var updates []string
+	var oldSC, newSC *ServiceConfig
+	var oldOK, newOK bool
+	if ccr.curState.ServiceConfig != nil {
+		oldSC, oldOK = ccr.curState.ServiceConfig.Config.(*ServiceConfig)
+	}
+	if s.ServiceConfig != nil {
+		newSC, newOK = s.ServiceConfig.Config.(*ServiceConfig)
+	}
+	if oldOK != newOK || (oldOK && newOK && oldSC.rawJSONString != newSC.rawJSONString) {
+		updates = append(updates, "service config updated")
+	}
+	if len(ccr.curState.Addresses) > 0 && len(s.Addresses) == 0 {
+		updates = append(updates, "resolver returned an empty address list")
+	} else if len(ccr.curState.Addresses) == 0 && len(s.Addresses) > 0 {
+		updates = append(updates, "resolver returned new addresses")
+	}
+	channelz.Infof(logger, ccr.cc.channelzID, "Resolver state updated: %s (%v)", pretty.ToJSON(s), strings.Join(updates, "; "))
 }

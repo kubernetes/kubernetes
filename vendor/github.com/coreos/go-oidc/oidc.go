@@ -261,6 +261,9 @@ type IDToken struct {
 
 	// Raw payload of the id_token.
 	claims []byte
+
+	// Map of distributed claim names to claim sources
+	distributedClaims map[string]claimSource
 }
 
 // Claims unmarshals the raw JSON payload of the ID Token into a provided struct.
@@ -313,13 +316,21 @@ func (i *IDToken) VerifyAccessToken(accessToken string) error {
 }
 
 type idToken struct {
-	Issuer   string   `json:"iss"`
-	Subject  string   `json:"sub"`
-	Audience audience `json:"aud"`
-	Expiry   jsonTime `json:"exp"`
-	IssuedAt jsonTime `json:"iat"`
-	Nonce    string   `json:"nonce"`
-	AtHash   string   `json:"at_hash"`
+	Issuer       string                 `json:"iss"`
+	Subject      string                 `json:"sub"`
+	Audience     audience               `json:"aud"`
+	Expiry       jsonTime               `json:"exp"`
+	IssuedAt     jsonTime               `json:"iat"`
+	NotBefore    *jsonTime              `json:"nbf"`
+	Nonce        string                 `json:"nonce"`
+	AtHash       string                 `json:"at_hash"`
+	ClaimNames   map[string]string      `json:"_claim_names"`
+	ClaimSources map[string]claimSource `json:"_claim_sources"`
+}
+
+type claimSource struct {
+	Endpoint    string `json:"endpoint"`
+	AccessToken string `json:"access_token"`
 }
 
 type audience []string

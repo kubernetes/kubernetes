@@ -17,13 +17,13 @@ limitations under the License.
 package flexvolume
 
 import (
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 )
 
 type unmounterDefaults flexVolumeUnmounter
 
 func (f *unmounterDefaults) TearDownAt(dir string) error {
 	klog.Warning(logPrefix(f.plugin), "using default TearDownAt for ", dir)
-	return util.UnmountPath(dir, f.mounter)
+	return mount.CleanupMountPoint(dir, f.mounter, false)
 }

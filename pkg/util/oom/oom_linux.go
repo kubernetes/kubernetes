@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -29,7 +30,7 @@ import (
 
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func NewOOMAdjuster() *OOMAdjuster {

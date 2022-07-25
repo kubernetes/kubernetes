@@ -24,28 +24,28 @@ import (
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 
-	"github.com/pkg/errors"
+	"errors"
 	"github.com/stretchr/testify/assert"
 )
 
 func fakeCommonRunner() *runner {
 	fakeCmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Success
-			func() ([]byte, error) {
-				return []byte{}, nil
+			func() ([]byte, []byte, error) {
+				return []byte{}, nil, nil
 			},
 			// utilexec.ExitError exists, and status is not 0
-			func() ([]byte, error) {
-				return nil, &fakeexec.FakeExitError{Status: 1}
+			func() ([]byte, []byte, error) {
+				return nil, nil, &fakeexec.FakeExitError{Status: 1}
 			},
 			// utilexec.ExitError exists, and status is 0
-			func() ([]byte, error) {
-				return nil, &fakeexec.FakeExitError{Status: 0}
+			func() ([]byte, []byte, error) {
+				return nil, nil, &fakeexec.FakeExitError{Status: 0}
 			},
 			// other error exists
-			func() ([]byte, error) {
-				return nil, errors.New("not ExitError")
+			func() ([]byte, []byte, error) {
+				return nil, nil, errors.New("not ExitError")
 			},
 		},
 	}
@@ -140,10 +140,10 @@ func TestEnsureIPAddress(t *testing.T) {
 			[]fakeexec.FakeCommandAction{
 				func(cmd string, args ...string) exec.Cmd {
 					return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-						CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+						CombinedOutputScript: []fakeexec.FakeAction{
 							// IP address exists
-							func() ([]byte, error) {
-								return []byte("IP Address:10.10.10.10\nIP Address:10.10.10.20"), nil
+							func() ([]byte, []byte, error) {
+								return []byte("IP Address:10.10.10.10\nIP Address:10.10.10.20"), nil, nil
 							},
 						},
 					}, cmd, args...)
@@ -160,40 +160,40 @@ func TestEnsureIPAddress(t *testing.T) {
 			[]fakeexec.FakeCommandAction{
 				func(cmd string, args ...string) exec.Cmd {
 					return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-						CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+						CombinedOutputScript: []fakeexec.FakeAction{
 							// IP address not exists
-							func() ([]byte, error) {
-								return []byte("IP Address:10.10.10.10"), nil
+							func() ([]byte, []byte, error) {
+								return []byte("IP Address:10.10.10.10"), nil, nil
 							},
 						},
 					}, cmd, args...)
 				},
 				func(cmd string, args ...string) exec.Cmd {
 					return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-						CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+						CombinedOutputScript: []fakeexec.FakeAction{
 							// Success to set ip
-							func() ([]byte, error) {
-								return []byte(""), nil
+							func() ([]byte, []byte, error) {
+								return []byte(""), nil, nil
 							},
 						},
 					}, cmd, args...)
 				},
 				func(cmd string, args ...string) exec.Cmd {
 					return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-						CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+						CombinedOutputScript: []fakeexec.FakeAction{
 							// IP address still not exists
-							func() ([]byte, error) {
-								return []byte("IP Address:10.10.10.10"), nil
+							func() ([]byte, []byte, error) {
+								return []byte("IP Address:10.10.10.10"), nil, nil
 							},
 						},
 					}, cmd, args...)
 				},
 				func(cmd string, args ...string) exec.Cmd {
 					return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-						CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+						CombinedOutputScript: []fakeexec.FakeAction{
 							// IP address exists
-							func() ([]byte, error) {
-								return []byte("IP Address:10.10.10.10\nIP Address:10.10.10.20"), nil
+							func() ([]byte, []byte, error) {
+								return []byte("IP Address:10.10.10.10\nIP Address:10.10.10.20"), nil, nil
 							},
 						},
 					}, cmd, args...)
@@ -209,20 +209,20 @@ func TestEnsureIPAddress(t *testing.T) {
 			[]fakeexec.FakeCommandAction{
 				func(cmd string, args ...string) exec.Cmd {
 					return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-						CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+						CombinedOutputScript: []fakeexec.FakeAction{
 							// IP address not exists
-							func() ([]byte, error) {
-								return []byte("IP Address:10.10.10.10"), nil
+							func() ([]byte, []byte, error) {
+								return []byte("IP Address:10.10.10.10"), nil, nil
 							},
 						},
 					}, cmd, args...)
 				},
 				func(cmd string, args ...string) exec.Cmd {
 					return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-						CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+						CombinedOutputScript: []fakeexec.FakeAction{
 							// Failed to set ip, utilexec.ExitError exists, and status is not 0
-							func() ([]byte, error) {
-								return nil, &fakeexec.FakeExitError{Status: 1}
+							func() ([]byte, []byte, error) {
+								return nil, nil, &fakeexec.FakeExitError{Status: 1}
 							},
 						},
 					}, cmd, args...)
@@ -238,20 +238,20 @@ func TestEnsureIPAddress(t *testing.T) {
 			[]fakeexec.FakeCommandAction{
 				func(cmd string, args ...string) exec.Cmd {
 					return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-						CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+						CombinedOutputScript: []fakeexec.FakeAction{
 							// IP address not exists
-							func() ([]byte, error) {
-								return []byte("IP Address:10.10.10.10"), nil
+							func() ([]byte, []byte, error) {
+								return []byte("IP Address:10.10.10.10"), nil, nil
 							},
 						},
 					}, cmd, args...)
 				},
 				func(cmd string, args ...string) exec.Cmd {
 					return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-						CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+						CombinedOutputScript: []fakeexec.FakeAction{
 							// Failed to set ip, utilexec.ExitError exists, and status is 0
-							func() ([]byte, error) {
-								return nil, &fakeexec.FakeExitError{Status: 0}
+							func() ([]byte, []byte, error) {
+								return nil, nil, &fakeexec.FakeExitError{Status: 0}
 							},
 						},
 					}, cmd, args...)
@@ -267,20 +267,20 @@ func TestEnsureIPAddress(t *testing.T) {
 			[]fakeexec.FakeCommandAction{
 				func(cmd string, args ...string) exec.Cmd {
 					return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-						CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+						CombinedOutputScript: []fakeexec.FakeAction{
 							// IP address not exists
-							func() ([]byte, error) {
-								return []byte("IP Address:10.10.10.10"), nil
+							func() ([]byte, []byte, error) {
+								return []byte("IP Address:10.10.10.10"), nil, nil
 							},
 						},
 					}, cmd, args...)
 				},
 				func(cmd string, args ...string) exec.Cmd {
 					return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
-						CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+						CombinedOutputScript: []fakeexec.FakeAction{
 							// Failed to set ip, other error exists
-							func() ([]byte, error) {
-								return nil, errors.New("not ExitError")
+							func() ([]byte, []byte, error) {
+								return nil, nil, errors.New("not ExitError")
 							},
 						},
 					}, cmd, args...)
@@ -369,26 +369,26 @@ func TestRestore(t *testing.T) {
 
 func TestCheckIPExists(t *testing.T) {
 	fakeCmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+		CombinedOutputScript: []fakeexec.FakeAction{
 			// Error exists
-			func() ([]byte, error) {
-				return nil, &fakeexec.FakeExitError{Status: 1}
+			func() ([]byte, []byte, error) {
+				return nil, nil, &fakeexec.FakeExitError{Status: 1}
 			},
 			// IP address string is empty
-			func() ([]byte, error) {
-				return []byte(""), nil
+			func() ([]byte, []byte, error) {
+				return []byte(""), nil, nil
 			},
 			// "IP Address:" field not exists
-			func() ([]byte, error) {
-				return []byte("10.10.10.10"), nil
+			func() ([]byte, []byte, error) {
+				return []byte("10.10.10.10"), nil, nil
 			},
 			// IP not exists
-			func() ([]byte, error) {
-				return []byte("IP Address:10.10.10.10"), nil
+			func() ([]byte, []byte, error) {
+				return []byte("IP Address:10.10.10.10"), nil, nil
 			},
 			// IP exists
-			func() ([]byte, error) {
-				return []byte("IP Address:10.10.10.10\nIP Address:10.10.10.20"), nil
+			func() ([]byte, []byte, error) {
+				return []byte("IP Address:10.10.10.10\nIP Address:10.10.10.20"), nil, nil
 			},
 		},
 	}
@@ -441,27 +441,43 @@ func TestCheckIPExists(t *testing.T) {
 
 func TestGetIP(t *testing.T) {
 	testcases := []struct {
+		name          string
 		showAddress   string
 		expectAddress string
 	}{
 		{
+			name:          "IP address displayed in Chinese",
 			showAddress:   "IP 地址:                           10.96.0.2",
 			expectAddress: "10.96.0.2",
 		},
 		{
+			name:          "IP address displayed in English",
 			showAddress:   "IP Address:                           10.96.0.3",
 			expectAddress: "10.96.0.3",
 		},
 		{
+			name:          "IP address without spaces",
 			showAddress:   "IP Address:10.96.0.4",
 			expectAddress: "10.96.0.4",
+		},
+		{
+			name:          "Only 'IP Address:' field exists",
+			showAddress:   "IP Address:",
+			expectAddress: "",
+		},
+		{
+			name:          "IP address without ':' separator",
+			showAddress:   "IP Address10.6.9.2",
+			expectAddress: "",
 		},
 	}
 
 	for _, tc := range testcases {
-		address := getIP(tc.showAddress)
-		if address != tc.expectAddress {
-			t.Errorf("expected address=%q, got %q", tc.expectAddress, address)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			address := getIP(tc.showAddress)
+			if address != tc.expectAddress {
+				t.Errorf("expected address=%q, got %q", tc.expectAddress, address)
+			}
+		})
 	}
 }

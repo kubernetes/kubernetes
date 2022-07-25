@@ -28,7 +28,7 @@ type Byte map[byte]Empty
 
 // NewByte creates a Byte from a list of values.
 func NewByte(items ...byte) Byte {
-	ss := Byte{}
+	ss := make(Byte, len(items))
 	ss.Insert(items...)
 	return ss
 }
@@ -46,17 +46,19 @@ func ByteKeySet(theMap interface{}) Byte {
 }
 
 // Insert adds items to the set.
-func (s Byte) Insert(items ...byte) {
+func (s Byte) Insert(items ...byte) Byte {
 	for _, item := range items {
 		s[item] = Empty{}
 	}
+	return s
 }
 
 // Delete removes all items from the set.
-func (s Byte) Delete(items ...byte) {
+func (s Byte) Delete(items ...byte) Byte {
 	for _, item := range items {
 		delete(s, item)
 	}
+	return s
 }
 
 // Has returns true if and only if item is contained in the set.
@@ -85,6 +87,15 @@ func (s Byte) HasAny(items ...byte) bool {
 	return false
 }
 
+// Clone returns a new set which is a copy of the current set.
+func (s Byte) Clone() Byte {
+	result := make(Byte, len(s))
+	for key := range s {
+		result.Insert(key)
+	}
+	return result
+}
+
 // Difference returns a set of objects that are not in s2
 // For example:
 // s1 = {a1, a2, a3}
@@ -108,10 +119,7 @@ func (s Byte) Difference(s2 Byte) Byte {
 // s1.Union(s2) = {a1, a2, a3, a4}
 // s2.Union(s1) = {a1, a2, a3, a4}
 func (s1 Byte) Union(s2 Byte) Byte {
-	result := NewByte()
-	for key := range s1 {
-		result.Insert(key)
-	}
+	result := s1.Clone()
 	for key := range s2 {
 		result.Insert(key)
 	}

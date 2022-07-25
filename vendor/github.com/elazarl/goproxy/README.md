@@ -32,7 +32,7 @@ Get the latest goproxy from `gopkg.in/elazarl/goproxy.v1`.
 # Why not Fiddler2?
 
 Fiddler is an excellent software with similar intent. However, Fiddler is not
-as customable as goproxy intend to be. The main difference is, Fiddler is not
+as customizable as goproxy intend to be. The main difference is, Fiddler is not
 intended to be used as a real proxy.
 
 A possible use case that suits goproxy but
@@ -73,7 +73,7 @@ proxy.OnRequest().DoFunc(
 `DoFunc` will process all incoming requests to the proxy. It will add a header to the request
 and return it. The proxy will send the modified request.
 
-Note that we returned nil value as the response. Have we returned a response, goproxy would
+Note that we returned nil value as the response. Had we returned a response, goproxy would
 have discarded the request and sent the new response to the client.
 
 In order to refuse connections to reddit at work time
@@ -102,9 +102,9 @@ See additional examples in the examples directory.
 
 # What's New
 
-  1. Ability to `Hijack` CONNECT requests. See
+1. Ability to `Hijack` CONNECT requests. See
 [the eavesdropper example](https://github.com/elazarl/goproxy/blob/master/examples/goproxy-eavesdropper/main.go#L27)
-2.  Transparent proxy support for http/https including MITM certificate generation for TLS.  See the [transparent example.](https://github.com/elazarl/goproxy/tree/master/examples/goproxy-transparent)
+2. Transparent proxy support for http/https including MITM certificate generation for TLS.  See the [transparent example.](https://github.com/elazarl/goproxy/tree/master/examples/goproxy-transparent)
 
 # License
 

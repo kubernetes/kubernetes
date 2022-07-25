@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // EtcdMigrateServer manages starting and stopping a versioned etcd server binary.
@@ -39,6 +39,7 @@ func NewEtcdMigrateServer(cfg *EtcdMigrateCfg, client EtcdMigrateClient) *EtcdMi
 }
 
 // Start starts an etcd server as a separate process, waits until it has started, and returns a exec.Cmd.
+// TODO: Add support for listening to client via TLS.
 func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 	etcdCmd := exec.Command(
 		fmt.Sprintf("%s/etcd-%s", r.cfg.binPath, version),
@@ -46,7 +47,7 @@ func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 		"--initial-cluster", r.cfg.initialCluster,
 		"--debug",
 		"--data-dir", r.cfg.dataDirectory,
-		"--listen-client-urls", fmt.Sprintf("http://127.0.0.1:%d", r.cfg.port),
+		"--listen-client-urls", r.cfg.clientListenUrls,
 		"--advertise-client-urls", fmt.Sprintf("http://127.0.0.1:%d", r.cfg.port),
 		"--listen-peer-urls", r.cfg.peerListenUrls,
 		"--initial-advertise-peer-urls", r.cfg.peerAdvertiseUrls,
@@ -65,7 +66,7 @@ func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 	}
 	interval := time.NewTicker(time.Millisecond * 500)
 	defer interval.Stop()
-	done := make(chan bool)
+	done := make(chan bool, 1)
 	go func() {
 		time.Sleep(time.Minute * 2)
 		done <- true
@@ -87,7 +88,7 @@ func (r *EtcdMigrateServer) Start(version *EtcdVersion) error {
 			if err != nil {
 				return fmt.Errorf("error killing etcd: %v", err)
 			}
-			return fmt.Errorf("Timed out waiting for etcd on port %d", r.cfg.port)
+			return fmt.Errorf("timed out waiting for etcd on port %d", r.cfg.port)
 		}
 	}
 }

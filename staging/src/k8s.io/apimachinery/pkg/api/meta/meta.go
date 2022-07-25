@@ -20,14 +20,12 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/klog"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 )
 
 // errNotList is returned when an object implements the Object style interfaces but not the List style
@@ -41,8 +39,6 @@ var errNotCommon = fmt.Errorf("object does not implement the common interface fo
 func CommonAccessor(obj interface{}) (metav1.Common, error) {
 	switch t := obj.(type) {
 	case List:
-		return t, nil
-	case metav1.ListInterface:
 		return t, nil
 	case ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
@@ -73,8 +69,6 @@ func CommonAccessor(obj interface{}) (metav1.Common, error) {
 func ListAccessor(obj interface{}) (List, error) {
 	switch t := obj.(type) {
 	case List:
-		return t, nil
-	case metav1.ListInterface:
 		return t, nil
 	case ListMetaAccessor:
 		if m := t.GetListMeta(); m != nil {
@@ -115,12 +109,12 @@ func Accessor(obj interface{}) (metav1.Object, error) {
 
 // AsPartialObjectMetadata takes the metav1 interface and returns a partial object.
 // TODO: consider making this solely a conversion action.
-func AsPartialObjectMetadata(m metav1.Object) *metav1beta1.PartialObjectMetadata {
+func AsPartialObjectMetadata(m metav1.Object) *metav1.PartialObjectMetadata {
 	switch t := m.(type) {
 	case *metav1.ObjectMeta:
-		return &metav1beta1.PartialObjectMetadata{ObjectMeta: *t}
+		return &metav1.PartialObjectMetadata{ObjectMeta: *t}
 	default:
-		return &metav1beta1.PartialObjectMetadata{
+		return &metav1.PartialObjectMetadata{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:                       m.GetName(),
 				GenerateName:               m.GetGenerateName(),
@@ -136,8 +130,7 @@ func AsPartialObjectMetadata(m metav1.Object) *metav1beta1.PartialObjectMetadata
 				Annotations:                m.GetAnnotations(),
 				OwnerReferences:            m.GetOwnerReferences(),
 				Finalizers:                 m.GetFinalizers(),
-				ClusterName:                m.GetClusterName(),
-				Initializers:               m.GetInitializers(),
+				ManagedFields:              m.GetManagedFields(),
 			},
 		}
 	}
@@ -606,7 +599,7 @@ func (a genericAccessor) SetFinalizers(finalizers []string) {
 func (a genericAccessor) GetOwnerReferences() []metav1.OwnerReference {
 	var ret []metav1.OwnerReference
 	s := a.ownerReferences
-	if s.Kind() != reflect.Ptr || s.Elem().Kind() != reflect.Slice {
+	if s.Kind() != reflect.Pointer || s.Elem().Kind() != reflect.Slice {
 		klog.Errorf("expect %v to be a pointer to slice", s)
 		return ret
 	}
@@ -624,7 +617,7 @@ func (a genericAccessor) GetOwnerReferences() []metav1.OwnerReference {
 
 func (a genericAccessor) SetOwnerReferences(references []metav1.OwnerReference) {
 	s := a.ownerReferences
-	if s.Kind() != reflect.Ptr || s.Elem().Kind() != reflect.Slice {
+	if s.Kind() != reflect.Pointer || s.Elem().Kind() != reflect.Slice {
 		klog.Errorf("expect %v to be a pointer to slice", s)
 	}
 	s = s.Elem()

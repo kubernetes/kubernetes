@@ -17,10 +17,11 @@ limitations under the License.
 package deny
 
 import (
+	"context"
 	"errors"
 	"io"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apiserver/pkg/admission"
 )
@@ -42,12 +43,12 @@ var _ admission.MutationInterface = alwaysDeny{}
 var _ admission.ValidationInterface = alwaysDeny{}
 
 // Admit makes an admission decision based on the request attributes.
-func (alwaysDeny) Admit(a admission.Attributes) (err error) {
+func (alwaysDeny) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return admission.NewForbidden(a, errors.New("admission control is denying all modifications"))
 }
 
 // Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
-func (alwaysDeny) Validate(a admission.Attributes) (err error) {
+func (alwaysDeny) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	return admission.NewForbidden(a, errors.New("admission control is denying all modifications"))
 }
 

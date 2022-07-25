@@ -17,6 +17,7 @@ limitations under the License.
 package configmap
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -26,11 +27,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
+	"k8s.io/utils/clock"
 )
 
 func checkObject(t *testing.T, store manager.Store, ns, name string, shouldExist bool) {
@@ -49,7 +50,7 @@ func noObjectTTL() (time.Duration, bool) {
 
 func getConfigMap(fakeClient clientset.Interface) manager.GetObjectFunc {
 	return func(namespace, name string, opts metav1.GetOptions) (runtime.Object, error) {
-		return fakeClient.CoreV1().ConfigMaps(namespace).Get(name, opts)
+		return fakeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), name, opts)
 	}
 }
 

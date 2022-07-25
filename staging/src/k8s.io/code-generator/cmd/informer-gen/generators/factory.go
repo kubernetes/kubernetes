@@ -25,7 +25,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // factoryGenerator produces a file of listers for a given GroupVersion and
@@ -152,7 +152,7 @@ func NewSharedInformerFactory(client {{.clientSetInterface|raw}}, defaultResync 
 // as specified here.
 // Deprecated: Please use NewSharedInformerFactoryWithOptions instead
 func NewFilteredSharedInformerFactory(client {{.clientSetInterface|raw}}, defaultResync {{.timeDuration|raw}}, namespace string, tweakListOptions {{.interfacesTweakListOptionsFunc|raw}}) SharedInformerFactory {
-	return NewSharedInformerFactoryWithOptions(client, defaultResync, WithNamespace(namespace), WithTweakListOptions(tweakListOptions)) 
+	return NewSharedInformerFactoryWithOptions(client, defaultResync, WithNamespace(namespace), WithTweakListOptions(tweakListOptions))
 }
 
 // NewSharedInformerFactoryWithOptions constructs a new instance of a SharedInformerFactory with additional options.
@@ -165,7 +165,7 @@ func NewSharedInformerFactoryWithOptions(client {{.clientSetInterface|raw}}, def
 		startedInformers: make(map[{{.reflectType|raw}}]bool),
 		customResync:     make(map[{{.reflectType|raw}}]{{.timeDuration|raw}}),
 	}
-	
+
 	// Apply all options
 	for _, opt := range options {
 		factory = opt(factory)

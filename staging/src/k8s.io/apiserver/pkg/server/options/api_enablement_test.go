@@ -21,12 +21,12 @@ import (
 	"testing"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
-type fakeGroupRegisty struct{}
+type fakeGroupRegistry struct{}
 
-func (f fakeGroupRegisty) IsGroupRegistered(group string) bool {
+func (f fakeGroupRegistry) IsGroupRegistered(group string) bool {
 	return group == "apiregistration.k8s.io"
 }
 
@@ -42,36 +42,36 @@ func TestAPIEnablementOptionsValidate(t *testing.T) {
 		{
 			name: "test when invalid key with only api/all=false",
 			testOptions: &APIEnablementOptions{
-				RuntimeConfig: utilflag.ConfigurationMap{"api/all": "false"},
+				RuntimeConfig: cliflag.ConfigurationMap{"api/all": "false"},
 			},
 			expectErr: "invalid key with only api/all=false",
 		},
 		{
 			name: "test when ConfigurationMap key is invalid",
 			testOptions: &APIEnablementOptions{
-				RuntimeConfig: utilflag.ConfigurationMap{"apiall": "false"},
+				RuntimeConfig: cliflag.ConfigurationMap{"apiall": "false"},
 			},
 			expectErr: "runtime-config invalid key",
 		},
 		{
 			name: "test when unknown api groups",
 			testOptions: &APIEnablementOptions{
-				RuntimeConfig: utilflag.ConfigurationMap{"api/v1": "true"},
+				RuntimeConfig: cliflag.ConfigurationMap{"api/v1": "true"},
 			},
 			expectErr: "unknown api groups",
 		},
 		{
 			name: "test when valid api groups",
 			testOptions: &APIEnablementOptions{
-				RuntimeConfig: utilflag.ConfigurationMap{"apiregistration.k8s.io/v1beta1": "true"},
+				RuntimeConfig: cliflag.ConfigurationMap{"apiregistration.k8s.io/v1beta1": "true"},
 			},
 		},
 	}
-	testGroupRegisty := fakeGroupRegisty{}
+	testGroupRegistry := fakeGroupRegistry{}
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
-			errs := testcase.testOptions.Validate(testGroupRegisty)
+			errs := testcase.testOptions.Validate(testGroupRegistry)
 			if len(testcase.expectErr) != 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErr) {
 				t.Errorf("got err: %v, expected err: %s", errs, testcase.expectErr)
 			}

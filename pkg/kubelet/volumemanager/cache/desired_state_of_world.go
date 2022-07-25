@@ -23,8 +23,12 @@ package cache
 import (
 	"fmt"
 	"sync"
+	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/sets"
+	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -105,6 +109,26 @@ type DesiredStateOfWorld interface {
 	// If a pod with the same name does not exist under the specified
 	// volume, false is returned.
 	VolumeExistsWithSpecName(podName types.UniquePodName, volumeSpecName string) bool
+
+	// AddErrorToPod adds the given error to the given pod in the cache.
+	// It will be returned by subsequent GetPodErrors().
+	// Each error string is stored only once.
+	AddErrorToPod(podName types.UniquePodName, err string)
+
+	// PopPodErrors returns accumulated errors on a given pod and clears
+	// them.
+	PopPodErrors(podName types.UniquePodName) []string
+
+	// GetPodsWithErrors returns names of pods that have stored errors.
+	GetPodsWithErrors() []types.UniquePodName
+
+	// MarkVolumeAttachability updates the volume's attachability for a given volume
+	MarkVolumeAttachability(volumeName v1.UniqueVolumeName, attachable bool)
+
+	// UpdatePersistentVolumeSize updates persistentVolumeSize in desired state of the world
+	// so as it can be compared against actual size and volume expansion performed
+	// if necessary
+	UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size *resource.Quantity)
 }
 
 // VolumeToMount represents a volume that is attached to this node and needs to
@@ -118,6 +142,7 @@ func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) DesiredStat
 	return &desiredStateOfWorld{
 		volumesToMount:  make(map[v1.UniqueVolumeName]volumeToMount),
 		volumePluginMgr: volumePluginMgr,
+		podErrors:       make(map[types.UniquePodName]sets.String),
 	}
 }
 
@@ -130,6 +155,8 @@ type desiredStateOfWorld struct {
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
+	// podErrors are errors caught by desiredStateOfWorldPopulator about volumes for a given pod.
+	podErrors map[types.UniquePodName]sets.String
 
 	sync.RWMutex
 }
@@ -160,6 +187,14 @@ type volumeToMount struct {
 	// reportedInUse indicates that the volume was successfully added to the
 	// VolumesInUse field in the node's status.
 	reportedInUse bool
+
+	// desiredSizeLimit indicates the desired upper bound on the size of the volume
+	// (if so implemented)
+	desiredSizeLimit *resource.Quantity
+
+	// persistentVolumeSize records desired size of a persistent volume.
+	// Usually this value reflects size recorded in pv.Spec.Capacity
+	persistentVolumeSize *resource.Quantity
 }
 
 // The pod object represents a pod that references the underlying volume and
@@ -182,7 +217,15 @@ type podToMount struct {
 	// volume claim, this contains the volume.Spec.Name() of the persistent
 	// volume claim
 	outerVolumeSpecName string
+	// mountRequestTime stores time at which mount was requested
+	mountRequestTime time.Time
 }
+
+const (
+	// Maximum errors to be stored per pod in desiredStateOfWorld.podErrors to
+	// prevent unbound growth.
+	maxPodErrors = 10
+)
 
 func (dsw *desiredStateOfWorld) AddPodToVolume(
 	podName types.UniquePodName,
@@ -203,11 +246,12 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 
 	var volumeName v1.UniqueVolumeName
 
-	// The unique volume name used depends on whether the volume is attachable
+	// The unique volume name used depends on whether the volume is attachable/device-mountable
 	// or not.
-	attachable := dsw.isAttachableVolume(volumeSpec)
-	if attachable {
-		// For attachable volumes, use the unique volume name as reported by
+	attachable := util.IsAttachableVolume(volumeSpec, dsw.volumePluginMgr)
+	deviceMountable := util.IsDeviceMountableVolume(volumeSpec, dsw.volumePluginMgr)
+	if attachable || deviceMountable {
+		// For attachable/device-mountable volumes, use the unique volume name as reported by
 		// the plugin.
 		volumeName, err =
 			util.GetUniqueVolumeNameFromSpec(volumePlugin, volumeSpec)
@@ -219,22 +263,50 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				err)
 		}
 	} else {
-		// For non-attachable volumes, generate a unique name based on the pod
+		// For non-attachable and non-device-mountable volumes, generate a unique name based on the pod
 		// namespace and name and the name of the volume within the pod.
-		volumeName = util.GetUniqueVolumeNameForNonAttachableVolume(podName, volumePlugin, volumeSpec)
+		volumeName = util.GetUniqueVolumeNameFromSpecWithPod(podName, volumePlugin, volumeSpec)
 	}
 
-	deviceMountable := dsw.isDeviceMountableVolume(volumeSpec)
-
 	if _, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
-		dsw.volumesToMount[volumeName] = volumeToMount{
+		var sizeLimit *resource.Quantity
+		if volumeSpec.Volume != nil {
+			if util.IsLocalEphemeralVolume(*volumeSpec.Volume) {
+				_, podLimits := apiv1resource.PodRequestsAndLimits(pod)
+				ephemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
+				sizeLimit = resource.NewQuantity(ephemeralStorageLimit.Value(), resource.BinarySI)
+				if volumeSpec.Volume.EmptyDir != nil &&
+					volumeSpec.Volume.EmptyDir.SizeLimit != nil &&
+					volumeSpec.Volume.EmptyDir.SizeLimit.Value() > 0 &&
+					(sizeLimit.Value() == 0 || volumeSpec.Volume.EmptyDir.SizeLimit.Value() < sizeLimit.Value()) {
+					sizeLimit = resource.NewQuantity(volumeSpec.Volume.EmptyDir.SizeLimit.Value(), resource.BinarySI)
+				}
+			}
+		}
+		vmt := volumeToMount{
 			volumeName:              volumeName,
 			podsToMount:             make(map[types.UniquePodName]podToMount),
 			pluginIsAttachable:      attachable,
 			pluginIsDeviceMountable: deviceMountable,
 			volumeGidValue:          volumeGidValue,
 			reportedInUse:           false,
+			desiredSizeLimit:        sizeLimit,
 		}
+		// record desired size of the volume
+		if volumeSpec.PersistentVolume != nil {
+			pvCap := volumeSpec.PersistentVolume.Spec.Capacity.Storage()
+			if pvCap != nil {
+				pvCapCopy := pvCap.DeepCopy()
+				vmt.persistentVolumeSize = &pvCapCopy
+			}
+		}
+
+		dsw.volumesToMount[volumeName] = vmt
+	}
+	oldPodMount, ok := dsw.volumesToMount[volumeName].podsToMount[podName]
+	mountRequestTime := time.Now()
+	if ok && !volumePlugin.RequiresRemount(volumeSpec) {
+		mountRequestTime = oldPodMount.mountRequestTime
 	}
 
 	// Create new podToMount object. If it already exists, it is refreshed with
@@ -245,6 +317,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		pod:                 pod,
 		volumeSpec:          volumeSpec,
 		outerVolumeSpecName: outerVolumeSpecName,
+		mountRequestTime:    mountRequestTime,
 	}
 	return volumeName, nil
 }
@@ -273,6 +346,8 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 	dsw.Lock()
 	defer dsw.Unlock()
 
+	delete(dsw.podErrors, podName)
+
 	volumeObj, volumeExists := dsw.volumesToMount[volumeName]
 	if !volumeExists {
 		return
@@ -288,6 +363,19 @@ func (dsw *desiredStateOfWorld) DeletePodFromVolume(
 	if len(dsw.volumesToMount[volumeName].podsToMount) == 0 {
 		// Delete volume if no child pods left
 		delete(dsw.volumesToMount, volumeName)
+	}
+}
+
+// UpdatePersistentVolumeSize updates last known PV size. This is used for volume expansion and
+// should be only used for persistent volumes.
+func (dsw *desiredStateOfWorld) UpdatePersistentVolumeSize(volumeName v1.UniqueVolumeName, size *resource.Quantity) {
+	dsw.Lock()
+	defer dsw.Unlock()
+
+	vol, volExists := dsw.volumesToMount[volumeName]
+	if volExists {
+		vol.persistentVolumeSize = size
+		dsw.volumesToMount[volumeName] = vol
 	}
 }
 
@@ -318,8 +406,8 @@ func (dsw *desiredStateOfWorld) VolumeExistsWithSpecName(podName types.UniquePod
 	dsw.RLock()
 	defer dsw.RUnlock()
 	for _, volumeObj := range dsw.volumesToMount {
-		for name, podObj := range volumeObj.podsToMount {
-			if podName == name && podObj.volumeSpec.Name() == volumeSpecName {
+		if podObj, podExists := volumeObj.podsToMount[podName]; podExists {
+			if podObj.volumeSpec.Name() == volumeSpecName {
 				return true
 			}
 		}
@@ -334,9 +422,7 @@ func (dsw *desiredStateOfWorld) GetPods() map[types.UniquePodName]bool {
 	podList := make(map[types.UniquePodName]bool)
 	for _, volumeObj := range dsw.volumesToMount {
 		for podName := range volumeObj.podsToMount {
-			if !podList[podName] {
-				podList[podName] = true
-			}
+			podList[podName] = true
 		}
 	}
 	return podList
@@ -349,45 +435,72 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 	volumesToMount := make([]VolumeToMount, 0 /* len */, len(dsw.volumesToMount) /* cap */)
 	for volumeName, volumeObj := range dsw.volumesToMount {
 		for podName, podObj := range volumeObj.podsToMount {
-			volumesToMount = append(
-				volumesToMount,
-				VolumeToMount{
-					VolumeToMount: operationexecutor.VolumeToMount{
-						VolumeName:              volumeName,
-						PodName:                 podName,
-						Pod:                     podObj.pod,
-						VolumeSpec:              podObj.volumeSpec,
-						PluginIsAttachable:      volumeObj.pluginIsAttachable,
-						PluginIsDeviceMountable: volumeObj.pluginIsDeviceMountable,
-						OuterVolumeSpecName:     podObj.outerVolumeSpecName,
-						VolumeGidValue:          volumeObj.volumeGidValue,
-						ReportedInUse:           volumeObj.reportedInUse}})
+			vmt := VolumeToMount{
+				VolumeToMount: operationexecutor.VolumeToMount{
+					VolumeName:              volumeName,
+					PodName:                 podName,
+					Pod:                     podObj.pod,
+					VolumeSpec:              podObj.volumeSpec,
+					PluginIsAttachable:      volumeObj.pluginIsAttachable,
+					PluginIsDeviceMountable: volumeObj.pluginIsDeviceMountable,
+					OuterVolumeSpecName:     podObj.outerVolumeSpecName,
+					VolumeGidValue:          volumeObj.volumeGidValue,
+					ReportedInUse:           volumeObj.reportedInUse,
+					MountRequestTime:        podObj.mountRequestTime,
+					DesiredSizeLimit:        volumeObj.desiredSizeLimit,
+				},
+			}
+			if volumeObj.persistentVolumeSize != nil {
+				vmt.PersistentVolumeSize = volumeObj.persistentVolumeSize.DeepCopy()
+			}
+			volumesToMount = append(volumesToMount, vmt)
 		}
 	}
 	return volumesToMount
 }
 
-func (dsw *desiredStateOfWorld) isAttachableVolume(volumeSpec *volume.Spec) bool {
-	attachableVolumePlugin, _ :=
-		dsw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
-	if attachableVolumePlugin != nil {
-		volumeAttacher, err := attachableVolumePlugin.NewAttacher()
-		if err == nil && volumeAttacher != nil {
-			return true
-		}
-	}
+func (dsw *desiredStateOfWorld) AddErrorToPod(podName types.UniquePodName, err string) {
+	dsw.Lock()
+	defer dsw.Unlock()
 
-	return false
+	if errs, found := dsw.podErrors[podName]; found {
+		if errs.Len() <= maxPodErrors {
+			errs.Insert(err)
+		}
+		return
+	}
+	dsw.podErrors[podName] = sets.NewString(err)
 }
 
-func (dsw *desiredStateOfWorld) isDeviceMountableVolume(volumeSpec *volume.Spec) bool {
-	deviceMountableVolumePlugin, _ := dsw.volumePluginMgr.FindDeviceMountablePluginBySpec(volumeSpec)
-	if deviceMountableVolumePlugin != nil {
-		volumeDeviceMounter, err := deviceMountableVolumePlugin.NewDeviceMounter()
-		if err == nil && volumeDeviceMounter != nil {
-			return true
-		}
-	}
+func (dsw *desiredStateOfWorld) PopPodErrors(podName types.UniquePodName) []string {
+	dsw.Lock()
+	defer dsw.Unlock()
 
-	return false
+	if errs, found := dsw.podErrors[podName]; found {
+		delete(dsw.podErrors, podName)
+		return errs.List()
+	}
+	return []string{}
+}
+
+func (dsw *desiredStateOfWorld) GetPodsWithErrors() []types.UniquePodName {
+	dsw.RLock()
+	defer dsw.RUnlock()
+
+	pods := make([]types.UniquePodName, 0, len(dsw.podErrors))
+	for podName := range dsw.podErrors {
+		pods = append(pods, podName)
+	}
+	return pods
+}
+
+func (dsw *desiredStateOfWorld) MarkVolumeAttachability(volumeName v1.UniqueVolumeName, attachable bool) {
+	dsw.Lock()
+	defer dsw.Unlock()
+	volumeObj, volumeExists := dsw.volumesToMount[volumeName]
+	if !volumeExists {
+		return
+	}
+	volumeObj.pluginIsAttachable = attachable
+	dsw.volumesToMount[volumeName] = volumeObj
 }

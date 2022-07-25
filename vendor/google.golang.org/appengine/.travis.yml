@@ -1,0 +1,18 @@
+language: go
+
+go_import_path: google.golang.org/appengine
+
+install:
+  - ./travis_install.sh
+
+script:
+  - ./travis_test.sh
+
+matrix:
+  include:
+    - go: 1.9.x
+      env: GOAPP=true
+    - go: 1.10.x
+      env: GOAPP=false
+    - go: 1.11.x
+      env: GO111MODULE=on

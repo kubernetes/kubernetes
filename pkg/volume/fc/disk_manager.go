@@ -19,8 +19,10 @@ package fc
 import (
 	"os"
 
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -38,7 +40,7 @@ type diskManager interface {
 }
 
 // utility to mount a disk based filesystem
-func diskSetUp(manager diskManager, b fcDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
+func diskSetUp(manager diskManager, b fcDiskMounter, volPath string, mounter mount.Interface, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
 	globalPDPath := manager.MakeGlobalPDName(*b.fcDisk)
 	noMnt, err := mounter.IsLikelyNotMountPoint(volPath)
 
@@ -59,7 +61,7 @@ func diskSetUp(manager diskManager, b fcDiskMounter, volPath string, mounter mou
 		options = append(options, "ro")
 	}
 	mountOptions := util.JoinMountOptions(options, b.mountOptions)
-	err = mounter.Mount(globalPDPath, volPath, "", mountOptions)
+	err = mounter.MountSensitiveWithoutSystemd(globalPDPath, volPath, "", mountOptions, nil)
 	if err != nil {
 		klog.Errorf("Failed to bind mount: source:%s, target:%s, err:%v", globalPDPath, volPath, err)
 		noMnt, mntErr := b.mounter.IsLikelyNotMountPoint(volPath)
@@ -89,7 +91,7 @@ func diskSetUp(manager diskManager, b fcDiskMounter, volPath string, mounter mou
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(&b, fsGroup)
+		volume.SetVolumeOwnership(&b, fsGroup, fsGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 
 	return nil

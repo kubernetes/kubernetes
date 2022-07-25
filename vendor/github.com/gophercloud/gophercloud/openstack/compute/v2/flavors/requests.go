@@ -52,6 +52,14 @@ type ListOpts struct {
 	MinDisk int `q:"minDisk"`
 	MinRAM  int `q:"minRam"`
 
+	// SortDir allows to select sort direction.
+	// It can be "asc" or "desc" (default).
+	SortDir string `q:"sort_dir"`
+
+	// SortKey allows to sort by one of the flavors attributes.
+	// Default is flavorid.
+	SortKey string `q:"sort_key"`
+
 	// Marker and Limit control paging.
 	// Marker instructs List where to start listing from.
 	Marker string `q:"marker"`
@@ -140,7 +148,7 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) (r Create
 	return
 }
 
-// Get retrieves details of a single flavor. Use ExtractFlavor to convert its
+// Get retrieves details of a single flavor. Use Extract to convert its
 // result into a Flavor.
 func Get(client *gophercloud.ServiceClient, id string) (r GetResult) {
 	_, r.Err = client.Get(getURL(client, id), &r.Body, nil)

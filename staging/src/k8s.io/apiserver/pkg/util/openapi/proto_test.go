@@ -20,9 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-openapi/spec"
-
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // TestOpenAPIDefinitionsToProtoSchema tests the openapi parser
@@ -44,8 +43,8 @@ func TestOpenAPIDefinitionsToProtoModels(t *testing.T) {
 					},
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: spec.Extensions{
-							"x-kubernetes-group-version-kind": []map[string]string{
-								{
+							"x-kubernetes-group-version-kind": []interface{}{
+								map[string]interface{}{
 									"group":   "testgroup.k8s.io",
 									"version": "v1",
 									"kind":    "Foo",

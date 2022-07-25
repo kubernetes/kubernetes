@@ -32,6 +32,11 @@ const (
 	formatSHA256 = "sha256"
 )
 
+var (
+	// supportedFormats enumerates the supported formats
+	supportedFormats = strings.Join([]string{formatSHA256}, ", ")
+)
+
 // Set is a set of pinned x509 public keys.
 type Set struct {
 	sha256Hashes map[string]bool
@@ -47,26 +52,35 @@ func (s *Set) Allow(pubKeyHashes ...string) error {
 	for _, pubKeyHash := range pubKeyHashes {
 		parts := strings.Split(pubKeyHash, ":")
 		if len(parts) != 2 {
-			return errors.New("invalid public key hash, expected \"format:value\"")
+			return errors.Errorf("invalid hash, expected \"format:hex-value\". "+
+				"Known format(s) are: %s", supportedFormats)
 		}
 		format, value := parts[0], parts[1]
 
 		switch strings.ToLower(format) {
 		case "sha256":
-			return s.allowSHA256(value)
+			if err := s.allowSHA256(value); err != nil {
+				return errors.Errorf("invalid hash %q, %v", pubKeyHash, err)
+			}
 		default:
-			return errors.Errorf("unknown hash format %q", format)
+			return errors.Errorf("unknown hash format %q. Known format(s) are: %s", format, supportedFormats)
 		}
 	}
 	return nil
 }
 
-// Check if a certificate matches one of the public keys in the set
-func (s *Set) Check(certificate *x509.Certificate) error {
-	if s.checkSHA256(certificate) {
-		return nil
+// CheckAny checks if at least one certificate matches one of the public keys in the set
+func (s *Set) CheckAny(certificates []*x509.Certificate) error {
+	var hashes []string
+
+	for _, certificate := range certificates {
+		if s.checkSHA256(certificate) {
+			return nil
+		}
+
+		hashes = append(hashes, Hash(certificate))
 	}
-	return errors.Errorf("public key %s not pinned", Hash(certificate))
+	return errors.Errorf("none of the public keys %q are pinned", strings.Join(hashes, ":"))
 }
 
 // Empty returns true if the Set contains no pinned public keys.
@@ -93,7 +107,7 @@ func (s *Set) allowSHA256(hash string) error {
 	// validate that the hash is valid hex
 	_, err := hex.DecodeString(hash)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "could not decode SHA-256 from hex")
 	}
 
 	// in the end, just store the original hex string in memory (in lowercase)

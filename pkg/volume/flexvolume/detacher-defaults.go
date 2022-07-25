@@ -19,9 +19,10 @@ package flexvolume
 import (
 	"time"
 
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 type detacherDefaults flexVolumeDetacher
@@ -41,5 +42,5 @@ func (d *detacherDefaults) WaitForDetach(devicePath string, timeout time.Duratio
 // UnmountDevice is part of the volume.Detacher interface.
 func (d *detacherDefaults) UnmountDevice(deviceMountPath string) error {
 	klog.Warning(logPrefix(d.plugin.flexVolumePlugin), "using default UnmountDevice for device mount path ", deviceMountPath)
-	return util.UnmountPath(deviceMountPath, d.plugin.host.GetMounter(d.plugin.GetPluginName()))
+	return mount.CleanupMountPoint(deviceMountPath, d.plugin.host.GetMounter(d.plugin.GetPluginName()), false)
 }

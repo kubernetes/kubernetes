@@ -17,7 +17,6 @@ limitations under the License.
 package labels
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 	"strconv"
@@ -26,7 +25,21 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/klog"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/klog/v2"
+	stringslices "k8s.io/utils/strings/slices"
+)
+
+var (
+	unaryOperators = []string{
+		string(selection.Exists), string(selection.DoesNotExist),
+	}
+	binaryOperators = []string{
+		string(selection.In), string(selection.NotIn),
+		string(selection.Equals), string(selection.DoubleEquals), string(selection.NotEquals),
+		string(selection.GreaterThan), string(selection.LessThan),
+	}
+	validRequirementOperators = append(binaryOperators, unaryOperators...)
 )
 
 // Requirements is AND of all requirements.
@@ -54,6 +67,11 @@ type Selector interface {
 
 	// Make a deep copy of the selector.
 	DeepCopySelector() Selector
+
+	// RequiresExactMatch allows a caller to introspect whether a given selector
+	// requires a single specific label to be set, and if so returns the value it
+	// requires.
+	RequiresExactMatch(label string) (value string, found bool)
 }
 
 // Everything returns a selector that matches all labels.
@@ -69,6 +87,9 @@ func (n nothingSelector) String() string                     { return "" }
 func (n nothingSelector) Add(_ ...Requirement) Selector      { return n }
 func (n nothingSelector) Requirements() (Requirements, bool) { return nil, false }
 func (n nothingSelector) DeepCopySelector() Selector         { return n }
+func (n nothingSelector) RequiresExactMatch(label string) (value string, found bool) {
+	return "", false
+}
 
 // Nothing returns a selector that matches no labels
 func Nothing() Selector {
@@ -122,7 +143,7 @@ type Requirement struct {
 
 // NewRequirement is the constructor for a Requirement.
 // If any of these rules is violated, an error is returned:
-// (1) The operator can only be In, NotIn, Equals, DoubleEquals, NotEquals, Exists, or DoesNotExist.
+// (1) The operator can only be In, NotIn, Equals, DoubleEquals, Gt, Lt, NotEquals, Exists, or DoesNotExist.
 // (2) If the operator is In or NotIn, the values set must be non-empty.
 // (3) If the operator is Equals, DoubleEquals, or NotEquals, the values set must contain one value.
 // (4) If the operator is Exists or DoesNotExist, the value set must be empty.
@@ -131,42 +152,47 @@ type Requirement struct {
 //     of characters. See validateLabelKey for more details.
 //
 // The empty string is a valid value in the input values set.
-func NewRequirement(key string, op selection.Operator, vals []string) (*Requirement, error) {
-	if err := validateLabelKey(key); err != nil {
-		return nil, err
+// Returned error, if not nil, is guaranteed to be an aggregated field.ErrorList
+func NewRequirement(key string, op selection.Operator, vals []string, opts ...field.PathOption) (*Requirement, error) {
+	var allErrs field.ErrorList
+	path := field.ToPath(opts...)
+	if err := validateLabelKey(key, path.Child("key")); err != nil {
+		allErrs = append(allErrs, err)
 	}
+
+	valuePath := path.Child("values")
 	switch op {
 	case selection.In, selection.NotIn:
 		if len(vals) == 0 {
-			return nil, fmt.Errorf("for 'in', 'notin' operators, values set can't be empty")
+			allErrs = append(allErrs, field.Invalid(valuePath, vals, "for 'in', 'notin' operators, values set can't be empty"))
 		}
 	case selection.Equals, selection.DoubleEquals, selection.NotEquals:
 		if len(vals) != 1 {
-			return nil, fmt.Errorf("exact-match compatibility requires one single value")
+			allErrs = append(allErrs, field.Invalid(valuePath, vals, "exact-match compatibility requires one single value"))
 		}
 	case selection.Exists, selection.DoesNotExist:
 		if len(vals) != 0 {
-			return nil, fmt.Errorf("values set must be empty for exists and does not exist")
+			allErrs = append(allErrs, field.Invalid(valuePath, vals, "values set must be empty for exists and does not exist"))
 		}
 	case selection.GreaterThan, selection.LessThan:
 		if len(vals) != 1 {
-			return nil, fmt.Errorf("for 'Gt', 'Lt' operators, exactly one value is required")
+			allErrs = append(allErrs, field.Invalid(valuePath, vals, "for 'Gt', 'Lt' operators, exactly one value is required"))
 		}
 		for i := range vals {
 			if _, err := strconv.ParseInt(vals[i], 10, 64); err != nil {
-				return nil, fmt.Errorf("for 'Gt', 'Lt' operators, the value must be an integer")
+				allErrs = append(allErrs, field.Invalid(valuePath.Index(i), vals[i], "for 'Gt', 'Lt' operators, the value must be an integer"))
 			}
 		}
 	default:
-		return nil, fmt.Errorf("operator '%v' is not recognized", op)
+		allErrs = append(allErrs, field.NotSupported(path.Child("operator"), op, validRequirementOperators))
 	}
 
 	for i := range vals {
-		if err := validateLabelValue(vals[i]); err != nil {
-			return nil, err
+		if err := validateLabelValue(key, vals[i], valuePath.Index(i)); err != nil {
+			allErrs = append(allErrs, err)
 		}
 	}
-	return &Requirement{key: key, operator: op, strValues: vals}, nil
+	return &Requirement{key: key, operator: op, strValues: vals}, allErrs.ToAggregate()
 }
 
 func (r *Requirement) hasValue(value string) bool {
@@ -215,7 +241,7 @@ func (r *Requirement) Matches(ls Labels) bool {
 			return false
 		}
 
-		// There should be only one strValue in r.strValues, and can be converted to a integer.
+		// There should be only one strValue in r.strValues, and can be converted to an integer.
 		if len(r.strValues) != 1 {
 			klog.V(10).Infof("Invalid values count %+v of requirement %#v, for 'Gt', 'Lt' operators, exactly one value is required", len(r.strValues), r)
 			return false
@@ -254,63 +280,81 @@ func (r *Requirement) Values() sets.String {
 	return ret
 }
 
+// Equal checks the equality of requirement.
+func (r Requirement) Equal(x Requirement) bool {
+	if r.key != x.key {
+		return false
+	}
+	if r.operator != x.operator {
+		return false
+	}
+	return stringslices.Equal(r.strValues, x.strValues)
+}
+
 // Empty returns true if the internalSelector doesn't restrict selection space
-func (lsel internalSelector) Empty() bool {
-	if lsel == nil {
+func (s internalSelector) Empty() bool {
+	if s == nil {
 		return true
 	}
-	return len(lsel) == 0
+	return len(s) == 0
 }
 
 // String returns a human-readable string that represents this
 // Requirement. If called on an invalid Requirement, an error is
 // returned. See NewRequirement for creating a valid Requirement.
 func (r *Requirement) String() string {
-	var buffer bytes.Buffer
+	var sb strings.Builder
+	sb.Grow(
+		// length of r.key
+		len(r.key) +
+			// length of 'r.operator' + 2 spaces for the worst case ('in' and 'notin')
+			len(r.operator) + 2 +
+			// length of 'r.strValues' slice times. Heuristically 5 chars per word
+			+5*len(r.strValues))
 	if r.operator == selection.DoesNotExist {
-		buffer.WriteString("!")
+		sb.WriteString("!")
 	}
-	buffer.WriteString(r.key)
+	sb.WriteString(r.key)
 
 	switch r.operator {
 	case selection.Equals:
-		buffer.WriteString("=")
+		sb.WriteString("=")
 	case selection.DoubleEquals:
-		buffer.WriteString("==")
+		sb.WriteString("==")
 	case selection.NotEquals:
-		buffer.WriteString("!=")
+		sb.WriteString("!=")
 	case selection.In:
-		buffer.WriteString(" in ")
+		sb.WriteString(" in ")
 	case selection.NotIn:
-		buffer.WriteString(" notin ")
+		sb.WriteString(" notin ")
 	case selection.GreaterThan:
-		buffer.WriteString(">")
+		sb.WriteString(">")
 	case selection.LessThan:
-		buffer.WriteString("<")
+		sb.WriteString("<")
 	case selection.Exists, selection.DoesNotExist:
-		return buffer.String()
+		return sb.String()
 	}
 
 	switch r.operator {
 	case selection.In, selection.NotIn:
-		buffer.WriteString("(")
+		sb.WriteString("(")
 	}
 	if len(r.strValues) == 1 {
-		buffer.WriteString(r.strValues[0])
+		sb.WriteString(r.strValues[0])
 	} else { // only > 1 since == 0 prohibited by NewRequirement
 		// normalizes value order on output, without mutating the in-memory selector representation
 		// also avoids normalization when it is not required, and ensures we do not mutate shared data
-		buffer.WriteString(strings.Join(safeSort(r.strValues), ","))
+		sb.WriteString(strings.Join(safeSort(r.strValues), ","))
 	}
 
 	switch r.operator {
 	case selection.In, selection.NotIn:
-		buffer.WriteString(")")
+		sb.WriteString(")")
 	}
-	return buffer.String()
+	return sb.String()
 }
 
-// safeSort sort input strings without modification
+// safeSort sorts input strings without modification
 func safeSort(in []string) []string {
 	if sort.StringsAreSorted(in) {
 		return in
@@ -322,40 +366,53 @@ func safeSort(in []string) []string {
 }
 
 // Add adds requirements to the selector. It copies the current selector returning a new one
-func (lsel internalSelector) Add(reqs ...Requirement) Selector {
-	var sel internalSelector
-	for ix := range lsel {
-		sel = append(sel, lsel[ix])
-	}
-	for _, r := range reqs {
-		sel = append(sel, r)
-	}
-	sort.Sort(ByKey(sel))
-	return sel
+func (s internalSelector) Add(reqs ...Requirement) Selector {
+	ret := make(internalSelector, 0, len(s)+len(reqs))
+	ret = append(ret, s...)
+	ret = append(ret, reqs...)
+	sort.Sort(ByKey(ret))
+	return ret
 }
 
 // Matches for a internalSelector returns true if all
 // its Requirements match the input Labels. If any
 // Requirement does not match, false is returned.
-func (lsel internalSelector) Matches(l Labels) bool {
-	for ix := range lsel {
-		if matches := lsel[ix].Matches(l); !matches {
+func (s internalSelector) Matches(l Labels) bool {
+	for ix := range s {
+		if matches := s[ix].Matches(l); !matches {
 			return false
 		}
 	}
 	return true
 }
 
-func (lsel internalSelector) Requirements() (Requirements, bool) { return Requirements(lsel), true }
+func (s internalSelector) Requirements() (Requirements, bool) { return Requirements(s), true }
 
 // String returns a comma-separated string of all
 // the internalSelector Requirements' human-readable strings.
-func (lsel internalSelector) String() string {
+func (s internalSelector) String() string {
 	var reqs []string
-	for ix := range lsel {
-		reqs = append(reqs, lsel[ix].String())
+	for ix := range s {
+		reqs = append(reqs, s[ix].String())
 	}
 	return strings.Join(reqs, ",")
+}
+
+// RequiresExactMatch introspects whether a given selector requires a single specific field
+// to be set, and if so returns the value it requires.
+func (s internalSelector) RequiresExactMatch(label string) (value string, found bool) {
+	for ix := range s {
+		if s[ix].key == label {
+			switch s[ix].operator {
+			case selection.Equals, selection.DoubleEquals, selection.In:
+				if len(s[ix].strValues) == 1 {
+					return s[ix].strValues[0], true
+				}
+			}
+			return "", false
+		}
+	}
+	return "", false
 }
 
 // Token represents constant definition for lexer token
@@ -419,7 +476,7 @@ func isWhitespace(ch byte) bool {
 	return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n'
 }
 
-// isSpecialSymbol detect if the character ch can be an operator
+// isSpecialSymbol detects if the character ch can be an operator
 func isSpecialSymbol(ch byte) bool {
 	switch ch {
 	case '=', '!', '(', ')', ',', '>', '<':
@@ -437,7 +494,7 @@ type Lexer struct {
 	pos int
 }
 
-// read return the character currently lexed
+// read returns the character currently lexed
 // increment the position and check the buffer overflow
 func (l *Lexer) read() (b byte) {
 	b = 0
@@ -535,6 +592,7 @@ type Parser struct {
 	l            *Lexer
 	scannedItems []ScannedItem
 	position     int
+	path         *field.Path
 }
 
 // ParserContext represents context during parsing:
@@ -628,7 +686,7 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 		return nil, err
 	}
 	if operator == selection.Exists || operator == selection.DoesNotExist { // operator found lookahead set checked
-		return NewRequirement(key, operator, []string{})
+		return NewRequirement(key, operator, []string{}, field.WithPath(p.path))
 	}
 	operator, err = p.parseOperator()
 	if err != nil {
@@ -644,11 +702,11 @@ func (p *Parser) parseRequirement() (*Requirement, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewRequirement(key, operator, values.List())
+	return NewRequirement(key, operator, values.List(), field.WithPath(p.path))
 
 }
 
-// parseKeyAndInferOperator parse literals.
+// parseKeyAndInferOperator parses literals.
 // in case of no operator '!, in, notin, ==, =, !=' are found
 // the 'exists' operator is inferred
 func (p *Parser) parseKeyAndInferOperator() (string, selection.Operator, error) {
@@ -662,7 +720,7 @@ func (p *Parser) parseKeyAndInferOperator() (string, selection.Operator, error) 
 		err := fmt.Errorf("found '%s', expected: identifier", literal)
 		return "", "", err
 	}
-	if err := validateLabelKey(literal); err != nil {
+	if err := validateLabelKey(literal, p.path); err != nil {
 		return "", "", err
 	}
 	if t, _ := p.lookahead(Values); t == EndOfStringToken || t == CommaToken {
@@ -673,7 +731,7 @@ func (p *Parser) parseKeyAndInferOperator() (string, selection.Operator, error) 
 	return literal, operator, nil
 }
 
-// parseOperator return operator and eventually matchType
+// parseOperator returns operator and eventually matchType
 // matchType can be exact
 func (p *Parser) parseOperator() (op selection.Operator, err error) {
 	tok, lit := p.consume(KeyAndOperator)
@@ -694,7 +752,7 @@ func (p *Parser) parseOperator() (op selection.Operator, err error) {
 	case NotEqualsToken:
 		op = selection.NotEquals
 	default:
-		return "", fmt.Errorf("found '%s', expected: '=', '!=', '==', 'in', notin'", lit)
+		return "", fmt.Errorf("found '%s', expected: %v", lit, strings.Join(binaryOperators, ", "))
 	}
 	return op, nil
 }
@@ -764,12 +822,12 @@ func (p *Parser) parseIdentifiersList() (sets.String, error) {
 // parseExactValue parses the only value for exact match style
 func (p *Parser) parseExactValue() (sets.String, error) {
 	s := sets.NewString()
-	tok, lit := p.lookahead(Values)
+	tok, _ := p.lookahead(Values)
 	if tok == EndOfStringToken || tok == CommaToken {
 		s.Insert("")
 		return s, nil
 	}
-	tok, lit = p.consume(Values)
+	tok, lit := p.consume(Values)
 	if tok == IdentifierToken {
 		s.Insert(lit)
 		return s, nil
@@ -808,8 +866,8 @@ func (p *Parser) parseExactValue() (sets.String, error) {
 //      the KEY exists and can be any VALUE.
 //  (5) A requirement with just !KEY requires that the KEY not exist.
 //
-func Parse(selector string) (Selector, error) {
-	parsedSelector, err := parse(selector)
+func Parse(selector string, opts ...field.PathOption) (Selector, error) {
+	parsedSelector, err := parse(selector, field.ToPath(opts...))
 	if err == nil {
 		return parsedSelector, nil
 	}
@@ -820,8 +878,8 @@ func Parse(selector string) (Selector, error) {
 // The callers of this method can then decide how to return the internalSelector struct to their
 // callers. This function has two callers now, one returns a Selector interface and the other
 // returns a list of requirements.
-func parse(selector string) (internalSelector, error) {
-	p := &Parser{l: &Lexer{s: selector, pos: 0}}
+func parse(selector string, path *field.Path) (internalSelector, error) {
+	p := &Parser{l: &Lexer{s: selector, pos: 0}, path: path}
 	items, err := p.parse()
 	if err != nil {
 		return nil, err
@@ -830,39 +888,46 @@ func parse(selector string) (internalSelector, error) {
 	return internalSelector(items), err
 }
 
-func validateLabelKey(k string) error {
+func validateLabelKey(k string, path *field.Path) *field.Error {
 	if errs := validation.IsQualifiedName(k); len(errs) != 0 {
-		return fmt.Errorf("invalid label key %q: %s", k, strings.Join(errs, "; "))
+		return field.Invalid(path, k, strings.Join(errs, "; "))
 	}
 	return nil
 }
 
-func validateLabelValue(v string) error {
+func validateLabelValue(k, v string, path *field.Path) *field.Error {
 	if errs := validation.IsValidLabelValue(v); len(errs) != 0 {
-		return fmt.Errorf("invalid label value: %q: %s", v, strings.Join(errs, "; "))
+		return field.Invalid(path.Key(k), v, strings.Join(errs, "; "))
 	}
 	return nil
 }
 
 // SelectorFromSet returns a Selector which will match exactly the given Set. A
 // nil and empty Sets are considered equivalent to Everything().
+// It does not perform any validation, which means the server will reject
+// the request if the Set contains invalid values.
 func SelectorFromSet(ls Set) Selector {
+	return SelectorFromValidatedSet(ls)
+}
+
+// ValidatedSelectorFromSet returns a Selector which will match exactly the given Set. A
+// nil and empty Sets are considered equivalent to Everything().
+// The Set is validated client-side, which allows to catch errors early.
+func ValidatedSelectorFromSet(ls Set) (Selector, error) {
 	if ls == nil || len(ls) == 0 {
-		return internalSelector{}
+		return internalSelector{}, nil
 	}
-	var requirements internalSelector
+	requirements := make([]Requirement, 0, len(ls))
 	for label, value := range ls {
 		r, err := NewRequirement(label, selection.Equals, []string{value})
-		if err == nil {
-			requirements = append(requirements, *r)
-		} else {
-			//TODO: double check errors when input comes from serialization?
-			return internalSelector{}
+		if err != nil {
+			return nil, err
 		}
+		requirements = append(requirements, *r)
 	}
 	// sort to have deterministic string representation
 	sort.Sort(ByKey(requirements))
-	return requirements
+	return internalSelector(requirements), nil
 }
 
 // SelectorFromValidatedSet returns a Selector which will match exactly the given Set.
@@ -872,13 +937,13 @@ func SelectorFromValidatedSet(ls Set) Selector {
 	if ls == nil || len(ls) == 0 {
 		return internalSelector{}
 	}
-	var requirements internalSelector
+	requirements := make([]Requirement, 0, len(ls))
 	for label, value := range ls {
 		requirements = append(requirements, Requirement{key: label, operator: selection.Equals, strValues: []string{value}})
 	}
 	// sort to have deterministic string representation
 	sort.Sort(ByKey(requirements))
-	return requirements
+	return internalSelector(requirements)
 }
 
 // ParseToRequirements takes a string representing a selector and returns a list of
@@ -886,6 +951,6 @@ func SelectorFromValidatedSet(ls Set) Selector {
 // processing on selector requirements.
 // See the documentation for Parse() function for more details.
 // TODO: Consider exporting the internalSelector type instead.
-func ParseToRequirements(selector string) ([]Requirement, error) {
-	return parse(selector)
+func ParseToRequirements(selector string, opts ...field.PathOption) ([]Requirement, error) {
+	return parse(selector, field.ToPath(opts...))
 }

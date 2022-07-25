@@ -18,8 +18,6 @@ package rest
 
 import (
 	appsapiv1 "k8s.io/api/apps/v1"
-	appsapiv1beta1 "k8s.io/api/apps/v1beta1"
-	appsapiv1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -33,115 +31,83 @@ import (
 	statefulsetstore "k8s.io/kubernetes/pkg/registry/apps/statefulset/storage"
 )
 
-type RESTStorageProvider struct{}
+// StorageProvider is a struct for apps REST storage.
+type StorageProvider struct{}
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+// NewRESTStorage returns APIGroupInfo object.
+func (p StorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apps.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if apiResourceConfigSource.VersionEnabled(appsapiv1beta1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
-	}
-	if apiResourceConfigSource.VersionEnabled(appsapiv1beta2.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1beta2.SchemeGroupVersion.Version] = p.v1beta2Storage(apiResourceConfigSource, restOptionsGetter)
-	}
-	if apiResourceConfigSource.VersionEnabled(appsapiv1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
+	if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[appsapiv1.SchemeGroupVersion.Version] = storageMap
 	}
 
-	return apiGroupInfo, true
+	return apiGroupInfo, nil
 }
 
-func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p StorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
 
 	// deployments
-	deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
-	storage["deployments"] = deploymentStorage.Deployment
-	storage["deployments/status"] = deploymentStorage.Status
-	storage["deployments/rollback"] = deploymentStorage.Rollback
-	storage["deployments/scale"] = deploymentStorage.Scale
+	if resource := "deployments"; apiResourceConfigSource.ResourceEnabled(appsapiv1.SchemeGroupVersion.WithResource(resource)) {
+		deploymentStorage, err := deploymentstore.NewStorage(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = deploymentStorage.Deployment
+		storage[resource+"/status"] = deploymentStorage.Status
+		storage[resource+"/scale"] = deploymentStorage.Scale
+	}
 
 	// statefulsets
-	statefulSetStorage := statefulsetstore.NewStorage(restOptionsGetter)
-	storage["statefulsets"] = statefulSetStorage.StatefulSet
-	storage["statefulsets/status"] = statefulSetStorage.Status
-	storage["statefulsets/scale"] = statefulSetStorage.Scale
-
-	// controllerrevisions
-	historyStorage := controllerrevisionsstore.NewREST(restOptionsGetter)
-	storage["controllerrevisions"] = historyStorage
-
-	return storage
-}
-
-func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	storage := map[string]rest.Storage{}
-
-	// deployments
-	deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
-	storage["deployments"] = deploymentStorage.Deployment
-	storage["deployments/status"] = deploymentStorage.Status
-	storage["deployments/scale"] = deploymentStorage.Scale
-
-	// statefulsets
-	statefulSetStorage := statefulsetstore.NewStorage(restOptionsGetter)
-	storage["statefulsets"] = statefulSetStorage.StatefulSet
-	storage["statefulsets/status"] = statefulSetStorage.Status
-	storage["statefulsets/scale"] = statefulSetStorage.Scale
+	if resource := "statefulsets"; apiResourceConfigSource.ResourceEnabled(appsapiv1.SchemeGroupVersion.WithResource(resource)) {
+		statefulSetStorage, err := statefulsetstore.NewStorage(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = statefulSetStorage.StatefulSet
+		storage[resource+"/status"] = statefulSetStorage.Status
+		storage[resource+"/scale"] = statefulSetStorage.Scale
+	}
 
 	// daemonsets
-	daemonSetStorage, daemonSetStatusStorage := daemonsetstore.NewREST(restOptionsGetter)
-	storage["daemonsets"] = daemonSetStorage
-	storage["daemonsets/status"] = daemonSetStatusStorage
+	if resource := "daemonsets"; apiResourceConfigSource.ResourceEnabled(appsapiv1.SchemeGroupVersion.WithResource(resource)) {
+		daemonSetStorage, daemonSetStatusStorage, err := daemonsetstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = daemonSetStorage
+		storage[resource+"/status"] = daemonSetStatusStorage
+	}
 
 	// replicasets
-	replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter)
-	storage["replicasets"] = replicaSetStorage.ReplicaSet
-	storage["replicasets/status"] = replicaSetStorage.Status
-	storage["replicasets/scale"] = replicaSetStorage.Scale
+	if resource := "replicasets"; apiResourceConfigSource.ResourceEnabled(appsapiv1.SchemeGroupVersion.WithResource(resource)) {
+		replicaSetStorage, err := replicasetstore.NewStorage(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = replicaSetStorage.ReplicaSet
+		storage[resource+"/status"] = replicaSetStorage.Status
+		storage[resource+"/scale"] = replicaSetStorage.Scale
+	}
 
 	// controllerrevisions
-	historyStorage := controllerrevisionsstore.NewREST(restOptionsGetter)
-	storage["controllerrevisions"] = historyStorage
+	if resource := "controllerrevisions"; apiResourceConfigSource.ResourceEnabled(appsapiv1.SchemeGroupVersion.WithResource(resource)) {
+		historyStorage, err := controllerrevisionsstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = historyStorage
+	}
 
-	return storage
+	return storage, nil
 }
 
-func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	storage := map[string]rest.Storage{}
-
-	// deployments
-	deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
-	storage["deployments"] = deploymentStorage.Deployment
-	storage["deployments/status"] = deploymentStorage.Status
-	storage["deployments/scale"] = deploymentStorage.Scale
-
-	// statefulsets
-	statefulSetStorage := statefulsetstore.NewStorage(restOptionsGetter)
-	storage["statefulsets"] = statefulSetStorage.StatefulSet
-	storage["statefulsets/status"] = statefulSetStorage.Status
-	storage["statefulsets/scale"] = statefulSetStorage.Scale
-
-	// daemonsets
-	daemonSetStorage, daemonSetStatusStorage := daemonsetstore.NewREST(restOptionsGetter)
-	storage["daemonsets"] = daemonSetStorage
-	storage["daemonsets/status"] = daemonSetStatusStorage
-
-	// replicasets
-	replicaSetStorage := replicasetstore.NewStorage(restOptionsGetter)
-	storage["replicasets"] = replicaSetStorage.ReplicaSet
-	storage["replicasets/status"] = replicaSetStorage.Status
-	storage["replicasets/scale"] = replicaSetStorage.Scale
-
-	// controllerrevisions
-	historyStorage := controllerrevisionsstore.NewREST(restOptionsGetter)
-	storage["controllerrevisions"] = historyStorage
-
-	return storage
-}
-
-func (p RESTStorageProvider) GroupName() string {
+// GroupName returns name of the group
+func (p StorageProvider) GroupName() string {
 	return apps.GroupName
 }

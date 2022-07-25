@@ -17,8 +17,8 @@ limitations under the License.
 package cache
 
 import (
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/clock"
 )
 
 type fakeThreadSafeMap struct {
@@ -33,16 +33,19 @@ func (c *fakeThreadSafeMap) Delete(key string) {
 	}
 }
 
+// FakeExpirationPolicy keeps the list for keys which never expires.
 type FakeExpirationPolicy struct {
 	NeverExpire     sets.String
 	RetrieveKeyFunc KeyFunc
 }
 
-func (p *FakeExpirationPolicy) IsExpired(obj *timestampedEntry) bool {
+// IsExpired used to check if object is expired.
+func (p *FakeExpirationPolicy) IsExpired(obj *TimestampedEntry) bool {
 	key, _ := p.RetrieveKeyFunc(obj)
 	return !p.NeverExpire.Has(key)
 }
 
+// NewFakeExpirationStore creates a new instance for the ExpirationCache.
 func NewFakeExpirationStore(keyFunc KeyFunc, deletedKeys chan<- string, expirationPolicy ExpirationPolicy, cacheClock clock.Clock) Store {
 	cacheStorage := NewThreadSafeStore(Indexers{}, Indices{})
 	return &ExpirationCache{

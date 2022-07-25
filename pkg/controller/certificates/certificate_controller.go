@@ -19,48 +19,47 @@ limitations under the License.
 package certificates
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"golang.org/x/time/rate"
-	"k8s.io/klog"
 
-	certificates "k8s.io/api/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
+	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
+	certificateslisters "k8s.io/client-go/listers/certificates/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
 type CertificateController struct {
+	// name is an identifier for this particular controller instance.
+	name string
+
 	kubeClient clientset.Interface
 
 	csrLister  certificateslisters.CertificateSigningRequestLister
 	csrsSynced cache.InformerSynced
 
-	handler func(*certificates.CertificateSigningRequest) error
+	handler func(context.Context, *certificates.CertificateSigningRequest) error
 
 	queue workqueue.RateLimitingInterface
 }
 
 func NewCertificateController(
+	name string,
 	kubeClient clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
-	handler func(*certificates.CertificateSigningRequest) error,
+	handler func(context.Context, *certificates.CertificateSigningRequest) error,
 ) *CertificateController {
-	// Send events to the apiserver
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-
 	cc := &CertificateController{
+		name:       name,
 		kubeClient: kubeClient,
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
 			workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 1000*time.Second),
@@ -106,39 +105,39 @@ func NewCertificateController(
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
-func (cc *CertificateController) Run(workers int, stopCh <-chan struct{}) {
+func (cc *CertificateController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer cc.queue.ShutDown()
 
-	klog.Infof("Starting certificate controller")
-	defer klog.Infof("Shutting down certificate controller")
+	klog.Infof("Starting certificate controller %q", cc.name)
+	defer klog.Infof("Shutting down certificate controller %q", cc.name)
 
-	if !controller.WaitForCacheSync("certificate", stopCh, cc.csrsSynced) {
+	if !cache.WaitForNamedCacheSync(fmt.Sprintf("certificate-%s", cc.name), ctx.Done(), cc.csrsSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(cc.worker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, cc.worker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 // worker runs a thread that dequeues CSRs, handles them, and marks them done.
-func (cc *CertificateController) worker() {
-	for cc.processNextWorkItem() {
+func (cc *CertificateController) worker(ctx context.Context) {
+	for cc.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (cc *CertificateController) processNextWorkItem() bool {
+func (cc *CertificateController) processNextWorkItem(ctx context.Context) bool {
 	cKey, quit := cc.queue.Get()
 	if quit {
 		return false
 	}
 	defer cc.queue.Done(cKey)
 
-	if err := cc.syncFunc(cKey.(string)); err != nil {
+	if err := cc.syncFunc(ctx, cKey.(string)); err != nil {
 		cc.queue.AddRateLimited(cKey)
 		if _, ignorable := err.(ignorableError); !ignorable {
 			utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))
@@ -162,11 +161,7 @@ func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
 	cc.queue.Add(key)
 }
 
-// maybeSignCertificate will inspect the certificate request and, if it has
-// been approved and meets policy expectations, generate an X509 cert using the
-// cluster CA assets. If successful it will update the CSR approve subresource
-// with the signed certificate.
-func (cc *CertificateController) syncFunc(key string) error {
+func (cc *CertificateController) syncFunc(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing certificate request %q (%v)", key, time.Since(startTime))
@@ -180,15 +175,14 @@ func (cc *CertificateController) syncFunc(key string) error {
 		return err
 	}
 
-	if csr.Status.Certificate != nil {
+	if len(csr.Status.Certificate) > 0 {
 		// no need to do anything because it already has a cert
 		return nil
 	}
 
 	// need to operate on a copy so we don't mutate the csr in the shared cache
 	csr = csr.DeepCopy()
-
-	return cc.handler(csr)
+	return cc.handler(ctx, csr)
 }
 
 // IgnorableError returns an error that we shouldn't handle (i.e. log) because

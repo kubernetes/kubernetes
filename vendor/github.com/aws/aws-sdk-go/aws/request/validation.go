@@ -17,6 +17,12 @@ const (
 	ParamMinValueErrCode = "ParamMinValueError"
 	// ParamMinLenErrCode is the error code for fields without enough elements.
 	ParamMinLenErrCode = "ParamMinLenError"
+	// ParamMaxLenErrCode is the error code for value being too long.
+	ParamMaxLenErrCode = "ParamMaxLenError"
+
+	// ParamFormatErrCode is the error code for a field with invalid
+	// format or characters.
+	ParamFormatErrCode = "ParamFormatInvalidError"
 )
 
 // Validator provides a way for types to perform validation logic on their
@@ -231,4 +237,50 @@ func NewErrParamMinLen(field string, min int) *ErrParamMinLen {
 // MinLen returns the field's required minimum length.
 func (e *ErrParamMinLen) MinLen() int {
 	return e.min
+}
+
+// An ErrParamMaxLen represents a maximum length parameter error.
+type ErrParamMaxLen struct {
+	errInvalidParam
+	max int
+}
+
+// NewErrParamMaxLen creates a new maximum length parameter error.
+func NewErrParamMaxLen(field string, max int, value string) *ErrParamMaxLen {
+	return &ErrParamMaxLen{
+		errInvalidParam: errInvalidParam{
+			code:  ParamMaxLenErrCode,
+			field: field,
+			msg:   fmt.Sprintf("maximum size of %v, %v", max, value),
+		},
+		max: max,
+	}
+}
+
+// MaxLen returns the field's required minimum length.
+func (e *ErrParamMaxLen) MaxLen() int {
+	return e.max
+}
+
+// An ErrParamFormat represents a invalid format parameter error.
+type ErrParamFormat struct {
+	errInvalidParam
+	format string
+}
+
+// NewErrParamFormat creates a new invalid format parameter error.
+func NewErrParamFormat(field string, format, value string) *ErrParamFormat {
+	return &ErrParamFormat{
+		errInvalidParam: errInvalidParam{
+			code:  ParamFormatErrCode,
+			field: field,
+			msg:   fmt.Sprintf("format %v, %v", format, value),
+		},
+		format: format,
+	}
+}
+
+// Format returns the field's required format.
+func (e *ErrParamFormat) Format() string {
+	return e.format
 }

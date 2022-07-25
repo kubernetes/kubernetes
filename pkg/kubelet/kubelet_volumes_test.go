@@ -21,22 +21,44 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func TestListVolumesForPod(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name: "container1",
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "vol1",
+						MountPath: "/mnt/vol1",
+					},
+					{
+						Name:      "vol2",
+						MountPath: "/mnt/vol2",
+					},
+				},
+			},
+		},
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -74,10 +96,15 @@ func TestListVolumesForPod(t *testing.T) {
 
 	outerVolumeSpecName2 := "vol2"
 	assert.NotNil(t, volumesToReturn[outerVolumeSpecName2], "key %s", outerVolumeSpecName2)
-
 }
 
 func TestPodVolumesExist(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
+
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -89,6 +116,17 @@ func TestPodVolumesExist(t *testing.T) {
 				UID:  "pod1uid",
 			},
 			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container1",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "vol1",
+								MountPath: "/mnt/vol1",
+							},
+						},
+					},
+				},
 				Volumes: []v1.Volume{
 					{
 						Name: "vol1",
@@ -107,6 +145,17 @@ func TestPodVolumesExist(t *testing.T) {
 				UID:  "pod2uid",
 			},
 			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container2",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "vol2",
+								MountPath: "/mnt/vol2",
+							},
+						},
+					},
+				},
 				Volumes: []v1.Volume{
 					{
 						Name: "vol2",
@@ -125,6 +174,17 @@ func TestPodVolumesExist(t *testing.T) {
 				UID:  "pod3uid",
 			},
 			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name: "container3",
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "vol3",
+								MountPath: "/mnt/vol3",
+							},
+						},
+					},
+				},
 				Volumes: []v1.Volume{
 					{
 						Name: "vol3",
@@ -155,11 +215,28 @@ func TestPodVolumesExist(t *testing.T) {
 }
 
 func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
+
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name: "container1",
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "vol1",
+						MountPath: "/mnt/vol1",
+					},
+				},
+			},
+		},
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -199,11 +276,28 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 }
 
 func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
+
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name: "container1",
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "vol1",
+						MountPath: "/mnt/vol1",
+					},
+				},
+			},
+		},
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -246,9 +340,14 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin))
 
 	// Remove pod
+	// TODO: technically waitForVolumeUnmount
+	kubelet.podWorkers.(*fakePodWorkers).setPodRuntimeBeRemoved(pod.UID)
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
-	assert.NoError(t, waitForVolumeUnmount(kubelet.volumeManager, pod))
+	assert.NoError(t, kubelet.volumeManager.WaitForUnmount(pod))
+	if actual := kubelet.volumeManager.GetMountedVolumesForPod(util.GetUniquePodName(pod)); len(actual) > 0 {
+		t.Fatalf("expected volume unmount to wait for no volumes: %v", actual)
+	}
 
 	// Verify volumes unmounted
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
@@ -268,6 +367,12 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 }
 
 func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
+
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -290,6 +395,17 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	})
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name: "container1",
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "vol1",
+						MountPath: "/mnt/vol1",
+					},
+				},
+			},
+		},
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -317,6 +433,9 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
+	allPodVolumes := kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
+		util.GetUniquePodName(pod))
+	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -334,6 +453,12 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 }
 
 func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
+
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -356,6 +481,17 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	})
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "test", v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Name: "container1",
+				VolumeMounts: []v1.VolumeMount{
+					{
+						Name:      "vol1",
+						MountPath: "/mnt/vol1",
+					},
+				},
+			},
+		},
 		Volumes: []v1.Volume{
 			{
 				Name: "vol1",
@@ -385,6 +521,9 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
+	allPodVolumes := kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
+		util.GetUniquePodName(pod))
+	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -402,6 +541,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		1 /* expectedSetUpCallCount */, testKubelet.volumePlugin))
 
 	// Remove pod
+	kubelet.podWorkers.(*fakePodWorkers).setPodRuntimeBeRemoved(pod.UID)
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
 	assert.NoError(t, waitForVolumeUnmount(kubelet.volumeManager, pod))
@@ -409,6 +549,9 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	// Verify volumes unmounted
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
+	allPodVolumes = kubelet.volumeManager.GetPossiblyMountedVolumesForPod(
+		util.GetUniquePodName(pod))
+	assert.Equal(t, podVolumes, allPodVolumes, "GetMountedVolumesForPod and GetPossiblyMountedVolumesForPod should return the same volumes")
 
 	assert.Len(t, podVolumes, 0,
 		"Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
@@ -435,15 +578,11 @@ func (f *stubVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{}
 }
 
-func (f *stubVolume) CanMount() error {
+func (f *stubVolume) SetUp(mounterArgs volume.MounterArgs) error {
 	return nil
 }
 
-func (f *stubVolume) SetUp(fsGroup *int64) error {
-	return nil
-}
-
-func (f *stubVolume) SetUpAt(dir string, fsGroup *int64) error {
+func (f *stubVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	return nil
 }
 
@@ -464,10 +603,22 @@ func (f *stubBlockVolume) SetUpDevice() (string, error) {
 	return "", nil
 }
 
-func (f stubBlockVolume) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+func (f stubBlockVolume) MapPodDevice() error {
 	return nil
 }
 
 func (f *stubBlockVolume) TearDownDevice(mapPath string, devicePath string) error {
 	return nil
+}
+
+func (f *stubBlockVolume) UnmapPodDevice() error {
+	return nil
+}
+
+func (f *stubBlockVolume) SupportsMetrics() bool {
+	return false
+}
+
+func (f *stubBlockVolume) GetMetrics() (*volume.Metrics, error) {
+	return nil, nil
 }

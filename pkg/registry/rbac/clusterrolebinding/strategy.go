@@ -44,7 +44,7 @@ var _ rest.RESTCreateStrategy = Strategy
 // Strategy should implement rest.RESTUpdateStrategy
 var _ rest.RESTUpdateStrategy = Strategy
 
-// NamespaceScoped is true for ClusterRoleBindings.
+// NamespaceScoped is false for ClusterRoleBindings.
 func (strategy) NamespaceScoped() bool {
 	return false
 }
@@ -74,6 +74,9 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	return validation.ValidateClusterRoleBinding(clusterRoleBinding)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (strategy) Canonicalize(obj runtime.Object) {
 	_ = obj.(*rbac.ClusterRoleBinding)
@@ -84,6 +87,11 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	newObj := obj.(*rbac.ClusterRoleBinding)
 	errorList := validation.ValidateClusterRoleBinding(newObj)
 	return append(errorList, validation.ValidateClusterRoleBindingUpdate(newObj, old.(*rbac.ClusterRoleBinding))...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // If AllowUnconditionalUpdate() is true and the object specified by

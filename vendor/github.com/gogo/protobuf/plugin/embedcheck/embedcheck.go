@@ -47,9 +47,10 @@ package embedcheck
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/gogo/protobuf/gogoproto"
 	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
-	"os"
 )
 
 type plugin struct {
@@ -163,7 +164,7 @@ func (p *plugin) checkOverwrite(message *generator.Descriptor, enablers map[stri
 			desc := p.ObjectNamed(field.GetTypeName())
 			msg := desc.(*generator.Descriptor)
 			for errStr, enabled := range enablers {
-				if enabled(msg.File(), msg.DescriptorProto) {
+				if enabled(msg.File().FileDescriptorProto, msg.DescriptorProto) {
 					fmt.Fprintf(os.Stderr, "WARNING: found non-%v %v with embedded %v %v\n", names, ccTypeName, errStr, fieldname)
 				}
 			}

@@ -1,0 +1,17 @@
+---
+Language:        Cpp
+BasedOnStyle:    LLVM
+AlignAfterOpenBracket: DontAlign
+AlignConsecutiveAssignments: true
+AlignEscapedNewlines: DontAlign
+AlwaysBreakBeforeMultilineStrings: true
+AlwaysBreakTemplateDeclarations: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortFunctionsOnASingleLine: false
+BreakBeforeBraces: Attach
+IndentWidth:     4
+KeepEmptyLinesAtTheStartOfBlocks: false
+TabWidth:        4
+UseTab:          ForContinuationAndIndentation
+ColumnLimit:     1000
+...

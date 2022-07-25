@@ -21,33 +21,44 @@ import (
 //
 // tau must have length at least min(m,n), and this function will panic otherwise.
 func (impl Implementation) Dgelqf(m, n int, a []float64, lda int, tau, work []float64, lwork int) {
-	nb := impl.Ilaenv(1, "DGELQF", " ", m, n, -1, -1)
-	lworkopt := m * max(nb, 1)
-	if lwork == -1 {
-		work[0] = float64(lworkopt)
-		return
-	}
-	checkMatrix(m, n, a, lda)
-	if len(work) < lwork {
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
+	case lwork < max(1, m) && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
 		panic(shortWork)
 	}
-	if lwork < m {
-		panic(badWork)
-	}
+
 	k := min(m, n)
-	if len(tau) < k {
-		panic(badTau)
-	}
 	if k == 0 {
+		work[0] = 1
 		return
 	}
+
+	nb := impl.Ilaenv(1, "DGELQF", " ", m, n, -1, -1)
+	if lwork == -1 {
+		work[0] = float64(m * nb)
+		return
+	}
+
+	if len(a) < (m-1)*lda+n {
+		panic(shortA)
+	}
+	if len(tau) < k {
+		panic(shortTau)
+	}
+
 	// Find the optimal blocking size based on the size of available memory
 	// and optimal machine parameters.
 	nbmin := 2
 	var nx int
 	iws := m
-	ldwork := nb
-	if nb > 1 && k > nb {
+	if 1 < nb && nb < k {
 		nx = max(0, impl.Ilaenv(3, "DGELQF", " ", m, n, -1, -1))
 		if nx < k {
 			iws = m * nb
@@ -57,9 +68,10 @@ func (impl Implementation) Dgelqf(m, n int, a []float64, lda int, tau, work []fl
 			}
 		}
 	}
+	ldwork := nb
 	// Computed blocked LQ factorization.
 	var i int
-	if nb >= nbmin && nb < k && nx < k {
+	if nbmin <= nb && nb < k && nx < k {
 		for i = 0; i < k-nx; i += nb {
 			ib := min(k-i, nb)
 			impl.Dgelq2(ib, n-i, a[i*lda+i:], lda, tau[i:], work)
@@ -81,4 +93,5 @@ func (impl Implementation) Dgelqf(m, n int, a []float64, lda int, tau, work []fl
 	if i < k {
 		impl.Dgelq2(m-i, n-i, a[i*lda+i:], lda, tau[i:], work)
 	}
+	work[0] = float64(iws)
 }

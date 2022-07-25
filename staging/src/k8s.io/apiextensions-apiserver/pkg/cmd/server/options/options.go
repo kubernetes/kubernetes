@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -33,13 +34,15 @@ import (
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/util/webhook"
-	"k8s.io/client-go/listers/core/v1"
+	corev1 "k8s.io/client-go/listers/core/v1"
+	netutils "k8s.io/utils/net"
 )
 
 const defaultEtcdPathPrefix = "/registry/apiextensions.kubernetes.io"
 
 // CustomResourceDefinitionsServerOptions describes the runtime options of an apiextensions-apiserver.
 type CustomResourceDefinitionsServerOptions struct {
+	ServerRunOptions   *genericoptions.ServerRunOptions
 	RecommendedOptions *genericoptions.RecommendedOptions
 	APIEnablement      *genericoptions.APIEnablementOptions
 
@@ -50,10 +53,10 @@ type CustomResourceDefinitionsServerOptions struct {
 // NewCustomResourceDefinitionsServerOptions creates default options of an apiextensions-apiserver.
 func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
 	o := &CustomResourceDefinitionsServerOptions{
+		ServerRunOptions: genericoptions.NewServerRunOptions(),
 		RecommendedOptions: genericoptions.NewRecommendedOptions(
 			defaultEtcdPathPrefix,
-			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion),
-			genericoptions.NewProcessInfo("apiextensions-apiserver", "kube-system"),
+			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion),
 		),
 		APIEnablement: genericoptions.NewAPIEnablementOptions(),
 
@@ -66,6 +69,7 @@ func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomRes
 
 // AddFlags adds the apiextensions-apiserver flags to the flagset.
 func (o CustomResourceDefinitionsServerOptions) AddFlags(fs *pflag.FlagSet) {
+	o.ServerRunOptions.AddUniversalFlags(fs)
 	o.RecommendedOptions.AddFlags(fs)
 	o.APIEnablement.AddFlags(fs)
 }
@@ -73,6 +77,7 @@ func (o CustomResourceDefinitionsServerOptions) AddFlags(fs *pflag.FlagSet) {
 // Validate validates the apiextensions-apiserver options.
 func (o CustomResourceDefinitionsServerOptions) Validate() error {
 	errors := []error{}
+	errors = append(errors, o.ServerRunOptions.Validate()...)
 	errors = append(errors, o.RecommendedOptions.Validate()...)
 	errors = append(errors, o.APIEnablement.Validate(apiserver.Scheme)...)
 	return utilerrors.NewAggregate(errors)
@@ -86,12 +91,15 @@ func (o *CustomResourceDefinitionsServerOptions) Complete() error {
 // Config returns an apiextensions-apiserver configuration.
 func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, error) {
 	// TODO have a "real" external address
-	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
+	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{netutils.ParseIPSloppy("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
-	if err := o.RecommendedOptions.ApplyTo(serverConfig, apiserver.Scheme); err != nil {
+	if err := o.ServerRunOptions.ApplyTo(&serverConfig.Config); err != nil {
+		return nil, err
+	}
+	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return nil, err
 	}
 	if err := o.APIEnablement.ApplyTo(&serverConfig.Config, apiserver.DefaultAPIResourceConfigSource(), apiserver.Scheme); err != nil {
@@ -103,7 +111,7 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		ExtraConfig: apiserver.ExtraConfig{
 			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
 			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
-			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, serverConfig.LoopbackClientConfig),
+			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig, nil),
 		},
 	}
 	return config, nil
@@ -112,13 +120,14 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 // NewCRDRESTOptionsGetter create a RESTOptionsGetter for CustomResources.
 func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregistry.RESTOptionsGetter {
 	ret := apiserver.CRDRESTOptionsGetter{
-		StorageConfig:           etcdOptions.StorageConfig,
-		StoragePrefix:           etcdOptions.StorageConfig.Prefix,
-		EnableWatchCache:        etcdOptions.EnableWatchCache,
-		DefaultWatchCacheSize:   etcdOptions.DefaultWatchCacheSize,
-		EnableGarbageCollection: etcdOptions.EnableGarbageCollection,
-		DeleteCollectionWorkers: etcdOptions.DeleteCollectionWorkers,
-		CountMetricPollPeriod:   etcdOptions.StorageConfig.CountMetricPollPeriod,
+		StorageConfig:             etcdOptions.StorageConfig,
+		StoragePrefix:             etcdOptions.StorageConfig.Prefix,
+		EnableWatchCache:          etcdOptions.EnableWatchCache,
+		DefaultWatchCacheSize:     etcdOptions.DefaultWatchCacheSize,
+		EnableGarbageCollection:   etcdOptions.EnableGarbageCollection,
+		DeleteCollectionWorkers:   etcdOptions.DeleteCollectionWorkers,
+		CountMetricPollPeriod:     etcdOptions.StorageConfig.CountMetricPollPeriod,
+		StorageObjectCountTracker: etcdOptions.StorageConfig.StorageObjectCountTracker,
 	}
 	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 
@@ -126,9 +135,9 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregi
 }
 
 type serviceResolver struct {
-	services v1.ServiceLister
+	services corev1.ServiceLister
 }
 
-func (r *serviceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
-	return proxy.ResolveCluster(r.services, namespace, name)
+func (r *serviceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
+	return proxy.ResolveCluster(r.services, namespace, name, port)
 }

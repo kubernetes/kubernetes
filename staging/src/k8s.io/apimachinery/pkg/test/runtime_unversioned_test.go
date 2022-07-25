@@ -70,8 +70,6 @@ func TestExperimentalEncodeDecodeStatus(t *testing.T) {
 		Reason:  metav1.StatusReasonUnknown,
 		Message: "",
 	}
-	// TODO: caesarxuchao: use the testapi.Extensions.Codec() once the PR that
-	// moves experimental from v1 to v1beta1 got merged.
 	_, codecs := TestScheme()
 	expCodec := apitesting.TestCodec(codecs, schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal})
 

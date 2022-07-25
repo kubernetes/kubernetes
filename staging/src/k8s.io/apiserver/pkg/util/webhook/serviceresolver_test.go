@@ -25,22 +25,25 @@ func TestDefaultServiceResolver(t *testing.T) {
 	scenarios := []struct {
 		serviceName      string
 		serviceNamespace string
+		port             int32
 		expectedOutput   string
 		expectError      bool
 	}{
 		// scenario 1: a service name along with a namespace resolves
-		{serviceName: "ross", serviceNamespace: "andromeda", expectedOutput: "https://ross.andromeda.svc:443"},
+		{serviceName: "ross", serviceNamespace: "andromeda", port: 443, expectedOutput: "https://ross.andromeda.svc:443"},
 		// scenario 2: a service name without a namespace does not resolve
 		{serviceName: "ross", expectError: true},
 		// scenario 3: cannot resolve an empty service name
 		{serviceNamespace: "andromeda", expectError: true},
+		// scenario 1: a service name along with a namespace and different port resolves
+		{serviceName: "ross", serviceNamespace: "andromeda", port: 1002, expectedOutput: "https://ross.andromeda.svc:1002"},
 	}
 
 	// act
 	for index, scenario := range scenarios {
 		t.Run(fmt.Sprintf("scenario %d", index), func(t *testing.T) {
 			target := defaultServiceResolver{}
-			serviceURL, err := target.ResolveEndpoint(scenario.serviceNamespace, scenario.serviceName)
+			serviceURL, err := target.ResolveEndpoint(scenario.serviceNamespace, scenario.serviceName, scenario.port)
 
 			if err != nil && !scenario.expectError {
 				t.Errorf("unexpected error has occurred = %v", err)

@@ -17,6 +17,7 @@ limitations under the License.
 package ttl
 
 import (
+	"context"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -75,10 +76,10 @@ func TestPatchNode(t *testing.T) {
 
 	for i, testCase := range testCases {
 		fakeClient := &fake.Clientset{}
-		ttlController := &TTLController{
+		ttlController := &Controller{
 			kubeClient: fakeClient,
 		}
-		err := ttlController.patchNodeWithAnnotation(testCase.node, v1.ObjectTTLAnnotationKey, testCase.ttlSeconds)
+		err := ttlController.patchNodeWithAnnotation(context.TODO(), testCase.node, v1.ObjectTTLAnnotationKey, testCase.ttlSeconds)
 		if err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
@@ -132,12 +133,12 @@ func TestUpdateNodeIfNeeded(t *testing.T) {
 		fakeClient := &fake.Clientset{}
 		nodeStore := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 		nodeStore.Add(testCase.node)
-		ttlController := &TTLController{
+		ttlController := &Controller{
 			kubeClient:        fakeClient,
 			nodeStore:         listers.NewNodeLister(nodeStore),
 			desiredTTLSeconds: testCase.desiredTTL,
 		}
-		if err := ttlController.updateNodeIfNeeded(testCase.node.Name); err != nil {
+		if err := ttlController.updateNodeIfNeeded(context.TODO(), testCase.node.Name); err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
@@ -210,10 +211,24 @@ func TestDesiredTTL(t *testing.T) {
 			boundaryStep: 1,
 			expectedTTL:  0,
 		},
+		{
+			deleteNode:   true,
+			nodeCount:    1800,
+			desiredTTL:   300,
+			boundaryStep: 4,
+			expectedTTL:  60,
+		},
+		{
+			deleteNode:   true,
+			nodeCount:    10000,
+			desiredTTL:   300,
+			boundaryStep: 4,
+			expectedTTL:  300,
+		},
 	}
 
 	for i, testCase := range testCases {
-		ttlController := &TTLController{
+		ttlController := &Controller{
 			queue:             workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 			nodeCount:         testCase.nodeCount,
 			desiredTTLSeconds: testCase.desiredTTL,

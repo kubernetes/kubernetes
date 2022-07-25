@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -34,12 +34,14 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
+// Controller demonstrates how to implement a controller with client-go.
 type Controller struct {
 	indexer  cache.Indexer
 	queue    workqueue.RateLimitingInterface
 	informer cache.Controller
 }
 
+// NewController creates a new Controller.
 func NewController(queue workqueue.RateLimitingInterface, indexer cache.Indexer, informer cache.Controller) *Controller {
 	return &Controller{
 		informer: informer,
@@ -113,7 +115,8 @@ func (c *Controller) handleErr(err error, key interface{}) {
 	klog.Infof("Dropping pod %q out of the queue: %v", key, err)
 }
 
-func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
+// Run begins watching and syncing.
+func (c *Controller) Run(workers int, stopCh chan struct{}) {
 	defer runtime.HandleCrash()
 
 	// Let the workers stop when we are done
@@ -128,7 +131,7 @@ func (c *Controller) Run(threadiness int, stopCh chan struct{}) {
 		return
 	}
 
-	for i := 0; i < threadiness; i++ {
+	for i := 0; i < workers; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 

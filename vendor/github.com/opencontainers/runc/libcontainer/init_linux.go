@@ -1,27 +1,28 @@
-// +build linux
-
 package libcontainer
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"strings"
-	"syscall" // only for Errno
 	"unsafe"
 
+	"github.com/containerd/console"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
+	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 
-	"github.com/containerd/console"
+	"github.com/opencontainers/runc/libcontainer/capabilities"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/runc/libcontainer/user"
 	"github.com/opencontainers/runc/libcontainer/utils"
-	"github.com/sirupsen/logrus"
-	"github.com/vishvananda/netlink"
 )
 
 type initType string
@@ -32,8 +33,8 @@ const (
 )
 
 type pid struct {
-	Pid           int `json:"pid"`
-	PidFirstChild int `json:"pid_first"`
+	Pid           int `json:"stage2_pid"`
+	PidFirstChild int `json:"stage1_pid"`
 }
 
 // network is an internal struct used to setup container networks.
@@ -64,14 +65,17 @@ type initConfig struct {
 	CreateConsole    bool                  `json:"create_console"`
 	ConsoleWidth     uint16                `json:"console_width"`
 	ConsoleHeight    uint16                `json:"console_height"`
-	Rootless         bool                  `json:"rootless"`
+	RootlessEUID     bool                  `json:"rootless_euid,omitempty"`
+	RootlessCgroups  bool                  `json:"rootless_cgroups,omitempty"`
+	SpecState        *specs.State          `json:"spec_state,omitempty"`
+	Cgroup2Path      string                `json:"cgroup2_path,omitempty"`
 }
 
 type initer interface {
 	Init() error
 }
 
-func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd int) (initer, error) {
+func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd, logFd int, mountFds []int) (initer, error) {
 	var config *initConfig
 	if err := json.NewDecoder(pipe).Decode(&config); err != nil {
 		return nil, err
@@ -81,10 +85,16 @@ func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd 
 	}
 	switch t {
 	case initSetns:
+		// mountFds must be nil in this case. We don't mount while doing runc exec.
+		if mountFds != nil {
+			return nil, errors.New("mountFds must be nil. Can't mount while doing runc exec.")
+		}
+
 		return &linuxSetnsInit{
 			pipe:          pipe,
 			consoleSocket: consoleSocket,
 			config:        config,
+			logFd:         logFd,
 		}, nil
 	case initStandard:
 		return &linuxStandardInit{
@@ -93,6 +103,8 @@ func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd 
 			parentPid:     unix.Getppid(),
 			config:        config,
 			fifoFd:        fifoFd,
+			logFd:         logFd,
+			mountFds:      mountFds,
 		}, nil
 	}
 	return nil, fmt.Errorf("unknown init type %q", t)
@@ -104,9 +116,19 @@ func populateProcessEnvironment(env []string) error {
 	for _, pair := range env {
 		p := strings.SplitN(pair, "=", 2)
 		if len(p) < 2 {
-			return fmt.Errorf("invalid environment '%v'", pair)
+			return fmt.Errorf("invalid environment variable: %q", pair)
 		}
-		if err := os.Setenv(p[0], p[1]); err != nil {
+		name, val := p[0], p[1]
+		if name == "" {
+			return fmt.Errorf("environment variable name can't be empty: %q", pair)
+		}
+		if strings.IndexByte(name, 0) >= 0 {
+			return fmt.Errorf("environment variable name can't contain null(\\x00): %q", pair)
+		}
+		if strings.IndexByte(val, 0) >= 0 {
+			return fmt.Errorf("environment variable value can't contain null(\\x00): %q", pair)
+		}
+		if err := os.Setenv(name, val); err != nil {
 			return err
 		}
 	}
@@ -121,40 +143,61 @@ func finalizeNamespace(config *initConfig) error {
 	// inherited are marked close-on-exec so they stay out of the
 	// container
 	if err := utils.CloseExecFrom(config.PassedFilesCount + 3); err != nil {
-		return err
+		return fmt.Errorf("error closing exec fds: %w", err)
 	}
 
-	capabilities := &configs.Capabilities{}
-	if config.Capabilities != nil {
-		capabilities = config.Capabilities
-	} else if config.Config.Capabilities != nil {
-		capabilities = config.Config.Capabilities
+	// we only do chdir if it's specified
+	doChdir := config.Cwd != ""
+	if doChdir {
+		// First, attempt the chdir before setting up the user.
+		// This could allow us to access a directory that the user running runc can access
+		// but the container user cannot.
+		err := unix.Chdir(config.Cwd)
+		switch {
+		case err == nil:
+			doChdir = false
+		case os.IsPermission(err):
+			// If we hit an EPERM, we should attempt again after setting up user.
+			// This will allow us to successfully chdir if the container user has access
+			// to the directory, but the user running runc does not.
+			// This is useful in cases where the cwd is also a volume that's been chowned to the container user.
+		default:
+			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %w", config.Cwd, err)
+		}
 	}
-	w, err := newContainerCapList(capabilities)
+
+	caps := &configs.Capabilities{}
+	if config.Capabilities != nil {
+		caps = config.Capabilities
+	} else if config.Config.Capabilities != nil {
+		caps = config.Config.Capabilities
+	}
+	w, err := capabilities.New(caps)
 	if err != nil {
 		return err
 	}
 	// drop capabilities in bounding set before changing user
 	if err := w.ApplyBoundingSet(); err != nil {
-		return err
+		return fmt.Errorf("unable to apply bounding set: %w", err)
 	}
 	// preserve existing capabilities while we change users
 	if err := system.SetKeepCaps(); err != nil {
-		return err
+		return fmt.Errorf("unable to set keep caps: %w", err)
 	}
 	if err := setupUser(config); err != nil {
-		return err
+		return fmt.Errorf("unable to setup user: %w", err)
+	}
+	// Change working directory AFTER the user has been set up, if we haven't done it yet.
+	if doChdir {
+		if err := unix.Chdir(config.Cwd); err != nil {
+			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %w", config.Cwd, err)
+		}
 	}
 	if err := system.ClearKeepCaps(); err != nil {
-		return err
+		return fmt.Errorf("unable to clear keep caps: %w", err)
 	}
 	if err := w.ApplyCaps(); err != nil {
-		return err
-	}
-	if config.Cwd != "" {
-		if err := unix.Chdir(config.Cwd); err != nil {
-			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %v", config.Cwd, err)
-		}
+		return fmt.Errorf("unable to apply caps: %w", err)
 	}
 	return nil
 }
@@ -179,6 +222,9 @@ func setupConsole(socket *os.File, config *initConfig, mount bool) error {
 		return err
 	}
 
+	// After we return from here, we don't need the console anymore.
+	defer pty.Close()
+
 	if config.ConsoleHeight != 0 && config.ConsoleWidth != 0 {
 		err = pty.Resize(console.WinSize{
 			Height: config.ConsoleHeight,
@@ -189,9 +235,6 @@ func setupConsole(socket *os.File, config *initConfig, mount bool) error {
 			return err
 		}
 	}
-
-	// After we return from here, we don't need the console anymore.
-	defer pty.Close()
 
 	// Mount the console inside our rootfs.
 	if mount {
@@ -217,11 +260,7 @@ func syncParentReady(pipe io.ReadWriter) error {
 	}
 
 	// Wait for parent to give the all-clear.
-	if err := readSync(pipe, procRun); err != nil {
-		return err
-	}
-
-	return nil
+	return readSync(pipe, procRun)
 }
 
 // syncParentHooks sends to the given pipe a JSON payload which indicates that
@@ -234,8 +273,34 @@ func syncParentHooks(pipe io.ReadWriter) error {
 	}
 
 	// Wait for parent to give the all-clear.
-	if err := readSync(pipe, procResume); err != nil {
+	return readSync(pipe, procResume)
+}
+
+// syncParentSeccomp sends to the given pipe a JSON payload which
+// indicates that the parent should pick up the seccomp fd with pidfd_getfd()
+// and send it to the seccomp agent over a unix socket. It then waits for
+// the parent to indicate that it is cleared to resume and closes the seccompFd.
+// If the seccompFd is -1, there isn't anything to sync with the parent, so it
+// returns no error.
+func syncParentSeccomp(pipe io.ReadWriter, seccompFd int) error {
+	if seccompFd == -1 {
+		return nil
+	}
+
+	// Tell parent.
+	if err := writeSyncWithFd(pipe, procSeccomp, seccompFd); err != nil {
+		unix.Close(seccompFd)
 		return err
+	}
+
+	// Wait for parent to give the all-clear.
+	if err := readSync(pipe, procSeccompDone); err != nil {
+		unix.Close(seccompFd)
+		return fmt.Errorf("sync parent seccomp: %w", err)
+	}
+
+	if err := unix.Close(seccompFd); err != nil {
+		return fmt.Errorf("close seccomp fd: %w", err)
 	}
 
 	return nil
@@ -276,25 +341,30 @@ func setupUser(config *initConfig) error {
 	// Rather than just erroring out later in setuid(2) and setgid(2), check
 	// that the user is mapped here.
 	if _, err := config.Config.HostUID(execUser.Uid); err != nil {
-		return fmt.Errorf("cannot set uid to unmapped user in user namespace")
+		return errors.New("cannot set uid to unmapped user in user namespace")
 	}
 	if _, err := config.Config.HostGID(execUser.Gid); err != nil {
-		return fmt.Errorf("cannot set gid to unmapped user in user namespace")
+		return errors.New("cannot set gid to unmapped user in user namespace")
 	}
 
-	if config.Rootless {
+	if config.RootlessEUID {
 		// We cannot set any additional groups in a rootless container and thus
 		// we bail if the user asked us to do so. TODO: We currently can't do
 		// this check earlier, but if libcontainer.Process.User was typesafe
 		// this might work.
 		if len(addGroups) > 0 {
-			return fmt.Errorf("cannot set any additional groups in a rootless container")
+			return errors.New("cannot set any additional groups in a rootless container")
 		}
 	}
 
 	// Before we change to the container's user make sure that the processes
 	// STDIO is correctly owned by the user that we are switching to.
-	if err := fixStdioPermissions(config, execUser); err != nil {
+	if err := fixStdioPermissions(execUser); err != nil {
+		return err
+	}
+
+	setgroups, err := os.ReadFile("/proc/self/setgroups")
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
@@ -302,10 +372,12 @@ func setupUser(config *initConfig) error {
 	// There's nothing we can do about /etc/group entries, so we silently
 	// ignore setting groups here (since the user didn't explicitly ask us to
 	// set the group).
-	if !config.Rootless {
+	allowSupGroups := !config.RootlessEUID && string(bytes.TrimSpace(setgroups)) != "deny"
+
+	if allowSupGroups {
 		suppGroups := append(execUser.Sgids, addGroups...)
 		if err := unix.Setgroups(suppGroups); err != nil {
-			return err
+			return &os.SyscallError{Syscall: "setgroups", Err: err}
 		}
 	}
 
@@ -328,40 +400,38 @@ func setupUser(config *initConfig) error {
 // fixStdioPermissions fixes the permissions of PID 1's STDIO within the container to the specified user.
 // The ownership needs to match because it is created outside of the container and needs to be
 // localized.
-func fixStdioPermissions(config *initConfig, u *user.ExecUser) error {
+func fixStdioPermissions(u *user.ExecUser) error {
 	var null unix.Stat_t
 	if err := unix.Stat("/dev/null", &null); err != nil {
-		return err
+		return &os.PathError{Op: "stat", Path: "/dev/null", Err: err}
 	}
-	for _, fd := range []uintptr{
-		os.Stdin.Fd(),
-		os.Stderr.Fd(),
-		os.Stdout.Fd(),
-	} {
+	for _, file := range []*os.File{os.Stdin, os.Stdout, os.Stderr} {
 		var s unix.Stat_t
-		if err := unix.Fstat(int(fd), &s); err != nil {
-			return err
+		if err := unix.Fstat(int(file.Fd()), &s); err != nil {
+			return &os.PathError{Op: "fstat", Path: file.Name(), Err: err}
 		}
 
-		// Skip chown of /dev/null if it was used as one of the STDIO fds.
-		if s.Rdev == null.Rdev {
+		// Skip chown if uid is already the one we want.
+		if int(s.Uid) == u.Uid {
 			continue
 		}
 
-		// We only change the uid owner (as it is possible for the mount to
+		// We only change the uid (as it is possible for the mount to
 		// prefer a different gid, and there's no reason for us to change it).
 		// The reason why we don't just leave the default uid=X mount setup is
 		// that users expect to be able to actually use their console. Without
 		// this code, you couldn't effectively run as a non-root user inside a
 		// container and also have a console set up.
-		if err := unix.Fchown(int(fd), u.Uid, int(s.Gid)); err != nil {
+		if err := file.Chown(u.Uid, int(s.Gid)); err != nil {
 			// If we've hit an EINVAL then s.Gid isn't mapped in the user
 			// namespace. If we've hit an EPERM then the inode's current owner
 			// is not mapped in our user namespace (in particular,
-			// privileged_wrt_inode_uidgid() has failed). In either case, we
-			// are in a configuration where it's better for us to just not
-			// touch the stdio rather than bail at this point.
-			if err == unix.EINVAL || err == unix.EPERM {
+			// privileged_wrt_inode_uidgid() has failed). Read-only
+			// /dev can result in EROFS error. In any case, it's
+			// better for us to just not touch the stdio rather
+			// than bail at this point.
+
+			if errors.Is(err, unix.EINVAL) || errors.Is(err, unix.EPERM) || errors.Is(err, unix.EROFS) {
 				continue
 			}
 			return err
@@ -418,8 +488,8 @@ func setupRoute(config *configs.Config) error {
 
 func setupRlimits(limits []configs.Rlimit, pid int) error {
 	for _, rlimit := range limits {
-		if err := system.Prlimit(pid, rlimit.Type, unix.Rlimit{Max: rlimit.Hard, Cur: rlimit.Soft}); err != nil {
-			return fmt.Errorf("error setting rlimit type %v: %v", rlimit.Type, err)
+		if err := unix.Prlimit(pid, rlimit.Type, &unix.Rlimit{Max: rlimit.Hard, Cur: rlimit.Soft}, nil); err != nil {
+			return fmt.Errorf("error setting rlimit type %v: %w", rlimit.Type, err)
 		}
 	}
 	return nil
@@ -427,6 +497,7 @@ func setupRlimits(limits []configs.Rlimit, pid int) error {
 
 const _P_PID = 1
 
+//nolint:structcheck,unused
 type siginfo struct {
 	si_signo int32
 	si_errno int32
@@ -443,25 +514,10 @@ func isWaitable(pid int) (bool, error) {
 	si := &siginfo{}
 	_, _, e := unix.Syscall6(unix.SYS_WAITID, _P_PID, uintptr(pid), uintptr(unsafe.Pointer(si)), unix.WEXITED|unix.WNOWAIT|unix.WNOHANG, 0, 0)
 	if e != 0 {
-		return false, os.NewSyscallError("waitid", e)
+		return false, &os.SyscallError{Syscall: "waitid", Err: e}
 	}
 
 	return si.si_pid != 0, nil
-}
-
-// isNoChildren returns true if err represents a unix.ECHILD (formerly syscall.ECHILD) false otherwise
-func isNoChildren(err error) bool {
-	switch err := err.(type) {
-	case syscall.Errno:
-		if err == unix.ECHILD {
-			return true
-		}
-	case *os.SyscallError:
-		if err.Err == unix.ECHILD {
-			return true
-		}
-	}
-	return false
 }
 
 // signalAllProcesses freezes then iterates over all the processes inside the
@@ -476,7 +532,9 @@ func signalAllProcesses(m cgroups.Manager, s os.Signal) error {
 	}
 	pids, err := m.GetAllPids()
 	if err != nil {
-		m.Freeze(configs.Thawed)
+		if err := m.Freeze(configs.Thawed); err != nil {
+			logrus.Warn(err)
+		}
 		return err
 	}
 	for _, pid := range pids {
@@ -507,7 +565,7 @@ func signalAllProcesses(m cgroups.Manager, s os.Signal) error {
 	for _, p := range procs {
 		if s != unix.SIGKILL {
 			if ok, err := isWaitable(p.Pid); err != nil {
-				if !isNoChildren(err) {
+				if !errors.Is(err, unix.ECHILD) {
 					logrus.Warn("signalAllProcesses: ", p.Pid, err)
 				}
 				continue
@@ -524,7 +582,7 @@ func signalAllProcesses(m cgroups.Manager, s os.Signal) error {
 		// to retrieve its exit code.
 		if subreaper == 0 {
 			if _, err := p.Wait(); err != nil {
-				if !isNoChildren(err) {
+				if !errors.Is(err, unix.ECHILD) {
 					logrus.Warn("wait: ", err)
 				}
 			}

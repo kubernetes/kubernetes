@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -26,31 +27,31 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
 // syncStatusOnly only updates Deployments Status and doesn't take any mutating actions.
-func (dc *DeploymentController) syncStatusOnly(d *apps.Deployment, rsList []*apps.ReplicaSet) error {
-	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
+func (dc *DeploymentController) syncStatusOnly(ctx context.Context, d *apps.Deployment, rsList []*apps.ReplicaSet) error {
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(ctx, d, rsList, false)
 	if err != nil {
 		return err
 	}
 
 	allRSs := append(oldRSs, newRS)
-	return dc.syncDeploymentStatus(allRSs, newRS, d)
+	return dc.syncDeploymentStatus(ctx, allRSs, newRS, d)
 }
 
 // sync is responsible for reconciling deployments on scaling events or when they
 // are paused.
-func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaSet) error {
-	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
+func (dc *DeploymentController) sync(ctx context.Context, d *apps.Deployment, rsList []*apps.ReplicaSet) error {
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(ctx, d, rsList, false)
 	if err != nil {
 		return err
 	}
-	if err := dc.scale(d, newRS, oldRSs); err != nil {
+	if err := dc.scale(ctx, d, newRS, oldRSs); err != nil {
 		// If we get an error while trying to scale, the deployment will be requeued
 		// so we can abort this resync
 		return err
@@ -58,19 +59,19 @@ func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaS
 
 	// Clean up the deployment when it's paused and no rollback is in flight.
 	if d.Spec.Paused && getRollbackTo(d) == nil {
-		if err := dc.cleanupDeployment(oldRSs, d); err != nil {
+		if err := dc.cleanupDeployment(ctx, oldRSs, d); err != nil {
 			return err
 		}
 	}
 
 	allRSs := append(oldRSs, newRS)
-	return dc.syncDeploymentStatus(allRSs, newRS, d)
+	return dc.syncDeploymentStatus(ctx, allRSs, newRS, d)
 }
 
 // checkPausedConditions checks if the given deployment is paused or not and adds an appropriate condition.
 // These conditions are needed so that we won't accidentally report lack of progress for resumed deployments
 // that were paused for longer than progressDeadlineSeconds.
-func (dc *DeploymentController) checkPausedConditions(d *apps.Deployment) error {
+func (dc *DeploymentController) checkPausedConditions(ctx context.Context, d *apps.Deployment) error {
 	if !deploymentutil.HasProgressDeadline(d) {
 		return nil
 	}
@@ -97,7 +98,7 @@ func (dc *DeploymentController) checkPausedConditions(d *apps.Deployment) error 
 	}
 
 	var err error
-	d, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(d)
+	_, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{})
 	return err
 }
 
@@ -112,11 +113,11 @@ func (dc *DeploymentController) checkPausedConditions(d *apps.Deployment) error 
 //
 // Note that currently the deployment controller is using caches to avoid querying the server for reads.
 // This may lead to stale reads of replica sets, thus incorrect deployment status.
-func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(d *apps.Deployment, rsList []*apps.ReplicaSet, createIfNotExisted bool) (*apps.ReplicaSet, []*apps.ReplicaSet, error) {
+func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(ctx context.Context, d *apps.Deployment, rsList []*apps.ReplicaSet, createIfNotExisted bool) (*apps.ReplicaSet, []*apps.ReplicaSet, error) {
 	_, allOldRSs := deploymentutil.FindOldReplicaSets(d, rsList)
 
 	// Get new replica set with the updated revision number
-	newRS, err := dc.getNewReplicaSet(d, rsList, allOldRSs, createIfNotExisted)
+	newRS, err := dc.getNewReplicaSet(ctx, d, rsList, allOldRSs, createIfNotExisted)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -124,12 +125,17 @@ func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(d *apps.Deploym
 	return newRS, allOldRSs, nil
 }
 
+const (
+	// limit revision history length to 100 element (~2000 chars)
+	maxRevHistoryLengthInChars = 2000
+)
+
 // Returns a replica set that matches the intent of the given deployment. Returns nil if the new replica set doesn't exist yet.
 // 1. Get existing new RS (the RS that the given deployment targets, whose pod template is the same as deployment's).
 // 2. If there's existing new RS, update its revision number if it's smaller than (maxOldRevision + 1), where maxOldRevision is the max revision number among all old RSes.
 // 3. If there's no existing new RS and createIfNotExisted is true, create one with appropriate revision number (maxOldRevision + 1) and replicas.
 // Note that the pod-template-hash will be added to adopted RSes and pods.
-func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, oldRSs []*apps.ReplicaSet, createIfNotExisted bool) (*apps.ReplicaSet, error) {
+func (dc *DeploymentController) getNewReplicaSet(ctx context.Context, d *apps.Deployment, rsList, oldRSs []*apps.ReplicaSet, createIfNotExisted bool) (*apps.ReplicaSet, error) {
 	existingNewRS := deploymentutil.FindNewReplicaSet(d, rsList)
 
 	// Calculate the max revision number among all old RSes
@@ -145,11 +151,11 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 		rsCopy := existingNewRS.DeepCopy()
 
 		// Set existing new replica set's annotation
-		annotationsUpdated := deploymentutil.SetNewReplicaSetAnnotations(d, rsCopy, newRevision, true)
+		annotationsUpdated := deploymentutil.SetNewReplicaSetAnnotations(d, rsCopy, newRevision, true, maxRevHistoryLengthInChars)
 		minReadySecondsNeedsUpdate := rsCopy.Spec.MinReadySeconds != d.Spec.MinReadySeconds
 		if annotationsUpdated || minReadySecondsNeedsUpdate {
 			rsCopy.Spec.MinReadySeconds = d.Spec.MinReadySeconds
-			return dc.client.AppsV1().ReplicaSets(rsCopy.ObjectMeta.Namespace).Update(rsCopy)
+			return dc.client.AppsV1().ReplicaSets(rsCopy.ObjectMeta.Namespace).Update(ctx, rsCopy, metav1.UpdateOptions{})
 		}
 
 		// Should use the revision in existingNewRS's annotation, since it set by before
@@ -167,7 +173,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 
 		if needsUpdate {
 			var err error
-			if d, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(d); err != nil {
+			if _, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{}); err != nil {
 				return nil, err
 			}
 		}
@@ -209,12 +215,12 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 
 	*(newRS.Spec.Replicas) = newReplicasCount
 	// Set new replica set's annotation
-	deploymentutil.SetNewReplicaSetAnnotations(d, &newRS, newRevision, false)
+	deploymentutil.SetNewReplicaSetAnnotations(d, &newRS, newRevision, false, maxRevHistoryLengthInChars)
 	// Create the new ReplicaSet. If it already exists, then we need to check for possible
 	// hash collisions. If there is any other error, we need to report it in the status of
 	// the Deployment.
 	alreadyExists := false
-	createdRS, err := dc.client.AppsV1().ReplicaSets(d.Namespace).Create(&newRS)
+	createdRS, err := dc.client.AppsV1().ReplicaSets(d.Namespace).Create(ctx, &newRS, metav1.CreateOptions{})
 	switch {
 	// We may end up hitting this due to a slow cache or a fast resync of the Deployment.
 	case errors.IsAlreadyExists(err):
@@ -246,10 +252,13 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 		*d.Status.CollisionCount++
 		// Update the collisionCount for the Deployment and let it requeue by returning the original
 		// error.
-		_, dErr := dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(d)
+		_, dErr := dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{})
 		if dErr == nil {
 			klog.V(2).Infof("Found a hash collision for deployment %q - bumping collisionCount (%d->%d) to resolve it", d.Name, preCollisionCount, *d.Status.CollisionCount)
 		}
+		return nil, err
+	case errors.HasStatusCause(err, v1.NamespaceTerminatingCause):
+		// if the namespace is terminating, all subsequent creates will fail and we can safely do nothing
 		return nil, err
 	case err != nil:
 		msg := fmt.Sprintf("Failed to create new replica set %q: %v", newRS.Name, err)
@@ -259,7 +268,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 			// We don't really care about this error at this point, since we have a bigger issue to report.
 			// TODO: Identify which errors are permanent and switch DeploymentIsFailed to take into account
 			// these reasons as well. Related issue: https://github.com/kubernetes/kubernetes/issues/18568
-			_, _ = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(d)
+			_, _ = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{})
 		}
 		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, deploymentutil.FailedRSCreateReason, msg)
 		return nil, err
@@ -276,7 +285,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 		needsUpdate = true
 	}
 	if needsUpdate {
-		_, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(d)
+		_, err = dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(ctx, d, metav1.UpdateOptions{})
 	}
 	return createdRS, err
 }
@@ -286,14 +295,14 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 // have the effect of hastening the rollout progress, which could produce a higher proportion of unavailable
 // replicas in the event of a problem with the rolled out template. Should run only on scaling events or
 // when a deployment is paused and not during the normal rollout process.
-func (dc *DeploymentController) scale(deployment *apps.Deployment, newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet) error {
+func (dc *DeploymentController) scale(ctx context.Context, deployment *apps.Deployment, newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet) error {
 	// If there is only one active replica set then we should scale that up to the full count of the
 	// deployment. If there is no active replica set, then we should scale up the newest replica set.
 	if activeOrLatest := deploymentutil.FindActiveOrLatest(newRS, oldRSs); activeOrLatest != nil {
 		if *(activeOrLatest.Spec.Replicas) == *(deployment.Spec.Replicas) {
 			return nil
 		}
-		_, _, err := dc.scaleReplicaSetAndRecordEvent(activeOrLatest, *(deployment.Spec.Replicas), deployment)
+		_, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, activeOrLatest, *(deployment.Spec.Replicas), deployment)
 		return err
 	}
 
@@ -301,7 +310,7 @@ func (dc *DeploymentController) scale(deployment *apps.Deployment, newRS *apps.R
 	// This case handles replica set adoption during a saturated new replica set.
 	if deploymentutil.IsSaturated(deployment, newRS) {
 		for _, old := range controller.FilterActiveReplicaSets(oldRSs) {
-			if _, _, err := dc.scaleReplicaSetAndRecordEvent(old, 0, deployment); err != nil {
+			if _, _, err := dc.scaleReplicaSetAndRecordEvent(ctx, old, 0, deployment); err != nil {
 				return err
 			}
 		}
@@ -375,7 +384,7 @@ func (dc *DeploymentController) scale(deployment *apps.Deployment, newRS *apps.R
 			}
 
 			// TODO: Use transactions when we have them.
-			if _, _, err := dc.scaleReplicaSet(rs, nameToSize[rs.Name], deployment, scalingOperation); err != nil {
+			if _, _, err := dc.scaleReplicaSet(ctx, rs, nameToSize[rs.Name], deployment, scalingOperation); err != nil {
 				// Return as soon as we fail, the deployment is requeued
 				return err
 			}
@@ -384,7 +393,7 @@ func (dc *DeploymentController) scale(deployment *apps.Deployment, newRS *apps.R
 	return nil
 }
 
-func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment) (bool, *apps.ReplicaSet, error) {
+func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(ctx context.Context, rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment) (bool, *apps.ReplicaSet, error) {
 	// No need to scale
 	if *(rs.Spec.Replicas) == newScale {
 		return false, rs, nil
@@ -395,11 +404,11 @@ func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *apps.ReplicaSe
 	} else {
 		scalingOperation = "down"
 	}
-	scaled, newRS, err := dc.scaleReplicaSet(rs, newScale, deployment, scalingOperation)
+	scaled, newRS, err := dc.scaleReplicaSet(ctx, rs, newScale, deployment, scalingOperation)
 	return scaled, newRS, err
 }
 
-func (dc *DeploymentController) scaleReplicaSet(rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment, scalingOperation string) (bool, *apps.ReplicaSet, error) {
+func (dc *DeploymentController) scaleReplicaSet(ctx context.Context, rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment, scalingOperation string) (bool, *apps.ReplicaSet, error) {
 
 	sizeNeedsUpdate := *(rs.Spec.Replicas) != newScale
 
@@ -408,13 +417,14 @@ func (dc *DeploymentController) scaleReplicaSet(rs *apps.ReplicaSet, newScale in
 	scaled := false
 	var err error
 	if sizeNeedsUpdate || annotationsNeedUpdate {
+		oldScale := *(rs.Spec.Replicas)
 		rsCopy := rs.DeepCopy()
 		*(rsCopy.Spec.Replicas) = newScale
 		deploymentutil.SetReplicasAnnotations(rsCopy, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
-		rs, err = dc.client.AppsV1().ReplicaSets(rsCopy.Namespace).Update(rsCopy)
+		rs, err = dc.client.AppsV1().ReplicaSets(rsCopy.Namespace).Update(ctx, rsCopy, metav1.UpdateOptions{})
 		if err == nil && sizeNeedsUpdate {
 			scaled = true
-			dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d", scalingOperation, rs.Name, newScale)
+			dc.eventRecorder.Eventf(deployment, v1.EventTypeNormal, "ScalingReplicaSet", "Scaled %s replica set %s to %d from %d", scalingOperation, rs.Name, newScale, oldScale)
 		}
 	}
 	return scaled, rs, err
@@ -423,7 +433,7 @@ func (dc *DeploymentController) scaleReplicaSet(rs *apps.ReplicaSet, newScale in
 // cleanupDeployment is responsible for cleaning up a deployment ie. retains all but the latest N old replica sets
 // where N=d.Spec.RevisionHistoryLimit. Old replica sets are older versions of the podtemplate of a deployment kept
 // around by default 1) for historical reasons and 2) for the ability to rollback a deployment.
-func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, deployment *apps.Deployment) error {
+func (dc *DeploymentController) cleanupDeployment(ctx context.Context, oldRSs []*apps.ReplicaSet, deployment *apps.Deployment) error {
 	if !deploymentutil.HasRevisionHistoryLimit(deployment) {
 		return nil
 	}
@@ -439,7 +449,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, dep
 		return nil
 	}
 
-	sort.Sort(controller.ReplicaSetsByCreationTimestamp(cleanableRSes))
+	sort.Sort(deploymentutil.ReplicaSetsByRevision(cleanableRSes))
 	klog.V(4).Infof("Looking to cleanup old replica sets for deployment %q", deployment.Name)
 
 	for i := int32(0); i < diff; i++ {
@@ -449,7 +459,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, dep
 			continue
 		}
 		klog.V(4).Infof("Trying to cleanup replica set %q for deployment %q", rs.Name, deployment.Name)
-		if err := dc.client.AppsV1().ReplicaSets(rs.Namespace).Delete(rs.Name, nil); err != nil && !errors.IsNotFound(err) {
+		if err := dc.client.AppsV1().ReplicaSets(rs.Namespace).Delete(ctx, rs.Name, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			// Return error instead of aggregating and continuing DELETEs on the theory
 			// that we may be overloading the api server.
 			return err
@@ -460,7 +470,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, dep
 }
 
 // syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
-func (dc *DeploymentController) syncDeploymentStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
+func (dc *DeploymentController) syncDeploymentStatus(ctx context.Context, allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
 	newStatus := calculateStatus(allRSs, newRS, d)
 
 	if reflect.DeepEqual(d.Status, newStatus) {
@@ -469,7 +479,7 @@ func (dc *DeploymentController) syncDeploymentStatus(allRSs []*apps.ReplicaSet, 
 
 	newDeployment := d
 	newDeployment.Status = newStatus
-	_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(newDeployment)
+	_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(ctx, newDeployment, metav1.UpdateOptions{})
 	return err
 }
 
@@ -516,9 +526,8 @@ func calculateStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployme
 // by looking at the desired-replicas annotation in the active replica sets of the deployment.
 //
 // rsList should come from getReplicaSetsForDeployment(d).
-// podMap should come from getPodMapForDeployment(d, rsList).
-func (dc *DeploymentController) isScalingEvent(d *apps.Deployment, rsList []*apps.ReplicaSet) (bool, error) {
-	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
+func (dc *DeploymentController) isScalingEvent(ctx context.Context, d *apps.Deployment, rsList []*apps.ReplicaSet) (bool, error) {
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(ctx, d, rsList, false)
 	if err != nil {
 		return false, err
 	}

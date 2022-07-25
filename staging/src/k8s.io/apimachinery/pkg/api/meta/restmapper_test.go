@@ -588,23 +588,23 @@ func TestRESTMapperRESTMappingSelectsVersion(t *testing.T) {
 	}
 
 	// mismatch of version
-	mapping, err = mapper.RESTMapping(internalObjectGK, expectedGroupVersion2.Version)
+	_, err = mapper.RESTMapping(internalObjectGK, expectedGroupVersion2.Version)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	mapping, err = mapper.RESTMapping(otherObjectGK, expectedGroupVersion1.Version)
+	_, err = mapper.RESTMapping(otherObjectGK, expectedGroupVersion1.Version)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
 
 	// not in the search versions
-	mapping, err = mapper.RESTMapping(otherObjectGK, expectedGroupVersion3.Version)
+	_, err = mapper.RESTMapping(otherObjectGK, expectedGroupVersion3.Version)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
 
 	// explicit search order
-	mapping, err = mapper.RESTMapping(otherObjectGK, expectedGroupVersion3.Version, expectedGroupVersion1.Version)
+	_, err = mapper.RESTMapping(otherObjectGK, expectedGroupVersion3.Version, expectedGroupVersion1.Version)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}

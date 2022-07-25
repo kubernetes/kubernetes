@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"os"
 
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 type flexVolumeDetacher struct {
@@ -51,18 +52,18 @@ func (d *flexVolumeDetacher) Detach(volumeName string, hostName types.NodeName) 
 // UnmountDevice is part of the volume.Detacher interface.
 func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 
-	pathExists, pathErr := util.PathExists(deviceMountPath)
+	pathExists, pathErr := mount.PathExists(deviceMountPath)
 	if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)
 		return nil
 	}
-	if pathErr != nil && !util.IsCorruptedMnt(pathErr) {
-		return fmt.Errorf("Error checking path: %v", pathErr)
+	if pathErr != nil && !mount.IsCorruptedMnt(pathErr) {
+		return fmt.Errorf("error checking path: %w", pathErr)
 	}
 
 	notmnt, err := isNotMounted(d.plugin.host.GetMounter(d.plugin.GetPluginName()), deviceMountPath)
 	if err != nil {
-		if util.IsCorruptedMnt(err) {
+		if mount.IsCorruptedMnt(err) {
 			notmnt = false // Corrupted error is assumed to be mounted.
 		} else {
 			return err
@@ -85,8 +86,8 @@ func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 	}
 
 	// Flexvolume driver may remove the directory. Ignore if it does.
-	if pathExists, pathErr := util.PathExists(deviceMountPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+	if pathExists, pathErr := mount.PathExists(deviceMountPath); pathErr != nil {
+		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
 		return nil
 	}

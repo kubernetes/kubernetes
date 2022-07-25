@@ -49,6 +49,12 @@ func (r *REST) New() runtime.Object {
 	return &authorizationapi.SelfSubjectRulesReview{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *REST) Destroy() {
+	// Given no underlying store, we don't destroy anything
+	// here explicitly.
+}
+
 // Create attempts to get self subject rules in specific namespace.
 func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	selfSRR, ok := obj.(*authorizationapi.SelfSubjectRulesReview)
@@ -65,6 +71,13 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	if namespace == "" {
 		return nil, apierrors.NewBadRequest("no namespace on request")
 	}
+
+	if createValidation != nil {
+		if err := createValidation(ctx, obj.DeepCopyObject()); err != nil {
+			return nil, err
+		}
+	}
+
 	resourceInfo, nonResourceInfo, incomplete, err := r.ruleResolver.RulesFor(user, namespace)
 
 	ret := &authorizationapi.SelfSubjectRulesReview{

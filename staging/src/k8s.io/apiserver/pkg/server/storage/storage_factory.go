@@ -22,7 +22,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -46,7 +46,7 @@ type Backend struct {
 type StorageFactory interface {
 	// New finds the storage destination for the given group and resource. It will
 	// return an error if the group has no storage destination configured.
-	NewConfig(groupResource schema.GroupResource) (*storagebackend.Config, error)
+	NewConfig(groupResource schema.GroupResource) (*storagebackend.ConfigForResource, error)
 
 	// ResourcePrefix returns the overridden resource prefix for the GroupResource
 	// This allows for cohabitation of resources with different native types and provides
@@ -86,7 +86,7 @@ type DefaultStorageFactory struct {
 	APIResourceConfigSource APIResourceConfigSource
 
 	// newStorageCodecFn exists to be overwritten for unit testing.
-	newStorageCodecFn func(opts StorageCodecConfig) (codec runtime.Codec, err error)
+	newStorageCodecFn func(opts StorageCodecConfig) (codec runtime.Codec, encodeVersioner runtime.GroupVersioner, err error)
 }
 
 type groupResourceOverrides struct {
@@ -121,7 +121,7 @@ type groupResourceOverrides struct {
 // Apply overrides the provided config and options if the override has a value in that position
 func (o groupResourceOverrides) Apply(config *storagebackend.Config, options *StorageCodecConfig) {
 	if len(o.etcdLocation) > 0 {
-		config.ServerList = o.etcdLocation
+		config.Transport.ServerList = o.etcdLocation
 	}
 	if len(o.etcdPrefix) > 0 {
 		config.Prefix = o.etcdPrefix
@@ -240,7 +240,8 @@ func getAllResourcesAlias(resource schema.GroupResource) schema.GroupResource {
 
 func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.GroupResource) schema.GroupResource {
 	for _, potentialStorageResource := range s.Overrides[groupResource].cohabitatingResources {
-		if s.APIResourceConfigSource.AnyVersionForGroupEnabled(potentialStorageResource.Group) {
+		// TODO deads2k or liggitt determine if have ever stored any of our cohabitating resources in a different location on new clusters
+		if s.APIResourceConfigSource.AnyResourceForGroupEnabled(potentialStorageResource.Group) {
 			return potentialStorageResource
 		}
 	}
@@ -250,7 +251,7 @@ func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.Gro
 
 // New finds the storage destination for the given group and resource. It will
 // return an error if the group has no storage destination configured.
-func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.Config, error) {
+func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.ConfigForResource, error) {
 	chosenStorageResource := s.getStorageGroupResource(groupResource)
 
 	// operate on copy
@@ -278,19 +279,19 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	}
 	codecConfig.Config = storageConfig
 
-	storageConfig.Codec, err = s.newStorageCodecFn(codecConfig)
+	storageConfig.Codec, storageConfig.EncodeVersioner, err = s.newStorageCodecFn(codecConfig)
 	if err != nil {
 		return nil, err
 	}
 	klog.V(3).Infof("storing %v in %v, reading as %v from %#v", groupResource, codecConfig.StorageVersion, codecConfig.MemoryVersion, codecConfig.Config)
 
-	return &storageConfig, nil
+	return storageConfig.ForResource(groupResource), nil
 }
 
 // Backends returns all backends for all registered storage destinations.
 // Used for getting all instances for health validations.
 func (s *DefaultStorageFactory) Backends() []Backend {
-	servers := sets.NewString(s.StorageConfig.ServerList...)
+	servers := sets.NewString(s.StorageConfig.Transport.ServerList...)
 
 	for _, overrides := range s.Overrides {
 		servers.Insert(overrides.etcdLocation...)
@@ -299,16 +300,16 @@ func (s *DefaultStorageFactory) Backends() []Backend {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true,
 	}
-	if len(s.StorageConfig.CertFile) > 0 && len(s.StorageConfig.KeyFile) > 0 {
-		cert, err := tls.LoadX509KeyPair(s.StorageConfig.CertFile, s.StorageConfig.KeyFile)
+	if len(s.StorageConfig.Transport.CertFile) > 0 && len(s.StorageConfig.Transport.KeyFile) > 0 {
+		cert, err := tls.LoadX509KeyPair(s.StorageConfig.Transport.CertFile, s.StorageConfig.Transport.KeyFile)
 		if err != nil {
 			klog.Errorf("failed to load key pair while getting backends: %s", err)
 		} else {
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
 	}
-	if len(s.StorageConfig.CAFile) > 0 {
-		if caCert, err := ioutil.ReadFile(s.StorageConfig.CAFile); err != nil {
+	if len(s.StorageConfig.Transport.TrustedCAFile) > 0 {
+		if caCert, err := ioutil.ReadFile(s.StorageConfig.Transport.TrustedCAFile); err != nil {
 			klog.Errorf("failed to read ca file while getting backends: %s", err)
 		} else {
 			caPool := x509.NewCertPool()

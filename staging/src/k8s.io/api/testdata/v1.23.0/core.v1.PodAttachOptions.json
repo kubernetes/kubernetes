@@ -1,0 +1,7 @@
+{
+  "kind": "PodAttachOptions",
+  "apiVersion": "v1",
+  "stdin": true,
+  "stderr": true,
+  "container": "2"
+}

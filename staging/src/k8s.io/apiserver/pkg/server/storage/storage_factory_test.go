@@ -17,7 +17,9 @@ limitations under the License.
 package storage
 
 import (
+	"mime"
 	"reflect"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,9 +35,8 @@ import (
 var (
 	v1GroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
 
-	scheme         = runtime.NewScheme()
-	codecs         = serializer.NewCodecFactory(scheme)
-	parameterCodec = runtime.NewParameterCodec(scheme)
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
 )
 
 func init() {
@@ -60,7 +61,24 @@ type fakeNegotiater struct {
 func (n *fakeNegotiater) SupportedMediaTypes() []runtime.SerializerInfo {
 	var out []runtime.SerializerInfo
 	for _, s := range n.types {
-		info := runtime.SerializerInfo{Serializer: n.serializer, MediaType: s, EncodesAsText: true}
+		mediaType, _, err := mime.ParseMediaType(s)
+		if err != nil {
+			panic(err)
+		}
+		parts := strings.SplitN(mediaType, "/", 2)
+		if len(parts) == 1 {
+			// this is an error on the server side
+			parts = append(parts, "")
+		}
+
+		info := runtime.SerializerInfo{
+			Serializer:       n.serializer,
+			MediaType:        s,
+			MediaTypeType:    parts[0],
+			MediaTypeSubType: parts[1],
+			EncodesAsText:    true,
+		}
+
 		for _, t := range n.streamTypes {
 			if t == s {
 				info.StreamSerializer = &runtime.StreamSerializerInfo{
@@ -104,7 +122,7 @@ func TestConfigurableStorageFactory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Prefix != "/prefix_for_test" || !reflect.DeepEqual(config.ServerList, []string{"/server2"}) {
+	if config.Prefix != "/prefix_for_test" || !reflect.DeepEqual(config.Transport.ServerList, []string{"/server2"}) {
 		t.Errorf("unexpected config %#v", config)
 	}
 	if !called {
@@ -136,8 +154,10 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 	defaultEtcdLocation := []string{"http://127.0.0.1"}
 	for i, test := range testCases {
 		defaultConfig := storagebackend.Config{
-			Prefix:     "/registry",
-			ServerList: defaultEtcdLocation,
+			Prefix: "/registry",
+			Transport: storagebackend.TransportConfig{
+				ServerList: defaultEtcdLocation,
+			},
 		}
 		storageFactory := NewDefaultStorageFactory(defaultConfig, "", codecs, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
 		storageFactory.SetEtcdLocation(test.resource, test.servers)
@@ -148,8 +168,8 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(config.ServerList, test.servers) {
-			t.Errorf("%d: expected %v, got %v", i, test.servers, config.ServerList)
+		if !reflect.DeepEqual(config.Transport.ServerList, test.servers) {
+			t.Errorf("%d: expected %v, got %v", i, test.servers, config.Transport.ServerList)
 			continue
 		}
 
@@ -158,8 +178,8 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(config.ServerList, defaultEtcdLocation) {
-			t.Errorf("%d: expected %v, got %v", i, defaultEtcdLocation, config.ServerList)
+		if !reflect.DeepEqual(config.Transport.ServerList, defaultEtcdLocation) {
+			t.Errorf("%d: expected %v, got %v", i, defaultEtcdLocation, config.Transport.ServerList)
 			continue
 		}
 

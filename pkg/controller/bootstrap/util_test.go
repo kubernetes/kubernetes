@@ -20,8 +20,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
@@ -179,28 +177,4 @@ func TestMismatchSecretName(t *testing.T) {
 	if ok {
 		t.Errorf("Token validation should fail with mismatched name")
 	}
-}
-
-func TestParseSecretName(t *testing.T) {
-	tokenID, ok := parseSecretName("bootstrap-token-abc123")
-	assert.True(t, ok, "parseSecretName should accept valid name")
-	assert.Equal(t, "abc123", tokenID, "parseSecretName should return token ID")
-
-	_, ok = parseSecretName("")
-	assert.False(t, ok, "parseSecretName should reject blank name")
-
-	_, ok = parseSecretName("abc123")
-	assert.False(t, ok, "parseSecretName should reject with no prefix")
-
-	_, ok = parseSecretName("bootstrap-token-")
-	assert.False(t, ok, "parseSecretName should reject no token ID")
-
-	_, ok = parseSecretName("bootstrap-token-abc")
-	assert.False(t, ok, "parseSecretName should reject short token ID")
-
-	_, ok = parseSecretName("bootstrap-token-abc123ghi")
-	assert.False(t, ok, "parseSecretName should reject long token ID")
-
-	_, ok = parseSecretName("bootstrap-token-ABC123")
-	assert.False(t, ok, "parseSecretName should reject invalid token ID")
 }

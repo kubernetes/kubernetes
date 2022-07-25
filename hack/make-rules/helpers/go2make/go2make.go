@@ -148,7 +148,7 @@ func saveImport(pkgName string) error {
 
 		// Emit a variable for each package.
 		var buf bytes.Buffer
-		buf.WriteString(pkgName)
+		buf.WriteString("GODEPS_" + pkgName)
 		buf.WriteString(" := ")
 
 		// Packages depend on their own directories, their own files, and

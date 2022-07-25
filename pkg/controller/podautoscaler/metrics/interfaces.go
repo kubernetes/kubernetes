@@ -17,10 +17,11 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"time"
 
-	autoscaling "k8s.io/api/autoscaling/v2beta2"
-	"k8s.io/api/core/v1"
+	autoscaling "k8s.io/api/autoscaling/v2"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -38,8 +39,9 @@ type PodMetricsInfo map[string]PodMetric
 // resource metrics as well as pod-level arbitrary metrics
 type MetricsClient interface {
 	// GetResourceMetric gets the given resource metric (and an associated oldest timestamp)
-	// for all pods matching the specified selector in the given namespace
-	GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error)
+	// for the specified named container in all pods matching the specified selector in the given namespace and when
+	// the container is an empty string it returns the sum of all the container metrics.
+	GetResourceMetric(ctx context.Context, resource v1.ResourceName, namespace string, selector labels.Selector, container string) (PodMetricsInfo, time.Time, error)
 
 	// GetRawMetric gets the given metric (and an associated oldest timestamp)
 	// for all pods matching the specified selector in the given namespace

@@ -19,13 +19,14 @@ package configmap
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -46,6 +47,10 @@ type configMapPlugin struct {
 }
 
 var _ volume.VolumePlugin = &configMapPlugin{}
+
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(configMapPluginName), volName)
+}
 
 func (plugin *configMapPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
@@ -73,7 +78,7 @@ func (plugin *configMapPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.ConfigMap != nil
 }
 
-func (plugin *configMapPlugin) RequiresRemount() bool {
+func (plugin *configMapPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return true
 }
 
@@ -92,7 +97,7 @@ func (plugin *configMapPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts v
 			pod.UID,
 			plugin,
 			plugin.host.GetMounter(plugin.GetPluginName()),
-			volume.MetricsNil{},
+			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
 		source:       *spec.Volume.ConfigMap,
 		pod:          *pod,
@@ -108,7 +113,7 @@ func (plugin *configMapPlugin) NewUnmounter(volName string, podUID types.UID) (v
 			podUID,
 			plugin,
 			plugin.host.GetMounter(plugin.GetPluginName()),
-			volume.MetricsNil{},
+			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil
 }
@@ -128,13 +133,13 @@ type configMapVolume struct {
 	podUID  types.UID
 	plugin  *configMapPlugin
 	mounter mount.Interface
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 var _ volume.Volume = &configMapVolume{}
 
 func (sv *configMapVolume) GetPath() string {
-	return sv.plugin.host.GetPodVolumeDir(sv.podUID, strings.EscapeQualifiedNameForDisk(configMapPluginName), sv.volName)
+	return sv.plugin.host.GetPodVolumeDir(sv.podUID, utilstrings.EscapeQualifiedName(configMapPluginName), sv.volName)
 }
 
 // configMapVolumeMounter handles retrieving secrets from the API server
@@ -152,9 +157,9 @@ var _ volume.Mounter = &configMapVolumeMounter{}
 
 func (sv *configMapVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        true,
-		Managed:         true,
-		SupportsSELinux: true,
+		ReadOnly:       true,
+		Managed:        true,
+		SELinuxRelabel: true,
 	}
 }
 
@@ -168,18 +173,11 @@ func wrappedVolumeSpec() volume.Spec {
 	}
 }
 
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *configMapVolumeMounter) CanMount() error {
-	return nil
+func (b *configMapVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
-func (b *configMapVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
-}
-
-func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *configMapVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
@@ -216,7 +214,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	setupSuccess := false
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
 		return err
 	}
 	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {
@@ -251,9 +249,9 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(b, fsGroup)
+	err = volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
 	if err != nil {
-		klog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
+		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
 		return err
 	}
 	setupSuccess = true
@@ -263,7 +261,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 // MakePayload function is exported so that it can be called from the projection volume driver
 func MakePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
-		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
+		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
 
 	payload := make(map[string]volumeutil.FileProjection, (len(configMap.Data) + len(configMap.BinaryData)))

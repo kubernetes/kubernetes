@@ -42,14 +42,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	oidc "github.com/coreos/go-oidc"
-	"k8s.io/klog"
+	"github.com/coreos/go-oidc"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -70,6 +70,9 @@ type Options struct {
 	// See: https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig
 	IssuerURL string
 
+	// Optional KeySet to allow for synchronous initialization instead of fetching from the remote issuer.
+	KeySet oidc.KeySet
+
 	// ClientID the JWT must be issued for, the "sub" field. This plugin only trusts a single
 	// client to ensure the plugin can be used with public providers.
 	//
@@ -78,14 +81,11 @@ type Options struct {
 	// See: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
 	ClientID string
 
-	// APIAudiences are the audiences that the API server identitifes as. The
-	// (API audiences unioned with the ClientIDs) should have a non-empty
-	// intersection with the request's target audience. This preserves the
-	// behavior of the OIDC authenticator pre-introduction of API audiences.
-	APIAudiences authenticator.Audiences
+	// PEM encoded root certificate contents of the provider.  Mutually exclusive with Client.
+	CAContentProvider CAContentProvider
 
-	// Path to a PEM encoded root certificate of the provider.
-	CAFile string
+	// Optional http.Client used to make all requests to the remote issuer.  Mutually exclusive with CAContentProvider.
+	Client *http.Client
 
 	// UsernameClaim is the JWT field to use as the user's username.
 	UsernameClaim string
@@ -120,6 +120,11 @@ type Options struct {
 
 	// now is used for testing. It defaults to time.Now.
 	now func() time.Time
+}
+
+// Subset of dynamiccertificates.CAContentProvider that can be used to dynamically load root CAs.
+type CAContentProvider interface {
+	CurrentCABundleContent() []byte
 }
 
 // initVerifier creates a new ID token verifier for the given configuration and issuer URL.  On success, calls setVerifier with the
@@ -194,8 +199,6 @@ type Authenticator struct {
 	groupsClaim    string
 	groupsPrefix   string
 	requiredClaims map[string]string
-	clientIDs      authenticator.Audiences
-	apiAudiences   authenticator.Audiences
 
 	// Contains an *oidc.IDTokenVerifier. Do not access directly use the
 	// idTokenVerifier method.
@@ -222,24 +225,6 @@ func (a *Authenticator) Close() {
 	a.cancel()
 }
 
-func New(opts Options) (*Authenticator, error) {
-	return newAuthenticator(opts, func(ctx context.Context, a *Authenticator, config *oidc.Config) {
-		// Asynchronously attempt to initialize the authenticator. This enables
-		// self-hosted providers, providers that run on top of Kubernetes itself.
-		go wait.PollUntil(time.Second*10, func() (done bool, err error) {
-			provider, err := oidc.NewProvider(ctx, a.issuerURL)
-			if err != nil {
-				klog.Errorf("oidc authenticator: initializing plugin: %v", err)
-				return false, nil
-			}
-
-			verifier := provider.Verifier(config)
-			a.setVerifier(verifier)
-			return true, nil
-		}, ctx.Done())
-	})
-}
-
 // whitelist of signing algorithms to ensure users don't mistakenly pass something
 // goofy.
 var allowedSigningAlgs = map[string]bool{
@@ -254,7 +239,7 @@ var allowedSigningAlgs = map[string]bool{
 	oidc.PS512: true,
 }
 
-func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Authenticator, config *oidc.Config)) (*Authenticator, error) {
+func New(opts Options) (*Authenticator, error) {
 	url, err := url.Parse(opts.IssuerURL)
 	if err != nil {
 		return nil, err
@@ -280,24 +265,33 @@ func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Au
 		}
 	}
 
-	var roots *x509.CertPool
-	if opts.CAFile != "" {
-		roots, err = certutil.NewPool(opts.CAFile)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to read the CA file: %v", err)
-		}
-	} else {
-		klog.Info("OIDC: No x509 certificates provided, will use host's root CA set")
+	if opts.Client != nil && opts.CAContentProvider != nil {
+		return nil, fmt.Errorf("oidc: Client and CAContentProvider are mutually exclusive")
 	}
 
-	// Copied from http.DefaultTransport.
-	tr := net.SetTransportDefaults(&http.Transport{
-		// According to golang's doc, if RootCAs is nil,
-		// TLS uses the host's root CA set.
-		TLSClientConfig: &tls.Config{RootCAs: roots},
-	})
+	client := opts.Client
 
-	client := &http.Client{Transport: tr, Timeout: 30 * time.Second}
+	if client == nil {
+		var roots *x509.CertPool
+		if opts.CAContentProvider != nil {
+			// TODO(enj): make this reload CA data dynamically
+			roots, err = certutil.NewPoolFromBytes(opts.CAContentProvider.CurrentCABundleContent())
+			if err != nil {
+				return nil, fmt.Errorf("Failed to read the CA contents: %v", err)
+			}
+		} else {
+			klog.Info("OIDC: No x509 certificates provided, will use host's root CA set")
+		}
+
+		// Copied from http.DefaultTransport.
+		tr := net.SetTransportDefaults(&http.Transport{
+			// According to golang's doc, if RootCAs is nil,
+			// TLS uses the host's root CA set.
+			TLSClientConfig: &tls.Config{RootCAs: roots},
+		})
+
+		client = &http.Client{Transport: tr, Timeout: 30 * time.Second}
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = oidc.ClientContext(ctx, client)
@@ -325,13 +319,29 @@ func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Au
 		groupsClaim:    opts.GroupsClaim,
 		groupsPrefix:   opts.GroupsPrefix,
 		requiredClaims: opts.RequiredClaims,
-		clientIDs:      authenticator.Audiences{opts.ClientID},
-		apiAudiences:   opts.APIAudiences,
 		cancel:         cancel,
 		resolver:       resolver,
 	}
 
-	initVerifier(ctx, authenticator, verifierConfig)
+	if opts.KeySet != nil {
+		// We already have a key set, synchronously initialize the verifier.
+		authenticator.setVerifier(oidc.NewVerifier(opts.IssuerURL, opts.KeySet, verifierConfig))
+	} else {
+		// Asynchronously attempt to initialize the authenticator. This enables
+		// self-hosted providers, providers that run on top of Kubernetes itself.
+		go wait.PollImmediateUntil(10*time.Second, func() (done bool, err error) {
+			provider, err := oidc.NewProvider(ctx, opts.IssuerURL)
+			if err != nil {
+				klog.Errorf("oidc authenticator: initializing plugin: %v", err)
+				return false, nil
+			}
+
+			verifier := provider.Verifier(verifierConfig)
+			authenticator.setVerifier(verifier)
+			return true, nil
+		}, ctx.Done())
+	}
+
 	return authenticator, nil
 }
 
@@ -535,18 +545,13 @@ func (r *claimResolver) resolve(endpoint endpoint, allClaims claims) error {
 	}
 	value, ok := distClaims[r.claim]
 	if !ok {
-		return fmt.Errorf("jwt returned by distributed claim endpoint %s did not contain claim: %v", endpoint, r.claim)
+		return fmt.Errorf("jwt returned by distributed claim endpoint %q did not contain claim: %v", endpoint.URL, r.claim)
 	}
 	allClaims[r.claim] = value
 	return nil
 }
 
 func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
-	if reqAuds, ok := authenticator.AudiencesFrom(ctx); ok {
-		if len(reqAuds.Intersect(a.clientIDs)) == 0 && len(reqAuds.Intersect(a.apiAudiences)) == 0 {
-			return nil, false, nil
-		}
-	}
 	if !hasCorrectIssuer(a.issuerURL, token) {
 		return nil, false, nil
 	}

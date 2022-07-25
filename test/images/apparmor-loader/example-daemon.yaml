@@ -1,13 +1,18 @@
 # The example DaemonSet demonstrating how the profile loader can be deployed onto a cluster to
 # automatically load AppArmor profiles from a ConfigMap.
 
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: apparmor-loader
   # Namespace must match that of the ConfigMap.
   namespace: apparmor
+  labels:
+    daemon: apparmor-loader
 spec:
+  selector:
+    matchLabels:
+      daemon: apparmor-loader
   template:
     metadata:
       name: apparmor-loader

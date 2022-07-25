@@ -25,13 +25,13 @@ limitations under the License.
 package testfiles
 
 import (
+	"embed"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -64,24 +64,6 @@ type FileSource interface {
 	DescribeFiles() string
 }
 
-// Fail is an error handler function with the same prototype and
-// semantic as ginkgo.Fail. Typically ginkgo.Fail is what callers
-// of ReadOrDie and Exists will pass. This way this package
-// avoids depending on Ginkgo.
-type Fail func(failure string, callerSkip ...int)
-
-// ReadOrDie tries to retrieve the desired file content from
-// one of the registered file sources. In contrast to FileSource, it
-// will either return a valid slice or abort the test by calling the fatal function,
-// i.e. the caller doesn't have to implement error checking.
-func ReadOrDie(filePath string, fail Fail) []byte {
-	data, err := Read(filePath)
-	if err != nil {
-		fail(err.Error(), 1)
-	}
-	return data
-}
-
 // Read tries to retrieve the desired file content from
 // one of the registered file sources.
 func Read(filePath string) ([]byte, error) {
@@ -99,28 +81,28 @@ func Read(filePath string) ([]byte, error) {
 	}
 	// Here we try to generate an error that points test authors
 	// or users in the right direction for resolving the problem.
-	error := fmt.Sprintf("Test file %q was not found.\n", filePath)
+	err := fmt.Sprintf("Test file %q was not found.\n", filePath)
 	for _, filesource := range filesources {
-		error += filesource.DescribeFiles()
-		error += "\n"
+		err += filesource.DescribeFiles()
+		err += "\n"
 	}
-	return nil, errors.New(error)
+	return nil, errors.New(err)
 }
 
 // Exists checks whether a file could be read. Unexpected errors
 // are handled by calling the fail function, which then should
 // abort the current test.
-func Exists(filePath string, fail Fail) bool {
+func Exists(filePath string) (bool, error) {
 	for _, filesource := range filesources {
 		data, err := filesource.ReadTestFile(filePath)
 		if err != nil {
-			fail(fmt.Sprintf("fatal error looking for test file %s: %s", filePath, err), 1)
+			return false, err
 		}
 		if data != nil {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // RootFileSource looks for files relative to a root directory.
@@ -129,10 +111,17 @@ type RootFileSource struct {
 }
 
 // ReadTestFile looks for the file relative to the configured
-// root directory.
+// root directory. If the path is already absolute, for example
+// in a test that has its own method of determining where
+// files are, then the path will be used directly.
 func (r RootFileSource) ReadTestFile(filePath string) ([]byte, error) {
-	fullPath := filepath.Join(r.Root, filePath)
-	data, err := ioutil.ReadFile(fullPath)
+	var fullPath string
+	if path.IsAbs(filePath) {
+		fullPath = filePath
+	} else {
+		fullPath = filepath.Join(r.Root, filePath)
+	}
+	data, err := os.ReadFile(fullPath)
 	if os.IsNotExist(err) {
 		// Not an error (yet), some other provider may have the file.
 		return nil, nil
@@ -158,32 +147,47 @@ func (r RootFileSource) DescribeFiles() string {
 	return description
 }
 
-// BindataFileSource handles files stored in a package generated with bindata.
-type BindataFileSource struct {
-	Asset      func(string) ([]byte, error)
-	AssetNames func() []string
+// EmbeddedFileSource handles files stored in a package generated with bindata.
+type EmbeddedFileSource struct {
+	EmbeddedFS embed.FS
+	Root       string
+	fileList   []string
 }
 
-// ReadTestFile looks for an asset with the given path.
-func (b BindataFileSource) ReadTestFile(filePath string) ([]byte, error) {
-	fileBytes, err := b.Asset(filePath)
+// ReadTestFile looks for an embedded file with the given path.
+func (e EmbeddedFileSource) ReadTestFile(filepath string) ([]byte, error) {
+	relativePath := strings.TrimPrefix(filepath, fmt.Sprintf("%s/", e.Root))
+
+	b, err := e.EmbeddedFS.ReadFile(relativePath)
 	if err != nil {
-		// It would be nice to have a better way to detect
-		// "not found" errors :-/
-		if strings.HasSuffix(err.Error(), "not found") {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
 		}
+		return nil, err
 	}
-	return fileBytes, nil
+
+	return b, nil
 }
 
-// DescribeFiles explains about gobindata and then lists all available files.
-func (b BindataFileSource) DescribeFiles() string {
+// DescribeFiles explains that it is looking inside an embedded filesystem
+func (e EmbeddedFileSource) DescribeFiles() string {
 	var lines []string
-	lines = append(lines, "The following files are built into the test executable via gobindata. For questions on maintaining gobindata, contact the sig-testing group.")
-	assets := b.AssetNames()
-	sort.Strings(assets)
-	lines = append(lines, assets...)
-	description := strings.Join(lines, "\n   ")
-	return description
+	lines = append(lines, "The following files are embedded into the test executable:")
+
+	if len(e.fileList) == 0 {
+		e.populateFileList()
+	}
+	lines = append(lines, e.fileList...)
+
+	return strings.Join(lines, "\n\t")
+}
+
+func (e *EmbeddedFileSource) populateFileList() {
+	fs.WalkDir(e.EmbeddedFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if !d.IsDir() {
+			e.fileList = append(e.fileList, filepath.Join(e.Root, path))
+		}
+
+		return nil
+	})
 }

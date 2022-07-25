@@ -17,20 +17,24 @@ limitations under the License.
 package options
 
 import (
-	"crypto/tls"
+	"context"
 	"fmt"
 	"net"
 	"path"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 type SecureServingOptions struct {
@@ -54,7 +58,7 @@ type SecureServingOptions struct {
 	// ServerCert is the TLS cert info for serving secure traffic
 	ServerCert GeneratableKeyCert
 	// SNICertKeys are named CertKeys for serving secure traffic with SNI support.
-	SNICertKeys []utilflag.NamedCertKey
+	SNICertKeys []cliflag.NamedCertKey
 	// CipherSuites is the list of allowed cipher suites for the server.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	CipherSuites []string
@@ -65,6 +69,13 @@ type SecureServingOptions struct {
 	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
 	HTTP2MaxStreamsPerConnection int
+
+	// PermitPortSharing controls if SO_REUSEPORT is used when binding the port, which allows
+	// more than one instance to bind on the same address and port.
+	PermitPortSharing bool
+
+	// PermitAddressSharing controls if SO_REUSEADDR is used when binding the port.
+	PermitAddressSharing bool
 }
 
 type CertKey struct {
@@ -87,7 +98,7 @@ type GeneratableKeyCert struct {
 	PairName string
 
 	// GeneratedCert holds an in-memory generated certificate if CertFile/KeyFile aren't explicitly set, and CertDirectory/PairName are not set.
-	GeneratedCert *tls.Certificate
+	GeneratedCert dynamiccertificates.CertKeyContentProvider
 
 	// FixtureDirectory is a directory that contains test fixture used to avoid regeneration of certs during tests.
 	// The format is:
@@ -98,7 +109,7 @@ type GeneratableKeyCert struct {
 
 func NewSecureServingOptions() *SecureServingOptions {
 	return &SecureServingOptions{
-		BindAddress: net.ParseIP("0.0.0.0"),
+		BindAddress: netutils.ParseIPSloppy("0.0.0.0"),
 		BindPort:    443,
 		ServerCert: GeneratableKeyCert{
 			PairName:      "apiserver",
@@ -108,10 +119,10 @@ func NewSecureServingOptions() *SecureServingOptions {
 }
 
 func (s *SecureServingOptions) DefaultExternalAddress() (net.IP, error) {
-	if !s.ExternalAddress.IsUnspecified() {
+	if s.ExternalAddress != nil && !s.ExternalAddress.IsUnspecified() {
 		return s.ExternalAddress, nil
 	}
-	return utilnet.ChooseBindAddress(s.BindAddress)
+	return utilnet.ResolveBindAddress(s.BindAddress)
 }
 
 func (s *SecureServingOptions) Validate() []error {
@@ -142,13 +153,13 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
 		"The IP address on which to listen for the --secure-port port. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
-		"clients. If blank, all interfaces will be used (0.0.0.0 for all IPv4 interfaces and :: for all IPv6 interfaces).")
+		"clients. If blank or an unspecified address (0.0.0.0 or ::), all interfaces will be used.")
 
 	desc := "The port on which to serve HTTPS with authentication and authorization."
 	if s.Required {
-		desc += "It cannot be switched off with 0."
+		desc += " It cannot be switched off with 0."
 	} else {
-		desc += "If 0, don't serve HTTPS at all."
+		desc += " If 0, don't serve HTTPS at all."
 	}
 	fs.IntVar(&s.BindPort, "secure-port", s.BindPort, desc)
 
@@ -165,21 +176,25 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ServerCert.CertKey.KeyFile, "tls-private-key-file", s.ServerCert.CertKey.KeyFile,
 		"File containing the default x509 private key matching --tls-cert-file.")
 
-	tlsCipherPossibleValues := utilflag.TLSCipherPossibleValues()
+	tlsCipherPreferredValues := cliflag.PreferredTLSCipherNames()
+	tlsCipherInsecureValues := cliflag.InsecureTLSCipherNames()
 	fs.StringSliceVar(&s.CipherSuites, "tls-cipher-suites", s.CipherSuites,
 		"Comma-separated list of cipher suites for the server. "+
-			"If omitted, the default Go cipher suites will be use.  "+
-			"Possible values: "+strings.Join(tlsCipherPossibleValues, ","))
+			"If omitted, the default Go cipher suites will be used. \n"+
+			"Preferred values: "+strings.Join(tlsCipherPreferredValues, ", ")+". \n"+
+			"Insecure values: "+strings.Join(tlsCipherInsecureValues, ", ")+".")
 
-	tlsPossibleVersions := utilflag.TLSPossibleVersions()
+	tlsPossibleVersions := cliflag.TLSPossibleVersions()
 	fs.StringVar(&s.MinTLSVersion, "tls-min-version", s.MinTLSVersion,
 		"Minimum TLS version supported. "+
 			"Possible values: "+strings.Join(tlsPossibleVersions, ", "))
 
-	fs.Var(utilflag.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
+	fs.Var(cliflag.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
 		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
 		"domain patterns which are fully qualified domain names, possibly with prefixed wildcard "+
-		"segments. If no domain patterns are provided, the names of the certificate are "+
+		"segments. The domain patterns also allow IP addresses, but IPs should only be used if "+
+		"the apiserver has visibility to the IP address requested by a client. "+
+		"If no domain patterns are provided, the names of the certificate are "+
 		"extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns "+
 		"trump over extracted names. For multiple key/certificate pairs, use the "+
 		"--tls-sni-cert-key multiple times. "+
@@ -189,6 +204,15 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"The limit that the server gives to clients for "+
 		"the maximum number of streams in an HTTP/2 connection. "+
 		"Zero means to use golang's default.")
+
+	fs.BoolVar(&s.PermitPortSharing, "permit-port-sharing", s.PermitPortSharing,
+		"If true, SO_REUSEPORT will be used when binding the port, which allows "+
+			"more than one instance to bind on the same address and port. [default=false]")
+
+	fs.BoolVar(&s.PermitAddressSharing, "permit-address-sharing", s.PermitAddressSharing,
+		"If true, SO_REUSEADDR will be used when binding the port. This allows binding "+
+			"to wildcard IPs like 0.0.0.0 and specific IPs in parallel, and it avoids waiting "+
+			"for the kernel to release sockets in TIME_WAIT state. [default=false]")
 }
 
 // ApplyTo fills up serving information in the server configuration.
@@ -203,7 +227,21 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	if s.Listener == nil {
 		var err error
 		addr := net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.BindPort))
-		s.Listener, s.BindPort, err = CreateListener(s.BindNetwork, addr)
+
+		c := net.ListenConfig{}
+
+		ctls := multipleControls{}
+		if s.PermitPortSharing {
+			ctls = append(ctls, permitPortReuse)
+		}
+		if s.PermitAddressSharing {
+			ctls = append(ctls, permitAddressReuse)
+		}
+		if len(ctls) > 0 {
+			c.Control = ctls.Control
+		}
+
+		s.Listener, s.BindPort, err = CreateListener(s.BindNetwork, addr, c)
 		if err != nil {
 			return fmt.Errorf("failed to create listener: %v", err)
 		}
@@ -224,17 +262,17 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	serverCertFile, serverKeyFile := s.ServerCert.CertKey.CertFile, s.ServerCert.CertKey.KeyFile
 	// load main cert
 	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
-		tlsCert, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
+		var err error
+		c.Cert, err = dynamiccertificates.NewDynamicServingContentFromFiles("serving-cert", serverCertFile, serverKeyFile)
 		if err != nil {
-			return fmt.Errorf("unable to load server certificate: %v", err)
+			return err
 		}
-		c.Cert = &tlsCert
 	} else if s.ServerCert.GeneratedCert != nil {
 		c.Cert = s.ServerCert.GeneratedCert
 	}
 
 	if len(s.CipherSuites) != 0 {
-		cipherSuites, err := utilflag.TLSCipherSuites(s.CipherSuites)
+		cipherSuites, err := cliflag.TLSCipherSuites(s.CipherSuites)
 		if err != nil {
 			return err
 		}
@@ -242,27 +280,21 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	}
 
 	var err error
-	c.MinTLSVersion, err = utilflag.TLSVersion(s.MinTLSVersion)
+	c.MinTLSVersion, err = cliflag.TLSVersion(s.MinTLSVersion)
 	if err != nil {
 		return err
 	}
 
 	// load SNI certs
-	namedTLSCerts := make([]server.NamedTLSCert, 0, len(s.SNICertKeys))
+	namedTLSCerts := make([]dynamiccertificates.SNICertKeyContentProvider, 0, len(s.SNICertKeys))
 	for _, nck := range s.SNICertKeys {
-		tlsCert, err := tls.LoadX509KeyPair(nck.CertFile, nck.KeyFile)
-		namedTLSCerts = append(namedTLSCerts, server.NamedTLSCert{
-			TLSCert: tlsCert,
-			Names:   nck.Names,
-		})
+		tlsCert, err := dynamiccertificates.NewDynamicSNIContentFromFiles("sni-serving-cert", nck.CertFile, nck.KeyFile, nck.Names...)
+		namedTLSCerts = append(namedTLSCerts, tlsCert)
 		if err != nil {
 			return fmt.Errorf("failed to load SNI cert and key: %v", err)
 		}
 	}
-	c.SNICerts, err = server.GetNamedCertificateMap(namedTLSCerts)
-	if err != nil {
-		return err
-	}
+	c.SNICerts = namedTLSCerts
 
 	return nil
 }
@@ -292,8 +324,7 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 
 	if !canReadCertAndKey {
 		// add either the bind address or localhost to the valid alternates
-		bindIP := s.BindAddress.String()
-		if bindIP == "0.0.0.0" {
+		if s.BindAddress.IsUnspecified() {
 			alternateDNS = append(alternateDNS, "localhost")
 		} else {
 			alternateIPs = append(alternateIPs, s.BindAddress)
@@ -305,16 +336,15 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 			if err := certutil.WriteCert(keyCert.CertFile, cert); err != nil {
 				return err
 			}
-			if err := certutil.WriteKey(keyCert.KeyFile, key); err != nil {
+			if err := keyutil.WriteKey(keyCert.KeyFile, key); err != nil {
 				return err
 			}
 			klog.Infof("Generated self-signed cert (%s, %s)", keyCert.CertFile, keyCert.KeyFile)
 		} else {
-			tlsCert, err := tls.X509KeyPair(cert, key)
+			s.ServerCert.GeneratedCert, err = dynamiccertificates.NewStaticCertKeyContent("Generated self signed cert", cert, key)
 			if err != nil {
-				return fmt.Errorf("unable to generate self signed cert: %v", err)
+				return err
 			}
-			s.ServerCert.GeneratedCert = &tlsCert
 			klog.Infof("Generated self-signed cert in-memory")
 		}
 	}
@@ -322,11 +352,12 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 	return nil
 }
 
-func CreateListener(network, addr string) (net.Listener, int, error) {
+func CreateListener(network, addr string, config net.ListenConfig) (net.Listener, int, error) {
 	if len(network) == 0 {
 		network = "tcp"
 	}
-	ln, err := net.Listen(network, addr)
+
+	ln, err := config.Listen(context.TODO(), network, addr)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to listen on %v: %v", addr, err)
 	}
@@ -339,4 +370,15 @@ func CreateListener(network, addr string) (net.Listener, int, error) {
 	}
 
 	return ln, tcpAddr.Port, nil
+}
+
+type multipleControls []func(network, addr string, conn syscall.RawConn) error
+
+func (mcs multipleControls) Control(network, addr string, conn syscall.RawConn) error {
+	for _, c := range mcs {
+		if err := c(network, addr, conn); err != nil {
+			return err
+		}
+	}
+	return nil
 }

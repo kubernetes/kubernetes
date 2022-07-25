@@ -14,35 +14,42 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	"flag"
 	"os"
 	"testing"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/spf13/pflag"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 )
 
-func init() {
-	framework.RegisterCommonFlags()
-	framework.RegisterClusterFlags()
-
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-}
-
 func TestMain(m *testing.M) {
+	// Copy go flags in TestMain, to ensure go test flags are registered (no longer available in init() as of go1.13)
+	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
+	framework.RegisterCommonFlags(flag.CommandLine)
+	framework.RegisterClusterFlags(flag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	framework.AfterReadingAllFlags(&framework.TestContext)
 	os.Exit(m.Run())
 }
 
 func TestE2E(t *testing.T) {
-	reporters := []ginkgo.Reporter{}
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "E2EKubadm suite", reporters)
+	reportDir := framework.TestContext.ReportDir
+	if reportDir != "" {
+		// Create the directory if it doesn't already exists
+		// NOTE: junit report can be simply created by executing your tests with the new --junit-report flags instead.
+		if err := os.MkdirAll(reportDir, 0755); err != nil {
+			t.Fatalf("Failed creating report directory: %v", err)
+		}
+	}
+	suiteConfig, reporterConfig := framework.CreateGinkgoConfig()
+	ginkgo.RunSpecs(t, "E2EKubeadm suite", suiteConfig, reporterConfig)
 }

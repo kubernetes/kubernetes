@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostpathvolumes1
+spec:
+  containers:
+  - image: k8s.gcr.io/pause
+    name: container1
+    securityContext:
+      allowPrivilegeEscalation: false
+  initContainers:
+  - image: k8s.gcr.io/pause
+    name: initcontainer1
+    securityContext:
+      allowPrivilegeEscalation: false
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  volumes:
+  - hostPath:
+      path: /a
+    name: volume-hostpath-a
+  - hostPath:
+      path: /b
+    name: volume-hostpath-b

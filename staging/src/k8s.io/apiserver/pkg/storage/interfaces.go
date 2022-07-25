@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,10 +41,12 @@ type Versioner interface {
 	// from database.
 	UpdateObject(obj runtime.Object, resourceVersion uint64) error
 	// UpdateList sets the resource version into an API list object. Returns an error if the object
-	// cannot be updated correctly. May return nil if the requested object does not need metadata
-	// from database. continueValue is optional and indicates that more results are available if
-	// the client passes that value to the server in a subsequent call.
-	UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string) error
+	// cannot be updated correctly. May return nil if the requested object does not need metadata from
+	// database. continueValue is optional and indicates that more results are available if the client
+	// passes that value to the server in a subsequent call. remainingItemCount indicates the number
+	// of remaining objects if the list is partial. The remainingItemCount field is omitted during
+	// serialization if it is set to nil.
+	UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, remainingItemCount *int64) error
 	// PrepareObjectForStorage should set SelfLink and ResourceVersion to the empty value. Should
 	// return an error if the specified object cannot be updated.
 	PrepareObjectForStorage(obj runtime.Object) error
@@ -71,23 +74,24 @@ type ResponseMeta struct {
 	ResourceVersion uint64
 }
 
-// MatchValue defines a pair (<index name>, <value for that index>).
-type MatchValue struct {
-	IndexName string
-	Value     string
-}
+// IndexerFunc is a function that for a given object computes
+// `<value of an index>` for a particular `<index>`.
+type IndexerFunc func(obj runtime.Object) string
 
-// TriggerPublisherFunc is a function that takes an object, and returns a list of pairs
-// (<index name>, <index value for the given object>) for all indexes known
-// to that function.
-type TriggerPublisherFunc func(obj runtime.Object) []MatchValue
+// IndexerFuncs is a mapping from `<index name>` to function that
+// for a given object computes `<value for that index>`.
+type IndexerFuncs map[string]IndexerFunc
 
 // Everything accepts all objects.
 var Everything = SelectionPredicate{
 	Label: labels.Everything(),
 	Field: fields.Everything(),
-	// TODO: split this into a new top level constant?
-	IncludeUninitialized: true,
+}
+
+// MatchValue defines a pair (`<index name>`, `<value for that index>`).
+type MatchValue struct {
+	IndexName string
+	Value     string
 }
 
 // Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update
@@ -95,11 +99,24 @@ var Everything = SelectionPredicate{
 // See the comment for GuaranteedUpdate for more details.
 type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Object, ttl *uint64, err error)
 
+// ValidateObjectFunc is a function to act on a given object. An error may be returned
+// if the hook cannot be completed. The function may NOT transform the provided
+// object.
+type ValidateObjectFunc func(ctx context.Context, obj runtime.Object) error
+
+// ValidateAllObjectFunc is a "admit everything" instance of ValidateObjectFunc.
+func ValidateAllObjectFunc(ctx context.Context, obj runtime.Object) error {
+	return nil
+}
+
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 type Preconditions struct {
 	// Specifies the target UID.
 	// +optional
 	UID *types.UID `json:"uid,omitempty"`
+	// Specifies the target ResourceVersion
+	// +optional
+	ResourceVersion *string `json:"resourceVersion,omitempty"`
 }
 
 // NewUIDPreconditions returns a Preconditions with UID set.
@@ -127,8 +144,14 @@ func (p *Preconditions) Check(key string, obj runtime.Object) error {
 			objMeta.GetUID())
 		return NewInvalidObjError(key, err)
 	}
+	if p.ResourceVersion != nil && *p.ResourceVersion != objMeta.GetResourceVersion() {
+		err := fmt.Sprintf(
+			"Precondition failed: ResourceVersion in precondition: %v, ResourceVersion in object meta: %v",
+			*p.ResourceVersion,
+			objMeta.GetResourceVersion())
+		return NewInvalidObjError(key, err)
+	}
 	return nil
-
 }
 
 // Interface offers a common interface for object marshaling/unmarshaling operations and
@@ -144,7 +167,12 @@ type Interface interface {
 
 	// Delete removes the specified key and returns the value that existed at that spot.
 	// If key didn't exist, it will return NotFound storage error.
-	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error
+	// If 'cachedExistingObject' is non-nil, it can be used as a suggestion about the
+	// current version of the object to avoid read operation from storage to get it.
+	// However, the implementations have to retry in case suggestion is stale.
+	Delete(
+		ctx context.Context, key string, out runtime.Object, preconditions *Preconditions,
+		validateDeletion ValidateObjectFunc, cachedExistingObject runtime.Object) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items selected by 'p' are sent down to returned watch.Interface.
@@ -153,56 +181,44 @@ type Interface interface {
 	// (e.g. reconnecting without missing any updates).
 	// If resource version is "0", this interface will get current object at given key
 	// and send it in an "ADDED" event, before watch starts.
-	Watch(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
+	Watch(ctx context.Context, key string, opts ListOptions) (watch.Interface, error)
 
-	// WatchList begins watching the specified key's items. Items are decoded into API
-	// objects and any item selected by 'p' are sent down to returned watch.Interface.
-	// resourceVersion may be used to specify what version to begin watching,
-	// which should be the current resourceVersion, and no longer rv+1
-	// (e.g. reconnecting without missing any updates).
-	// If resource version is "0", this interface will list current objects directory defined by key
-	// and send them in "ADDED" events, before watch starts.
-	WatchList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate) (watch.Interface, error)
-
-	// Get unmarshals json found at key into objPtr. On a not found error, will either
-	// return a zero object of the requested type, or an error, depending on ignoreNotFound.
+	// Get unmarshals object found at key into objPtr. On a not found error, will either
+	// return a zero object of the requested type, or an error, depending on 'opts.ignoreNotFound'.
 	// Treats empty responses and nil response nodes exactly like a not found error.
 	// The returned contents may be delayed, but it is guaranteed that they will
-	// be have at least 'resourceVersion'.
-	Get(ctx context.Context, key string, resourceVersion string, objPtr runtime.Object, ignoreNotFound bool) error
+	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
+	Get(ctx context.Context, key string, opts GetOptions, objPtr runtime.Object) error
 
-	// GetToList unmarshals json found at key and opaque it into *List api object
-	// (an object that satisfies the runtime.IsList definition).
+	// GetList unmarshalls objects found at key into a *List api object (an object
+	// that satisfies runtime.IsList definition).
+	// If 'opts.Recursive' is false, 'key' is used as an exact match. If `opts.Recursive'
+	// is true, 'key' is used as a prefix.
 	// The returned contents may be delayed, but it is guaranteed that they will
-	// be have at least 'resourceVersion'.
-	GetToList(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
+	// match 'opts.ResourceVersion' according 'opts.ResourceVersionMatch'.
+	GetList(ctx context.Context, key string, opts ListOptions, listObj runtime.Object) error
 
-	// List unmarshalls jsons found at directory defined by key and opaque them
-	// into *List api object (an object that satisfies runtime.IsList definition).
-	// The returned contents may be delayed, but it is guaranteed that they will
-	// be have at least 'resourceVersion'.
-	List(ctx context.Context, key string, resourceVersion string, p SelectionPredicate, listObj runtime.Object) error
-
-	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'ptrToType')
+	// GuaranteedUpdate keeps calling 'tryUpdate()' to update key 'key' (of type 'destination')
 	// retrying the update until success if there is index conflict.
 	// Note that object passed to tryUpdate may change across invocations of tryUpdate() if
 	// other writers are simultaneously updating it, so tryUpdate() needs to take into account
 	// the current contents of the object when deciding how the update object should look.
 	// If the key doesn't exist, it will return NotFound storage error if ignoreNotFound=false
-	// or zero value in 'ptrToType' parameter otherwise.
-	// If the object to update has the same value as previous, it won't do any update
-	// but will return the object in 'ptrToType' parameter.
-	// If 'suggestion' can contain zero or one element - in such case this can be used as
-	// a suggestion about the current version of the object to avoid read operation from
-	// storage to get it.
+	// else `destination` will be set to the zero value of it's type.
+	// If the eventual successful invocation of `tryUpdate` returns an output with the same serialized
+	// contents as the input, it won't perform any update, but instead set `destination` to an object with those
+	// contents.
+	// If 'cachedExistingObject' is non-nil, it can be used as a suggestion about the
+	// current version of the object to avoid read operation from storage to get it.
+	// However, the implementations have to retry in case suggestion is stale.
 	//
 	// Example:
 	//
 	// s := /* implementation of Interface */
 	// err := s.GuaranteedUpdate(
-	//     "myKey", &MyType{}, true,
+	//     "myKey", &MyType{}, true, preconditions,
 	//     func(input runtime.Object, res ResponseMeta) (runtime.Object, *uint64, error) {
-	//       // Before each incovation of the user defined function, "input" is reset to
+	//       // Before each invocation of the user defined function, "input" is reset to
 	//       // current contents for "myKey" in database.
 	//       curr := input.(*MyType)  // Guaranteed to succeed.
 	//
@@ -212,12 +228,44 @@ type Interface interface {
 	//       // Return the modified object - return an error to stop iterating. Return
 	//       // a uint64 to alter the TTL on the object, or nil to keep it the same value.
 	//       return cur, nil, nil
-	//    }
-	// })
+	//    }, cachedExistingObject
+	// )
 	GuaranteedUpdate(
-		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
-		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion ...runtime.Object) error
+		ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool,
+		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
 	// Count returns number of different entries under the key (generally being path prefix).
 	Count(key string) (int64, error)
+}
+
+// GetOptions provides the options that may be provided for storage get operations.
+type GetOptions struct {
+	// IgnoreNotFound determines what is returned if the requested object is not found. If
+	// true, a zero object is returned. If false, an error is returned.
+	IgnoreNotFound bool
+	// ResourceVersion provides a resource version constraint to apply to the get operation
+	// as a "not older than" constraint: the result contains data at least as new as the provided
+	// ResourceVersion. The newest available data is preferred, but any data not older than this
+	// ResourceVersion may be served.
+	ResourceVersion string
+}
+
+// ListOptions provides the options that may be provided for storage list operations.
+type ListOptions struct {
+	// ResourceVersion provides a resource version constraint to apply to the list operation
+	// as a "not older than" constraint: the result contains data at least as new as the provided
+	// ResourceVersion. The newest available data is preferred, but any data not older than this
+	// ResourceVersion may be served.
+	ResourceVersion string
+	// ResourceVersionMatch provides the rule for how the resource version constraint applies. If set
+	// to the default value "" the legacy resource version semantic apply.
+	ResourceVersionMatch metav1.ResourceVersionMatch
+	// Predicate provides the selection rules for the list operation.
+	Predicate SelectionPredicate
+	// Recursive determines whether the list or watch is defined for a single object located at the
+	// given key, or for the whole set of objects with the given key as a prefix.
+	Recursive bool
+	// ProgressNotify determines whether storage-originated bookmark (progress notify) events should
+	// be delivered to the users. The option is ignored for non-watch requests.
+	ProgressNotify bool
 }

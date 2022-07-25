@@ -22,12 +22,10 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -50,14 +48,14 @@ func (p podSandboxByCreated) Len() int           { return len(p) }
 func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p podSandboxByCreated) Less(i, j int) bool { return p[i].CreatedAt > p[j].CreatedAt }
 
-type containerStatusByCreated []*kubecontainer.ContainerStatus
+type containerStatusByCreated []*kubecontainer.Status
 
 func (c containerStatusByCreated) Len() int           { return len(c) }
 func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
 
-// toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.ContainerState.
-func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.ContainerState {
+// toKubeContainerState converts runtimeapi.ContainerState to kubecontainer.State.
+func toKubeContainerState(state runtimeapi.ContainerState) kubecontainer.State {
 	switch state {
 	case runtimeapi.ContainerState_CONTAINER_CREATED:
 		return kubecontainer.ContainerStateCreated
@@ -83,7 +81,7 @@ func toRuntimeProtocol(protocol v1.Protocol) runtimeapi.Protocol {
 		return runtimeapi.Protocol_SCTP
 	}
 
-	klog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
+	klog.InfoS("Unknown protocol, defaulting to TCP", "protocol", protocol)
 	return runtimeapi.Protocol_TCP
 }
 
@@ -122,10 +120,11 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeapi.PodSand
 // getImageUser gets uid or user name that will run the command(s) from image. The function
 // guarantees that only one of them is set.
 func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, string, error) {
-	imageStatus, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image})
+	resp, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image}, false)
 	if err != nil {
 		return nil, "", err
 	}
+	imageStatus := resp.GetImage()
 
 	if imageStatus != nil {
 		if imageStatus.Uid != nil {
@@ -141,9 +140,21 @@ func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, string, 
 	return new(int64), "", nil
 }
 
-// isContainerFailed returns true if container has exited and exitcode is not zero.
-func isContainerFailed(status *kubecontainer.ContainerStatus) bool {
+// isInitContainerFailed returns true under the following conditions:
+// 1. container has exited and exitcode is not zero.
+// 2. container is in unknown state.
+// 3. container gets OOMKilled.
+func isInitContainerFailed(status *kubecontainer.Status) bool {
+	// When oomkilled occurs, init container should be considered as a failure.
+	if status.Reason == "OOMKilled" {
+		return true
+	}
+
 	if status.State == kubecontainer.ContainerStateExited && status.ExitCode != 0 {
+		return true
+	}
+
+	if status.State == kubecontainer.ContainerStateUnknown {
 		return true
 	}
 
@@ -158,24 +169,31 @@ func getStableKey(pod *v1.Pod, container *v1.Container) string {
 	return fmt.Sprintf("%s_%s_%s_%s_%s", pod.Name, pod.Namespace, string(pod.UID), container.Name, hash)
 }
 
+// logPathDelimiter is the delimiter used in the log path.
+const logPathDelimiter = "_"
+
 // buildContainerLogsPath builds log path for container relative to pod logs directory.
 func buildContainerLogsPath(containerName string, restartCount int) string {
 	return filepath.Join(containerName, fmt.Sprintf("%d.log", restartCount))
 }
 
-// buildFullContainerLogsPath builds absolute log path for container.
-func buildFullContainerLogsPath(podUID types.UID, containerName string, restartCount int) string {
-	return filepath.Join(buildPodLogsDirectory(podUID), buildContainerLogsPath(containerName, restartCount))
-}
-
 // BuildContainerLogsDirectory builds absolute log directory path for a container in pod.
-func BuildContainerLogsDirectory(podUID types.UID, containerName string) string {
-	return filepath.Join(buildPodLogsDirectory(podUID), containerName)
+func BuildContainerLogsDirectory(podNamespace, podName string, podUID types.UID, containerName string) string {
+	return filepath.Join(BuildPodLogsDirectory(podNamespace, podName, podUID), containerName)
 }
 
-// buildPodLogsDirectory builds absolute log directory path for a pod sandbox.
-func buildPodLogsDirectory(podUID types.UID) string {
-	return filepath.Join(podLogsRootDirectory, string(podUID))
+// BuildPodLogsDirectory builds absolute log directory path for a pod sandbox.
+func BuildPodLogsDirectory(podNamespace, podName string, podUID types.UID) string {
+	return filepath.Join(podLogsRootDirectory, strings.Join([]string{podNamespace, podName,
+		string(podUID)}, logPathDelimiter))
+}
+
+// parsePodUIDFromLogsDirectory parses pod logs directory name and returns the pod UID.
+// It supports both the old pod log directory /var/log/pods/UID, and the new pod log
+// directory /var/log/pods/NAMESPACE_NAME_UID.
+func parsePodUIDFromLogsDirectory(name string) types.UID {
+	parts := strings.Split(name, logPathDelimiter)
+	return types.UID(parts[len(parts)-1])
 }
 
 // toKubeRuntimeStatus converts the runtimeapi.RuntimeStatus to kubecontainer.RuntimeStatus.
@@ -192,31 +210,119 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 	return &kubecontainer.RuntimeStatus{Conditions: conditions}
 }
 
-// getSeccompProfileFromAnnotations gets seccomp profile from annotations.
-// It gets pod's profile if containerName is empty.
-func (m *kubeGenericRuntimeManager) getSeccompProfileFromAnnotations(annotations map[string]string, containerName string) string {
-	// try the pod profile.
-	profile, profileOK := annotations[v1.SeccompPodAnnotationKey]
+func fieldProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) string {
+	if scmp == nil {
+		if fallbackToRuntimeDefault {
+			return v1.SeccompProfileRuntimeDefault
+		}
+		return ""
+	}
+	if scmp.Type == v1.SeccompProfileTypeRuntimeDefault {
+		return v1.SeccompProfileRuntimeDefault
+	}
+	if scmp.Type == v1.SeccompProfileTypeLocalhost && scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
+		fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
+		return v1.SeccompLocalhostProfileNamePrefix + fname
+	}
+	if scmp.Type == v1.SeccompProfileTypeUnconfined {
+		return v1.SeccompProfileNameUnconfined
+	}
+
+	if fallbackToRuntimeDefault {
+		return v1.SeccompProfileRuntimeDefault
+	}
+	return ""
+}
+
+func annotationProfile(profile, profileRootPath string) string {
+	if strings.HasPrefix(profile, v1.SeccompLocalhostProfileNamePrefix) {
+		name := strings.TrimPrefix(profile, v1.SeccompLocalhostProfileNamePrefix)
+		fname := filepath.Join(profileRootPath, filepath.FromSlash(name))
+		return v1.SeccompLocalhostProfileNamePrefix + fname
+	}
+	return profile
+}
+
+func (m *kubeGenericRuntimeManager) getSeccompProfilePath(annotations map[string]string, containerName string,
+	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) string {
+	// container fields are applied first
+	if containerSecContext != nil && containerSecContext.SeccompProfile != nil {
+		return fieldProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
+	}
+
+	// if container field does not exist, try container annotation (deprecated)
 	if containerName != "" {
-		// try the container profile.
-		cProfile, cProfileOK := annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName]
-		if cProfileOK {
-			profile = cProfile
-			profileOK = cProfileOK
+		if profile, ok := annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName]; ok {
+			return annotationProfile(profile, m.seccompProfileRoot)
 		}
 	}
 
-	if !profileOK {
-		return ""
+	// when container seccomp is not defined, try to apply from pod field
+	if podSecContext != nil && podSecContext.SeccompProfile != nil {
+		return fieldProfile(podSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
 	}
 
-	if strings.HasPrefix(profile, "localhost/") {
-		name := strings.TrimPrefix(profile, "localhost/")
-		fname := filepath.Join(m.seccompProfileRoot, filepath.FromSlash(name))
-		return "localhost/" + fname
+	// as last resort, try to apply pod annotation (deprecated)
+	if profile, ok := annotations[v1.SeccompPodAnnotationKey]; ok {
+		return annotationProfile(profile, m.seccompProfileRoot)
 	}
 
-	return profile
+	if fallbackToRuntimeDefault {
+		return v1.SeccompProfileRuntimeDefault
+	}
+
+	return ""
+}
+
+func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRuntimeDefault bool) *runtimeapi.SecurityProfile {
+	if scmp == nil {
+		if fallbackToRuntimeDefault {
+			return &runtimeapi.SecurityProfile{
+				ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+			}
+		}
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_Unconfined,
+		}
+	}
+	if scmp.Type == v1.SeccompProfileTypeRuntimeDefault {
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		}
+	}
+	if scmp.Type == v1.SeccompProfileTypeLocalhost && scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
+		fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
+		return &runtimeapi.SecurityProfile{
+			ProfileType:  runtimeapi.SecurityProfile_Localhost,
+			LocalhostRef: fname,
+		}
+	}
+	return &runtimeapi.SecurityProfile{
+		ProfileType: runtimeapi.SecurityProfile_Unconfined,
+	}
+}
+
+func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]string, containerName string,
+	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) *runtimeapi.SecurityProfile {
+	// container fields are applied first
+	if containerSecContext != nil && containerSecContext.SeccompProfile != nil {
+		return fieldSeccompProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
+	}
+
+	// when container seccomp is not defined, try to apply from pod field
+	if podSecContext != nil && podSecContext.SeccompProfile != nil {
+		return fieldSeccompProfile(podSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
+	}
+
+	if fallbackToRuntimeDefault {
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		}
+	}
+
+	return &runtimeapi.SecurityProfile{
+		ProfileType: runtimeapi.SecurityProfile_Unconfined,
+	}
 }
 
 func ipcNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
@@ -238,7 +344,7 @@ func pidNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {
 		if pod.Spec.HostPID {
 			return runtimeapi.NamespaceMode_NODE
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodShareProcessNamespace) && pod.Spec.ShareProcessNamespace != nil && *pod.Spec.ShareProcessNamespace {
+		if pod.Spec.ShareProcessNamespace != nil && *pod.Spec.ShareProcessNamespace {
 			return runtimeapi.NamespaceMode_POD
 		}
 	}

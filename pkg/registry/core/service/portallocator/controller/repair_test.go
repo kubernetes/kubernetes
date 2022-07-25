@@ -18,6 +18,8 @@ package controller
 
 import (
 	"fmt"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -56,9 +58,9 @@ func TestRepair(t *testing.T) {
 		item: &api.RangeAllocation{Range: "100-200"},
 	}
 	pr, _ := net.ParsePortRange(registry.item.Range)
-	r := NewRepair(0, fakeClient.Core(), fakeClient.Core(), *pr, registry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
 
-	if err := r.RunOnce(); err != nil {
+	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
 	if !registry.updateCalled || registry.updated == nil || registry.updated.Range != pr.String() || registry.updated != registry.item {
@@ -69,19 +71,22 @@ func TestRepair(t *testing.T) {
 		item:      &api.RangeAllocation{Range: "100-200"},
 		updateErr: fmt.Errorf("test error"),
 	}
-	r = NewRepair(0, fakeClient.Core(), fakeClient.Core(), *pr, registry)
-	if err := r.RunOnce(); !strings.Contains(err.Error(), ": test error") {
+	r = NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	if err := r.runOnce(); !strings.Contains(err.Error(), ": test error") {
 		t.Fatal(err)
 	}
 }
 
 func TestRepairLeak(t *testing.T) {
 	pr, _ := net.ParsePortRange("100-200")
-	previous := portallocator.NewPortAllocator(*pr)
+	previous, err := portallocator.NewInMemory(*pr)
+	if err != nil {
+		t.Fatal(err)
+	}
 	previous.Allocate(111)
 
 	var dst api.RangeAllocation
-	err := previous.Snapshot(&dst)
+	err = previous.Snapshot(&dst)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,10 +102,10 @@ func TestRepairLeak(t *testing.T) {
 		},
 	}
 
-	r := NewRepair(0, fakeClient.Core(), fakeClient.Core(), *pr, registry)
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
 	// Run through the "leak detection holdoff" loops.
 	for i := 0; i < (numRepairsBeforeLeakCleanup - 1); i++ {
-		if err := r.RunOnce(); err != nil {
+		if err := r.runOnce(); err != nil {
 			t.Fatal(err)
 		}
 		after, err := portallocator.NewFromSnapshot(registry.updated)
@@ -112,7 +117,7 @@ func TestRepairLeak(t *testing.T) {
 		}
 	}
 	// Run one more time to actually remove the leak.
-	if err := r.RunOnce(); err != nil {
+	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
 	after, err := portallocator.NewFromSnapshot(registry.updated)
@@ -126,10 +131,13 @@ func TestRepairLeak(t *testing.T) {
 
 func TestRepairWithExisting(t *testing.T) {
 	pr, _ := net.ParsePortRange("100-200")
-	previous := portallocator.NewPortAllocator(*pr)
+	previous, err := portallocator.NewInMemory(*pr)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var dst api.RangeAllocation
-	err := previous.Snapshot(&dst)
+	err = previous.Snapshot(&dst)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,8 +190,8 @@ func TestRepairWithExisting(t *testing.T) {
 			Data:  dst.Data,
 		},
 	}
-	r := NewRepair(0, fakeClient.Core(), fakeClient.Core(), *pr, registry)
-	if err := r.RunOnce(); err != nil {
+	r := NewRepair(0, fakeClient.CoreV1(), fakeClient.EventsV1(), *pr, registry)
+	if err := r.runOnce(); err != nil {
 		t.Fatal(err)
 	}
 	after, err := portallocator.NewFromSnapshot(registry.updated)
@@ -195,5 +203,103 @@ func TestRepairWithExisting(t *testing.T) {
 	}
 	if free := after.Free(); free != 97 {
 		t.Errorf("unexpected portallocator state: %d free", free)
+	}
+}
+
+func TestCollectServiceNodePorts(t *testing.T) {
+	tests := []struct {
+		name        string
+		serviceSpec corev1.ServiceSpec
+		expected    []int
+	}{
+		{
+			name: "no duplicated nodePorts",
+			serviceSpec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{NodePort: 111, Protocol: corev1.ProtocolTCP},
+					{NodePort: 112, Protocol: corev1.ProtocolUDP},
+					{NodePort: 113, Protocol: corev1.ProtocolUDP},
+				},
+			},
+			expected: []int{111, 112, 113},
+		},
+		{
+			name: "duplicated nodePort with TCP protocol",
+			serviceSpec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{NodePort: 111, Protocol: corev1.ProtocolTCP},
+					{NodePort: 111, Protocol: corev1.ProtocolTCP},
+					{NodePort: 112, Protocol: corev1.ProtocolUDP},
+				},
+			},
+			expected: []int{111, 111, 112},
+		},
+		{
+			name: "duplicated nodePort with UDP protocol",
+			serviceSpec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{NodePort: 111, Protocol: corev1.ProtocolUDP},
+					{NodePort: 111, Protocol: corev1.ProtocolUDP},
+					{NodePort: 112, Protocol: corev1.ProtocolTCP},
+				},
+			},
+			expected: []int{111, 111, 112},
+		},
+		{
+			name: "duplicated nodePort with different protocol",
+			serviceSpec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{NodePort: 111, Protocol: corev1.ProtocolTCP},
+					{NodePort: 112, Protocol: corev1.ProtocolTCP},
+					{NodePort: 111, Protocol: corev1.ProtocolUDP},
+				},
+			},
+			expected: []int{111, 112},
+		},
+		{
+			name: "no duplicated port(with health check port)",
+			serviceSpec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{NodePort: 111, Protocol: corev1.ProtocolTCP},
+					{NodePort: 112, Protocol: corev1.ProtocolUDP},
+				},
+				HealthCheckNodePort: 113,
+			},
+			expected: []int{111, 112, 113},
+		},
+		{
+			name: "nodePort has different protocol with duplicated health check port",
+			serviceSpec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{NodePort: 111, Protocol: corev1.ProtocolUDP},
+					{NodePort: 112, Protocol: corev1.ProtocolTCP},
+				},
+				HealthCheckNodePort: 111,
+			},
+			expected: []int{111, 112},
+		},
+		{
+			name: "nodePort has same protocol as duplicated health check port",
+			serviceSpec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{NodePort: 111, Protocol: corev1.ProtocolUDP},
+					{NodePort: 112, Protocol: corev1.ProtocolTCP},
+				},
+				HealthCheckNodePort: 112,
+			},
+			expected: []int{111, 112, 112},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ports := collectServiceNodePorts(&corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "one", Name: "one"},
+				Spec:       tc.serviceSpec,
+			})
+			sort.Ints(ports)
+			if !reflect.DeepEqual(tc.expected, ports) {
+				t.Fatalf("Invalid result\nexpected: %v\ngot: %v", tc.expected, ports)
+			}
+		})
 	}
 }

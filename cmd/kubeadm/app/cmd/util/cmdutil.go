@@ -17,10 +17,20 @@ limitations under the License.
 package util
 
 import (
+	"bufio"
+	"fmt"
+	"io"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
+
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -60,16 +70,54 @@ func ValidateExactArgNumber(args []string, supportedArgs []string) error {
 	return nil
 }
 
-// FindExistingKubeConfig returns the localtion of kubeconfig
-func FindExistingKubeConfig(file string) string {
-	// The user did provide a --kubeconfig flag. Respect that and threat it as an
-	// explicit path without building a DefaultClientConfigLoadingRules object.
-	if file != kubeadmconstants.GetAdminKubeConfigPath() {
+// GetKubeConfigPath can be used to search for a kubeconfig in standard locations
+// if and empty string is passed to the function. If a non-empty string is passed
+// the function returns the same string.
+func GetKubeConfigPath(file string) string {
+	// If a value is provided respect that.
+	if file != "" {
 		return file
 	}
-	// The user did not provide a --kubeconfig flag. Find a config in the standard
-	// locations using DefaultClientConfigLoadingRules, but also consider the default config path.
+	// Find a config in the standard locations using DefaultClientConfigLoadingRules,
+	// but also consider the default config path.
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
 	rules.Precedence = append(rules.Precedence, kubeadmconstants.GetAdminKubeConfigPath())
-	return rules.GetDefaultFilename()
+	file = rules.GetDefaultFilename()
+	klog.V(1).Infof("Using kubeconfig file: %s", file)
+	return file
+}
+
+// AddCRISocketFlag adds the cri-socket flag to the supplied flagSet
+func AddCRISocketFlag(flagSet *pflag.FlagSet, criSocket *string) {
+	flagSet.StringVar(
+		criSocket, options.NodeCRISocket, *criSocket,
+		"Path to the CRI socket to connect. If empty kubeadm will try to auto-detect this value; use this option only if you have more than one CRI installed or if you have non-standard CRI socket.",
+	)
+}
+
+// DefaultInitConfiguration return default InitConfiguration. Avoid running the CRI auto-detection
+// code as we don't need it.
+func DefaultInitConfiguration() *kubeadmapiv1.InitConfiguration {
+	initCfg := &kubeadmapiv1.InitConfiguration{
+		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
+			CRISocket: kubeadmconstants.UnknownCRISocket, // avoid CRI detection
+		},
+	}
+	return initCfg
+}
+
+// InteractivelyConfirmAction asks the user whether they _really_ want to take the action.
+func InteractivelyConfirmAction(action, question string, r io.Reader) error {
+	fmt.Printf("[%s] %s [y/N]: ", action, question)
+	scanner := bufio.NewScanner(r)
+	scanner.Scan()
+	if err := scanner.Err(); err != nil {
+		return errors.Wrap(err, "couldn't read from standard input")
+	}
+	answer := scanner.Text()
+	if strings.ToLower(answer) == "y" || strings.ToLower(answer) == "yes" {
+		return nil
+	}
+
+	return errors.New("won't proceed; the user didn't answer (Y|y) in order to continue")
 }

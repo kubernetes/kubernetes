@@ -19,7 +19,7 @@ package volume
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -75,7 +75,7 @@ func (plugin *testPlugins) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *testPlugins) RequiresRemount() bool {
+func (plugin *testPlugins) RequiresRemount(spec *Spec) bool {
 	return false
 }
 
@@ -110,19 +110,19 @@ func TestVolumePluginMgrFunc(t *testing.T) {
 
 	plug, err := vpm.FindPluginByName(testPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != testPluginName {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
 	}
 
-	plug, err = vpm.FindPluginBySpec(nil)
+	_, err = vpm.FindPluginBySpec(nil)
 	if err == nil {
 		t.Errorf("Should return error if volume spec is nil")
 	}
 
 	volumeSpec := &Spec{}
-	plug, err = vpm.FindPluginBySpec(volumeSpec)
+	_, err = vpm.FindPluginBySpec(volumeSpec)
 	if err != nil {
 		t.Errorf("Should return test plugin if volume spec is not nil")
 	}

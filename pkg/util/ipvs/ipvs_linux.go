@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -19,35 +20,36 @@ limitations under the License.
 package ipvs
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"strings"
-	"syscall"
+	"sync"
+	"time"
 
-	libipvs "github.com/docker/libnetwork/ipvs"
-	"k8s.io/klog"
-	utilexec "k8s.io/utils/exec"
+	"errors"
+	libipvs "github.com/moby/ipvs"
+
+	"golang.org/x/sys/unix"
+	"k8s.io/klog/v2"
 )
 
 // runner implements ipvs.Interface.
 type runner struct {
-	exec       utilexec.Interface
 	ipvsHandle *libipvs.Handle
+	mu         sync.Mutex // Protect Netlink calls
 }
 
 // Protocol is the IPVS service protocol type
 type Protocol uint16
 
 // New returns a new Interface which will call ipvs APIs.
-func New(exec utilexec.Interface) Interface {
+func New() Interface {
 	handle, err := libipvs.New("")
 	if err != nil {
 		klog.Errorf("IPVS interface can't be initialized, error: %v", err)
 		return nil
 	}
 	return &runner{
-		exec:       exec,
 		ipvsHandle: handle,
 	}
 }
@@ -56,8 +58,10 @@ func New(exec utilexec.Interface) Interface {
 func (runner *runner) AddVirtualServer(vs *VirtualServer) error {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not convert local virtual server to IPVS service: %w", err)
 	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.NewService(svc)
 }
 
@@ -65,8 +69,10 @@ func (runner *runner) AddVirtualServer(vs *VirtualServer) error {
 func (runner *runner) UpdateVirtualServer(vs *VirtualServer) error {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not convert local virtual server to IPVS service: %w", err)
 	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.UpdateService(svc)
 }
 
@@ -74,8 +80,10 @@ func (runner *runner) UpdateVirtualServer(vs *VirtualServer) error {
 func (runner *runner) DeleteVirtualServer(vs *VirtualServer) error {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not convert local virtual server to IPVS service: %w", err)
 	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.DelService(svc)
 }
 
@@ -83,30 +91,35 @@ func (runner *runner) DeleteVirtualServer(vs *VirtualServer) error {
 func (runner *runner) GetVirtualServer(vs *VirtualServer) (*VirtualServer, error) {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not convert local virtual server to IPVS service: %w", err)
 	}
+	runner.mu.Lock()
 	ipvsSvc, err := runner.ipvsHandle.GetService(svc)
+	runner.mu.Unlock()
+
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get IPVS service: %w", err)
 	}
 	vServ, err := toVirtualServer(ipvsSvc)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not convert IPVS service to local virtual server: %w", err)
 	}
 	return vServ, nil
 }
 
 // GetVirtualServers is part of ipvs.Interface.
 func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
+	runner.mu.Lock()
 	ipvsSvcs, err := runner.ipvsHandle.GetServices()
+	runner.mu.Unlock()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get IPVS services: %w", err)
 	}
 	vss := make([]*VirtualServer, 0)
 	for _, ipvsSvc := range ipvsSvcs {
 		vs, err := toVirtualServer(ipvsSvc)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not convert IPVS service to local virtual server: %w", err)
 		}
 		vss = append(vss, vs)
 	}
@@ -115,6 +128,8 @@ func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
 
 // Flush is part of ipvs.Interface. Currently we delete IPVS services one by one
 func (runner *runner) Flush() error {
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.Flush()
 }
 
@@ -122,12 +137,14 @@ func (runner *runner) Flush() error {
 func (runner *runner) AddRealServer(vs *VirtualServer, rs *RealServer) error {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not convert local virtual server to IPVS service: %w", err)
 	}
 	dst, err := toIPVSDestination(rs)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not convert local real server to IPVS destination: %w", err)
 	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.NewDestination(svc, dst)
 }
 
@@ -135,24 +152,28 @@ func (runner *runner) AddRealServer(vs *VirtualServer, rs *RealServer) error {
 func (runner *runner) DeleteRealServer(vs *VirtualServer, rs *RealServer) error {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not convert local virtual server to IPVS service: %w", err)
 	}
 	dst, err := toIPVSDestination(rs)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not convert local real server to IPVS destination: %w", err)
 	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.DelDestination(svc, dst)
 }
 
 func (runner *runner) UpdateRealServer(vs *VirtualServer, rs *RealServer) error {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not convert local virtual server to IPVS service: %w", err)
 	}
 	dst, err := toIPVSDestination(rs)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not convert local real server to IPVS destination: %w", err)
 	}
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
 	return runner.ipvsHandle.UpdateDestination(svc, dst)
 }
 
@@ -160,22 +181,35 @@ func (runner *runner) UpdateRealServer(vs *VirtualServer, rs *RealServer) error 
 func (runner *runner) GetRealServers(vs *VirtualServer) ([]*RealServer, error) {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not convert local virtual server to IPVS service: %w", err)
 	}
+	runner.mu.Lock()
 	dsts, err := runner.ipvsHandle.GetDestinations(svc)
+	runner.mu.Unlock()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get IPVS destination for service: %w", err)
 	}
 	rss := make([]*RealServer, 0)
 	for _, dst := range dsts {
 		dst, err := toRealServer(dst)
 		// TODO: aggregate errors?
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not convert IPVS destination to local real server: %w", err)
 		}
 		rss = append(rss, dst)
 	}
 	return rss, nil
+}
+
+// ConfigureTimeouts is the equivalent to running "ipvsadm --set" to configure tcp, tcpfin and udp timeouts
+func (runner *runner) ConfigureTimeouts(tcpTimeout, tcpFinTimeout, udpTimeout time.Duration) error {
+	ipvsConfig := &libipvs.Config{
+		TimeoutTCP:    tcpTimeout,
+		TimeoutTCPFin: tcpFinTimeout,
+		TimeoutUDP:    udpTimeout,
+	}
+
+	return runner.ipvsHandle.SetConfig(ipvsConfig)
 }
 
 // toVirtualServer converts an IPVS Service to the equivalent VirtualServer structure.
@@ -200,7 +234,7 @@ func toVirtualServer(svc *libipvs.Service) (*VirtualServer, error) {
 	vs.Flags = ServiceFlags(svc.Flags &^ uint32(FlagHashed))
 
 	if vs.Address == nil {
-		if svc.AddressFamily == syscall.AF_INET {
+		if svc.AddressFamily == unix.AF_INET {
 			vs.Address = net.IPv4zero
 		} else {
 			vs.Address = net.IPv6zero
@@ -238,10 +272,10 @@ func toIPVSService(vs *VirtualServer) (*libipvs.Service, error) {
 	}
 
 	if ip4 := vs.Address.To4(); ip4 != nil {
-		ipvsSvc.AddressFamily = syscall.AF_INET
+		ipvsSvc.AddressFamily = unix.AF_INET
 		ipvsSvc.Netmask = 0xffffffff
 	} else {
-		ipvsSvc.AddressFamily = syscall.AF_INET6
+		ipvsSvc.AddressFamily = unix.AF_INET6
 		ipvsSvc.Netmask = 128
 	}
 	return ipvsSvc, nil
@@ -263,11 +297,11 @@ func toIPVSDestination(rs *RealServer) (*libipvs.Destination, error) {
 func stringToProtocol(protocol string) uint16 {
 	switch strings.ToLower(protocol) {
 	case "tcp":
-		return uint16(syscall.IPPROTO_TCP)
+		return uint16(unix.IPPROTO_TCP)
 	case "udp":
-		return uint16(syscall.IPPROTO_UDP)
+		return uint16(unix.IPPROTO_UDP)
 	case "sctp":
-		return uint16(syscall.IPPROTO_SCTP)
+		return uint16(unix.IPPROTO_SCTP)
 	}
 	return uint16(0)
 }
@@ -275,11 +309,11 @@ func stringToProtocol(protocol string) uint16 {
 // protocolTypeToString returns the name for the given protocol.
 func protocolToString(proto Protocol) string {
 	switch proto {
-	case syscall.IPPROTO_TCP:
+	case unix.IPPROTO_TCP:
 		return "TCP"
-	case syscall.IPPROTO_UDP:
+	case unix.IPPROTO_UDP:
 		return "UDP"
-	case syscall.IPPROTO_SCTP:
+	case unix.IPPROTO_SCTP:
 		return "SCTP"
 	}
 	return ""

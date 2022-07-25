@@ -22,7 +22,8 @@ import (
 	"testing"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
+
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 )
 
 // AssertKubeConfigCurrentCluster is a utility function for kubeadm testing that asserts if the CurrentCluster in
@@ -95,6 +96,18 @@ func AssertKubeConfigCurrentAuthInfoWithToken(t *testing.T, config *clientcmdapi
 	// assert token
 	if currentAuthInfo.Token != expectedToken {
 		t.Errorf("kubeconfig.currentAuthInfo.Token [%s], expected [%s]", currentAuthInfo.Token, expectedToken)
+		return
+	}
+}
+
+// AssertKubeConfigCurrentContextWithClusterName is a utility function for kubeadm testing that asserts if the Current Cluster config in
+// the given KubeConfig object refers to expected cluster name
+func AssertKubeConfigCurrentContextWithClusterName(t *testing.T, config *clientcmdapi.Config, expectedClusterName string) {
+	currentContext := config.Contexts[config.CurrentContext]
+
+	// assert cluster name
+	if currentContext.Cluster != expectedClusterName {
+		t.Errorf("kubeconfig.currentContext.clusterName [%s], expected [%s]", currentContext.Cluster, expectedClusterName)
 		return
 	}
 }

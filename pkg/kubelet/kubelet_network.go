@@ -20,24 +20,8 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-)
-
-const (
-	// KubeMarkMasqChain is the mark-for-masquerade chain
-	// TODO: clean up this logic in kube-proxy
-	KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
-
-	// KubeMarkDropChain is the mark-for-drop chain
-	KubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
-
-	// KubePostroutingChain is kubernetes postrouting rules
-	KubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
-
-	// KubeFirewallChain is kubernetes firewall rules
-	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 )
 
 // providerRequiresNetworkingConfiguration returns whether the cloud provider
@@ -73,8 +57,7 @@ func (kl *Kubelet) updatePodCIDR(cidr string) (bool, error) {
 		// But it is better to be on the safe side to still return true here.
 		return true, fmt.Errorf("failed to update pod CIDR: %v", err)
 	}
-
-	klog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
+	klog.InfoS("Updating Pod CIDR", "originalPodCIDR", podCIDR, "newPodCIDR", cidr)
 	kl.runtimeState.setPodCIDR(cidr)
 	return true, nil
 }

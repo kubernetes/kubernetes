@@ -19,8 +19,6 @@ package v1
 import (
 	"encoding/json"
 	"time"
-
-	"github.com/google/gofuzz"
 )
 
 const RFC3339Micro = "2006-01-02T15:04:05.000000Z07:00"
@@ -39,11 +37,6 @@ type MicroTime struct {
 // copy-by-assign, despite the presence of (unexported) Pointer fields.
 func (t *MicroTime) DeepCopyInto(out *MicroTime) {
 	*out = *t
-}
-
-// String returns the representation of the time.
-func (t MicroTime) String() string {
-	return t.Time.String()
 }
 
 // NewMicroTime returns a wrapped instance of the provided time
@@ -72,22 +65,40 @@ func (t *MicroTime) IsZero() bool {
 
 // Before reports whether the time instant t is before u.
 func (t *MicroTime) Before(u *MicroTime) bool {
-	return t.Time.Before(u.Time)
+	if t != nil && u != nil {
+		return t.Time.Before(u.Time)
+	}
+	return false
 }
 
 // Equal reports whether the time instant t is equal to u.
 func (t *MicroTime) Equal(u *MicroTime) bool {
-	return t.Time.Equal(u.Time)
+	if t == nil && u == nil {
+		return true
+	}
+	if t != nil && u != nil {
+		return t.Time.Equal(u.Time)
+	}
+	return false
 }
 
 // BeforeTime reports whether the time instant t is before second-lever precision u.
 func (t *MicroTime) BeforeTime(u *Time) bool {
-	return t.Time.Before(u.Time)
+	if t != nil && u != nil {
+		return t.Time.Before(u.Time)
+	}
+	return false
 }
 
 // EqualTime reports whether the time instant t is equal to second-lever precision u.
 func (t *MicroTime) EqualTime(u *Time) bool {
-	return t.Time.Equal(u.Time)
+	if t == nil && u == nil {
+		return true
+	}
+	if t != nil && u != nil {
+		return t.Time.Equal(u.Time)
+	}
+	return false
 }
 
 // UnixMicro returns the local time corresponding to the given Unix time
@@ -168,16 +179,3 @@ func (t MicroTime) MarshalQueryParameter() (string, error) {
 
 	return t.UTC().Format(RFC3339Micro), nil
 }
-
-// Fuzz satisfies fuzz.Interface.
-func (t *MicroTime) Fuzz(c fuzz.Continue) {
-	if t == nil {
-		return
-	}
-	// Allow for about 1000 years of randomness. Accurate to a tenth of
-	// micro second. Leave off nanoseconds because JSON doesn't
-	// represent them so they can't round-trip properly.
-	t.Time = time.Unix(c.Rand.Int63n(1000*365*24*60*60), 1000*c.Rand.Int63n(1000000))
-}
-
-var _ fuzz.Interface = &MicroTime{}

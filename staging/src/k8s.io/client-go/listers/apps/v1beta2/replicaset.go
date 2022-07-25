@@ -26,8 +26,10 @@ import (
 )
 
 // ReplicaSetLister helps list ReplicaSets.
+// All objects returned here must be treated as read-only.
 type ReplicaSetLister interface {
 	// List lists all ReplicaSets in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta2.ReplicaSet, err error)
 	// ReplicaSets returns an object that can list and get ReplicaSets.
 	ReplicaSets(namespace string) ReplicaSetNamespaceLister
@@ -58,10 +60,13 @@ func (s *replicaSetLister) ReplicaSets(namespace string) ReplicaSetNamespaceList
 }
 
 // ReplicaSetNamespaceLister helps list and get ReplicaSets.
+// All objects returned here must be treated as read-only.
 type ReplicaSetNamespaceLister interface {
 	// List lists all ReplicaSets in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta2.ReplicaSet, err error)
 	// Get retrieves the ReplicaSet from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1beta2.ReplicaSet, error)
 	ReplicaSetNamespaceListerExpansion
 }

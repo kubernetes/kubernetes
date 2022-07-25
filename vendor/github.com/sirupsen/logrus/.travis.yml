@@ -1,15 +1,15 @@
 language: go
-go:
-  - 1.6.x
-  - 1.7.x
-  - 1.8.x
-  - tip
+go_import_path: github.com/sirupsen/logrus
+git:
+  depth: 1
 env:
-  - GOMAXPROCS=4 GORACE=halt_on_error=1
+  - GO111MODULE=on
+go: 1.15.x
+os: linux
 install:
-  - go get github.com/stretchr/testify/assert
-  - go get gopkg.in/gemnasium/logrus-airbrake-hook.v2
-  - go get golang.org/x/sys/unix
-  - go get golang.org/x/sys/windows
+  - ./travis/install.sh
 script:
-  - go test -race -v ./...
+  - cd ci
+  - go run mage.go -v -w ../ crossBuild
+  - go run mage.go -v -w ../ lint
+  - go run mage.go -v -w ../ test

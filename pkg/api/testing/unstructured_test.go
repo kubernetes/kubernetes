@@ -21,9 +21,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/gofuzz"
+	"github.com/google/go-cmp/cmp"
+	fuzz "github.com/google/gofuzz"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -31,10 +32,8 @@ import (
 	metaunstruct "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -50,7 +49,7 @@ func doRoundTrip(t *testing.T, internalVersion schema.GroupVersion, externalVers
 	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs).
 		// We are explicitly overwriting custom fuzzing functions, to ensure
 		// that InitContainers and their statuses are not generated. This is
-		// because in thise test we are simply doing json operations, in which
+		// because in this test we are simply doing json operations, in which
 		// those disappear.
 		Funcs(
 			func(s *api.PodSpec, c fuzz.Continue) {
@@ -95,11 +94,11 @@ func doRoundTrip(t *testing.T, internalVersion schema.GroupVersion, externalVers
 		return
 	}
 	if !apiequality.Semantic.DeepEqual(item, unmarshalledObj) {
-		t.Errorf("Object changed during JSON operations, diff: %v", diff.ObjectReflectDiff(item, unmarshalledObj))
+		t.Errorf("Object changed during JSON operations, diff: %v", cmp.Diff(item, unmarshalledObj))
 		return
 	}
 
-	newUnstr, err := runtime.NewTestUnstructuredConverter(apiequality.Semantic).ToUnstructured(item)
+	newUnstr, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
 	if err != nil {
 		t.Errorf("ToUnstructured failed: %v", err)
 		return
@@ -113,100 +112,147 @@ func doRoundTrip(t *testing.T, internalVersion schema.GroupVersion, externalVers
 	}
 
 	if !apiequality.Semantic.DeepEqual(item, newObj) {
-		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
+		t.Errorf("Object changed, diff: %v", cmp.Diff(item, newObj))
 	}
 }
 
 func TestRoundTrip(t *testing.T) {
-	for groupKey, group := range testapi.Groups {
-		for kind := range legacyscheme.Scheme.KnownTypes(*group.GroupVersion()) {
-			if nonRoundTrippableTypes.Has(kind) {
-				continue
-			}
-			t.Logf("Testing: %v in %v", kind, groupKey)
-			for i := 0; i < 50; i++ {
-				doRoundTrip(t, schema.GroupVersion{Group: groupKey, Version: runtime.APIVersionInternal}, *group.GroupVersion(), kind)
-				if t.Failed() {
-					break
-				}
+	for gvk := range legacyscheme.Scheme.AllKnownTypes() {
+		if nonRoundTrippableTypes.Has(gvk.Kind) {
+			continue
+		}
+		if gvk.Version == runtime.APIVersionInternal {
+			continue
+		}
+		t.Logf("Testing: %v in %v", gvk.Kind, gvk.GroupVersion().String())
+		for i := 0; i < 50; i++ {
+			doRoundTrip(t, schema.GroupVersion{Group: gvk.Group, Version: runtime.APIVersionInternal}, gvk.GroupVersion(), gvk.Kind)
+			if t.Failed() {
+				break
 			}
 		}
 	}
 }
 
 func TestRoundTripWithEmptyCreationTimestamp(t *testing.T) {
-	for groupKey, group := range testapi.Groups {
-		for kind := range legacyscheme.Scheme.KnownTypes(*group.GroupVersion()) {
-			if nonRoundTrippableTypes.Has(kind) {
-				continue
-			}
-			item, err := legacyscheme.Scheme.New(group.GroupVersion().WithKind(kind))
-			if err != nil {
-				t.Fatalf("Couldn't create external object %v: %v", kind, err)
-			}
-			t.Logf("Testing: %v in %v", kind, groupKey)
+	for gvk := range legacyscheme.Scheme.AllKnownTypes() {
+		if nonRoundTrippableTypes.Has(gvk.Kind) {
+			continue
+		}
+		if gvk.Version == runtime.APIVersionInternal {
+			continue
+		}
 
-			unstrBody, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
-			if err != nil {
-				t.Fatalf("ToUnstructured failed: %v", err)
-			}
+		item, err := legacyscheme.Scheme.New(gvk)
+		if err != nil {
+			t.Fatalf("Couldn't create external object %v: %v", gvk, err)
+		}
+		t.Logf("Testing: %v in %v", gvk.Kind, gvk.GroupVersion().String())
 
-			unstructObj := &metaunstruct.Unstructured{}
-			unstructObj.Object = unstrBody
+		unstrBody, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
+		if err != nil {
+			t.Fatalf("ToUnstructured failed: %v", err)
+		}
 
-			if meta, err := meta.Accessor(unstructObj); err == nil {
-				meta.SetCreationTimestamp(metav1.Time{})
-			} else {
-				t.Fatalf("Unable to set creation timestamp: %v", err)
-			}
+		unstructObj := &metaunstruct.Unstructured{}
+		unstructObj.Object = unstrBody
 
-			// attempt to re-convert unstructured object - conversion should not fail
-			// based on empty metadata fields, such as creationTimestamp
-			newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
-			err = runtime.NewTestUnstructuredConverter(apiequality.Semantic).FromUnstructured(unstructObj.Object, newObj)
-			if err != nil {
-				t.Fatalf("FromUnstructured failed: %v", err)
-			}
+		if meta, err := meta.Accessor(unstructObj); err == nil {
+			meta.SetCreationTimestamp(metav1.Time{})
+		} else {
+			t.Fatalf("Unable to set creation timestamp: %v", err)
+		}
+
+		// attempt to re-convert unstructured object - conversion should not fail
+		// based on empty metadata fields, such as creationTimestamp
+		newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
+		err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstructObj.Object, newObj)
+		if err != nil {
+			t.Fatalf("FromUnstructured failed: %v", err)
 		}
 	}
 }
 
-func BenchmarkToFromUnstructured(b *testing.B) {
+func BenchmarkToUnstructured(b *testing.B) {
 	items := benchmarkItems(b)
 	size := len(items)
+	convertor := runtime.DefaultUnstructuredConverter
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		unstr, err := runtime.NewTestUnstructuredConverter(apiequality.Semantic).ToUnstructured(&items[i%size])
-		if err != nil {
-			b.Fatalf("unexpected error: %v", err)
-		}
-		obj := v1.Pod{}
-		if err := runtime.NewTestUnstructuredConverter(apiequality.Semantic).FromUnstructured(unstr, &obj); err != nil {
+		unstr, err := convertor.ToUnstructured(&items[i%size])
+		if err != nil || unstr == nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
 	}
 	b.StopTimer()
 }
 
-func BenchmarkToFromUnstructuredViaJSON(b *testing.B) {
+func BenchmarkFromUnstructured(b *testing.B) {
 	items := benchmarkItems(b)
+	convertor := runtime.DefaultUnstructuredConverter
+	var unstr []map[string]interface{}
+	for i := range items {
+		item, err := convertor.ToUnstructured(&items[i])
+		if err != nil || item == nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		unstr = append(unstr, item)
+	}
 	size := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		data, err := json.Marshal(&items[i%size])
+		obj := v1.Pod{}
+		if err := convertor.FromUnstructured(unstr[i%size], &obj); err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkToUnstructuredViaJSON(b *testing.B) {
+	items := benchmarkItems(b)
+	var data [][]byte
+	for i := range items {
+		item, err := json.Marshal(&items[i])
 		if err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
+		data = append(data, item)
+	}
+	size := len(items)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
 		unstr := map[string]interface{}{}
-		if err := json.Unmarshal(data, &unstr); err != nil {
+		if err := json.Unmarshal(data[i%size], &unstr); err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
-		data, err = json.Marshal(unstr)
+	}
+	b.StopTimer()
+}
+
+func BenchmarkFromUnstructuredViaJSON(b *testing.B) {
+	items := benchmarkItems(b)
+	var unstr []map[string]interface{}
+	for i := range items {
+		data, err := json.Marshal(&items[i])
+		if err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		item := map[string]interface{}{}
+		if err := json.Unmarshal(data, &item); err != nil {
+			b.Fatalf("unexpected error: %v", err)
+		}
+		unstr = append(unstr, item)
+	}
+	size := len(items)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		item, err := json.Marshal(unstr[i%size])
 		if err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
 		obj := v1.Pod{}
-		if err := json.Unmarshal(data, &obj); err != nil {
+		if err := json.Unmarshal(item, &obj); err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
 	}

@@ -21,24 +21,20 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
 	"strings"
 	"testing"
 
-	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/cloud-provider"
-	cloudctrlmgrtesting "k8s.io/kubernetes/cmd/cloud-controller-manager/app/testing"
+	cloudprovider "k8s.io/cloud-provider"
+	cloudctrlmgrtesting "k8s.io/cloud-provider/app/testing"
+	"k8s.io/cloud-provider/fake"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -49,6 +45,8 @@ type componentTester interface {
 type kubeControllerManagerTester struct{}
 
 func (kubeControllerManagerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFlags []string) (*options.SecureServingOptionsWithLoopback, *server.SecureServingInfo, *server.DeprecatedInsecureServingInfo, func(), error) {
+	// avoid starting any controller loops, we're just testing serving
+	customFlags = append([]string{"--controllers="}, customFlags...)
 	gotResult, err := kubectrlmgrtesting.StartTestServer(t, customFlags)
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -73,7 +71,7 @@ func (kubeSchedulerTester) StartTestServer(t kubectrlmgrtesting.Logger, customFl
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, gotResult.Config.InsecureServing, gotResult.TearDownFn, err
+	return gotResult.Options.SecureServing, gotResult.Config.SecureServing, nil, gotResult.TearDownFn, err
 }
 
 func TestComponentSecureServingAndAuth(t *testing.T) {
@@ -90,13 +88,13 @@ func TestComponentSecureServingAndAuth(t *testing.T) {
 	}
 
 	// authenticate to apiserver via bearer token
-	token := "flwqkenfjasasdfmwerasd"
-	tokenFile, err := ioutil.TempFile("", "kubeconfig")
+	token := "flwqkenfjasasdfmwerasd" // Fake token for testing.
+	tokenFile, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
 	tokenFile.WriteString(fmt.Sprintf(`
-%s,controller-manager,controller-manager,""
+%s,system:kube-controller-manager,system:kube-controller-manager,""
 `, token))
 	tokenFile.Close()
 
@@ -107,46 +105,8 @@ func TestComponentSecureServingAndAuth(t *testing.T) {
 	}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
-	// allow controller-manager to do SubjectAccessReview
-	client, err := kubernetes.NewForConfig(server.ClientConfig)
-	if err != nil {
-		t.Fatalf("unexpected error creating client config: %v", err)
-	}
-	_, err = client.RbacV1().ClusterRoleBindings().Create(&rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: "controller-manager:system:auth-delegator"},
-		Subjects: []rbacv1.Subject{{
-			Kind: "User",
-			Name: "controller-manager",
-		}},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "system:auth-delegator",
-		},
-	})
-	if err != nil {
-		t.Fatalf("failed to create system:auth-delegator rbac cluster role binding: %v", err)
-	}
-
-	// allow controller-manager to read kube-system/extension-apiserver-authentication
-	_, err = client.RbacV1().RoleBindings("kube-system").Create(&rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: "controller-manager:extension-apiserver-authentication-reader"},
-		Subjects: []rbacv1.Subject{{
-			Kind: "User",
-			Name: "controller-manager",
-		}},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "Role",
-			Name:     "extension-apiserver-authentication-reader",
-		},
-	})
-	if err != nil {
-		t.Fatalf("failed to create controller-manager:extension-apiserver-authentication-reader rbac role binding: %v", err)
-	}
-
 	// create kubeconfig for the apiserver
-	apiserverConfig, err := ioutil.TempFile("", "kubeconfig")
+	apiserverConfig, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +132,7 @@ users:
 	apiserverConfig.Close()
 
 	// create BROKEN kubeconfig for the apiserver
-	brokenApiserverConfig, err := ioutil.TempFile("", "kubeconfig")
+	brokenApiserverConfig, err := os.CreateTemp("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,17 +158,23 @@ users:
 	brokenApiserverConfig.Close()
 
 	tests := []struct {
-		name       string
-		tester     componentTester
-		extraFlags []string
+		name             string
+		tester           componentTester
+		extraFlags       []string
+		insecureDisabled bool
 	}{
-		{"kube-controller-manager", kubeControllerManagerTester{}, nil},
-		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake"}},
-		{"kube-scheduler", kubeSchedulerTester{}, nil},
+		{"kube-controller-manager", kubeControllerManagerTester{}, nil, true},
+		{"cloud-controller-manager", cloudControllerManagerTester{}, []string{"--cloud-provider=fake"}, true},
+		{"kube-scheduler", kubeSchedulerTester{}, nil, true},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testComponent(t, tt.tester, apiserverConfig.Name(), brokenApiserverConfig.Name(), token, tt.extraFlags)
+			if tt.insecureDisabled {
+				testComponentWithSecureServing(t, tt.tester, apiserverConfig.Name(), brokenApiserverConfig.Name(), token, tt.extraFlags)
+			} else {
+				testComponent(t, tt.tester, apiserverConfig.Name(), brokenApiserverConfig.Name(), token, tt.extraFlags)
+			}
 		})
 	}
 }
@@ -254,7 +220,7 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 		}, "/healthz", false, false, intPtr(http.StatusOK), nil},
 		{"authorization skipped for /healthz with BROKEN authn/authz", []string{
 			"--port=0",
-			"--authentication-skip-lookup", // to survive unaccessible extensions-apiserver-authentication configmap
+			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
 			"--authentication-kubeconfig", brokenKubeconfig,
 			"--authorization-kubeconfig", brokenKubeconfig,
 			"--kubeconfig", kubeconfig,
@@ -276,9 +242,9 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 		}, "/metrics", false, false, intPtr(http.StatusInternalServerError), intPtr(http.StatusOK)},
 		{"always-allowed /metrics with BROKEN authn/authz", []string{
 			"--port=0",
-			"--authentication-skip-lookup", // to survive unaccessible extensions-apiserver-authentication configmap
-			"--authentication-kubeconfig", kubeconfig,
-			"--authorization-kubeconfig", kubeconfig,
+			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
+			"--authentication-kubeconfig", brokenKubeconfig,
+			"--authorization-kubeconfig", brokenKubeconfig,
 			"--authorization-always-allow-paths", "/healthz,/metrics",
 			"--kubeconfig", kubeconfig,
 			"--leader-elect=false",
@@ -306,7 +272,7 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 				// read self-signed server cert disk
 				pool := x509.NewCertPool()
 				serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
-				serverCert, err := ioutil.ReadFile(serverCertPath)
+				serverCert, err := os.ReadFile(serverCertPath)
 				if err != nil {
 					t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
 				}
@@ -330,7 +296,10 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
 
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Fatalf("failed to read response body: %v", err)
+				}
 				defer r.Body.Close()
 				if got, expected := r.StatusCode, *tt.wantSecureCode; got != expected {
 					t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
@@ -345,9 +314,117 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 				if err != nil {
 					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Fatalf("failed to read response body: %v", err)
+				}
 				defer r.Body.Close()
 				if got, expected := r.StatusCode, *tt.wantInsecureCode; got != expected {
+					t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
+				}
+			}
+		})
+	}
+}
+
+func testComponentWithSecureServing(t *testing.T, tester componentTester, kubeconfig, brokenKubeconfig, token string, extraFlags []string) {
+	tests := []struct {
+		name           string
+		flags          []string
+		path           string
+		anonymous      bool // to use the token or not
+		wantErr        bool
+		wantSecureCode *int
+	}{
+		{"no-flags", nil, "/healthz", false, true, nil},
+		{"/healthz without authn/authz", []string{
+			"--kubeconfig", kubeconfig,
+			"--leader-elect=false",
+		}, "/healthz", true, false, intPtr(http.StatusOK)},
+		{"/metrics without authn/authz", []string{
+			"--kubeconfig", kubeconfig,
+			"--leader-elect=false",
+		}, "/metrics", true, false, intPtr(http.StatusForbidden)},
+		{"authorization skipped for /healthz with authn/authz", []string{
+			"--authentication-kubeconfig", kubeconfig,
+			"--authorization-kubeconfig", kubeconfig,
+			"--kubeconfig", kubeconfig,
+			"--leader-elect=false",
+		}, "/healthz", false, false, intPtr(http.StatusOK)},
+		{"authorization skipped for /healthz with BROKEN authn/authz", []string{
+			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
+			"--authentication-kubeconfig", brokenKubeconfig,
+			"--authorization-kubeconfig", brokenKubeconfig,
+			"--kubeconfig", kubeconfig,
+			"--leader-elect=false",
+		}, "/healthz", false, false, intPtr(http.StatusOK)},
+		{"not authorized /metrics with BROKEN authn/authz", []string{
+			"--authentication-kubeconfig", kubeconfig,
+			"--authorization-kubeconfig", brokenKubeconfig,
+			"--kubeconfig", kubeconfig,
+			"--leader-elect=false",
+		}, "/metrics", false, false, intPtr(http.StatusInternalServerError)},
+		{"always-allowed /metrics with BROKEN authn/authz", []string{
+			"--authentication-skip-lookup", // to survive inaccessible extensions-apiserver-authentication configmap
+			"--authentication-kubeconfig", brokenKubeconfig,
+			"--authorization-kubeconfig", brokenKubeconfig,
+			"--authorization-always-allow-paths", "/healthz,/metrics",
+			"--kubeconfig", kubeconfig,
+			"--leader-elect=false",
+		}, "/metrics", false, false, intPtr(http.StatusOK)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			secureOptions, secureInfo, _, tearDownFn, err := tester.StartTestServer(t, append(append([]string{}, tt.flags...), extraFlags...))
+			if tearDownFn != nil {
+				defer tearDownFn()
+			}
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("StartTestServer() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil {
+				return
+			}
+
+			if want, got := tt.wantSecureCode != nil, secureInfo != nil; want != got {
+				t.Errorf("SecureServing enabled: expected=%v got=%v", want, got)
+			} else if want {
+				url := fmt.Sprintf("https://%s%s", secureInfo.Listener.Addr().String(), tt.path)
+				url = strings.Replace(url, "[::]", "127.0.0.1", -1) // switch to IPv4 because the self-signed cert does not support [::]
+
+				// read self-signed server cert disk
+				pool := x509.NewCertPool()
+				serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
+				serverCert, err := os.ReadFile(serverCertPath)
+				if err != nil {
+					t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
+				}
+				pool.AppendCertsFromPEM(serverCert)
+				tr := &http.Transport{
+					TLSClientConfig: &tls.Config{
+						RootCAs: pool,
+					},
+				}
+
+				client := &http.Client{Transport: tr}
+				req, err := http.NewRequest("GET", url, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !tt.anonymous {
+					req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+				}
+				r, err := client.Do(req)
+				if err != nil {
+					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
+				}
+
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Fatalf("failed to read response body: %v", err)
+				}
+				defer r.Body.Close()
+				if got, expected := r.StatusCode, *tt.wantSecureCode; got != expected {
 					t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
 				}
 			}
@@ -360,5 +437,7 @@ func intPtr(x int) *int {
 }
 
 func fakeCloudProviderFactory(io.Reader) (cloudprovider.Interface, error) {
-	return &fake.FakeCloud{}, nil
+	return &fake.Cloud{
+		DisableRoutes: true, // disable routes for server tests, otherwise --cluster-cidr is required
+	}, nil
 }

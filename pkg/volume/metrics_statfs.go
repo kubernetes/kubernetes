@@ -17,8 +17,11 @@ limitations under the License.
 package volume
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/volume/util/fs"
 )
 
@@ -40,6 +43,9 @@ func NewMetricsStatFS(path string) MetricsProvider {
 // GetMetrics calculates the volume usage and device free space by executing "du"
 // and gathering filesystem info for the Volume path.
 func (md *metricsStatFS) GetMetrics() (*Metrics, error) {
+	startTime := time.Now()
+	defer servermetrics.CollectVolumeStatCalDuration("statfs", startTime)
+
 	metrics := &Metrics{Time: metav1.Now()}
 	if md.path == "" {
 		return metrics, NewNoPathDefinedError()
@@ -55,7 +61,7 @@ func (md *metricsStatFS) GetMetrics() (*Metrics, error) {
 
 // getFsInfo writes metrics.Capacity, metrics.Used and metrics.Available from the filesystem info
 func (md *metricsStatFS) getFsInfo(metrics *Metrics) error {
-	available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.FsInfo(md.path)
+	available, capacity, usage, inodes, inodesFree, inodesUsed, err := fs.Info(md.path)
 	if err != nil {
 		return NewFsInfoFailedError(err)
 	}

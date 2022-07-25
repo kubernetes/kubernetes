@@ -6,45 +6,59 @@ package gonum
 
 import "gonum.org/v1/gonum/lapack"
 
-// Dorgbr generates one of the matrices Q or P^T computed by Dgebrd
+// Dorgbr generates one of the matrices Q or Pᵀ computed by Dgebrd
 // computed from the decomposition Dgebrd. See Dgebd2 for the description of
-// Q and P^T.
+// Q and Pᵀ.
 //
-// If vect == lapack.ApplyQ, then a is assumed to have been an m×k matrix and
+// If vect == lapack.GenerateQ, then a is assumed to have been an m×k matrix and
 // Q is of order m. If m >= k, then Dorgbr returns the first n columns of Q
 // where m >= n >= k. If m < k, then Dorgbr returns Q as an m×m matrix.
 //
-// If vect == lapack.ApplyP, then A is assumed to have been a k×n matrix, and
-// P^T is of order n. If k < n, then Dorgbr returns the first m rows of P^T,
-// where n >= m >= k. If k >= n, then Dorgbr returns P^T as an n×n matrix.
+// If vect == lapack.GeneratePT, then A is assumed to have been a k×n matrix, and
+// Pᵀ is of order n. If k < n, then Dorgbr returns the first m rows of Pᵀ,
+// where n >= m >= k. If k >= n, then Dorgbr returns Pᵀ as an n×n matrix.
 //
 // Dorgbr is an internal routine. It is exported for testing purposes.
-func (impl Implementation) Dorgbr(vect lapack.DecompUpdate, m, n, k int, a []float64, lda int, tau, work []float64, lwork int) {
+func (impl Implementation) Dorgbr(vect lapack.GenOrtho, m, n, k int, a []float64, lda int, tau, work []float64, lwork int) {
+	wantq := vect == lapack.GenerateQ
 	mn := min(m, n)
-	wantq := vect == lapack.ApplyQ
-	if wantq {
-		if m < n || n < min(m, k) || m < min(m, k) {
-			panic(badDims)
-		}
-	} else {
-		if n < m || m < min(n, k) || n < min(n, k) {
-			panic(badDims)
-		}
+	switch {
+	case vect != lapack.GenerateQ && vect != lapack.GeneratePT:
+		panic(badGenOrtho)
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case k < 0:
+		panic(kLT0)
+	case wantq && n > m:
+		panic(nGTM)
+	case wantq && n < min(m, k):
+		panic("lapack: n < min(m,k)")
+	case !wantq && m > n:
+		panic(mGTN)
+	case !wantq && m < min(n, k):
+		panic("lapack: m < min(n,k)")
+	case lda < max(1, n) && lwork != -1:
+		// Normally, we follow the reference and require the leading
+		// dimension to be always valid, even in case of workspace
+		// queries. However, if a caller provided a placeholder value
+		// for lda (and a) when doing a workspace query that didn't
+		// fulfill the condition here, it would cause a panic. This is
+		// exactly what Dgesvd does.
+		panic(badLdA)
+	case lwork < max(1, mn) && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
+		panic(shortWork)
 	}
-	if wantq {
-		if m >= k {
-			checkMatrix(m, k, a, lda)
-		} else {
-			checkMatrix(m, m, a, lda)
-		}
-	} else {
-		if n >= k {
-			checkMatrix(k, n, a, lda)
-		} else {
-			checkMatrix(n, n, a, lda)
-		}
-	}
+
+	// Quick return if possible.
 	work[0] = 1
+	if m == 0 || n == 0 {
+		return
+	}
+
 	if wantq {
 		if m >= k {
 			impl.Dorgqr(m, n, k, a, lda, tau, work, -1)
@@ -64,16 +78,16 @@ func (impl Implementation) Dorgbr(vect lapack.DecompUpdate, m, n, k int, a []flo
 		work[0] = float64(lworkopt)
 		return
 	}
-	if len(work) < lwork {
-		panic(badWork)
+
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case wantq && len(tau) < min(m, k):
+		panic(shortTau)
+	case !wantq && len(tau) < min(n, k):
+		panic(shortTau)
 	}
-	if lwork < mn {
-		panic(badWork)
-	}
-	if m == 0 || n == 0 {
-		work[0] = 1
-		return
-	}
+
 	if wantq {
 		// Form Q, determined by a call to Dgebrd to reduce an m×k matrix.
 		if m >= k {
@@ -98,12 +112,12 @@ func (impl Implementation) Dorgbr(vect lapack.DecompUpdate, m, n, k int, a []flo
 			}
 		}
 	} else {
-		// Form P^T, determined by a call to Dgebrd to reduce a k×n matrix.
+		// Form Pᵀ, determined by a call to Dgebrd to reduce a k×n matrix.
 		if k < n {
 			impl.Dorglq(m, n, k, a, lda, tau, work, lwork)
 		} else {
 			// Shift the vectors which define the elementary reflectors one
-			// row downward, and set the first row and column of P^T to
+			// row downward, and set the first row and column of Pᵀ to
 			// those of the unit matrix.
 			a[0] = 1
 			for i := 1; i < n; i++ {

@@ -18,6 +18,7 @@
 package jwt
 
 import (
+	"fmt"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/json"
 	"strings"
@@ -25,8 +26,9 @@ import (
 
 // JSONWebToken represents a JSON Web Token (as specified in RFC7519).
 type JSONWebToken struct {
-	payload func(k interface{}) ([]byte, error)
-	Headers []jose.Header
+	payload           func(k interface{}) ([]byte, error)
+	unverifiedPayload func() []byte
+	Headers           []jose.Header
 }
 
 type NestedJSONWebToken struct {
@@ -47,6 +49,22 @@ func (t *JSONWebToken) Claims(key interface{}, dest ...interface{}) error {
 		}
 	}
 
+	return nil
+}
+
+// UnsafeClaimsWithoutVerification deserializes the claims of a
+// JSONWebToken into the dests. For signed JWTs, the claims are not
+// verified. This function won't work for encrypted JWTs.
+func (t *JSONWebToken) UnsafeClaimsWithoutVerification(dest ...interface{}) error {
+	if t.unverifiedPayload == nil {
+		return fmt.Errorf("square/go-jose: Cannot get unverified claims")
+	}
+	claims := t.unverifiedPayload()
+	for _, d := range dest {
+		if err := json.Unmarshal(claims, d); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -76,8 +94,9 @@ func ParseSigned(s string) (*JSONWebToken, error) {
 	}
 
 	return &JSONWebToken{
-		payload: sig.Verify,
-		Headers: headers,
+		payload:           sig.Verify,
+		unverifiedPayload: sig.UnsafePayloadWithoutVerification,
+		Headers:           headers,
 	}, nil
 }
 

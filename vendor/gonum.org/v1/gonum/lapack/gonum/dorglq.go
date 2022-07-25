@@ -15,7 +15,7 @@ import (
 // Dorglq is the blocked version of Dorgl2 that makes greater use of level-3 BLAS
 // routines.
 //
-// len(tau) >= k, 0 <= k <= n, and 0 <= n <= m.
+// len(tau) >= k, 0 <= k <= m, and 0 <= m <= n.
 //
 // work is temporary storage, and lwork specifies the usable memory length. At minimum,
 // lwork >= m, and the amount of blocking is limited by the usable length.
@@ -26,39 +26,46 @@ import (
 //
 // Dorglq is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dorglq(m, n, k int, a []float64, lda int, tau, work []float64, lwork int) {
-	nb := impl.Ilaenv(1, "DORGLQ", " ", m, n, k, -1)
-	// work is treated as an n×nb matrix
-	if lwork == -1 {
-		work[0] = float64(max(1, m) * nb)
-		return
-	}
-	checkMatrix(m, n, a, lda)
-	if k < 0 {
-		panic(kLT0)
-	}
-	if k > m {
-		panic(kGTM)
-	}
-	if m > n {
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < m:
 		panic(nLTM)
-	}
-	if len(tau) < k {
-		panic(badTau)
-	}
-	if len(work) < lwork {
+	case k < 0:
+		panic(kLT0)
+	case k > m:
+		panic(kGTM)
+	case lda < max(1, n):
+		panic(badLdA)
+	case lwork < max(1, m) && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
 		panic(shortWork)
 	}
-	if lwork < m {
-		panic(badWork)
-	}
+
 	if m == 0 {
+		work[0] = 1
 		return
 	}
-	nbmin := 2 // Minimum number of blocks
-	var nx int // Minimum number of rows
+
+	nb := impl.Ilaenv(1, "DORGLQ", " ", m, n, k, -1)
+	if lwork == -1 {
+		work[0] = float64(m * nb)
+		return
+	}
+
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(tau) < k:
+		panic(shortTau)
+	}
+
+	nbmin := 2 // Minimum block size
+	var nx int // Crossover size from blocked to unbloked code
 	iws := m   // Length of work needed
 	var ldwork int
-	if nb > 1 && nb < k {
+	if 1 < nb && nb < k {
 		nx = max(0, impl.Ilaenv(3, "DORGLQ", " ", m, n, k, -1))
 		if nx < k {
 			ldwork = nb
@@ -70,12 +77,11 @@ func (impl Implementation) Dorglq(m, n, k int, a []float64, lda int, tau, work [
 			}
 		}
 	}
+
 	var ki, kk int
-	if nb >= nbmin && nb < k && nx < k {
+	if nbmin <= nb && nb < k && nx < k {
 		// The first kk rows are handled by the blocked method.
-		// Note: lapack has nx here, but this means the last nx rows are handled
-		// serially which could be quite different than nb.
-		ki = ((k - nb - 1) / nb) * nb
+		ki = ((k - nx - 1) / nb) * nb
 		kk = min(k, ki+nb)
 		for i := kk; i < m; i++ {
 			for j := 0; j < kk; j++ {
@@ -87,31 +93,31 @@ func (impl Implementation) Dorglq(m, n, k int, a []float64, lda int, tau, work [
 		// Perform the operation on colums kk to the end.
 		impl.Dorgl2(m-kk, n-kk, k-kk, a[kk*lda+kk:], lda, tau[kk:], work)
 	}
-	if kk == 0 {
-		return
-	}
-	// Perform the operation on column-blocks
-	for i := ki; i >= 0; i -= nb {
-		ib := min(nb, k-i)
-		if i+ib < m {
-			impl.Dlarft(lapack.Forward, lapack.RowWise,
-				n-i, ib,
-				a[i*lda+i:], lda,
-				tau[i:],
-				work, ldwork)
+	if kk > 0 {
+		// Perform the operation on column-blocks
+		for i := ki; i >= 0; i -= nb {
+			ib := min(nb, k-i)
+			if i+ib < m {
+				impl.Dlarft(lapack.Forward, lapack.RowWise,
+					n-i, ib,
+					a[i*lda+i:], lda,
+					tau[i:],
+					work, ldwork)
 
-			impl.Dlarfb(blas.Right, blas.Trans, lapack.Forward, lapack.RowWise,
-				m-i-ib, n-i, ib,
-				a[i*lda+i:], lda,
-				work, ldwork,
-				a[(i+ib)*lda+i:], lda,
-				work[ib*ldwork:], ldwork)
-		}
-		impl.Dorgl2(ib, n-i, ib, a[i*lda+i:], lda, tau[i:], work)
-		for l := i; l < i+ib; l++ {
-			for j := 0; j < i; j++ {
-				a[l*lda+j] = 0
+				impl.Dlarfb(blas.Right, blas.Trans, lapack.Forward, lapack.RowWise,
+					m-i-ib, n-i, ib,
+					a[i*lda+i:], lda,
+					work, ldwork,
+					a[(i+ib)*lda+i:], lda,
+					work[ib*ldwork:], ldwork)
+			}
+			impl.Dorgl2(ib, n-i, ib, a[i*lda+i:], lda, tau[i:], work)
+			for l := i; l < i+ib; l++ {
+				for j := 0; j < i; j++ {
+					a[l*lda+j] = 0
+				}
 			}
 		}
 	}
+	work[0] = float64(iws)
 }

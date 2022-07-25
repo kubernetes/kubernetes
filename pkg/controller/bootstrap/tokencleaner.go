@@ -17,10 +17,11 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -31,10 +32,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
-	"k8s.io/klog"
+	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 // TokenCleanerOptions contains options for the TokenCleaner
@@ -81,7 +83,7 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 	}
 
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("token_cleaner", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("token_cleaner", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
@@ -109,20 +111,20 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 }
 
 // Run runs controller loops and returns when they are done
-func (tc *TokenCleaner) Run(stopCh <-chan struct{}) {
+func (tc *TokenCleaner) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer tc.queue.ShutDown()
 
 	klog.Infof("Starting token cleaner controller")
 	defer klog.Infof("Shutting down token cleaner controller")
 
-	if !controller.WaitForCacheSync("token_cleaner", stopCh, tc.secretSynced) {
+	if !cache.WaitForNamedCacheSync("token_cleaner", ctx.Done(), tc.secretSynced) {
 		return
 	}
 
-	go wait.Until(tc.worker, 10*time.Second, stopCh)
+	go wait.UntilWithContext(ctx, tc.worker, 10*time.Second)
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 func (tc *TokenCleaner) enqueueSecrets(obj interface{}) {
@@ -135,20 +137,20 @@ func (tc *TokenCleaner) enqueueSecrets(obj interface{}) {
 }
 
 // worker runs a thread that dequeues secrets, handles them, and marks them done.
-func (tc *TokenCleaner) worker() {
-	for tc.processNextWorkItem() {
+func (tc *TokenCleaner) worker(ctx context.Context) {
+	for tc.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (tc *TokenCleaner) processNextWorkItem() bool {
+func (tc *TokenCleaner) processNextWorkItem(ctx context.Context) bool {
 	key, quit := tc.queue.Get()
 	if quit {
 		return false
 	}
 	defer tc.queue.Done(key)
 
-	if err := tc.syncFunc(key.(string)); err != nil {
+	if err := tc.syncFunc(ctx, key.(string)); err != nil {
 		tc.queue.AddRateLimited(key)
 		utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", key, err))
 		return true
@@ -158,7 +160,7 @@ func (tc *TokenCleaner) processNextWorkItem() bool {
 	return true
 }
 
-func (tc *TokenCleaner) syncFunc(key string) error {
+func (tc *TokenCleaner) syncFunc(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing secret %q (%v)", key, time.Since(startTime))
@@ -180,24 +182,32 @@ func (tc *TokenCleaner) syncFunc(key string) error {
 	}
 
 	if ret.Type == bootstrapapi.SecretTypeBootstrapToken {
-		tc.evalSecret(ret)
+		tc.evalSecret(ctx, ret)
 	}
 	return nil
 }
 
-func (tc *TokenCleaner) evalSecret(o interface{}) {
+func (tc *TokenCleaner) evalSecret(ctx context.Context, o interface{}) {
 	secret := o.(*v1.Secret)
-	if isSecretExpired(secret) {
+	ttl, alreadyExpired := bootstrapsecretutil.GetExpiration(secret, time.Now())
+	if alreadyExpired {
 		klog.V(3).Infof("Deleting expired secret %s/%s", secret.Namespace, secret.Name)
-		var options *metav1.DeleteOptions
+		var options metav1.DeleteOptions
 		if len(secret.UID) > 0 {
-			options = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &secret.UID}}
+			options.Preconditions = &metav1.Preconditions{UID: &secret.UID}
 		}
-		err := tc.client.CoreV1().Secrets(secret.Namespace).Delete(secret.Name, options)
+		err := tc.client.CoreV1().Secrets(secret.Namespace).Delete(ctx, secret.Name, options)
 		// NotFound isn't a real error (it's already been deleted)
 		// Conflict isn't a real error (the UID precondition failed)
 		if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
 			klog.V(3).Infof("Error deleting Secret: %v", err)
 		}
+	} else if ttl > 0 {
+		key, err := controller.KeyFunc(o)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+		tc.queue.AddAfter(key, ttl)
 	}
 }

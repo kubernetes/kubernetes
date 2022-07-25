@@ -17,8 +17,10 @@ limitations under the License.
 package flexvolume
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -36,10 +38,22 @@ func (e *expanderDefaults) ExpandVolumeDevice(spec *volume.Spec, newSize resourc
 	return newSize, nil
 }
 
-// the defaults for ExpandFS return a generic resize indicator that will trigger the operation executor to go ahead with
+// the defaults for NodeExpand return a generic resize indicator that will trigger the operation executor to go ahead with
 // generic filesystem resize
-func (e *expanderDefaults) ExpandFS(spec *volume.Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) error {
-	klog.Warning(logPrefix(e.plugin), "using default filesystem resize for volume ", spec.Name(), ", at ", devicePath)
-	_, err := util.GenericResizeFS(e.plugin.host, e.plugin.GetPluginName(), devicePath, deviceMountPath)
-	return err
+func (e *expanderDefaults) NodeExpand(rsOpt volume.NodeResizeOptions) (bool, error) {
+	klog.Warning(logPrefix(e.plugin), "using default filesystem resize for volume ", rsOpt.VolumeSpec.Name(), ", at ", rsOpt.DevicePath)
+	fsVolume, err := util.CheckVolumeModeFilesystem(rsOpt.VolumeSpec)
+	if err != nil {
+		return false, fmt.Errorf("error checking VolumeMode: %v", err)
+	}
+	// if volume is not a fs file system, there is nothing for us to do here.
+	if !fsVolume {
+		return true, nil
+	}
+
+	_, err = util.GenericResizeFS(e.plugin.host, e.plugin.GetPluginName(), rsOpt.DevicePath, rsOpt.DeviceMountPath)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }

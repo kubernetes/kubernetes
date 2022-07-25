@@ -19,18 +19,18 @@ package flocker
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/env"
-	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
-	"k8s.io/kubernetes/pkg/volume"
-
 	flockerapi "github.com/clusterhq/flocker-go"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/util/env"
+	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -78,11 +78,11 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(flockerPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(flockerPluginName), volName)
 }
 
 func makeGlobalFlockerPath(datasetUUID string) string {
-	return path.Join(defaultMountPath, datasetUUID)
+	return filepath.Join(defaultMountPath, datasetUUID)
 }
 
 func (p *flockerPlugin) Init(host volume.VolumeHost) error {
@@ -108,7 +108,7 @@ func (p *flockerPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.Flocker != nil)
 }
 
-func (p *flockerPlugin) RequiresRemount() bool {
+func (p *flockerPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -200,7 +200,7 @@ func (b *flockerVolume) GetDatasetUUID() (datasetUUID string, err error) {
 	}
 
 	if b.flockerClient == nil {
-		return "", fmt.Errorf("Flocker client is not initialized")
+		return "", fmt.Errorf("flocker client is not initialized")
 	}
 
 	// lookup in flocker API otherwise
@@ -214,17 +214,10 @@ type flockerVolumeMounter struct {
 
 func (b *flockerVolumeMounter) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        b.readOnly,
-		Managed:         false,
-		SupportsSELinux: false,
+		ReadOnly:       b.readOnly,
+		Managed:        false,
+		SELinuxRelabel: false,
 	}
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *flockerVolumeMounter) CanMount() error {
-	return nil
 }
 
 func (b *flockerVolumeMounter) GetPath() string {
@@ -232,8 +225,8 @@ func (b *flockerVolumeMounter) GetPath() string {
 }
 
 // SetUp bind mounts the disk global mount to the volume path.
-func (b *flockerVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *flockerVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
 // newFlockerClient uses environment variables and pod attributes to return a
@@ -274,7 +267,7 @@ control service:
    need to update the Primary UUID for this volume.
 5. Wait until the Primary UUID was updated or timeout.
 */
-func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *flockerVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	var err error
 	if b.flockerClient == nil {
 		b.flockerClient, err = b.newFlockerClient()
@@ -285,12 +278,12 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	datasetUUID, err := b.GetDatasetUUID()
 	if err != nil {
-		return fmt.Errorf("The datasetUUID for volume with datasetName='%s' can not be found using flocker: %s", b.datasetName, err)
+		return fmt.Errorf("the datasetUUID for volume with datasetName='%s' can not be found using flocker: %s", b.datasetName, err)
 	}
 
 	datasetState, err := b.flockerClient.GetDatasetState(datasetUUID)
 	if err != nil {
-		return fmt.Errorf("The datasetState for volume with datasetUUID='%s' could not determinted uusing flocker: %s", datasetUUID, err)
+		return fmt.Errorf("the datasetState for volume with datasetUUID='%s' could not determinted uusing flocker: %s", datasetUUID, err)
 	}
 
 	primaryUUID, err := b.flockerClient.GetPrimaryUUID()
@@ -304,7 +297,7 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		}
 		_, err := b.flockerClient.GetDatasetState(datasetUUID)
 		if err != nil {
-			return fmt.Errorf("The volume with datasetUUID='%s' migrated unsuccessfully", datasetUUID)
+			return fmt.Errorf("the volume with datasetUUID='%s' migrated unsuccessfully", datasetUUID)
 		}
 	}
 
@@ -333,7 +326,7 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	globalFlockerPath := makeGlobalFlockerPath(datasetUUID)
 	klog.V(4).Infof("attempting to mount %s", dir)
 
-	err = b.mounter.Mount(globalFlockerPath, dir, "", options)
+	err = b.mounter.MountSensitiveWithoutSystemd(globalFlockerPath, dir, "", options, nil)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
@@ -362,7 +355,7 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, fsGroup)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 
 	klog.V(4).Infof("successfully mounted %s", dir)
@@ -395,7 +388,6 @@ func (b *flockerVolumeMounter) updateDatasetPrimary(datasetUUID string, primaryU
 				datasetUUID, primaryUUID, err,
 			)
 		case <-tickChan.C:
-			break
 		}
 	}
 
@@ -430,7 +422,7 @@ func (c *flockerVolumeUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (c *flockerVolumeUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 func (p *flockerPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {

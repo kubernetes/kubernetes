@@ -14,14 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script generates `/staging/src/k8s.io/kubelet/pkg/apis/podresources/v1/api.pb.go`
+# from the protobuf file `/staging/src/k8s.io/kubelet/pkg/apis/podresources/v1/api.proto`
+# for pods.
+# Usage: `hack/update-generated-pod-resources.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 # NOTE: All output from this script needs to be copied back to the calling
 # source tree.  This is managed in kube::build::copy_output in build/common.sh.
 # If the output set is changed update that function.
 
-${KUBE_ROOT}/build/run.sh hack/update-generated-pod-resources-dockerized.sh "$@"
+"${KUBE_ROOT}/build/run.sh" hack/update-generated-pod-resources-dockerized.sh "$@"

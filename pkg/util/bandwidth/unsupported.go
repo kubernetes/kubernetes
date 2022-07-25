@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 /*
@@ -27,7 +28,8 @@ import (
 type unsupportedShaper struct {
 }
 
-func NewTCShaper(iface string) BandwidthShaper {
+// NewTCShaper makes a new unsupportedShaper for the given interface
+func NewTCShaper(iface string) Shaper {
 	return &unsupportedShaper{}
 }
 

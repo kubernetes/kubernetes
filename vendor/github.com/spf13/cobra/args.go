@@ -2,6 +2,7 @@ package cobra
 
 import (
 	"fmt"
+	"strings"
 )
 
 type PositionalArgs func(cmd *Command, args []string) error
@@ -34,8 +35,15 @@ func NoArgs(cmd *Command, args []string) error {
 // OnlyValidArgs returns an error if any args are not in the list of ValidArgs.
 func OnlyValidArgs(cmd *Command, args []string) error {
 	if len(cmd.ValidArgs) > 0 {
+		// Remove any description that may be included in ValidArgs.
+		// A description is following a tab character.
+		var validArgs []string
+		for _, v := range cmd.ValidArgs {
+			validArgs = append(validArgs, strings.Split(v, "\t")[0])
+		}
+
 		for _, v := range args {
-			if !stringInSlice(v, cmd.ValidArgs) {
+			if !stringInSlice(v, validArgs) {
 				return fmt.Errorf("invalid argument %q for %q%s", v, cmd.CommandPath(), cmd.findSuggestions(args[0]))
 			}
 		}
@@ -78,11 +86,35 @@ func ExactArgs(n int) PositionalArgs {
 	}
 }
 
+// ExactValidArgs returns an error if
+// there are not exactly N positional args OR
+// there are any positional args that are not in the `ValidArgs` field of `Command`
+func ExactValidArgs(n int) PositionalArgs {
+	return func(cmd *Command, args []string) error {
+		if err := ExactArgs(n)(cmd, args); err != nil {
+			return err
+		}
+		return OnlyValidArgs(cmd, args)
+	}
+}
+
 // RangeArgs returns an error if the number of args is not within the expected range.
 func RangeArgs(min int, max int) PositionalArgs {
 	return func(cmd *Command, args []string) error {
 		if len(args) < min || len(args) > max {
 			return fmt.Errorf("accepts between %d and %d arg(s), received %d", min, max, len(args))
+		}
+		return nil
+	}
+}
+
+// MatchAll allows combining several PositionalArgs to work in concert.
+func MatchAll(pargs ...PositionalArgs) PositionalArgs {
+	return func(cmd *Command, args []string) error {
+		for _, parg := range pargs {
+			if err := parg(cmd, args); err != nil {
+				return err
+			}
 		}
 		return nil
 	}

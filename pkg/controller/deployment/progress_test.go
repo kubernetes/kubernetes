@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"context"
 	"math"
 	"testing"
 	"time"
@@ -166,7 +167,7 @@ func TestRequeueStuckDeployment(t *testing.T) {
 	}
 
 	dc := &DeploymentController{
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "doesnt-matter"),
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "doesnt_matter"),
 	}
 	dc.enqueueDeployment = dc.enqueue
 
@@ -330,7 +331,7 @@ func TestSyncRolloutStatus(t *testing.T) {
 				test.allRSs = append(test.allRSs, test.newRS)
 			}
 
-			err := dc.syncRolloutStatus(test.allRSs, test.newRS, test.d)
+			err := dc.syncRolloutStatus(context.TODO(), test.allRSs, test.newRS, test.d)
 			if err != nil {
 				t.Error(err)
 			}

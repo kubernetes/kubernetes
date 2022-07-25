@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"bytes"
+	"compress/flate"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -29,8 +30,9 @@ import (
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -81,7 +83,7 @@ type Transport struct {
 // RoundTrip implements the http.RoundTripper interface
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Add reverse proxy headers.
-	forwardedURI := path.Join(t.PathPrepend, req.URL.Path)
+	forwardedURI := path.Join(t.PathPrepend, req.URL.EscapedPath())
 	if strings.HasSuffix(req.URL.Path, "/") {
 		forwardedURI = forwardedURI + "/"
 	}
@@ -100,16 +102,15 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	resp, err := rt.RoundTrip(req)
 
 	if err != nil {
-		message := fmt.Sprintf("Error: '%s'\nTrying to reach: '%v'", err.Error(), req.URL.String())
-		resp = &http.Response{
-			StatusCode: http.StatusServiceUnavailable,
-			Body:       ioutil.NopCloser(strings.NewReader(message)),
-		}
-		return resp, nil
+		return nil, errors.NewServiceUnavailable(fmt.Sprintf("error trying to reach service: %v", err))
 	}
 
 	if redirect := resp.Header.Get("Location"); redirect != "" {
-		resp.Header.Set("Location", t.rewriteURL(redirect, req.URL, req.Host))
+		targetURL, err := url.Parse(redirect)
+		if err != nil {
+			return nil, errors.NewInternalError(fmt.Errorf("error trying to parse Location header: %v", err))
+		}
+		resp.Header.Set("Location", t.rewriteURL(targetURL, req.URL, req.Host))
 		return resp, nil
 	}
 
@@ -131,14 +132,8 @@ func (rt *Transport) WrappedRoundTripper() http.RoundTripper {
 
 // rewriteURL rewrites a single URL to go through the proxy, if the URL refers
 // to the same host as sourceURL, which is the page on which the target URL
-// occurred, or if the URL matches the sourceRequestHost. If any error occurs (e.g.
-// parsing), it returns targetURL.
-func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL, sourceRequestHost string) string {
-	url, err := url.Parse(targetURL)
-	if err != nil {
-		return targetURL
-	}
-
+// occurred, or if the URL matches the sourceRequestHost.
+func (t *Transport) rewriteURL(url *url.URL, sourceURL *url.URL, sourceRequestHost string) string {
 	// Example:
 	//      When API server processes a proxy request to a service (e.g. /api/v1/namespace/foo/service/bar/proxy/),
 	//      the sourceURL.Host (i.e. req.URL.Host) is the endpoint IP address of the service. The
@@ -154,7 +149,7 @@ func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL, sourceReque
 	isDifferentHost := url.Host != "" && url.Host != sourceURL.Host && url.Host != sourceRequestHost
 	isRelative := !strings.HasPrefix(url.Path, "/")
 	if isDifferentHost || isRelative {
-		return targetURL
+		return url.String()
 	}
 
 	// Do not rewrite scheme and host if the Transport has empty scheme and host
@@ -181,7 +176,7 @@ func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL, sourceReque
 // rewriteHTML scans the HTML for tags with url-valued attributes, and updates
 // those values with the urlRewriter function. The updated HTML is output to the
 // writer.
-func rewriteHTML(reader io.Reader, writer io.Writer, urlRewriter func(string) string) error {
+func rewriteHTML(reader io.Reader, writer io.Writer, urlRewriter func(*url.URL) string) error {
 	// Note: This assumes the content is UTF-8.
 	tokenizer := html.NewTokenizer(reader)
 
@@ -196,7 +191,14 @@ func rewriteHTML(reader io.Reader, writer io.Writer, urlRewriter func(string) st
 			if urlAttrs, ok := atomsToAttrs[token.DataAtom]; ok {
 				for i, attr := range token.Attr {
 					if urlAttrs.Has(attr.Key) {
-						token.Attr[i].Val = urlRewriter(attr.Val)
+						url, err := url.Parse(attr.Val)
+						if err != nil {
+							// Do not rewrite the URL if it isn't valid.  It is intended not
+							// to error here to prevent the inability to understand the
+							// content of the body to cause a fatal error.
+							continue
+						}
+						token.Attr[i].Val = urlRewriter(url)
 					}
 				}
 			}
@@ -231,7 +233,18 @@ func (t *Transport) rewriteResponse(req *http.Request, resp *http.Response) (*ht
 		gzw := gzip.NewWriter(writer)
 		defer gzw.Close()
 		writer = gzw
-	// TODO: support flate, other encodings.
+	case "deflate":
+		var err error
+		reader = flate.NewReader(reader)
+		flw, err := flate.NewWriter(writer, flate.BestCompression)
+		if err != nil {
+			return nil, fmt.Errorf("errorf making flate writer: %v", err)
+		}
+		defer func() {
+			flw.Close()
+			flw.Flush()
+		}()
+		writer = flw
 	case "":
 		// This is fine
 	default:
@@ -240,7 +253,7 @@ func (t *Transport) rewriteResponse(req *http.Request, resp *http.Response) (*ht
 		return resp, nil
 	}
 
-	urlRewriter := func(targetUrl string) string {
+	urlRewriter := func(targetUrl *url.URL) string {
 		return t.rewriteURL(targetUrl, req.URL, req.Host)
 	}
 	err := rewriteHTML(reader, writer, urlRewriter)

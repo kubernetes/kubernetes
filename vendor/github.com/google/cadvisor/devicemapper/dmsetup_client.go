@@ -18,7 +18,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // DmsetupClient is a low-level client for interacting with device mapper via

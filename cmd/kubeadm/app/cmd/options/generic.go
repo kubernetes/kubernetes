@@ -17,13 +17,21 @@ limitations under the License.
 package options
 
 import (
+	"strings"
+
 	"github.com/spf13/pflag"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+
+	cliflag "k8s.io/component-base/cli/flag"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 // AddKubeConfigFlag adds the --kubeconfig flag to the given flagset
 func AddKubeConfigFlag(fs *pflag.FlagSet, kubeConfigFile *string) {
-	fs.StringVar(kubeConfigFile, KubeconfigPath, *kubeConfigFile, "The kubeconfig file to use when talking to the cluster. If the flag is not set, a set of standard locations are searched for an existing KubeConfig file.")
+	fs.StringVar(kubeConfigFile, KubeconfigPath, *kubeConfigFile, "The kubeconfig file to use when talking to the cluster. If the flag is not set, a set of standard locations can be searched for an existing kubeconfig file.")
+	// Note that DefValue is the text shown in the terminal and not the default value assigned to the flag
+	fs.Lookup(KubeconfigPath).DefValue = constants.GetAdminKubeConfigPath()
 }
 
 // AddKubeConfigDirFlag adds the --kubeconfig-dir flag to the given flagset
@@ -33,7 +41,7 @@ func AddKubeConfigDirFlag(fs *pflag.FlagSet, kubeConfigDir *string) {
 
 // AddConfigFlag adds the --config flag to the given flagset
 func AddConfigFlag(fs *pflag.FlagSet, cfgPath *string) {
-	fs.StringVar(cfgPath, CfgPath, *cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental).")
+	fs.StringVar(cfgPath, CfgPath, *cfgPath, "Path to a kubeadm configuration file.")
 }
 
 // AddIgnorePreflightErrorsFlag adds the --ignore-preflight-errors flag to the given flagset
@@ -46,12 +54,52 @@ func AddIgnorePreflightErrorsFlag(fs *pflag.FlagSet, ignorePreflightErrors *[]st
 
 // AddControlPlanExtraArgsFlags adds the ExtraArgs flags for control plane components
 func AddControlPlanExtraArgsFlags(fs *pflag.FlagSet, apiServerExtraArgs, controllerManagerExtraArgs, schedulerExtraArgs *map[string]string) {
-	fs.Var(utilflag.NewMapStringString(apiServerExtraArgs), APIServerExtraArgs, "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
-	fs.Var(utilflag.NewMapStringString(controllerManagerExtraArgs), ControllerManagerExtraArgs, "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
-	fs.Var(utilflag.NewMapStringString(schedulerExtraArgs), SchedulerExtraArgs, "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
+	fs.Var(cliflag.NewMapStringString(apiServerExtraArgs), APIServerExtraArgs, "A set of extra flags to pass to the API Server or override default ones in form of <flagname>=<value>")
+	fs.Var(cliflag.NewMapStringString(controllerManagerExtraArgs), ControllerManagerExtraArgs, "A set of extra flags to pass to the Controller Manager or override default ones in form of <flagname>=<value>")
+	fs.Var(cliflag.NewMapStringString(schedulerExtraArgs), SchedulerExtraArgs, "A set of extra flags to pass to the Scheduler or override default ones in form of <flagname>=<value>")
 }
 
 // AddImageMetaFlags adds the --image-repository flag to the given flagset
 func AddImageMetaFlags(fs *pflag.FlagSet, imageRepository *string) {
 	fs.StringVar(imageRepository, ImageRepository, *imageRepository, "Choose a container registry to pull control plane images from")
+}
+
+// AddFeatureGatesStringFlag adds the --feature-gates flag to the given flagset
+func AddFeatureGatesStringFlag(fs *pflag.FlagSet, featureGatesString *string) {
+	if knownFeatures := features.KnownFeatures(&features.InitFeatureGates); len(knownFeatures) > 0 {
+		fs.StringVar(featureGatesString, FeatureGatesString, *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
+			"Options are:\n"+strings.Join(knownFeatures, "\n"))
+	} else {
+		fs.StringVar(featureGatesString, FeatureGatesString, *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
+			"No feature gates are available in this release.")
+	}
+}
+
+// AddKubernetesVersionFlag adds the --kubernetes-version flag to the given flagset
+func AddKubernetesVersionFlag(fs *pflag.FlagSet, kubernetesVersion *string) {
+	fs.StringVar(
+		kubernetesVersion, KubernetesVersion, *kubernetesVersion,
+		`Choose a specific Kubernetes version for the control plane.`,
+	)
+}
+
+// AddKubeadmOtherFlags adds flags that are not bound to a configuration file to the given flagset
+func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
+	flagSet.StringVar(
+		rootfsPath, "rootfs", *rootfsPath,
+		"[EXPERIMENTAL] The path to the 'real' host root filesystem.",
+	)
+}
+
+// AddPatchesFlag adds the --patches flag to the given flagset
+func AddPatchesFlag(fs *pflag.FlagSet, patchesDir *string) {
+	const usage = `Path to a directory that contains files named ` +
+		`"target[suffix][+patchtype].extension". For example, ` +
+		`"kube-apiserver0+merge.yaml" or just "etcd.json". ` +
+		`"target" can be one of "kube-apiserver", "kube-controller-manager", "kube-scheduler", "etcd", "kubeletconfiguration". ` +
+		`"patchtype" can be one of "strategic", "merge" or "json" and they match the patch formats ` +
+		`supported by kubectl. The default "patchtype" is "strategic". "extension" must be either ` +
+		`"json" or "yaml". "suffix" is an optional string that can be used to determine ` +
+		`which patches are applied first alpha-numerically.`
+	fs.StringVar(patchesDir, Patches, *patchesDir, usage)
 }

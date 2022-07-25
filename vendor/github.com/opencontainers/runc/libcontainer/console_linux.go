@@ -9,7 +9,7 @@ import (
 // mount initializes the console inside the rootfs mounting with the specified mount label
 // and applying the correct ownership of the console.
 func mountConsole(slavePath string) error {
-	oldMask := unix.Umask(0000)
+	oldMask := unix.Umask(0o000)
 	defer unix.Umask(oldMask)
 	f, err := os.Create("/dev/console")
 	if err != nil && !os.IsExist(err) {
@@ -18,7 +18,7 @@ func mountConsole(slavePath string) error {
 	if f != nil {
 		f.Close()
 	}
-	return unix.Mount(slavePath, "/dev/console", "bind", unix.MS_BIND, "")
+	return mount(slavePath, "/dev/console", "", "bind", unix.MS_BIND, "")
 }
 
 // dupStdio opens the slavePath for the console and dups the fds to the current

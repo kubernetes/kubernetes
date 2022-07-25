@@ -1,4 +1,5 @@
-{
-  "Rules": [
-  ]
-}
+rules:
+  #  Allow imports of k8s.io/kubernetes/pkg/{api|apis}
+  - selectorRegexp: "k8s[.]io/kubernetes/pkg/(api$|apis/)"
+    allowedPrefixes:
+      - ""

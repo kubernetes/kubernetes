@@ -1,6 +1,9 @@
 package gophercloud
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // BaseError is an error type that all other error types embed.
 type BaseError struct {
@@ -40,6 +43,33 @@ type ErrInvalidInput struct {
 
 func (e ErrInvalidInput) Error() string {
 	e.DefaultErrString = fmt.Sprintf("Invalid input provided for argument [%s]: [%+v]", e.Argument, e.Value)
+	return e.choseErrString()
+}
+
+// ErrMissingEnvironmentVariable is the error when environment variable is required
+// in a particular situation but not provided by the user
+type ErrMissingEnvironmentVariable struct {
+	BaseError
+	EnvironmentVariable string
+}
+
+func (e ErrMissingEnvironmentVariable) Error() string {
+	e.DefaultErrString = fmt.Sprintf("Missing environment variable [%s]", e.EnvironmentVariable)
+	return e.choseErrString()
+}
+
+// ErrMissingAnyoneOfEnvironmentVariables is the error when anyone of the environment variables
+// is required in a particular situation but not provided by the user
+type ErrMissingAnyoneOfEnvironmentVariables struct {
+	BaseError
+	EnvironmentVariables []string
+}
+
+func (e ErrMissingAnyoneOfEnvironmentVariables) Error() string {
+	e.DefaultErrString = fmt.Sprintf(
+		"Missing one of the following environment variables [%s]",
+		strings.Join(e.EnvironmentVariables, ", "),
+	)
 	return e.choseErrString()
 }
 
@@ -92,6 +122,11 @@ type ErrDefault408 struct {
 	ErrUnexpectedResponseCode
 }
 
+// ErrDefault409 is the default error type returned on a 409 HTTP response code.
+type ErrDefault409 struct {
+	ErrUnexpectedResponseCode
+}
+
 // ErrDefault429 is the default error type returned on a 429 HTTP response code.
 type ErrDefault429 struct {
 	ErrUnexpectedResponseCode
@@ -108,7 +143,11 @@ type ErrDefault503 struct {
 }
 
 func (e ErrDefault400) Error() string {
-	return "Invalid request due to incorrect syntax or missing required parameters."
+	e.DefaultErrString = fmt.Sprintf(
+		"Bad request with: [%s %s], error message: %s",
+		e.Method, e.URL, e.Body,
+	)
+	return e.choseErrString()
 }
 func (e ErrDefault401) Error() string {
 	return "Authentication failed"
@@ -175,6 +214,12 @@ type Err405er interface {
 // from a 408 error.
 type Err408er interface {
 	Error408(ErrUnexpectedResponseCode) error
+}
+
+// Err409er is the interface resource error types implement to override the error message
+// from a 409 error.
+type Err409er interface {
+	Error409(ErrUnexpectedResponseCode) error
 }
 
 // Err429er is the interface resource error types implement to override the error message
@@ -416,4 +461,11 @@ type ErrScopeEmpty struct{ BaseError }
 
 func (e ErrScopeEmpty) Error() string {
 	return "You must provide either a Project or Domain in a Scope"
+}
+
+// ErrAppCredMissingSecret indicates that no Application Credential Secret was provided with Application Credential ID or Name
+type ErrAppCredMissingSecret struct{ BaseError }
+
+func (e ErrAppCredMissingSecret) Error() string {
+	return "You must provide an Application Credential Secret"
 }

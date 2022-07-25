@@ -17,13 +17,15 @@ limitations under the License.
 package leaderelection
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
-	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 	"net/http"
+
+	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type fakeLock struct {
@@ -31,17 +33,17 @@ type fakeLock struct {
 }
 
 // Get is a dummy to allow us to have a fakeLock for testing.
-func (fl *fakeLock) Get() (ler *rl.LeaderElectionRecord, err error) {
-	return nil, nil
+func (fl *fakeLock) Get(ctx context.Context) (ler *rl.LeaderElectionRecord, rawRecord []byte, err error) {
+	return nil, nil, nil
 }
 
 // Create is a dummy to allow us to have a fakeLock for testing.
-func (fl *fakeLock) Create(ler rl.LeaderElectionRecord) error {
+func (fl *fakeLock) Create(ctx context.Context, ler rl.LeaderElectionRecord) error {
 	return nil
 }
 
 // Update is a dummy to allow us to have a fakeLock for testing.
-func (fl *fakeLock) Update(ler rl.LeaderElectionRecord) error {
+func (fl *fakeLock) Update(ctx context.Context, ler rl.LeaderElectionRecord) error {
 	return nil
 }
 
@@ -76,7 +78,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 			elector:        nil,
 		},
 		{
-			description:    "call check when the the lease is far expired",
+			description:    "call check when the lease is far expired",
 			expected:       fmt.Errorf("failed election to renew leadership on lease %s", "foo"),
 			adaptorTimeout: time.Second * 20,
 			elector: &LeaderElector{
@@ -89,11 +91,11 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 					HolderIdentity: "healthTest",
 				},
 				observedTime: current,
-				clock:        clock.NewFakeClock(current.Add(time.Hour)),
+				clock:        testingclock.NewFakeClock(current.Add(time.Hour)),
 			},
 		},
 		{
-			description:    "call check when the the lease is far expired but held by another server",
+			description:    "call check when the lease is far expired but held by another server",
 			expected:       nil,
 			adaptorTimeout: time.Second * 20,
 			elector: &LeaderElector{
@@ -106,11 +108,11 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 					HolderIdentity: "otherServer",
 				},
 				observedTime: current,
-				clock:        clock.NewFakeClock(current.Add(time.Hour)),
+				clock:        testingclock.NewFakeClock(current.Add(time.Hour)),
 			},
 		},
 		{
-			description:    "call check when the the lease is not expired",
+			description:    "call check when the lease is not expired",
 			expected:       nil,
 			adaptorTimeout: time.Second * 20,
 			elector: &LeaderElector{
@@ -123,11 +125,11 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 					HolderIdentity: "healthTest",
 				},
 				observedTime: current,
-				clock:        clock.NewFakeClock(current),
+				clock:        testingclock.NewFakeClock(current),
 			},
 		},
 		{
-			description:    "call check when the the lease is expired but inside the timeout",
+			description:    "call check when the lease is expired but inside the timeout",
 			expected:       nil,
 			adaptorTimeout: time.Second * 20,
 			elector: &LeaderElector{
@@ -140,7 +142,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 					HolderIdentity: "healthTest",
 				},
 				observedTime: current,
-				clock:        clock.NewFakeClock(current.Add(time.Minute).Add(time.Second)),
+				clock:        testingclock.NewFakeClock(current.Add(time.Minute).Add(time.Second)),
 			},
 		},
 	}

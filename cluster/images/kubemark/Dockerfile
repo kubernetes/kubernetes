@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM debian:jessie
+# The line below points to the latest go-runner image, a wrapper around
+# gcr.io/distroless/static which adds the go-runner command that we need
+# for redirecting log output.
+#
+# See https://console.cloud.google.com/gcr/images/k8s-staging-build-image/global/go-runner
+# for a list of available versions. This base image should be updated
+# periodically.
+FROM registry.k8s.io/build-image/go-runner:v2.3.1-go1.17.2-bullseye.0
 
 COPY kubemark /kubemark

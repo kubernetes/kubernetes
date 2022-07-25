@@ -22,18 +22,19 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 const (
-	caCertsVolumeName       = "ca-certs"
-	caCertsVolumePath       = "/etc/ssl/certs"
-	flexvolumeDirVolumeName = "flexvolume-dir"
-	flexvolumeDirVolumePath = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
+	caCertsVolumeName              = "ca-certs"
+	caCertsVolumePath              = "/etc/ssl/certs"
+	flexvolumeDirVolumeName        = "flexvolume-dir"
+	defaultFlexvolumeDirVolumePath = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
 )
 
 // caCertsExtraVolumePaths specifies the paths that can be conditionally mounted into the apiserver and controller-manager containers
@@ -42,7 +43,7 @@ const (
 var caCertsExtraVolumePaths = []string{"/etc/pki", "/usr/share/ca-certificates", "/usr/local/share/ca-certificates", "/etc/ca-certificates"}
 
 // getHostPathVolumesForTheControlPlane gets the required hostPath volumes and mounts for the control plane
-func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.InitConfiguration) controlPlaneHostPathMounts {
+func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.ClusterConfiguration) controlPlaneHostPathMounts {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	hostPathFileOrCreate := v1.HostPathFileOrCreate
 	mounts := newControlPlaneHostPathMounts()
@@ -69,11 +70,13 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.InitConfiguration) con
 	// Read-only mount for the controller manager kubeconfig file
 	controllerManagerKubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
 	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeConfigVolumeName, controllerManagerKubeConfigFile, controllerManagerKubeConfigFile, true, &hostPathFileOrCreate)
-	// Mount for the flexvolume directory (/usr/libexec/kubernetes/kubelet-plugins/volume/exec) directory
+	// Mount for the flexvolume directory (/usr/libexec/kubernetes/kubelet-plugins/volume/exec by default)
 	// Flexvolume dir must NOT be readonly as it is used for third-party plugins to integrate with their storage backends via unix domain socket.
-	if stat, err := os.Stat(flexvolumeDirVolumePath); err == nil && stat.IsDir() {
-		mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, flexvolumeDirVolumeName, flexvolumeDirVolumePath, flexvolumeDirVolumePath, false, &hostPathDirectoryOrCreate)
+	flexvolumeDirVolumePath, ok := cfg.ControllerManager.ExtraArgs["flex-volume-plugin-dir"]
+	if !ok {
+		flexvolumeDirVolumePath = defaultFlexvolumeDirVolumePath
 	}
+	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, flexvolumeDirVolumeName, flexvolumeDirVolumePath, flexvolumeDirVolumePath, false, &hostPathDirectoryOrCreate)
 
 	// HostPath volumes for the scheduler
 	// Read-only mount for the scheduler kubeconfig file
@@ -142,7 +145,6 @@ func (c *controlPlaneHostPathMounts) AddHostPathMounts(component string, vols []
 // paths in the case that a user specifies the same volume/volume mount name.
 func (c *controlPlaneHostPathMounts) AddExtraHostPathMounts(component string, extraVols []kubeadmapi.HostPathMount) {
 	for _, extraVol := range extraVols {
-		fmt.Printf("[controlplane] Adding extra host path mount %q to %q\n", extraVol.Name, component)
 		hostPathType := extraVol.PathType
 		c.NewHostPathMount(component, extraVol.Name, extraVol.HostPath, extraVol.MountPath, extraVol.ReadOnly, &hostPathType)
 	}

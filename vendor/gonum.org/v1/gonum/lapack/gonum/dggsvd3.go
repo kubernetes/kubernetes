@@ -13,13 +13,13 @@ import (
 
 // Dggsvd3 computes the generalized singular value decomposition (GSVD)
 // of an m×n matrix A and p×n matrix B:
-//  U^T*A*Q = D1*[ 0 R ]
+//  Uᵀ*A*Q = D1*[ 0 R ]
 //
-//  V^T*B*Q = D2*[ 0 R ]
+//  Vᵀ*B*Q = D2*[ 0 R ]
 // where U, V and Q are orthogonal matrices.
 //
 // Dggsvd3 returns k and l, the dimensions of the sub-blocks. k+l
-// is the effective numerical rank of the (m+p)×n matrix [ A^T B^T ]^T.
+// is the effective numerical rank of the (m+p)×n matrix [ Aᵀ Bᵀ ]ᵀ.
 // R is a (k+l)×(k+l) nonsingular upper triangular matrix, D1 and
 // D2 are m×(k+l) and p×(k+l) diagonal matrices and of the following
 // structures, respectively:
@@ -108,43 +108,38 @@ import (
 // lwork is -1, work[0] holds the optimal lwork on return, but Dggsvd3 does
 // not perform the GSVD.
 func (impl Implementation) Dggsvd3(jobU, jobV, jobQ lapack.GSVDJob, m, n, p int, a []float64, lda int, b []float64, ldb int, alpha, beta, u []float64, ldu int, v []float64, ldv int, q []float64, ldq int, work []float64, lwork int, iwork []int) (k, l int, ok bool) {
-	checkMatrix(m, n, a, lda)
-	checkMatrix(p, n, b, ldb)
-
 	wantu := jobU == lapack.GSVDU
-	if wantu {
-		checkMatrix(m, m, u, ldu)
-	} else if jobU != lapack.GSVDNone {
-		panic(badGSVDJob + "U")
-	}
 	wantv := jobV == lapack.GSVDV
-	if wantv {
-		checkMatrix(p, p, v, ldv)
-	} else if jobV != lapack.GSVDNone {
-		panic(badGSVDJob + "V")
-	}
 	wantq := jobQ == lapack.GSVDQ
-	if wantq {
-		checkMatrix(n, n, q, ldq)
-	} else if jobQ != lapack.GSVDNone {
+	switch {
+	case !wantu && jobU != lapack.GSVDNone:
+		panic(badGSVDJob + "U")
+	case !wantv && jobV != lapack.GSVDNone:
+		panic(badGSVDJob + "V")
+	case !wantq && jobQ != lapack.GSVDNone:
 		panic(badGSVDJob + "Q")
-	}
-
-	if len(alpha) != n {
-		panic(badAlpha)
-	}
-	if len(beta) != n {
-		panic(badBeta)
-	}
-
-	if lwork != -1 && lwork <= n {
-		panic(badWork)
-	}
-	if len(work) < max(1, lwork) {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case p < 0:
+		panic(pLT0)
+	case lda < max(1, n):
+		panic(badLdA)
+	case ldb < max(1, n):
+		panic(badLdB)
+	case ldu < 1, wantu && ldu < m:
+		panic(badLdU)
+	case ldv < 1, wantv && ldv < p:
+		panic(badLdV)
+	case ldq < 1, wantq && ldq < n:
+		panic(badLdQ)
+	case len(iwork) < n:
 		panic(shortWork)
-	}
-	if len(iwork) < n {
-		panic(badWork)
+	case lwork < 1 && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
+		panic(shortWork)
 	}
 
 	// Determine optimal work length.
@@ -166,9 +161,26 @@ func (impl Implementation) Dggsvd3(jobU, jobV, jobQ lapack.GSVDJob, m, n, p int,
 		return 0, 0, true
 	}
 
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(b) < (p-1)*ldb+n:
+		panic(shortB)
+	case wantu && len(u) < (m-1)*ldu+m:
+		panic(shortU)
+	case wantv && len(v) < (p-1)*ldv+p:
+		panic(shortV)
+	case wantq && len(q) < (n-1)*ldq+n:
+		panic(shortQ)
+	case len(alpha) != n:
+		panic(badLenAlpha)
+	case len(beta) != n:
+		panic(badLenBeta)
+	}
+
 	// Compute the Frobenius norm of matrices A and B.
-	anorm := impl.Dlange(lapack.NormFrob, m, n, a, lda, nil)
-	bnorm := impl.Dlange(lapack.NormFrob, p, n, b, ldb, nil)
+	anorm := impl.Dlange(lapack.Frobenius, m, n, a, lda, nil)
+	bnorm := impl.Dlange(lapack.Frobenius, p, n, b, ldb, nil)
 
 	// Get machine precision and set up threshold for determining
 	// the effective numerical rank of the matrices A and B.

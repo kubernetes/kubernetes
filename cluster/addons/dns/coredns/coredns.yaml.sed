@@ -33,6 +33,13 @@ rules:
   - nodes
   verbs:
   - get
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -63,21 +70,26 @@ data:
   Corefile: |
     .:53 {
         errors
-        health
+        health {
+            lameduck 5s
+        }
+        ready
         kubernetes $DNS_DOMAIN in-addr.arpa ip6.arpa {
             pods insecure
-            upstream
             fallthrough in-addr.arpa ip6.arpa
+            ttl 30
         }
         prometheus :9153
-        proxy . /etc/resolv.conf
+        forward . /etc/resolv.conf {
+            max_concurrent 1000
+        }
         cache 30
         loop
         reload
         loadbalance
     }
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: coredns
@@ -103,20 +115,35 @@ spec:
     metadata:
       labels:
         k8s-app: kube-dns
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      priorityClassName: system-cluster-critical
       serviceAccountName: coredns
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: k8s-app
+                    operator: In
+                    values: ["kube-dns"]
+              topologyKey: kubernetes.io/hostname
       tolerations:
         - key: "CriticalAddonsOnly"
           operator: "Exists"
+      nodeSelector:
+        kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.2.6
+        image: registry.k8s.io/coredns/coredns:v1.9.3
         imagePullPolicy: IfNotPresent
         resources:
           limits:
-            memory: 170Mi
+            memory: $DNS_MEMORY_LIMIT
           requests:
             cpu: 100m
             memory: 70Mi
@@ -144,6 +171,11 @@ spec:
           timeoutSeconds: 5
           successThreshold: 1
           failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8181
+            scheme: HTTP
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -184,4 +216,7 @@ spec:
     protocol: UDP
   - name: dns-tcp
     port: 53
+    protocol: TCP
+  - name: metrics
+    port: 9153
     protocol: TCP

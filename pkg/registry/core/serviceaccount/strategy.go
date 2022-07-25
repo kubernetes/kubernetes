@@ -49,6 +49,9 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	return validation.ValidateServiceAccount(obj.(*api.ServiceAccount))
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (strategy) Canonicalize(obj runtime.Object) {
 }
@@ -69,6 +72,11 @@ func cleanSecretReferences(serviceAccount *api.ServiceAccount) {
 
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateServiceAccountUpdate(obj.(*api.ServiceAccount), old.(*api.ServiceAccount))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (strategy) AllowUnconditionalUpdate() bool {

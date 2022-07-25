@@ -17,11 +17,13 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"math/rand"
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/client-go/util/integer"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/integer"
 )
 
 type backoffEntry struct {
@@ -30,35 +32,55 @@ type backoffEntry struct {
 }
 
 type Backoff struct {
-	sync.Mutex
+	sync.RWMutex
 	Clock           clock.Clock
 	defaultDuration time.Duration
 	maxDuration     time.Duration
 	perItemBackoff  map[string]*backoffEntry
+	rand            *rand.Rand
+
+	// maxJitterFactor adds jitter to the exponentially backed off delay.
+	// if maxJitterFactor is zero, no jitter is added to the delay in
+	// order to maintain current behavior.
+	maxJitterFactor float64
 }
 
-func NewFakeBackOff(initial, max time.Duration, tc *clock.FakeClock) *Backoff {
-	return &Backoff{
-		perItemBackoff:  map[string]*backoffEntry{},
-		Clock:           tc,
-		defaultDuration: initial,
-		maxDuration:     max,
-	}
+func NewFakeBackOff(initial, max time.Duration, tc *testingclock.FakeClock) *Backoff {
+	return newBackoff(tc, initial, max, 0.0)
 }
 
 func NewBackOff(initial, max time.Duration) *Backoff {
+	return NewBackOffWithJitter(initial, max, 0.0)
+}
+
+func NewFakeBackOffWithJitter(initial, max time.Duration, tc *testingclock.FakeClock, maxJitterFactor float64) *Backoff {
+	return newBackoff(tc, initial, max, maxJitterFactor)
+}
+
+func NewBackOffWithJitter(initial, max time.Duration, maxJitterFactor float64) *Backoff {
+	clock := clock.RealClock{}
+	return newBackoff(clock, initial, max, maxJitterFactor)
+}
+
+func newBackoff(clock clock.Clock, initial, max time.Duration, maxJitterFactor float64) *Backoff {
+	var random *rand.Rand
+	if maxJitterFactor > 0 {
+		random = rand.New(rand.NewSource(clock.Now().UnixNano()))
+	}
 	return &Backoff{
 		perItemBackoff:  map[string]*backoffEntry{},
-		Clock:           clock.RealClock{},
+		Clock:           clock,
 		defaultDuration: initial,
 		maxDuration:     max,
+		maxJitterFactor: maxJitterFactor,
+		rand:            random,
 	}
 }
 
 // Get the current backoff Duration
 func (p *Backoff) Get(id string) time.Duration {
-	p.Lock()
-	defer p.Unlock()
+	p.RLock()
+	defer p.RUnlock()
 	var delay time.Duration
 	entry, ok := p.perItemBackoff[id]
 	if ok {
@@ -74,8 +96,10 @@ func (p *Backoff) Next(id string, eventTime time.Time) {
 	entry, ok := p.perItemBackoff[id]
 	if !ok || hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
 		entry = p.initEntryUnsafe(id)
+		entry.backoff += p.jitter(entry.backoff)
 	} else {
-		delay := entry.backoff * 2 // exponential
+		delay := entry.backoff * 2       // exponential
+		delay += p.jitter(entry.backoff) // add some jitter to the delay
 		entry.backoff = time.Duration(integer.Int64Min(int64(delay), int64(p.maxDuration)))
 	}
 	entry.lastUpdate = p.Clock.Now()
@@ -90,8 +114,8 @@ func (p *Backoff) Reset(id string) {
 
 // Returns True if the elapsed time since eventTime is smaller than the current backoff window
 func (p *Backoff) IsInBackOffSince(id string, eventTime time.Time) bool {
-	p.Lock()
-	defer p.Unlock()
+	p.RLock()
+	defer p.RUnlock()
 	entry, ok := p.perItemBackoff[id]
 	if !ok {
 		return false
@@ -99,13 +123,13 @@ func (p *Backoff) IsInBackOffSince(id string, eventTime time.Time) bool {
 	if hasExpired(eventTime, entry.lastUpdate, p.maxDuration) {
 		return false
 	}
-	return p.Clock.Now().Sub(eventTime) < entry.backoff
+	return p.Clock.Since(eventTime) < entry.backoff
 }
 
 // Returns True if time since lastupdate is less than the current backoff window.
 func (p *Backoff) IsInBackOffSinceUpdate(id string, eventTime time.Time) bool {
-	p.Lock()
-	defer p.Unlock()
+	p.RLock()
+	defer p.RUnlock()
 	entry, ok := p.perItemBackoff[id]
 	if !ok {
 		return false
@@ -141,6 +165,14 @@ func (p *Backoff) initEntryUnsafe(id string) *backoffEntry {
 	entry := &backoffEntry{backoff: p.defaultDuration}
 	p.perItemBackoff[id] = entry
 	return entry
+}
+
+func (p *Backoff) jitter(delay time.Duration) time.Duration {
+	if p.rand == nil {
+		return 0
+	}
+
+	return time.Duration(p.rand.Float64() * p.maxJitterFactor * float64(delay))
 }
 
 // After 2*maxDuration we restart the backoff factor to the beginning

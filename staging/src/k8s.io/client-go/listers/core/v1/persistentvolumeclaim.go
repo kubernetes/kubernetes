@@ -26,8 +26,10 @@ import (
 )
 
 // PersistentVolumeClaimLister helps list PersistentVolumeClaims.
+// All objects returned here must be treated as read-only.
 type PersistentVolumeClaimLister interface {
 	// List lists all PersistentVolumeClaims in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error)
 	// PersistentVolumeClaims returns an object that can list and get PersistentVolumeClaims.
 	PersistentVolumeClaims(namespace string) PersistentVolumeClaimNamespaceLister
@@ -58,10 +60,13 @@ func (s *persistentVolumeClaimLister) PersistentVolumeClaims(namespace string) P
 }
 
 // PersistentVolumeClaimNamespaceLister helps list and get PersistentVolumeClaims.
+// All objects returned here must be treated as read-only.
 type PersistentVolumeClaimNamespaceLister interface {
 	// List lists all PersistentVolumeClaims in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.PersistentVolumeClaim, err error)
 	// Get retrieves the PersistentVolumeClaim from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.PersistentVolumeClaim, error)
 	PersistentVolumeClaimNamespaceListerExpansion
 }

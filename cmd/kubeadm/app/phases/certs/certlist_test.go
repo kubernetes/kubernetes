@@ -20,14 +20,49 @@ import (
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
 	"os"
 	"path"
 	"testing"
 
 	certutil "k8s.io/client-go/util/cert"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
+
+func TestCertListOrder(t *testing.T) {
+	tests := []struct {
+		certs Certificates
+		name  string
+	}{
+		{
+			name:  "Default Certificate List",
+			certs: GetDefaultCertList(),
+		},
+		{
+			name:  "Cert list less etcd",
+			certs: GetCertsWithoutEtcd(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var lastCA *KubeadmCert
+			for i, cert := range test.certs {
+				if i > 0 && lastCA == nil {
+					t.Fatalf("CA not present in list before certificate %q", cert.Name)
+				}
+				if cert.CAName == "" {
+					lastCA = cert
+				} else {
+					if cert.CAName != lastCA.Name {
+						t.Fatalf("expected CA name %q, got %q, for certificate %q", lastCA.Name, cert.CAName, cert.Name)
+					}
+				}
+			}
+		})
+	}
+}
 
 func TestCAPointersValid(t *testing.T) {
 	tests := []struct {
@@ -109,7 +144,7 @@ func TestMakeCertTree(t *testing.T) {
 }
 
 func TestCreateCertificateChain(t *testing.T) {
-	dir, err := ioutil.TempDir("", t.Name())
+	dir, err := os.MkdirTemp("", t.Name())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,16 +161,18 @@ func TestCreateCertificateChain(t *testing.T) {
 
 	caCfg := Certificates{
 		{
-			config:   certutil.Config{},
+			config:   pkiutil.CertConfig{},
 			Name:     "test-ca",
 			BaseName: "test-ca",
 		},
 		{
-			config: certutil.Config{
-				AltNames: certutil.AltNames{
-					DNSNames: []string{"test-domain.space"},
+			config: pkiutil.CertConfig{
+				Config: certutil.Config{
+					AltNames: certutil.AltNames{
+						DNSNames: []string{"test-domain.space"},
+					},
+					Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 				},
-				Usages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 			},
 			configMutators: []configMutatorsFunc{
 				setCommonNameToNodeName(),

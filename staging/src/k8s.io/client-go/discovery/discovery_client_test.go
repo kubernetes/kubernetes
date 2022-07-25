@@ -24,17 +24,20 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/googleapis/gnostic/OpenAPIv2"
+	openapi_v2 "github.com/google/gnostic/openapiv2"
+	openapi_v3 "github.com/google/gnostic/openapiv3"
 	"github.com/stretchr/testify/assert"
-
+	golangproto "google.golang.org/protobuf/proto"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	restclient "k8s.io/client-go/rest"
+	testutil "k8s.io/client-go/util/testing"
 )
 
 func TestGetServerVersion(t *testing.T) {
@@ -163,7 +166,7 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 	defer server.Close()
 	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	// ServerResources should not return an error even if server returns error at /api/v1.
-	serverResources, err := client.ServerResources()
+	_, serverResources, err := client.ServerGroupsAndResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -173,7 +176,7 @@ func TestGetServerResourcesWithV1Server(t *testing.T) {
 	}
 }
 
-func TestGetServerResources(t *testing.T) {
+func TestGetServerResourcesForGroupVersion(t *testing.T) {
 	stable := metav1.APIResourceList{
 		GroupVersion: "v1",
 		APIResources: []metav1.APIResource{
@@ -198,6 +201,26 @@ func TestGetServerResources(t *testing.T) {
 			{Name: "jobs", Namespaced: true, Kind: "Job"},
 		},
 	}
+	extensionsbeta3 := metav1.APIResourceList{GroupVersion: "extensions/v1beta3", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	extensionsbeta4 := metav1.APIResourceList{GroupVersion: "extensions/v1beta4", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	extensionsbeta5 := metav1.APIResourceList{GroupVersion: "extensions/v1beta5", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	extensionsbeta6 := metav1.APIResourceList{GroupVersion: "extensions/v1beta6", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	extensionsbeta7 := metav1.APIResourceList{GroupVersion: "extensions/v1beta7", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	extensionsbeta8 := metav1.APIResourceList{GroupVersion: "extensions/v1beta8", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	extensionsbeta9 := metav1.APIResourceList{GroupVersion: "extensions/v1beta9", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	extensionsbeta10 := metav1.APIResourceList{GroupVersion: "extensions/v1beta10", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+
+	appsbeta1 := metav1.APIResourceList{GroupVersion: "apps/v1beta1", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	appsbeta2 := metav1.APIResourceList{GroupVersion: "apps/v1beta2", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	appsbeta3 := metav1.APIResourceList{GroupVersion: "apps/v1beta3", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	appsbeta4 := metav1.APIResourceList{GroupVersion: "apps/v1beta4", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	appsbeta5 := metav1.APIResourceList{GroupVersion: "apps/v1beta5", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	appsbeta6 := metav1.APIResourceList{GroupVersion: "apps/v1beta6", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	appsbeta7 := metav1.APIResourceList{GroupVersion: "apps/v1beta7", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	appsbeta8 := metav1.APIResourceList{GroupVersion: "apps/v1beta8", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	appsbeta9 := metav1.APIResourceList{GroupVersion: "apps/v1beta9", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+	appsbeta10 := metav1.APIResourceList{GroupVersion: "apps/v1beta10", APIResources: []metav1.APIResource{{Name: "deployments", Namespaced: true, Kind: "Deployment"}}}
+
 	tests := []struct {
 		resourcesList *metav1.APIResourceList
 		path          string
@@ -232,6 +255,42 @@ func TestGetServerResources(t *testing.T) {
 			list = &beta
 		case "/apis/extensions/v1beta2":
 			list = &beta2
+		case "/apis/extensions/v1beta3":
+			list = &extensionsbeta3
+		case "/apis/extensions/v1beta4":
+			list = &extensionsbeta4
+		case "/apis/extensions/v1beta5":
+			list = &extensionsbeta5
+		case "/apis/extensions/v1beta6":
+			list = &extensionsbeta6
+		case "/apis/extensions/v1beta7":
+			list = &extensionsbeta7
+		case "/apis/extensions/v1beta8":
+			list = &extensionsbeta8
+		case "/apis/extensions/v1beta9":
+			list = &extensionsbeta9
+		case "/apis/extensions/v1beta10":
+			list = &extensionsbeta10
+		case "/apis/apps/v1beta1":
+			list = &appsbeta1
+		case "/apis/apps/v1beta2":
+			list = &appsbeta2
+		case "/apis/apps/v1beta3":
+			list = &appsbeta3
+		case "/apis/apps/v1beta4":
+			list = &appsbeta4
+		case "/apis/apps/v1beta5":
+			list = &appsbeta5
+		case "/apis/apps/v1beta6":
+			list = &appsbeta6
+		case "/apis/apps/v1beta7":
+			list = &appsbeta7
+		case "/apis/apps/v1beta8":
+			list = &appsbeta8
+		case "/apis/apps/v1beta9":
+			list = &appsbeta9
+		case "/apis/apps/v1beta10":
+			list = &appsbeta10
 		case "/api":
 			list = &metav1.APIVersions{
 				Versions: []string{
@@ -242,10 +301,33 @@ func TestGetServerResources(t *testing.T) {
 			list = &metav1.APIGroupList{
 				Groups: []metav1.APIGroup{
 					{
+						Name: "apps",
+						Versions: []metav1.GroupVersionForDiscovery{
+							{GroupVersion: "apps/v1beta1", Version: "v1beta1"},
+							{GroupVersion: "apps/v1beta2", Version: "v1beta2"},
+							{GroupVersion: "apps/v1beta3", Version: "v1beta3"},
+							{GroupVersion: "apps/v1beta4", Version: "v1beta4"},
+							{GroupVersion: "apps/v1beta5", Version: "v1beta5"},
+							{GroupVersion: "apps/v1beta6", Version: "v1beta6"},
+							{GroupVersion: "apps/v1beta7", Version: "v1beta7"},
+							{GroupVersion: "apps/v1beta8", Version: "v1beta8"},
+							{GroupVersion: "apps/v1beta9", Version: "v1beta9"},
+							{GroupVersion: "apps/v1beta10", Version: "v1beta10"},
+						},
+					},
+					{
 						Name: "extensions",
 						Versions: []metav1.GroupVersionForDiscovery{
 							{GroupVersion: "extensions/v1beta1", Version: "v1beta1"},
 							{GroupVersion: "extensions/v1beta2", Version: "v1beta2"},
+							{GroupVersion: "extensions/v1beta3", Version: "v1beta3"},
+							{GroupVersion: "extensions/v1beta4", Version: "v1beta4"},
+							{GroupVersion: "extensions/v1beta5", Version: "v1beta5"},
+							{GroupVersion: "extensions/v1beta6", Version: "v1beta6"},
+							{GroupVersion: "extensions/v1beta7", Version: "v1beta7"},
+							{GroupVersion: "extensions/v1beta8", Version: "v1beta8"},
+							{GroupVersion: "extensions/v1beta9", Version: "v1beta9"},
+							{GroupVersion: "extensions/v1beta10", Version: "v1beta10"},
 						},
 					},
 				},
@@ -265,8 +347,8 @@ func TestGetServerResources(t *testing.T) {
 		w.Write(output)
 	}))
 	defer server.Close()
-	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 	for _, test := range tests {
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
 		got, err := client.ServerResourcesForGroupVersion(test.request)
 		if test.expectErr {
 			if err == nil {
@@ -283,53 +365,83 @@ func TestGetServerResources(t *testing.T) {
 		}
 	}
 
-	serverResources, err := client.ServerResources()
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	start := time.Now()
+	_, serverResources, err := client.ServerGroupsAndResources()
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	end := time.Now()
+	if d := end.Sub(start); d > time.Second {
+		t.Errorf("took too long to perform discovery: %s", d)
+	}
 	serverGroupVersions := groupVersions(serverResources)
-	expectedGroupVersions := []string{"v1", "extensions/v1beta1", "extensions/v1beta2"}
+	expectedGroupVersions := []string{
+		"v1",
+		"apps/v1beta1",
+		"apps/v1beta2",
+		"apps/v1beta3",
+		"apps/v1beta4",
+		"apps/v1beta5",
+		"apps/v1beta6",
+		"apps/v1beta7",
+		"apps/v1beta8",
+		"apps/v1beta9",
+		"apps/v1beta10",
+		"extensions/v1beta1",
+		"extensions/v1beta2",
+		"extensions/v1beta3",
+		"extensions/v1beta4",
+		"extensions/v1beta5",
+		"extensions/v1beta6",
+		"extensions/v1beta7",
+		"extensions/v1beta8",
+		"extensions/v1beta9",
+		"extensions/v1beta10",
+	}
 	if !reflect.DeepEqual(expectedGroupVersions, serverGroupVersions) {
 		t.Errorf("unexpected group versions: %v", diff.ObjectReflectDiff(expectedGroupVersions, serverGroupVersions))
 	}
 }
 
-var returnedOpenAPI = openapi_v2.Document{
-	Definitions: &openapi_v2.Definitions{
-		AdditionalProperties: []*openapi_v2.NamedSchema{
-			{
-				Name: "fake.type.1",
-				Value: &openapi_v2.Schema{
-					Properties: &openapi_v2.Properties{
-						AdditionalProperties: []*openapi_v2.NamedSchema{
-							{
-								Name: "count",
-								Value: &openapi_v2.Schema{
-									Type: &openapi_v2.TypeItem{
-										Value: []string{"integer"},
+func returnedOpenAPI() *openapi_v2.Document {
+	return &openapi_v2.Document{
+		Definitions: &openapi_v2.Definitions{
+			AdditionalProperties: []*openapi_v2.NamedSchema{
+				{
+					Name: "fake.type.1",
+					Value: &openapi_v2.Schema{
+						Properties: &openapi_v2.Properties{
+							AdditionalProperties: []*openapi_v2.NamedSchema{
+								{
+									Name: "count",
+									Value: &openapi_v2.Schema{
+										Type: &openapi_v2.TypeItem{
+											Value: []string{"integer"},
+										},
 									},
 								},
 							},
 						},
 					},
 				},
-			},
-			{
-				Name: "fake.type.2",
-				Value: &openapi_v2.Schema{
-					Properties: &openapi_v2.Properties{
-						AdditionalProperties: []*openapi_v2.NamedSchema{
-							{
-								Name: "count",
-								Value: &openapi_v2.Schema{
-									Type: &openapi_v2.TypeItem{
-										Value: []string{"array"},
-									},
-									Items: &openapi_v2.ItemsItem{
-										Schema: []*openapi_v2.Schema{
-											{
-												Type: &openapi_v2.TypeItem{
-													Value: []string{"string"},
+				{
+					Name: "fake.type.2",
+					Value: &openapi_v2.Schema{
+						Properties: &openapi_v2.Properties{
+							AdditionalProperties: []*openapi_v2.NamedSchema{
+								{
+									Name: "count",
+									Value: &openapi_v2.Schema{
+										Type: &openapi_v2.TypeItem{
+											Value: []string{"array"},
+										},
+										Items: &openapi_v2.ItemsItem{
+											Schema: []*openapi_v2.Schema{
+												{
+													Type: &openapi_v2.TypeItem{
+														Value: []string{"string"},
+													},
 												},
 											},
 										},
@@ -341,11 +453,10 @@ var returnedOpenAPI = openapi_v2.Document{
 				},
 			},
 		},
-	},
+	}
 }
 
-func openapiSchemaDeprecatedFakeServer(status int) (*httptest.Server, error) {
-	var sErr error
+func openapiSchemaDeprecatedFakeServer(status int, t *testing.T) (*httptest.Server, error) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == "/openapi/v2" {
 			// write the error status for the new endpoint request
@@ -353,54 +464,89 @@ func openapiSchemaDeprecatedFakeServer(status int) (*httptest.Server, error) {
 			return
 		}
 		if req.URL.Path != "/swagger-2.0.0.pb-v1" {
-			sErr = fmt.Errorf("Unexpected url %v", req.URL)
+			errMsg := fmt.Sprintf("Unexpected url %v", req.URL)
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
+			return
 		}
 		if req.Method != "GET" {
-			sErr = fmt.Errorf("Unexpected method %v", req.Method)
+			errMsg := fmt.Sprintf("Unexpected method %v", req.Method)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
+			return
 		}
 
 		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
 
-		output, err := proto.Marshal(&returnedOpenAPI)
+		output, err := proto.Marshal(returnedOpenAPI())
 		if err != nil {
-			sErr = err
+			errMsg := fmt.Sprintf("Unexpected marshal error: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(output)
 	}))
-	return server, sErr
+
+	return server, nil
 }
 
-func openapiSchemaFakeServer() (*httptest.Server, error) {
-	var sErr error
+func openapiSchemaFakeServer(t *testing.T) (*httptest.Server, error) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path != "/openapi/v2" {
-			sErr = fmt.Errorf("Unexpected url %v", req.URL)
+			errMsg := fmt.Sprintf("Unexpected url %v", req.URL)
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
+			return
 		}
 		if req.Method != "GET" {
-			sErr = fmt.Errorf("Unexpected method %v", req.Method)
+			errMsg := fmt.Sprintf("Unexpected method %v", req.Method)
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
+			return
 		}
 		decipherableFormat := req.Header.Get("Accept")
 		if decipherableFormat != "application/com.github.proto-openapi.spec.v2@v1.0+protobuf" {
-			sErr = fmt.Errorf("Unexpected accept mime type %v", decipherableFormat)
+			errMsg := fmt.Sprintf("Unexpected accept mime type %v", decipherableFormat)
+			w.WriteHeader(http.StatusUnsupportedMediaType)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
+			return
 		}
 
 		mime.AddExtensionType(".pb-v1", "application/com.github.googleapis.gnostic.OpenAPIv2@68f4ded+protobuf")
 
-		output, err := proto.Marshal(&returnedOpenAPI)
+		output, err := proto.Marshal(returnedOpenAPI())
 		if err != nil {
-			sErr = err
+			errMsg := fmt.Sprintf("Unexpected marshal error: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(errMsg))
+			t.Errorf("testing should fail as %s", errMsg)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(output)
 	}))
-	return server, sErr
+
+	return server, nil
+}
+
+func openapiV3SchemaFakeServer(t *testing.T) (*httptest.Server, map[string]*openapi_v3.Document, error) {
+	res, err := testutil.NewFakeOpenAPIV3Server("testdata")
+	if err != nil {
+		return nil, nil, err
+	}
+	return res.HttpServer, res.ServedDocuments, nil
 }
 
 func TestGetOpenAPISchema(t *testing.T) {
-	server, err := openapiSchemaFakeServer()
+	server, err := openapiSchemaFakeServer(t)
 	if err != nil {
 		t.Errorf("unexpected error starting fake server: %v", err)
 	}
@@ -411,13 +557,52 @@ func TestGetOpenAPISchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
-		t.Errorf("expected %v, got %v", e, a)
+	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
+		t.Errorf("expected \n%v, got \n%v", e, a)
+	}
+}
+
+func TestGetOpenAPISchemaV3(t *testing.T) {
+	server, testV3Specs, err := openapiV3SchemaFakeServer(t)
+	if err != nil {
+		t.Errorf("unexpected error starting fake server: %v", err)
+	}
+	defer server.Close()
+
+	client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+	openapiClient := client.OpenAPIV3()
+	paths, err := openapiClient.Paths()
+	if err != nil {
+		t.Fatalf("unexpected error getting openapi: %v", err)
+	}
+
+	for k, v := range paths {
+		actual, err := v.Schema()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expected := testV3Specs[k]
+		if !golangproto.Equal(expected, actual) {
+			t.Fatalf("expected \n%v\n\ngot:\n%v", expected, actual)
+		}
+
+		// Ensure that fetching schema once again does not return same instance
+		actualAgain, err := v.Schema()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if reflect.ValueOf(actual).Pointer() == reflect.ValueOf(actualAgain).Pointer() {
+			t.Fatal("expected schema not to be cached")
+		} else if !golangproto.Equal(actual, actualAgain) {
+			t.Fatal("expected schema values to be equal")
+		}
 	}
 }
 
 func TestGetOpenAPISchemaForbiddenFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusForbidden)
+	server, err := openapiSchemaDeprecatedFakeServer(http.StatusForbidden, t)
 	if err != nil {
 		t.Errorf("unexpected error starting fake server: %v", err)
 	}
@@ -428,13 +613,13 @@ func TestGetOpenAPISchemaForbiddenFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
+	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
 
 func TestGetOpenAPISchemaNotFoundFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotFound)
+	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotFound, t)
 	if err != nil {
 		t.Errorf("unexpected error starting fake server: %v", err)
 	}
@@ -445,13 +630,13 @@ func TestGetOpenAPISchemaNotFoundFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
+	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }
 
 func TestGetOpenAPISchemaNotAcceptableFallback(t *testing.T) {
-	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotAcceptable)
+	server, err := openapiSchemaDeprecatedFakeServer(http.StatusNotAcceptable, t)
 	if err != nil {
 		t.Errorf("unexpected error starting fake server: %v", err)
 	}
@@ -462,7 +647,7 @@ func TestGetOpenAPISchemaNotAcceptableFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error getting openapi: %v", err)
 	}
-	if e, a := returnedOpenAPI, *got; !reflect.DeepEqual(e, a) {
+	if e, a := returnedOpenAPI(), got; !golangproto.Equal(e, a) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 }

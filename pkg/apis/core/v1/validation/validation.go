@@ -23,15 +23,18 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 const isNegativeErrorMsg string = `must be greater than or equal to 0`
 const isNotIntegerErrorMsg string = `must be an integer`
 
+// ValidateResourceRequirements will check if any of the resource
+// Limits/Requests are of a valid value. Any incorrect value will be added to
+// the ErrorList.
 func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	limPath := fldPath.Child("limits")
@@ -39,7 +42,7 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 	for resourceName, quantity := range requirements.Limits {
 		fldPath := limPath.Key(string(resourceName))
 		// Validate resource name.
-		allErrs = append(allErrs, validateContainerResourceName(string(resourceName), fldPath)...)
+		allErrs = append(allErrs, ValidateContainerResourceName(string(resourceName), fldPath)...)
 
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
@@ -48,7 +51,7 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 	for resourceName, quantity := range requirements.Requests {
 		fldPath := reqPath.Key(string(resourceName))
 		// Validate resource name.
-		allErrs = append(allErrs, validateContainerResourceName(string(resourceName), fldPath)...)
+		allErrs = append(allErrs, ValidateContainerResourceName(string(resourceName), fldPath)...)
 		// Validate resource quantity.
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(resourceName), quantity, fldPath)...)
 
@@ -67,7 +70,8 @@ func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath
 	return allErrs
 }
 
-func validateContainerResourceName(value string, fldPath *field.Path) field.ErrorList {
+// ValidateContainerResourceName checks the name of resource specified for a container
+func ValidateContainerResourceName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := validateResourceName(value, fldPath)
 	if len(strings.Split(value, "/")) == 1 {
 		if !helper.IsStandardContainerResourceName(value) {
@@ -93,7 +97,7 @@ func ValidateResourceQuantityValue(resource string, value resource.Quantity, fld
 	return allErrs
 }
 
-// Validates that a Quantity is not negative
+// ValidateNonnegativeQuantity checks that a Quantity is not negative.
 func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value.Cmp(resource.Quantity{}) < 0 {
@@ -105,10 +109,7 @@ func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) f
 // Validate compute resource typename.
 // Refer to docs/design/resources.md for more details.
 func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	for _, msg := range validation.IsQualifiedName(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
-	}
+	allErrs := apivalidation.ValidateQualifiedName(value, fldPath)
 	if len(allErrs) != 0 {
 		return allErrs
 	}
@@ -122,6 +123,8 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidatePodLogOptions checks if options that are set are at the correct
+// value. Any incorrect value will be returned to the ErrorList.
 func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if opts.TailLines != nil && *opts.TailLines < 0 {
@@ -141,6 +144,8 @@ func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 	return allErrs
 }
 
+// AccumulateUniqueHostPorts checks all the containers for duplicates ports. Any
+// duplicate port will be returned in the ErrorList.
 func AccumulateUniqueHostPorts(containers []v1.Container, accumulator *sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 

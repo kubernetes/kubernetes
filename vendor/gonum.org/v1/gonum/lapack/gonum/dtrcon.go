@@ -19,24 +19,32 @@ import (
 //
 // iwork is a temporary data slice of length at least n and Dtrcon will panic otherwise.
 func (impl Implementation) Dtrcon(norm lapack.MatrixNorm, uplo blas.Uplo, diag blas.Diag, n int, a []float64, lda int, work []float64, iwork []int) float64 {
-	if norm != lapack.MaxColumnSum && norm != lapack.MaxRowSum {
+	switch {
+	case norm != lapack.MaxColumnSum && norm != lapack.MaxRowSum:
 		panic(badNorm)
-	}
-	if uplo != blas.Upper && uplo != blas.Lower {
+	case uplo != blas.Upper && uplo != blas.Lower:
 		panic(badUplo)
-	}
-	if diag != blas.NonUnit && diag != blas.Unit {
+	case diag != blas.NonUnit && diag != blas.Unit:
 		panic(badDiag)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
 	}
-	if len(work) < 3*n {
-		panic(badWork)
-	}
-	if len(iwork) < n {
-		panic(badWork)
-	}
+
 	if n == 0 {
 		return 1
 	}
+
+	switch {
+	case len(a) < (n-1)*lda+n:
+		panic(shortA)
+	case len(work) < 3*n:
+		panic(shortWork)
+	case len(iwork) < n:
+		panic(shortIWork)
+	}
+
 	bi := blas64.Implementation()
 
 	var rcond float64

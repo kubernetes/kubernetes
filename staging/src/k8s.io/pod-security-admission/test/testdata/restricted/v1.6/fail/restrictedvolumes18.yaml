@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: restrictedvolumes18
+spec:
+  containers:
+  - image: k8s.gcr.io/pause
+    name: container1
+  initContainers:
+  - image: k8s.gcr.io/pause
+    name: initcontainer1
+  securityContext:
+    runAsNonRoot: true
+  volumes:
+  - name: volume1
+    storageos:
+      volumeName: test

@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -61,13 +62,13 @@ func NewFilteredJobInformer(client kubernetes.Interface, namespace string, resyn
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BatchV1().Jobs(namespace).List(options)
+				return client.BatchV1().Jobs(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.BatchV1().Jobs(namespace).Watch(options)
+				return client.BatchV1().Jobs(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&batchv1.Job{},

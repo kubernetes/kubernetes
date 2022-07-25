@@ -17,10 +17,11 @@ limitations under the License.
 package setdefault
 
 import (
+	"context"
 	"fmt"
 	"io"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -85,7 +86,7 @@ func (a *claimDefaulterPlugin) ValidateInitialization() error {
 // 1.  Find available StorageClasses.
 // 2.  Figure which is the default
 // 3.  Write to the PVClaim
-func (a *claimDefaulterPlugin) Admit(attr admission.Attributes) error {
+func (a *claimDefaulterPlugin) Admit(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
 	if attr.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
 		return nil
 	}

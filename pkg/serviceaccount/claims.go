@@ -17,15 +17,25 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"gopkg.in/square/go-jose.v2/jwt"
-	"k8s.io/klog"
+	"k8s.io/apiserver/pkg/audit"
+	"k8s.io/klog/v2"
 
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/apis/core"
+)
+
+const (
+	// Injected bound service account token expiration which triggers monitoring of its time-bound feature.
+	WarnOnlyBoundTokenExpirationSeconds = 60*60 + 7
+
+	// Extended expiration for those modifed tokens involved in safe rollout if time-bound feature.
+	ExpirationExtensionSeconds = 24 * 365 * 60 * 60
 )
 
 // time.Now stubbed out to allow testing
@@ -36,10 +46,11 @@ type privateClaims struct {
 }
 
 type kubernetes struct {
-	Namespace string `json:"namespace,omitempty"`
-	Svcacct   ref    `json:"serviceaccount,omitempty"`
-	Pod       *ref   `json:"pod,omitempty"`
-	Secret    *ref   `json:"secret,omitempty"`
+	Namespace string          `json:"namespace,omitempty"`
+	Svcacct   ref             `json:"serviceaccount,omitempty"`
+	Pod       *ref            `json:"pod,omitempty"`
+	Secret    *ref            `json:"secret,omitempty"`
+	WarnAfter jwt.NumericDate `json:"warnafter,omitempty"`
 }
 
 type ref struct {
@@ -47,7 +58,7 @@ type ref struct {
 	UID  string `json:"uid,omitempty"`
 }
 
-func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirationSeconds int64, audience []string) (*jwt.Claims, interface{}) {
+func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirationSeconds, warnafter int64, audience []string) (*jwt.Claims, interface{}) {
 	now := now()
 	sc := &jwt.Claims{
 		Subject:   apiserverserviceaccount.MakeUsername(sa.Namespace, sa.Name),
@@ -77,6 +88,11 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirati
 			UID:  string(secret.UID),
 		}
 	}
+
+	if warnafter != 0 {
+		pc.Kubernetes.WarnAfter = jwt.NewNumericDate(now.Add(time.Duration(warnafter) * time.Second))
+	}
+
 	return sc, pc
 }
 
@@ -92,24 +108,38 @@ type validator struct {
 
 var _ = Validator(&validator{})
 
-func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{}) (*ServiceAccountInfo, error) {
+func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, privateObj interface{}) (*apiserverserviceaccount.ServiceAccountInfo, error) {
 	private, ok := privateObj.(*privateClaims)
 	if !ok {
-		klog.Errorf("jwt validator expected private claim of type *privateClaims but got: %T", privateObj)
-		return nil, errors.New("Token could not be validated.")
+		klog.Errorf("service account jwt validator expected private claim of type *privateClaims but got: %T", privateObj)
+		return nil, errors.New("service account token claims could not be validated due to unexpected private claim")
 	}
+	nowTime := now()
 	err := public.Validate(jwt.Expected{
-		Time: now(),
+		Time: nowTime,
 	})
-	switch {
-	case err == nil:
-	case err == jwt.ErrExpired:
-		return nil, errors.New("Token has expired.")
+	switch err {
+	case nil:
+		// successful validation
+
+	case jwt.ErrExpired:
+		return nil, errors.New("service account token has expired")
+
+	case jwt.ErrNotValidYet:
+		return nil, errors.New("service account token is not valid yet")
+
+	// our current use of jwt.Expected above should make these cases impossible to hit
+	case jwt.ErrInvalidAudience, jwt.ErrInvalidID, jwt.ErrInvalidIssuer, jwt.ErrInvalidSubject:
+		klog.Errorf("service account token claim validation got unexpected validation failure: %v", err)
+		return nil, fmt.Errorf("service account token claims could not be validated: %w", err) // safe to pass these errors back to the user
+
 	default:
-		klog.Errorf("unexpected validation error: %T", err)
-		return nil, errors.New("Token could not be validated.")
+		klog.Errorf("service account token claim validation got unexpected error type: %T", err)                         // avoid leaking unexpected information into the logs
+		return nil, errors.New("service account token claims could not be validated due to unexpected validation error") // return an opaque error
 	}
 
+	// consider things deleted prior to now()-leeway to be invalid
+	invalidIfDeletedBefore := nowTime.Add(-jwt.DefaultLeeway)
 	namespace := private.Kubernetes.Namespace
 	saref := private.Kubernetes.Svcacct
 	podref := private.Kubernetes.Pod
@@ -120,13 +150,13 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 		klog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, saref.Name, err)
 		return nil, err
 	}
-	if serviceAccount.DeletionTimestamp != nil {
+	if serviceAccount.DeletionTimestamp != nil && serviceAccount.DeletionTimestamp.Time.Before(invalidIfDeletedBefore) {
 		klog.V(4).Infof("Service account has been deleted %s/%s", namespace, saref.Name)
-		return nil, fmt.Errorf("ServiceAccount %s/%s has been deleted", namespace, saref.Name)
+		return nil, fmt.Errorf("service account %s/%s has been deleted", namespace, saref.Name)
 	}
 	if string(serviceAccount.UID) != saref.UID {
 		klog.V(4).Infof("Service account UID no longer matches %s/%s: %q != %q", namespace, saref.Name, string(serviceAccount.UID), saref.UID)
-		return nil, fmt.Errorf("ServiceAccount UID (%s) does not match claim (%s)", serviceAccount.UID, saref.UID)
+		return nil, fmt.Errorf("service account UID (%s) does not match claim (%s)", serviceAccount.UID, saref.UID)
 	}
 
 	if secref != nil {
@@ -134,15 +164,15 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 		secret, err := v.getter.GetSecret(namespace, secref.Name)
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve bound secret %s/%s for service account %s/%s: %v", namespace, secref.Name, namespace, saref.Name, err)
-			return nil, errors.New("Token has been invalidated")
+			return nil, errors.New("service account token has been invalidated")
 		}
-		if secret.DeletionTimestamp != nil {
+		if secret.DeletionTimestamp != nil && secret.DeletionTimestamp.Time.Before(invalidIfDeletedBefore) {
 			klog.V(4).Infof("Bound secret is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, secref.Name, namespace, saref.Name)
-			return nil, errors.New("Token has been invalidated")
+			return nil, errors.New("service account token has been invalidated")
 		}
 		if secref.UID != string(secret.UID) {
 			klog.V(4).Infof("Secret UID no longer matches %s/%s: %q != %q", namespace, secref.Name, string(secret.UID), secref.UID)
-			return nil, fmt.Errorf("Secret UID (%s) does not match claim (%s)", secret.UID, secref.UID)
+			return nil, fmt.Errorf("secret UID (%s) does not match service account secret ref claim (%s)", secret.UID, secref.UID)
 		}
 	}
 
@@ -152,21 +182,34 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 		pod, err := v.getter.GetPod(namespace, podref.Name)
 		if err != nil {
 			klog.V(4).Infof("Could not retrieve bound pod %s/%s for service account %s/%s: %v", namespace, podref.Name, namespace, saref.Name, err)
-			return nil, errors.New("Token has been invalidated")
+			return nil, errors.New("service account token has been invalidated")
 		}
-		if pod.DeletionTimestamp != nil {
+		if pod.DeletionTimestamp != nil && pod.DeletionTimestamp.Time.Before(invalidIfDeletedBefore) {
 			klog.V(4).Infof("Bound pod is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, podref.Name, namespace, saref.Name)
-			return nil, errors.New("Token has been invalidated")
+			return nil, errors.New("service account token has been invalidated")
 		}
 		if podref.UID != string(pod.UID) {
 			klog.V(4).Infof("Pod UID no longer matches %s/%s: %q != %q", namespace, podref.Name, string(pod.UID), podref.UID)
-			return nil, fmt.Errorf("Pod UID (%s) does not match claim (%s)", pod.UID, podref.UID)
+			return nil, fmt.Errorf("pod UID (%s) does not match service account pod ref claim (%s)", pod.UID, podref.UID)
 		}
 		podName = podref.Name
 		podUID = podref.UID
 	}
 
-	return &ServiceAccountInfo{
+	// Check special 'warnafter' field for projected service account token transition.
+	warnafter := private.Kubernetes.WarnAfter
+	if warnafter != 0 {
+		if nowTime.After(warnafter.Time()) {
+			secondsAfterWarn := nowTime.Unix() - warnafter.Time().Unix()
+			auditInfo := fmt.Sprintf("subject: %s, seconds after warning threshold: %d", public.Subject, secondsAfterWarn)
+			audit.AddAuditAnnotation(ctx, "authentication.k8s.io/stale-token", auditInfo)
+			staleTokensTotal.WithContext(ctx).Inc()
+		} else {
+			validTokensTotal.WithContext(ctx).Inc()
+		}
+	}
+
+	return &apiserverserviceaccount.ServiceAccountInfo{
 		Namespace: private.Kubernetes.Namespace,
 		Name:      private.Kubernetes.Svcacct.Name,
 		UID:       private.Kubernetes.Svcacct.UID,

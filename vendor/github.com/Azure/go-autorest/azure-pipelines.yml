@@ -1,0 +1,105 @@
+variables:
+  GOPATH: '$(system.defaultWorkingDirectory)/work'
+  sdkPath: '$(GOPATH)/src/github.com/$(build.repository.name)'
+
+jobs:
+  - job: 'goautorest'
+    displayName: 'Run go-autorest CI Checks'
+
+    strategy:
+      matrix:
+        Linux_Go113:
+          vm.image: 'ubuntu-18.04'
+          go.version: '1.13'
+        Linux_Go114:
+          vm.image: 'ubuntu-18.04'
+          go.version: '1.14'
+
+    pool:
+      vmImage: '$(vm.image)'
+
+    steps:
+      - task: GoTool@0
+        inputs:
+          version: '$(go.version)'
+        displayName: "Select Go Version"
+
+      - script: |
+          set -e
+          mkdir -p '$(GOPATH)/bin'
+          mkdir -p '$(sdkPath)'
+          shopt -s extglob
+          mv !(work) '$(sdkPath)'
+          echo '##vso[task.prependpath]$(GOPATH)/bin'
+        displayName: 'Create Go Workspace'
+
+      - script: |
+          set -e
+          curl -sSL https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+          dep ensure -v
+          go install ./vendor/golang.org/x/lint/golint
+          go get github.com/jstemmer/go-junit-report
+          go get github.com/axw/gocov/gocov
+          go get github.com/AlekSi/gocov-xml
+          go get -u github.com/matm/gocov-html
+        workingDirectory: '$(sdkPath)'
+        displayName: 'Install Dependencies'
+
+      - script: |
+          go vet ./autorest/...
+          go vet ./logger/...
+          go vet ./tracing/...
+        workingDirectory: '$(sdkPath)'
+        displayName: 'Vet'
+
+      - script: |
+          go build -v ./autorest/...
+          go build -v ./logger/...
+          go build -v ./tracing/...
+        workingDirectory: '$(sdkPath)'
+        displayName: 'Build'
+
+      - script: |
+          set -e
+          go test -race -v -coverprofile=coverage.txt -covermode atomic ./autorest/... ./logger/... ./tracing/... 2>&1 | go-junit-report > report.xml
+          gocov convert coverage.txt > coverage.json
+          gocov-xml < coverage.json > coverage.xml
+          gocov-html < coverage.json > coverage.html
+        workingDirectory: '$(sdkPath)'
+        displayName: 'Run Tests'
+
+      - script: grep -L -r --include *.go --exclude-dir vendor -P "Copyright (\d{4}|\(c\)) Microsoft" ./ | tee >&2
+        workingDirectory: '$(sdkPath)'
+        displayName: 'Copyright Header Check'
+        failOnStderr: true
+        condition: succeededOrFailed()
+
+      - script: |
+          gofmt -s -l -w ./autorest/. >&2
+          gofmt -s -l -w ./logger/. >&2
+          gofmt -s -l -w ./tracing/. >&2
+        workingDirectory: '$(sdkPath)'
+        displayName: 'Format Check'
+        failOnStderr: true
+        condition: succeededOrFailed()
+
+      - script: |
+          golint ./autorest/... >&2
+          golint ./logger/... >&2
+          golint ./tracing/... >&2
+        workingDirectory: '$(sdkPath)'
+        displayName: 'Linter Check'
+        failOnStderr: true
+        condition: succeededOrFailed()
+
+      - task: PublishTestResults@2
+        inputs:
+          testRunner: JUnit
+          testResultsFiles: $(sdkPath)/report.xml
+          failTaskOnFailedTests: true
+
+      - task: PublishCodeCoverageResults@1
+        inputs:
+          codeCoverageTool: Cobertura 
+          summaryFileLocation: $(sdkPath)/coverage.xml
+          additionalCodeCoverageFiles: $(sdkPath)/coverage.html

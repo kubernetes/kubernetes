@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -47,7 +47,7 @@ type genProtoIDL struct {
 func (g *genProtoIDL) PackageVars(c *generator.Context) []string {
 	if g.omitGogo {
 		return []string{
-			fmt.Sprintf("option go_package = %q;", g.localGoPackage.Name),
+			fmt.Sprintf("option go_package = %q;", g.localGoPackage.Package),
 		}
 	}
 	return []string{
@@ -60,7 +60,7 @@ func (g *genProtoIDL) PackageVars(c *generator.Context) []string {
 		"option (gogoproto.goproto_unrecognized_all) = false;",
 		"option (gogoproto.goproto_enum_prefix_all) = false;",
 		"option (gogoproto.goproto_getters_all) = false;",
-		fmt.Sprintf("option go_package = %q;", g.localGoPackage.Name),
+		fmt.Sprintf("option go_package = %q;", g.localGoPackage.Package),
 	}
 }
 func (g *genProtoIDL) Filename() string { return g.OptionalName + ".proto" }
@@ -371,7 +371,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 `, b.t)
 
 	if len(options) > 0 {
-		sort.Sort(sort.StringSlice(options))
+		sort.Strings(options)
 		for _, s := range options {
 			fmt.Fprintf(out, "  option %s;\n", s)
 		}
@@ -399,7 +399,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 				}
 				extras = append(extras, fmt.Sprintf("%s = %s", k, v))
 			}
-			sort.Sort(sort.StringSlice(extras))
+			sort.Strings(extras)
 			if len(extras) > 0 {
 				fmt.Fprintf(out, " [")
 				fmt.Fprint(out, strings.Join(extras, ", "))
@@ -573,7 +573,7 @@ func protobufTagToField(tag string, field *protoField, m types.Member, t *types.
 	switch parts[0] {
 	case "varint", "fixed32", "fixed64", "bytes", "group":
 	default:
-		name := types.Name{}
+		var name types.Name
 		if last := strings.LastIndex(parts[0], "."); last != -1 {
 			prefix := parts[0][:last]
 			name = types.Name{
@@ -740,7 +740,7 @@ func formatProtoFile(source []byte) ([]byte, error) {
 func assembleProtoFile(w io.Writer, f *generator.File) {
 	w.Write(f.Header)
 
-	fmt.Fprint(w, "syntax = 'proto2';\n\n")
+	fmt.Fprint(w, "syntax = \"proto2\";\n\n")
 
 	if len(f.PackageName) > 0 {
 		fmt.Fprintf(w, "package %s;\n\n", f.PackageName)

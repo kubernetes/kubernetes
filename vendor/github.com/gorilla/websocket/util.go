@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"unicode/utf8"
 )
 
 var keyGUID = []byte("258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
@@ -30,68 +31,113 @@ func generateChallengeKey() (string, error) {
 	return base64.StdEncoding.EncodeToString(p), nil
 }
 
-// Octet types from RFC 2616.
-var octetTypes [256]byte
-
-const (
-	isTokenOctet = 1 << iota
-	isSpaceOctet
-)
-
-func init() {
-	// From RFC 2616
-	//
-	// OCTET      = <any 8-bit sequence of data>
-	// CHAR       = <any US-ASCII character (octets 0 - 127)>
-	// CTL        = <any US-ASCII control character (octets 0 - 31) and DEL (127)>
-	// CR         = <US-ASCII CR, carriage return (13)>
-	// LF         = <US-ASCII LF, linefeed (10)>
-	// SP         = <US-ASCII SP, space (32)>
-	// HT         = <US-ASCII HT, horizontal-tab (9)>
-	// <">        = <US-ASCII double-quote mark (34)>
-	// CRLF       = CR LF
-	// LWS        = [CRLF] 1*( SP | HT )
-	// TEXT       = <any OCTET except CTLs, but including LWS>
-	// separators = "(" | ")" | "<" | ">" | "@" | "," | ";" | ":" | "\" | <">
-	//              | "/" | "[" | "]" | "?" | "=" | "{" | "}" | SP | HT
-	// token      = 1*<any CHAR except CTLs or separators>
-	// qdtext     = <any TEXT except <">>
-
-	for c := 0; c < 256; c++ {
-		var t byte
-		isCtl := c <= 31 || c == 127
-		isChar := 0 <= c && c <= 127
-		isSeparator := strings.IndexRune(" \t\"(),/:;<=>?@[]\\{}", rune(c)) >= 0
-		if strings.IndexRune(" \t\r\n", rune(c)) >= 0 {
-			t |= isSpaceOctet
-		}
-		if isChar && !isCtl && !isSeparator {
-			t |= isTokenOctet
-		}
-		octetTypes[c] = t
-	}
+// Token octets per RFC 2616.
+var isTokenOctet = [256]bool{
+	'!':  true,
+	'#':  true,
+	'$':  true,
+	'%':  true,
+	'&':  true,
+	'\'': true,
+	'*':  true,
+	'+':  true,
+	'-':  true,
+	'.':  true,
+	'0':  true,
+	'1':  true,
+	'2':  true,
+	'3':  true,
+	'4':  true,
+	'5':  true,
+	'6':  true,
+	'7':  true,
+	'8':  true,
+	'9':  true,
+	'A':  true,
+	'B':  true,
+	'C':  true,
+	'D':  true,
+	'E':  true,
+	'F':  true,
+	'G':  true,
+	'H':  true,
+	'I':  true,
+	'J':  true,
+	'K':  true,
+	'L':  true,
+	'M':  true,
+	'N':  true,
+	'O':  true,
+	'P':  true,
+	'Q':  true,
+	'R':  true,
+	'S':  true,
+	'T':  true,
+	'U':  true,
+	'W':  true,
+	'V':  true,
+	'X':  true,
+	'Y':  true,
+	'Z':  true,
+	'^':  true,
+	'_':  true,
+	'`':  true,
+	'a':  true,
+	'b':  true,
+	'c':  true,
+	'd':  true,
+	'e':  true,
+	'f':  true,
+	'g':  true,
+	'h':  true,
+	'i':  true,
+	'j':  true,
+	'k':  true,
+	'l':  true,
+	'm':  true,
+	'n':  true,
+	'o':  true,
+	'p':  true,
+	'q':  true,
+	'r':  true,
+	's':  true,
+	't':  true,
+	'u':  true,
+	'v':  true,
+	'w':  true,
+	'x':  true,
+	'y':  true,
+	'z':  true,
+	'|':  true,
+	'~':  true,
 }
 
+// skipSpace returns a slice of the string s with all leading RFC 2616 linear
+// whitespace removed.
 func skipSpace(s string) (rest string) {
 	i := 0
 	for ; i < len(s); i++ {
-		if octetTypes[s[i]]&isSpaceOctet == 0 {
+		if b := s[i]; b != ' ' && b != '\t' {
 			break
 		}
 	}
 	return s[i:]
 }
 
+// nextToken returns the leading RFC 2616 token of s and the string following
+// the token.
 func nextToken(s string) (token, rest string) {
 	i := 0
 	for ; i < len(s); i++ {
-		if octetTypes[s[i]]&isTokenOctet == 0 {
+		if !isTokenOctet[s[i]] {
 			break
 		}
 	}
 	return s[:i], s[i:]
 }
 
+// nextTokenOrQuoted returns the leading token or quoted string per RFC 2616
+// and the string following the token or quoted string.
 func nextTokenOrQuoted(s string) (value string, rest string) {
 	if !strings.HasPrefix(s, "\"") {
 		return nextToken(s)
@@ -127,8 +173,32 @@ func nextTokenOrQuoted(s string) (value string, rest string) {
 	return "", ""
 }
 
+// equalASCIIFold returns true if s is equal to t with ASCII case folding as
+// defined in RFC 4790.
+func equalASCIIFold(s, t string) bool {
+	for s != "" && t != "" {
+		sr, size := utf8.DecodeRuneInString(s)
+		s = s[size:]
+		tr, size := utf8.DecodeRuneInString(t)
+		t = t[size:]
+		if sr == tr {
+			continue
+		}
+		if 'A' <= sr && sr <= 'Z' {
+			sr = sr + 'a' - 'A'
+		}
+		if 'A' <= tr && tr <= 'Z' {
+			tr = tr + 'a' - 'A'
+		}
+		if sr != tr {
+			return false
+		}
+	}
+	return s == t
+}
+
 // tokenListContainsValue returns true if the 1#token header with the given
-// name contains token.
+// name contains a token equal to value with ASCII case folding.
 func tokenListContainsValue(header http.Header, name string, value string) bool {
 headers:
 	for _, s := range header[name] {
@@ -142,7 +212,7 @@ headers:
 			if s != "" && s[0] != ',' {
 				continue headers
 			}
-			if strings.EqualFold(t, value) {
+			if equalASCIIFold(t, value) {
 				return true
 			}
 			if s == "" {
@@ -154,9 +224,8 @@ headers:
 	return false
 }
 
-// parseExtensiosn parses WebSocket extensions from a header.
+// parseExtensions parses WebSocket extensions from a header.
 func parseExtensions(header http.Header) []map[string]string {
-
 	// From RFC 6455:
 	//
 	//  Sec-WebSocket-Extensions = extension-list

@@ -1,7 +1,9 @@
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: nginx
+  labels:
+    app: nginx-statefulset
 spec:
   selector:
     matchLabels:
@@ -18,7 +20,7 @@ spec:
       terminationGracePeriodSeconds: 5
       containers:
       - name: nginx
-        image: k8s.gcr.io/nginx-slim:0.8
+        image: registry.k8s.io/nginx-slim:0.8
         ports:
         - containerPort: 80
           name: web
@@ -27,7 +29,7 @@ spec:
         - -c
         - 'while true; do sleep 1; done'
       - name: pause
-        image: k8s.gcr.io/pause:2.0
+        image: registry.k8s.io/pause:2.0
         ports:
         - containerPort: 81
           name: web-2

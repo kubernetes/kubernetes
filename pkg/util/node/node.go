@@ -17,22 +17,20 @@ limitations under the License.
 package node
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -64,6 +62,17 @@ func GetHostname(hostnameOverride string) (string, error) {
 	return strings.ToLower(hostName), nil
 }
 
+// NoMatchError is a typed implementation of the error interface. It indicates a failure to get a matching Node.
+type NoMatchError struct {
+	addresses []v1.NodeAddress
+}
+
+// Error is the implementation of the conventional interface for
+// representing an error condition, with the nil value representing no error.
+func (e *NoMatchError) Error() string {
+	return fmt.Sprintf("no preferred addresses found; known addresses: %v", e.addresses)
+}
+
 // GetPreferredNodeAddress returns the address of the provided node, using the provided preference order.
 // If none of the preferred address types are found, an error is returned.
 func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddressType) (string, error) {
@@ -74,130 +83,94 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 			}
 		}
 	}
-	return "", fmt.Errorf("no preferred addresses found; known addresses: %v", node.Status.Addresses)
+	return "", &NoMatchError{addresses: node.Status.Addresses}
 }
 
-// GetNodeHostIP returns the provided node's IP, based on the priority:
-// 1. NodeInternalIP
-// 2. NodeExternalIP
+// GetNodeHostIPs returns the provided node's IP(s); either a single "primary IP" for the
+// node in a single-stack cluster, or a dual-stack pair of IPs in a dual-stack cluster
+// (for nodes that actually have dual-stack IPs). Among other things, the IPs returned
+// from this function are used as the `.status.PodIPs` values for host-network pods on the
+// node, and the first IP is used as the `.status.HostIP` for all pods on the node.
+func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
+	// Re-sort the addresses with InternalIPs first and then ExternalIPs
+	allIPs := make([]net.IP, 0, len(node.Status.Addresses))
+	for _, addr := range node.Status.Addresses {
+		if addr.Type == v1.NodeInternalIP {
+			ip := netutils.ParseIPSloppy(addr.Address)
+			if ip != nil {
+				allIPs = append(allIPs, ip)
+			}
+		}
+	}
+	for _, addr := range node.Status.Addresses {
+		if addr.Type == v1.NodeExternalIP {
+			ip := netutils.ParseIPSloppy(addr.Address)
+			if ip != nil {
+				allIPs = append(allIPs, ip)
+			}
+		}
+	}
+	if len(allIPs) == 0 {
+		return nil, fmt.Errorf("host IP unknown; known addresses: %v", node.Status.Addresses)
+	}
+
+	nodeIPs := []net.IP{allIPs[0]}
+	for _, ip := range allIPs {
+		if netutils.IsIPv6(ip) != netutils.IsIPv6(nodeIPs[0]) {
+			nodeIPs = append(nodeIPs, ip)
+			break
+		}
+	}
+
+	return nodeIPs, nil
+}
+
+// GetNodeHostIP returns the provided node's "primary" IP; see GetNodeHostIPs for more details
 func GetNodeHostIP(node *v1.Node) (net.IP, error) {
-	addresses := node.Status.Addresses
-	addressMap := make(map[v1.NodeAddressType][]v1.NodeAddress)
-	for i := range addresses {
-		addressMap[addresses[i].Type] = append(addressMap[addresses[i].Type], addresses[i])
+	ips, err := GetNodeHostIPs(node)
+	if err != nil {
+		return nil, err
 	}
-	if addresses, ok := addressMap[v1.NodeInternalIP]; ok {
-		return net.ParseIP(addresses[0].Address), nil
-	}
-	if addresses, ok := addressMap[v1.NodeExternalIP]; ok {
-		return net.ParseIP(addresses[0].Address), nil
-	}
-	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
+	// GetNodeHostIPs always returns at least one IP if it didn't return an error
+	return ips[0], nil
 }
 
-// GetNodeIP returns the ip of node with the provided hostname
-func GetNodeIP(client clientset.Interface, hostname string) net.IP {
+// GetNodeIP returns an IP (as with GetNodeHostIP) for the node with the provided name.
+// If required, it will wait for the node to be created.
+func GetNodeIP(client clientset.Interface, name string) net.IP {
 	var nodeIP net.IP
-	node, err := client.CoreV1().Nodes().Get(hostname, metav1.GetOptions{})
-	if err != nil {
-		klog.Warningf("Failed to retrieve node info: %v", err)
-		return nil
+	backoff := wait.Backoff{
+		Steps:    6,
+		Duration: 1 * time.Second,
+		Factor:   2.0,
+		Jitter:   0.2,
 	}
-	nodeIP, err = GetNodeHostIP(node)
-	if err != nil {
-		klog.Warningf("Failed to retrieve node IP: %v", err)
-		return nil
+
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			klog.Errorf("Failed to retrieve node info: %v", err)
+			return false, nil
+		}
+		nodeIP, err = GetNodeHostIP(node)
+		if err != nil {
+			klog.Errorf("Failed to retrieve node IP: %v", err)
+			return false, err
+		}
+		return true, nil
+	})
+	if err == nil {
+		klog.Infof("Successfully retrieved node IP: %v", nodeIP)
 	}
 	return nodeIP
 }
 
-// GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;
-// it returns empty-string for no zone.
-func GetZoneKey(node *v1.Node) string {
-	labels := node.Labels
-	if labels == nil {
-		return ""
-	}
-
-	region, _ := labels[kubeletapis.LabelZoneRegion]
-	failureDomain, _ := labels[kubeletapis.LabelZoneFailureDomain]
-
-	if region == "" && failureDomain == "" {
-		return ""
-	}
-
-	// We include the null character just in case region or failureDomain has a colon
-	// (We do assume there's no null characters in a region or failureDomain)
-	// As a nice side-benefit, the null character is not printed by fmt.Print or glog
-	return region + ":\x00:" + failureDomain
-}
-
-// SetNodeCondition updates specific node condition with patch operation.
-func SetNodeCondition(c clientset.Interface, node types.NodeName, condition v1.NodeCondition) error {
-	generatePatch := func(condition v1.NodeCondition) ([]byte, error) {
-		raw, err := json.Marshal(&[]v1.NodeCondition{condition})
-		if err != nil {
-			return nil, err
+// IsNodeReady returns true if a node is ready; false otherwise.
+func IsNodeReady(node *v1.Node) bool {
+	for _, c := range node.Status.Conditions {
+		if c.Type == v1.NodeReady {
+			return c.Status == v1.ConditionTrue
 		}
-		return []byte(fmt.Sprintf(`{"status":{"conditions":%s}}`, raw)), nil
 	}
-	condition.LastHeartbeatTime = metav1.NewTime(time.Now())
-	patch, err := generatePatch(condition)
-	if err != nil {
-		return nil
-	}
-	_, err = c.CoreV1().Nodes().PatchStatus(string(node), patch)
-	return err
-}
-
-// PatchNodeCIDR patches the specified node's CIDR to the given value.
-func PatchNodeCIDR(c clientset.Interface, node types.NodeName, cidr string) error {
-	raw, err := json.Marshal(cidr)
-	if err != nil {
-		return fmt.Errorf("failed to json.Marshal CIDR: %v", err)
-	}
-
-	patchBytes := []byte(fmt.Sprintf(`{"spec":{"podCIDR":%s}}`, raw))
-
-	if _, err := c.CoreV1().Nodes().Patch(string(node), types.StrategicMergePatchType, patchBytes); err != nil {
-		return fmt.Errorf("failed to patch node CIDR: %v", err)
-	}
-	return nil
-}
-
-// PatchNodeStatus patches node status.
-func PatchNodeStatus(c v1core.CoreV1Interface, nodeName types.NodeName, oldNode *v1.Node, newNode *v1.Node) (*v1.Node, []byte, error) {
-	patchBytes, err := preparePatchBytesforNodeStatus(nodeName, oldNode, newNode)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	updatedNode, err := c.Nodes().Patch(string(nodeName), types.StrategicMergePatchType, patchBytes, "status")
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to patch status %q for node %q: %v", patchBytes, nodeName, err)
-	}
-	return updatedNode, patchBytes, nil
-}
-
-func preparePatchBytesforNodeStatus(nodeName types.NodeName, oldNode *v1.Node, newNode *v1.Node) ([]byte, error) {
-	oldData, err := json.Marshal(oldNode)
-	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal oldData for node %q: %v", nodeName, err)
-	}
-
-	// Reset spec to make sure only patch for Status or ObjectMeta is generated.
-	// Note that we don't reset ObjectMeta here, because:
-	// 1. This aligns with Nodes().UpdateStatus().
-	// 2. Some component does use this to update node annotations.
-	newNode.Spec = oldNode.Spec
-	newData, err := json.Marshal(newNode)
-	if err != nil {
-		return nil, fmt.Errorf("failed to Marshal newData for node %q: %v", nodeName, err)
-	}
-
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to CreateTwoWayMergePatch for node %q: %v", nodeName, err)
-	}
-	return patchBytes, nil
+	return false
 }

@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -216,7 +215,7 @@ func main() {
 }
 
 func loadImportRestrictions(configFile string) ([]ImportRestriction, error) {
-	config, err := ioutil.ReadFile(configFile)
+	config, err := os.ReadFile(configFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration from %s: %v", configFile, err)
 	}
@@ -230,9 +229,26 @@ func loadImportRestrictions(configFile string) ([]ImportRestriction, error) {
 }
 
 func resolvePackageTree(treeBase string) ([]Package, error) {
+	// try resolving with $cwd
+	packages, err := resolvePackageTreeInDir("", treeBase)
+	if err != nil || len(packages) == 0 {
+		// if that fails or finds no packages, resolve under ./vendor/$treeBase
+		stagingPackages, stagingErr := resolvePackageTreeInDir(filepath.Join("./vendor", treeBase), treeBase)
+		if stagingErr == nil && len(stagingPackages) > 0 {
+			// if that succeeds, return
+			return stagingPackages, stagingErr
+		}
+	}
+	// otherwise, return original packages and error
+	return packages, err
+}
+
+func resolvePackageTreeInDir(dir string, treeBase string) ([]Package, error) {
 	cmd := "go"
 	args := []string{"list", "-json", fmt.Sprintf("%s...", treeBase)}
-	stdout, err := exec.Command(cmd, args...).Output()
+	c := exec.Command(cmd, args...)
+	c.Dir = dir
+	stdout, err := c.Output()
 	if err != nil {
 		var message string
 		if ee, ok := err.(*exec.ExitError); ok {

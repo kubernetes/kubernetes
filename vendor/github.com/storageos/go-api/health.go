@@ -14,6 +14,22 @@ var (
 	HealthAPIPrefix = "health"
 )
 
+func (c *Client) ClusterHealth(ctx context.Context) ([]*types.ClusterHealthNode, error) {
+	status := []*types.ClusterHealthNode{}
+	url := fmt.Sprintf("/cluster/%s", HealthAPIPrefix)
+
+	resp, err := c.do("GET", url, doOptions{context: ctx, retryOn: []int{http.StatusNotFound}})
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		return nil, err
+	}
+	return status, nil
+}
+
 // CPHealth returns the health of the control plane server at a given url.
 func (c *Client) CPHealth(ctx context.Context, hostname string) (*types.CPHealthStatus, error) {
 
@@ -23,12 +39,14 @@ func (c *Client) CPHealth(ctx context.Context, hostname string) (*types.CPHealth
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", c.userAgent)
 	if c.username != "" && c.secret != "" {
 		req.SetBasicAuth(c.username, c.secret)
 	}
 
-	resp, err := c.HTTPClient.Do(req.WithContext(ctx))
+	c.configLock.RLock()
+	resp, err := c.httpClient.Do(req.WithContext(ctx))
+	c.configLock.RUnlock()
 	if err != nil {
 		return nil, err
 	}
@@ -51,12 +69,14 @@ func (c *Client) DPHealth(ctx context.Context, hostname string) (*types.DPHealth
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("User-Agent", c.userAgent)
 	if c.username != "" && c.secret != "" {
 		req.SetBasicAuth(c.username, c.secret)
 	}
 
-	resp, err := c.HTTPClient.Do(req.WithContext(ctx))
+	c.configLock.RLock()
+	resp, err := c.httpClient.Do(req.WithContext(ctx))
+	c.configLock.RUnlock()
 	if err != nil {
 		return nil, err
 	}

@@ -1,0 +1,35 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "cost.go",
+        "error.go",
+        "errors.go",
+        "location.go",
+        "source.go",
+    ],
+    importpath = "github.com/google/cel-go/common",
+    deps = [
+        "//common/runes:go_default_library",
+        "@org_golang_google_genproto//googleapis/api/expr/v1alpha1:go_default_library",
+        "@org_golang_x_text//width:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    size = "small",
+    srcs = [
+        "errors_test.go",
+        "source_test.go",
+    ],
+    embed = [
+        ":go_default_library",
+    ],
+)

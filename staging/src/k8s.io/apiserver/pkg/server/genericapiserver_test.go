@@ -31,7 +31,6 @@ import (
 	"testing"
 	"time"
 
-	openapi "github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
@@ -53,6 +53,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	kubeopenapi "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/validation/spec"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -82,25 +84,25 @@ func init() {
 
 func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
 	return kubeopenapi.OpenAPIDefinition{
-		Schema: openapi.Schema{
-			SchemaProps: openapi.SchemaProps{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
 				Description: "Description",
-				Properties:  map[string]openapi.Schema{},
+				Properties:  map[string]spec.Schema{},
 			},
-			VendorExtensible: openapi.VendorExtensible{
-				Extensions: openapi.Extensions{
-					"x-kubernetes-group-version-kind": []map[string]string{
-						{
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-group-version-kind": []interface{}{
+						map[string]interface{}{
 							"group":   "",
 							"version": "v1",
 							"kind":    "Getter",
 						},
-						{
+						map[string]interface{}{
 							"group":   "batch",
 							"version": "v1",
 							"kind":    "Getter",
 						},
-						{
+						map[string]interface{}{
 							"group":   "extensions",
 							"version": "v1",
 							"kind":    "Getter",
@@ -126,7 +128,7 @@ func testGetOpenAPIDefinitions(_ kubeopenapi.ReferenceCallback) map[string]kubeo
 func setUp(t *testing.T) (Config, *assert.Assertions) {
 	config := NewConfig(codecs)
 	config.ExternalAddress = "192.168.10.4:443"
-	config.PublicAddress = net.ParseIP("192.168.10.4")
+	config.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
 
@@ -137,7 +139,6 @@ func setUp(t *testing.T) (Config, *assert.Assertions) {
 
 	config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(runtime.NewScheme()))
 	config.OpenAPIConfig.Info.Version = "unversioned"
-	config.SwaggerConfig = DefaultSwaggerConfig()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, config.LoopbackClientConfig.Timeout)
 	config.Complete(sharedInformers)
 
@@ -162,11 +163,6 @@ func TestNew(t *testing.T) {
 	// Verify many of the variables match their config counterparts
 	assert.Equal(s.legacyAPIGroupPrefixes, config.LegacyAPIGroupPrefixes)
 	assert.Equal(s.admissionControl, config.AdmissionControl)
-
-	// these values get defaulted
-	assert.Equal(net.JoinHostPort(config.PublicAddress.String(), "443"), s.ExternalAddress)
-	assert.NotNil(s.swaggerConfig)
-	assert.Equal("http://"+s.ExternalAddress, s.swaggerConfig.WebServicesUrl)
 }
 
 // Verifies that AddGroupVersions works as expected.
@@ -321,27 +317,77 @@ func TestInstallAPIGroups(t *testing.T) {
 func TestPrepareRun(t *testing.T) {
 	s, config, assert := newMaster(t)
 
-	assert.NotNil(config.SwaggerConfig)
+	assert.NotNil(config.OpenAPIConfig)
 
 	server := httptest.NewServer(s.Handler.Director)
 	defer server.Close()
 	done := make(chan struct{})
+	defer close(done)
 
 	s.PrepareRun()
 	s.RunPostStartHooks(done)
 
-	// swagger is installed in PrepareRun
-	resp, err := http.Get(server.URL + "/swaggerapi/")
+	// openapi is installed in PrepareRun
+	resp, err := http.Get(server.URL + "/openapi/v2")
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
 
-	// healthz checks are installed in PrepareRun
-	resp, err = http.Get(server.URL + "/healthz")
-	assert.NoError(err)
-	assert.Equal(http.StatusOK, resp.StatusCode)
+	// wait for health (max-in-flight-filter is initialized asynchronously, can take a few milliseconds to initialize)
+	assert.NoError(wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		// healthz checks are installed in PrepareRun
+		resp, err = http.Get(server.URL + "/healthz")
+		assert.NoError(err)
+		data, _ := ioutil.ReadAll(resp.Body)
+		if http.StatusOK != resp.StatusCode {
+			t.Logf("got %d", resp.StatusCode)
+			t.Log(string(data))
+			return false, nil
+		}
+		return true, nil
+	}))
 	resp, err = http.Get(server.URL + "/healthz/ping")
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
+}
+
+func TestUpdateOpenAPISpec(t *testing.T) {
+	s, _, assert := newMaster(t)
+	s.PrepareRun()
+	s.RunPostStartHooks(make(chan struct{}))
+
+	server := httptest.NewServer(s.Handler.Director)
+	defer server.Close()
+
+	// verify the static spec in record is what we currently serve
+	oldSpec, err := json.Marshal(s.StaticOpenAPISpec)
+	assert.NoError(err)
+
+	resp, err := http.Get(server.URL + "/openapi/v2")
+	assert.NoError(err)
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	body, err := ioutil.ReadAll(resp.Body)
+	assert.NoError(err)
+	assert.Equal(oldSpec, body)
+	resp.Body.Close()
+
+	// verify we are able to update the served spec using the exposed service
+	newSpec := []byte(`{"swagger":"2.0","info":{"title":"Test Updated Generic API Server Swagger","version":"v0.1.0"},"paths":null}`)
+	swagger := new(spec.Swagger)
+	err = json.Unmarshal(newSpec, swagger)
+	assert.NoError(err)
+
+	err = s.OpenAPIVersionedService.UpdateSpec(swagger)
+	assert.NoError(err)
+
+	resp, err = http.Get(server.URL + "/openapi/v2")
+	assert.NoError(err)
+	defer resp.Body.Close()
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	body, err = ioutil.ReadAll(resp.Body)
+	assert.NoError(err)
+	assert.Equal(newSpec, body)
 }
 
 // TestCustomHandlerChain verifies the handler chain with custom handler chain builder functions.
@@ -406,10 +452,8 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
 	config.Authorization.Authorizer = &authz
 
-	config.EnableSwaggerUI = true
 	config.EnableIndex = true
 	config.EnableProfiling = true
-	config.SwaggerConfig = DefaultSwaggerConfig()
 
 	kubeVersion := fakeVersion()
 	config.Version = &kubeVersion
@@ -423,7 +467,6 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 		route string
 	}{
 		{"/"},
-		{"/swagger-ui/"},
 		{"/debug/pprof/"},
 		{"/debug/flags/"},
 		{"/version"},
@@ -442,11 +485,44 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	}
 }
 
+func TestMuxAndDiscoveryCompleteSignals(t *testing.T) {
+	// setup
+	cfg, assert := setUp(t)
+
+	// scenario 1: single server with some signals
+	root, err := cfg.Complete(nil).New("rootServer", NewEmptyDelegate())
+	assert.NoError(err)
+	if len(root.MuxAndDiscoveryCompleteSignals()) != 0 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the root server", root.MuxAndDiscoveryCompleteSignals()))
+	}
+	root.RegisterMuxAndDiscoveryCompleteSignal("rootTestSignal", make(chan struct{}))
+	if len(root.MuxAndDiscoveryCompleteSignals()) != 1 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the root server", root.MuxAndDiscoveryCompleteSignals()))
+	}
+
+	// scenario 2: multiple servers with some signals
+	delegate, err := cfg.Complete(nil).New("delegateServer", NewEmptyDelegate())
+	assert.NoError(err)
+	delegate.RegisterMuxAndDiscoveryCompleteSignal("delegateTestSignal", make(chan struct{}))
+	if len(delegate.MuxAndDiscoveryCompleteSignals()) != 1 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the delegate server", delegate.MuxAndDiscoveryCompleteSignals()))
+	}
+	newRoot, err := cfg.Complete(nil).New("newRootServer", delegate)
+	assert.NoError(err)
+	if len(newRoot.MuxAndDiscoveryCompleteSignals()) != 1 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the newRoot server", newRoot.MuxAndDiscoveryCompleteSignals()))
+	}
+	newRoot.RegisterMuxAndDiscoveryCompleteSignal("newRootTestSignal", make(chan struct{}))
+	if len(newRoot.MuxAndDiscoveryCompleteSignals()) != 2 {
+		assert.Error(fmt.Errorf("unexpected signals %v registered in the newRoot server", newRoot.MuxAndDiscoveryCompleteSignals()))
+	}
+}
+
 type mockAuthorizer struct {
 	lastURI string
 }
 
-func (authz *mockAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+func (authz *mockAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	authz.lastURI = a.GetPath()
 	return authorizer.DecisionAllow, "", nil
 }
@@ -468,6 +544,9 @@ func (p *testGetterStorage) New() runtime.Object {
 	}
 }
 
+func (p *testGetterStorage) Destroy() {
+}
+
 func (p *testGetterStorage) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
 	return nil, nil
 }
@@ -487,6 +566,9 @@ func (p *testNoVerbsStorage) New() runtime.Object {
 			APIVersion: p.Version,
 		},
 	}
+}
+
+func (p *testNoVerbsStorage) Destroy() {
 }
 
 func fakeVersion() version.Info {
@@ -517,19 +599,23 @@ func TestGracefulShutdown(t *testing.T) {
 		return handler
 	}
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		wg.Done()
-		time.Sleep(2 * time.Second)
-		w.WriteHeader(http.StatusOK)
-		graceShutdown = true
-	})
-
 	s, err := config.Complete(nil).New("test", NewEmptyDelegate())
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
 
-	s.Handler.NonGoRestfulMux.Handle("/test", handler)
+	twoSecondHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		wg.Done()
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
+		graceShutdown = true
+	})
+	okHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	s.Handler.NonGoRestfulMux.Handle("/test", twoSecondHandler)
+	s.Handler.NonGoRestfulMux.Handle("/200", okHandler)
 
 	insecureServer := &http.Server{
 		Addr:    "0.0.0.0:0",
@@ -544,9 +630,9 @@ func TestGracefulShutdown(t *testing.T) {
 
 	// get port
 	serverPort := ln.Addr().(*net.TCPAddr).Port
-	err = RunServer(insecureServer, ln, 10*time.Second, stopCh)
+	stoppedCh, _, err := RunServer(insecureServer, ln, 10*time.Second, stopCh)
 	if err != nil {
-		t.Errorf("RunServer err: %v", err)
+		t.Fatalf("RunServer err: %v", err)
 	}
 
 	graceCh := make(chan struct{})
@@ -565,8 +651,15 @@ func TestGracefulShutdown(t *testing.T) {
 	// close stopCh after request sent to server to guarantee request handler is running.
 	wg.Wait()
 	close(stopCh)
+
+	time.Sleep(500 * time.Millisecond)
+	if _, err := http.Get("http://127.0.0.1:" + strconv.Itoa(serverPort) + "/200"); err == nil {
+		t.Errorf("Unexpected http success after stopCh was closed")
+	}
+
 	// wait for wait group handler finish
 	s.HandlerChainWaitGroup.Wait()
+	<-stoppedCh
 
 	// check server all handlers finished.
 	if !graceShutdown {

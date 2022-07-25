@@ -24,7 +24,9 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/diff"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/kubernetes/pkg/kubelet/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func newKubeletServerOrDie() *KubeletServer {
@@ -33,10 +35,6 @@ func newKubeletServerOrDie() *KubeletServer {
 		panic(err)
 	}
 	return s
-}
-
-func cleanFlags(s *KubeletServer) {
-	s.DynamicConfigDir = utilflag.NewStringFlag(s.DynamicConfigDir.Value())
 }
 
 // TestRoundTrip ensures that flag values from the Kubelet can be serialized
@@ -103,7 +101,6 @@ func TestRoundTrip(t *testing.T) {
 			}
 			continue
 		}
-		cleanFlags(outputFlags)
 		if !reflect.DeepEqual(modifiedFlags, outputFlags) {
 			t.Errorf("%s: flags did not round trip: %s", testCase.name, diff.ObjectReflectDiff(modifiedFlags, outputFlags))
 			continue
@@ -118,8 +115,8 @@ func asArgs(fn, defaultFn func(*pflag.FlagSet)) []string {
 	defaultFn(defaults)
 	var args []string
 	fs.VisitAll(func(flag *pflag.Flag) {
-		// if the flag implements utilflag.OmitEmpty and the value is Empty, then just omit it from the command line
-		if omit, ok := flag.Value.(utilflag.OmitEmpty); ok && omit.Empty() {
+		// if the flag implements cliflag.OmitEmpty and the value is Empty, then just omit it from the command line
+		if omit, ok := flag.Value.(cliflag.OmitEmpty); ok && omit.Empty() {
 			return
 		}
 		s := flag.Value.String()
@@ -144,4 +141,52 @@ func asArgs(fn, defaultFn func(*pflag.FlagSet)) []string {
 		}
 	})
 	return args
+}
+
+func TestValidateKubeletFlags(t *testing.T) {
+	tests := []struct {
+		name   string
+		error  bool
+		labels map[string]string
+	}{
+		{
+			name:  "Invalid kubernetes.io label",
+			error: true,
+			labels: map[string]string{
+				"beta.kubernetes.io/metadata-proxy-ready": "true",
+			},
+		},
+		{
+			name:  "Valid label outside of kubernetes.io and k8s.io",
+			error: false,
+			labels: map[string]string{
+				"cloud.google.com/metadata-proxy-ready": "true",
+			},
+		},
+		{
+			name:   "Empty label list",
+			error:  false,
+			labels: map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateKubeletFlags(&KubeletFlags{
+				ContainerRuntimeOptions: config.ContainerRuntimeOptions{
+					ContainerRuntime: kubetypes.RemoteContainerRuntime,
+				},
+				NodeLabels: tt.labels,
+			})
+
+			if tt.error && err == nil {
+				t.Errorf("ValidateKubeletFlags should have failed with labels: %+v", tt.labels)
+			}
+
+			if !tt.error && err != nil {
+				t.Errorf("ValidateKubeletFlags should not have failed with labels: %+v", tt.labels)
+			}
+		})
+	}
+
 }

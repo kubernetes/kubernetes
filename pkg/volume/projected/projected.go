@@ -20,21 +20,18 @@ import (
 	"fmt"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
 	"k8s.io/kubernetes/pkg/volume/secret"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
-	"k8s.io/klog"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -67,7 +64,7 @@ func wrappedVolumeSpec() volume.Spec {
 }
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedNameForDisk(projectedPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(projectedPluginName), volName)
 }
 
 func (plugin *projectedPlugin) Init(host volume.VolumeHost) error {
@@ -96,7 +93,7 @@ func (plugin *projectedPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.Projected != nil
 }
 
-func (plugin *projectedPlugin) RequiresRemount() bool {
+func (plugin *projectedPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return true
 }
 
@@ -111,10 +108,11 @@ func (plugin *projectedPlugin) SupportsBulkVolumeVerification() bool {
 func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &projectedVolumeMounter{
 		projectedVolume: &projectedVolume{
-			volName: spec.Name(),
-			sources: spec.Volume.Projected.Sources,
-			podUID:  pod.UID,
-			plugin:  plugin,
+			volName:         spec.Name(),
+			sources:         spec.Volume.Projected.Sources,
+			podUID:          pod.UID,
+			plugin:          plugin,
+			MetricsProvider: volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
 		source: *spec.Volume.Projected,
 		pod:    pod,
@@ -125,9 +123,10 @@ func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts v
 func (plugin *projectedPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	return &projectedVolumeUnmounter{
 		&projectedVolume{
-			volName: volName,
-			podUID:  podUID,
-			plugin:  plugin,
+			volName:         volName,
+			podUID:          podUID,
+			plugin:          plugin,
+			MetricsProvider: volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil
 }
@@ -148,7 +147,7 @@ type projectedVolume struct {
 	sources []v1.VolumeProjection
 	podUID  types.UID
 	plugin  *projectedPlugin
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 var _ volume.Volume = &projectedVolume{}
@@ -169,25 +168,18 @@ var _ volume.Mounter = &projectedVolumeMounter{}
 
 func (sv *projectedVolume) GetAttributes() volume.Attributes {
 	return volume.Attributes{
-		ReadOnly:        true,
-		Managed:         true,
-		SupportsSELinux: true,
+		ReadOnly:       true,
+		Managed:        true,
+		SELinuxRelabel: true,
 	}
 
 }
 
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (s *projectedVolumeMounter) CanMount() error {
-	return nil
+func (s *projectedVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return s.SetUpAt(s.GetPath(), mounterArgs)
 }
 
-func (s *projectedVolumeMounter) SetUp(fsGroup *int64) error {
-	return s.SetUpAt(s.GetPath(), fsGroup)
-}
-
-func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", s.volName, s.pod.UID, dir)
 
 	wrapped, err := s.plugin.host.NewWrapperMounter(s.volName, wrappedVolumeSpec(), s.pod, *s.opts)
@@ -195,14 +187,14 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	data, err := s.collectData()
+	data, err := s.collectData(mounterArgs)
 	if err != nil {
 		klog.Errorf("Error preparing data for projected volume %v for pod %v/%v: %s", s.volName, s.pod.Namespace, s.pod.Name, err.Error())
 		return err
 	}
 
 	setupSuccess := false
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
 		return err
 	}
 
@@ -238,23 +230,23 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(s, fsGroup)
+	err = volume.SetVolumeOwnership(s, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(s.plugin, nil))
 	if err != nil {
-		klog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
+		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
 		return err
 	}
 	setupSuccess = true
 	return nil
 }
 
-func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjection, error) {
+func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (map[string]volumeutil.FileProjection, error) {
 	if s.source.DefaultMode == nil {
-		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
+		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
 
 	kubeClient := s.plugin.host.GetKubeClient()
 	if kubeClient == nil {
-		return nil, fmt.Errorf("Cannot setup projected volume %v because kube client is not configured", s.volName)
+		return nil, fmt.Errorf("cannot setup projected volume %v because kube client is not configured", s.volName)
 	}
 
 	errlist := []error{}
@@ -321,11 +313,14 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 				payload[k] = v
 			}
 		case source.ServiceAccountToken != nil:
-			if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
-				errlist = append(errlist, fmt.Errorf("pod request ServiceAccountToken projection but the TokenRequestProjection feature was not enabled"))
-				continue
-			}
 			tp := source.ServiceAccountToken
+
+			// When FsGroup is set, we depend on SetVolumeOwnership to
+			// change from 0600 to 0640.
+			mode := *s.source.DefaultMode
+			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
+				mode = 0600
+			}
 
 			var auds []string
 			if len(tp.Audience) != 0 {
@@ -348,8 +343,9 @@ func (s *projectedVolumeMounter) collectData() (map[string]volumeutil.FileProjec
 				continue
 			}
 			payload[tp.Path] = volumeutil.FileProjection{
-				Data: []byte(tr.Status.Token),
-				Mode: 0600,
+				Data:   []byte(tr.Status.Token),
+				Mode:   mode,
+				FsUser: mounterArgs.FsUser,
 			}
 		}
 	}

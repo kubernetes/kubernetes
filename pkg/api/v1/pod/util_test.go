@@ -22,12 +22,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestFindPort(t *testing.T) {
@@ -198,7 +202,198 @@ func TestFindPort(t *testing.T) {
 	}
 }
 
+func TestVisitContainers(t *testing.T) {
+	setAllFeatureEnabledContainersDuringTest := ContainerType(0)
+	testCases := []struct {
+		desc                       string
+		spec                       *v1.PodSpec
+		wantContainers             []string
+		mask                       ContainerType
+		ephemeralContainersEnabled bool
+	}{
+		{
+			desc:           "empty podspec",
+			spec:           &v1.PodSpec{},
+			wantContainers: []string{},
+			mask:           AllContainers,
+		},
+		{
+			desc: "regular containers",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"c1", "c2"},
+			mask:           Containers,
+		},
+		{
+			desc: "init containers",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"i1", "i2"},
+			mask:           InitContainers,
+		},
+		{
+			desc: "ephemeral containers",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"e1", "e2"},
+			mask:           EphemeralContainers,
+		},
+		{
+			desc: "all container types",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			mask:           AllContainers,
+		},
+		{
+			desc: "all feature enabled container types with ephemeral containers disabled",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers: []string{"i1", "i2", "c1", "c2"},
+			mask:           setAllFeatureEnabledContainersDuringTest,
+		},
+		{
+			desc: "all feature enabled container types with ephemeral containers enabled",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2", SecurityContext: &v1.SecurityContext{}},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2", SecurityContext: &v1.SecurityContext{}},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			wantContainers:             []string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			mask:                       setAllFeatureEnabledContainersDuringTest,
+			ephemeralContainersEnabled: true,
+		},
+		{
+			desc: "dropping fields",
+			spec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2", SecurityContext: &v1.SecurityContext{}},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2", SecurityContext: &v1.SecurityContext{}},
+				},
+				EphemeralContainers: []v1.EphemeralContainer{
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: v1.EphemeralContainerCommon{Name: "e2", SecurityContext: &v1.SecurityContext{}}},
+				},
+			},
+			wantContainers: []string{"i1", "i2", "c1", "c2", "e1", "e2"},
+			mask:           AllContainers,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, tc.ephemeralContainersEnabled)()
+
+			if tc.mask == setAllFeatureEnabledContainersDuringTest {
+				tc.mask = AllFeatureEnabledContainers()
+			}
+
+			gotContainers := []string{}
+			VisitContainers(tc.spec, tc.mask, func(c *v1.Container, containerType ContainerType) bool {
+				gotContainers = append(gotContainers, c.Name)
+				if c.SecurityContext != nil {
+					c.SecurityContext = nil
+				}
+				return true
+			})
+			if !cmp.Equal(gotContainers, tc.wantContainers) {
+				t.Errorf("VisitContainers() = %+v, want %+v", gotContainers, tc.wantContainers)
+			}
+			for _, c := range tc.spec.Containers {
+				if c.SecurityContext != nil {
+					t.Errorf("VisitContainers() did not drop SecurityContext for container %q", c.Name)
+				}
+			}
+			for _, c := range tc.spec.InitContainers {
+				if c.SecurityContext != nil {
+					t.Errorf("VisitContainers() did not drop SecurityContext for init container %q", c.Name)
+				}
+			}
+			for _, c := range tc.spec.EphemeralContainers {
+				if c.SecurityContext != nil {
+					t.Errorf("VisitContainers() did not drop SecurityContext for ephemeral container %q", c.Name)
+				}
+			}
+		})
+	}
+}
+
 func TestPodSecrets(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
 	// Stub containing all possible secret references in a pod.
 	// The names of the referenced secrets match struct paths detected by reflection.
 	pod := &v1.Pod{
@@ -268,7 +463,22 @@ func TestPodSecrets(t *testing.T) {
 				VolumeSource: v1.VolumeSource{
 					StorageOS: &v1.StorageOSVolumeSource{
 						SecretRef: &v1.LocalObjectReference{
-							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef"}}}}},
+							Name: "Spec.Volumes[*].VolumeSource.StorageOS.SecretRef"}}}}, {
+				VolumeSource: v1.VolumeSource{
+					CSI: &v1.CSIVolumeSource{
+						NodePublishSecretRef: &v1.LocalObjectReference{
+							Name: "Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef"}}}}},
+			EphemeralContainers: []v1.EphemeralContainer{{
+				EphemeralContainerCommon: v1.EphemeralContainerCommon{
+					EnvFrom: []v1.EnvFromSource{{
+						SecretRef: &v1.SecretEnvSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].SecretRef"}}}},
+					Env: []v1.EnvVar{{
+						ValueFrom: &v1.EnvVarSource{
+							SecretKeyRef: &v1.SecretKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.SecretKeyRef"}}}}}}}},
 		},
 	}
 	extractedNames := sets.NewString()
@@ -286,6 +496,8 @@ func TestPodSecrets(t *testing.T) {
 	expectedSecretPaths := sets.NewString(
 		"Spec.Containers[*].EnvFrom[*].SecretRef",
 		"Spec.Containers[*].Env[*].ValueFrom.SecretKeyRef",
+		"Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].SecretRef",
+		"Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.SecretKeyRef",
 		"Spec.ImagePullSecrets",
 		"Spec.InitContainers[*].EnvFrom[*].SecretRef",
 		"Spec.InitContainers[*].Env[*].ValueFrom.SecretKeyRef",
@@ -300,6 +512,7 @@ func TestPodSecrets(t *testing.T) {
 		"Spec.Volumes[*].VolumeSource.ScaleIO.SecretRef",
 		"Spec.Volumes[*].VolumeSource.ISCSI.SecretRef",
 		"Spec.Volumes[*].VolumeSource.StorageOS.SecretRef",
+		"Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef",
 	)
 	secretPaths := collectResourcePaths(t, "secret", nil, "", reflect.TypeOf(&v1.Pod{}))
 	secretPaths = secretPaths.Difference(excludedSecretPaths)
@@ -320,6 +533,21 @@ func TestPodSecrets(t *testing.T) {
 		t.Logf("Extra secret names:\n%s", strings.Join(extraNames.List(), "\n"))
 		t.Error("Extra secret names extracted. Verify VisitPodSecretNames() is correctly extracting secret names")
 	}
+
+	// emptyPod is a stub containing empty object names
+	emptyPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				EnvFrom: []v1.EnvFromSource{{
+					SecretRef: &v1.SecretEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: ""}}}}}},
+		},
+	}
+	VisitPodSecretNames(emptyPod, func(name string) bool {
+		t.Fatalf("expected no empty names collected, got %q", name)
+		return false
+	})
 }
 
 // collectResourcePaths traverses the object, computing all the struct paths that lead to fields with resourcename in the name.
@@ -327,7 +555,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 	resourcename = strings.ToLower(resourcename)
 	resourcePaths := sets.NewString()
 
-	if tp.Kind() == reflect.Ptr {
+	if tp.Kind() == reflect.Pointer {
 		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
 		return resourcePaths
 	}
@@ -337,9 +565,14 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 	}
 
 	switch tp.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
 	case reflect.Struct:
+		// ObjectMeta is generic and therefore should never have a field with a specific resource's name;
+		// it contains cycles so it's easiest to just skip it.
+		if name == "ObjectMeta" {
+			break
+		}
 		for i := 0; i < tp.NumField(); i++ {
 			field := tp.Field(i)
 			resourcePaths.Insert(collectResourcePaths(t, resourcename, path.Child(field.Name), field.Name, field.Type).List()...)
@@ -358,6 +591,8 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 }
 
 func TestPodConfigmaps(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
 	// Stub containing all possible ConfigMap references in a pod.
 	// The names of the referenced ConfigMaps match struct paths detected by reflection.
 	pod := &v1.Pod{
@@ -372,6 +607,17 @@ func TestPodConfigmaps(t *testing.T) {
 						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
 							LocalObjectReference: v1.LocalObjectReference{
 								Name: "Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}},
+			EphemeralContainers: []v1.EphemeralContainer{{
+				EphemeralContainerCommon: v1.EphemeralContainerCommon{
+					EnvFrom: []v1.EnvFromSource{{
+						ConfigMapRef: &v1.ConfigMapEnvSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].ConfigMapRef"}}}},
+					Env: []v1.EnvVar{{
+						ValueFrom: &v1.EnvVarSource{
+							ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+								LocalObjectReference: v1.LocalObjectReference{
+									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}}},
 			InitContainers: []v1.Container{{
 				EnvFrom: []v1.EnvFromSource{{
 					ConfigMapRef: &v1.ConfigMapEnvSource{
@@ -406,6 +652,8 @@ func TestPodConfigmaps(t *testing.T) {
 	expectedPaths := sets.NewString(
 		"Spec.Containers[*].EnvFrom[*].ConfigMapRef",
 		"Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef",
+		"Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].ConfigMapRef",
+		"Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.ConfigMapKeyRef",
 		"Spec.InitContainers[*].EnvFrom[*].ConfigMapRef",
 		"Spec.InitContainers[*].Env[*].ValueFrom.ConfigMapKeyRef",
 		"Spec.Volumes[*].VolumeSource.Projected.Sources[*].ConfigMap",
@@ -429,6 +677,21 @@ func TestPodConfigmaps(t *testing.T) {
 		t.Logf("Extra names:\n%s", strings.Join(extraNames.List(), "\n"))
 		t.Error("Extra names extracted. Verify VisitPodConfigmapNames() is correctly extracting resource names")
 	}
+
+	// emptyPod is a stub containing empty object names
+	emptyPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				EnvFrom: []v1.EnvFromSource{{
+					ConfigMapRef: &v1.ConfigMapEnvSource{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: ""}}}}}},
+		},
+	}
+	VisitPodConfigmapNames(emptyPod, func(name string) bool {
+		t.Fatalf("expected no empty names collected, got %q", name)
+		return false
+	})
 }
 
 func newPod(now metav1.Time, ready bool, beforeSec int) *v1.Pod {
@@ -482,6 +745,48 @@ func TestIsPodAvailable(t *testing.T) {
 		isAvailable := IsPodAvailable(test.pod, test.minReadySeconds, now)
 		if isAvailable != test.expected {
 			t.Errorf("[tc #%d] expected available pod: %t, got: %t", i, test.expected, isAvailable)
+		}
+	}
+}
+
+func TestIsPodTerminal(t *testing.T) {
+	now := metav1.Now()
+
+	tests := []struct {
+		podPhase v1.PodPhase
+		expected bool
+	}{
+		{
+			podPhase: v1.PodFailed,
+			expected: true,
+		},
+		{
+			podPhase: v1.PodSucceeded,
+			expected: true,
+		},
+		{
+			podPhase: v1.PodUnknown,
+			expected: false,
+		},
+		{
+			podPhase: v1.PodPending,
+			expected: false,
+		},
+		{
+			podPhase: v1.PodRunning,
+			expected: false,
+		},
+		{
+			expected: false,
+		},
+	}
+
+	for i, test := range tests {
+		pod := newPod(now, true, 0)
+		pod.Status.Phase = test.podPhase
+		isTerminal := IsPodTerminal(pod)
+		if isTerminal != test.expected {
+			t.Errorf("[tc #%d] expected terminal pod: %t, got: %t", i, test.expected, isTerminal)
 		}
 	}
 }
@@ -594,9 +899,102 @@ func TestUpdatePodCondition(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		var resultStatus bool
-		resultStatus = UpdatePodCondition(test.status, &test.conditions)
+		resultStatus := UpdatePodCondition(test.status, &test.conditions)
 
 		assert.Equal(t, test.expected, resultStatus, test.desc)
+	}
+}
+
+func TestGetContainersReadyCondition(t *testing.T) {
+	time := metav1.Now()
+
+	containersReadyCondition := v1.PodCondition{
+		Type:               v1.ContainersReady,
+		Status:             v1.ConditionTrue,
+		Reason:             "successfully",
+		Message:            "sync pod successfully",
+		LastProbeTime:      time,
+		LastTransitionTime: metav1.NewTime(time.Add(1000)),
+	}
+
+	tests := []struct {
+		desc              string
+		podStatus         v1.PodStatus
+		expectedCondition *v1.PodCondition
+	}{
+		{
+			desc: "containers ready condition exists",
+			podStatus: v1.PodStatus{
+				Conditions: []v1.PodCondition{containersReadyCondition},
+			},
+			expectedCondition: &containersReadyCondition,
+		},
+		{
+			desc: "containers ready condition does not exist",
+			podStatus: v1.PodStatus{
+				Conditions: []v1.PodCondition{},
+			},
+			expectedCondition: nil,
+		},
+	}
+
+	for _, test := range tests {
+		containersReadyCondition := GetContainersReadyCondition(test.podStatus)
+		assert.Equal(t, test.expectedCondition, containersReadyCondition, test.desc)
+	}
+}
+
+func TestIsContainersReadyConditionTrue(t *testing.T) {
+	time := metav1.Now()
+
+	tests := []struct {
+		desc      string
+		podStatus v1.PodStatus
+		expected  bool
+	}{
+		{
+			desc: "containers ready condition is true",
+			podStatus: v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:               v1.ContainersReady,
+						Status:             v1.ConditionTrue,
+						Reason:             "successfully",
+						Message:            "sync pod successfully",
+						LastProbeTime:      time,
+						LastTransitionTime: metav1.NewTime(time.Add(1000)),
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			desc: "containers ready condition is false",
+			podStatus: v1.PodStatus{
+				Conditions: []v1.PodCondition{
+					{
+						Type:               v1.ContainersReady,
+						Status:             v1.ConditionFalse,
+						Reason:             "successfully",
+						Message:            "sync pod successfully",
+						LastProbeTime:      time,
+						LastTransitionTime: metav1.NewTime(time.Add(1000)),
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "containers ready condition is empty",
+			podStatus: v1.PodStatus{
+				Conditions: []v1.PodCondition{},
+			},
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		isContainersReady := IsContainersReadyConditionTrue(test.podStatus)
+		assert.Equal(t, test.expected, isContainersReady, test.desc)
 	}
 }

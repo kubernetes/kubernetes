@@ -37,7 +37,7 @@ type mutatingWebhookConfigurationStrategy struct {
 // Strategy is the default logic that applies when creating and updating mutatingWebhookConfiguration objects.
 var Strategy = mutatingWebhookConfigurationStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// NamespaceScoped returns true because all mutatingWebhookConfiguration' need to be within a namespace.
+// NamespaceScoped returns false because MutatingWebhookConfiguration is cluster-scoped resource.
 func (mutatingWebhookConfigurationStrategy) NamespaceScoped() bool {
 	return false
 }
@@ -46,6 +46,11 @@ func (mutatingWebhookConfigurationStrategy) NamespaceScoped() bool {
 func (mutatingWebhookConfigurationStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	ic := obj.(*admissionregistration.MutatingWebhookConfiguration)
 	ic.Generation = 1
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (mutatingWebhookConfigurationStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -78,9 +83,12 @@ func (mutatingWebhookConfigurationStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (mutatingWebhookConfigurationStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	validationErrorList := validation.ValidateMutatingWebhookConfiguration(obj.(*admissionregistration.MutatingWebhookConfiguration))
-	updateErrorList := validation.ValidateMutatingWebhookConfigurationUpdate(obj.(*admissionregistration.MutatingWebhookConfiguration), old.(*admissionregistration.MutatingWebhookConfiguration))
-	return append(validationErrorList, updateErrorList...)
+	return validation.ValidateMutatingWebhookConfigurationUpdate(obj.(*admissionregistration.MutatingWebhookConfiguration), old.(*admissionregistration.MutatingWebhookConfiguration))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (mutatingWebhookConfigurationStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for mutatingWebhookConfiguration objects. Status update should

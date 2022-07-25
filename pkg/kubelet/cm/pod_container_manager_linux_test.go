@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -22,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -106,13 +107,15 @@ func TestIsCgroupPod(t *testing.T) {
 			qosContainersInfo: qosContainersInfo,
 		}
 		for _, testCase := range testCases {
-			// give the right cgroup structure based on driver
-			cgroupfs := testCase.input.ToCgroupfs()
+			// Give the right cgroup structure based on whether systemd is enabled.
+			var name string
 			if cgroupDriver == "systemd" {
-				cgroupfs = testCase.input.ToSystemd()
+				name = testCase.input.ToSystemd()
+			} else {
+				name = testCase.input.ToCgroupfs()
 			}
 			// check if this is a pod or not with the literal cgroupfs input
-			result, resultUID := pcm.IsPodCgroup(cgroupfs)
+			result, resultUID := pcm.IsPodCgroup(name)
 			if result != testCase.expectedResult {
 				t.Errorf("Unexpected result for driver: %v, input: %v, expected: %v, actual: %v", cgroupDriver, testCase.input, testCase.expectedResult, result)
 			}

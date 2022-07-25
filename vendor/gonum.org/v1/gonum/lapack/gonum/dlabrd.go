@@ -25,8 +25,8 @@ import (
 //  Q = H_0 * H_1 * ... * H_{nb-1}
 //  P = G_0 * G_1 * ... * G_{nb-1}
 // where
-//  H_i = I - tauQ[i] * v_i * v_i^T
-//  G_i = I - tauP[i] * u_i * u_i^T
+//  H_i = I - tauQ[i] * v_i * v_iᵀ
+//  G_i = I - tauP[i] * u_i * u_iᵀ
 //
 // As an example, on exit the entries of A when m = 6, n = 5, and nb = 2
 //  [ 1   1  u1  u1  u1]
@@ -44,7 +44,7 @@ import (
 //
 // Dlabrd also returns the matrices X and Y which are used with U and V to
 // apply the transformation to the unreduced part of the matrix
-//  A := A - V*Y^T - X*U^T
+//  A := A - V*Yᵀ - X*Uᵀ
 // and returns the matrices X and Y which are needed to apply the
 // transformation to the unreduced part of A.
 //
@@ -53,25 +53,48 @@ import (
 //
 // Dlabrd is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlabrd(m, n, nb int, a []float64, lda int, d, e, tauQ, tauP, x []float64, ldx int, y []float64, ldy int) {
-	checkMatrix(m, n, a, lda)
-	checkMatrix(m, nb, x, ldx)
-	checkMatrix(n, nb, y, ldy)
-	if len(d) < nb {
-		panic(badD)
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case nb < 0:
+		panic(nbLT0)
+	case nb > n:
+		panic(nbGTN)
+	case nb > m:
+		panic(nbGTM)
+	case lda < max(1, n):
+		panic(badLdA)
+	case ldx < max(1, nb):
+		panic(badLdX)
+	case ldy < max(1, nb):
+		panic(badLdY)
 	}
-	if len(e) < nb {
-		panic(badE)
-	}
-	if len(tauQ) < nb {
-		panic(badTauQ)
-	}
-	if len(tauP) < nb {
-		panic(badTauP)
-	}
-	if m <= 0 || n <= 0 {
+
+	if m == 0 || n == 0 || nb == 0 {
 		return
 	}
+
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(d) < nb:
+		panic(shortD)
+	case len(e) < nb:
+		panic(shortE)
+	case len(tauQ) < nb:
+		panic(shortTauQ)
+	case len(tauP) < nb:
+		panic(shortTauP)
+	case len(x) < (m-1)*ldx+nb:
+		panic(shortX)
+	case len(y) < (n-1)*ldy+nb:
+		panic(shortY)
+	}
+
 	bi := blas64.Implementation()
+
 	if m >= n {
 		// Reduce to upper bidiagonal form.
 		for i := 0; i < nb; i++ {
