@@ -198,8 +198,8 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 		BindVerb:       "bar",
 	})
 
-	goodRemovedPlugins2 := validConfig.DeepCopy()
-	goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
+	goodInvalidPlugins := validConfig.DeepCopy()
+	goodInvalidPlugins.Profiles[0].Plugins.Score.Enabled = append(goodInvalidPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
 
 	scenarios := map[string]struct {
 		expectedToFail bool
@@ -278,9 +278,9 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 			expectedToFail: true,
 			config:         mismatchQueueSort,
 		},
-		"good-removed-plugins-2": {
+		"good-invalid-plugins": {
 			expectedToFail: false,
-			config:         goodRemovedPlugins2,
+			config:         goodInvalidPlugins,
 		},
 	}
 
@@ -472,8 +472,8 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 		BindVerb:       "bar",
 	})
 
-	goodRemovedPlugins2 := validConfig.DeepCopy()
-	goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
+	goodInvalidPlugins := validConfig.DeepCopy()
+	goodInvalidPlugins.Profiles[0].Plugins.Score.Enabled = append(goodInvalidPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
 
 	scenarios := map[string]struct {
 		expectedToFail bool
@@ -552,9 +552,9 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 			expectedToFail: true,
 			config:         mismatchQueueSort,
 		},
-		"good-removed-plugins-2": {
+		"good-invalid-plugins": {
 			expectedToFail: false,
-			config:         goodRemovedPlugins2,
+			config:         goodInvalidPlugins,
 		},
 	}
 
