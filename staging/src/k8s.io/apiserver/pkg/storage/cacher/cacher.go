@@ -377,6 +377,10 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	// Configure reflector's pager to for an appropriate pagination chunk size for fetching data from
 	// storage. The pager falls back to full list if paginated list calls fail due to an "Expired" error.
 	reflector.WatchListPageSize = storageWatchListPageSize
+	// When etcd loses leader for 3 cycles, it returns error "no leader".
+	// We don't want to terminate all watchers as recreating all watchers puts high load on api-server.
+	// In most of the cases, leader is reelected within few cycles.
+	reflector.MaxInternalErrorRetryDuration = time.Second * 30
 
 	cacher.watchCache = watchCache
 	cacher.reflector = reflector
