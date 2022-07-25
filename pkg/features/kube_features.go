@@ -215,6 +215,7 @@ const (
 	// owner: @smarterclayton
 	// alpha: v1.21
 	// beta: v1.22
+	// GA: v1.25
 	// DaemonSets allow workloads to maintain availability during update per node
 	DaemonSetUpdateSurge featuregate.Feature = "DaemonSetUpdateSurge"
 
@@ -862,7 +863,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CronJobTimeZone: {Default: false, PreRelease: featuregate.Alpha},
 
-	DaemonSetUpdateSurge: {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.22
+	DaemonSetUpdateSurge: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
 	DefaultPodTopologySpread: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 

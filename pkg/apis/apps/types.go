@@ -625,7 +625,6 @@ type RollingUpdateDaemonSet struct {
 	// daemonset on any given node can double if the readiness check fails, and
 	// so resource intensive daemonsets should take into account that they may
 	// cause evictions during disruption.
-	// This is beta field and enabled/disabled by DaemonSetUpdateSurge feature gate.
 	// +optional
 	MaxSurge intstr.IntOrString
 }
