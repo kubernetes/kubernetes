@@ -65,18 +65,6 @@ import (
 // ShutdownFunc represents the function handle to be called, typically in a defer handler, to shutdown a running module
 type ShutdownFunc func()
 
-// StartApiserver starts a local API server for testing and returns the handle to the URL and the shutdown function to stop it.
-func StartApiserver() (string, ShutdownFunc) {
-	_, s, closeFn := framework.RunAnAPIServer(framework.NewIntegrationTestControlPlaneConfig())
-
-	shutdownFunc := func() {
-		klog.Infof("destroying API server")
-		closeFn()
-		klog.Infof("destroyed API server")
-	}
-	return s.URL, shutdownFunc
-}
-
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns the running scheduler, podInformer and the shutdown function to stop it.
 func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
