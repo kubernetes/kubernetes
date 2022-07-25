@@ -112,41 +112,41 @@ func TestApplyFlagValidation(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			args: [][]string {
+			args: [][]string{
 				{"force-conflicts", "true"},
 			},
 			expectedErr: "--force-conflicts only works with --server-side",
 		},
 		{
-			args: [][]string {
+			args: [][]string{
 				{"server-side", "true"},
 				{"dry-run", "client"},
 			},
 			expectedErr: "--dry-run=client doesn't work with --server-side (did you mean --dry-run=server instead?)",
 		},
 		{
-			args: [][]string {
+			args: [][]string{
 				{"force", "true"},
 				{"server-side", "true"},
 			},
 			expectedErr: "--force cannot be used with --server-side",
 		},
 		{
-			args: [][]string {
+			args: [][]string{
 				{"force", "true"},
 				{"dry-run", "server"},
 			},
 			expectedErr: "--dry-run=server cannot be used with --force",
 		},
 		{
-			args: [][]string {
+			args: [][]string{
 				{"all", "true"},
 				{"selector", "unused"},
 			},
 			expectedErr: "cannot set --all and --selector at the same time",
 		},
 		{
-			args: [][]string {
+			args: [][]string{
 				{"force", "true"},
 				{"prune", "true"},
 				{"all", "true"},
