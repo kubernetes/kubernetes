@@ -483,6 +483,39 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+
+	// ImagePullDuration is a Histogram that tracks the duration (in seconds) it takes to pull Images.
+	ImagePullDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "image_pull_duration_seconds",
+			Help:           "Duration in seconds to pull image.",
+			Buckets:        metrics.LinearBuckets(5, 10, 30),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"image_handler", "pull_state", "image"},
+	)
+
+	// ImagePullErrors is a Counter that tracks the cumulative number of Images pull errors.
+	ImagePullErrors = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "image_pull_errors_total",
+			Help:           "Number of the image pull errors.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"image_handler"},
+	)
+
+	// ImagePullingCount is a gauge that tracks the number of Images currently pulling
+	ImagePullingCount = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "image_pulling_count",
+			Help:           "Number of images currently pulling.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -531,6 +564,9 @@ func Register(collectors ...metrics.StableCollector) {
 			legacyregistry.MustRegister(GracefulShutdownStartTime)
 			legacyregistry.MustRegister(GracefulShutdownEndTime)
 		}
+		legacyregistry.MustRegister(ImagePullDuration)
+		legacyregistry.MustRegister(ImagePullErrors)
+		legacyregistry.MustRegister(ImagePullingCount)
 
 	})
 }
