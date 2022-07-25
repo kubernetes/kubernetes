@@ -333,3 +333,12 @@ func (in instrumentedRuntimeService) CheckpointContainer(options *runtimeapi.Che
 	recordError(operation, err)
 	return err
 }
+
+func (in instrumentedRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {
+	const operation = "get_container_events"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.GetContainerEvents(containerEventsCh)
+	recordError(operation, err)
+	return err
+}

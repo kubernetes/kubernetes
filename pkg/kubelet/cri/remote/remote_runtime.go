@@ -1208,3 +1208,7 @@ func (r *remoteRuntimeService) CheckpointContainer(options *runtimeapi.Checkpoin
 
 	return nil
 }
+
+func (r *remoteRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {
+	return nil
+}

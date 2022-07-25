@@ -117,6 +117,10 @@ service RuntimeService {
 
     // CheckpointContainer checkpoints a container
     rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
+
+    // GetContainerEvents gets container events from the CRI runtime
+    rpc  GetContainerEvents(GetEventsRequest) returns (stream ContainerEventResponse) {}
+
 }
 
 // ImageService defines the public APIs for managing images.
@@ -758,7 +762,7 @@ message SELinuxOption {
 
 // Capability contains the container capabilities to add or drop
 // Dropping a capability will drop it from all sets.
-// If a capability is added to only the add_capabilities list then it gets added to permitted, 
+// If a capability is added to only the add_capabilities list then it gets added to permitted,
 // inheritable, effective and bounding sets, i.e. all sets except the ambient set.
 // If a capability is added to only the add_ambient_capabilities list then it gets added to all sets, i.e permitted
 // inheritable, effective, bounding and ambient sets.
@@ -1559,3 +1563,33 @@ message CheckpointContainerRequest {
 }
 
 message CheckpointContainerResponse {}
+
+message GetEventsRequest {}
+
+message ContainerEventResponse {
+    // ID of the container
+    string container_id = 1;
+
+    // Type of the container event
+    ContainerEventType container_event_type = 2;
+
+    // Creation timestamp of this event
+    int64 created_at = 3;
+
+    // ID of the sandbox container
+    PodSandboxMetadata pod_sandbox_metadata = 4;
+}
+
+enum ContainerEventType {
+    // Container created
+    CONTAINER_CREATED_EVENT = 0;
+
+    // Container started
+    CONTAINER_STARTED_EVENT = 1;
+
+    // Container stopped
+    CONTAINER_STOPPED_EVENT = 2;
+
+    // Container deleted
+    CONTAINER_DELETED_EVENT = 3;
+}
