@@ -239,6 +239,7 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 		"peer-client-cert-auth":              "true",
 		"snapshot-count":                     "10000",
 		"listen-metrics-urls":                fmt.Sprintf("http://%s", net.JoinHostPort(etcdLocalhostAddress, strconv.Itoa(kubeadmconstants.EtcdMetricsPort))),
+		"experimental-watch-progress-notify-interval": "5s",
 	}
 
 	if len(initialCluster) == 0 {
