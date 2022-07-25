@@ -198,6 +198,9 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 		BindVerb:       "bar",
 	})
 
+	goodInvalidPlugins := validConfig.DeepCopy()
+	goodInvalidPlugins.Profiles[0].Plugins.Score.Enabled = append(goodInvalidPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
+
 	scenarios := map[string]struct {
 		expectedToFail bool
 		config         *config.KubeSchedulerConfiguration
@@ -274,6 +277,10 @@ func TestValidateKubeSchedulerConfigurationV1beta2(t *testing.T) {
 		"mismatch-queue-sort": {
 			expectedToFail: true,
 			config:         mismatchQueueSort,
+		},
+		"good-invalid-plugins": {
+			expectedToFail: false,
+			config:         goodInvalidPlugins,
 		},
 	}
 
@@ -465,6 +472,9 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 		BindVerb:       "bar",
 	})
 
+	goodInvalidPlugins := validConfig.DeepCopy()
+	goodInvalidPlugins.Profiles[0].Plugins.Score.Enabled = append(goodInvalidPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
+
 	scenarios := map[string]struct {
 		expectedToFail bool
 		config         *config.KubeSchedulerConfiguration
@@ -541,6 +551,10 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 		"mismatch-queue-sort": {
 			expectedToFail: true,
 			config:         mismatchQueueSort,
+		},
+		"good-invalid-plugins": {
+			expectedToFail: false,
+			config:         goodInvalidPlugins,
 		},
 	}
 
