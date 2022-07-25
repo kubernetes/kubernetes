@@ -88,7 +88,8 @@ var (
 		arbitrary string values such as structured JSON. Tools and system extensions may use
 		annotations to store their own data.
 
-		Attempting to set an annotation that already exists will fail unless --overwrite is set.
+		Attempting to set an annotation that already exists will fail unless the --overwrite
+		flag is set to true.
 		If --resource-version is specified and does not match the current resource version on
 		the server the command will fail.`))
 
@@ -101,7 +102,7 @@ var (
     kubectl annotate -f pod.json description='my frontend'
 
     # Update pod 'foo' with the annotation 'description' and the value 'my frontend running nginx', overwriting any existing value
-    kubectl annotate --overwrite pods foo description='my frontend running nginx'
+    kubectl annotate --overwrite=true pods foo description='my frontend running nginx'
 
     # Update all pods in the namespace
     kubectl annotate pods --all description='my frontend running nginx'
