@@ -29,9 +29,8 @@ import (
 	"github.com/vmware/govmomi/sts"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
-	"k8s.io/klog/v2"
-
 	"k8s.io/client-go/pkg/version"
+	"k8s.io/klog/v2"
 )
 
 // VSphereConnection contains information for connecting to vCenter
@@ -220,10 +219,10 @@ func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Clie
 	client.RoundTripper = vim25.Retry(client.RoundTripper, vim25.TemporaryNetworkError(int(connection.RoundTripperCount)))
 	vcNotSupported, err := isvCenterNotSupported(client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion)
 	if err != nil {
-		klog.Errorf("failed to check if vCenter version:%v and api version: %s is supported. Error: %v", client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion, err)
+		klog.Errorf("failed to check if vCenter version:%v and api version: %s is supported or not. Error: %v", client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion, err)
 	}
 	if vcNotSupported {
-		klog.Warningf("vCenter version is not supported. version: %s, api verson: %s Please consider upgrading vCenter and ESXi servers to 7.0u2 or higher", client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion)
+		klog.Warningf("vCenter version (version: %q, api verson: %q) is not supported for CSI Migration. Please consider upgrading vCenter and ESXi servers to 7.0u2 or higher for migrating vSphere volumes to CSI.", client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion)
 	}
 	return client, nil
 }
