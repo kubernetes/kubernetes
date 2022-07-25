@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/adrg/xdg"
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -289,13 +289,13 @@ func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 
 // getDefaultCacheDir returns default caching directory path.
 // it first looks at KUBECACHEDIR env var if it is set, otherwise
-// it returns standard kube cache dir.
+// it'll return the XDG compliant cache directory depending on the platform
 func getDefaultCacheDir() string {
 	if kcd := os.Getenv("KUBECACHEDIR"); kcd != "" {
 		return kcd
 	}
 
-	return filepath.Join(homedir.HomeDir(), ".kube", "cache")
+	return filepath.Join(xdg.CacheHome, "kube")
 }
 
 // ToRESTMapper returns a mapper.
