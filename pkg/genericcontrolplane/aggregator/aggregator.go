@@ -101,22 +101,16 @@ type MiniAggregatorServer struct {
 // Complete fills in any fields not set that are required to have valid data.
 // It's mutating the receiver.
 func (cfg *MiniAggregatorConfig) Complete(kubeInformers clientgoinformers.SharedInformerFactory) CompletedMiniAggregatorConfig {
-	// make a shallow copy to let us twiddle a few things
-	// most of the config actually remains the same.
-	cfgCopy := cfg
-
 	// CRITICAL: to be able to provide our own /openapi/v2 implementation that aggregates
 	// content from multiple servers, we *must* skip OpenAPI installation. Otherwise,
 	// when PrepareRun() is invoked, it will register a handler for /openapi/v2,
 	// replacing the aggregator's handler.
-	cfgCopy.GenericConfig.SkipOpenAPIInstallation = true
-
-	c := completedMiniAggregatorConfig{
-		GenericConfig: cfgCopy.GenericConfig.Complete(kubeInformers),
-	}
+	cfg.GenericConfig.SkipOpenAPIInstallation = true
 
 	return CompletedMiniAggregatorConfig{
-		completedMiniAggregatorConfig: &c,
+		completedMiniAggregatorConfig: &completedMiniAggregatorConfig{
+			GenericConfig: cfg.GenericConfig.Complete(kubeInformers),
+		},
 	}
 }
 
