@@ -228,7 +228,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			}
 
 			if (kubeletConfig.KubeletCgroups != "" && kubeletConfig.KubeReservedCgroup != "") && (strings.Index(kubeletConfig.KubeletCgroups, kubeletConfig.KubeReservedCgroup) != 0) {
-				klog.InfoS("unsupported configuration:KubeletCgroups is not within KubeReservedCgroup")
+				klog.InfoS("Unsupported configuration:KubeletCgroups is not within KubeReservedCgroup")
 			}
 
 			// The features.DynamicKubeletConfig is locked to false,
