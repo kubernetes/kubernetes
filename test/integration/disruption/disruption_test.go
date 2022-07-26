@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/utils/clock"
 
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -94,6 +95,7 @@ func setup(t *testing.T) (*kubeapiservertesting.TestServer, *disruption.Disrupti
 		mapper,
 		scaleClient,
 		client.Discovery(),
+		clock.RealClock{},
 	)
 	return server, pdbc, informers, clientSet, apiExtensionClient, dynamicClient
 }

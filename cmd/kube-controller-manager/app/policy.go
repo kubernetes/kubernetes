@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/scale"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/disruption"
+	"k8s.io/utils/clock"
 )
 
 func startDisruptionController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
@@ -49,6 +50,7 @@ func startDisruptionController(ctx context.Context, controllerContext Controller
 		controllerContext.RESTMapper,
 		scaleClient,
 		client.Discovery(),
+		clock.RealClock{},
 	).Run(ctx)
 	return nil, true, nil
 }

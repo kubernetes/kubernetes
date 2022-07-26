@@ -50,6 +50,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -440,6 +441,7 @@ func rmSetup(t *testing.T) (kubeapiservertesting.TearDownFunc, *disruption.Disru
 		mapper,
 		scaleClient,
 		client.Discovery(),
+		clock.RealClock{},
 	)
 	return server.TearDownFn, rm, informers, config, clientSet
 }

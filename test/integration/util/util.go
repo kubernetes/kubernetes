@@ -59,6 +59,7 @@ import (
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/pointer"
 )
 
@@ -483,7 +484,8 @@ func InitDisruptionController(t *testing.T, testCtx *TestContext) *disruption.Di
 		testCtx.ClientSet,
 		mapper,
 		scaleClient,
-		testCtx.ClientSet.Discovery())
+		testCtx.ClientSet.Discovery(),
+		clock.RealClock{})
 
 	informers.Start(testCtx.Scheduler.StopEverything)
 	informers.WaitForCacheSync(testCtx.Scheduler.StopEverything)
