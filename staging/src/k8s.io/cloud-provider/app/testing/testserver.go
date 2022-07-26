@@ -33,6 +33,8 @@ import (
 	"k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
+
+	"k8s.io/klog/v2"
 )
 
 // TearDownFunc is to be called to tear down a test server.
@@ -62,10 +64,20 @@ type Logger interface {
 // 		 enough time to remove temporary files.
 func StartTestServer(t Logger, customFlags []string) (result TestServer, err error) {
 	stopCh := make(chan struct{})
+	var errCh chan error
 	configDoneCh := make(chan struct{})
 	var capturedConfig config.CompletedConfig
 	tearDown := func() {
 		close(stopCh)
+
+		// If cloud-controller-manager was started, let's wait for
+		// it to shutdown clearly.
+		if errCh != nil {
+			err, ok := <-errCh
+			if ok && err != nil {
+				klog.Errorf("Failed to shutdown test server clearly: %v", err)
+			}
+		}
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
 		}
@@ -135,13 +147,14 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		listener.Close()
 	}
 
-	errCh := make(chan error)
+	errCh = make(chan error)
 	go func() {
+		defer close(errCh)
+
 		command.SetArgs(commandArgs)
 		if err := command.Execute(); err != nil {
 			errCh <- err
 		}
-		close(errCh)
 	}()
 
 	select {
