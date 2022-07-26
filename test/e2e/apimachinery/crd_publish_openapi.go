@@ -145,8 +145,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 	/*
 		Release: v1.16
-		Testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in object
-		Description: Register a custom resource definition with x-preserve-unknown-fields in the top level object.
+		Testname: Custom Resource OpenAPI Publish, with x-kubernetes-preserve-unknown-fields in object
+		Description: Register a custom resource definition with x-kubernetes-preserve-unknown-fields in the top level object.
 		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST contain a valid DESCRIPTION stanza.
 	*/
@@ -186,8 +186,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 	/*
 		Release: v1.16
-		Testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields at root
-		Description: Register a custom resource definition with x-preserve-unknown-fields in the schema root.
+		Testname: Custom Resource OpenAPI Publish, with x-kubernetes-preserve-unknown-fields at root
+		Description: Register a custom resource definition with x-kubernetes-preserve-unknown-fields in the schema root.
 		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST show the custom resource KIND.
 	*/
@@ -227,8 +227,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 	/*
 		Release: v1.16
-		Testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in embedded object
-		Description: Register a custom resource definition with x-preserve-unknown-fields in an embedded object.
+		Testname: Custom Resource OpenAPI Publish, with x-kubernetes-preserve-unknown-fields in embedded object
+		Description: Register a custom resource definition with x-kubernetes-preserve-unknown-fields in an embedded object.
 		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST show that x-preserve-unknown-properties is used on the
 		nested field.
