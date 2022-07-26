@@ -248,6 +248,185 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 	}
 }
 
+func getRV(obj runtime.Object) (string, error) {
+	acc, err := meta.Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	return acc.GetResourceVersion(), nil
+}
+
+// TestNoSemanticUpdateAppleSameResourceVersion makes sure that APPLY requests which makes no semantic changes
+// will not change the resource version (no write to etcd is done)
+//
+// Some of the non-semantic changes are:
+// - Applying an atomic struct that removes a default
+// - Changing Quantity or other fields that are normalized
+func TestNoSemanticUpdateApplySameResourceVersion(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	ssBytes := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "StatefulSet",
+		"metadata": {
+			"name": "nginx",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"serviceName": "nginx",
+			"selector": { "matchLabels": {"app": "nginx"}},
+			"template": {
+				"metadata": {
+					"labels": {"app": "nginx"}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx",
+						"resources": {
+							"limits": {"memory": "2048Mi"}
+						}
+					}]
+				}
+			},
+			"volumeClaimTemplates": [{
+				"metadata": {"name": "nginx"},
+				"spec": {
+					"accessModes": ["ReadWriteOnce"],
+					"resources": {"requests": {"storage": "1Gi"}}
+				}
+			}]
+		}
+	}`)
+
+	obj, err := client.AppsV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("statefulsets").
+		Name("nginx").
+		Body(ssBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	rvCreated, err := getRV(obj)
+	if err != nil {
+		t.Fatalf("Failed to get RV: %v", err)
+	}
+
+	// Sleep for one second to make sure that the times of each update operation is different.
+	time.Sleep(1200 * time.Millisecond)
+
+	obj, err = client.AppsV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("statefulsets").
+		Name("nginx").
+		Body(ssBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+	rvApplied, err := getRV(obj)
+	if err != nil {
+		t.Fatalf("Failed to get RV: %v", err)
+	}
+	if rvApplied != rvCreated {
+		t.Fatal("ResourceVersion changed after apply")
+	}
+}
+
+// TestNoSemanticUpdateAppleSameResourceVersion makes sure that PUT requests which makes no semantic changes
+// will not change the resource version (no write to etcd is done)
+//
+// Some of the non-semantic changes are:
+// - Applying an atomic struct that removes a default
+// - Changing Quantity or other fields that are normalized
+func TestNoSemanticUpdatePutSameResourceVersion(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	ssBytes := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "StatefulSet",
+		"metadata": {
+			"name": "nginx",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"serviceName": "nginx",
+			"selector": { "matchLabels": {"app": "nginx"}},
+			"template": {
+				"metadata": {
+					"labels": {"app": "nginx"}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx",
+						"resources": {
+							"limits": {"memory": "2048Mi"}
+						}
+					}]
+				}
+			},
+			"volumeClaimTemplates": [{
+				"metadata": {"name": "nginx"},
+				"spec": {
+					"accessModes": ["ReadWriteOnce"],
+					"resources": { "requests": { "storage": "1Gi"}}
+				}
+			}]
+		}
+	}`)
+
+	obj, err := client.AppsV1().RESTClient().Post().
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("statefulsets").
+		Body(ssBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	rvCreated, err := getRV(obj)
+	if err != nil {
+		t.Fatalf("Failed to get RV: %v", err)
+	}
+
+	// Sleep for one second to make sure that the times of each update operation is different.
+	time.Sleep(1200 * time.Millisecond)
+
+	obj, err = client.AppsV1().RESTClient().Put().
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("statefulsets").
+		Name("nginx").
+		Body(ssBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+	rvApplied, err := getRV(obj)
+	if err != nil {
+		t.Fatalf("Failed to get RV: %v", err)
+	}
+	if rvApplied != rvCreated {
+		t.Fatal("ResourceVersion changed after similar PUT")
+	}
+}
+
 // TestCreateOnApplyFailsWithUID makes sure that PATCH requests with the apply content type
 // will not create the object if it doesn't already exist and it specifies a UID
 func TestCreateOnApplyFailsWithUID(t *testing.T) {
