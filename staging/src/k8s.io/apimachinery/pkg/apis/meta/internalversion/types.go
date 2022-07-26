@@ -66,6 +66,24 @@ type ListOptions struct {
 	// it does not recognize and will return a 410 error if the token can no longer be used because
 	// it has expired.
 	Continue string
+
+	// SendInitialEvents when set together with Watch option,
+	// begins the watch stream with synthetic "Added" events of all resources.
+	// Followed by a synthetic "Bookmark" event containing a ResourceVersion
+	// after which the server continues streaming events.
+	// This option is meant to be used with the resourceVersion parameter with the following semantics:
+	//
+	// - sendInitialEvent and RV>0 - provides the initial events and when we reach the desired RV,
+	//   the synthetic bookmark event. Note that the desired RV must be <= the current revision the server knows about.
+	//   If the desired RV is newer than the current revision the server is aware of,
+	//   The TooLargeResourceVersionError is returned.
+	//   Essentially this mode provides NotOlderThan semantics.
+	// - sendInitialEvent and RV=0 - provides the initial events and the synthetic bookmark with the current RV.
+	// - sendInitialEvent and RV="" - matches data at the most recent ResourceVersion.
+	//   The returned data is consistent, that is, served from etcd via a quorum read.
+	//   It provides the initial events, any other updates and the synthetic bookmark
+	//   event with the most recent ResourceVersion.
+	SendInitialEvents bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

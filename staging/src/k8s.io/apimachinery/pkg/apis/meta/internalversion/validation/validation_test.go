@@ -17,9 +17,10 @@ limitations under the License.
 package validation
 
 import (
+	"testing"
+
 	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
 )
 
 func TestValidateListOptions(t *testing.T) {
@@ -61,6 +62,29 @@ func TestValidateListOptions(t *testing.T) {
 				ResourceVersionMatch: "foo",
 			},
 			expectError: "resourceVersionMatch: Unsupported value: \"foo\": supported values: \"Exact\", \"NotOlderThan\", \"\"",
+		},
+		{
+			name: "watch-resourceversionmatch-forbidden",
+			opts: internalversion.ListOptions{
+				Watch:                true,
+				ResourceVersionMatch: "foo",
+			},
+			expectError: "resourceVersionMatch: Forbidden: resourceVersionMatch is forbidden for watch",
+		},
+		{
+			name: "watch-sendInitialEvents-forbidden",
+			opts: internalversion.ListOptions{
+				Watch:             true,
+				SendInitialEvents: true,
+			},
+			expectError: "sendInitialEvents: Forbidden: sendInitialEvents is forbidden for watch",
+		},
+		{
+			name: "list-sendInitialEvents-forbidden",
+			opts: internalversion.ListOptions{
+				SendInitialEvents: true,
+			},
+			expectError: "sendInitialEvents: Forbidden: sendInitialEvents is forbidden for list",
 		},
 	}
 
