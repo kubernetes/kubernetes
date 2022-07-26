@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/apis/apiserver"
@@ -214,7 +215,8 @@ func (u *udsGRPCConnector) connect(_ context.Context) (proxier, error) {
 	// we cannot use ctx just for dialing and control the connection lifetime separately.
 	// See https://github.com/kubernetes-sigs/apiserver-network-proxy/issues/357.
 	tunnelCtx := context.TODO()
-	tunnel, err := client.CreateSingleUseGrpcTunnel(tunnelCtx, udsName, dialOption, grpc.WithInsecure())
+	tunnel, err := client.CreateSingleUseGrpcTunnel(tunnelCtx, udsName, dialOption,
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}
