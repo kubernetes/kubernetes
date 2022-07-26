@@ -78,7 +78,6 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
 
 	rc := &RouteController{
@@ -98,15 +97,18 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration) {
 	defer utilruntime.HandleCrash()
 
+	// Start event processing pipeline.
+	if rc.broadcaster != nil {
+		rc.broadcaster.StartStructuredLogging(0)
+		rc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: rc.kubeClient.CoreV1().Events("")})
+		defer rc.broadcaster.Shutdown()
+	}
+
 	klog.Info("Starting route controller")
 	defer klog.Info("Shutting down route controller")
 
 	if !cache.WaitForNamedCacheSync("route", ctx.Done(), rc.nodeListerSynced) {
 		return
-	}
-
-	if rc.broadcaster != nil {
-		rc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: rc.kubeClient.CoreV1().Events("")})
 	}
 
 	// TODO: If we do just the full Resync every 5 minutes (default value)

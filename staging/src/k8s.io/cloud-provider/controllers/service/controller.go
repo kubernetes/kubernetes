@@ -110,8 +110,6 @@ func New(
 	featureGate featuregate.FeatureGate,
 ) (*Controller, error) {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartStructuredLogging(0)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
@@ -230,6 +228,11 @@ func (s *Controller) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
 	defer s.queue.ShutDown()
 
+	// Start event processing pipeline.
+	s.eventBroadcaster.StartStructuredLogging(0)
+	s.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.kubeClient.CoreV1().Events("")})
+	defer s.eventBroadcaster.Shutdown()
+
 	klog.Info("Starting service controller")
 	defer klog.Info("Shutting down service controller")
 
@@ -287,11 +290,15 @@ func (s *Controller) worker(ctx context.Context) {
 // nodeSyncLoop takes nodeSync signal and triggers nodeSync
 func (s *Controller) nodeSyncLoop(ctx context.Context, workers int) {
 	klog.V(4).Info("nodeSyncLoop Started")
-	for range s.nodeSyncCh {
-		klog.V(4).Info("nodeSync has been triggered")
-		s.nodeSyncInternal(ctx, workers)
+	for {
+		select {
+		case <-s.nodeSyncCh:
+			klog.V(4).Info("nodeSync has been triggered")
+			s.nodeSyncInternal(ctx, workers)
+		case <-ctx.Done():
+			return
+		}
 	}
-	klog.V(2).Info("s.nodeSyncCh is closed. Exiting nodeSyncLoop")
 }
 
 func (s *Controller) processNextWorkItem(ctx context.Context) bool {

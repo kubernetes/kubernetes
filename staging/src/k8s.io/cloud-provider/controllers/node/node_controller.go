@@ -93,7 +93,9 @@ var UpdateNodeSpecBackoff = wait.Backoff{
 type CloudNodeController struct {
 	nodeInformer coreinformers.NodeInformer
 	kubeClient   clientset.Interface
-	recorder     record.EventRecorder
+
+	broadcaster record.EventBroadcaster
+	recorder    record.EventRecorder
 
 	cloud cloudprovider.Interface
 
@@ -113,10 +115,6 @@ func NewCloudNodeController(
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
-	eventBroadcaster.StartStructuredLogging(0)
-
-	klog.Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	_, instancesSupported := cloud.Instances()
 	_, instancesV2Supported := cloud.InstancesV2()
@@ -127,6 +125,7 @@ func NewCloudNodeController(
 	cnc := &CloudNodeController{
 		nodeInformer:              nodeInformer,
 		kubeClient:                kubeClient,
+		broadcaster:               eventBroadcaster,
 		recorder:                  recorder,
 		cloud:                     cloud,
 		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
@@ -152,6 +151,12 @@ func NewCloudNodeController(
 func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer cnc.workqueue.ShutDown()
+
+	// Start event processing pipeline.
+	klog.Infof("Sending events to api server.")
+	cnc.broadcaster.StartStructuredLogging(0)
+	cnc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cnc.kubeClient.CoreV1().Events("")})
+	defer cnc.broadcaster.Shutdown()
 
 	// Wait for the caches to be synced before starting workers
 	klog.Info("Waiting for informer caches to sync")
