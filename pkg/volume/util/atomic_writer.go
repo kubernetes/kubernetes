@@ -42,9 +42,9 @@ const (
 //
 // Note:
 //
-// 1. AtomicWriter reserves the set of pathnames starting with `..`.
-// 2. AtomicWriter offers no concurrency guarantees and must be synchronized
-//    by the caller.
+//  1. AtomicWriter reserves the set of pathnames starting with `..`.
+//  2. AtomicWriter offers no concurrency guarantees and must be synchronized
+//     by the caller.
 //
 // The visible files in this volume are symlinks to files in the writer's data
 // directory.  Actual files are stored in a hidden timestamped directory which
@@ -89,36 +89,40 @@ const (
 //
 // The Write algorithm is:
 //
-//  1.  The payload is validated; if the payload is invalid, the function returns
-//  2.  The current timestamped directory is detected by reading the data directory
-//      symlink
-//  3.  The old version of the volume is walked to determine whether any
-//      portion of the payload was deleted and is still present on disk.
-//  4.  The data in the current timestamped directory is compared to the projected
-//      data to determine if an update is required.
-//  5.  A new timestamped dir is created
-//  6.  The payload is written to the new timestamped directory
-//  7.  A symlink to the new timestamped directory ..data_tmp is created that will
-//      become the new data directory
-//  8.  The new data directory symlink is renamed to the data directory; rename is atomic
-//  9.  Symlinks and directory for new user-visible files are created (if needed).
+//  1. The payload is validated; if the payload is invalid, the function returns
+//     2.  The current timestamped directory is detected by reading the data directory
+//     symlink
 //
-//      For example, consider the files:
-//        <target-dir>/podName
-//        <target-dir>/user/labels
-//        <target-dir>/k8s/annotations
+//  3. The old version of the volume is walked to determine whether any
+//     portion of the payload was deleted and is still present on disk.
 //
-//      The user visible files are symbolic links into the internal data directory:
-//        <target-dir>/podName         -> ..data/podName
-//        <target-dir>/usr -> ..data/usr
-//        <target-dir>/k8s -> ..data/k8s
+//  4. The data in the current timestamped directory is compared to the projected
+//     data to determine if an update is required.
+//     5.  A new timestamped dir is created
 //
-//      The data directory itself is a link to a timestamped directory with
-//      the real data:
-//        <target-dir>/..data          -> ..2016_02_01_15_04_05.12345678/
-//      NOTE(claudiub): We need to create these symlinks AFTER we've finished creating and
-//      linking everything else. On Windows, if a target does not exist, the created symlink
-//      will not work properly if the target ends up being a directory.
+//  6. The payload is written to the new timestamped directory
+//     7.  A symlink to the new timestamped directory ..data_tmp is created that will
+//     become the new data directory
+//     8.  The new data directory symlink is renamed to the data directory; rename is atomic
+//     9.  Symlinks and directory for new user-visible files are created (if needed).
+//
+//     For example, consider the files:
+//     <target-dir>/podName
+//     <target-dir>/user/labels
+//     <target-dir>/k8s/annotations
+//
+//     The user visible files are symbolic links into the internal data directory:
+//     <target-dir>/podName         -> ..data/podName
+//     <target-dir>/usr -> ..data/usr
+//     <target-dir>/k8s -> ..data/k8s
+//
+//     The data directory itself is a link to a timestamped directory with
+//     the real data:
+//     <target-dir>/..data          -> ..2016_02_01_15_04_05.12345678/
+//     NOTE(claudiub): We need to create these symlinks AFTER we've finished creating and
+//     linking everything else. On Windows, if a target does not exist, the created symlink
+//     will not work properly if the target ends up being a directory.
+//
 // 10.  Old paths are removed from the user-visible portion of the target directory
 // 11.  The previous timestamped directory is removed, if it exists
 func (w *AtomicWriter) Write(payload map[string]FileProjection) error {

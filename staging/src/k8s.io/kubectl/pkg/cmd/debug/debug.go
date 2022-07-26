@@ -403,8 +403,9 @@ func (o *DebugOptions) visitNode(ctx context.Context, node *corev1.Node) (*corev
 }
 
 // visitPod handles debugging for pod targets by (depending on options):
-//   1. Creating an ephemeral debug container in an existing pod, OR
-//   2. Making a copy of pod with certain attributes changed
+//  1. Creating an ephemeral debug container in an existing pod, OR
+//  2. Making a copy of pod with certain attributes changed
+//
 // visitPod returns a pod and debug container name for subsequent attach, if applicable.
 func (o *DebugOptions) visitPod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
 	if len(o.CopyTo) > 0 {

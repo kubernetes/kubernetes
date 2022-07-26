@@ -120,57 +120,56 @@ func newSignalInterceptingTestStep() *signalInterceptingTestStep {
 	}
 }
 
-//  This test exercises the graceful termination scenario
-//  described in the following diagram
-//    - every vertical line is an independent timeline
-//    - the leftmost vertical line represents the go routine that
-//      is executing GenericAPIServer.Run methos
-//    - (signal name) indicates that the given lifecycle signal has been fired
+//	 This test exercises the graceful termination scenario
+//	 described in the following diagram
+//	   - every vertical line is an independent timeline
+//	   - the leftmost vertical line represents the go routine that
+//	     is executing GenericAPIServer.Run methos
+//	   - (signal name) indicates that the given lifecycle signal has been fired
 //
-//                                  stopCh
-//                                    |
-//              |--------------------------------------------|
-//              |                                            |
-// 	    call PreShutdownHooks                        (ShutdownInitiated)
-//              |                                            |
-//   (PreShutdownHooksStopped)                   Sleep(ShutdownDelayDuration)
-//              |                                            |
-//              |                                 (AfterShutdownDelayDuration)
-//              |                                            |
-//              |                                            |
-//              |--------------------------------------------|
-//              |                                            |
-//              |                                 (NotAcceptingNewRequest)
-//              |                                            |
-//              |                       |-------------------------------------------------|
-//              |                       |                                                 |
-//              |             close(stopHttpServerCh)                         HandlerChainWaitGroup.Wait()
-//              |                       |                                                 |
-//              |            server.Shutdown(timeout=60s)                                 |
-//              |                       |                                                 |
-//              |              stop listener (net/http)                                   |
-//              |                       |                                                 |
-//              |          |-------------------------------------|                        |
-//              |          |                                     |                        |
-//              |          |                      (HTTPServerStoppedListening)            |
-//              |          |                                                              |
-//              |    wait up to 60s                                                       |
-//              |          |                                                  (InFlightRequestsDrained)
-//              |          |
-//              |          |
-//              |	stoppedCh is closed
-//              |
-//              |
-//    <-drainedCh.Signaled()
-//              |
-//   s.AuditBackend.Shutdown()
-//              |
-//      <-listenerStoppedCh
-//              |
-//         <-stoppedCh
-//              |
-//          return nil
-//
+//	                                 stopCh
+//	                                   |
+//	             |--------------------------------------------|
+//	             |                                            |
+//		    call PreShutdownHooks                        (ShutdownInitiated)
+//	             |                                            |
+//	  (PreShutdownHooksStopped)                   Sleep(ShutdownDelayDuration)
+//	             |                                            |
+//	             |                                 (AfterShutdownDelayDuration)
+//	             |                                            |
+//	             |                                            |
+//	             |--------------------------------------------|
+//	             |                                            |
+//	             |                                 (NotAcceptingNewRequest)
+//	             |                                            |
+//	             |                       |-------------------------------------------------|
+//	             |                       |                                                 |
+//	             |             close(stopHttpServerCh)                         HandlerChainWaitGroup.Wait()
+//	             |                       |                                                 |
+//	             |            server.Shutdown(timeout=60s)                                 |
+//	             |                       |                                                 |
+//	             |              stop listener (net/http)                                   |
+//	             |                       |                                                 |
+//	             |          |-------------------------------------|                        |
+//	             |          |                                     |                        |
+//	             |          |                      (HTTPServerStoppedListening)            |
+//	             |          |                                                              |
+//	             |    wait up to 60s                                                       |
+//	             |          |                                                  (InFlightRequestsDrained)
+//	             |          |
+//	             |          |
+//	             |	stoppedCh is closed
+//	             |
+//	             |
+//	   <-drainedCh.Signaled()
+//	             |
+//	  s.AuditBackend.Shutdown()
+//	             |
+//	     <-listenerStoppedCh
+//	             |
+//	        <-stoppedCh
+//	             |
+//	         return nil
 func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t *testing.T) {
 	fakeAudit := &fakeAudit{}
 	s := newGenericAPIServer(t, fakeAudit, false)
@@ -333,50 +332,52 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationDisabled(t
 	}
 }
 
-//  This test exercises the graceful termination scenario
-//  described in the following diagram
-//    - every vertical line is an independent timeline
-//    - the leftmost vertical line represents the go routine that
-//      is executing GenericAPIServer.Run method
-//    - (signal) indicates that the given lifecycle signal has been fired
+// This test exercises the graceful termination scenario
+// described in the following diagram
 //
-//                                  stopCh
-//                                    |
-//              |--------------------------------------------|
-//              |                                            |
-//      call PreShutdownHooks                       (ShutdownInitiated)
-//              |                                            |
-//   (PreShutdownHooksCompleted)                  Sleep(ShutdownDelayDuration)
-//              |                                            |
-//              |                                 (AfterShutdownDelayDuration)
-//              |                                            |
-//              |                                            |
-//              |--------------------------------------------|
-//              |                                            |
-//              |                               (NotAcceptingNewRequest)
-//              |                                            |
-//              |                              HandlerChainWaitGroup.Wait()
-//              |                                            |
-//              |                                (InFlightRequestsDrained)
-//              |                                            |
-//              |                                            |
-//              |------------------------------------------------------------|
-//              |                                                            |
-//      <-drainedCh.Signaled()                                     close(stopHttpServerCh)
-//              |                                                            |
+//   - every vertical line is an independent timeline
+//
+//   - the leftmost vertical line represents the go routine that
+//     is executing GenericAPIServer.Run method
+//
+//   - (signal) indicates that the given lifecycle signal has been fired
+//
+//     stopCh
+//     |
+//     |--------------------------------------------|
+//     |                                            |
+//     call PreShutdownHooks                       (ShutdownInitiated)
+//     |                                            |
+//     (PreShutdownHooksCompleted)                  Sleep(ShutdownDelayDuration)
+//     |                                            |
+//     |                                 (AfterShutdownDelayDuration)
+//     |                                            |
+//     |                                            |
+//     |--------------------------------------------|
+//     |                                            |
+//     |                               (NotAcceptingNewRequest)
+//     |                                            |
+//     |                              HandlerChainWaitGroup.Wait()
+//     |                                            |
+//     |                                (InFlightRequestsDrained)
+//     |                                            |
+//     |                                            |
+//     |------------------------------------------------------------|
+//     |                                                            |
+//     <-drainedCh.Signaled()                                     close(stopHttpServerCh)
+//     |                                                            |
 //     s.AuditBackend.Shutdown()                                 server.Shutdown(timeout=2s)
-//              |                                                            |
-//              |                                                   stop listener (net/http)
-//              |                                                            |
-//              |                                         |-------------------------------------|
-//              |                                         |                                     |
-//              |                                   wait up to 2s                 (HTTPServerStoppedListening)
+//     |                                                            |
+//     |                                                   stop listener (net/http)
+//     |                                                            |
+//     |                                         |-------------------------------------|
+//     |                                         |                                     |
+//     |                                   wait up to 2s                 (HTTPServerStoppedListening)
 //     <-listenerStoppedCh                                |
-//              |                                stoppedCh is closed
-//         <-stoppedCh
-//              |
-//          return nil
-//
+//     |                                stoppedCh is closed
+//     <-stoppedCh
+//     |
+//     return nil
 func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t *testing.T) {
 	fakeAudit := &fakeAudit{}
 	s := newGenericAPIServer(t, fakeAudit, true)

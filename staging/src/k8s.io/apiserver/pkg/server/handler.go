@@ -154,7 +154,7 @@ func (d director) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	d.nonGoRestfulMux.ServeHTTP(w, req)
 }
 
-//TODO: Unify with RecoverPanics?
+// TODO: Unify with RecoverPanics?
 func logStackOnRecover(s runtime.NegotiatedSerializer, panicReason interface{}, w http.ResponseWriter) {
 	var buffer bytes.Buffer
 	buffer.WriteString(fmt.Sprintf("recover from panic situation: - %v\r\n", panicReason))

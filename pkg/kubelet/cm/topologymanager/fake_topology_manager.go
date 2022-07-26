@@ -27,7 +27,7 @@ type fakeManager struct {
 	hint *TopologyHint
 }
 
-//NewFakeManager returns an instance of FakeManager
+// NewFakeManager returns an instance of FakeManager
 func NewFakeManager() Manager {
 	klog.InfoS("NewFakeManager")
 	return &fakeManager{}

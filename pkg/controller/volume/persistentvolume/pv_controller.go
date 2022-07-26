@@ -756,9 +756,10 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 
 // updateClaimStatus saves new claim.Status to API server.
 // Parameters:
-//  claim - claim to update
-//  phase - phase to set
-//  volume - volume which Capacity is set into claim.Status.Capacity
+//
+//	claim - claim to update
+//	phase - phase to set
+//	volume - volume which Capacity is set into claim.Status.Capacity
 func (ctrl *PersistentVolumeController) updateClaimStatus(claim *v1.PersistentVolumeClaim, phase v1.PersistentVolumeClaimPhase, volume *v1.PersistentVolume) (*v1.PersistentVolumeClaim, error) {
 	klog.V(4).Infof("updating PersistentVolumeClaim[%s] status: set phase %s", claimToClaimKey(claim), phase)
 
@@ -840,10 +841,11 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(claim *v1.PersistentVo
 // given event on the claim. It saves the status and emits the event only when
 // the status has actually changed from the version saved in API server.
 // Parameters:
-//   claim - claim to update
-//   phase - phase to set
-//   volume - volume which Capacity is set into claim.Status.Capacity
-//   eventtype, reason, message - event to send, see EventRecorder.Event()
+//
+//	claim - claim to update
+//	phase - phase to set
+//	volume - volume which Capacity is set into claim.Status.Capacity
+//	eventtype, reason, message - event to send, see EventRecorder.Event()
 func (ctrl *PersistentVolumeController) updateClaimStatusWithEvent(claim *v1.PersistentVolumeClaim, phase v1.PersistentVolumeClaimPhase, volume *v1.PersistentVolume, eventtype, reason, message string) (*v1.PersistentVolumeClaim, error) {
 	klog.V(4).Infof("updating updateClaimStatusWithEvent[%s]: set phase %s", claimToClaimKey(claim), phase)
 	if claim.Status.Phase == phase {

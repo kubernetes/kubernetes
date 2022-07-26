@@ -135,25 +135,26 @@ func NewFit(plArgs runtime.Object, h framework.Handle, fts feature.Features) (fr
 // the max in each dimension iteratively. In contrast, we sum the resource vectors for
 // regular containers since they run simultaneously.
 //
-// The resources defined for Overhead should be added to the calculated Resource request sum
+// # The resources defined for Overhead should be added to the calculated Resource request sum
 //
 // Example:
 //
 // Pod:
-//   InitContainers
-//     IC1:
-//       CPU: 2
-//       Memory: 1G
-//     IC2:
-//       CPU: 2
-//       Memory: 3G
-//   Containers
-//     C1:
-//       CPU: 2
-//       Memory: 1G
-//     C2:
-//       CPU: 1
-//       Memory: 1G
+//
+//	InitContainers
+//	  IC1:
+//	    CPU: 2
+//	    Memory: 1G
+//	  IC2:
+//	    CPU: 2
+//	    Memory: 3G
+//	Containers
+//	  C1:
+//	    CPU: 2
+//	    Memory: 1G
+//	  C2:
+//	    CPU: 1
+//	    Memory: 1G
 //
 // Result: CPU: 3, Memory: 3G
 func computePodResourceRequest(pod *v1.Pod) *preFilterState {

@@ -76,19 +76,19 @@ func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1I
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
 // The config's cluster field is used to refer to the remote service, user refers to the returned authorizer.
 //
-//     # clusters refers to the remote service.
-//     clusters:
-//     - name: name-of-remote-authz-service
-//       cluster:
-//         certificate-authority: /path/to/ca.pem      # CA for verifying the remote service.
-//         server: https://authz.example.com/authorize # URL of remote service to query. Must use 'https'.
+//	# clusters refers to the remote service.
+//	clusters:
+//	- name: name-of-remote-authz-service
+//	  cluster:
+//	    certificate-authority: /path/to/ca.pem      # CA for verifying the remote service.
+//	    server: https://authz.example.com/authorize # URL of remote service to query. Must use 'https'.
 //
-//     # users refers to the API server's webhook configuration.
-//     users:
-//     - name: name-of-api-server
-//       user:
-//         client-certificate: /path/to/cert.pem # cert for the webhook plugin to use
-//         client-key: /path/to/key.pem          # key matching the cert
+//	# users refers to the API server's webhook configuration.
+//	users:
+//	- name: name-of-api-server
+//	  user:
+//	    client-certificate: /path/to/cert.pem # cert for the webhook plugin to use
+//	    client-key: /path/to/key.pem          # key matching the cert
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // https://kubernetes.io/docs/user-guide/kubeconfig-file/.
@@ -120,45 +120,45 @@ func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, un
 // serialized api.authorization.v1beta1.SubjectAccessReview object. An example request body is
 // provided below.
 //
-//     {
-//       "apiVersion": "authorization.k8s.io/v1beta1",
-//       "kind": "SubjectAccessReview",
-//       "spec": {
-//         "resourceAttributes": {
-//           "namespace": "kittensandponies",
-//           "verb": "GET",
-//           "group": "group3",
-//           "resource": "pods"
-//         },
-//         "user": "jane",
-//         "group": [
-//           "group1",
-//           "group2"
-//         ]
-//       }
-//     }
+//	{
+//	  "apiVersion": "authorization.k8s.io/v1beta1",
+//	  "kind": "SubjectAccessReview",
+//	  "spec": {
+//	    "resourceAttributes": {
+//	      "namespace": "kittensandponies",
+//	      "verb": "GET",
+//	      "group": "group3",
+//	      "resource": "pods"
+//	    },
+//	    "user": "jane",
+//	    "group": [
+//	      "group1",
+//	      "group2"
+//	    ]
+//	  }
+//	}
 //
 // The remote service is expected to fill the SubjectAccessReviewStatus field to either allow or
 // disallow access. A permissive response would return:
 //
-//     {
-//       "apiVersion": "authorization.k8s.io/v1beta1",
-//       "kind": "SubjectAccessReview",
-//       "status": {
-//         "allowed": true
-//       }
-//     }
+//	{
+//	  "apiVersion": "authorization.k8s.io/v1beta1",
+//	  "kind": "SubjectAccessReview",
+//	  "status": {
+//	    "allowed": true
+//	  }
+//	}
 //
 // To disallow access, the remote service would return:
 //
-//     {
-//       "apiVersion": "authorization.k8s.io/v1beta1",
-//       "kind": "SubjectAccessReview",
-//       "status": {
-//         "allowed": false,
-//         "reason": "user does not have read access to the namespace"
-//       }
-//     }
+//	{
+//	  "apiVersion": "authorization.k8s.io/v1beta1",
+//	  "kind": "SubjectAccessReview",
+//	  "status": {
+//	    "allowed": false,
+//	    "reason": "user does not have read access to the namespace"
+//	  }
+//	}
 //
 // TODO(mikedanese): We should eventually support failing closed when we
 // encounter an error. We are failing open now to preserve backwards compatible
@@ -246,7 +246,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 
 }
 
-//TODO: need to finish the method to get the rules when using webhook mode
+// TODO: need to finish the method to get the rules when using webhook mode
 func (w *WebhookAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	var (
 		resourceRules    []authorizer.ResourceRuleInfo

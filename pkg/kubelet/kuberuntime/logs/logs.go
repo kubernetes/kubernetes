@@ -123,8 +123,9 @@ var parseFuncs = []parseFunc{
 }
 
 // parseCRILog parses logs in CRI log format. CRI Log format example:
-//   2016-10-06T00:17:09.669794202Z stdout P log content 1
-//   2016-10-06T00:17:09.669794203Z stderr F log content 2
+//
+//	2016-10-06T00:17:09.669794202Z stdout P log content 1
+//	2016-10-06T00:17:09.669794203Z stderr F log content 2
 func parseCRILog(log []byte, msg *logMessage) error {
 	var err error
 	// Parse timestamp
@@ -182,8 +183,9 @@ type jsonLog struct {
 
 // parseDockerJSONLog parses logs in Docker JSON log format. Docker JSON log format
 // example:
-//   {"log":"content 1","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}
-//   {"log":"content 2","stream":"stderr","time":"2016-10-20T18:39:20.57606444Z"}
+//
+//	{"log":"content 1","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}
+//	{"log":"content 2","stream":"stderr","time":"2016-10-20T18:39:20.57606444Z"}
 func parseDockerJSONLog(log []byte, msg *logMessage) error {
 	var l = &jsonLog{}
 

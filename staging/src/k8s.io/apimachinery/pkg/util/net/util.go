@@ -25,6 +25,7 @@ import (
 
 // IPNetEqual checks if the two input IPNets are representing the same subnet.
 // For example,
+//
 //	10.0.0.1/24 and 10.0.0.0/24 are the same subnet.
 //	10.0.0.1/24 and 10.0.0.0/25 are not the same subnet.
 func IPNetEqual(ipnet1, ipnet2 *net.IPNet) bool {

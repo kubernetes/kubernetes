@@ -373,7 +373,7 @@ func removeFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key
 	return err
 }
 
-//hasFinalizer returns if the given service has the specified key in its list of finalizers.
+// hasFinalizer returns if the given service has the specified key in its list of finalizers.
 func hasFinalizer(service *v1.Service, key string) bool {
 	for _, finalizer := range service.ObjectMeta.Finalizers {
 		if finalizer == key {

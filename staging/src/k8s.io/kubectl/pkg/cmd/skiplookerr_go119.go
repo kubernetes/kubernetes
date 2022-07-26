@@ -1,5 +1,8 @@
+//go:build go1.19
+// +build go1.19
+
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,9 +17,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package healthz implements basic http server health checking.
-// Usage:
-//
-//	import "k8s.io/apiserver/pkg/server/healthz"
-//	healthz.InstallHandler(mux)
-package healthz // import "k8s.io/apiserver/pkg/server/healthz"
+package cmd
+
+import (
+	"errors"
+	"os/exec"
+)
+
+func shouldSkipOnLookPathErr(err error) bool {
+	return err != nil && !errors.Is(err, exec.ErrDot)
+}

@@ -137,11 +137,12 @@ var _ = SIGDescribe("GarbageCollect [Serial][NodeFeature:GarbageCollect]", func(
 })
 
 // Tests the following:
-// 	pods are created, and all containers restart the specified number of times
-// 	while containers are running, the number of copies of a single container does not exceed maxPerPodContainer
-// 	while containers are running, the total number of containers does not exceed maxTotalContainers
-// 	while containers are running, if not constrained by maxPerPodContainer or maxTotalContainers, keep an extra copy of each container
-// 	once pods are killed, all containers are eventually cleaned up
+//
+//	pods are created, and all containers restart the specified number of times
+//	while containers are running, the number of copies of a single container does not exceed maxPerPodContainer
+//	while containers are running, the total number of containers does not exceed maxTotalContainers
+//	while containers are running, if not constrained by maxPerPodContainer or maxTotalContainers, keep an extra copy of each container
+//	once pods are killed, all containers are eventually cleaned up
 func containerGCTest(f *framework.Framework, test testRun) {
 	var runtime internalapi.RuntimeService
 	ginkgo.BeforeEach(func() {

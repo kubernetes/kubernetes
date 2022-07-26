@@ -45,7 +45,8 @@ func NewPopulatedClient() clientset.Interface {
 
 // StartManagerSync starts the manager, and waits for the informer cache to sync.
 // Returns a function to stop the manager, which should be called with a defer:
-//     defer StartManagerSync(t, m)()
+//
+//	defer StartManagerSync(t, m)()
 func StartManagerSync(m *runtimeclass.Manager) func() {
 	stopCh := make(chan struct{})
 	m.Start(stopCh)

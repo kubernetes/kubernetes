@@ -71,9 +71,10 @@ func init() {
 // function to call as the actual test. Available functions are:
 //   - testSyncClaim - calls syncClaim on the first claim in initialClaims.
 //   - testSyncClaimError - calls syncClaim on the first claim in initialClaims
-//                          and expects an error to be returned.
+//     and expects an error to be returned.
 //   - testSyncVolume - calls syncVolume on the first volume in initialVolumes.
 //   - any custom function for specialized tests.
+//
 // The test then contains list of volumes/claims that are expected at the end
 // of the test and list of generated events.
 type controllerTest struct {
@@ -602,10 +603,10 @@ var (
 )
 
 // wrapTestWithPluginCalls returns a testCall that:
-// - configures controller with a volume plugin that implements recycler,
-//   deleter and provisioner. The plugin returns provided errors when a volume
-//   is deleted, recycled or provisioned.
-// - calls given testCall
+//   - configures controller with a volume plugin that implements recycler,
+//     deleter and provisioner. The plugin returns provided errors when a volume
+//     is deleted, recycled or provisioned.
+//   - calls given testCall
 func wrapTestWithPluginCalls(expectedRecycleCalls, expectedDeleteCalls []error, expectedProvisionCalls []provisionCall, toWrap testCall) testCall {
 	return func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 		plugin := &mockVolumePlugin{
@@ -619,9 +620,9 @@ func wrapTestWithPluginCalls(expectedRecycleCalls, expectedDeleteCalls []error, 
 }
 
 // wrapTestWithReclaimCalls returns a testCall that:
-// - configures controller with recycler or deleter which will return provided
-//   errors when a volume is deleted or recycled
-// - calls given testCall
+//   - configures controller with recycler or deleter which will return provided
+//     errors when a volume is deleted or recycled
+//   - calls given testCall
 func wrapTestWithReclaimCalls(operation operationType, expectedOperationCalls []error, toWrap testCall) testCall {
 	if operation == operationDelete {
 		return wrapTestWithPluginCalls(nil, expectedOperationCalls, nil, toWrap)
@@ -631,9 +632,9 @@ func wrapTestWithReclaimCalls(operation operationType, expectedOperationCalls []
 }
 
 // wrapTestWithProvisionCalls returns a testCall that:
-// - configures controller with a provisioner which will return provided errors
-//   when a claim is provisioned
-// - calls given testCall
+//   - configures controller with a provisioner which will return provided errors
+//     when a claim is provisioned
+//   - calls given testCall
 func wrapTestWithProvisionCalls(expectedProvisionCalls []provisionCall, toWrap testCall) testCall {
 	return wrapTestWithPluginCalls(nil, nil, expectedProvisionCalls, toWrap)
 }
@@ -664,11 +665,11 @@ func wrapTestWithCSIMigrationProvisionCalls(toWrap testCall) testCall {
 }
 
 // wrapTestWithInjectedOperation returns a testCall that:
-// - starts the controller and lets it run original testCall until
-//   scheduleOperation() call. It blocks the controller there and calls the
-//   injected function to simulate that something is happening when the
-//   controller waits for the operation lock. Controller is then resumed and we
-//   check how it behaves.
+//   - starts the controller and lets it run original testCall until
+//     scheduleOperation() call. It blocks the controller there and calls the
+//     injected function to simulate that something is happening when the
+//     controller waits for the operation lock. Controller is then resumed and we
+//     check how it behaves.
 func wrapTestWithInjectedOperation(toWrap testCall, injectBeforeOperation func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor)) testCall {
 
 	return func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
@@ -716,10 +717,10 @@ func evaluateTestResults(ctrl *PersistentVolumeController, reactor *pvtesting.Vo
 
 // Test single call to syncClaim and syncVolume methods.
 // For all tests:
-// 1. Fill in the controller with initial data
-// 2. Call the tested function (syncClaim/syncVolume) via
-//    controllerTest.testCall *once*.
-// 3. Compare resulting volumes and claims with expected volumes and claims.
+//  1. Fill in the controller with initial data
+//  2. Call the tested function (syncClaim/syncVolume) via
+//     controllerTest.testCall *once*.
+//  3. Compare resulting volumes and claims with expected volumes and claims.
 func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass, pods []*v1.Pod) {
 	doit := func(t *testing.T, test controllerTest) {
 		// Initialize the controller
@@ -783,17 +784,18 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
 // volume/claims. For all tests, the test follows this pattern:
-// 0. Load the controller with initial data.
-// 1. Call controllerTest.testCall() once as in TestSync()
-// 2. For all volumes/claims changed by previous syncVolume/syncClaim calls,
-//    call appropriate syncVolume/syncClaim (simulating "volume/claim changed"
-//    events). Go to 2. if these calls change anything.
-// 3. When all changes are processed and no new changes were made, call
-//    syncVolume/syncClaim on all volumes/claims (simulating "periodic sync").
-// 4. If some changes were done by step 3., go to 2. (simulation of
-//    "volume/claim updated" events, eventually performing step 3. again)
-// 5. When 3. does not do any changes, finish the tests and compare final set
-//    of volumes/claims with expected claims/volumes and report differences.
+//  0. Load the controller with initial data.
+//  1. Call controllerTest.testCall() once as in TestSync()
+//  2. For all volumes/claims changed by previous syncVolume/syncClaim calls,
+//     call appropriate syncVolume/syncClaim (simulating "volume/claim changed"
+//     events). Go to 2. if these calls change anything.
+//  3. When all changes are processed and no new changes were made, call
+//     syncVolume/syncClaim on all volumes/claims (simulating "periodic sync").
+//  4. If some changes were done by step 3., go to 2. (simulation of
+//     "volume/claim updated" events, eventually performing step 3. again)
+//  5. When 3. does not do any changes, finish the tests and compare final set
+//     of volumes/claims with expected claims/volumes and report differences.
+//
 // Some limit of calls in enforced to prevent endless loops.
 func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass, defaultStorageClass string) {
 	run := func(t *testing.T, test controllerTest) {
