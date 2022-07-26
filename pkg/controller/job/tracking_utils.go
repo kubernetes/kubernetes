@@ -63,7 +63,7 @@ func (u *uidTrackingExpectations) getExpectedUIDs(controllerKey string) sets.Str
 		return nil
 	}
 	uids.RLock()
-	set := sets.NewString(uids.set.UnsortedList()...)
+	set := uids.set.Clone()
 	uids.RUnlock()
 	return set
 }
