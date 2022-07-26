@@ -7169,245 +7169,332 @@ func TestValidateContainers(t *testing.T) {
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: false,
 	})
-	errorCases := map[string][]core.Container{
-		"zero-length name":     {{Name: "", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-		"zero-length-image":    {{Name: "abc", Image: "", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-		"name > 63 characters": {{Name: strings.Repeat("a", 64), Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-		"name not a DNS label": {{Name: "a.b.c", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-		"name not unique": {
-			{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
-			{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+	errorCases := []struct {
+		title      string
+		containers []core.Container
+	}{
+		{
+			"zero-length name",
+			[]core.Container{{Name: "", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		},
-		"zero-length image": {{Name: "abc", Image: "", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-		"host port not unique": {
-			{Name: "abc", Image: "image", Ports: []core.ContainerPort{{ContainerPort: 80, HostPort: 80, Protocol: "TCP"}},
-				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
-			{Name: "def", Image: "image", Ports: []core.ContainerPort{{ContainerPort: 81, HostPort: 80, Protocol: "TCP"}},
-				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+		{
+			"zero-length-image",
+			[]core.Container{{Name: "abc", Image: "", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		},
-		"invalid env var name": {
-			{Name: "abc", Image: "image", Env: []core.EnvVar{{Name: "ev!1"}}, ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+		{
+			"name > 63 characters",
+			[]core.Container{{Name: strings.Repeat("a", 64), Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		},
-		"unknown volume name": {
-			{Name: "abc", Image: "image", VolumeMounts: []core.VolumeMount{{Name: "anything", MountPath: "/foo"}},
-				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+		{
+			"name not a DNS label",
+			[]core.Container{{Name: "a.b.c", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		},
-		"invalid lifecycle, no exec command.": {
-			{
-				Name:  "life-123",
-				Image: "image",
-				Lifecycle: &core.Lifecycle{
-					PreStop: &core.LifecycleHandler{
-						Exec: &core.ExecAction{},
-					},
-				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
+		{
+			"name not unique",
+			[]core.Container{
+				{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+				{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 			},
 		},
-		"invalid lifecycle, no http path.": {
-			{
-				Name:  "life-123",
-				Image: "image",
-				Lifecycle: &core.Lifecycle{
-					PreStop: &core.LifecycleHandler{
-						HTTPGet: &core.HTTPGetAction{},
-					},
-				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
+		{
+			"zero-length image",
+			[]core.Container{{Name: "abc", Image: "", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+		},
+		{
+			"host port not unique",
+			[]core.Container{
+				{Name: "abc", Image: "image", Ports: []core.ContainerPort{{ContainerPort: 80, HostPort: 80, Protocol: "TCP"}},
+					ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+				{Name: "def", Image: "image", Ports: []core.ContainerPort{{ContainerPort: 81, HostPort: 80, Protocol: "TCP"}},
+					ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 			},
 		},
-		"invalid lifecycle, no tcp socket port.": {
-			{
-				Name:  "life-123",
-				Image: "image",
-				Lifecycle: &core.Lifecycle{
-					PreStop: &core.LifecycleHandler{
-						TCPSocket: &core.TCPSocketAction{},
-					},
-				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
+		{
+			"invalid env var name",
+			[]core.Container{
+				{Name: "abc", Image: "image", Env: []core.EnvVar{{Name: "ev!1"}}, ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 			},
 		},
-		"invalid lifecycle, zero tcp socket port.": {
-			{
-				Name:  "life-123",
-				Image: "image",
-				Lifecycle: &core.Lifecycle{
-					PreStop: &core.LifecycleHandler{
-						TCPSocket: &core.TCPSocketAction{
-							Port: intstr.FromInt(0),
+		{
+			"unknown volume name",
+			[]core.Container{
+				{Name: "abc", Image: "image", VolumeMounts: []core.VolumeMount{{Name: "anything", MountPath: "/foo"}},
+					ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+			},
+		},
+		{
+			"invalid lifecycle, no exec command.",
+			[]core.Container{
+				{
+					Name:  "life-123",
+					Image: "image",
+					Lifecycle: &core.Lifecycle{
+						PreStop: &core.LifecycleHandler{
+							Exec: &core.ExecAction{},
 						},
 					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
 				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
 			},
 		},
-		"invalid lifecycle, no action.": {
-			{
-				Name:  "life-123",
-				Image: "image",
-				Lifecycle: &core.Lifecycle{
-					PreStop: &core.LifecycleHandler{},
-				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
-			},
-		},
-		"invalid readiness probe, terminationGracePeriodSeconds set.": {
-			{
-				Name:  "life-123",
-				Image: "image",
-				ReadinessProbe: &core.Probe{
-					ProbeHandler: core.ProbeHandler{
-						TCPSocket: &core.TCPSocketAction{},
+		{
+			"invalid lifecycle, no http path.",
+			[]core.Container{
+				{
+					Name:  "life-123",
+					Image: "image",
+					Lifecycle: &core.Lifecycle{
+						PreStop: &core.LifecycleHandler{
+							HTTPGet: &core.HTTPGetAction{},
+						},
 					},
-					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(10),
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
 				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
 			},
 		},
-		"invalid liveness probe, no tcp socket port.": {
-			{
-				Name:  "life-123",
-				Image: "image",
-				LivenessProbe: &core.Probe{
-					ProbeHandler: core.ProbeHandler{
-						TCPSocket: &core.TCPSocketAction{},
+		{
+			"invalid lifecycle, no tcp socket port.",
+			[]core.Container{
+				{
+					Name:  "life-123",
+					Image: "image",
+					Lifecycle: &core.Lifecycle{
+						PreStop: &core.LifecycleHandler{
+							TCPSocket: &core.TCPSocketAction{},
+						},
 					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
 				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
 			},
 		},
-		"invalid liveness probe, no action.": {
-			{
-				Name:  "life-123",
-				Image: "image",
-				LivenessProbe: &core.Probe{
-					ProbeHandler: core.ProbeHandler{},
-				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
-			},
-		},
-		"invalid message termination policy": {
-			{
-				Name:                     "life-123",
-				Image:                    "image",
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "Unknown",
-			},
-		},
-		"empty message termination policy": {
-			{
-				Name:                     "life-123",
-				Image:                    "image",
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "",
-			},
-		},
-		"privilege disabled": {
-			{Name: "abc", Image: "image", SecurityContext: fakeValidSecurityContext(true)},
-		},
-		"invalid compute resource": {
-			{
-				Name:  "abc-123",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Limits: core.ResourceList{
-						"disk": resource.MustParse("10G"),
+		{
+			"invalid lifecycle, zero tcp socket port.",
+			[]core.Container{
+				{
+					Name:  "life-123",
+					Image: "image",
+					Lifecycle: &core.Lifecycle{
+						PreStop: &core.LifecycleHandler{
+							TCPSocket: &core.TCPSocketAction{
+								Port: intstr.FromInt(0),
+							},
+						},
 					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
 				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
 			},
 		},
-		"Resource CPU invalid": {
-			{
-				Name:  "abc-123",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Limits: getResourceLimits("-10", "0"),
-				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
-			},
-		},
-		"Resource Requests CPU invalid": {
-			{
-				Name:  "abc-123",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Requests: getResourceLimits("-10", "0"),
-				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
-			},
-		},
-		"Resource Memory invalid": {
-			{
-				Name:  "abc-123",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Limits: getResourceLimits("0", "-10"),
-				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
-			},
-		},
-		"Request limit simple invalid": {
-			{
-				Name:  "abc-123",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Limits:   getResourceLimits("5", "3"),
-					Requests: getResourceLimits("6", "3"),
-				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
-			},
-		},
-		"Invalid storage limit request": {
-			{
-				Name:  "abc-123",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Limits: core.ResourceList{
-						core.ResourceName("attachable-volumes-aws-ebs"): *resource.NewQuantity(10, resource.DecimalSI),
+		{
+			"invalid lifecycle, no action.",
+			[]core.Container{
+				{
+					Name:  "life-123",
+					Image: "image",
+					Lifecycle: &core.Lifecycle{
+						PreStop: &core.LifecycleHandler{},
 					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
 				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
 			},
 		},
-		"Request limit multiple invalid": {
-			{
-				Name:  "abc-123",
-				Image: "image",
-				Resources: core.ResourceRequirements{
-					Limits:   getResourceLimits("5", "3"),
-					Requests: getResourceLimits("6", "4"),
+		{
+			"invalid readiness probe, terminationGracePeriodSeconds set.",
+			[]core.Container{
+				{
+					Name:  "life-123",
+					Image: "image",
+					ReadinessProbe: &core.Probe{
+						ProbeHandler: core.ProbeHandler{
+							TCPSocket: &core.TCPSocketAction{},
+						},
+						TerminationGracePeriodSeconds: utilpointer.Int64Ptr(10),
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
 				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
 			},
 		},
-		"Invalid env from": {
-			{
-				Name:                     "env-from-source",
-				Image:                    "image",
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
-				EnvFrom: []core.EnvFromSource{
-					{
-						ConfigMapRef: &core.ConfigMapEnvSource{
-							LocalObjectReference: core.LocalObjectReference{
-								Name: "$%^&*#",
+		{
+			"invalid liveness probe, no tcp socket port.",
+			[]core.Container{
+				{
+					Name:  "life-123",
+					Image: "image",
+					LivenessProbe: &core.Probe{
+						ProbeHandler: core.ProbeHandler{
+							TCPSocket: &core.TCPSocketAction{},
+						},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+		},
+		{
+			"invalid liveness probe, no action.",
+			[]core.Container{
+				{
+					Name:  "life-123",
+					Image: "image",
+					LivenessProbe: &core.Probe{
+						ProbeHandler: core.ProbeHandler{},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+		},
+		{
+			"invalid message termination policy",
+			[]core.Container{
+				{
+					Name:                     "life-123",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "Unknown",
+				},
+			},
+		},
+		{
+			"empty message termination policy",
+			[]core.Container{
+				{
+					Name:                     "life-123",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "",
+				},
+			},
+		},
+		{
+			"privilege disabled",
+			[]core.Container{
+				{Name: "abc", Image: "image", SecurityContext: fakeValidSecurityContext(true)},
+			},
+		},
+		{
+			"invalid compute resource",
+			[]core.Container{
+				{
+					Name:  "abc-123",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Limits: core.ResourceList{
+							"disk": resource.MustParse("10G"),
+						},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+		},
+		{
+			"Resource CPU invalid",
+			[]core.Container{
+				{
+					Name:  "abc-123",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Limits: getResourceLimits("-10", "0"),
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+		},
+		{
+			"Resource Requests CPU invalid",
+			[]core.Container{
+				{
+					Name:  "abc-123",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Requests: getResourceLimits("-10", "0"),
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+		},
+		{
+			"Resource Memory invalid",
+			[]core.Container{
+				{
+					Name:  "abc-123",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Limits: getResourceLimits("0", "-10"),
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+		},
+		{
+			"Request limit simple invalid",
+			[]core.Container{
+				{
+					Name:  "abc-123",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Limits:   getResourceLimits("5", "3"),
+						Requests: getResourceLimits("6", "3"),
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+		},
+		{
+			"Invalid storage limit request",
+			[]core.Container{
+				{
+					Name:  "abc-123",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Limits: core.ResourceList{
+							core.ResourceName("attachable-volumes-aws-ebs"): *resource.NewQuantity(10, resource.DecimalSI),
+						},
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+		},
+		{
+			"Request limit multiple invalid",
+			[]core.Container{
+				{
+					Name:  "abc-123",
+					Image: "image",
+					Resources: core.ResourceRequirements{
+						Limits:   getResourceLimits("5", "3"),
+						Requests: getResourceLimits("6", "4"),
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+		},
+		{
+			"Invalid env from",
+			[]core.Container{
+				{
+					Name:                     "env-from-source",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					EnvFrom: []core.EnvFromSource{
+						{
+							ConfigMapRef: &core.ConfigMapEnvSource{
+								LocalObjectReference: core.LocalObjectReference{
+									Name: "$%^&*#",
+								},
 							},
 						},
 					},
@@ -7415,9 +7502,9 @@ func TestValidateContainers(t *testing.T) {
 			},
 		},
 	}
-	for k, v := range errorCases {
-		if errs := validateContainers(v, false, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
+	for _, tc := range errorCases {
+		if errs := validateContainers(tc.containers, false, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+			t.Errorf("expected failure for %s", tc.title)
 		}
 	}
 }
@@ -7457,27 +7544,33 @@ func TestValidateInitContainers(t *testing.T) {
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: false,
 	})
-	errorCases := map[string][]core.Container{
-		"duplicate ports": {
-			{
-				Name:  "abc",
-				Image: "image",
-				Ports: []core.ContainerPort{
-					{
-						ContainerPort: 8080, HostPort: 8080, Protocol: "TCP",
+	errorCases := []struct {
+		title          string
+		initContainers []core.Container
+	}{
+		{
+			"duplicate ports",
+			[]core.Container{
+				{
+					Name:  "abc",
+					Image: "image",
+					Ports: []core.ContainerPort{
+						{
+							ContainerPort: 8080, HostPort: 8080, Protocol: "TCP",
+						},
+						{
+							ContainerPort: 8080, HostPort: 8080, Protocol: "TCP",
+						},
 					},
-					{
-						ContainerPort: 8080, HostPort: 8080, Protocol: "TCP",
-					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
 				},
-				ImagePullPolicy:          "IfNotPresent",
-				TerminationMessagePolicy: "File",
 			},
 		},
 	}
-	for k, v := range errorCases {
-		if errs := validateContainers(v, true, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
+	for _, tc := range errorCases {
+		if errs := validateContainers(tc.initContainers, true, volumeDevices, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+			t.Errorf("expected failure for %s", tc.title)
 		}
 	}
 }
