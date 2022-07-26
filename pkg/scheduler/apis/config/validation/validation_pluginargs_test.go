@@ -745,6 +745,15 @@ func TestValidateFitArgs(t *testing.T) {
 			args:   config.NodeResourcesFitArgs{},
 			expect: "ScoringStrategy field is required",
 		},
+		{
+			name: "ScoringStrategy: type is unsupported",
+			args: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type: "Invalid",
+				},
+			},
+			expect: `Unsupported value: "Invalid"`,
+		},
 	}
 
 	for _, test := range argsTest {
@@ -791,7 +800,7 @@ func TestValidateLeastAllocatedScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
+					Field: "scoringStrategy.resources[0].weight",
 				},
 			},
 		},
@@ -806,7 +815,7 @@ func TestValidateLeastAllocatedScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
+					Field: "scoringStrategy.resources[0].weight",
 				},
 			},
 		},
@@ -825,11 +834,11 @@ func TestValidateLeastAllocatedScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
+					Field: "scoringStrategy.resources[0].weight",
 				},
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[1].weight",
+					Field: "scoringStrategy.resources[1].weight",
 				},
 			},
 		},
@@ -886,7 +895,7 @@ func TestValidateMostAllocatedScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
+					Field: "scoringStrategy.resources[0].weight",
 				},
 			},
 		},
@@ -901,7 +910,7 @@ func TestValidateMostAllocatedScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
+					Field: "scoringStrategy.resources[0].weight",
 				},
 			},
 		},
@@ -920,11 +929,11 @@ func TestValidateMostAllocatedScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
+					Field: "scoringStrategy.resources[0].weight",
 				},
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[1].weight",
+					Field: "scoringStrategy.resources[1].weight",
 				},
 			},
 		},
@@ -965,7 +974,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeRequired,
-					Field: "shape",
+					Field: "scoringStrategy.shape",
 				},
 			},
 		},
@@ -981,7 +990,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
+					Field: "scoringStrategy.resources[0].weight",
 				},
 			},
 		},
@@ -997,7 +1006,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
+					Field: "scoringStrategy.resources[0].weight",
 				},
 			},
 		},
@@ -1017,7 +1026,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "shape[0].utilization",
+					Field: "scoringStrategy.shape[0].utilization",
 				},
 			},
 		},
@@ -1032,7 +1041,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "shape[0].utilization",
+					Field: "scoringStrategy.shape[0].utilization",
 				},
 			},
 		},
@@ -1051,7 +1060,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "shape[1].utilization",
+					Field: "scoringStrategy.shape[1].utilization",
 				},
 			},
 		},
@@ -1092,7 +1101,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "shape[2].utilization",
+					Field: "scoringStrategy.shape[2].utilization",
 				},
 			},
 		},
@@ -1107,7 +1116,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "shape[0].score",
+					Field: "scoringStrategy.shape[0].score",
 				},
 			},
 		},
@@ -1122,7 +1131,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "shape[0].score",
+					Field: "scoringStrategy.shape[0].score",
 				},
 			},
 		},
