@@ -33,7 +33,7 @@ const (
 	errBadImportedVariableAttribute = "Metric attribute was not correctly set. Please use only global consts in correctly impoprted same file"
 	errFieldNotSupported            = "Field %s is not supported"
 	errBuckets                      = "Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"
-	errObjectives                   = "Buckets should be set to map of floats to floats"
+	errObjectives                   = "Objectives should be set to map of floats to floats"
 	errDecodeUint32                 = "Should decode to uint32"
 	errDecodeInt64                  = "Should decode to int64"
 
