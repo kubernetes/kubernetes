@@ -64,39 +64,39 @@ var (
 		`) + envResources)
 
 	envExample = templates.Examples(`
-          # Update deployment 'registry' with a new environment variable
-	  kubectl set env deployment/registry STORAGE_DIR=/local
+		# Update deployment 'registry' with a new environment variable
+		kubectl set env deployment/registry STORAGE_DIR=/local
+		
+		# List the environment variables defined on a deployments 'sample-build'
+		kubectl set env deployment/sample-build --list
+		
+		# List the environment variables defined on all pods
+		kubectl set env pods --all --list
+		
+		# Output modified deployment in YAML, and does not alter the object on the server
+		kubectl set env deployment/sample-build STORAGE_DIR=/data -o yaml
+		
+		# Update all containers in all replication controllers in the project to have ENV=prod
+		kubectl set env rc --all ENV=prod
+		
+		# Import environment from a secret
+		kubectl set env --from=secret/mysecret deployment/myapp
+		
+		# Import environment from a config map with a prefix
+		kubectl set env --from=configmap/myconfigmap --prefix=MYSQL_ deployment/myapp
 
-	  # List the environment variables defined on a deployments 'sample-build'
-	  kubectl set env deployment/sample-build --list
+		# Import specific keys from a config map
+		kubectl set env --keys=my-example-key --from=configmap/myconfigmap deployment/myapp
 
-	  # List the environment variables defined on all pods
-	  kubectl set env pods --all --list
-
-	  # Output modified deployment in YAML, and does not alter the object on the server
-	  kubectl set env deployment/sample-build STORAGE_DIR=/data -o yaml
-
-	  # Update all containers in all replication controllers in the project to have ENV=prod
-	  kubectl set env rc --all ENV=prod
-
-	  # Import environment from a secret
-	  kubectl set env --from=secret/mysecret deployment/myapp
-
-	  # Import environment from a config map with a prefix
-	  kubectl set env --from=configmap/myconfigmap --prefix=MYSQL_ deployment/myapp
-
-          # Import specific keys from a config map
-          kubectl set env --keys=my-example-key --from=configmap/myconfigmap deployment/myapp
-
-	  # Remove the environment variable ENV from container 'c1' in all deployment configs
-	  kubectl set env deployments --all --containers="c1" ENV-
-
-	  # Remove the environment variable ENV from a deployment definition on disk and
-	  # update the deployment config on the server
-	  kubectl set env -f deploy.json ENV-
-
-	  # Set some of the local shell environment into a deployment config on the server
-	  env | grep RAILS_ | kubectl set env -e - deployment/registry`)
+		# Remove the environment variable ENV from container 'c1' in all deployment configs
+		kubectl set env deployments --all --containers="c1" ENV-
+		
+		# Remove the environment variable ENV from a deployment definition on disk and
+		# update the deployment config on the server
+		kubectl set env -f deploy.json ENV-
+		
+		# Set some of the local shell environment into a deployment config on the server
+		env | grep RAILS_ | kubectl set env -e - deployment/registry`)
 )
 
 // EnvOptions holds values for 'set env' command-lone options
