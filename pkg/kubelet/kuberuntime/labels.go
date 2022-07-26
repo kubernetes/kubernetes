@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -40,6 +41,8 @@ const (
 	containerPortsLabel                    = "io.kubernetes.container.ports"
 	containerNetworkIOIngress              = "intel.com/network-ingress"
 	containerNetworkIOEgress               = "intel.com/network-egress"
+	podNetworkIOIngress                    = "kubernetes.io/ingress-bandwidth"
+	podNetworkIOEgress                     = "kubernetes.io/egress-bandwidth"
 )
 
 type labeledPodSandboxInfo struct {
@@ -91,7 +94,25 @@ func newPodLabels(pod *v1.Pod) map[string]string {
 
 // newPodAnnotations creates pod annotations from v1.Pod.
 func newPodAnnotations(pod *v1.Pod) map[string]string {
-	return pod.Annotations
+	_, defineIngress := pod.Annotations[containerNetworkIOIngress]
+	_, defineEgress := pod.Annotations[containerNetworkIOEgress]
+	if defineEgress || defineIngress {
+		return pod.Annotations
+	}
+	annotations := pod.Annotations
+	var ingress resource.Quantity
+	var egress resource.Quantity
+	for _, c := range pod.Spec.Containers {
+		if val, ok := c.Resources.Limits[containerNetworkIOIngress]; ok {
+			ingress.Add(val)
+		}
+		if val, ok := c.Resources.Limits[containerNetworkIOEgress]; ok {
+			egress.Add(val)
+		}
+	}
+	annotations[podNetworkIOIngress] = ingress.String()
+	annotations[podNetworkIOEgress] = egress.String()
+	return annotations
 }
 
 // newContainerLabels creates container labels from v1.Container and v1.Pod.
