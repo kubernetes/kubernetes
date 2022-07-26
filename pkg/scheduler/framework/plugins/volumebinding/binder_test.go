@@ -1025,7 +1025,11 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 	} {
 		t.Run(description, func(t *testing.T) {
 			for name, scenario := range scenarios {
-				t.Run(name, func(t *testing.T) { run(t, scenario, csiDriver) })
+				scenario := scenario
+				t.Run(name, func(t *testing.T) {
+					t.Parallel()
+					run(t, scenario, csiDriver)
+				})
 			}
 		})
 	}
