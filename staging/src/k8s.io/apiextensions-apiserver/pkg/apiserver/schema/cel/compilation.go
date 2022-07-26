@@ -141,7 +141,7 @@ func Compile(s *schema.Structural, declType *celmodel.DeclType, perCallLimit uin
 	estimator := newCostEstimator(root)
 	// compResults is the return value which saves a list of compilation results in the same order as x-kubernetes-validations rules.
 	compResults := make([]CompilationResult, len(celRules))
-	maxCardinality := celmodel.MaxCardinality(s)
+	maxCardinality := celmodel.MaxCardinality(root.MinSerializedSize)
 	for i, rule := range celRules {
 		compResults[i] = compileRule(rule, env, perCallLimit, estimator, maxCardinality)
 	}

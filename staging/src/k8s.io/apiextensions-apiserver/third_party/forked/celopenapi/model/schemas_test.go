@@ -510,3 +510,32 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 func maxPtr(max int64) *int64 {
 	return &max
 }
+
+func genNestedSchema(depth int) *schema.Structural {
+	var generator func(d int) schema.Structural
+	generator = func(d int) schema.Structural {
+		nodeTemplate := schema.Structural{
+			Generic: schema.Generic{
+				Type:                 "object",
+				AdditionalProperties: &schema.StructuralOrBool{},
+			},
+		}
+		if d == 1 {
+			return nodeTemplate
+		} else {
+			mapType := generator(d - 1)
+			nodeTemplate.Generic.AdditionalProperties.Structural = &mapType
+			return nodeTemplate
+		}
+	}
+	schema := generator(depth)
+	return &schema
+}
+
+func BenchmarkDeeplyNestedSchemaDeclType(b *testing.B) {
+	benchmarkSchema := genNestedSchema(10)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		SchemaDeclType(benchmarkSchema, false)
+	}
+}
