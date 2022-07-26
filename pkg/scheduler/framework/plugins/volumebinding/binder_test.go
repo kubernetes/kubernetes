@@ -177,7 +177,7 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}) *testEnv {
 		informerFactory.Core().V1().PersistentVolumes(),
 		classInformer,
 		capacityCheck,
-		10*time.Second)
+		5*time.Second)
 
 	// Wait for informers cache sync
 	informerFactory.Start(stopCh)
@@ -1905,7 +1905,7 @@ func TestBindPodVolumes(t *testing.T) {
 		apiPV  *v1.PersistentVolume
 		apiPVC *v1.PersistentVolumeClaim
 
-		// This function runs with a delay of 5 seconds
+		// This function runs with a delay of 3 seconds
 		delayFunc func(t *testing.T, ctx context.Context, testEnv *testEnv, pod *v1.Pod, pvs []*v1.PersistentVolume, pvcs []*v1.PersistentVolumeClaim)
 
 		// Expected return values
@@ -2073,7 +2073,7 @@ func TestBindPodVolumes(t *testing.T) {
 
 		if scenario.delayFunc != nil {
 			go func(scenario scenarioType) {
-				time.Sleep(5 * time.Second)
+				time.Sleep(3 * time.Second)
 				// Sleep a while to run after bindAPIUpdate in BindPodVolumes
 				klog.V(5).InfoS("Running delay function")
 				scenario.delayFunc(t, ctx, testEnv, pod, scenario.initPVs, scenario.initPVCs)
