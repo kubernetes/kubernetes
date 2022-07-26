@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	discoveryv1 "k8s.io/apiserver/pkg/endpoints/discovery/v1"
 	"k8s.io/apiserver/pkg/endpoints/filterlatency"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
@@ -117,9 +118,11 @@ type Config struct {
 	// FlowControl, if not nil, gives priority and fairness to request handling
 	FlowControl utilflowcontrol.Interface
 
-	EnableIndex     bool
-	EnableProfiling bool
-	EnableDiscovery bool
+	EnableIndex       bool
+	EnableProfiling   bool
+	EnableDiscovery   bool
+	EnableDiscoveryV1 bool
+
 	// Requires generic profiling enabled
 	EnableContentionProfiling bool
 	EnableMetrics             bool
@@ -338,6 +341,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		LivezChecks:                 append([]healthz.HealthChecker{}, defaultHealthChecks...),
 		EnableIndex:                 true,
 		EnableDiscovery:             true,
+		EnableDiscoveryV1:           true,
 		EnableProfiling:             true,
 		EnableMetrics:               true,
 		MaxRequestsInFlight:         400,
@@ -646,7 +650,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		readyzChecks:     c.ReadyzChecks,
 		livezGracePeriod: c.LivezGracePeriod,
 
-		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
+		DiscoveryGroupManager:    discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
+		DiscoveryResourceManager: discoveryv1.NewResourceManager(c.Serializer),
 
 		maxRequestBodyBytes: c.MaxRequestBodyBytes,
 		livezClock:          clock.RealClock{},
@@ -893,6 +898,9 @@ func installAPI(s *GenericAPIServer, c *Config) {
 
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
+	}
+	if c.EnableDiscoveryV1 {
+		s.Handler.GoRestfulContainer.Add(s.DiscoveryResourceManager.WebService())
 	}
 	if c.FlowControl != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
 		c.FlowControl.Install(s.Handler.NonGoRestfulMux)

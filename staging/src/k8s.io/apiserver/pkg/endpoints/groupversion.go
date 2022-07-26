@@ -105,7 +105,7 @@ type APIGroupVersion struct {
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash.
-func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]*storageversion.ResourceInfo, error) {
+func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]metav1.APIResource, []*storageversion.ResourceInfo, error) {
 	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
 		group:             g,
@@ -117,7 +117,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) ([]*storagev
 	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources})
 	versionDiscoveryHandler.AddToWebService(ws)
 	container.Add(ws)
-	return removeNonPersistedResources(resourceInfos), utilerrors.NewAggregate(registrationErrors)
+	return apiResources, removeNonPersistedResources(resourceInfos), utilerrors.NewAggregate(registrationErrors)
 }
 
 func removeNonPersistedResources(infos []*storageversion.ResourceInfo) []*storageversion.ResourceInfo {

@@ -9,6 +9,11 @@ API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,APIVe
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,ApplyOptions,DryRun
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,CreateOptions,DryRun
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,DeleteOptions,DryRun
+API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,DiscoveryAPIGroup,Versions
+API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,DiscoveryAPIGroupList,Groups
+API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,DiscoveryAPIResource,Categories
+API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,DiscoveryAPIResource,ShortNames
+API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,DiscoveryGroupVersion,APIResources
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,FieldsV1,Raw
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,LabelSelector,MatchExpressions
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/apis/meta/v1,LabelSelectorRequirement,Values
@@ -27,6 +32,7 @@ API rule violation: list_type_missing,k8s.io/apimachinery/pkg/runtime,RawExtensi
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/runtime,Unknown,Raw
 API rule violation: list_type_missing,k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1,Fischer,DisallowedFlunders
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,APIResourceList,APIResources
+API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,DiscoveryGroupVersion,APIResources
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Duration,Duration
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Object
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Type

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	discoveryv1 "k8s.io/apiserver/pkg/endpoints/discovery/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
@@ -41,8 +42,9 @@ import (
 )
 
 type DiscoveryController struct {
-	versionHandler *versionDiscoveryHandler
-	groupHandler   *groupDiscoveryHandler
+	versionHandler  *versionDiscoveryHandler
+	groupHandler    *groupDiscoveryHandler
+	resourceManager discoveryv1.ResourceManager
 
 	crdLister  listers.CustomResourceDefinitionLister
 	crdsSynced cache.InformerSynced
@@ -53,12 +55,18 @@ type DiscoveryController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-func NewDiscoveryController(crdInformer informers.CustomResourceDefinitionInformer, versionHandler *versionDiscoveryHandler, groupHandler *groupDiscoveryHandler) *DiscoveryController {
+func NewDiscoveryController(
+	crdInformer informers.CustomResourceDefinitionInformer,
+	versionHandler *versionDiscoveryHandler,
+	groupHandler *groupDiscoveryHandler,
+	resourceManager discoveryv1.ResourceManager,
+) *DiscoveryController {
 	c := &DiscoveryController{
-		versionHandler: versionHandler,
-		groupHandler:   groupHandler,
-		crdLister:      crdInformer.Lister(),
-		crdsSynced:     crdInformer.Informer().HasSynced,
+		versionHandler:  versionHandler,
+		groupHandler:    groupHandler,
+		resourceManager: resourceManager,
+		crdLister:       crdInformer.Lister(),
+		crdsSynced:      crdInformer.Informer().HasSynced,
 
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DiscoveryController"),
 	}
@@ -170,6 +178,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	if !foundGroup {
 		c.groupHandler.unsetDiscovery(version.Group)
 		c.versionHandler.unsetDiscovery(version)
+		c.resourceManager.RemoveGroup(version.Group)
 		return nil
 	}
 
@@ -186,12 +195,20 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 
 	if !foundVersion {
 		c.versionHandler.unsetDiscovery(version)
+		c.resourceManager.RemoveGroupVersion(metav1.GroupVersion{
+			Group:   version.Group,
+			Version: version.Version,
+		})
 		return nil
 	}
 	c.versionHandler.setDiscovery(version, discovery.NewAPIVersionHandler(Codecs, version, discovery.APIResourceListerFunc(func() []metav1.APIResource {
 		return apiResourcesForDiscovery
 	})))
 
+	c.resourceManager.AddGroupVersion(version.Group, metav1.DiscoveryGroupVersion{
+		Version:      version.Version,
+		APIResources: discoveryv1.APIResourcesToDiscoveryAPIResources(apiResourcesForDiscovery),
+	})
 	return nil
 }
 
