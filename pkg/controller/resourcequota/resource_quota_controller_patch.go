@@ -17,22 +17,25 @@ limitations under the License.
 package resourcequota
 
 import (
+	"context"
 	"fmt"
 	"reflect"
-	"time"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 )
 
-func (rq *Controller) Sync(discoveryFunc NamespacedResourcesFunc, period time.Duration, stopCh <-chan struct{}) {
+// UpdateMonitors determines if there are any newly available or removed API resources, and if so, starts/stops monitors
+// for them. This is similar to Sync, but instead of polling discovery every 30 seconds, this method is invoked by kcp
+// whenever the set of APIs is known to change (CRDs added or removed).
+func (rq *Controller) UpdateMonitors(ctx context.Context, discoveryFunc NamespacedResourcesFunc) {
 	// Something has changed, so track the new state and perform a sync.
 	oldResources := make(map[schema.GroupVersionResource]struct{})
-	wait.Until(func() {
+	func() {
 		// Get the current resource list from discovery.
 		newResources, err := GetQuotableResources(discoveryFunc)
 		if err != nil {
@@ -74,7 +77,7 @@ func (rq *Controller) Sync(discoveryFunc NamespacedResourcesFunc, period time.Du
 		// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
 		// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
 		// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
-		if rq.quotaMonitor != nil && !cache.WaitForNamedCacheSync(fmt.Sprintf("%q resource quota", rq.clusterName), waitForStopOrTimeout(stopCh, period), rq.quotaMonitor.IsSynced) {
+		if rq.quotaMonitor != nil && !cache.WaitForNamedCacheSync(fmt.Sprintf("%q resource quota", rq.clusterName), ctx.Done(), rq.quotaMonitor.IsSynced) {
 			utilruntime.HandleError(fmt.Errorf("%s: timed out waiting for quota monitor sync", rq.clusterName))
 			return
 		}
@@ -82,5 +85,18 @@ func (rq *Controller) Sync(discoveryFunc NamespacedResourcesFunc, period time.Du
 		// success, remember newly synced resources
 		oldResources = newResources
 		klog.V(2).Infof("%s: synced quota controller", rq.clusterName)
-	}, period, stopCh)
+	}()
+
+	// List all the quotas (this is scoped to the workspace)
+	quotas, err := rq.rqLister.List(labels.Everything())
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("%s: error listing all resourcequotas: %v", rq.clusterName, err))
+	}
+
+	// Requeue all quotas in the workspace
+	for i := range quotas {
+		quota := quotas[i]
+		klog.V(2).Infof("%s: enqueuing resourcequota %s/%s because the list of available APIs changed", rq.clusterName, quota.Namespace, quota.Name)
+		rq.addQuota(quota)
+	}
 }
