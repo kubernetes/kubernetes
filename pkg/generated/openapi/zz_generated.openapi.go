@@ -44769,6 +44769,14 @@ func schema_pkg_apis_meta_v1_DiscoveryAPIGroup(ref common.ReferenceCallback) com
 						},
 					},
 					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"version",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "versions are the versions supported in this group. This will be sorted in descending order based on the preferred version",
 							Type:        []string{"array"},
@@ -44813,6 +44821,14 @@ func schema_pkg_apis_meta_v1_DiscoveryAPIGroupList(ref common.ReferenceCallback)
 						},
 					},
 					"groups": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "groups is a list of APIGroup.",
 							Type:        []string{"array"},
