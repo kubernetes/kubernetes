@@ -350,7 +350,7 @@ type indexOnce struct {
 
 func (io *indexOnce) getGauge() RatioedGauge {
 	io.once.Do(func() {
-		io.gauge = readWriteConcurrencyGaugeVec.NewForLabelValuesSafe(0, 1, io.labelValues)
+		io.gauge = readWriteConcurrencyGaugeVec.NewForLabelValuesEfficient(0, 1, io.labelValues)
 	})
 	return io.gauge
 }

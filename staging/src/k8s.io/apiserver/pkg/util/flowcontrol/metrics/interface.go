@@ -46,6 +46,14 @@ type RatioedGaugeVec interface {
 	// The "Safe" part is saying that the returned object will function properly after metric registration
 	// even if this method is called before registration.
 	NewForLabelValuesSafe(initialNumerator, initialDenominator float64, labelValues []string) RatioedGauge
+	// NewForLabelValuesEfficient makes a new vector member for the given tuple of label values,
+	// initialized with the given numerator and denominator.
+	// Unlike the usual Vec WithLabelValues method, this is intended to be called only
+	// once per vector member (at the start of its lifecycle).
+	// The "Efficient" part is saying that either (a) this was called after metric registration and
+	// the returned object does not repeatedly index into the underlying object, or
+	// (b) this was called before metric registration and panics.
+	NewForLabelValuesEfficient(initialNumerator, initialDenominator float64, labelValues []string) RatioedGauge
 }
 
 //////////////////////////////// Pairs ////////////////////////////////

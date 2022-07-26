@@ -210,6 +210,20 @@ func (v *TimingRatioHistogramVec) NewForLabelValuesSafe(initialNumerator, initia
 	}
 }
 
+func (v *TimingRatioHistogramVec) NewForLabelValuesEfficient(initialNumerator, initialDenominator float64, labelValues []string) RatioedGauge {
+	tro, err := v.NewForLabelValuesChecked(initialNumerator, initialDenominator, labelValues)
+	if err == nil {
+		klog.V(3).InfoS("TimingRatioHistogramVec.NewForLabelValuesEfficient hit the efficient case", "fqName", v.FQName(), "labelValues", labelValues)
+		return tro
+	}
+	if !compbasemetrics.ErrIsNotRegistered(err) {
+		klog.ErrorS(err, "Failed to extract TimingRatioHistogramVec member, using noop instead", "vectorname", v.FQName(), "labelValues", labelValues)
+		return tro
+	}
+	klog.ErrorS(nil, "TimingRatioHistogramVec.NewForLabelValuesEfficient hit the inefficient case", "fqName", v.FQName(), "labelValues", labelValues)
+	panic(v.FQName())
+}
+
 type noopRatioed struct{}
 
 func (noopRatioed) Set(float64)            {}
