@@ -139,6 +139,7 @@ type disruptionController struct {
 	coreClient      *fake.Clientset
 	scaleClient     *scalefake.FakeScaleClient
 	discoveryClient *discoveryfake.FakeDiscovery
+	informerFactory informers.SharedInformerFactory
 }
 
 var customGVK = schema.GroupVersionKind{
@@ -148,6 +149,10 @@ var customGVK = schema.GroupVersionKind{
 }
 
 func newFakeDisruptionController() (*disruptionController, *pdbStates) {
+	return newFakeDisruptionControllerWithTime(context.TODO(), time.Now())
+}
+
+func newFakeDisruptionControllerWithTime(ctx context.Context, now time.Time) (*disruptionController, *pdbStates) {
 	ps := &pdbStates{}
 
 	coreClient := fake.NewSimpleClientset()
@@ -159,7 +164,7 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 	fakeDiscovery := &discoveryfake.FakeDiscovery{
 		Fake: &core.Fake{},
 	}
-	fakeClock := clocktesting.NewFakeClock(time.Now())
+	fakeClock := clocktesting.NewFakeClock(now)
 
 	dc := NewDisruptionControllerInternal(
 		informerFactory.Core().V1().Pods(),
@@ -173,6 +178,7 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 		fakeScaleClient,
 		fakeDiscovery,
 		fakeClock,
+		stalePodDisruptionTimeout,
 	)
 	dc.getUpdater = func() updater { return ps.Set }
 	dc.podListerSynced = alwaysReady
@@ -181,9 +187,8 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 	dc.rsListerSynced = alwaysReady
 	dc.dListerSynced = alwaysReady
 	dc.ssListerSynced = alwaysReady
-	ctx := context.TODO()
 	informerFactory.Start(ctx.Done())
-	informerFactory.WaitForCacheSync(nil)
+	informerFactory.WaitForCacheSync(ctx.Done())
 
 	return &disruptionController{
 		dc,
@@ -196,6 +201,7 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 		coreClient,
 		fakeScaleClient,
 		fakeDiscovery,
+		informerFactory,
 	}, ps
 }
 
@@ -1377,6 +1383,151 @@ func TestInvalidSelectors(t *testing.T) {
 			add(t, dc.pdbStore, pdb)
 			dc.sync(ctx, pdbName)
 			ps.VerifyPdbStatus(t, pdbName, 0, 0, 0, 0, map[string]metav1.Time{})
+		})
+	}
+}
+
+func TestStalePodDisruption(t *testing.T) {
+	now := time.Now()
+	cases := map[string]struct {
+		pod            *v1.Pod
+		timePassed     time.Duration
+		wantConditions []v1.PodCondition
+	}{
+		"stale pod disruption": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Status:             v1.ConditionTrue,
+							LastTransitionTime: metav1.Time{Time: now},
+						},
+					},
+				},
+			},
+			timePassed: 2*time.Minute + time.Second,
+			wantConditions: []v1.PodCondition{
+				{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionFalse,
+				},
+			},
+		},
+		"pod disruption in progress": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: metav1.NamespaceDefault,
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Status:             v1.ConditionTrue,
+							LastTransitionTime: metav1.Time{Time: now},
+						},
+					},
+				},
+			},
+			timePassed: 2*time.Minute - time.Second,
+			wantConditions: []v1.PodCondition{
+				{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+		"pod disruption actuated": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         metav1.NamespaceDefault,
+					DeletionTimestamp: &metav1.Time{Time: now},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:               v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Status:             v1.ConditionTrue,
+							LastTransitionTime: metav1.Time{Time: now},
+						},
+					},
+				},
+			},
+			timePassed: 2*time.Minute + time.Second,
+			wantConditions: []v1.PodCondition{
+				{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+		"no pod disruption": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         metav1.NamespaceDefault,
+					DeletionTimestamp: &metav1.Time{Time: now},
+				},
+			},
+			timePassed: 2*time.Minute + time.Second,
+		},
+		"pod disruption cleared": {
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "foo",
+					Namespace:         metav1.NamespaceDefault,
+					DeletionTimestamp: &metav1.Time{Time: now},
+				},
+				Status: v1.PodStatus{
+					Conditions: []v1.PodCondition{
+						{
+							Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							Status: v1.ConditionFalse,
+						},
+					},
+				},
+			},
+			timePassed: 2*time.Minute + time.Second,
+			wantConditions: []v1.PodCondition{
+				{
+					Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status: v1.ConditionFalse,
+				},
+			},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			dc, _ := newFakeDisruptionControllerWithTime(ctx, now)
+			go dc.Run(ctx)
+			if _, err := dc.coreClient.CoreV1().Pods(tc.pod.Namespace).Create(ctx, tc.pod, metav1.CreateOptions{}); err != nil {
+				t.Fatalf("Failed to create pod: %v", err)
+			}
+			if err := dc.informerFactory.Core().V1().Pods().Informer().GetIndexer().Add(tc.pod); err != nil {
+				t.Fatalf("Failed adding pod to indexer: %v", err)
+			}
+			dc.clock.Sleep(tc.timePassed)
+			if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+				return dc.stalePodDisruptionQueue.Len() == 0, nil
+			}); err != nil {
+				t.Fatalf("Failed waiting for worker to sync: %v", err)
+			}
+			pod, err := dc.kubeClient.CoreV1().Pods(tc.pod.Namespace).Get(ctx, tc.pod.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed getting updated pod: %v", err)
+			}
+			diff := cmp.Diff(tc.wantConditions, pod.Status.Conditions, cmpopts.IgnoreFields(v1.PodCondition{}, "LastTransitionTime"))
+			if diff != "" {
+				t.Errorf("Obtained pod conditions (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }
