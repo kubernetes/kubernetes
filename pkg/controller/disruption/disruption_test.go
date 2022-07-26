@@ -27,11 +27,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	apps "k8s.io/api/apps/v1"
 	autoscalingapi "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
@@ -52,6 +53,7 @@ import (
 	"k8s.io/klog/v2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
+	clocktesting "k8s.io/utils/clock/testing"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -72,8 +74,8 @@ func (ps *pdbStates) Get(key string) policy.PodDisruptionBudget {
 	return (*ps)[key]
 }
 
-func (ps *pdbStates) VerifyPdbStatus(t *testing.T, key string, disruptionsAllowed, currentHealthy, desiredHealthy, expectedPods int32,
-	disruptedPodMap map[string]metav1.Time) {
+func (ps *pdbStates) VerifyPdbStatus(t *testing.T, key string, disruptionsAllowed, currentHealthy, desiredHealthy, expectedPods int32, disruptedPodMap map[string]metav1.Time) {
+	t.Helper()
 	actualPDB := ps.Get(key)
 	actualConditions := actualPDB.Status.Conditions
 	actualPDB.Status.Conditions = nil
@@ -86,9 +88,8 @@ func (ps *pdbStates) VerifyPdbStatus(t *testing.T, key string, disruptionsAllowe
 		ObservedGeneration: actualPDB.Generation,
 	}
 	actualStatus := actualPDB.Status
-	if !apiequality.Semantic.DeepEqual(actualStatus, expectedStatus) {
-		debug.PrintStack()
-		t.Fatalf("PDB %q status mismatch.  Expected %+v but got %+v.", key, expectedStatus, actualStatus)
+	if diff := cmp.Diff(expectedStatus, actualStatus, cmpopts.EquateEmpty()); diff != "" {
+		t.Fatalf("PDB %q status mismatch (-want,+got):\n%s", key, diff)
 	}
 
 	cond := apimeta.FindStatusCondition(actualConditions, policy.DisruptionAllowedCondition)
@@ -158,8 +159,9 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 	fakeDiscovery := &discoveryfake.FakeDiscovery{
 		Fake: &core.Fake{},
 	}
+	fakeClock := clocktesting.NewFakeClock(time.Now())
 
-	dc := NewDisruptionController(
+	dc := NewDisruptionControllerInternal(
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Policy().V1().PodDisruptionBudgets(),
 		informerFactory.Core().V1().ReplicationControllers(),
@@ -170,6 +172,7 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 		testrestmapper.TestOnlyStaticRESTMapper(scheme),
 		fakeScaleClient,
 		fakeDiscovery,
+		fakeClock,
 	)
 	dc.getUpdater = func() updater { return ps.Set }
 	dc.podListerSynced = alwaysReady
@@ -990,17 +993,17 @@ func TestUpdateDisruptedPods(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 	dc.recheckQueue = workqueue.NewNamedDelayingQueue("pdb_queue")
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
-	currentTime := time.Now()
+	currentTime := dc.clock.Now()
 	pdb.Status.DisruptedPods = map[string]metav1.Time{
 		"p1":       {Time: currentTime},                       // Should be removed, pod deletion started.
-		"p2":       {Time: currentTime.Add(-5 * time.Minute)}, // Should be removed, expired.
-		"p3":       {Time: currentTime},                       // Should remain, pod untouched.
+		"p2":       {Time: currentTime.Add(-3 * time.Minute)}, // Should be removed, expired.
+		"p3":       {Time: currentTime.Add(-time.Minute)},     // Should remain, pod untouched.
 		"notthere": {Time: currentTime},                       // Should be removed, pod deleted.
 	}
 	add(t, dc.pdbStore, pdb)
 
 	pod1, _ := newPod(t, "p1")
-	pod1.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	pod1.DeletionTimestamp = &metav1.Time{Time: dc.clock.Now()}
 	pod2, _ := newPod(t, "p2")
 	pod3, _ := newPod(t, "p3")
 
@@ -1010,7 +1013,7 @@ func TestUpdateDisruptedPods(t *testing.T) {
 
 	dc.sync(context.TODO(), pdbName)
 
-	ps.VerifyPdbStatus(t, pdbName, 0, 1, 1, 3, map[string]metav1.Time{"p3": {Time: currentTime}})
+	ps.VerifyPdbStatus(t, pdbName, 0, 1, 1, 3, map[string]metav1.Time{"p3": {Time: currentTime.Add(-time.Minute)}})
 }
 
 func TestBasicFinderFunctions(t *testing.T) {
@@ -1284,7 +1287,7 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 		updatedPDB.Status.DisruptionsAllowed -= int32(len(podNames))
 		updatedPDB.Status.DisruptedPods = make(map[string]metav1.Time)
 		for _, name := range podNames {
-			updatedPDB.Status.DisruptedPods[name] = metav1.NewTime(time.Now())
+			updatedPDB.Status.DisruptedPods[name] = metav1.NewTime(dc.clock.Now())
 		}
 		if err := dc.coreClient.Tracker().Update(poddisruptionbudgetsResource, updatedPDB, updatedPDB.Namespace); err != nil {
 			t.Fatalf("Eviction (PDB update) failed: %v", err)

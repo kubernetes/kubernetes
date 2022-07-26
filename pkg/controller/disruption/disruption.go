@@ -53,6 +53,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/utils/clock"
 )
 
 // DeletionTimeout sets maximum time from the moment a pod is added to DisruptedPods in PDB.Status
@@ -65,7 +66,7 @@ import (
 // clock (via ntp for example). Otherwise PodDisruptionBudget controller may not provide enough
 // protection against unwanted pod disruptions.
 const (
-	DeletionTimeout = 2 * 60 * time.Second
+	DeletionTimeout = 2 * time.Minute
 )
 
 type updater func(context.Context, *policy.PodDisruptionBudget) error
@@ -103,6 +104,8 @@ type DisruptionController struct {
 	recorder    record.EventRecorder
 
 	getUpdater func() updater
+
+	clock clock.Clock
 }
 
 // controllerAndScale is used to return (controller, scale) pairs from the
@@ -128,10 +131,40 @@ func NewDisruptionController(
 	scaleNamespacer scaleclient.ScalesGetter,
 	discoveryClient discovery.DiscoveryInterface,
 ) *DisruptionController {
+	return NewDisruptionControllerInternal(
+		podInformer,
+		pdbInformer,
+		rcInformer,
+		rsInformer,
+		dInformer,
+		ssInformer,
+		kubeClient,
+		restMapper,
+		scaleNamespacer,
+		discoveryClient,
+		clock.RealClock{})
+}
+
+// NewDisruptionControllerInternal allows to set a clock and
+// stalePodDisruptionTimeout
+// It is only supposed to be used by tests.
+func NewDisruptionControllerInternal(
+	podInformer coreinformers.PodInformer,
+	pdbInformer policyinformers.PodDisruptionBudgetInformer,
+	rcInformer coreinformers.ReplicationControllerInformer,
+	rsInformer appsv1informers.ReplicaSetInformer,
+	dInformer appsv1informers.DeploymentInformer,
+	ssInformer appsv1informers.StatefulSetInformer,
+	kubeClient clientset.Interface,
+	restMapper apimeta.RESTMapper,
+	scaleNamespacer scaleclient.ScalesGetter,
+	discoveryClient discovery.DiscoveryInterface,
+	clock clock.WithTicker,
+) *DisruptionController {
 	dc := &DisruptionController{
 		kubeClient:   kubeClient,
-		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "disruption"),
-		recheckQueue: workqueue.NewNamedDelayingQueue("disruption_recheck"),
+		queue:        workqueue.NewRateLimitingQueueWithDelayingInterface(workqueue.NewDelayingQueueWithCustomClock(clock, "disruption"), workqueue.DefaultControllerRateLimiter()),
+		recheckQueue: workqueue.NewDelayingQueueWithCustomClock(clock, "disruption_recheck"),
 		broadcaster:  record.NewBroadcaster(),
 	}
 	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
@@ -171,6 +204,8 @@ func NewDisruptionController(
 	dc.mapper = restMapper
 	dc.scaleNamespacer = scaleNamespacer
 	dc.discoveryClient = discoveryClient
+
+	dc.clock = clock
 
 	return dc
 }
@@ -564,9 +599,9 @@ func (dc *DisruptionController) processNextRecheckWorkItem() bool {
 }
 
 func (dc *DisruptionController) sync(ctx context.Context, key string) error {
-	startTime := time.Now()
+	startTime := dc.clock.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing PodDisruptionBudget %q (%v)", key, time.Since(startTime))
+		klog.V(4).Infof("Finished syncing PodDisruptionBudget %q (%v)", key, dc.clock.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -617,7 +652,7 @@ func (dc *DisruptionController) trySync(ctx context.Context, pdb *policy.PodDisr
 			strings.Join(unmanagedPods, ",'"))
 	}
 
-	currentTime := time.Now()
+	currentTime := dc.clock.Now()
 	disruptedPods, recheckTime := dc.buildDisruptedPodMap(pods, pdb, currentTime)
 	currentHealthy := countHealthyPods(pods, disruptedPods, currentTime)
 	err = dc.updatePdbStatus(ctx, pdb, currentHealthy, desiredHealthy, expectedCount, disruptedPods)
