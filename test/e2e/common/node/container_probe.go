@@ -615,7 +615,7 @@ done
 				return false, err
 			}
 			// verify the pod ready status has reported not ready
-			return podutil.IsPodReady(pod) == false, nil
+			return !podutil.IsPodReady(pod), nil
 		})
 		framework.ExpectNoError(err)
 	})
@@ -698,7 +698,7 @@ done
 				return false, err
 			}
 			// verify the pod ready status has reported not ready
-			return podutil.IsPodReady(pod) == false, nil
+			return !podutil.IsPodReady(pod), nil
 		})
 		framework.ExpectNoError(err)
 
