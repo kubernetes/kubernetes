@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -55,9 +56,7 @@ func TestSessionIsInteractive(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.flags.sessionIsInteractive() != tt.expected {
-				t.Error("unexpected result")
-			}
+			assert.Equal(t, tt.expected, tt.flags.sessionIsInteractive(), "unexpected result")
 		})
 	}
 }
