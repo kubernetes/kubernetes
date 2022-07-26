@@ -190,7 +190,9 @@ func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, ser
 	lbStatus, err := az.getServiceLoadBalancerStatus(service, lb)
 	if err != nil {
 		klog.Errorf("getServiceLoadBalancerStatus(%s) failed: %v", serviceName, err)
-		return nil, err
+		if err != cloudprovider.InstanceNotFound {
+			return nil, err
+		}
 	}
 
 	var serviceIP *string
