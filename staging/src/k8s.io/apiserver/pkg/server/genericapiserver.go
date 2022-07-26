@@ -684,8 +684,6 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 			return fmt.Errorf("unable to setup API %v: %v", apiGroupInfo, err)
 		}
 		resourceInfos = append(resourceInfos, r...)
-		s.RegisterDestroyFunc(apiGroupInfo.destroyStorage)
-
 		klog.Infof("Adding GroupVersion %s %s to DiscoveryManager", groupVersion.Group, groupVersion.Version)
 		s.DiscoveryResourceManager.AddGroupVersion(
 			apiGroupInfo.PrioritizedVersions[0].Group,
@@ -695,6 +693,8 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 			},
 		)
 	}
+
+	s.RegisterDestroyFunc(apiGroupInfo.destroyStorage)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageVersionAPI) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.APIServerIdentity) {
