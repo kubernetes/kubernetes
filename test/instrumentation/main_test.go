@@ -540,18 +540,6 @@ func TestIncorrectStableMetricDeclarations(t *testing.T) {
 		err      error
 	}{
 		{
-			testName: "Fail on stable summary metric (Summary is DEPRECATED)",
-			err:      fmt.Errorf("testdata/metric.go:4:9: Stable summary metric is not supported"),
-			src: `
-package test
-import "k8s.io/component-base/metrics"
-var _ = metrics.NewSummary(
-		&metrics.SummaryOpts{
-			StabilityLevel: metrics.STABLE,
-		},
-	)
-`},
-		{
 			testName: "Fail on stable metric with attribute set to unknown variable",
 			err:      fmt.Errorf("testdata/metric.go:6:4: Metric attribute was not correctly set. Please use only global consts in same file"),
 			src: `
