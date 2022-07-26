@@ -1757,7 +1757,11 @@ func TestCheckBindings(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		t.Run(name, func(t *testing.T) { run(t, scenario) })
+		scenario := scenario
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			run(t, scenario)
+		})
 	}
 }
 
