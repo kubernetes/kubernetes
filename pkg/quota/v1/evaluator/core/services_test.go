@@ -172,7 +172,7 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 							Port: 27444,
 						},
 					},
-					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
+					AllocateLoadBalancerNodePorts: utilpointer.Bool(false),
 				},
 			},
 			usage: corev1.ResourceList{
@@ -218,7 +218,7 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 							Port: 27444,
 						},
 					},
-					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(true),
+					AllocateLoadBalancerNodePorts: utilpointer.Bool(true),
 				},
 			},
 			usage: corev1.ResourceList{
@@ -242,7 +242,7 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 							NodePort: 32002,
 						},
 					},
-					AllocateLoadBalancerNodePorts: utilpointer.BoolPtr(false),
+					AllocateLoadBalancerNodePorts: utilpointer.Bool(false),
 				},
 			},
 			usage: corev1.ResourceList{

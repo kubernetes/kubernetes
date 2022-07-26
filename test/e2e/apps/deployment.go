@@ -824,7 +824,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	}
 	rsName := "test-cleanup-controller"
 	replicas := int32(1)
-	revisionHistoryLimit := utilpointer.Int32Ptr(0)
+	revisionHistoryLimit := utilpointer.Int32(0)
 	_, err := c.AppsV1().ReplicaSets(ns).Create(context.TODO(), newRS(rsName, replicas, rsPodLabels, WebserverImageName, WebserverImage, nil), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 

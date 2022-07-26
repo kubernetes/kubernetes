@@ -109,9 +109,9 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				{
 					Addresses: []string{"10.0.0.1"},
 					Conditions: discovery.EndpointConditions{
-						Ready:       utilpointer.BoolPtr(false),
-						Serving:     utilpointer.BoolPtr(true),
-						Terminating: utilpointer.BoolPtr(true),
+						Ready:       utilpointer.Bool(false),
+						Serving:     utilpointer.Bool(true),
+						Terminating: utilpointer.Bool(true),
 					},
 				},
 			},
@@ -138,9 +138,9 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				{
 					Addresses: []string{"10.0.0.1"},
 					Conditions: discovery.EndpointConditions{
-						Ready:       utilpointer.BoolPtr(false),
-						Serving:     utilpointer.BoolPtr(false),
-						Terminating: utilpointer.BoolPtr(true),
+						Ready:       utilpointer.Bool(false),
+						Serving:     utilpointer.Bool(false),
+						Terminating: utilpointer.Bool(true),
 					},
 				},
 			},

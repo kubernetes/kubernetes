@@ -99,20 +99,20 @@ var (
 			Key:               "foo",
 			Operator:          api.TolerationOpExists,
 			Effect:            api.TaintEffectNoExecute,
-			TolerationSeconds: utilpointer.Int64Ptr(10),
+			TolerationSeconds: utilpointer.Int64(10),
 		},
 		"foo-noexec-0": {
 			Key:               "foo",
 			Operator:          api.TolerationOpExists,
 			Effect:            api.TaintEffectNoExecute,
-			TolerationSeconds: utilpointer.Int64Ptr(0),
+			TolerationSeconds: utilpointer.Int64(0),
 		},
 		"foo-bar-noexec-10": {
 			Key:               "foo",
 			Operator:          api.TolerationOpEqual,
 			Value:             "bar",
 			Effect:            api.TaintEffectNoExecute,
-			TolerationSeconds: utilpointer.Int64Ptr(10),
+			TolerationSeconds: utilpointer.Int64(10),
 		},
 	}
 )
@@ -338,7 +338,7 @@ func TestFuzzed(t *testing.T) {
 			gen.Value = strings.Repeat("b", r.Intn(6)+1)
 		}
 		if gen.Effect == api.TaintEffectNoExecute && r.Float32() < tolerationSecondsProbability {
-			gen.TolerationSeconds = utilpointer.Int64Ptr(r.Int63n(10))
+			gen.TolerationSeconds = utilpointer.Int64(r.Int63n(10))
 		}
 		// Ensure only valid tolerations are generated.
 		require.NoError(t, validation.ValidateTolerations([]api.Toleration{gen}, field.NewPath("")).ToAggregate(), "%#v", gen)

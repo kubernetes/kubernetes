@@ -504,37 +504,37 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     utilpointer.StringPtr("sctp-example"),
+					Name:     utilpointer.String("sctp-example"),
 					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     utilpointer.Int32Ptr(int32(3456)),
+					Port:     utilpointer.Int32(int32(3456)),
 				},
 				{
-					Name:     utilpointer.StringPtr("udp-example"),
+					Name:     utilpointer.String("udp-example"),
 					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     utilpointer.Int32Ptr(int32(161)),
+					Port:     utilpointer.Int32(int32(161)),
 				},
 				{
-					Name:     utilpointer.StringPtr("tcp-example"),
+					Name:     utilpointer.String("tcp-example"),
 					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     utilpointer.Int32Ptr(int32(80)),
+					Port:     utilpointer.Int32(int32(80)),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready: utilpointer.BoolPtr(true),
+						Ready: utilpointer.Bool(true),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  utilpointer.String("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready: utilpointer.BoolPtr(true),
+						Ready: utilpointer.Bool(true),
 					},
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  utilpointer.String("node-1"),
 				},
 			},
 		},
@@ -617,29 +617,29 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     utilpointer.StringPtr("sctp-example"),
+					Name:     utilpointer.String("sctp-example"),
 					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     utilpointer.Int32Ptr(int32(3456)),
+					Port:     utilpointer.Int32(int32(3456)),
 				},
 				{
-					Name:     utilpointer.StringPtr("udp-example"),
+					Name:     utilpointer.String("udp-example"),
 					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     utilpointer.Int32Ptr(int32(161)),
+					Port:     utilpointer.Int32(int32(161)),
 				},
 				{
-					Name:     utilpointer.StringPtr("tcp-example"),
+					Name:     utilpointer.String("tcp-example"),
 					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     utilpointer.Int32Ptr(int32(80)),
+					Port:     utilpointer.Int32(int32(80)),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready: utilpointer.BoolPtr(true),
+						Ready: utilpointer.Bool(true),
 					},
 					Addresses: []string{"fd08::5678:0000:0000:9abc:def0"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  utilpointer.String("node-1"),
 				},
 			},
 		},
@@ -720,41 +720,41 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     utilpointer.StringPtr("sctp-example"),
+					Name:     utilpointer.String("sctp-example"),
 					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     utilpointer.Int32Ptr(int32(3456)),
+					Port:     utilpointer.Int32(int32(3456)),
 				},
 				{
-					Name:     utilpointer.StringPtr("udp-example"),
+					Name:     utilpointer.String("udp-example"),
 					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     utilpointer.Int32Ptr(int32(161)),
+					Port:     utilpointer.Int32(int32(161)),
 				},
 				{
-					Name:     utilpointer.StringPtr("tcp-example"),
+					Name:     utilpointer.String("tcp-example"),
 					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     utilpointer.Int32Ptr(int32(80)),
+					Port:     utilpointer.Int32(int32(80)),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       utilpointer.BoolPtr(true),
-						Serving:     utilpointer.BoolPtr(true),
-						Terminating: utilpointer.BoolPtr(false),
+						Ready:       utilpointer.Bool(true),
+						Serving:     utilpointer.Bool(true),
+						Terminating: utilpointer.Bool(false),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  utilpointer.String("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       utilpointer.BoolPtr(false),
-						Serving:     utilpointer.BoolPtr(true),
-						Terminating: utilpointer.BoolPtr(true),
+						Ready:       utilpointer.Bool(false),
+						Serving:     utilpointer.Bool(true),
+						Terminating: utilpointer.Bool(true),
 					},
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  utilpointer.String("node-1"),
 				},
 			},
 			terminatingGateEnabled: true,
@@ -836,29 +836,29 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     utilpointer.StringPtr("sctp-example"),
+					Name:     utilpointer.String("sctp-example"),
 					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     utilpointer.Int32Ptr(int32(3456)),
+					Port:     utilpointer.Int32(int32(3456)),
 				},
 				{
-					Name:     utilpointer.StringPtr("udp-example"),
+					Name:     utilpointer.String("udp-example"),
 					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     utilpointer.Int32Ptr(int32(161)),
+					Port:     utilpointer.Int32(int32(161)),
 				},
 				{
-					Name:     utilpointer.StringPtr("tcp-example"),
+					Name:     utilpointer.String("tcp-example"),
 					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     utilpointer.Int32Ptr(int32(80)),
+					Port:     utilpointer.Int32(int32(80)),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready: utilpointer.BoolPtr(true),
+						Ready: utilpointer.Bool(true),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  utilpointer.String("node-1"),
 				},
 			},
 			terminatingGateEnabled: false,
@@ -940,41 +940,41 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     utilpointer.StringPtr("sctp-example"),
+					Name:     utilpointer.String("sctp-example"),
 					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     utilpointer.Int32Ptr(int32(3456)),
+					Port:     utilpointer.Int32(int32(3456)),
 				},
 				{
-					Name:     utilpointer.StringPtr("udp-example"),
+					Name:     utilpointer.String("udp-example"),
 					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     utilpointer.Int32Ptr(int32(161)),
+					Port:     utilpointer.Int32(int32(161)),
 				},
 				{
-					Name:     utilpointer.StringPtr("tcp-example"),
+					Name:     utilpointer.String("tcp-example"),
 					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     utilpointer.Int32Ptr(int32(80)),
+					Port:     utilpointer.Int32(int32(80)),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       utilpointer.BoolPtr(true),
-						Serving:     utilpointer.BoolPtr(true),
-						Terminating: utilpointer.BoolPtr(false),
+						Ready:       utilpointer.Bool(true),
+						Serving:     utilpointer.Bool(true),
+						Terminating: utilpointer.Bool(false),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  utilpointer.String("node-1"),
 				},
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready:       utilpointer.BoolPtr(false),
-						Serving:     utilpointer.BoolPtr(false),
-						Terminating: utilpointer.BoolPtr(true),
+						Ready:       utilpointer.Bool(false),
+						Serving:     utilpointer.Bool(false),
+						Terminating: utilpointer.Bool(true),
 					},
 					Addresses: []string{"10.0.0.2"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod1"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  utilpointer.String("node-1"),
 				},
 			},
 			terminatingGateEnabled: true,
@@ -1056,29 +1056,29 @@ func TestSyncService(t *testing.T) {
 			},
 			expectedEndpointPorts: []discovery.EndpointPort{
 				{
-					Name:     utilpointer.StringPtr("sctp-example"),
+					Name:     utilpointer.String("sctp-example"),
 					Protocol: protoPtr(v1.ProtocolSCTP),
-					Port:     utilpointer.Int32Ptr(int32(3456)),
+					Port:     utilpointer.Int32(int32(3456)),
 				},
 				{
-					Name:     utilpointer.StringPtr("udp-example"),
+					Name:     utilpointer.String("udp-example"),
 					Protocol: protoPtr(v1.ProtocolUDP),
-					Port:     utilpointer.Int32Ptr(int32(161)),
+					Port:     utilpointer.Int32(int32(161)),
 				},
 				{
-					Name:     utilpointer.StringPtr("tcp-example"),
+					Name:     utilpointer.String("tcp-example"),
 					Protocol: protoPtr(v1.ProtocolTCP),
-					Port:     utilpointer.Int32Ptr(int32(80)),
+					Port:     utilpointer.Int32(int32(80)),
 				},
 			},
 			expectedEndpoints: []discovery.Endpoint{
 				{
 					Conditions: discovery.EndpointConditions{
-						Ready: utilpointer.BoolPtr(true),
+						Ready: utilpointer.Bool(true),
 					},
 					Addresses: []string{"10.0.0.1"},
 					TargetRef: &v1.ObjectReference{Kind: "Pod", Namespace: "default", Name: "pod0"},
-					NodeName:  utilpointer.StringPtr("node-1"),
+					NodeName:  utilpointer.String("node-1"),
 				},
 			},
 			terminatingGateEnabled: false,

@@ -41,9 +41,9 @@ func init() {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.SecurityContext.RunAsUser = pointer.Int64Ptr(1000)
-					p.Spec.Containers[0].SecurityContext.RunAsUser = pointer.Int64Ptr(1000)
-					p.Spec.InitContainers[0].SecurityContext.RunAsUser = pointer.Int64Ptr(1000)
+					p.Spec.SecurityContext.RunAsUser = pointer.Int64(1000)
+					p.Spec.Containers[0].SecurityContext.RunAsUser = pointer.Int64(1000)
+					p.Spec.InitContainers[0].SecurityContext.RunAsUser = pointer.Int64(1000)
 				}),
 			}
 		},
@@ -51,10 +51,10 @@ func init() {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
 				// explicit 0 on pod
-				tweak(p, func(p *corev1.Pod) { p.Spec.SecurityContext.RunAsUser = pointer.Int64Ptr(0) }),
+				tweak(p, func(p *corev1.Pod) { p.Spec.SecurityContext.RunAsUser = pointer.Int64(0) }),
 				// explicit 0 on containers
-				tweak(p, func(p *corev1.Pod) { p.Spec.Containers[0].SecurityContext.RunAsUser = pointer.Int64Ptr(0) }),
-				tweak(p, func(p *corev1.Pod) { p.Spec.InitContainers[0].SecurityContext.RunAsUser = pointer.Int64Ptr(0) }),
+				tweak(p, func(p *corev1.Pod) { p.Spec.Containers[0].SecurityContext.RunAsUser = pointer.Int64(0) }),
+				tweak(p, func(p *corev1.Pod) { p.Spec.InitContainers[0].SecurityContext.RunAsUser = pointer.Int64(0) }),
 			}
 		},
 	}

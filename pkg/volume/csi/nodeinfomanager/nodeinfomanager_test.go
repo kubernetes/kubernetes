@@ -459,7 +459,7 @@ func TestInstallCSIDriver(t *testing.T) {
 							NodeID:       "com.example.csi/csi-node1",
 							TopologyKeys: nil,
 							Allocatable: &storage.VolumeNodeResources{
-								Count: utilpointer.Int32Ptr(10),
+								Count: utilpointer.Int32(10),
 							},
 						},
 					},
@@ -488,7 +488,7 @@ func TestInstallCSIDriver(t *testing.T) {
 							NodeID:       "com.example.csi/csi-node1",
 							TopologyKeys: nil,
 							Allocatable: &storage.VolumeNodeResources{
-								Count: utilpointer.Int32Ptr(math.MaxInt32),
+								Count: utilpointer.Int32(math.MaxInt32),
 							},
 						},
 					},
@@ -517,7 +517,7 @@ func TestInstallCSIDriver(t *testing.T) {
 							NodeID:       "com.example.csi/csi-node1",
 							TopologyKeys: nil,
 							Allocatable: &storage.VolumeNodeResources{
-								Count: utilpointer.Int32Ptr(math.MaxInt32),
+								Count: utilpointer.Int32(math.MaxInt32),
 							},
 						},
 					},
@@ -606,7 +606,7 @@ func TestInstallCSIDriver(t *testing.T) {
 
 func generateVolumeLimits(i int32) *storage.VolumeNodeResources {
 	return &storage.VolumeNodeResources{
-		Count: utilpointer.Int32Ptr(i),
+		Count: utilpointer.Int32(i),
 	}
 }
 

@@ -70,7 +70,7 @@ func init() {
 
 	// 1.0+: baseline + runAsNonRoot=true
 	restricted_1_0 := tweak(baseline_1_0, func(p *corev1.Pod) {
-		p.Spec.SecurityContext = &corev1.PodSecurityContext{RunAsNonRoot: pointer.BoolPtr(true)}
+		p.Spec.SecurityContext = &corev1.PodSecurityContext{RunAsNonRoot: pointer.Bool(true)}
 	})
 	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 0)] = restricted_1_0
 	minimalValidLinuxPods[api.LevelRestricted][api.MajorMinorVersion(1, 0)] = addLinux(restricted_1_0)
@@ -78,8 +78,8 @@ func init() {
 
 	// 1.8+: allowPrivilegeEscalation=false
 	restricted_1_8 := tweak(restricted_1_0, func(p *corev1.Pod) {
-		p.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{AllowPrivilegeEscalation: pointer.BoolPtr(false)}
-		p.Spec.InitContainers[0].SecurityContext = &corev1.SecurityContext{AllowPrivilegeEscalation: pointer.BoolPtr(false)}
+		p.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{AllowPrivilegeEscalation: pointer.Bool(false)}
+		p.Spec.InitContainers[0].SecurityContext = &corev1.SecurityContext{AllowPrivilegeEscalation: pointer.Bool(false)}
 	})
 	minimalValidPods[api.LevelRestricted][api.MajorMinorVersion(1, 8)] = restricted_1_8
 	minimalValidLinuxPods[api.LevelRestricted][api.MajorMinorVersion(1, 8)] = addLinux(restricted_1_8)

@@ -65,7 +65,7 @@ func TestDeleteResourceAuditLogRequestObject(t *testing.T) {
 
 	policy := metav1.DeletePropagationBackground
 	deleteOption := &metav1.DeleteOptions{
-		GracePeriodSeconds: pointer.Int64Ptr(30),
+		GracePeriodSeconds: pointer.Int64(30),
 		PropagationPolicy:  &policy,
 	}
 
@@ -87,7 +87,7 @@ func TestDeleteResourceAuditLogRequestObject(t *testing.T) {
 		{
 			name: "meta built-in Codec encode v1.DeleteOptions",
 			object: &metav1.DeleteOptions{
-				GracePeriodSeconds: pointer.Int64Ptr(30),
+				GracePeriodSeconds: pointer.Int64(30),
 				PropagationPolicy:  &policy,
 			},
 			gv:         metav1.SchemeGroupVersion,
@@ -97,7 +97,7 @@ func TestDeleteResourceAuditLogRequestObject(t *testing.T) {
 		{
 			name: "fake corev1 registered codec encode v1 DeleteOptions",
 			object: &metav1.DeleteOptions{
-				GracePeriodSeconds: pointer.Int64Ptr(30),
+				GracePeriodSeconds: pointer.Int64(30),
 				PropagationPolicy:  &policy,
 			},
 			gv:         metav1.SchemeGroupVersion,

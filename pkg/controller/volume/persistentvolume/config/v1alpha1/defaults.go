@@ -58,10 +58,10 @@ func RecommendedDefaultPersistentVolumeBinderControllerConfiguration(obj *kubect
 // this defaulting method run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedDefaultVolumeConfiguration(obj *kubectrlmgrconfigv1alpha1.VolumeConfiguration) {
 	if obj.EnableHostPathProvisioning == nil {
-		obj.EnableHostPathProvisioning = utilpointer.BoolPtr(false)
+		obj.EnableHostPathProvisioning = utilpointer.Bool(false)
 	}
 	if obj.EnableDynamicProvisioning == nil {
-		obj.EnableDynamicProvisioning = utilpointer.BoolPtr(true)
+		obj.EnableDynamicProvisioning = utilpointer.Bool(true)
 	}
 	if obj.FlexVolumePluginDir == "" {
 		obj.FlexVolumePluginDir = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/"

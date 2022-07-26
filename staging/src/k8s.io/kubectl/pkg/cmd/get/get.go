@@ -658,7 +658,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	outputObjects := utilpointer.BoolPtr(!o.WatchOnly)
+	outputObjects := utilpointer.Bool(!o.WatchOnly)
 	printer, err := o.ToPrinter(mapping, outputObjects, o.AllNamespaces, false)
 	if err != nil {
 		return err

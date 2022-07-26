@@ -64,7 +64,7 @@ v1.HorizontalPodAutoscaler go struct. Take for example:
 	              Name:      autoscalerName,
 	     },
 	     Spec: v1.HorizontalPodAutoscalerSpec{
-	              MinReplicas: pointer.Int32Ptr(0),
+	              MinReplicas: pointer.Int32(0),
 	     },
 	}
 
@@ -96,7 +96,7 @@ The "apply configurations" also have convenience With<FieldName> functions that 
 build apply requests. This allows developers to set fields without having to deal with the fact that
 all the fields in the "apply configuration" types are pointers, and are inconvenient to set using
 go. For example "MinReplicas: &0" is not legal go code, so without the With functions, developers
-would work around this problem by using a library, .e.g. "MinReplicas: pointer.Int32Ptr(0)", but
+would work around this problem by using a library, .e.g. "MinReplicas: pointer.Int32(0)", but
 string enumerations like corev1.Protocol are still a problem since they cannot be supported by a
 general purpose library. In addition to the convenience, the With functions also isolate
 developers from the underlying representation, which makes it safer for the underlying

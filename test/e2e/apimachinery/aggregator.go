@@ -132,7 +132,7 @@ var _ = SIGDescribe("Aggregator", func() {
 				Service: &apiregistrationv1.ServiceReference{
 					Namespace: ns,
 					Name:      "e2e-api",
-					Port:      pointer.Int32Ptr(aggregatorServicePort),
+					Port:      pointer.Int32(aggregatorServicePort),
 				},
 				Group:                apiServiceGroup,
 				Version:              "v1alpha1",
@@ -461,7 +461,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 			Service: &apiregistrationv1.ServiceReference{
 				Namespace: namespace,
 				Name:      "sample-api",
-				Port:      pointer.Int32Ptr(aggregatorServicePort),
+				Port:      pointer.Int32(aggregatorServicePort),
 			},
 			Group:                "wardle.example.com",
 			Version:              "v1alpha1",

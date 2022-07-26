@@ -31,7 +31,7 @@ import (
 )
 
 func TestV12StatefulSetSpecConversion(t *testing.T) {
-	replicas := utilpointer.Int32Ptr(2)
+	replicas := utilpointer.Int32(2)
 	selector := &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}
 	appsv1Template := v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -177,7 +177,7 @@ func TestV1StatefulSetStatusConversion(t *testing.T) {
 }
 
 func TestV1StatefulSetUpdateStrategyConversion(t *testing.T) {
-	partition := utilpointer.Int32Ptr(2)
+	partition := utilpointer.Int32(2)
 	appsv1rollingUpdate := new(appsv1.RollingUpdateStatefulSetStrategy)
 	appsv1rollingUpdate.Partition = partition
 	appsrollingUpdate := new(apps.RollingUpdateStatefulSetStrategy)
@@ -259,7 +259,7 @@ func TestV1RollingUpdateDaemonSetConversion(t *testing.T) {
 }
 
 func TestV1DeploymentConversion(t *testing.T) {
-	replica := utilpointer.Int32Ptr(2)
+	replica := utilpointer.Int32(2)
 	rollbackTo := new(apps.RollbackConfig)
 	rollbackTo.Revision = int64(2)
 	testcases := map[string]struct {
@@ -338,9 +338,9 @@ func TestV1DeploymentConversion(t *testing.T) {
 }
 
 func TestV1DeploymentSpecConversion(t *testing.T) {
-	replica := utilpointer.Int32Ptr(2)
-	revisionHistoryLimit := utilpointer.Int32Ptr(2)
-	progressDeadlineSeconds := utilpointer.Int32Ptr(2)
+	replica := utilpointer.Int32(2)
+	revisionHistoryLimit := utilpointer.Int32(2)
+	progressDeadlineSeconds := utilpointer.Int32(2)
 
 	testcases := map[string]struct {
 		deploymentSpec1 *apps.DeploymentSpec

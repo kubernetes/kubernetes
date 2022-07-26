@@ -42,15 +42,15 @@ func init() {
 			return []*corev1.Pod{
 				// set at pod level
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.SecurityContext.RunAsNonRoot = pointer.BoolPtr(true)
+					p.Spec.SecurityContext.RunAsNonRoot = pointer.Bool(true)
 					p.Spec.Containers[0].SecurityContext.RunAsNonRoot = nil
 					p.Spec.InitContainers[0].SecurityContext.RunAsNonRoot = nil
 				}),
 				// set on all containers
 				tweak(p, func(p *corev1.Pod) {
 					p.Spec.SecurityContext.RunAsNonRoot = nil
-					p.Spec.Containers[0].SecurityContext.RunAsNonRoot = pointer.BoolPtr(true)
-					p.Spec.InitContainers[0].SecurityContext.RunAsNonRoot = pointer.BoolPtr(true)
+					p.Spec.Containers[0].SecurityContext.RunAsNonRoot = pointer.Bool(true)
+					p.Spec.InitContainers[0].SecurityContext.RunAsNonRoot = pointer.Bool(true)
 				}),
 			}
 		},
@@ -64,10 +64,10 @@ func init() {
 					p.Spec.InitContainers[0].SecurityContext.RunAsNonRoot = nil
 				}),
 				// explicit false on pod
-				tweak(p, func(p *corev1.Pod) { p.Spec.SecurityContext.RunAsNonRoot = pointer.BoolPtr(false) }),
+				tweak(p, func(p *corev1.Pod) { p.Spec.SecurityContext.RunAsNonRoot = pointer.Bool(false) }),
 				// explicit false on containers
-				tweak(p, func(p *corev1.Pod) { p.Spec.Containers[0].SecurityContext.RunAsNonRoot = pointer.BoolPtr(false) }),
-				tweak(p, func(p *corev1.Pod) { p.Spec.InitContainers[0].SecurityContext.RunAsNonRoot = pointer.BoolPtr(false) }),
+				tweak(p, func(p *corev1.Pod) { p.Spec.Containers[0].SecurityContext.RunAsNonRoot = pointer.Bool(false) }),
+				tweak(p, func(p *corev1.Pod) { p.Spec.InitContainers[0].SecurityContext.RunAsNonRoot = pointer.Bool(false) }),
 			}
 		},
 	}

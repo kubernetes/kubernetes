@@ -47,6 +47,6 @@ func SetDefaults_NetworkPolicy(obj *networkingv1.NetworkPolicy) {
 
 func SetDefaults_IngressClass(obj *networkingv1.IngressClass) {
 	if obj.Spec.Parameters != nil && obj.Spec.Parameters.Scope == nil {
-		obj.Spec.Parameters.Scope = utilpointer.StringPtr(networkingv1.IngressClassParametersReferenceScopeCluster)
+		obj.Spec.Parameters.Scope = utilpointer.String(networkingv1.IngressClassParametersReferenceScopeCluster)
 	}
 }

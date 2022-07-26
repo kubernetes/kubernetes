@@ -44,11 +44,11 @@ func init() {
 			return []*corev1.Pod{
 				// explicit true
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = pointer.BoolPtr(true)
+					p.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = pointer.Bool(true)
 				}),
 				// ensure initContainers are checked
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.InitContainers[0].SecurityContext.AllowPrivilegeEscalation = pointer.BoolPtr(true)
+					p.Spec.InitContainers[0].SecurityContext.AllowPrivilegeEscalation = pointer.Bool(true)
 				}),
 				// nil AllowPrivilegeEscalation
 				tweak(p, func(p *corev1.Pod) { p.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil }),

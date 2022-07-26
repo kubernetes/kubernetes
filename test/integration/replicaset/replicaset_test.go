@@ -25,7 +25,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -678,7 +678,7 @@ func TestPodDeletionCost(t *testing.T) {
 			// Change RS's number of replics to 1
 			rsClient := c.AppsV1().ReplicaSets(ns.Name)
 			updateRS(t, rsClient, rs.Name, func(rs *apps.ReplicaSet) {
-				rs.Spec.Replicas = pointer.Int32Ptr(1)
+				rs.Spec.Replicas = pointer.Int32(1)
 			})
 
 			// Poll until ReplicaSet is downscaled to 1.

@@ -104,7 +104,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "bogus"}},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -154,7 +154,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -204,7 +204,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -254,7 +254,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -300,7 +300,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -342,7 +342,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							URL: strPtr("https://example.com/webhook"),
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 							Type: "object",
@@ -386,7 +386,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Strategy:                 apiextensions.ConversionStrategyType("None"),
 						ConversionReviewVersions: []string{"v1beta1"},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 							Type: "object",
@@ -438,7 +438,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -485,7 +485,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -533,7 +533,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -578,7 +578,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -621,7 +621,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -664,7 +664,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -799,7 +799,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version1"},
@@ -844,7 +844,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version1"},
@@ -880,7 +880,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("None"),
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 							Type: "object",
@@ -923,7 +923,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("None"),
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 							Type: "object",
@@ -967,7 +967,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("None"),
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 							Type: "object",
@@ -1005,7 +1005,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Conversion: &apiextensions.CustomResourceConversion{
 						Strategy: apiextensions.ConversionStrategyType("None"),
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 							Type: "object",
@@ -1029,7 +1029,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural: "plural",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 							Type: "object",
@@ -1078,7 +1078,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "value()*a",
 						ListKind: "value()*a",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 							Type: "object",
@@ -1130,7 +1130,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "matching",
 						ListKind: "matching",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 							Type: "object",
@@ -1187,7 +1187,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1231,7 +1231,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1275,7 +1275,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1298,7 +1298,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Version: "version",
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
-							XPreserveUnknownFields: pointer.BoolPtr(false),
+							XPreserveUnknownFields: pointer.Bool(false),
 						},
 					},
 					Versions: []apiextensions.CustomResourceDefinitionVersion{
@@ -1315,7 +1315,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1354,7 +1354,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1398,7 +1398,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1442,7 +1442,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1482,7 +1482,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1523,7 +1523,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1545,7 +1545,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Validation:            &apiextensions.CustomResourceValidation{OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object"}},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -1618,7 +1618,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 							Type: "object",
@@ -1659,7 +1659,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1684,7 +1684,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 							Type:                   "object",
-							XPreserveUnknownFields: pointer.BoolPtr(true),
+							XPreserveUnknownFields: pointer.Bool(true),
 							Properties: map[string]apiextensions.JSONSchemaProps{
 								"nil": {
 									Type:              "object",
@@ -1735,7 +1735,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 										"metadata": {
 											Type:                   "object",
 											XEmbeddedResource:      true,
-											XPreserveUnknownFields: pointer.BoolPtr(true),
+											XPreserveUnknownFields: pointer.Bool(true),
 										},
 										"apiVersion": {
 											Type: "string",
@@ -1743,7 +1743,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 												"foo": {
 													Type:                   "object",
 													XEmbeddedResource:      true,
-													XPreserveUnknownFields: pointer.BoolPtr(true),
+													XPreserveUnknownFields: pointer.Bool(true),
 												},
 											},
 										},
@@ -1753,7 +1753,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 												"foo": {
 													Type:                   "object",
 													XEmbeddedResource:      true,
-													XPreserveUnknownFields: pointer.BoolPtr(true),
+													XPreserveUnknownFields: pointer.Bool(true),
 												},
 											},
 										},
@@ -1790,11 +1790,11 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 							Type:                   "object",
-							XPreserveUnknownFields: pointer.BoolPtr(true),
+							XPreserveUnknownFields: pointer.Bool(true),
 							XValidations: apiextensions.ValidationRules{
 								{
 									Rule: "size(self.metadata.name) > 3",
@@ -1840,7 +1840,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1877,7 +1877,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -1928,7 +1928,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -2035,7 +2035,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 											}),
 										},
 									},
-									XPreserveUnknownFields: pointer.BoolPtr(true),
+									XPreserveUnknownFields: pointer.Bool(true),
 								},
 								// x-kubernetes-embedded-resource: true
 								"embedded-fine": {
@@ -2058,7 +2058,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 								"embedded-preserve": {
 									Type:                   "object",
 									XEmbeddedResource:      true,
-									XPreserveUnknownFields: pointer.BoolPtr(true),
+									XPreserveUnknownFields: pointer.Bool(true),
 									Properties: map[string]apiextensions.JSONSchemaProps{
 										"foo": {
 											Type: "string",
@@ -2077,7 +2077,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 								"embedded-preserve-unpruned-objectmeta": {
 									Type:                   "object",
 									XEmbeddedResource:      true,
-									XPreserveUnknownFields: pointer.BoolPtr(true),
+									XPreserveUnknownFields: pointer.Bool(true),
 									Properties: map[string]apiextensions.JSONSchemaProps{
 										"foo": {
 											Type: "string",
@@ -2098,7 +2098,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -2143,7 +2143,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 								"embedded2": {
 									Type:                   "object",
 									XEmbeddedResource:      true,
-									XPreserveUnknownFields: pointer.BoolPtr(true),
+									XPreserveUnknownFields: pointer.Bool(true),
 									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
 										Schema: &apiextensions.JSONSchemaProps{Type: "string"},
 									},
@@ -2151,7 +2151,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -2332,7 +2332,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"v1"},
@@ -2405,7 +2405,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"v1"},
@@ -2451,7 +2451,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"v1"},
@@ -2614,7 +2614,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 								"x-preserve-unknown-fields-unknown-field-object-defaults": {
 									Type:                   "object",
 									XEmbeddedResource:      true,
-									XPreserveUnknownFields: pointer.BoolPtr(true),
+									XPreserveUnknownFields: pointer.Bool(true),
 									Properties:             map[string]apiextensions.JSONSchemaProps{},
 									Default: jsonPtr(map[string]interface{}{
 										"apiVersion": "v1",
@@ -2634,7 +2634,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 										"embedded": {
 											Type:                   "object",
 											XEmbeddedResource:      true,
-											XPreserveUnknownFields: pointer.BoolPtr(true),
+											XPreserveUnknownFields: pointer.Bool(true),
 											Properties:             map[string]apiextensions.JSONSchemaProps{},
 										},
 									},
@@ -2658,7 +2658,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 										"embedded": {
 											Type:                   "object",
 											XEmbeddedResource:      true,
-											XPreserveUnknownFields: pointer.BoolPtr(true),
+											XPreserveUnknownFields: pointer.Bool(true),
 											Properties:             map[string]apiextensions.JSONSchemaProps{},
 										},
 									},
@@ -3774,7 +3774,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"v1"},
@@ -3971,7 +3971,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4049,7 +4049,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4125,7 +4125,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4149,7 +4149,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "bogus"}},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4179,7 +4179,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "bogus"}},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4203,7 +4203,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "bogus2"}},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4239,7 +4239,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							}},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4272,7 +4272,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							}},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4299,7 +4299,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Properties: map[string]apiextensions.JSONSchemaProps{},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4332,7 +4332,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							}},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4357,7 +4357,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {Type: "integer"}},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4376,7 +4376,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {}}, // untyped object
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4396,7 +4396,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
 					Versions:              []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
 					Validation:            &apiextensions.CustomResourceValidation{},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4415,7 +4415,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Properties: map[string]apiextensions.JSONSchemaProps{"foo": {}}, // untyped object
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4447,7 +4447,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							},
 						}},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4473,7 +4473,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							},
 						}},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4518,7 +4518,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4559,7 +4559,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4604,7 +4604,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4645,7 +4645,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4692,7 +4692,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4732,7 +4732,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							Type: "object",
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -4766,7 +4766,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -4799,7 +4799,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -4837,7 +4837,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -4873,7 +4873,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -4916,7 +4916,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -4953,7 +4953,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -4993,7 +4993,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -5029,7 +5029,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind2",
 						ListKind: "listkind2",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -5070,7 +5070,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind",
 						ListKind: "listkind",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -5106,7 +5106,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "kind2",
 						ListKind: "listkind2",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					AcceptedNames: apiextensions.CustomResourceDefinitionNames{
@@ -5155,7 +5155,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -5197,7 +5197,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -5235,7 +5235,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -5266,7 +5266,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -5305,7 +5305,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -5336,7 +5336,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 						Kind:     "Plural",
 						ListKind: "PluralList",
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -5355,7 +5355,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Validation:            &apiextensions.CustomResourceValidation{OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object"}},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -5368,7 +5368,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Validation:            &apiextensions.CustomResourceValidation{OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object"}},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -5385,7 +5385,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Validation:            &apiextensions.CustomResourceValidation{OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object"}},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -5398,7 +5398,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Validation:            &apiextensions.CustomResourceValidation{OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object"}},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -5414,7 +5414,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Versions:              []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -5426,7 +5426,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Versions:              []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -5445,7 +5445,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -5460,7 +5460,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -5477,7 +5477,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Validation:            &apiextensions.CustomResourceValidation{OpenAPIV3Schema: &apiextensions.JSONSchemaProps{Type: "object"}},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -5489,7 +5489,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					Versions:              []apiextensions.CustomResourceDefinitionVersion{{Name: "version", Served: true, Storage: true}},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -5510,7 +5510,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -5525,7 +5525,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					},
 					Scope:                 apiextensions.NamespaceScoped,
 					Names:                 apiextensions.CustomResourceDefinitionNames{Plural: "plural", Singular: "singular", Kind: "Plural", ListKind: "PluralList"},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{StoredVersions: []string{"version"}},
 			},
@@ -5568,7 +5568,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -5607,7 +5607,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(false),
+					PreserveUnknownFields: pointer.Bool(false),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -5641,7 +5641,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -5671,7 +5671,7 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 							},
 						},
 					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
+					PreserveUnknownFields: pointer.Bool(true),
 				},
 				Status: apiextensions.CustomResourceDefinitionStatus{
 					StoredVersions: []string{"version"},
@@ -8736,57 +8736,57 @@ func Test_validateDeprecationWarning(t *testing.T) {
 		{
 			name:       "not deprecated, empty warning",
 			deprecated: false,
-			warning:    pointer.StringPtr(""),
+			warning:    pointer.String(""),
 			want:       []string{"can only be set for deprecated versions"},
 		},
 		{
 			name:       "not deprecated, set warning",
 			deprecated: false,
-			warning:    pointer.StringPtr("foo"),
+			warning:    pointer.String("foo"),
 			want:       []string{"can only be set for deprecated versions"},
 		},
 
 		{
 			name:       "utf-8",
 			deprecated: true,
-			warning:    pointer.StringPtr("Iñtërnâtiônàlizætiøn,💝🐹🌇⛔"),
+			warning:    pointer.String("Iñtërnâtiônàlizætiøn,💝🐹🌇⛔"),
 			want:       nil,
 		},
 		{
 			name:       "long warning",
 			deprecated: true,
-			warning:    pointer.StringPtr(strings.Repeat("x", 256)),
+			warning:    pointer.String(strings.Repeat("x", 256)),
 			want:       nil,
 		},
 
 		{
 			name:       "too long warning",
 			deprecated: true,
-			warning:    pointer.StringPtr(strings.Repeat("x", 257)),
+			warning:    pointer.String(strings.Repeat("x", 257)),
 			want:       []string{"must be <= 256 characters long"},
 		},
 		{
 			name:       "newline",
 			deprecated: true,
-			warning:    pointer.StringPtr("Test message\nfoo"),
+			warning:    pointer.String("Test message\nfoo"),
 			want:       []string{"must only contain printable UTF-8 characters; non-printable character found at index 12"},
 		},
 		{
 			name:       "non-printable character",
 			deprecated: true,
-			warning:    pointer.StringPtr("Test message\u0008"),
+			warning:    pointer.String("Test message\u0008"),
 			want:       []string{"must only contain printable UTF-8 characters; non-printable character found at index 12"},
 		},
 		{
 			name:       "null character",
 			deprecated: true,
-			warning:    pointer.StringPtr("Test message\u0000"),
+			warning:    pointer.String("Test message\u0000"),
 			want:       []string{"must only contain printable UTF-8 characters; non-printable character found at index 12"},
 		},
 		{
 			name:       "non-utf-8",
 			deprecated: true,
-			warning:    pointer.StringPtr("Test message\xc5foo"),
+			warning:    pointer.String("Test message\xc5foo"),
 			want:       []string{"must only contain printable UTF-8 characters"},
 		},
 	}

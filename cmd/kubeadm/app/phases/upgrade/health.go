@@ -114,14 +114,14 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 			Namespace: ns,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: utilpointer.Int32Ptr(0),
+			BackoffLimit: utilpointer.Int32(0),
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					SecurityContext: &v1.PodSecurityContext{
-						RunAsUser:    utilpointer.Int64Ptr(999),
-						RunAsGroup:   utilpointer.Int64Ptr(999),
-						RunAsNonRoot: utilpointer.BoolPtr(true),
+						RunAsUser:    utilpointer.Int64(999),
+						RunAsGroup:   utilpointer.Int64(999),
+						RunAsNonRoot: utilpointer.Bool(true),
 					},
 					Tolerations: []v1.Toleration{
 						{

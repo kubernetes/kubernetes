@@ -535,7 +535,7 @@ func TestCreateAdmissionObjects(t *testing.T) {
 						},
 						Object:    runtime.RawExtension{Object: versionedObj},
 						OldObject: runtime.RawExtension{Object: versionedObjOld},
-						DryRun:    utilpointer.BoolPtr(false),
+						DryRun:    utilpointer.Bool(false),
 						Options:   runtime.RawExtension{Object: &metav1.UpdateOptions{FieldManager: "foo"}},
 					},
 				}
@@ -578,7 +578,7 @@ func TestCreateAdmissionObjects(t *testing.T) {
 						},
 						Object:    runtime.RawExtension{Object: versionedObj},
 						OldObject: runtime.RawExtension{Object: versionedObjOld},
-						DryRun:    utilpointer.BoolPtr(false),
+						DryRun:    utilpointer.Bool(false),
 						Options:   runtime.RawExtension{Object: &metav1.UpdateOptions{FieldManager: "foo"}},
 					},
 				}

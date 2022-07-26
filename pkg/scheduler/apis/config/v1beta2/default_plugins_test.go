@@ -87,13 +87,13 @@ func TestApplyFeatureGates(t *testing.T) {
 				},
 				Score: v1beta2.PluginSet{
 					Enabled: []v1beta2.Plugin{
-						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
-						{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
-						{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(1)},
-						{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
-						{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(1)},
-						{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
-						{Name: names.TaintToleration, Weight: pointer.Int32Ptr(1)},
+						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
+						{Name: names.ImageLocality, Weight: pointer.Int32(1)},
+						{Name: names.InterPodAffinity, Weight: pointer.Int32(1)},
+						{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
+						{Name: names.NodeAffinity, Weight: pointer.Int32(1)},
+						{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
+						{Name: names.TaintToleration, Weight: pointer.Int32(1)},
 					},
 				},
 				Reserve: v1beta2.PluginSet{
@@ -281,8 +281,8 @@ func TestMergePlugins(t *testing.T) {
 			customPlugins: &v1beta2.Plugins{
 				Filter: v1beta2.PluginSet{
 					Enabled: []v1beta2.Plugin{
-						{Name: "Plugin1", Weight: pointer.Int32Ptr(2)},
-						{Name: "Plugin3", Weight: pointer.Int32Ptr(3)},
+						{Name: "Plugin1", Weight: pointer.Int32(2)},
+						{Name: "Plugin3", Weight: pointer.Int32(3)},
 					},
 				},
 			},
@@ -298,9 +298,9 @@ func TestMergePlugins(t *testing.T) {
 			expectedPlugins: &v1beta2.Plugins{
 				Filter: v1beta2.PluginSet{
 					Enabled: []v1beta2.Plugin{
-						{Name: "Plugin1", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin1", Weight: pointer.Int32(2)},
 						{Name: "Plugin2"},
-						{Name: "Plugin3", Weight: pointer.Int32Ptr(3)},
+						{Name: "Plugin3", Weight: pointer.Int32(3)},
 					},
 				},
 			},
@@ -310,8 +310,8 @@ func TestMergePlugins(t *testing.T) {
 			customPlugins: &v1beta2.Plugins{
 				Filter: v1beta2.PluginSet{
 					Enabled: []v1beta2.Plugin{
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
-						{Name: "Plugin1", Weight: pointer.Int32Ptr(1)},
+						{Name: "Plugin2", Weight: pointer.Int32(2)},
+						{Name: "Plugin1", Weight: pointer.Int32(1)},
 					},
 				},
 			},
@@ -327,8 +327,8 @@ func TestMergePlugins(t *testing.T) {
 			expectedPlugins: &v1beta2.Plugins{
 				Filter: v1beta2.PluginSet{
 					Enabled: []v1beta2.Plugin{
-						{Name: "Plugin1", Weight: pointer.Int32Ptr(1)},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin1", Weight: pointer.Int32(1)},
+						{Name: "Plugin2", Weight: pointer.Int32(2)},
 						{Name: "Plugin3"},
 					},
 				},
@@ -340,9 +340,9 @@ func TestMergePlugins(t *testing.T) {
 				Filter: v1beta2.PluginSet{
 					Enabled: []v1beta2.Plugin{
 						{Name: "Plugin1"},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin2", Weight: pointer.Int32(2)},
 						{Name: "Plugin3"},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(4)},
+						{Name: "Plugin2", Weight: pointer.Int32(4)},
 					},
 				},
 			},
@@ -359,9 +359,9 @@ func TestMergePlugins(t *testing.T) {
 				Filter: v1beta2.PluginSet{
 					Enabled: []v1beta2.Plugin{
 						{Name: "Plugin1"},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(4)},
+						{Name: "Plugin2", Weight: pointer.Int32(4)},
 						{Name: "Plugin3"},
-						{Name: "Plugin2", Weight: pointer.Int32Ptr(2)},
+						{Name: "Plugin2", Weight: pointer.Int32(2)},
 					},
 				},
 			},

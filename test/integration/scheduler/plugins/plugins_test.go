@@ -676,7 +676,7 @@ func TestPostFilterPlugin(t *testing.T) {
 			// Setup plugins for testing.
 			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 				Profiles: []configv1.KubeSchedulerProfile{{
-					SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+					SchedulerName: pointer.String(v1.DefaultSchedulerName),
 					Plugins: &configv1.Plugins{
 						Filter: configv1.PluginSet{
 							Enabled: []configv1.Plugin{
@@ -922,7 +922,7 @@ func TestPrebindPlugin(t *testing.T) {
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{
 			{
-				SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+				SchedulerName: pointer.String(v1.DefaultSchedulerName),
 				Plugins: &configv1.Plugins{
 					PreBind: configv1.PluginSet{
 						Enabled: []configv1.Plugin{
@@ -932,7 +932,7 @@ func TestPrebindPlugin(t *testing.T) {
 				},
 			},
 			{
-				SchedulerName: pointer.StringPtr("2nd-scheduler"),
+				SchedulerName: pointer.String("2nd-scheduler"),
 				Plugins: &configv1.Plugins{
 					Filter: configv1.PluginSet{
 						Enabled: []configv1.Plugin{
@@ -1466,7 +1466,7 @@ func TestBindPlugin(t *testing.T) {
 	// Setup initial unreserve and bind plugins for testing.
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				MultiPoint: configv1.PluginSet{
 					Disabled: []configv1.Plugin{
@@ -2109,7 +2109,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{
 			{
-				SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+				SchedulerName: pointer.String(v1.DefaultSchedulerName),
 				Plugins: &configv1.Plugins{
 					Permit: configv1.PluginSet{
 						Enabled: []configv1.Plugin{
@@ -2357,7 +2357,7 @@ func TestActivatePods(t *testing.T) {
 	// Setup initial filter plugin for testing.
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				PreFilter: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
@@ -2474,7 +2474,7 @@ func initRegistryAndConfig(t *testing.T, plugins ...framework.Plugin) (framework
 
 	versionedCfg := configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins:       pls,
 		}},
 	}

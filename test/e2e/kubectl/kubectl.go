@@ -1083,7 +1083,7 @@ metadata:
 					framework.Failf("failed to unmarshal schema: %v", err)
 				}
 				// Allow for arbitrary-extra properties.
-				props.XPreserveUnknownFields = pointer.BoolPtr(true)
+				props.XPreserveUnknownFields = pointer.Bool(true)
 				for i := range crd.Spec.Versions {
 					crd.Spec.Versions[i].Schema = &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: props}
 				}

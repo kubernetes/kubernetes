@@ -646,7 +646,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 		{
 			name: "preserve-unknown-fields in arrays",
 			in: &apiextensions.JSONSchemaProps{
-				XPreserveUnknownFields: pointer.BoolPtr(true),
+				XPreserveUnknownFields: pointer.Bool(true),
 				Type:                   "array",
 				Items: &apiextensions.JSONSchemaPropsOrArray{Schema: &apiextensions.JSONSchemaProps{
 					Type: "string",
@@ -657,7 +657,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 		{
 			name: "preserve-unknown-fields in objects",
 			in: &apiextensions.JSONSchemaProps{
-				XPreserveUnknownFields: pointer.BoolPtr(true),
+				XPreserveUnknownFields: pointer.Bool(true),
 				Type:                   "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"foo": {

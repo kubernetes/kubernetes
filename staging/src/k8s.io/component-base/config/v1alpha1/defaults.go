@@ -49,7 +49,7 @@ func RecommendedDefaultLeaderElectionConfiguration(obj *LeaderElectionConfigurat
 		obj.ResourceLock = EndpointsResourceLock
 	}
 	if obj.LeaderElect == nil {
-		obj.LeaderElect = utilpointer.BoolPtr(true)
+		obj.LeaderElect = utilpointer.Bool(true)
 	}
 }
 
@@ -85,7 +85,7 @@ func RecommendedDefaultClientConnectionConfiguration(obj *ClientConnectionConfig
 // run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedDebuggingConfiguration(obj *DebuggingConfiguration) {
 	if obj.EnableProfiling == nil {
-		obj.EnableProfiling = utilpointer.BoolPtr(true) // profile debugging is cheap to have exposed and standard on kube binaries
+		obj.EnableProfiling = utilpointer.Bool(true) // profile debugging is cheap to have exposed and standard on kube binaries
 	}
 }
 

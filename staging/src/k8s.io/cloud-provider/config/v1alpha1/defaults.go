@@ -60,7 +60,7 @@ func SetDefaults_KubeCloudSharedConfiguration(obj *KubeCloudSharedConfiguration)
 		obj.ClusterName = "kubernetes"
 	}
 	if obj.ConfigureCloudRoutes == nil {
-		obj.ConfigureCloudRoutes = utilpointer.BoolPtr(true)
+		obj.ConfigureCloudRoutes = utilpointer.Bool(true)
 	}
 	if obj.RouteReconciliationPeriod == zero {
 		obj.RouteReconciliationPeriod = metav1.Duration{Duration: 10 * time.Second}

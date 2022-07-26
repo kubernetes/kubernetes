@@ -200,7 +200,7 @@ func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
 
 		tr, inErr := ts.coreClient.ServiceAccounts(ts.namespace).CreateToken(context.TODO(), ts.serviceAccountName, &v1authenticationapi.TokenRequest{
 			Spec: v1authenticationapi.TokenRequestSpec{
-				ExpirationSeconds: utilpointer.Int64Ptr(ts.expirationSeconds),
+				ExpirationSeconds: utilpointer.Int64(ts.expirationSeconds),
 			},
 		}, metav1.CreateOptions{})
 		if inErr != nil {

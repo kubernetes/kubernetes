@@ -297,8 +297,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				Namespace: api.NamespaceNodeLease,
 			},
 			Spec: coordination.LeaseSpec{
-				HolderIdentity:       pointer.StringPtr("mynode"),
-				LeaseDurationSeconds: pointer.Int32Ptr(40),
+				HolderIdentity:       pointer.String("mynode"),
+				LeaseDurationSeconds: pointer.Int32(40),
 				RenewTime:            &metav1.MicroTime{Time: time.Now()},
 			},
 		}
@@ -308,8 +308,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				Namespace: "foo",
 			},
 			Spec: coordination.LeaseSpec{
-				HolderIdentity:       pointer.StringPtr("mynode"),
-				LeaseDurationSeconds: pointer.Int32Ptr(40),
+				HolderIdentity:       pointer.String("mynode"),
+				LeaseDurationSeconds: pointer.Int32(40),
 				RenewTime:            &metav1.MicroTime{Time: time.Now()},
 			},
 		}
@@ -319,8 +319,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				Namespace: api.NamespaceNodeLease,
 			},
 			Spec: coordination.LeaseSpec{
-				HolderIdentity:       pointer.StringPtr("mynode"),
-				LeaseDurationSeconds: pointer.Int32Ptr(40),
+				HolderIdentity:       pointer.String("mynode"),
+				LeaseDurationSeconds: pointer.Int32(40),
 				RenewTime:            &metav1.MicroTime{Time: time.Now()},
 			},
 		}
@@ -1256,7 +1256,7 @@ func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
 		Kind:       "Node",
 		Name:       "mynode",
 		UID:        "mynode-uid",
-		Controller: pointer.BoolPtr(true),
+		Controller: pointer.Bool(true),
 	}
 	invalidName := validOwner
 	invalidName.Name = "other"
@@ -1267,9 +1267,9 @@ func Test_nodePlugin_Admit_OwnerReference(t *testing.T) {
 	invalidControllerNil := validOwner
 	invalidControllerNil.Controller = nil
 	invalidControllerFalse := validOwner
-	invalidControllerFalse.Controller = pointer.BoolPtr(false)
+	invalidControllerFalse.Controller = pointer.Bool(false)
 	invalidBlockDeletion := validOwner
-	invalidBlockDeletion.BlockOwnerDeletion = pointer.BoolPtr(true)
+	invalidBlockDeletion.BlockOwnerDeletion = pointer.Bool(true)
 
 	tests := []struct {
 		name        string

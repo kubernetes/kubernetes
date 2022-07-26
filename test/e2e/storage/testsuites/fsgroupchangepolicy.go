@@ -228,7 +228,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 				NS:                     f.Namespace.Name,
 				NodeSelection:          l.config.ClientNodeSelection,
 				PVCs:                   []*v1.PersistentVolumeClaim{l.resource.Pvc},
-				FsGroup:                utilpointer.Int64Ptr(int64(test.initialPodFsGroup)),
+				FsGroup:                utilpointer.Int64(int64(test.initialPodFsGroup)),
 				PodFSGroupChangePolicy: &policy,
 			}
 			// Create initial pod and create files in root and sub-directory and verify ownership.
@@ -249,7 +249,7 @@ func (s *fsGroupChangePolicyTestSuite) DefineTests(driver storageframework.TestD
 			framework.ExpectNoError(e2epod.DeletePodWithWait(f.ClientSet, pod))
 
 			// Create a second pod with existing volume and verify the contents ownership.
-			podConfig.FsGroup = utilpointer.Int64Ptr(int64(test.secondPodFsGroup))
+			podConfig.FsGroup = utilpointer.Int64(int64(test.secondPodFsGroup))
 			pod = createPodAndVerifyContentGid(l.config.Framework, &podConfig, false /* createInitialFiles */, strconv.Itoa(test.finalExpectedRootDirFileOwnership), strconv.Itoa(test.finalExpectedSubDirFileOwnership))
 			ginkgo.By(fmt.Sprintf("Deleting Pod %s/%s", pod.Namespace, pod.Name))
 			framework.ExpectNoError(e2epod.DeletePodWithWait(f.ClientSet, pod))

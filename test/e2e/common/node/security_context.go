@@ -119,7 +119,7 @@ var _ = SIGDescribe("Security Context", func() {
 							Name:    podName,
 							Command: []string{"id", "-u"}, // Print UID and exit
 							SecurityContext: &v1.SecurityContext{
-								RunAsNonRoot: pointer.BoolPtr(true),
+								RunAsNonRoot: pointer.Bool(true),
 								RunAsUser:    userid,
 							},
 						},
@@ -132,7 +132,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-nonroot-uid"
-			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(nonRootTestUserID))
+			pod := makeNonRootPod(name, rootImage, pointer.Int64(nonRootTestUserID))
 			podClient.Create(pod)
 
 			podClient.WaitForSuccess(name, framework.PodStartTimeout)
@@ -142,7 +142,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// creates a pod with RunAsUser, which is not supported on Windows.
 			e2eskipper.SkipIfNodeOSDistroIs("windows")
 			name := "explicit-root-uid"
-			pod := makeNonRootPod(name, nonRootImage, pointer.Int64Ptr(0))
+			pod := makeNonRootPod(name, nonRootImage, pointer.Int64(0))
 			pod = podClient.Create(pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(pod)

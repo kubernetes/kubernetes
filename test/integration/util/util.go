@@ -505,7 +505,7 @@ func InitTestSchedulerWithNS(t *testing.T, nsPrefix string, opts ...scheduler.Op
 func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
 		Profiles: []v1beta3.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins: &v1beta3.Plugins{
 				PostFilter: v1beta3.PluginSet{
 					Disabled: []v1beta3.Plugin{

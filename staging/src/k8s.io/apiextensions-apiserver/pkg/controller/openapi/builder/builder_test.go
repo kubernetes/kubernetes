@@ -615,7 +615,7 @@ func TestBuildOpenAPIV2(t *testing.T) {
 		{
 			"with spec.preseveUnknownFields=true",
 			`{"type":"object","properties":{"foo":{"type":"string"}}}`,
-			utilpointer.BoolPtr(true),
+			utilpointer.Bool(true),
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true},
 		},
@@ -647,7 +647,7 @@ func TestBuildOpenAPIV2(t *testing.T) {
 				}
 			}
 			if tt.preserveUnknownFields != nil && *tt.preserveUnknownFields {
-				validation.OpenAPIV3Schema.XPreserveUnknownFields = utilpointer.BoolPtr(true)
+				validation.OpenAPIV3Schema.XPreserveUnknownFields = utilpointer.Bool(true)
 			}
 
 			// TODO: mostly copied from the test above. reuse code to cleanup
@@ -751,7 +751,7 @@ func TestBuildOpenAPIV3(t *testing.T) {
 				}
 			}
 			if tt.preserveUnknownFields != nil && *tt.preserveUnknownFields {
-				validation.OpenAPIV3Schema.XPreserveUnknownFields = utilpointer.BoolPtr(true)
+				validation.OpenAPIV3Schema.XPreserveUnknownFields = utilpointer.Bool(true)
 			}
 
 			got, err := BuildOpenAPIV3(&apiextensionsv1.CustomResourceDefinition{

@@ -109,7 +109,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Logging.Format = "text"
 			}
 			obj.EnableSystemLogHandler = true
-			obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(rand.Float64())
+			obj.MemoryThrottlingFactor = utilpointer.Float64(rand.Float64())
 		},
 	}
 }

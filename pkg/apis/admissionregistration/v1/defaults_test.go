@@ -107,7 +107,7 @@ func TestDefaultAdmissionWebhook(t *testing.T) {
 				Webhooks: []v1.MutatingWebhook{{
 					ClientConfig: v1.WebhookClientConfig{
 						Service: &v1.ServiceReference{
-							Port: utilpointer.Int32Ptr(443), // defaulted
+							Port: utilpointer.Int32(443), // defaulted
 						},
 					},
 					FailurePolicy:      &fail,

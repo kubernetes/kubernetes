@@ -382,17 +382,17 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		policyIgnore := admissionregistrationv1.Ignore
 
 		ginkgo.By("Setting timeout (1s) shorter than webhook latency (5s)")
-		slowWebhookCleanup := registerSlowWebhook(f, f.UniqueName, certCtx, &policyFail, pointer.Int32Ptr(1), servicePort)
+		slowWebhookCleanup := registerSlowWebhook(f, f.UniqueName, certCtx, &policyFail, pointer.Int32(1), servicePort)
 		testSlowWebhookTimeoutFailEarly(f)
 		slowWebhookCleanup()
 
 		ginkgo.By("Having no error when timeout is shorter than webhook latency and failure policy is ignore")
-		slowWebhookCleanup = registerSlowWebhook(f, f.UniqueName, certCtx, &policyIgnore, pointer.Int32Ptr(1), servicePort)
+		slowWebhookCleanup = registerSlowWebhook(f, f.UniqueName, certCtx, &policyIgnore, pointer.Int32(1), servicePort)
 		testSlowWebhookTimeoutNoError(f)
 		slowWebhookCleanup()
 
 		ginkgo.By("Having no error when timeout is longer than webhook latency")
-		slowWebhookCleanup = registerSlowWebhook(f, f.UniqueName, certCtx, &policyFail, pointer.Int32Ptr(10), servicePort)
+		slowWebhookCleanup = registerSlowWebhook(f, f.UniqueName, certCtx, &policyFail, pointer.Int32(10), servicePort)
 		testSlowWebhookTimeoutNoError(f)
 		slowWebhookCleanup()
 
@@ -920,7 +920,7 @@ func registerWebhookForAttachingPod(f *framework.Framework, configName string, c
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/pods/attach"),
-						Port:      pointer.Int32Ptr(servicePort),
+						Port:      pointer.Int32(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -1014,7 +1014,7 @@ func registerMutatingWebhookForPod(f *framework.Framework, configName string, ce
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/mutating-pods"),
-						Port:      pointer.Int32Ptr(servicePort),
+						Port:      pointer.Int32(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -1210,7 +1210,7 @@ func failingWebhook(namespace, name string, servicePort int32) admissionregistra
 				Namespace: namespace,
 				Name:      serviceName,
 				Path:      strPtr("/configmaps"),
-				Port:      pointer.Int32Ptr(servicePort),
+				Port:      pointer.Int32(servicePort),
 			},
 			// Without CA bundle, the call to webhook always fails
 			CABundle: nil,
@@ -1321,7 +1321,7 @@ func registerValidatingWebhookForWebhookConfigurations(f *framework.Framework, c
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/always-deny"),
-						Port:      pointer.Int32Ptr(servicePort),
+						Port:      pointer.Int32(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -1382,7 +1382,7 @@ func registerMutatingWebhookForWebhookConfigurations(f *framework.Framework, con
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/add-label"),
-						Port:      pointer.Int32Ptr(servicePort),
+						Port:      pointer.Int32(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -1445,7 +1445,7 @@ func testWebhooksForWebhookConfigurations(f *framework.Framework, configName str
 						// but because the failure policy is ignore, it will
 						// have no effect on admission requests.
 						Path: strPtr(""),
-						Port: pointer.Int32Ptr(servicePort),
+						Port: pointer.Int32(servicePort),
 					},
 					CABundle: nil,
 				},
@@ -1501,7 +1501,7 @@ func testWebhooksForWebhookConfigurations(f *framework.Framework, configName str
 						// but because the failure policy is ignore, it will
 						// have no effect on admission requests.
 						Path: strPtr(""),
-						Port: pointer.Int32Ptr(servicePort),
+						Port: pointer.Int32(servicePort),
 					},
 					CABundle: nil,
 				},
@@ -1710,7 +1710,7 @@ func registerWebhookForCustomResource(f *framework.Framework, configName string,
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/custom-resource"),
-						Port:      pointer.Int32Ptr(servicePort),
+						Port:      pointer.Int32(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -1761,7 +1761,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, configName
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/mutating-custom-resource"),
-						Port:      pointer.Int32Ptr(servicePort),
+						Port:      pointer.Int32(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -1787,7 +1787,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, configName
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/mutating-custom-resource"),
-						Port:      pointer.Int32Ptr(servicePort),
+						Port:      pointer.Int32(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -2020,7 +2020,7 @@ func registerValidatingWebhookForCRD(f *framework.Framework, configName string, 
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/crd"),
-						Port:      pointer.Int32Ptr(servicePort),
+						Port:      pointer.Int32(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -2056,7 +2056,7 @@ func testCRDDenyWebhook(f *framework.Framework) {
 			Storage: true,
 			Schema: &apiextensionsv1.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-					XPreserveUnknownFields: pointer.BoolPtr(true),
+					XPreserveUnknownFields: pointer.Bool(true),
 					Type:                   "object",
 				},
 			},
@@ -2147,7 +2147,7 @@ func registerSlowWebhook(f *framework.Framework, configName string, certCtx *cer
 						Namespace: namespace,
 						Name:      serviceName,
 						Path:      strPtr("/always-allow-delay-5s"),
-						Port:      pointer.Int32Ptr(servicePort),
+						Port:      pointer.Int32(servicePort),
 					},
 					CABundle: certCtx.signingCert,
 				},
@@ -2210,7 +2210,7 @@ func createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f *framework.Framewo
 				Storage: true,
 				Schema: &apiextensionsv1.CustomResourceValidation{
 					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-						XPreserveUnknownFields: pointer.BoolPtr(true),
+						XPreserveUnknownFields: pointer.Bool(true),
 						Type:                   "object",
 					},
 				},
@@ -2221,7 +2221,7 @@ func createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f *framework.Framewo
 				Storage: false,
 				Schema: &apiextensionsv1.CustomResourceValidation{
 					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-						XPreserveUnknownFields: pointer.BoolPtr(true),
+						XPreserveUnknownFields: pointer.Bool(true),
 						Type:                   "object",
 					},
 				},
@@ -2288,7 +2288,7 @@ func newDenyPodWebhookFixture(f *framework.Framework, certCtx *certContext, serv
 				Namespace: f.Namespace.Name,
 				Name:      serviceName,
 				Path:      strPtr("/pods"),
-				Port:      pointer.Int32Ptr(servicePort),
+				Port:      pointer.Int32(servicePort),
 			},
 			CABundle: certCtx.signingCert,
 		},
@@ -2329,7 +2329,7 @@ func newDenyConfigMapWebhookFixture(f *framework.Framework, certCtx *certContext
 				Namespace: f.Namespace.Name,
 				Name:      serviceName,
 				Path:      strPtr("/configmaps"),
-				Port:      pointer.Int32Ptr(servicePort),
+				Port:      pointer.Int32(servicePort),
 			},
 			CABundle: certCtx.signingCert,
 		},
@@ -2355,7 +2355,7 @@ func newMutateConfigMapWebhookFixture(f *framework.Framework, certCtx *certConte
 				Namespace: f.Namespace.Name,
 				Name:      serviceName,
 				Path:      strPtr("/mutating-configmaps"),
-				Port:      pointer.Int32Ptr(servicePort),
+				Port:      pointer.Int32(servicePort),
 			},
 			CABundle: certCtx.signingCert,
 		},
@@ -2434,7 +2434,7 @@ func newValidatingIsReadyWebhookFixture(f *framework.Framework, certCtx *certCon
 				Namespace: f.Namespace.Name,
 				Name:      serviceName,
 				Path:      strPtr("/always-deny"),
-				Port:      pointer.Int32Ptr(servicePort),
+				Port:      pointer.Int32(servicePort),
 			},
 			CABundle: certCtx.signingCert,
 		},
@@ -2473,7 +2473,7 @@ func newMutatingIsReadyWebhookFixture(f *framework.Framework, certCtx *certConte
 				Namespace: f.Namespace.Name,
 				Name:      serviceName,
 				Path:      strPtr("/always-deny"),
-				Port:      pointer.Int32Ptr(servicePort),
+				Port:      pointer.Int32(servicePort),
 			},
 			CABundle: certCtx.signingCert,
 		},

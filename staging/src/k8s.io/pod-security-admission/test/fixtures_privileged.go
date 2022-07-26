@@ -38,8 +38,8 @@ func init() {
 			return []*corev1.Pod{
 				// privileged explicitly set to false
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.Containers[0].SecurityContext.Privileged = pointer.BoolPtr(false)
-					p.Spec.InitContainers[0].SecurityContext.Privileged = pointer.BoolPtr(false)
+					p.Spec.Containers[0].SecurityContext.Privileged = pointer.Bool(false)
+					p.Spec.InitContainers[0].SecurityContext.Privileged = pointer.Bool(false)
 				}),
 			}
 		},
@@ -48,12 +48,12 @@ func init() {
 			return []*corev1.Pod{
 				// privileged set to true in container
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.Containers[0].SecurityContext.Privileged = pointer.BoolPtr(true)
+					p.Spec.Containers[0].SecurityContext.Privileged = pointer.Bool(true)
 					p.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
 				}),
 				// privileged set to true in init container
 				tweak(p, func(p *corev1.Pod) {
-					p.Spec.InitContainers[0].SecurityContext.Privileged = pointer.BoolPtr(true)
+					p.Spec.InitContainers[0].SecurityContext.Privileged = pointer.Bool(true)
 					p.Spec.InitContainers[0].SecurityContext.AllowPrivilegeEscalation = nil
 				}),
 			}

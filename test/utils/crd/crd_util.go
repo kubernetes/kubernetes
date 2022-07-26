@@ -132,7 +132,7 @@ func CreateTestCRD(f *framework.Framework, opts ...Option) (*TestCrd, error) {
 				Storage: true,
 				Schema: &apiextensionsv1.CustomResourceValidation{
 					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-						XPreserveUnknownFields: pointer.BoolPtr(true),
+						XPreserveUnknownFields: pointer.Bool(true),
 						Type:                   "object",
 					},
 				},

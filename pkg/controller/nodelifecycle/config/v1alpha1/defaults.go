@@ -45,6 +45,6 @@ func RecommendedDefaultNodeLifecycleControllerConfiguration(obj *kubectrlmgrconf
 		obj.NodeStartupGracePeriod = metav1.Duration{Duration: 60 * time.Second}
 	}
 	if obj.EnableTaintManager == nil {
-		obj.EnableTaintManager = utilpointer.BoolPtr(true)
+		obj.EnableTaintManager = utilpointer.Bool(true)
 	}
 }

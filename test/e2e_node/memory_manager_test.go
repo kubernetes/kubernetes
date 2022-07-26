@@ -311,11 +311,11 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 
 	ginkgo.BeforeEach(func() {
 		if isMultiNUMASupported == nil {
-			isMultiNUMASupported = pointer.BoolPtr(isMultiNUMA())
+			isMultiNUMASupported = pointer.Bool(isMultiNUMA())
 		}
 
 		if is2MiHugepagesSupported == nil {
-			is2MiHugepagesSupported = pointer.BoolPtr(isHugePageAvailable(hugepagesSize2M))
+			is2MiHugepagesSupported = pointer.Bool(isHugePageAvailable(hugepagesSize2M))
 		}
 
 		if len(allNUMANodes) == 0 {
@@ -326,7 +326,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 		if *is2MiHugepagesSupported {
 			ginkgo.By("Configuring hugepages")
 			gomega.Eventually(func() error {
-				return configureHugePages(hugepagesSize2M, hugepages2MiCount, pointer.IntPtr(0))
+				return configureHugePages(hugepagesSize2M, hugepages2MiCount, pointer.Int(0))
 			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
 		}
 	})
@@ -359,7 +359,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 			ginkgo.By("Releasing allocated hugepages")
 			gomega.Eventually(func() error {
 				// configure hugepages on the NUMA node 0 to avoid hugepages split across NUMA nodes
-				return configureHugePages(hugepagesSize2M, 0, pointer.IntPtr(0))
+				return configureHugePages(hugepagesSize2M, 0, pointer.Int(0))
 			}, 90*time.Second, 15*time.Second).ShouldNot(gomega.HaveOccurred(), "failed to release hugepages")
 		}
 	})

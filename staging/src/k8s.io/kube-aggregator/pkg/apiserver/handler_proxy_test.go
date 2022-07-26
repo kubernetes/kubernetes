@@ -129,7 +129,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service: &apiregistration.ServiceReference{Port: pointer.Int32Ptr(443)},
+					Service: &apiregistration.ServiceReference{Port: pointer.Int32(443)},
 					Group:   "foo",
 					Version: "v1",
 				},
@@ -151,7 +151,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:               &apiregistration.ServiceReference{Port: pointer.Int32Ptr(443)},
+					Service:               &apiregistration.ServiceReference{Port: pointer.Int32(443)},
 					Group:                 "foo",
 					Version:               "v1",
 					InsecureSkipTLSVerify: true,
@@ -183,7 +183,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32(443)},
 					Group:    "foo",
 					Version:  "v1",
 					CABundle: testCACrt,
@@ -215,7 +215,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32(443)},
 					Group:    "foo",
 					Version:  "v1",
 					CABundle: testCACrt,
@@ -238,7 +238,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:  &apiregistration.ServiceReference{Name: "bad-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "bad-service", Namespace: "test-ns", Port: pointer.Int32(443)},
 					Group:    "foo",
 					Version:  "v1",
 					CABundle: testCACrt,
@@ -260,7 +260,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service: &apiregistration.ServiceReference{Port: pointer.Int32Ptr(443)},
+					Service: &apiregistration.ServiceReference{Port: pointer.Int32(443)},
 					Group:   "foo",
 					Version: "v1",
 				},
@@ -281,7 +281,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32(443)},
 					Group:    "foo",
 					Version:  "v1",
 					CABundle: testCACrt,
@@ -429,7 +429,7 @@ func TestProxyUpgrade(t *testing.T) {
 					CABundle: testCACrt,
 					Group:    "mygroup",
 					Version:  "v1",
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32(443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -446,7 +446,7 @@ func TestProxyUpgrade(t *testing.T) {
 					InsecureSkipTLSVerify: true,
 					Group:                 "mygroup",
 					Version:               "v1",
-					Service:               &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns", Port: pointer.Int32Ptr(443)},
+					Service:               &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns", Port: pointer.Int32(443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -463,7 +463,7 @@ func TestProxyUpgrade(t *testing.T) {
 					CABundle: testCACrt,
 					Group:    "mygroup",
 					Version:  "v1",
-					Service:  &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns", Port: pointer.Int32(443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -480,7 +480,7 @@ func TestProxyUpgrade(t *testing.T) {
 					CABundle: testCACrt,
 					Group:    "mygroup",
 					Version:  "v1",
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32(443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -498,7 +498,7 @@ func TestProxyUpgrade(t *testing.T) {
 					CABundle: testCACrt,
 					Group:    "mygroup",
 					Version:  "v1",
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32(443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -857,7 +857,7 @@ func TestProxyCertReload(t *testing.T) {
 	apiService := &apiregistration.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 		Spec: apiregistration.APIServiceSpec{
-			Service:  &apiregistration.ServiceReference{Name: "test-service2", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+			Service:  &apiregistration.ServiceReference{Name: "test-service2", Namespace: "test-ns", Port: pointer.Int32(443)},
 			Group:    "foo",
 			Version:  "v1",
 			CABundle: backendCaCertificate(), // used to validate backendCertificate()

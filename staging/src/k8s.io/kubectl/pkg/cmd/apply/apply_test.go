@@ -1398,7 +1398,7 @@ func TestForceApply(t *testing.T) {
 						var bodyRC io.ReadCloser
 						if isScaledDownToZero {
 							rcObj := readReplicationControllerFromFile(t, filenameRC)
-							rcObj.Spec.Replicas = utilpointer.Int32Ptr(0)
+							rcObj.Spec.Replicas = utilpointer.Int32(0)
 							rcBytes, err := runtime.Encode(codec, rcObj)
 							if err != nil {
 								t.Fatal(err)

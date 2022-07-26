@@ -83,7 +83,7 @@ func SetTypeNodePort(svc *api.Service) {
 func SetTypeLoadBalancer(svc *api.Service) {
 	svc.Spec.Type = api.ServiceTypeLoadBalancer
 	svc.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeCluster
-	svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+	svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
 	svc.Spec.ExternalName = ""
 	internalTrafficPolicy := api.ServiceInternalTrafficPolicyCluster
 	svc.Spec.InternalTrafficPolicy = &internalTrafficPolicy
@@ -193,7 +193,7 @@ func SetExternalTrafficPolicy(policy api.ServiceExternalTrafficPolicyType) Tweak
 // SetAllocateLoadBalancerNodePorts sets the allocate LB node port field.
 func SetAllocateLoadBalancerNodePorts(val bool) Tweak {
 	return func(svc *api.Service) {
-		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(val)
+		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(val)
 	}
 }
 

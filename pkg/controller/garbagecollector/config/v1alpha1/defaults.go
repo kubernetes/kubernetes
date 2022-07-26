@@ -32,7 +32,7 @@ import (
 // run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedDefaultGarbageCollectorControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.GarbageCollectorControllerConfiguration) {
 	if obj.EnableGarbageCollector == nil {
-		obj.EnableGarbageCollector = utilpointer.BoolPtr(true)
+		obj.EnableGarbageCollector = utilpointer.Bool(true)
 	}
 	if obj.ConcurrentGCSyncs == 0 {
 		obj.ConcurrentGCSyncs = 20

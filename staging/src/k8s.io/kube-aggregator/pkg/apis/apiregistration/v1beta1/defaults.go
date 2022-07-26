@@ -28,6 +28,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 // SetDefaults_ServiceReference sets defaults for AuditSync Webhook's ServiceReference
 func SetDefaults_ServiceReference(obj *ServiceReference) {
 	if obj.Port == nil {
-		obj.Port = utilpointer.Int32Ptr(443)
+		obj.Port = utilpointer.Int32(443)
 	}
 }

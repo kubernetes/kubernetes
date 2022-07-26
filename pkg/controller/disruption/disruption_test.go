@@ -498,7 +498,7 @@ func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 5, 7, map[string]metav1.Time{})
 
 	// Update scale of ReplicaSet and check PDB
-	rs.Spec.Replicas = utilpointer.Int32Ptr(5)
+	rs.Spec.Replicas = utilpointer.Int32(5)
 	update(t, dc.rsStore, rs)
 
 	dc.sync(ctx, pdbName)
@@ -524,7 +524,7 @@ func TestPercentageMaxUnavailableWithScaling(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 4, 7, map[string]metav1.Time{})
 
 	// Update scale of ReplicaSet and check PDB
-	rs.Spec.Replicas = utilpointer.Int32Ptr(3)
+	rs.Spec.Replicas = utilpointer.Int32(3)
 	update(t, dc.rsStore, rs)
 
 	dc.sync(ctx, pdbName)

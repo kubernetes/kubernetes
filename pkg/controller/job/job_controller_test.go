@@ -740,7 +740,7 @@ func TestControllerSyncJob(t *testing.T) {
 
 				// job & pods setup
 				job := newJob(tc.parallelism, tc.completions, tc.backoffLimit, tc.completionMode)
-				job.Spec.Suspend = pointer.BoolPtr(tc.suspend)
+				job.Spec.Suspend = pointer.Bool(tc.suspend)
 				key, err := controller.KeyFunc(job)
 				if err != nil {
 					t.Errorf("Unexpected error getting job key: %v", err)
@@ -933,7 +933,7 @@ func TestSyncJobLegacyTracking(t *testing.T) {
 					Namespace: "ns",
 				},
 				Spec: batch.JobSpec{
-					Parallelism: pointer.Int32Ptr(1),
+					Parallelism: pointer.Int32(1),
 				},
 			},
 		},
@@ -944,7 +944,7 @@ func TestSyncJobLegacyTracking(t *testing.T) {
 					Namespace: "ns",
 				},
 				Spec: batch.JobSpec{
-					Parallelism: pointer.Int32Ptr(1),
+					Parallelism: pointer.Int32(1),
 				},
 			},
 			trackingWithFinalizersEnabled: true,
@@ -959,7 +959,7 @@ func TestSyncJobLegacyTracking(t *testing.T) {
 					},
 				},
 				Spec: batch.JobSpec{
-					Parallelism: pointer.Int32Ptr(1),
+					Parallelism: pointer.Int32(1),
 				},
 			},
 			// Finalizer removed.
@@ -975,7 +975,7 @@ func TestSyncJobLegacyTracking(t *testing.T) {
 					},
 				},
 				Spec: batch.JobSpec{
-					Parallelism: pointer.Int32Ptr(1),
+					Parallelism: pointer.Int32(1),
 				},
 			},
 			trackingWithFinalizersEnabled: true,
@@ -991,7 +991,7 @@ func TestSyncJobLegacyTracking(t *testing.T) {
 					},
 				},
 				Spec: batch.JobSpec{
-					Parallelism: pointer.Int32Ptr(1),
+					Parallelism: pointer.Int32(1),
 				},
 			},
 			trackingWithFinalizersEnabled: true,
@@ -1457,7 +1457,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode: &indexedCompletion,
-					Completions:    pointer.Int32Ptr(6),
+					Completions:    pointer.Int32(6),
 				},
 				Status: batch.JobStatus{
 					Active: 1,
@@ -1484,7 +1484,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode: &indexedCompletion,
-					Completions:    pointer.Int32Ptr(6),
+					Completions:    pointer.Int32(6),
 				},
 				Status: batch.JobStatus{
 					Active: 1,
@@ -1516,7 +1516,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode: &indexedCompletion,
-					Completions:    pointer.Int32Ptr(7),
+					Completions:    pointer.Int32(7),
 				},
 				Status: batch.JobStatus{
 					Failed:           2,
@@ -1594,7 +1594,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					CompletionMode: &indexedCompletion,
-					Completions:    pointer.Int32Ptr(501),
+					Completions:    pointer.Int32(501),
 				},
 			},
 			pods: func() []*v1.Pod {
@@ -1770,7 +1770,7 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			// job & pods setup
 			job := newJob(tc.parallelism, tc.completions, tc.backoffLimit, batch.NonIndexedCompletion)
 			job.Spec.ActiveDeadlineSeconds = &tc.activeDeadlineSeconds
-			job.Spec.Suspend = pointer.BoolPtr(tc.suspend)
+			job.Spec.Suspend = pointer.Bool(tc.suspend)
 			start := metav1.Unix(metav1.Now().Time.Unix()-tc.startTime, 0)
 			job.Status.StartTime = &start
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)

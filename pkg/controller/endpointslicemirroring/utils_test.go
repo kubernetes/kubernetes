@@ -193,7 +193,7 @@ func TestAddressToEndpoint(t *testing.T) {
 	epAddress := v1.EndpointAddress{
 		IP:       "10.1.2.3",
 		Hostname: "foo",
-		NodeName: utilpointer.StringPtr("node-abc"),
+		NodeName: utilpointer.String("node-abc"),
 		TargetRef: &v1.ObjectReference{
 			APIVersion: "v1",
 			Kind:       "Pod",
@@ -204,9 +204,9 @@ func TestAddressToEndpoint(t *testing.T) {
 	ready := true
 	expectedEndpoint := discovery.Endpoint{
 		Addresses: []string{"10.1.2.3"},
-		Hostname:  utilpointer.StringPtr("foo"),
+		Hostname:  utilpointer.String("foo"),
 		Conditions: discovery.EndpointConditions{
-			Ready: utilpointer.BoolPtr(true),
+			Ready: utilpointer.Bool(true),
 		},
 		TargetRef: &v1.ObjectReference{
 			APIVersion: "v1",
@@ -214,7 +214,7 @@ func TestAddressToEndpoint(t *testing.T) {
 			Namespace:  "default",
 			Name:       "foo",
 		},
-		NodeName: utilpointer.StringPtr("node-abc"),
+		NodeName: utilpointer.String("node-abc"),
 	}
 
 	ep := addressToEndpoint(epAddress, ready)

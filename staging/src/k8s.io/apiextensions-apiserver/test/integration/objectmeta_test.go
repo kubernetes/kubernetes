@@ -121,7 +121,7 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 				"embedded": {
 					Type:                   "object",
 					XEmbeddedResource:      true,
-					XPreserveUnknownFields: pointer.BoolPtr(true),
+					XPreserveUnknownFields: pointer.Bool(true),
 				},
 			},
 		},

@@ -61,15 +61,15 @@ func init() {
 					// HostNetwork is required to be true for HostProcess pods.
 					// Set to true here so we pass API validation and get to admission checks.
 					p.Spec.HostNetwork = true
-					p.Spec.SecurityContext.WindowsOptions.HostProcess = pointer.BoolPtr(true)
+					p.Spec.SecurityContext.WindowsOptions.HostProcess = pointer.Bool(true)
 				}),
 				// true for containers
 				tweak(p, func(p *corev1.Pod) {
 					// HostNetwork is required to be true for HostProcess pods.
 					// Set to true here so we pass API validation and get to admission checks.
 					p.Spec.HostNetwork = true
-					p.Spec.Containers[0].SecurityContext.WindowsOptions.HostProcess = pointer.BoolPtr(true)
-					p.Spec.InitContainers[0].SecurityContext.WindowsOptions.HostProcess = pointer.BoolPtr(true)
+					p.Spec.Containers[0].SecurityContext.WindowsOptions.HostProcess = pointer.Bool(true)
+					p.Spec.InitContainers[0].SecurityContext.WindowsOptions.HostProcess = pointer.Bool(true)
 				}),
 			}
 		},

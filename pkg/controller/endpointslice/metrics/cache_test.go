@@ -92,8 +92,8 @@ func expectNumEndpointsAndSlices(t *testing.T, c *Cache, desired int, actual int
 func benchmarkUpdateServicePortCache(b *testing.B, num int) {
 	c := NewCache(int32(100))
 	ns := "benchmark"
-	httpKey := endpoint.NewPortMapKey([]discovery.EndpointPort{{Port: utilpointer.Int32Ptr(80)}})
-	httpsKey := endpoint.NewPortMapKey([]discovery.EndpointPort{{Port: utilpointer.Int32Ptr(443)}})
+	httpKey := endpoint.NewPortMapKey([]discovery.EndpointPort{{Port: utilpointer.Int32(80)}})
+	httpsKey := endpoint.NewPortMapKey([]discovery.EndpointPort{{Port: utilpointer.Int32(443)}})
 	spCache := &ServicePortCache{items: map[endpoint.PortMapKey]EfficiencyInfo{
 		httpKey: {
 			Endpoints: 182,

@@ -101,7 +101,7 @@ func newRemoteAPIService(name string) *apiregistration.APIService {
 			Service: &apiregistration.ServiceReference{
 				Namespace: "foo",
 				Name:      "bar",
-				Port:      pointer.Int32Ptr(testServicePort),
+				Port:      pointer.Int32(testServicePort),
 			},
 		},
 	}

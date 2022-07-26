@@ -251,7 +251,7 @@ func TestCreateRemoteEndpointOverlay(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Name:     utilpointer.String(svcPortName.Port),
 				Port:     utilpointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
@@ -398,7 +398,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName1.Port),
+				Name:     utilpointer.String(svcPortName1.Port),
 				Port:     utilpointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
@@ -409,7 +409,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName2.Port),
+				Name:     utilpointer.String(svcPortName2.Port),
 				Port:     utilpointer.Int32(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
@@ -457,7 +457,7 @@ func TestSharedRemoteEndpointDelete(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName2.Port),
+				Name:     utilpointer.String(svcPortName2.Port),
 				Port:     utilpointer.Int32(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
@@ -542,7 +542,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName1.Port),
+				Name:     utilpointer.String(svcPortName1.Port),
 				Port:     utilpointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
@@ -553,7 +553,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName2.Port),
+				Name:     utilpointer.String(svcPortName2.Port),
 				Port:     utilpointer.Int32(int32(svcPort2)),
 				Protocol: &tcpProtocol,
 			}}
@@ -611,7 +611,7 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName1.Port),
+				Name:     utilpointer.String(svcPortName1.Port),
 				Port:     utilpointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			}}
@@ -622,12 +622,12 @@ func TestSharedRemoteEndpointUpdate(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName1.Port),
+				Name:     utilpointer.String(svcPortName1.Port),
 				Port:     utilpointer.Int32(int32(svcPort1)),
 				Protocol: &tcpProtocol,
 			},
 				{
-					Name:     utilpointer.StringPtr("p443"),
+					Name:     utilpointer.String("p443"),
 					Port:     utilpointer.Int32(int32(443)),
 					Protocol: &tcpProtocol,
 				}}
@@ -696,7 +696,7 @@ func TestCreateLoadBalancer(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Name:     utilpointer.String(svcPortName.Port),
 				Port:     utilpointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
@@ -759,7 +759,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 				Addresses: []string{epIpAddressRemote},
 			}}
 			eps.Ports = []discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Name:     utilpointer.String(svcPortName.Port),
 				Port:     utilpointer.Int32(int32(svcPort)),
 				Protocol: &tcpProtocol,
 			}}
@@ -824,14 +824,14 @@ func TestEndpointSlice(t *testing.T) {
 		},
 		Ports: []discovery.EndpointPort{{
 			Name:     &svcPortName.Port,
-			Port:     utilpointer.Int32Ptr(80),
+			Port:     utilpointer.Int32(80),
 			Protocol: &tcpProtocol,
 		}},
 		AddressType: discovery.AddressTypeIPv4,
 		Endpoints: []discovery.Endpoint{{
 			Addresses:  []string{"192.168.2.3"},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-			NodeName:   utilpointer.StringPtr("testhost2"),
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.Bool(true)},
+			NodeName:   utilpointer.String("testhost2"),
 		}},
 	}
 

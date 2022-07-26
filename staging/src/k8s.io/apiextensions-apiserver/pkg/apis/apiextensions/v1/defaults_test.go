@@ -65,7 +65,7 @@ func TestDefaults(t *testing.T) {
 						Strategy: WebhookConverter,
 						Webhook: &WebhookConversion{
 							ClientConfig: &WebhookClientConfig{
-								Service: &ServiceReference{Port: utilpointer.Int32Ptr(443)},
+								Service: &ServiceReference{Port: utilpointer.Int32(443)},
 							},
 						},
 					},

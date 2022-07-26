@@ -75,7 +75,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Conversion.ConversionReviewVersions = []string{"v1beta1"}
 			}
 			if obj.PreserveUnknownFields == nil {
-				obj.PreserveUnknownFields = pointer.BoolPtr(true)
+				obj.PreserveUnknownFields = pointer.Bool(true)
 			}
 
 			// Move per-version schema, subresources, additionalPrinterColumns to the top-level.

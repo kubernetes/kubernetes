@@ -923,7 +923,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 		tcpService, err = tcpJig.UpdateService(func(s *v1.Service) {
 			s.Spec.LoadBalancerIP = requestedIP // will be "" if not applicable
 			s.Spec.Type = v1.ServiceTypeLoadBalancer
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
+			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(false)
 		})
 		framework.ExpectNoError(err)
 
@@ -966,7 +966,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 
 		ginkgo.By("adding a TCP service's NodePort")
 		tcpService, err = tcpJig.UpdateService(func(s *v1.Service) {
-			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+			s.Spec.AllocateLoadBalancerNodePorts = utilpointer.Bool(true)
 		})
 		framework.ExpectNoError(err)
 		tcpNodePort := int(tcpService.Spec.Ports[0].NodePort)

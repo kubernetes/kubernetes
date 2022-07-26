@@ -127,7 +127,7 @@ func NewHollowProxyOrDie(
 			ProxyMode:         "fake",
 			NodeRef:           nodeRef,
 			UseEndpointSlices: true,
-			OOMScoreAdj:       utilpointer.Int32Ptr(0),
+			OOMScoreAdj:       utilpointer.Int32(0),
 			ConfigSyncPeriod:  30 * time.Second,
 		},
 	}, nil

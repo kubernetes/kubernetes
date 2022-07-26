@@ -50,11 +50,11 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32Ptr(1),
-					Parallelism:    pointer.Int32Ptr(1),
-					BackoffLimit:   pointer.Int32Ptr(6),
+					Completions:    pointer.Int32(1),
+					Parallelism:    pointer.Int32(1),
+					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
-					Suspend:        pointer.BoolPtr(false),
+					Suspend:        pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -69,11 +69,11 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32Ptr(1),
-					Parallelism:    pointer.Int32Ptr(1),
-					BackoffLimit:   pointer.Int32Ptr(6),
+					Completions:    pointer.Int32(1),
+					Parallelism:    pointer.Int32(1),
+					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
-					Suspend:        pointer.BoolPtr(false),
+					Suspend:        pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -81,7 +81,7 @@ func TestSetDefaultJob(t *testing.T) {
 		"suspend set, everything else is defaulted": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Suspend: pointer.BoolPtr(true),
+					Suspend: pointer.Bool(true),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -89,11 +89,11 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32Ptr(1),
-					Parallelism:    pointer.Int32Ptr(1),
-					BackoffLimit:   pointer.Int32Ptr(6),
+					Completions:    pointer.Int32(1),
+					Parallelism:    pointer.Int32(1),
+					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
-					Suspend:        pointer.BoolPtr(true),
+					Suspend:        pointer.Bool(true),
 				},
 			},
 			expectLabels: true,
@@ -111,18 +111,18 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32Ptr(1),
-					Parallelism:    pointer.Int32Ptr(1),
-					BackoffLimit:   pointer.Int32Ptr(6),
+					Completions:    pointer.Int32(1),
+					Parallelism:    pointer.Int32(1),
+					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
-					Suspend:        pointer.BoolPtr(false),
+					Suspend:        pointer.Bool(false),
 				},
 			},
 		},
 		"WQ: Parallelism explicitly 0 and completions unset -> BackoffLimit is defaulted": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(0),
+					Parallelism: pointer.Int32(0),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -130,10 +130,10 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism:    pointer.Int32Ptr(0),
-					BackoffLimit:   pointer.Int32Ptr(6),
+					Parallelism:    pointer.Int32(0),
+					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
-					Suspend:        pointer.BoolPtr(false),
+					Suspend:        pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -141,7 +141,7 @@ func TestSetDefaultJob(t *testing.T) {
 		"WQ: Parallelism explicitly 2 and completions unset -> BackoffLimit is defaulted": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(2),
+					Parallelism: pointer.Int32(2),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -149,10 +149,10 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism:    pointer.Int32Ptr(2),
-					BackoffLimit:   pointer.Int32Ptr(6),
+					Parallelism:    pointer.Int32(2),
+					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
-					Suspend:        pointer.BoolPtr(false),
+					Suspend:        pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -160,7 +160,7 @@ func TestSetDefaultJob(t *testing.T) {
 		"Completions explicitly 2 and others unset -> parallelism and BackoffLimit are defaulted": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions: pointer.Int32Ptr(2),
+					Completions: pointer.Int32(2),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -168,11 +168,11 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32Ptr(2),
-					Parallelism:    pointer.Int32Ptr(1),
-					BackoffLimit:   pointer.Int32Ptr(6),
+					Completions:    pointer.Int32(2),
+					Parallelism:    pointer.Int32(1),
+					BackoffLimit:   pointer.Int32(6),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
-					Suspend:        pointer.BoolPtr(false),
+					Suspend:        pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -180,7 +180,7 @@ func TestSetDefaultJob(t *testing.T) {
 		"BackoffLimit explicitly 5 and others unset -> parallelism and completions are defaulted": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					BackoffLimit: pointer.Int32Ptr(5),
+					BackoffLimit: pointer.Int32(5),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -188,11 +188,11 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32Ptr(1),
-					Parallelism:    pointer.Int32Ptr(1),
-					BackoffLimit:   pointer.Int32Ptr(5),
+					Completions:    pointer.Int32(1),
+					Parallelism:    pointer.Int32(1),
+					BackoffLimit:   pointer.Int32(5),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
-					Suspend:        pointer.BoolPtr(false),
+					Suspend:        pointer.Bool(false),
 				},
 			},
 			expectLabels: true,
@@ -200,11 +200,11 @@ func TestSetDefaultJob(t *testing.T) {
 		"All set -> no change": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32Ptr(8),
-					Parallelism:    pointer.Int32Ptr(9),
-					BackoffLimit:   pointer.Int32Ptr(10),
+					Completions:    pointer.Int32(8),
+					Parallelism:    pointer.Int32(9),
+					BackoffLimit:   pointer.Int32(10),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
-					Suspend:        pointer.BoolPtr(false),
+					Suspend:        pointer.Bool(false),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -212,11 +212,11 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32Ptr(8),
-					Parallelism:    pointer.Int32Ptr(9),
-					BackoffLimit:   pointer.Int32Ptr(10),
+					Completions:    pointer.Int32(8),
+					Parallelism:    pointer.Int32(9),
+					BackoffLimit:   pointer.Int32(10),
 					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
-					Suspend:        pointer.BoolPtr(false),
+					Suspend:        pointer.Bool(false),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -227,11 +227,11 @@ func TestSetDefaultJob(t *testing.T) {
 		"All set, flipped -> no change": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32Ptr(11),
-					Parallelism:    pointer.Int32Ptr(10),
-					BackoffLimit:   pointer.Int32Ptr(9),
+					Completions:    pointer.Int32(11),
+					Parallelism:    pointer.Int32(10),
+					BackoffLimit:   pointer.Int32(9),
 					CompletionMode: completionModePtr(batchv1.IndexedCompletion),
-					Suspend:        pointer.BoolPtr(true),
+					Suspend:        pointer.Bool(true),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
 					},
@@ -239,11 +239,11 @@ func TestSetDefaultJob(t *testing.T) {
 			},
 			expected: &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Completions:    pointer.Int32Ptr(11),
-					Parallelism:    pointer.Int32Ptr(10),
-					BackoffLimit:   pointer.Int32Ptr(9),
+					Completions:    pointer.Int32(11),
+					Parallelism:    pointer.Int32(10),
+					BackoffLimit:   pointer.Int32(9),
 					CompletionMode: completionModePtr(batchv1.IndexedCompletion),
-					Suspend:        pointer.BoolPtr(true),
+					Suspend:        pointer.Bool(true),
 				},
 			},
 			expectLabels: true,
@@ -322,9 +322,9 @@ func TestSetDefaultCronJob(t *testing.T) {
 			expected: &batchv1.CronJob{
 				Spec: batchv1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1.AllowConcurrent,
-					Suspend:                    pointer.BoolPtr(false),
-					SuccessfulJobsHistoryLimit: pointer.Int32Ptr(3),
-					FailedJobsHistoryLimit:     pointer.Int32Ptr(1),
+					Suspend:                    pointer.Bool(false),
+					SuccessfulJobsHistoryLimit: pointer.Int32(3),
+					FailedJobsHistoryLimit:     pointer.Int32(1),
 				},
 			},
 		},
@@ -332,17 +332,17 @@ func TestSetDefaultCronJob(t *testing.T) {
 			original: &batchv1.CronJob{
 				Spec: batchv1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1.ForbidConcurrent,
-					Suspend:                    pointer.BoolPtr(true),
-					SuccessfulJobsHistoryLimit: pointer.Int32Ptr(5),
-					FailedJobsHistoryLimit:     pointer.Int32Ptr(5),
+					Suspend:                    pointer.Bool(true),
+					SuccessfulJobsHistoryLimit: pointer.Int32(5),
+					FailedJobsHistoryLimit:     pointer.Int32(5),
 				},
 			},
 			expected: &batchv1.CronJob{
 				Spec: batchv1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1.ForbidConcurrent,
-					Suspend:                    pointer.BoolPtr(true),
-					SuccessfulJobsHistoryLimit: pointer.Int32Ptr(5),
-					FailedJobsHistoryLimit:     pointer.Int32Ptr(5),
+					Suspend:                    pointer.Bool(true),
+					SuccessfulJobsHistoryLimit: pointer.Int32(5),
+					FailedJobsHistoryLimit:     pointer.Int32(5),
 				},
 			},
 		},

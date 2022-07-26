@@ -40,13 +40,13 @@ func TestSetDefaultEndpointPort(t *testing.T) {
 	}{
 		"should set appropriate defaults": {
 			original: &discovery.EndpointSlice{Ports: []discovery.EndpointPort{{
-				Port: utilpointer.Int32Ptr(80),
+				Port: utilpointer.Int32(80),
 			}}},
 			expected: &discovery.EndpointSlice{
 				Ports: []discovery.EndpointPort{{
 					Name:     &emptyStr,
 					Protocol: &protoTCP,
-					Port:     utilpointer.Int32Ptr(80),
+					Port:     utilpointer.Int32(80),
 				}},
 			},
 		},

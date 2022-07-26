@@ -583,7 +583,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 		{
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
-					Replicas: utilpointer.Int32Ptr(0),
+					Replicas: utilpointer.Int32(0),
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -598,7 +598,7 @@ func TestSetDefaultReplicationControllerReplicas(t *testing.T) {
 		{
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
-					Replicas: utilpointer.Int32Ptr(3),
+					Replicas: utilpointer.Int32(3),
 					Template: &v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -1731,7 +1731,7 @@ func TestDefaultRequestIsNotSetForReplicationController(t *testing.T) {
 	}
 	rc := &v1.ReplicationController{
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: utilpointer.Int32Ptr(3),
+			Replicas: utilpointer.Int32(3),
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{

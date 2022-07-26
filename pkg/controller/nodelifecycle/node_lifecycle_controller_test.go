@@ -116,7 +116,7 @@ func createNodeLease(nodeName string, renewTime metav1.MicroTime) *coordv1.Lease
 			Namespace: v1.NamespaceNodeLease,
 		},
 		Spec: coordv1.LeaseSpec{
-			HolderIdentity: pointer.StringPtr(nodeName),
+			HolderIdentity: pointer.String(nodeName),
 			RenewTime:      &renewTime,
 		},
 	}

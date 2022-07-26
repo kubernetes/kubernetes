@@ -232,7 +232,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				},
 				Spec: v1.ServiceSpec{
 					Type:              v1.ServiceTypeLoadBalancer,
-					LoadBalancerClass: utilpointer.StringPtr("custom-loadbalancer"),
+					LoadBalancerClass: utilpointer.String("custom-loadbalancer"),
 				},
 			},
 			expectOp:             deleteLoadBalancer,

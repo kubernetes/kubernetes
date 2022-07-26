@@ -76,11 +76,11 @@ const (
 func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *testutils.TestContext {
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{{
-			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			Plugins: &configv1.Plugins{
 				Score: configv1.PluginSet{
 					Enabled: []configv1.Plugin{
-						{Name: scorePluginName, Weight: pointer.Int32Ptr(1)},
+						{Name: scorePluginName, Weight: pointer.Int32(1)},
 					},
 					Disabled: []configv1.Plugin{
 						{Name: "*"},
@@ -104,10 +104,10 @@ func initTestSchedulerForNodeResourcesTest(t *testing.T) *testutils.TestContext 
 	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
 		Profiles: []configv1.KubeSchedulerProfile{
 			{
-				SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+				SchedulerName: pointer.String(v1.DefaultSchedulerName),
 			},
 			{
-				SchedulerName: pointer.StringPtr("gpu-binpacking-scheduler"),
+				SchedulerName: pointer.String("gpu-binpacking-scheduler"),
 				PluginConfig: []configv1.PluginConfig{
 					{
 						Name: noderesources.Name,

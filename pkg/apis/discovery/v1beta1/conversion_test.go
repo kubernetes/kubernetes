@@ -63,7 +63,7 @@ func TestEndpointZoneConverstion(t *testing.T) {
 				DeprecatedTopology: map[string]string{
 					"key1": "val1",
 				},
-				Zone: utilpointer.StringPtr("zone1"),
+				Zone: utilpointer.String("zone1"),
 			},
 		},
 		{
@@ -74,19 +74,19 @@ func TestEndpointZoneConverstion(t *testing.T) {
 				},
 			},
 			internal: discovery.Endpoint{
-				Zone: utilpointer.StringPtr("zone1"),
+				Zone: utilpointer.String("zone1"),
 			},
 		},
 		{
 			desc: "nodeName and topology[hostname] are populated with different values",
 			external: v1beta1.Endpoint{
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: utilpointer.String("node-1"),
 				Topology: map[string]string{
 					corev1.LabelHostname: "node-2",
 				},
 			},
 			internal: discovery.Endpoint{
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: utilpointer.String("node-1"),
 				DeprecatedTopology: map[string]string{
 					corev1.LabelHostname: "node-2",
 				},
@@ -95,13 +95,13 @@ func TestEndpointZoneConverstion(t *testing.T) {
 		{
 			desc: "nodeName and topology[hostname] are populated with same values",
 			external: v1beta1.Endpoint{
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: utilpointer.String("node-1"),
 				Topology: map[string]string{
 					corev1.LabelHostname: "node-1",
 				},
 			},
 			internal: discovery.Endpoint{
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: utilpointer.String("node-1"),
 			},
 		},
 		{
@@ -120,13 +120,13 @@ func TestEndpointZoneConverstion(t *testing.T) {
 		{
 			desc: "only nodeName is populated",
 			external: v1beta1.Endpoint{
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: utilpointer.String("node-1"),
 				Topology: map[string]string{
 					corev1.LabelHostname: "node-1",
 				},
 			},
 			internal: discovery.Endpoint{
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: utilpointer.String("node-1"),
 			},
 		},
 	}

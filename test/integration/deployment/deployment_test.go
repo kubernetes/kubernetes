@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -875,7 +875,7 @@ func TestSpecReplicasChange(t *testing.T) {
 	var oldGeneration int64
 	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
 		oldGeneration = update.Generation
-		update.Spec.RevisionHistoryLimit = pointer.Int32Ptr(4)
+		update.Spec.RevisionHistoryLimit = pointer.Int32(4)
 	})
 	if err != nil {
 		t.Fatalf("failed updating deployment %q: %v", tester.deployment.Name, err)
@@ -904,7 +904,7 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	// Assign a high value to the deployment's minReadySeconds
 	tester.deployment.Spec.MinReadySeconds = 3600
 	// progressDeadlineSeconds must be greater than minReadySeconds
-	tester.deployment.Spec.ProgressDeadlineSeconds = pointer.Int32Ptr(7200)
+	tester.deployment.Spec.ProgressDeadlineSeconds = pointer.Int32(7200)
 	var err error
 	tester.deployment, err = c.AppsV1().Deployments(ns.Name).Create(context.TODO(), tester.deployment, metav1.CreateOptions{})
 	if err != nil {

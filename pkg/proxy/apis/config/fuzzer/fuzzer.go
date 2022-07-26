@@ -35,15 +35,15 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FuzzNoCustom(obj)
 			obj.BindAddress = fmt.Sprintf("%d.%d.%d.%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256))
 			obj.ClientConnection.ContentType = c.RandString()
-			obj.Conntrack.MaxPerCore = utilpointer.Int32Ptr(c.Int31())
-			obj.Conntrack.Min = utilpointer.Int32Ptr(c.Int31())
+			obj.Conntrack.MaxPerCore = utilpointer.Int32(c.Int31())
+			obj.Conntrack.Min = utilpointer.Int32(c.Int31())
 			obj.Conntrack.TCPCloseWaitTimeout = &metav1.Duration{Duration: time.Duration(c.Int63()) * time.Hour}
 			obj.Conntrack.TCPEstablishedTimeout = &metav1.Duration{Duration: time.Duration(c.Int63()) * time.Hour}
 			obj.FeatureGates = map[string]bool{c.RandString(): true}
 			obj.HealthzBindAddress = fmt.Sprintf("%d.%d.%d.%d:%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(65536))
-			obj.IPTables.MasqueradeBit = utilpointer.Int32Ptr(c.Int31())
+			obj.IPTables.MasqueradeBit = utilpointer.Int32(c.Int31())
 			obj.MetricsBindAddress = fmt.Sprintf("%d.%d.%d.%d:%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(65536))
-			obj.OOMScoreAdj = utilpointer.Int32Ptr(c.Int31())
+			obj.OOMScoreAdj = utilpointer.Int32(c.Int31())
 			obj.ClientConnection.ContentType = "bar"
 			obj.NodePortAddresses = []string{"1.2.3.0/24"}
 		},

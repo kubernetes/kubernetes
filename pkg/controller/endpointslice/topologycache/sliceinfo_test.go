@@ -93,14 +93,14 @@ func sliceWithNEndpoints(ready, unready int) *discovery.EndpointSlice {
 	for i := 0; i < ready; i++ {
 		endpoints[i] = discovery.Endpoint{
 			Addresses:  []string{fmt.Sprintf("10.1.2.%d", i)},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.Bool(true)},
 		}
 	}
 
 	for i := 0; i < unready; i++ {
 		endpoints[ready+i] = discovery.Endpoint{
 			Addresses:  []string{fmt.Sprintf("10.1.2.%d", ready+i)},
-			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.Bool(false)},
 		}
 	}
 

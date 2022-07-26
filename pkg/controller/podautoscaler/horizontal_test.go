@@ -815,7 +815,7 @@ func TestScaleUpContainer(t *testing.T) {
 				Name: v1.ResourceCPU,
 				Target: autoscalingv2.MetricTarget{
 					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: utilpointer.Int32Ptr(30),
+					AverageUtilization: utilpointer.Int32(30),
 				},
 				Container: "container1",
 			},
@@ -1349,7 +1349,7 @@ func TestScaleDownContainerResource(t *testing.T) {
 				Name:      v1.ResourceCPU,
 				Target: autoscalingv2.MetricTarget{
 					Type:               autoscalingv2.UtilizationMetricType,
-					AverageUtilization: utilpointer.Int32Ptr(50),
+					AverageUtilization: utilpointer.Int32(50),
 				},
 			},
 		}},
@@ -3030,7 +3030,7 @@ func TestCalculateScaleUpLimitWithScalingRules(t *testing.T) {
 	policy := autoscalingv2.MinChangePolicySelect
 
 	calculated := calculateScaleUpLimitWithScalingRules(1, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
+		StabilizationWindowSeconds: utilpointer.Int32(300),
 		SelectPolicy:               &policy,
 		Policies: []autoscalingv2.HPAScalingPolicy{
 			{
@@ -3052,7 +3052,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 	policy := autoscalingv2.MinChangePolicySelect
 
 	calculated := calculateScaleDownLimitWithBehaviors(5, []timestampedScaleEvent{}, &autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: utilpointer.Int32Ptr(300),
+		StabilizationWindowSeconds: utilpointer.Int32(300),
 		SelectPolicy:               &policy,
 		Policies: []autoscalingv2.HPAScalingPolicy{
 			{
@@ -3073,7 +3073,7 @@ func TestCalculateScaleDownLimitWithBehaviors(t *testing.T) {
 func generateScalingRules(pods, podsPeriod, percent, percentPeriod, stabilizationWindow int32) *autoscalingv2.HPAScalingRules {
 	policy := autoscalingv2.MaxChangePolicySelect
 	directionBehavior := autoscalingv2.HPAScalingRules{
-		StabilizationWindowSeconds: utilpointer.Int32Ptr(stabilizationWindow),
+		StabilizationWindowSeconds: utilpointer.Int32(stabilizationWindow),
 		SelectPolicy:               &policy,
 	}
 	if pods != 0 {

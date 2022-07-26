@@ -814,7 +814,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 						},
 					},
-					ShareProcessNamespace: pointer.BoolPtr(true),
+					ShareProcessNamespace: pointer.Bool(true),
 				},
 			},
 		},

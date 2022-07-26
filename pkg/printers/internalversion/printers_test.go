@@ -967,7 +967,7 @@ func TestPrintIngress(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
 		},
 		Spec: networking.IngressSpec{
-			IngressClassName: utilpointer.StringPtr("foo"),
+			IngressClassName: utilpointer.String("foo"),
 			DefaultBackend: &networking.IngressBackend{
 				Service: &networking.IngressServiceBackend{
 					Name: "default-backend",
@@ -1030,7 +1030,7 @@ func TestPrintIngressClass(t *testing.T) {
 			Spec: networking.IngressClassSpec{
 				Controller: "example.com/controller",
 				Parameters: &networking.IngressClassParametersReference{
-					APIGroup: utilpointer.StringPtr("example.com"),
+					APIGroup: utilpointer.String("example.com"),
 					Kind:     "customgroup",
 					Name:     "example",
 				},
@@ -5397,8 +5397,8 @@ func TestPrintEndpointSlice(t *testing.T) {
 				},
 				AddressType: discovery.AddressTypeIPv4,
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr("http"),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     utilpointer.String("http"),
+					Port:     utilpointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}},
 				Endpoints: []discovery.Endpoint{{
@@ -5415,12 +5415,12 @@ func TestPrintEndpointSlice(t *testing.T) {
 				},
 				AddressType: discovery.AddressTypeIPv6,
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr("http"),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     utilpointer.String("http"),
+					Port:     utilpointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}, {
-					Name:     utilpointer.StringPtr("https"),
-					Port:     utilpointer.Int32Ptr(443),
+					Name:     utilpointer.String("https"),
+					Port:     utilpointer.Int32(443),
 					Protocol: &tcpProtocol,
 				}},
 				Endpoints: []discovery.Endpoint{{
@@ -5439,20 +5439,20 @@ func TestPrintEndpointSlice(t *testing.T) {
 				},
 				AddressType: discovery.AddressTypeIPv4,
 				Ports: []discovery.EndpointPort{{
-					Name:     utilpointer.StringPtr("http"),
-					Port:     utilpointer.Int32Ptr(80),
+					Name:     utilpointer.String("http"),
+					Port:     utilpointer.Int32(80),
 					Protocol: &tcpProtocol,
 				}, {
-					Name:     utilpointer.StringPtr("https"),
-					Port:     utilpointer.Int32Ptr(443),
+					Name:     utilpointer.String("https"),
+					Port:     utilpointer.Int32(443),
 					Protocol: &tcpProtocol,
 				}, {
-					Name:     utilpointer.StringPtr("extra1"),
-					Port:     utilpointer.Int32Ptr(3000),
+					Name:     utilpointer.String("extra1"),
+					Port:     utilpointer.Int32(3000),
 					Protocol: &tcpProtocol,
 				}, {
-					Name:     utilpointer.StringPtr("extra2"),
-					Port:     utilpointer.Int32Ptr(3001),
+					Name:     utilpointer.String("extra2"),
+					Port:     utilpointer.Int32(3001),
 					Protocol: &tcpProtocol,
 				}},
 				Endpoints: []discovery.Endpoint{{

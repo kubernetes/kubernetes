@@ -694,7 +694,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 			}
 			if addLimits {
 				driver.Allocatable = &storagev1.VolumeNodeResources{
-					Count: utilpointer.Int32Ptr(int32(limit)),
+					Count: utilpointer.Int32(int32(limit)),
 				}
 			}
 			csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, driver)

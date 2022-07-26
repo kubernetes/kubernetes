@@ -792,14 +792,14 @@ func getFakePVCLister(filterName string) fakeframework.PersistentVolumeClaimList
 			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCWithDefaultSCPod"},
 			Spec: v1.PersistentVolumeClaimSpec{
 				VolumeName:       "",
-				StorageClassName: utilpointer.StringPtr("standard-sc"),
+				StorageClassName: utilpointer.String("standard-sc"),
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCWithInvalidSCPod"},
 			Spec: v1.PersistentVolumeClaimSpec{
 				VolumeName:       "",
-				StorageClassName: utilpointer.StringPtr("invalid-sc"),
+				StorageClassName: utilpointer.String("invalid-sc"),
 			},
 		},
 	}

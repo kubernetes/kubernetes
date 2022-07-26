@@ -37,7 +37,7 @@ import (
 
 func TestSetDefaultHPA(t *testing.T) {
 	utilizationDefaultVal := int32(autoscaling.DefaultCPUUtilization)
-	defaultReplicas := utilpointer.Int32Ptr(1)
+	defaultReplicas := utilpointer.Int32(1)
 	defaultTemplate := []autoscalingv2beta1.MetricSpec{
 		{
 			Type: autoscalingv2beta1.ResourceMetricSourceType,
@@ -68,13 +68,13 @@ func TestSetDefaultHPA(t *testing.T) {
 		{ // MinReplicas update
 			original: &autoscalingv2beta1.HorizontalPodAutoscaler{
 				Spec: autoscalingv2beta1.HorizontalPodAutoscalerSpec{
-					MinReplicas: utilpointer.Int32Ptr(3),
+					MinReplicas: utilpointer.Int32(3),
 					Metrics:     defaultTemplate,
 				},
 			},
 			expected: &autoscalingv2beta1.HorizontalPodAutoscaler{
 				Spec: autoscalingv2beta1.HorizontalPodAutoscalerSpec{
-					MinReplicas: utilpointer.Int32Ptr(3),
+					MinReplicas: utilpointer.Int32(3),
 					Metrics:     defaultTemplate,
 				},
 			},
