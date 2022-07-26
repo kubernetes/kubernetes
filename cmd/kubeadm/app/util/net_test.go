@@ -17,10 +17,11 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func TestGetHostname(t *testing.T) {
