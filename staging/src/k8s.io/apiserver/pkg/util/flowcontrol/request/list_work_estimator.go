@@ -57,14 +57,7 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		// return maximumSeats for this request to be consistent.
 		return WorkEstimate{InitialSeats: maximumSeats}
 	}
-	isListFromCache := !storage.ShouldDelegateList(storage.ListOptions{
-		Predicate: storage.SelectionPredicate{
-			Limit:    listOptions.Limit,
-			Continue: listOptions.Continue,
-		},
-		ResourceVersion:      listOptions.ResourceVersion,
-		ResourceVersionMatch: listOptions.ResourceVersionMatch,
-	})
+	isListFromCache := !storage.ShouldDelegateList(storage.ConvertToListOptions(listOptions))
 
 	numStored, err := e.countGetterFn(key(requestInfo))
 	switch {

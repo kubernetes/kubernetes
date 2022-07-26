@@ -83,8 +83,12 @@ func (hwm *HighWaterMark) Update(current int64) bool {
 	}
 }
 
-// ShouldDelegateList decides if the LIST request will be served from the underlying storage
-// or from the cache itself.
+// ShouldDelegateList decides if the LIST request will be served from
+// the underlying storage or from the cache itself.
+//
+// NOTE: If in the future any other fields of ListOptions are required,
+// please handle conversions of those fields from respective fields of
+// metav1.ListOptions in the ConvertToListOptions func.
 func ShouldDelegateList(opts ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
@@ -99,4 +103,20 @@ func ShouldDelegateList(opts ListOptions) bool {
 	// since the watch cache isn't able to perform continuations, and
 	// limits are ignored when resource version is zero
 	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
+}
+
+// ConvertToListOptions converts metav1.ListOptions to storage.ListOptions.
+//
+// This function should be used when calling ShouldDelegateList if a conversion
+// is required to storage.ListOptions in order to ensure that we have all fields
+// needed by the function.
+func ConvertToListOptions(listOptions metav1.ListOptions) ListOptions {
+	return ListOptions{
+		ResourceVersion:      listOptions.ResourceVersion,
+		ResourceVersionMatch: listOptions.ResourceVersionMatch,
+		Predicate: SelectionPredicate{
+			Limit:    listOptions.Limit,
+			Continue: listOptions.Continue,
+		},
+	}
 }

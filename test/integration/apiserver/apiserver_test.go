@@ -559,14 +559,7 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 
 	// Cacher.GetList uses this for logic to decide if the watch cache is skipped. We need to know it to know if
 	// the limit is respected when testing here.
-	skipWatchCache := storage.ShouldDelegateList(storage.ListOptions{
-		Predicate: storage.SelectionPredicate{
-			Limit:    opts.Limit,
-			Continue: opts.Continue,
-		},
-		ResourceVersion:      opts.ResourceVersion,
-		ResourceVersionMatch: opts.ResourceVersionMatch,
-	})
+	skipWatchCache := storage.ShouldDelegateList(storage.ConvertToListOptions(opts))
 	usingWatchCache := watchCacheEnabled && !skipWatchCache
 
 	if usingWatchCache { // watch cache does not respect limit and is not used for continue
