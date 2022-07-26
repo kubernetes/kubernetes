@@ -69,7 +69,7 @@ type apiServiceInfo struct {
 	// ETag hash of the cached discoveryDocument
 	etag string
 
-	// Must be non-
+	// Must be non-nil
 	proxyHandler http.Handler
 
 	// Groups handled by this apiService
