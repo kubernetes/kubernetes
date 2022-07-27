@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 )
@@ -163,4 +164,11 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
+}
+
+// RunWithMetrics is a wrapper for Run that also tracks starting and stopping of the nodeipam controller with additional metric
+func (nc *Controller) RunWithMetrics(stopCh <-chan struct{}, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
+	controllerManagerMetrics.ControllerStarted("nodeipam")
+	defer controllerManagerMetrics.ControllerStopped("nodeipam")
+	nc.Run(stopCh)
 }
