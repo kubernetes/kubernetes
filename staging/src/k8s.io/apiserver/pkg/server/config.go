@@ -455,6 +455,12 @@ func (c *Config) AddHealthChecks(healthChecks ...healthz.HealthChecker) {
 	c.ReadyzChecks = append(c.ReadyzChecks, healthChecks...)
 }
 
+// AddReadyzChecks adds a health check to our config to be exposed by the readyz endpoint
+// of our configured apiserver.
+func (c *Config) AddReadyzChecks(healthChecks ...healthz.HealthChecker) {
+	c.ReadyzChecks = append(c.ReadyzChecks, healthChecks...)
+}
+
 // AddPostStartHook allows you to add a PostStartHook that will later be added to the server itself in a New call.
 // Name conflicts will cause an error.
 func (c *Config) AddPostStartHook(name string, hook PostStartHookFunc) error {
