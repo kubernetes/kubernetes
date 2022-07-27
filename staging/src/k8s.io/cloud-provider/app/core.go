@@ -40,7 +40,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
-func startCloudNodeController(ctx context.Context, initContext ControllerInitContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
+func startCloudNodeController(ctx context.Context, initContext ControllerInitContext, controlexContext controllermanagerapp.ControllerContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
 	// Start the CloudNodeController
 	nodeController, err := cloudnodecontroller.NewCloudNodeController(
 		completedConfig.SharedInformers.Core().V1().Nodes(),
@@ -54,7 +54,7 @@ func startCloudNodeController(ctx context.Context, initContext ControllerInitCon
 		return nil, false, nil
 	}
 
-	go nodeController.Run(ctx.Done())
+	go nodeController.Run(ctx.Done(), controlexContext.ControllerManagerMetrics)
 
 	return nil, true, nil
 }
@@ -78,7 +78,7 @@ func startCloudNodeLifecycleController(ctx context.Context, initContext Controll
 	return nil, true, nil
 }
 
-func startServiceController(ctx context.Context, initContext ControllerInitContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
+func startServiceController(ctx context.Context, initContext ControllerInitContext, controlexContext controllermanagerapp.ControllerContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
 	// Start the service controller
 	serviceController, err := servicecontroller.New(
 		cloud,
@@ -94,12 +94,12 @@ func startServiceController(ctx context.Context, initContext ControllerInitConte
 		return nil, false, nil
 	}
 
-	go serviceController.Run(ctx, int(completedConfig.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
+	go serviceController.Run(ctx, int(completedConfig.ComponentConfig.ServiceController.ConcurrentServiceSyncs), controlexContext.ControllerManagerMetrics)
 
 	return nil, true, nil
 }
 
-func startRouteController(ctx context.Context, initContext ControllerInitContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
+func startRouteController(ctx context.Context, initContext ControllerInitContext, controlexContext controllermanagerapp.ControllerContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {
 	if !completedConfig.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
 		klog.Infof("Will not configure cloud provider routes, --configure-cloud-routes: %v", completedConfig.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
 		return nil, false, nil
@@ -140,7 +140,7 @@ func startRouteController(ctx context.Context, initContext ControllerInitContext
 		completedConfig.ComponentConfig.KubeCloudShared.ClusterName,
 		clusterCIDRs,
 	)
-	go routeController.Run(ctx, completedConfig.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
+	go routeController.Run(ctx, completedConfig.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration, controlexContext.ControllerManagerMetrics)
 
 	return nil, true, nil
 }

@@ -41,6 +41,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
@@ -148,12 +149,15 @@ func NewCloudNodeController(
 // This controller updates newly registered nodes with information
 // from the cloud provider. This call is blocking so should be called
 // via a goroutine
-func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
+func (cnc *CloudNodeController) Run(stopCh <-chan struct{}, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
 	defer utilruntime.HandleCrash()
 	defer cnc.workqueue.ShutDown()
 
 	// Start event processing pipeline.
 	klog.Infof("Sending events to api server.")
+	controllerManagerMetrics.ControllerStarted("cloud-node")
+	defer controllerManagerMetrics.ControllerStopped("cloud-node")
+
 	cnc.broadcaster.StartStructuredLogging(0)
 	cnc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: cnc.kubeClient.CoreV1().Events("")})
 	defer cnc.broadcaster.Shutdown()
