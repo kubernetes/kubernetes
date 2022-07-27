@@ -3736,6 +3736,11 @@ func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.HostUsers != nil {
+		in, out := &in.HostUsers, &out.HostUsers
+		*out = new(bool)
+		**out = **in
+	}
 	if in.SELinuxOptions != nil {
 		in, out := &in.SELinuxOptions, &out.SELinuxOptions
 		*out = new(SELinuxOptions)
