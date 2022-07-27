@@ -44920,6 +44920,11 @@ func schema_pkg_apis_meta_v1_DiscoveryAPIResource(ref common.ReferenceCallback) 
 						},
 					},
 					"shortNames": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "shortNames is a list of suggested short names of the resource.",
 							Type:        []string{"array"},
@@ -44935,6 +44940,11 @@ func schema_pkg_apis_meta_v1_DiscoveryAPIResource(ref common.ReferenceCallback) 
 						},
 					},
 					"categories": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
 							Type:        []string{"array"},
@@ -44972,6 +44982,14 @@ func schema_pkg_apis_meta_v1_DiscoveryGroupVersion(ref common.ReferenceCallback)
 						},
 					},
 					"resources": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
 							Description: "resources contains the name of the resources and if they are namespaced.",
 							Type:        []string{"array"},

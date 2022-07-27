@@ -1149,6 +1149,8 @@ type DiscoveryGroupVersion struct {
 	// the clients the trouble of splitting the GroupVersion.
 	Version string `json:"version" protobuf:"bytes,2,opt,name=version"`
 	// resources contains the name of the resources and if they are namespaced.
+	// +listType=map
+	// +listMapKey=name
 	APIResources []DiscoveryAPIResource `json:"resources" protobuf:"bytes,2,rep,name=resources"`
 
 	// LastContacted is the last time that the apiserver has successfully reached the
@@ -1180,8 +1182,10 @@ type DiscoveryAPIResource struct {
 	// update, patch, delete, deletecollection, and proxy)
 	Verbs Verbs `json:"verbs" protobuf:"bytes,4,opt,name=verbs"`
 	// shortNames is a list of suggested short names of the resource.
+	// +listType=atomic
 	ShortNames []string `json:"shortNames,omitempty" protobuf:"bytes,5,rep,name=shortNames"`
 	// categories is a list of the grouped resources this resource belongs to (e.g. 'all')
+	// +listType=atomic
 	Categories []string `json:"categories,omitempty" protobuf:"bytes,7,rep,name=categories"`
 }
 
