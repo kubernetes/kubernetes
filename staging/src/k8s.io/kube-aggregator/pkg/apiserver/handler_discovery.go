@@ -33,7 +33,7 @@ import (
 	discoveryv1 "k8s.io/apiserver/pkg/endpoints/discovery/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
-	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 // Given a list of APIServices and proxyHandlers for contacting them,
@@ -43,7 +43,7 @@ type DiscoveryAggregationController interface {
 	// Adds or Updates an APIService from the Aggregated Discovery Controller's
 	// knowledge base
 	// Thread-safe
-	AddAPIService(apiService *v1.APIService, handler http.Handler)
+	AddAPIService(apiService *apiregistrationv1.APIService, handler *proxyHandler)
 
 	// Removes an APIService from the Aggregated Discovery Controller's Knowledge
 	// bank
@@ -75,34 +75,80 @@ type discoveryManager struct {
 	dirtyChannel chan struct{}
 
 	// Locks `services`
-	servicesLock sync.Mutex
+	servicesLock sync.RWMutex
 
-	// Map from v1.APIService.Spec.Service (or a unique string for local servers)
-	// to currently stored discovery document retrieved from that service.
-	services map[string]*apiServiceInfo
+	// Map from APIService's Namespace/Name (or a unique string for local servers)
+	// to information about contacting that API Service
+	services map[serviceKey]*apiServiceInfo
 
 	// Merged handler which stores all known groupversions
 	mergedDiscoveryHandler discoveryv1.ResourceManager
 }
 
+// Either a ServiceReference or a Local Service Name for use as a key in a map
+// Difference from ServiceReference: Port is no longer *int32 to avoid hashing
+// port memory address
+type serviceKey struct {
+	Name      string
+	Namespace string
+	Port      int32
+
+	// If service is a local service, unique name identifying it
+	// If LocalName is not empty, all other fields should be empty
+	LocalName string
+}
+
+// Human-readable String representation used for loggs
+func (s serviceKey) String() string {
+	if s.LocalName == "" {
+		return fmt.Sprintf("%v/%v:%v", s.Namespace, s.Name, s.Port)
+	}
+	return s.LocalName
+}
+
+func (s serviceKey) isLocalService() bool {
+	return s.LocalName != ""
+}
+
+func newLocalServiceKey(name string) serviceKey {
+	return serviceKey{
+		LocalName: name,
+	}
+}
+
+func newServiceKey(service apiregistrationv1.ServiceReference) serviceKey {
+	// Docs say. Defaults to 443 for compatibility reasons.
+	// BETA: Should this be a shared constant to avoid drifting with the
+	// implementation?
+	port := int32(443)
+	if service.Port != nil {
+		port = *service.Port
+	}
+
+	return serviceKey{
+		Name:      service.Name,
+		Namespace: service.Namespace,
+		Port:      port,
+	}
+}
+
 type apiServiceInfo struct {
+	// False if the APIService is known to possibly have updated discovery
+	// information.
 	fresh bool
 
-	// Currently cached discovery document for this apiservice
+	// Currently cached discovery document for this service
 	// a nil discovery document indicates this service needs to be re-fetched
 	discovery *metav1.DiscoveryAPIGroupList
 
 	// ETag hash of the cached discoveryDocument
 	etag string
 
-	// Must be non-nil
-	proxyHandler http.Handler
+	// Handler for this service key
+	handler http.Handler
 
-	// Groups handled by this apiService
-	knownGroups sets.String
-
-	// Whether this is a local APIServer
-	local bool
+	// APIServices which are hosted by the represented ServiceReference
+	dependentAPIServices sets.String
 }
 
 var _ DiscoveryAggregationController = &discoveryManager{}
@@ -114,7 +160,7 @@ func NewDiscoveryManager(
 	return &discoveryManager{
 		serializer:             serializer,
 		mergedDiscoveryHandler: discoveryv1.NewResourceManager(serializer),
-		services:               make(map[string]*apiServiceInfo),
+		services:               make(map[serviceKey]*apiServiceInfo),
 		dirtyChannel:           make(chan struct{}),
 	}
 }
@@ -128,13 +174,13 @@ func handlerWithUser(handler http.Handler, info user.Info) http.Handler {
 
 // Synchronously refreshes the discovery document by contacting all known
 // APIServices. Waits until all respond or timeout.
-func (self *discoveryManager) refreshDocument(localOnly bool) error {
+func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 	klog.Info("Refreshing discovery information from apiservices")
 
 	// information needed in the below loop to update a service
 	type serviceUpdateInfo struct {
-		// Name of service
-		name string
+		// Service
+		service serviceKey
 
 		// Handler For the service which responds to /discovery/v1 requests
 		handler http.Handler
@@ -149,40 +195,42 @@ func (self *discoveryManager) refreshDocument(localOnly bool) error {
 	// Done in two steps like this to avoid holding the lock while fetching the
 	// documents.
 	func() {
-		self.servicesLock.Lock()
-		defer self.servicesLock.Unlock()
+		dm.servicesLock.Lock()
+		defer dm.servicesLock.Unlock()
 
-		servicesToUpdate = make(chan serviceUpdateInfo, len(self.services))
+		servicesToUpdate = make(chan serviceUpdateInfo, len(dm.services))
 
 		// Close the buffered channel once we have finished populating if
 		// Note that even though it is closed it may still deliver any
 		// enqueued items to the webworkers.
 		defer close(servicesToUpdate)
 
-		for name, service := range self.services {
-			if localOnly && !service.local {
+		for key, apiServiceInfo := range dm.services {
+			if !key.isLocalService() && len(apiServiceInfo.dependentAPIServices) == 0 {
+				// Purge unused non-local services from knowledge base
+				delete(dm.services, key)
+			} else if localOnly && !key.isLocalService() {
+				// If only local services are desired to be fetched, skip
+				// non-local
+				continue
+			} else if apiServiceInfo.fresh {
+				// Skip APIServices which are not marked dirty
 				continue
 			}
 
-			if !service.local && service.knownGroups.Len() == 0 {
-				// Clean up unused services
-				delete(self.services, name)
-			} else if !service.fresh {
-
-				// Should not block. Buffered channel is as large as services
-				// slice
-				servicesToUpdate <- serviceUpdateInfo{
-					name:    name,
-					handler: service.proxyHandler,
-					etag:    service.etag,
-				}
+			// Should not block. Buffered channel is as large as services
+			// slice
+			servicesToUpdate <- serviceUpdateInfo{
+				service: key,
+				handler: apiServiceInfo.handler,
+				etag:    apiServiceInfo.etag,
 			}
 		}
 	}()
 
 	// Download update discovery documents in parallel
 	type resultItem struct {
-		name      string
+		service   serviceKey
 		discovery *metav1.DiscoveryAPIGroupList
 		etag      string
 		error     error
@@ -199,7 +247,7 @@ func (self *discoveryManager) refreshDocument(localOnly bool) error {
 		// If channel is already closed, but has buffered items, will still only
 		// stop once all enqueued items have been processed
 		for updateInfo := range servicesToUpdate {
-			name := updateInfo.name
+			key := updateInfo.service
 			handler := updateInfo.handler
 			handler = handlerWithUser(handler, &user.DefaultInfo{Name: "system:kube-aggregator", Groups: []string{"system:masters"}})
 			handler = http.TimeoutHandler(handler, 5*time.Second, "request timed out")
@@ -226,7 +274,7 @@ func (self *discoveryManager) refreshDocument(localOnly bool) error {
 			case http.StatusNotFound:
 				// Wipe out any data for this service
 				results <- resultItem{
-					name:      name,
+					service:   key,
 					discovery: &metav1.DiscoveryAPIGroupList{},
 					error:     errors.New("not found"),
 				}
@@ -234,25 +282,25 @@ func (self *discoveryManager) refreshDocument(localOnly bool) error {
 				parsed := &metav1.DiscoveryAPIGroupList{}
 				if err := utiljson.Unmarshal(writer.data, parsed); err != nil {
 					results <- resultItem{
-						name:  name,
-						error: err,
+						service: key,
+						error:   err,
 					}
 					continue
 				}
 
 				results <- resultItem{
-					name:      name,
+					service:   key,
 					discovery: parsed,
 					etag:      writer.Header().Get("Etag"),
 				}
-				klog.Infof("DiscoveryManager: Successfully downloaded discovery for %s", name)
+				klog.Infof("DiscoveryManager: Successfully downloaded discovery for %s", key.String())
 			default:
 				results <- resultItem{
-					name:      name,
+					service:   key,
 					discovery: &metav1.DiscoveryAPIGroupList{},
-					error:     fmt.Errorf("service %s returned unknown response code: %v", name, writer.respCode),
+					error:     fmt.Errorf("service %s returned unknown response code: %v", key.String(), writer.respCode),
 				}
-				klog.Infof("DiscoveryManager: Failed to download discovery for %s: %s %s", name, writer.respCode, writer.data)
+				klog.Infof("DiscoveryManager: Failed to download discovery for %s: %s %s", key.String(), writer.respCode, writer.data)
 			}
 		}
 	}
@@ -273,11 +321,12 @@ func (self *discoveryManager) refreshDocument(localOnly bool) error {
 
 	// Merge information back into services list and inform the endpoint handler
 	//  of updated information
-	self.servicesLock.Lock()
-	defer self.servicesLock.Unlock()
+	dm.servicesLock.Lock()
+	defer dm.servicesLock.Unlock()
 
+	var errors []error
 	for info := range results {
-		if service, exists := self.services[info.name]; exists {
+		if service, exists := dm.services[info.service]; exists {
 			service.fresh = true
 			service.discovery = info.discovery
 			service.etag = info.etag
@@ -289,29 +338,32 @@ func (self *discoveryManager) refreshDocument(localOnly bool) error {
 		}
 
 		// If there was an issue with fetching local types then throw an error
-		if info.error != nil && self.services[info.name].local {
-			return info.error
+		if info.error != nil {
+			errors = append(errors, info.error)
 		}
 	}
 
 	// After merging all the data back together, give it to the endpoint handler
 	// to respond to HTTP requests
 	var allGroups []metav1.DiscoveryAPIGroup
-	for _, info := range self.services {
+	for _, info := range dm.services {
 		if info.discovery != nil {
 			allGroups = append(allGroups, info.discovery.Groups...)
 		}
 	}
-	self.mergedDiscoveryHandler.SetGroups(allGroups)
+	dm.mergedDiscoveryHandler.SetGroups(allGroups)
 
+	if len(errors) > 0 {
+		return fmt.Errorf("%v", errors)
+	}
 	return nil
 }
 
-func (self *discoveryManager) markAPIServicesDirty() {
-	self.servicesLock.Lock()
-	defer self.servicesLock.Unlock()
-	for _, info := range self.services {
-		if !info.local {
+func (dm *discoveryManager) markAPIServicesDirty() {
+	dm.servicesLock.Lock()
+	defer dm.servicesLock.Unlock()
+	for key, info := range dm.services {
+		if !key.isLocalService() {
 			info.fresh = false
 		}
 	}
@@ -319,7 +371,7 @@ func (self *discoveryManager) markAPIServicesDirty() {
 
 // Spwans a goroutune which waits for added/updated apiservices and updates
 // the discovery document accordingly
-func (self *discoveryManager) Run(stopCh <-chan struct{}) error {
+func (dm *discoveryManager) Run(stopCh <-chan struct{}) error {
 	klog.Info("Starting ResourceDiscoveryManager")
 
 	readyChannel := make(chan struct{})
@@ -328,7 +380,7 @@ func (self *discoveryManager) Run(stopCh <-chan struct{}) error {
 	go func() {
 		// Signal the ready channel once local APIServices have been fetched
 		defer close(readyChannel)
-		result = self.refreshDocument(true)
+		result = dm.refreshDocument(true)
 	}()
 
 	// Wait for eitehr local APIServices to populate, or the worker to be
@@ -344,8 +396,8 @@ func (self *discoveryManager) Run(stopCh <-chan struct{}) error {
 	// debounce in 1s intervals so that successive updates don't keep causing
 	// a refresh
 	go func() {
-		debounce(time.Second, self.dirtyChannel, stopCh, func() {
-			err := self.refreshDocument(false)
+		debounce(time.Second, dm.dirtyChannel, stopCh, func() {
+			err := dm.refreshDocument(false)
 			if err != nil {
 				klog.Error(err)
 			}
@@ -359,8 +411,8 @@ func (self *discoveryManager) Run(stopCh <-chan struct{}) error {
 		for {
 			select {
 			case <-ticker.C:
-				self.markAPIServicesDirty()
-				self.kickWorker()
+				dm.markAPIServicesDirty()
+				dm.kickWorker()
 			case <-stopCh:
 				ticker.Stop()
 				return
@@ -372,9 +424,9 @@ func (self *discoveryManager) Run(stopCh <-chan struct{}) error {
 }
 
 // Wakes worker thread to notice the change and update the discovery document
-func (self *discoveryManager) kickWorker() {
+func (dm *discoveryManager) kickWorker() {
 	select {
-	case self.dirtyChannel <- struct{}{}:
+	case dm.dirtyChannel <- struct{}{}:
 		// Flagged to the channel that the object is dirty
 	default:
 		// Don't wait/Do nothing if the channel is already flagged
@@ -383,82 +435,85 @@ func (self *discoveryManager) kickWorker() {
 
 // Adds an APIService to be tracked by the discovery manager. If the APIService
 // is already known
-func (self *discoveryManager) AddAPIService(apiService *v1.APIService, handler http.Handler) {
-	// If service is nil then a local APIServer owns this APIService
-	// However, we have no way of disambiguating them, so in that case we mark
-	// all as dirty
-	serviceName := ""
-	if apiService.Spec.Service != nil {
-		serviceName = apiService.Spec.Service.String()
-	}
+func (dm *discoveryManager) AddAPIService(apiService *apiregistrationv1.APIService, handler *proxyHandler) {
+	dm.servicesLock.Lock()
+	defer dm.servicesLock.Unlock()
 
-	self.servicesLock.Lock()
-	defer self.servicesLock.Unlock()
-
-	// If this APIService is associated with a different server it should be
-	// removed
-	for otherServiceName, info := range self.services {
-		if info.knownGroups.Has(apiService.Name) && otherServiceName == serviceName {
-			info.knownGroups.Delete(apiService.Name)
+	// If this APIService is associated with a different apiserver, it should
+	// be removed as a dependency and the old server should be marked as dirty
+	for _, info := range dm.services {
+		if info.dependentAPIServices.Has(apiService.Name) {
+			info.dependentAPIServices.Delete(apiService.Name)
 			info.fresh = false
 		}
 	}
 
-	if serviceName == "" {
+	// If service is nil then a local APIServer owns this APIService
+	if apiService.Spec.Service == nil {
 		// Mark all local services as dirty since we cannot disambiguate which
 		// owns the given api group. This is not expensive due to usage of ETags
-		// to detect if there were no changes.
-		for _, info := range self.services {
-			if info.local {
+		// to detect if there were no changes and the local nature of the
+		// HTTP handler
+		for key, info := range dm.services {
+			if key.isLocalService() {
 				info.fresh = false
 			}
 		}
 	} else {
-		if service, exists := self.services[serviceName]; exists {
+		serviceKey := newServiceKey(*apiService.Spec.Service)
+
+		if service, exists := dm.services[serviceKey]; exists {
 			// Set the fresh flag to false
 			service.fresh = false
 		} else {
+			// Create a copy of the provided handler when creating a new service.
+			// This is to prevent the given pointer from shifting to a different
+			// service out from under us.
+			//
+			proxyHandlerCopy := *handler
+
 			// APIService is new to us, so start tracking it
-			self.services[serviceName] = &apiServiceInfo{
-				knownGroups:  sets.NewString(),
-				proxyHandler: handler,
+			dm.services[serviceKey] = &apiServiceInfo{
+				dependentAPIServices: sets.NewString(),
+				handler:              &proxyHandlerCopy,
 			}
 		}
-		self.services[serviceName].knownGroups.Insert(apiService.Name)
+
+		dm.services[serviceKey].dependentAPIServices.Insert(apiService.Name)
 	}
 
-	self.kickWorker()
+	dm.kickWorker()
 }
 
-func (self *discoveryManager) AddLocalAPIService(name string, handler http.Handler) {
-	self.servicesLock.Lock()
-	defer self.servicesLock.Unlock()
+func (dm *discoveryManager) AddLocalAPIService(name string, handler http.Handler) {
+	dm.servicesLock.Lock()
+	defer dm.servicesLock.Unlock()
 
-	if _, exists := self.services[name]; exists {
+	serviceKey := newLocalServiceKey(name)
+
+	if _, exists := dm.services[serviceKey]; exists {
 		klog.Errorf("Attempted to add local APIService %s but it already exists", name)
 	} else {
 		// APIService is new to us, so start tracking it
-		self.services[name] = &apiServiceInfo{
+		dm.services[serviceKey] = &apiServiceInfo{
 			// add the name itself to knownGroups so local service is never
 			// removed
-			knownGroups:  sets.NewString(name),
-			proxyHandler: handler,
-			local:        true,
+			handler: handler,
 		}
 	}
 
-	self.kickWorker()
+	dm.kickWorker()
 }
 
-func (self *discoveryManager) RemoveAPIService(apiServiceName string) {
-	self.servicesLock.Lock()
-	defer self.servicesLock.Unlock()
+func (dm *discoveryManager) RemoveAPIService(apiServiceName string) {
+	dm.servicesLock.Lock()
+	defer dm.servicesLock.Unlock()
 
 	// Find record of a group with given name
-	for _, info := range self.services {
-		if info.knownGroups.Has(apiServiceName) {
-			info.knownGroups.Delete(apiServiceName)
-			self.kickWorker()
+	for _, info := range dm.services {
+		if info.dependentAPIServices.Has(apiServiceName) {
+			info.dependentAPIServices.Delete(apiServiceName)
+			dm.kickWorker()
 			return
 		}
 	}
@@ -466,16 +521,16 @@ func (self *discoveryManager) RemoveAPIService(apiServiceName string) {
 	// If we reached this point, then no services had the name given.
 	// Thus it is possible it is contained by one of the local apiservices.
 	// Just refresh them all
-	for _, info := range self.services {
-		if info.local {
+	for key, info := range dm.services {
+		if key.isLocalService() {
 			info.fresh = false
 		}
 	}
-	self.kickWorker()
+	dm.kickWorker()
 }
 
-func (self *discoveryManager) WebService() *restful.WebService {
-	return self.mergedDiscoveryHandler.WebService()
+func (dm *discoveryManager) WebService() *restful.WebService {
+	return dm.mergedDiscoveryHandler.WebService()
 }
 
 // Takes an input structP{} channel and quantizes the channel sends to the given
