@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
+	"go.etcd.io/etcd/client/pkg/v3/logutil"
 	"go.etcd.io/etcd/client/v3/credentials"
 	"go.etcd.io/etcd/client/v3/internal/endpoint"
 	"go.etcd.io/etcd/client/v3/internal/resolver"
@@ -184,7 +185,9 @@ func (c *Client) Sync(ctx context.Context) error {
 	}
 	var eps []string
 	for _, m := range mresp.Members {
-		eps = append(eps, m.ClientURLs...)
+		if len(m.Name) != 0 && !m.IsLearner {
+			eps = append(eps, m.ClientURLs...)
+		}
 	}
 	c.SetEndpoints(eps...)
 	return nil
@@ -368,7 +371,10 @@ func newClient(cfg *Config) (*Client, error) {
 	} else if cfg.LogConfig != nil {
 		client.lg, err = cfg.LogConfig.Build()
 	} else {
-		client.lg, err = CreateDefaultZapLogger()
+		client.lg, err = logutil.CreateDefaultZapLogger(etcdClientDebugLevel())
+		if client.lg != nil {
+			client.lg = client.lg.Named("etcd-client")
+		}
 	}
 	if err != nil {
 		return nil, err

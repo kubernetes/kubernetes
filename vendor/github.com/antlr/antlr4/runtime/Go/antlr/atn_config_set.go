@@ -11,7 +11,7 @@ type ATNConfigSet interface {
 	Add(ATNConfig, *DoubleDict) bool
 	AddAll([]ATNConfig) bool
 
-	GetStates() *Set
+	GetStates() Set
 	GetPredicates() []SemanticContext
 	GetItems() []ATNConfig
 
@@ -35,6 +35,8 @@ type ATNConfigSet interface {
 	GetConflictingAlts() *BitSet
 	SetConflictingAlts(*BitSet)
 
+	Alts() *BitSet
+
 	FullContext() bool
 
 	GetUniqueAlt() int
@@ -55,7 +57,7 @@ type BaseATNConfigSet struct {
 	// effectively doubles the number of objects associated with ATNConfigs. All
 	// keys are hashed by (s, i, _, pi), not including the context. Wiped out when
 	// read-only because a set becomes a DFA state.
-	configLookup *Set
+	configLookup Set
 
 	// configs is the added elements.
 	configs []ATNConfig
@@ -91,11 +93,19 @@ type BaseATNConfigSet struct {
 	uniqueAlt int
 }
 
+func (b *BaseATNConfigSet) Alts() *BitSet {
+	alts := NewBitSet()
+	for _, it := range b.configs {
+		alts.add(it.GetAlt())
+	}
+	return alts
+}
+
 func NewBaseATNConfigSet(fullCtx bool) *BaseATNConfigSet {
 	return &BaseATNConfigSet{
-		cachedHash: -1,
-		configLookup:     NewSet(nil, equalATNConfigs),
-		fullCtx:          fullCtx,
+		cachedHash:   -1,
+		configLookup: NewArray2DHashSetWithCap(hashATNConfig, equalATNConfigs, 16, 2),
+		fullCtx:      fullCtx,
 	}
 }
 
@@ -116,12 +126,11 @@ func (b *BaseATNConfigSet) Add(config ATNConfig, mergeCache *DoubleDict) bool {
 		b.dipsIntoOuterContext = true
 	}
 
-	existing := b.configLookup.add(config).(ATNConfig)
+	existing := b.configLookup.Add(config).(ATNConfig)
 
 	if existing == config {
 		b.cachedHash = -1
 		b.configs = append(b.configs, config) // Track order here
-
 		return true
 	}
 
@@ -145,11 +154,11 @@ func (b *BaseATNConfigSet) Add(config ATNConfig, mergeCache *DoubleDict) bool {
 	return true
 }
 
-func (b *BaseATNConfigSet) GetStates() *Set {
-	states := NewSet(nil, nil)
+func (b *BaseATNConfigSet) GetStates() Set {
+	states := NewArray2DHashSet(nil, nil)
 
 	for i := 0; i < len(b.configs); i++ {
-		states.add(b.configs[i].GetState())
+		states.Add(b.configs[i].GetState())
 	}
 
 	return states
@@ -186,7 +195,7 @@ func (b *BaseATNConfigSet) OptimizeConfigs(interpreter *BaseATNSimulator) {
 		panic("set is read-only")
 	}
 
-	if b.configLookup.length() == 0 {
+	if b.configLookup.Len() == 0 {
 		return
 	}
 
@@ -236,13 +245,11 @@ func (b *BaseATNConfigSet) hash() int {
 }
 
 func (b *BaseATNConfigSet) hashCodeConfigs() int {
-	h := murmurInit(1)
-	for _, c := range b.configs {
-		if c != nil {
-			h = murmurUpdate(h, c.hash())
-		}
+	h := 1
+	for _, config := range b.configs {
+		h = 31*h + config.hash()
 	}
-	return murmurFinish(h, len(b.configs))
+	return h
 }
 
 func (b *BaseATNConfigSet) Length() int {
@@ -258,7 +265,7 @@ func (b *BaseATNConfigSet) Contains(item ATNConfig) bool {
 		panic("not implemented for read-only sets")
 	}
 
-	return b.configLookup.contains(item)
+	return b.configLookup.Contains(item)
 }
 
 func (b *BaseATNConfigSet) ContainsFast(item ATNConfig) bool {
@@ -266,7 +273,7 @@ func (b *BaseATNConfigSet) ContainsFast(item ATNConfig) bool {
 		panic("not implemented for read-only sets")
 	}
 
-	return b.configLookup.contains(item) // TODO: containsFast is not implemented for Set
+	return b.configLookup.Contains(item) // TODO: containsFast is not implemented for Set
 }
 
 func (b *BaseATNConfigSet) Clear() {
@@ -276,7 +283,7 @@ func (b *BaseATNConfigSet) Clear() {
 
 	b.configs = make([]ATNConfig, 0)
 	b.cachedHash = -1
-	b.configLookup = NewSet(nil, equalATNConfigs)
+	b.configLookup = NewArray2DHashSet(nil, equalATNConfigs)
 }
 
 func (b *BaseATNConfigSet) FullContext() bool {
@@ -358,9 +365,18 @@ type OrderedATNConfigSet struct {
 func NewOrderedATNConfigSet() *OrderedATNConfigSet {
 	b := NewBaseATNConfigSet(false)
 
-	b.configLookup = NewSet(nil, nil)
+	b.configLookup = NewArray2DHashSet(nil, nil)
 
 	return &OrderedATNConfigSet{BaseATNConfigSet: b}
+}
+
+func hashATNConfig(i interface{}) int {
+	o := i.(ATNConfig)
+	hash := 7
+	hash = 31*hash + o.GetState().GetStateNumber()
+	hash = 31*hash + o.GetAlt()
+	hash = 31*hash + o.GetSemanticContext().hash()
+	return hash
 }
 
 func equalATNConfigs(a, b interface{}) bool {
@@ -379,9 +395,13 @@ func equalATNConfigs(a, b interface{}) bool {
 		return false
 	}
 
-	nums := ai.GetState().GetStateNumber() == bi.GetState().GetStateNumber()
-	alts := ai.GetAlt() == bi.GetAlt()
-	cons := ai.GetSemanticContext().equals(bi.GetSemanticContext())
+	if ai.GetState().GetStateNumber() != bi.GetState().GetStateNumber() {
+		return false
+	}
 
-	return nums && alts && cons
+	if ai.GetAlt() != bi.GetAlt() {
+		return false
+	}
+
+	return ai.GetSemanticContext().equals(bi.GetSemanticContext())
 }
