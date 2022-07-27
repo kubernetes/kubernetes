@@ -1661,6 +1661,19 @@ func GetTestKubeletVolumePluginMgrWithNode(t *testing.T, node *v1.Node) (*volume
 	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
 }
 
+func GetTestKubeletVolumePluginMgrWithNodeAndRoot(t *testing.T, node *v1.Node, rootDir string) (*volume.VolumePluginMgr, *FakeVolumePlugin) {
+	plugins := ProbeVolumePlugins(volume.VolumeConfig{})
+	v := NewFakeKubeletVolumeHost(
+		t,
+		rootDir, /* rootDir */
+		nil,     /* kubeClient */
+		plugins, /* plugins */
+	)
+	v.WithNode(node)
+
+	return v.GetPluginMgr(), plugins[0].(*FakeVolumePlugin)
+}
+
 // CreateTestPVC returns a provisionable PVC for tests
 func CreateTestPVC(capacity string, accessModes []v1.PersistentVolumeAccessMode) *v1.PersistentVolumeClaim {
 	claim := v1.PersistentVolumeClaim{
