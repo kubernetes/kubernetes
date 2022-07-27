@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -63,33 +62,6 @@ func ServeHTTPWithETag(
 	}
 
 	if len(hash) > 0 {
-		if providedHash := reqURL.Query().Get("hash"); len(providedHash) > 0 {
-			if hash == providedHash {
-				// The Vary header is required because the Accept header can
-				// change the contents returned. This prevents clients from
-				// caching protobuf as JSON and vice versa.
-				w.Header().Set("Vary", "Accept")
-
-				// Only set these headers when a hash is given.
-				w.Header().Set("Cache-Control", "public, immutable")
-
-				// Set the Expires directive to the maximum value of one year from the request,
-				// effectively indicating that the cache never expires.
-				w.Header().Set(
-					"Expires", time.Now().AddDate(1, 0, 0).Format(time.RFC1123))
-			} else {
-				// When provided hash is incorrect, reply with redirect
-				redirectURL := *reqURL
-				query := redirectURL.Query()
-
-				query.Set("hash", hash)
-				redirectURL.RawQuery = query.Encode()
-
-				http.Redirect(w, req, redirectURL.String(), http.StatusMovedPermanently)
-				return
-			}
-		}
-
 		// ETag must be enclosed in double quotes:
 		// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag
 		quotedHash := strconv.Quote(hash)
