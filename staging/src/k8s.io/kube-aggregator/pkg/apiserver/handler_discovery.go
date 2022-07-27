@@ -24,13 +24,13 @@ import (
 // DiscoveryManager caches a list of discovery documents for each server
 
 type DiscoveryManager interface {
-	APIHandlerManager
-
+	AddAPIService(apiService *v1.APIService, handler http.Handler)
+	RemoveAPIService(apiServiceName string)
 	AddLocalAPIService(name string, handler http.Handler)
 
 	// Spwans a worker which waits for added/updated apiservices and updates
 	// the unified discovery document by contacting the aggregated api services
-	Run(ctx <-chan struct{})
+	Run(stopCh <-chan struct{})
 
 	// Returns a restful webservice which responds to discovery requests
 	// Thread-safe
@@ -40,8 +40,7 @@ type DiscoveryManager interface {
 }
 
 type discoveryManager struct {
-	serializer      runtime.NegotiatedSerializer
-	getProxyHandler func(apiServiceName string) http.Handler
+	serializer runtime.NegotiatedSerializer
 
 	// Channel used to indicate that the document needs to be refreshed
 	// The Run() function starts a worker thread which waits for signals on this
@@ -84,12 +83,10 @@ var _ DiscoveryManager = &discoveryManager{}
 func NewDiscoveryManager(
 	codecs serializer.CodecFactory,
 	serializer runtime.NegotiatedSerializer,
-	getProxyHandler func(string) http.Handler,
 ) DiscoveryManager {
 	return &discoveryManager{
 		serializer:             serializer,
 		mergedDiscoveryHandler: discoveryv1.NewResourceManager(serializer),
-		getProxyHandler:        getProxyHandler,
 		services:               make(map[string]*apiServiceInfo),
 		dirtyChannel:           make(chan struct{}),
 	}
@@ -332,7 +329,7 @@ func (self *discoveryManager) kickWorker() {
 
 // Adds an APIService to be tracked by the discovery manager. If the APIService
 // is already known
-func (self *discoveryManager) AddAPIService(apiService *v1.APIService) error {
+func (self *discoveryManager) AddAPIService(apiService *v1.APIService, handler http.Handler) {
 	// If service is nil then a local APIServer owns this APIService
 	// However, we have no way of disambiguating them, so in that case we mark
 	// all as dirty
@@ -370,14 +367,13 @@ func (self *discoveryManager) AddAPIService(apiService *v1.APIService) error {
 			// APIService is new to us, so start tracking it
 			self.services[serviceName] = &apiServiceInfo{
 				knownGroups:  sets.NewString(),
-				proxyHandler: self.getProxyHandler(apiService.Name),
+				proxyHandler: handler,
 			}
 		}
 		self.services[serviceName].knownGroups.Insert(apiService.Name)
 	}
 
 	self.kickWorker()
-	return nil
 }
 
 func (self *discoveryManager) AddLocalAPIService(name string, handler http.Handler) {

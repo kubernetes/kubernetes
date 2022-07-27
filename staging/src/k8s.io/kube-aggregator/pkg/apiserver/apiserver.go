@@ -388,9 +388,6 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	s.discoveryManager = NewDiscoveryManager(
 		aggregatorscheme.Codecs,
 		s.GenericAPIServer.Serializer,
-		func(a string) http.Handler {
-			return s.proxyHandlers[a]
-		},
 	)
 
 	// Inform discovery manager of all local api servers which contain
@@ -468,7 +465,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 			s.openAPIV3AggregationController.UpdateAPIService(proxyHandler, apiService)
 		}
 		// Forward calls to discovery manager to update discovery document
-		s.discoveryManager.AddAPIService(apiService)
+		s.discoveryManager.AddAPIService(apiService, proxyHandler)
 		return nil
 	}
 
@@ -499,7 +496,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 
 	// Forward calls to discovery manager to update discovery document
 	// This must be called after the proxyHandler for the apiservices are set up
-	s.discoveryManager.AddAPIService(apiService)
+	s.discoveryManager.AddAPIService(apiService, proxyHandler)
 
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {
