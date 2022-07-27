@@ -85,6 +85,7 @@ func (rdm *resourceDiscoveryManager) SetGroups(groups []metav1.DiscoveryAPIGroup
 	defer rdm.lock.Unlock()
 
 	rdm.apiGroups = nil
+	rdm.apiGroupNames = nil
 	rdm.cachedResponse = nil
 
 	for _, group := range groups {
@@ -92,14 +93,6 @@ func (rdm *resourceDiscoveryManager) SetGroups(groups []metav1.DiscoveryAPIGroup
 			rdm.addGroupVersionLocked(group.Name, version)
 		}
 	}
-}
-
-func (rdm *resourceDiscoveryManager) Reset() {
-	rdm.lock.Lock()
-	defer rdm.lock.Unlock()
-
-	rdm.apiGroups = nil
-	rdm.cachedResponse = nil
 }
 
 func (rdm *resourceDiscoveryManager) AddGroups(groups ...metav1.DiscoveryAPIGroup) {
