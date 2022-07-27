@@ -156,7 +156,7 @@ type APIAggregator struct {
 	// discoveryAggregationController downloads and caches discovery documents
 	// from all aggregated apiservices so they may be served as a unified
 	// document from /discovery/v1
-	discoveryManager DiscoveryManager
+	discoveryAggregationController DiscoveryAggregationController
 
 	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
 	// overwrites proxyTransport dialer if not nil
@@ -385,33 +385,33 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 		})
 	}
 
-	s.discoveryManager = NewDiscoveryManager(
+	s.discoveryAggregationController = NewDiscoveryManager(
 		aggregatorscheme.Codecs,
 		s.GenericAPIServer.Serializer,
 	)
 
 	// Inform discovery manager of all local api servers which contain
 	// crds/builtin types
-	s.discoveryManager.AddLocalAPIService("kube-aggregator", s.GenericAPIServer.DiscoveryResourceManager)
+	s.discoveryAggregationController.AddLocalAPIService("kube-aggregator", s.GenericAPIServer.DiscoveryResourceManager)
 
 	i := 0
 	for delegate := s.GenericAPIServer.NextDelegate(); delegate != nil && delegate.NextDelegate() != nil; delegate = delegate.NextDelegate() {
-		s.discoveryManager.AddLocalAPIService("delegate_"+strconv.Itoa(i), delegate.UnprotectedHandler())
+		s.discoveryAggregationController.AddLocalAPIService("delegate_"+strconv.Itoa(i), delegate.UnprotectedHandler())
 		i++
 	}
 
 	// Setup discovery endpoint
-	s.GenericAPIServer.Handler.GoRestfulContainer.Add(s.discoveryManager.WebService())
+	s.GenericAPIServer.Handler.GoRestfulContainer.Add(s.discoveryAggregationController.WebService())
 
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-initial", func(context genericapiserver.PostStartHookContext) error {
 		// Call synchronous function to setup initial document once server starts
-		return s.discoveryManager.RefreshDocument()
+		return s.discoveryAggregationController.RefreshDocument()
 	})
 
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-controller", func(context genericapiserver.PostStartHookContext) error {
 		// Run discovery manager's worker to watch for new/removed/updated
 		// APIServices to the discovery document can be updated at runtime
-		s.discoveryManager.Run(context.StopCh)
+		s.discoveryAggregationController.Run(context.StopCh)
 		return nil
 	})
 
@@ -465,7 +465,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 			s.openAPIV3AggregationController.UpdateAPIService(proxyHandler, apiService)
 		}
 		// Forward calls to discovery manager to update discovery document
-		s.discoveryManager.AddAPIService(apiService, proxyHandler)
+		s.discoveryAggregationController.AddAPIService(apiService, proxyHandler)
 		return nil
 	}
 
@@ -496,7 +496,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 
 	// Forward calls to discovery manager to update discovery document
 	// This must be called after the proxyHandler for the apiservices are set up
-	s.discoveryManager.AddAPIService(apiService, proxyHandler)
+	s.discoveryAggregationController.AddAPIService(apiService, proxyHandler)
 
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {
@@ -527,7 +527,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 // It's a slow moving API, so it's ok to run the controller on a single thread.
 func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	// Forward calls to discovery manager to update discovery document
-	s.discoveryManager.RemoveAPIService(apiServiceName)
+	s.discoveryAggregationController.RemoveAPIService(apiServiceName)
 
 	version := v1helper.APIServiceNameToGroupVersion(apiServiceName)
 

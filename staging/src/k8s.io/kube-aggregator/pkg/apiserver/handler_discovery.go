@@ -23,7 +23,7 @@ import (
 // Given a list of APIServices and proxyHandlers for contacting them,
 // DiscoveryManager caches a list of discovery documents for each server
 
-type DiscoveryManager interface {
+type DiscoveryAggregationController interface {
 	AddAPIService(apiService *v1.APIService, handler http.Handler)
 	RemoveAPIService(apiServiceName string)
 	AddLocalAPIService(name string, handler http.Handler)
@@ -78,12 +78,12 @@ type apiServiceInfo struct {
 	local bool
 }
 
-var _ DiscoveryManager = &discoveryManager{}
+var _ DiscoveryAggregationController = &discoveryManager{}
 
 func NewDiscoveryManager(
 	codecs serializer.CodecFactory,
 	serializer runtime.NegotiatedSerializer,
-) DiscoveryManager {
+) DiscoveryAggregationController {
 	return &discoveryManager{
 		serializer:             serializer,
 		mergedDiscoveryHandler: discoveryv1.NewResourceManager(serializer),
@@ -442,7 +442,7 @@ func debounce(interval time.Duration, input chan struct{}, cb func()) {
 	}
 }
 
-//!TODO: This was copied from staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator/downloader.go
+// !TODO: This was copied from staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator/downloader.go
 // which was copied from staging/src/k8s.io/kube-aggregator/pkg/controllers/openapiv3/aggregator/downloader.go
 // so we should find a home for this
 // inMemoryResponseWriter is a http.Writer that keep the response in memory.
