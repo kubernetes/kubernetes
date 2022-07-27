@@ -1147,7 +1147,7 @@ type DiscoveryAPIGroup struct {
 type DiscoveryGroupVersion struct {
 	// version specifies the version in the form of "version". This is to save
 	// the clients the trouble of splitting the GroupVersion.
-	Version string `json:"version" protobuf:"bytes,2,opt,name=version"`
+	Version string `json:"version" protobuf:"bytes,1,opt,name=version"`
 	// resources contains the name of the resources and if they are namespaced.
 	// +listType=map
 	// +listMapKey=name
@@ -1157,7 +1157,7 @@ type DiscoveryGroupVersion struct {
 	// corresponding group version's discovery document. This will be nil if the group-version
 	// has not been aggregated yet (APIResources will be empty). To maintain consistency across scenarios with multiple
 	// apiservers, this time will be quantized down to the nearest fifteen minutes.
-	// LastContacted *time.Time `json:"lastContacted" protobuf:"bytes,opt,name=lastContacted"`
+	// LastContacted *time.Time `json:"lastContacted" protobuf:"bytes,3,opt,name=lastContacted"`
 }
 
 // APIResource specifies the name of a resource and whether it is namespaced.
