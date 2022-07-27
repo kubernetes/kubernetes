@@ -402,17 +402,13 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 
 	// Setup discovery endpoint
 	s.GenericAPIServer.Handler.GoRestfulContainer.Add(s.discoveryAggregationController.WebService())
-
-	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-initial", func(context genericapiserver.PostStartHookContext) error {
-		// Call synchronous function to setup initial document once server starts
-		return s.discoveryAggregationController.RefreshDocument()
-	})
-
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-controller", func(context genericapiserver.PostStartHookContext) error {
 		// Run discovery manager's worker to watch for new/removed/updated
 		// APIServices to the discovery document can be updated at runtime
-		s.discoveryAggregationController.Run(context.StopCh)
-		return nil
+		//
+		// Run populates only the local APIServices and returns an error if
+		// there was any.
+		return s.discoveryAggregationController.Run(context.StopCh)
 	})
 
 	prepared := s.GenericAPIServer.PrepareRun()

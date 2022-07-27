@@ -24,19 +24,30 @@ import (
 // DiscoveryManager caches a list of discovery documents for each server
 
 type DiscoveryAggregationController interface {
+	// Adds or Updates an APIService from the Aggregated Discovery Controller's
+	// knowledge base
+	// Thread-safe
 	AddAPIService(apiService *v1.APIService, handler http.Handler)
+
+	// Removes an APIService from the Aggregated Discovery Controller's Knowledge
+	// bank
+	// Thread-safe
 	RemoveAPIService(apiServiceName string)
+
+	// Adds or Updates a local APIService from the Aggregated Discovery Controller's
+	// knowledge base
+	// Thread-safe
 	AddLocalAPIService(name string, handler http.Handler)
 
 	// Spwans a worker which waits for added/updated apiservices and updates
 	// the unified discovery document by contacting the aggregated api services
-	Run(stopCh <-chan struct{})
+	//
+	// Blocks until local apiservices are populated or returns an error
+	Run(stopCh <-chan struct{}) error
 
 	// Returns a restful webservice which responds to discovery requests
 	// Thread-safe
 	WebService() *restful.WebService
-
-	RefreshDocument() error
 }
 
 type discoveryManager struct {
@@ -101,7 +112,7 @@ func handlerWithUser(handler http.Handler, info user.Info) http.Handler {
 
 // Synchronously refreshes the discovery document by contacting all known
 // APIServices. Waits until all respond or timeout.
-func (self *discoveryManager) RefreshDocument() error {
+func (self *discoveryManager) refreshDocument(localOnly bool) error {
 	klog.Info("Refreshing discovery information from apiservices")
 
 	// information needed in the below loop to update a service
@@ -133,6 +144,10 @@ func (self *discoveryManager) RefreshDocument() error {
 		defer close(servicesToUpdate)
 
 		for name, service := range self.services {
+			if localOnly && !service.local {
+				continue
+			}
+
 			if !service.local && service.knownGroups.Len() == 0 {
 				// Clean up unused services
 				delete(self.services, name)
@@ -288,18 +303,40 @@ func (self *discoveryManager) markAPIServicesDirty() {
 
 // Spwans a goroutune which waits for added/updated apiservices and updates
 // the discovery document accordingly
-func (self *discoveryManager) Run(stopCh <-chan struct{}) {
+func (self *discoveryManager) Run(stopCh <-chan struct{}) error {
 	klog.Info("Starting ResourceDiscoveryManager")
+
+	readyChannel := make(chan struct{})
+	var result error
+
+	go func() {
+		// Signal the ready channel once local APIServices have been fetched
+		defer close(readyChannel)
+		result = self.refreshDocument(true)
+	}()
+
+	// Wait for eitehr local APIServices to populate, or the worker to be
+	// cancelled. Whichever comes first.
+	select {
+	case <-stopCh:
+		return errors.New("worker stopped")
+	case <-readyChannel:
+		// Local API services now populated
+	}
 
 	// Every time the dirty channel is signalled, refresh the document
 	// debounce in 1s intervals so that successive updates don't keep causing
 	// a refresh
-	go debounce(time.Second, self.dirtyChannel, func() {
-		err := self.RefreshDocument()
-		if err != nil {
-			klog.Error(err)
-		}
-	})
+	go func() {
+		debounce(time.Second, self.dirtyChannel, stopCh, func() {
+			err := self.refreshDocument(false)
+			if err != nil {
+				klog.Error(err)
+			}
+
+		})
+	}()
+
 	// TODO: This should be in a constant
 	ticker := time.NewTicker(60 * time.Second)
 	go func() {
@@ -315,6 +352,7 @@ func (self *discoveryManager) Run(stopCh <-chan struct{}) {
 		}
 	}()
 
+	return result
 }
 
 // Wakes worker thread to notice the change and update the discovery document
@@ -427,13 +465,18 @@ func (self *discoveryManager) WebService() *restful.WebService {
 // Takes an input structP{} channel and quantizes the channel sends to the given
 // interval
 // Should be moved into util library somewhere?
-func debounce(interval time.Duration, input chan struct{}, cb func()) {
+func debounce(interval time.Duration, input <-chan struct{}, stopCh <-chan struct{}, cb func()) {
 	var timer *time.Timer = time.NewTimer(interval)
+
+	// Make sure the timer is initially empty
 	if !timer.Stop() {
+		// As documentation for Stop() instructions. Does not block.
 		<-timer.C
 	}
 	for {
 		select {
+		case <-stopCh:
+			return
 		case <-input:
 			timer.Reset(interval)
 		case <-timer.C:
