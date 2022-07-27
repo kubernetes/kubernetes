@@ -275,7 +275,7 @@ func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 				// Wipe out any data for this service
 				results <- resultItem{
 					service:   key,
-					discovery: &metav1.DiscoveryAPIGroupList{},
+					discovery: nil,
 					error:     errors.New("not found"),
 				}
 			case http.StatusOK:
@@ -295,9 +295,10 @@ func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 				}
 				klog.Infof("DiscoveryManager: Successfully downloaded discovery for %s", key.String())
 			default:
+				// Wipe out discovery information
 				results <- resultItem{
 					service:   key,
-					discovery: &metav1.DiscoveryAPIGroupList{},
+					discovery: nil,
 					error:     fmt.Errorf("service %s returned unknown response code: %v", key.String(), writer.respCode),
 				}
 				klog.Infof("DiscoveryManager: Failed to download discovery for %s: %s %s", key.String(), writer.respCode, writer.data)
@@ -326,18 +327,18 @@ func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 
 	var errors []error
 	for info := range results {
-		if service, exists := dm.services[info.service]; exists {
-			service.fresh = true
-			service.discovery = info.discovery
-			service.etag = info.etag
-		} else {
+		service, exists := dm.services[info.service]
+		if !exists {
 			// If a service was in services list at the beginning of this
 			// function call but not anymore, then it was removed in the meantime
 			// so we just throw away this result.
 			continue
 		}
 
-		// If there was an issue with fetching local types then throw an error
+		service.fresh = true
+		service.discovery = info.discovery
+		service.etag = info.etag
+
 		if info.error != nil {
 			errors = append(errors, info.error)
 		}
