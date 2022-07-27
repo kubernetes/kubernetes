@@ -39,13 +39,14 @@ type Marshalable interface {
 }
 
 // Attaches Cache-Busting functionality to an endpoint
-//  * Immutability Response Header
-//  * Expires Never
-//  * Redirects when incorrect hash is provided
-//  * Sets ETag haeader to provided hash
-//  * Replies with 304 Not Modified, if If-None-Match header matches hash
+//   - Immutability Response Header
+//   - Expires Never
+//   - Redirects when incorrect hash is provided
+//   - Sets ETag haeader to provided hash
+//   - Replies with 304 Not Modified, if If-None-Match header matches hash
 //
 // hash should be the value of CalculateETag on object. If hash is empty, then
+//
 //	the object is simply serialized without E-Tag functionality
 func ServeHTTPWithETag(
 	object runtime.Object,

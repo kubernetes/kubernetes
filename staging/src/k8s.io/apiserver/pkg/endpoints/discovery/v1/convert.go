@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// The /discovery/v1 endpoint uses slighly different types compared to the
+// The /discovery/v1 endpoint uses slightly different types compared to the
 // original discovery types. These functions convert between them
 
 func APIResourcesToDiscoveryAPIResources(rsrc []metav1.APIResource) []metav1.DiscoveryAPIResource {

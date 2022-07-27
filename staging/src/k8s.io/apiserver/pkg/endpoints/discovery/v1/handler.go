@@ -41,7 +41,7 @@ type ResourceManager interface {
 	// Thread-safe
 	RemoveGroup(groupName string)
 
-	// Removes a specfic groupversion. If all versions of a group have been
+	// Removes a specific groupversion. If all versions of a group have been
 	// removed, then the entire group is unlisted.
 	// Thread-safe
 	RemoveGroupVersion(gv metav1.GroupVersion)
@@ -245,7 +245,7 @@ func (rdm *resourceDiscoveryManager) ServeHTTP(resp http.ResponseWriter, req *ht
 			etag, err = CalculateETag(response)
 
 			if err != nil {
-				klog.Errorf("failed to caclulate etag for discovery document: %s", etag)
+				klog.Errorf("failed to calculate etag for discovery document: %s", etag)
 			}
 
 			rdm.cachedResponse = response
