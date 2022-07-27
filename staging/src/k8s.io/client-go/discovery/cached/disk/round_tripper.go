@@ -34,7 +34,7 @@ type cacheRoundTripper struct {
 // newCacheRoundTripper creates a roundtripper that reads the ETag on
 // response headers and send the If-None-Match header on subsequent
 // corresponding requests.
-func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripper {
+func NewCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripper {
 	d := diskv.New(diskv.Options{
 		PathPerm: os.FileMode(0750),
 		FilePerm: os.FileMode(0660),

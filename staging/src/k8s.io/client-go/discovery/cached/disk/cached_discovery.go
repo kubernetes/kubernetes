@@ -288,7 +288,7 @@ func NewCachedDiscoveryClientForConfig(config *restclient.Config, discoveryCache
 		// understands how to handle cache responses.
 		config = restclient.CopyConfig(config)
 		config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			return newCacheRoundTripper(httpCacheDir, rt)
+			return NewCacheRoundTripper(httpCacheDir, rt)
 		})
 	}
 

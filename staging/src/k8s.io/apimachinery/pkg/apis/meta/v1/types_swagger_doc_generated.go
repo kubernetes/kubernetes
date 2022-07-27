@@ -135,6 +135,52 @@ func (DeleteOptions) SwaggerDoc() map[string]string {
 	return map_DeleteOptions
 }
 
+var map_DiscoveryAPIGroup = map[string]string{
+	"":         "APIGroup contains the name, the supported versions, and the preferred version of a group.",
+	"name":     "name is the name of the group.",
+	"versions": "versions are the versions supported in this group. This will be sorted in descending order based on the preferred version",
+}
+
+func (DiscoveryAPIGroup) SwaggerDoc() map[string]string {
+	return map_DiscoveryAPIGroup
+}
+
+var map_DiscoveryAPIGroupList = map[string]string{
+	"":       "Discovery API Types APIGroupList is a list of APIGroup, to allow clients to discover the API at /apis.",
+	"groups": "groups is a list of APIGroup.",
+}
+
+func (DiscoveryAPIGroupList) SwaggerDoc() map[string]string {
+	return map_DiscoveryAPIGroupList
+}
+
+var map_DiscoveryAPIResource = map[string]string{
+	"":             "APIResource specifies the name of a resource and whether it is namespaced.",
+	"name":         "name is the plural name of the resource.",
+	"singularName": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
+	"namespaced":   "namespaced indicates if a resource is namespaced or not.",
+	"group":        "group is the preferred group of the resource.  Empty implies the group of the containing resource list. For subresources, this may have a different value, for example: Scale\".",
+	"version":      "version is the preferred version of the resource.  Empty implies the version of the containing resource list For subresources, this may have a different value, for example: v1 (while inside a v1beta1 version of the core resource's group)\".",
+	"kind":         "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
+	"verbs":        "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
+	"shortNames":   "shortNames is a list of suggested short names of the resource.",
+	"categories":   "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
+}
+
+func (DiscoveryAPIResource) SwaggerDoc() map[string]string {
+	return map_DiscoveryAPIResource
+}
+
+var map_DiscoveryGroupVersion = map[string]string{
+	"":          "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
+	"version":   "version specifies the version in the form of \"version\". This is to save the clients the trouble of splitting the GroupVersion.",
+	"resources": "resources contains the name of the resources and if they are namespaced.",
+}
+
+func (DiscoveryGroupVersion) SwaggerDoc() map[string]string {
+	return map_DiscoveryGroupVersion
+}
+
 var map_FieldsV1 = map[string]string{
 	"": "FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.\n\nEach key is either a '.' representing the field itself, and will always map to an empty set, or a string representing a sub-field or item. The string will follow one of these four formats: 'f:<name>', where <name> is the name of a field in a struct, or key in a map 'v:<value>', where <value> is the exact json formatted value of a list item 'i:<index>', where <index> is position of a item in a list 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values If a key maps to an empty Fields value, the field that key represents is part of the set.\n\nThe exact format is defined in sigs.k8s.io/structured-merge-diff",
 }
