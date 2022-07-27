@@ -17,8 +17,14 @@ limitations under the License.
 package cadvisor
 
 import (
+	"errors"
+	"fmt"
+	"net"
+	"syscall"
+
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
+	"github.com/vishvananda/netlink"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -50,17 +56,43 @@ func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
 		c[v1helper.HugePageResourceName(*pageSizeQuantity)] = *resource.NewQuantity(hugePagesBytes, resource.BinarySI)
 	}
 
-	// if network io are enabled, we report them as two schedulable resource on the node
-	for i, netInfo := range info.NetworkDevices {
-		if i > 0 {
+	// if network io are enabled, we report them as two schedulable resources on the node
+	var iface *net.Interface
+	var err error
+	if iface, err = GetDefaultGatewayInterface(); err != nil {
+		return c
+	}
+
+	for _, netInfo := range info.NetworkDevices {
+		// fmt.Println("iface name", iface.Name, "cadvisor interface name", netInfo.Name)
+		if netInfo.Name != iface.Name {
 			continue
 		}
 		networkSpeed := int64(netInfo.Speed)
-		c[v1helper.NetworkIngressResourceName(i)] = *resource.NewQuantity(networkSpeed, resource.BinarySI)
-		c[v1helper.NetworkEgressResourceName(i)] = *resource.NewQuantity(networkSpeed, resource.BinarySI)
+		c[v1.ResourceName(fmt.Sprintf("%s-ingress", v1.ResourceNetworkIOPrefix))] = *resource.NewQuantity(networkSpeed, resource.BinarySI)
+		c[v1.ResourceName(fmt.Sprintf("%s-egress", v1.ResourceNetworkIOPrefix))] = *resource.NewQuantity(networkSpeed, resource.BinarySI)
 	}
 
 	return c
+}
+
+// find the default gateway's interface from the route table
+func GetDefaultGatewayInterface() (*net.Interface, error) {
+	routes, err := netlink.RouteList(nil, syscall.AF_INET)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, route := range routes {
+		if route.Dst == nil || route.Dst.String() == "0.0.0.0/0" {
+			if route.LinkIndex <= 0 {
+				return nil, errors.New("found default route but could not determine interface")
+			}
+			return net.InterfaceByIndex(route.LinkIndex)
+		}
+	}
+
+	return nil, errors.New("unable to find default route")
 }
 
 // EphemeralStorageCapacityFromFsInfo returns the capacity of the ephemeral storage from the FsInfo.

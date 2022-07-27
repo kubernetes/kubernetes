@@ -18,6 +18,7 @@ package kuberuntime
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
@@ -110,8 +111,8 @@ func newPodAnnotations(pod *v1.Pod) map[string]string {
 			egress.Add(val)
 		}
 	}
-	annotations[podNetworkIOIngress] = ingress.String()
-	annotations[podNetworkIOEgress] = egress.String()
+	annotations[podNetworkIOIngress] = fmt.Sprintf("%dM", ingress.Value())
+	annotations[podNetworkIOEgress] = fmt.Sprintf("%dM", egress.Value())
 	return annotations
 }
 
@@ -141,10 +142,10 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 	annotations[containerTerminationMessagePolicyLabel] = string(container.TerminationMessagePolicy)
 
 	if val, ok := container.Resources.Limits[containerNetworkIOIngress]; ok {
-		annotations[containerNetworkIOIngress] = val.String()
+		annotations[containerNetworkIOIngress] = fmt.Sprintf("%sM", val.String())
 	}
 	if val, ok := container.Resources.Limits[containerNetworkIOEgress]; ok {
-		annotations[containerNetworkIOEgress] = val.String()
+		annotations[containerNetworkIOEgress] = fmt.Sprintf("%sM", val.String())
 	}
 	if pod.DeletionGracePeriodSeconds != nil {
 		annotations[podDeletionGracePeriodLabel] = strconv.FormatInt(*pod.DeletionGracePeriodSeconds, 10)
