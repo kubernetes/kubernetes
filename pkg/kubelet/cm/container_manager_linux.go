@@ -649,6 +649,11 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		return err
 	}
 
+	// Starts DRA manager.
+	if cm.draManager != nil {
+		cm.draManager.Configure(dra.ActivePodsFunc(activePods), sourcesReady)
+	}
+
 	return nil
 }
 

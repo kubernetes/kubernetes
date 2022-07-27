@@ -104,6 +104,13 @@ func NewManagerImpl(topology []cadvisorapi.Node, topologyAffinityStore topologym
 	return manager, nil
 }
 
+// Configure configures the DRA Manager and initializes
+// podResources cache from checkpointed state
+func (m *ManagerImpl) Configure(activePods ActivePodsFunc, sourcesReady config.SourcesReady) {
+	m.activePods = activePods
+	m.sourcesReady = sourcesReady
+}
+
 func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
 	m.Lock()
 	defer m.Unlock()
@@ -252,6 +259,10 @@ func (m *ManagerImpl) GetCDIAnnotations(pod *v1.Pod, container *v1.Container) []
 	annotations := []kubecontainer.Annotation{}
 	for _, claim := range container.Resources.Claims {
 		resource := m.podResources.get(pod.UID, container.Name, claim)
+		if resource == nil {
+			klog.V(3).Infof("unable to get resource for pod: %s, container: %s, claim: %s, pod resources: %+v", pod.Name, container.Name, claim, m.podResources)
+			continue
+		}
 		klog.V(3).Infof("GetCDIAnnotations: claim %s: add resource annotations: %+v", resource.annotations)
 		annotations = append(annotations, resource.annotations...)
 	}

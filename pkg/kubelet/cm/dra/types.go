@@ -18,6 +18,7 @@ package dra
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -26,6 +27,9 @@ type ActivePodsFunc func() []*v1.Pod
 
 // Manager manages all the kubelet resource plugins running on a node.
 type Manager interface {
+	// Configure configures DRA manager
+	Configure(activePods ActivePodsFunc, sourcesReady config.SourcesReady)
+
 	// Allocate prepares and assigns resources to a container in a pod. From
 	// the requested resources, Allocate will communicate with the
 	// kubelet resource plugin to prepare resources.
