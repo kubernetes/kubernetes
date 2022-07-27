@@ -46,8 +46,6 @@ func TestFixtures(t *testing.T) {
 
 	defaultChecks := policy.DefaultChecks()
 
-	const newestMinorVersionToTest = 23
-
 	policyVersions := computeVersionsToTest(t, defaultChecks)
 	newestMinorVersionWithPolicyChanges := policyVersions[len(policyVersions)-1].Minor()
 
@@ -61,11 +59,25 @@ func TestFixtures(t *testing.T) {
 			failDir := filepath.Join("testdata", string(level), fmt.Sprintf("v1.%d", version), "fail")
 
 			// render the minimal valid pod fixture
-			validPod, err := GetMinimalValidPod(level, api.MajorMinorVersion(1, version))
+			osNeutralPod, err := GetMinimalValidPod(level, api.MajorMinorVersion(1, version))
 			if err != nil {
 				t.Fatal(err)
 			}
-			expectedFiles.Insert(testFixtureFile(t, passDir, "base", validPod))
+			expectedFiles.Insert(testFixtureFile(t, passDir, "base", osNeutralPod))
+			// Don't generate OS specific pods when version < 1.25 as pod os field based restriction is not enabled.
+			if level == api.LevelRestricted && version >= podOSBasedRestrictionEnabledVersion {
+				linuxPod, err := GetMinimalValidLinuxPod(level, api.MajorMinorVersion(1, version))
+				if err != nil {
+					t.Fatal(err)
+				}
+				expectedFiles.Insert(testFixtureFile(t, passDir, "base_linux", linuxPod))
+
+				windowsPod, err := GetMinimalValidWindowsPod(level, api.MajorMinorVersion(1, version))
+				if err != nil {
+					t.Fatal(err)
+				}
+				expectedFiles.Insert(testFixtureFile(t, passDir, "base_windows", windowsPod))
+			}
 
 			// render check-specific fixtures
 			checkIDs, err := checksForLevelAndVersion(defaultChecks, level, api.MajorMinorVersion(1, version))
