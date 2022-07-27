@@ -17,10 +17,9 @@ limitations under the License.
 package disk
 
 import (
+	"bytes"
 	"crypto/sha256"
-	"encoding/binary"
 	"fmt"
-	"hash/crc32"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -44,7 +43,7 @@ func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripp
 		BasePath: cacheDir,
 		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
 	})
-	t := httpcache.NewTransport(&crcDiskCache{disk: d})
+	t := httpcache.NewTransport(&sumDiskCache{disk: d})
 	t.Transport = rt
 
 	return &cacheRoundTripper{rt: t}
@@ -67,28 +66,30 @@ func (rt *cacheRoundTripper) CancelRequest(req *http.Request) {
 
 func (rt *cacheRoundTripper) WrappedRoundTripper() http.RoundTripper { return rt.rt.Transport }
 
-// A crcDiskCache is a cache backend for github.com/gregjones/httpcache. It is
-// similar to httpcache's diskcache package, but uses checksums to ensure cache
-// integrity rather than fsyncing each cache entry in order to avoid performance
-// degradation on MacOS.
+// A sumDiskCache is a cache backend for github.com/gregjones/httpcache. It is
+// similar to httpcache's diskcache package, but uses SHA256 sums to ensure
+// cache integrity at read time rather than fsyncing each cache entry to
+// increase the likelihood they will be persisted at write time. This avoids
+// significant performance degradation on MacOS.
 //
 // See https://github.com/kubernetes/kubernetes/issues/110753 for more.
-type crcDiskCache struct {
+type sumDiskCache struct {
 	disk *diskv.Diskv
 }
 
 // Get the requested key from the cache on disk. If Get encounters an error, or
-// the returned value is not a CRC-32 checksum followed by bytes with a matching
+// the returned value is not a SHA256 sum followed by bytes with a matching
 // checksum it will return false to indicate a cache miss.
-func (c *crcDiskCache) Get(key string) ([]byte, bool) {
+func (c *sumDiskCache) Get(key string) ([]byte, bool) {
 	b, err := c.disk.Read(sanitize(key))
-	if err != nil || len(b) < binary.MaxVarintLen32 {
+	if err != nil || len(b) < sha256.Size {
 		return []byte{}, false
 	}
 
-	response := b[binary.MaxVarintLen32:]
-	sum, _ := binary.Uvarint(b[:binary.MaxVarintLen32])
-	if crc32.ChecksumIEEE(response) != uint32(sum) {
+	response := b[sha256.Size:]
+	want := b[:sha256.Size] // The first 32 bytes of the file should be the SHA256 sum.
+	got := sha256.Sum256(response)
+	if !bytes.Equal(want, got[:]) {
 		return []byte{}, false
 	}
 
@@ -96,15 +97,14 @@ func (c *crcDiskCache) Get(key string) ([]byte, bool) {
 }
 
 // Set writes the response to a file on disk. The filename will be the SHA256
-// hash of the key. The file will contain the CRC-32 checksum of the response
-// bytes, followed by said response bytes.
-func (c *crcDiskCache) Set(key string, response []byte) {
-	sum := make([]byte, binary.MaxVarintLen32)
-	_ = binary.PutUvarint(sum, uint64(crc32.ChecksumIEEE(response)))
-	_ = c.disk.Write(sanitize(key), append(sum, response...)) // Nothing we can do with this error.
+// sum of the key. The file will contain a SHA256 sum of the response bytes,
+// followed by said response bytes.
+func (c *sumDiskCache) Set(key string, response []byte) {
+	s := sha256.Sum256(response)
+	_ = c.disk.Write(sanitize(key), append(s[:], response...)) // Nothing we can do with this error.
 }
 
-func (c *crcDiskCache) Delete(key string) {
+func (c *sumDiskCache) Delete(key string) {
 	_ = c.disk.Erase(sanitize(key)) // Nothing we can do with this error.
 }
 
