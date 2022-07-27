@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -128,21 +129,22 @@ var (
 			Name:      "priority_level_request_utilization",
 			Help:      "Observations, at the end of every nanosecond, of number of requests (as a fraction of the relevant limit) waiting or in any stage of execution (but only initial stage for WATCHes)",
 			// For executing: the denominator will be seats, so this metric will skew low.
-			// FOr waiting: the denominiator is individual queue length limit, so this metric can go over 1.  Issue #110160
-			Buckets:        []float64{0, 0.001, 0.0025, 0.005, 0.1, 0.25, 0.5, 0.75, 1, 10, 100},
+			// For waiting: total queue capacity is generally quite generous, so this metric will skew low.
+			Buckets:        []float64{0, 0.001, 0.003, 0.01, 0.03, 0.1, 0.25, 0.5, 0.75, 1},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		LabelNamePhase, priorityLevel,
 	)
-	// ReadWriteConcurrencyPairVec creates gauges of number of requests broken down by phase and mutating vs readonly
-	ReadWriteConcurrencyGaugeVec = NewTimingRatioHistogramVec(
+	// readWriteConcurrencyGaugeVec creates ratioed gauges of requests/limit broken down by phase and mutating vs readonly
+	readWriteConcurrencyGaugeVec = NewTimingRatioHistogramVec(
 		&compbasemetrics.TimingHistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "read_vs_write_current_requests",
-			Help:      "Observations, at the end of every nanosecond, of the number of requests (as a fraction of the relevant limit, if max-in-flight filter is being used) waiting or in regular stage of execution",
-			Buckets:   []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1, 3, 10, 30, 100, 300, 1000, 3000},
-			// TODO: something about the utilization vs count irregularity.  Issue #109846
+			Help:      "Observations, at the end of every nanosecond, of the number of requests (as a fraction of the relevant limit) waiting or in regular stage of execution",
+			// This metric will skew low for the same reason as the priority level metrics
+			// and also because APF has a combined limit for mutating and readonly.
+			Buckets:        []float64{0, 0.001, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		LabelNamePhase, requestKind,
@@ -337,8 +339,38 @@ var (
 	}.
 		Append(PriorityLevelExecutionSeatsGaugeVec.metrics()...).
 		Append(PriorityLevelConcurrencyGaugeVec.metrics()...).
-		Append(ReadWriteConcurrencyGaugeVec.metrics()...)
+		Append(readWriteConcurrencyGaugeVec.metrics()...)
 )
+
+type indexOnce struct {
+	labelValues []string
+	once        sync.Once
+	gauge       RatioedGauge
+}
+
+func (io *indexOnce) getGauge() RatioedGauge {
+	io.once.Do(func() {
+		io.gauge = readWriteConcurrencyGaugeVec.NewForLabelValuesSafe(0, 1, io.labelValues)
+	})
+	return io.gauge
+}
+
+var waitingReadonly = indexOnce{labelValues: []string{LabelValueWaiting, epmetrics.ReadOnlyKind}}
+var executingReadonly = indexOnce{labelValues: []string{LabelValueExecuting, epmetrics.ReadOnlyKind}}
+var waitingMutating = indexOnce{labelValues: []string{LabelValueWaiting, epmetrics.MutatingKind}}
+var executingMutating = indexOnce{labelValues: []string{LabelValueExecuting, epmetrics.MutatingKind}}
+
+// GetWaitingReadonlyConcurrency returns the gauge of number of readonly requests waiting / limit on those.
+var GetWaitingReadonlyConcurrency = waitingReadonly.getGauge
+
+// GetExecutingReadonlyConcurrency returns the gauge of number of executing readonly requests / limit on those.
+var GetExecutingReadonlyConcurrency = executingReadonly.getGauge
+
+// GetWaitingMutatingConcurrency returns the gauge of number of mutating requests waiting / limit on those.
+var GetWaitingMutatingConcurrency = waitingMutating.getGauge
+
+// GetExecutingMutatingConcurrency returns the gauge of number of executing mutating requests / limit on those.
+var GetExecutingMutatingConcurrency = executingMutating.getGauge
 
 // AddRequestsInQueues adds the given delta to the gauge of the # of requests in the queues of the specified flowSchema and priorityLevel
 func AddRequestsInQueues(ctx context.Context, priorityLevel, flowSchema string, delta int) {

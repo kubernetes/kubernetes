@@ -48,12 +48,16 @@ type Reconciler interface {
 // NewReconciler returns a new instance of Reconciler.
 //
 // loopSleepDuration - the amount of time the reconciler loop sleeps between
-//   successive executions
-//   syncDuration - the amount of time the syncStates sleeps between
-//   successive executions
+//
+//	successive executions
+//	syncDuration - the amount of time the syncStates sleeps between
+//	successive executions
+//
 // operationExecutor - used to trigger register/unregister operations safely
-//   (prevents more than one operation from being triggered on the same
-//   socket path)
+//
+//	(prevents more than one operation from being triggered on the same
+//	socket path)
+//
 // desiredStateOfWorld - cache containing the desired state of the world
 // actualStateOfWorld - cache containing the actual state of the world
 func NewReconciler(

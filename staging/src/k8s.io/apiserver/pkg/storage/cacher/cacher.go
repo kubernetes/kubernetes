@@ -34,6 +34,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
@@ -296,6 +297,8 @@ type Cacher struct {
 	watchersToStop []*cacheWatcher
 	// Maintain a timeout queue to send the bookmark event before the watcher times out.
 	bookmarkWatchers *watcherBookmarkTimeBuckets
+	// expiredBookmarkWatchers is a list of watchers that were expired and need to be schedule for a next bookmark event
+	expiredBookmarkWatchers []*cacheWatcher
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -477,21 +480,12 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		}
 	}
 
-	// If there is indexedTrigger defined, but triggerSupported is false,
-	// we can't narrow the amount of events significantly at this point.
-	//
-	// That said, currently indexedTrigger is defined only for couple resources:
-	// Pods, Nodes, Secrets and ConfigMaps and there is only a constant
-	// number of watchers for which triggerSupported is false (excluding those
-	// issued explicitly by users).
-	// Thus, to reduce the risk of those watchers blocking all watchers of a
-	// given resource in the system, we increase the sizes of buffers for them.
-	chanSize := 10
-	if c.indexedTrigger != nil && !triggerSupported {
-		// TODO: We should tune this value and ideally make it dependent on the
-		// number of objects of a given type and/or their churn.
-		chanSize = 1000
-	}
+	// It boils down to a tradeoff between:
+	// - having it as small as possible to reduce memory usage
+	// - having it large enough to ensure that watchers that need to process
+	//   a bunch of changes have enough buffer to avoid from blocking other
+	//   watchers on our watcher having a processing hiccup
+	chanSize := c.watchCache.suggestedWatchChannelSize(c.indexedTrigger != nil, triggerSupported)
 
 	// Determine watch timeout('0' means deadline is not set, ignore checking)
 	deadline, _ := ctx.Deadline()
@@ -591,7 +585,8 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 }
 
 // NOTICE: Keep in sync with shouldListFromStorage function in
-//  staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
+//
+//	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
 func shouldDelegateList(opts storage.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
@@ -645,7 +640,9 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
-	trace := utiltrace.New("cacher list", utiltrace.Field{Key: "type", Value: c.objectType.String()})
+	trace := utiltrace.New("cacher list",
+		utiltrace.Field{"audit-id", endpointsrequest.GetAuditIDTruncated(ctx)},
+		utiltrace.Field{Key: "type", Value: c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	if err := c.ready.wait(); err != nil {
@@ -905,7 +902,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	}
 }
 
-func (c *Cacher) startDispatchingBookmarkEvents() {
+func (c *Cacher) startDispatchingBookmarkEventsLocked() {
 	// Pop already expired watchers. However, explicitly ignore stopped ones,
 	// as we don't delete watcher from bookmarkWatchers when it is stopped.
 	for _, watchers := range c.bookmarkWatchers.popExpiredWatchers() {
@@ -916,8 +913,7 @@ func (c *Cacher) startDispatchingBookmarkEvents() {
 				continue
 			}
 			c.watchersBuffer = append(c.watchersBuffer, watcher)
-			// Requeue the watcher for the next bookmark if needed.
-			c.bookmarkWatchers.addWatcher(watcher)
+			c.expiredBookmarkWatchers = append(c.expiredBookmarkWatchers, watcher)
 		}
 	}
 }
@@ -942,7 +938,7 @@ func (c *Cacher) startDispatching(event *watchCacheEvent) {
 	c.watchersBuffer = c.watchersBuffer[:0]
 
 	if event.Type == watch.Bookmark {
-		c.startDispatchingBookmarkEvents()
+		c.startDispatchingBookmarkEventsLocked()
 		// return here to reduce following code indentation and diff
 		return
 	}
@@ -986,6 +982,15 @@ func (c *Cacher) finishDispatching() {
 		watcher.stopLocked()
 	}
 	c.watchersToStop = c.watchersToStop[:0]
+
+	for _, watcher := range c.expiredBookmarkWatchers {
+		if watcher.stopped {
+			continue
+		}
+		// requeue the watcher for the next bookmark if needed.
+		c.bookmarkWatchers.addWatcher(watcher)
+	}
+	c.expiredBookmarkWatchers = c.expiredBookmarkWatchers[:0]
 }
 
 func (c *Cacher) terminateAllWatchers() {
@@ -1242,12 +1247,16 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 
 func (c *cacheWatcher) nextBookmarkTime(now time.Time, bookmarkFrequency time.Duration) (time.Time, bool) {
 	// We try to send bookmarks:
-	// (a) roughly every minute
-	// (b) right before the watcher timeout - for now we simply set it 2s before
+	//
+	// (a) right before the watcher timeout - for now we simply set it 2s before
 	//     the deadline
-	// The former gives us periodicity if the watch breaks due to unexpected
-	// conditions, the later ensures that on timeout the watcher is as close to
+	//
+	// (b) roughly every minute
+	//
+	// (b) gives us periodicity if the watch breaks due to unexpected
+	// conditions, (a) ensures that on timeout the watcher is as close to
 	// now as possible - this covers 99% of cases.
+
 	heartbeatTime := now.Add(bookmarkFrequency)
 	if c.deadline.IsZero() {
 		// Timeout is set by our client libraries (e.g. reflector) as well as defaulted by

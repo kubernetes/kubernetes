@@ -1,0 +1,37 @@
+- name: summary_metric_test
+  subsystem: kubelet
+  help: Cumulative number of device plugin registrations. Broken down by resource
+    name.
+  type: Summary
+  stabilityLevel: STABLE
+- name: summary_vec_metric_test
+  subsystem: kubelet
+  help: Duration in seconds to serve a device plugin Allocation request. Broken down
+    by resource name.
+  type: Summary
+  stabilityLevel: STABLE
+  labels:
+  - resource_name
+  objectives:
+    0.5: 0.5
+    0.75: 0.75
+  ageBuckets: 5
+  bufCap: 500
+  maxAge: 600000000000
+- name: test_histogram_metric
+  subsystem: kubelet
+  help: Interval in seconds between relisting in PLEG.
+  type: Histogram
+  stabilityLevel: STABLE
+  buckets:
+  - 0.005
+  - 0.01
+  - 0.025
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10

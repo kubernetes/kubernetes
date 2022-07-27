@@ -32,21 +32,20 @@ import (
 )
 
 /*
-   This is a function test for Selector-Label Volume Binding Feature
-   Test verifies volume with the matching label is bounded with the PVC.
+This is a function test for Selector-Label Volume Binding Feature
+Test verifies volume with the matching label is bounded with the PVC.
 
-   Test Steps
-   ----------
-   1. Create VMDK.
-   2. Create pv with label volume-type:ssd, volume path set to vmdk created in previous step, and PersistentVolumeReclaimPolicy is set to Delete.
-   3. Create PVC (pvcVvol) with label selector to match with volume-type:vvol
-   4. Create PVC (pvcSsd) with label selector to match with volume-type:ssd
-   5. Wait and verify pvSsd is bound with PV.
-   6. Verify Status of pvcVvol is still pending.
-   7. Delete pvcSsd.
-   8. verify associated pv is also deleted.
-   9. delete pvcVvol
-
+Test Steps
+----------
+1. Create VMDK.
+2. Create pv with label volume-type:ssd, volume path set to vmdk created in previous step, and PersistentVolumeReclaimPolicy is set to Delete.
+3. Create PVC (pvcVvol) with label selector to match with volume-type:vvol
+4. Create PVC (pvcSsd) with label selector to match with volume-type:ssd
+5. Wait and verify pvSsd is bound with PV.
+6. Verify Status of pvcVvol is still pending.
+7. Delete pvcSsd.
+8. verify associated pv is also deleted.
+9. delete pvcVvol
 */
 var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSelector]", func() {
 	f := framework.NewDefaultFramework("pvclabelselector")

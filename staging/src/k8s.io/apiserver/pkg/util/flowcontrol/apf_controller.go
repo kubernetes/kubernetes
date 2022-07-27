@@ -143,8 +143,8 @@ type configController struct {
 	// This may only be accessed from the one and only worker goroutine.
 	mostRecentUpdates []updateAttempt
 
-	// This must be locked while accessing flowSchemas or
-	// priorityLevelStates.  A lock for writing is needed
+	// This must be locked while accessing the later fields.
+	// A lock for writing is needed
 	// for writing to any of the following:
 	// - the flowSchemas field
 	// - the slice held in the flowSchemas field
@@ -291,23 +291,6 @@ func newTestableController(config TestableConfig) *configController {
 	return cfgCtlr
 }
 
-// MaintainObservations keeps the observers from
-// metrics.PriorityLevelConcurrencyPairVec from falling
-// too far behind
-func (cfgCtlr *configController) MaintainObservations(stopCh <-chan struct{}) {
-	wait.Until(cfgCtlr.updateObservations, 10*time.Second, stopCh)
-}
-
-func (cfgCtlr *configController) updateObservations() {
-	cfgCtlr.lock.RLock()
-	defer cfgCtlr.lock.RUnlock()
-	for _, plc := range cfgCtlr.priorityLevelStates {
-		if plc.queues != nil {
-			plc.queues.UpdateObservations()
-		}
-	}
-}
-
 func (cfgCtlr *configController) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 
@@ -404,6 +387,8 @@ type cfgMeal struct {
 	// provoking a call into this controller while the lock held
 	// waiting on that request to complete.
 	fsStatusUpdates []fsStatusUpdate
+
+	maxWaitingRequests, maxExecutingRequests int
 }
 
 // A buffered set of status updates for FlowSchemas
@@ -528,7 +513,13 @@ func (cfgCtlr *configController) lockAndDigestConfigObjects(newPLs []*flowcontro
 
 	// The new config has been constructed
 	cfgCtlr.priorityLevelStates = meal.newPLStates
-	klog.V(5).Infof("Switched to new API Priority and Fairness configuration")
+	klog.V(5).InfoS("Switched to new API Priority and Fairness configuration", "maxWaitingRequests", meal.maxWaitingRequests, "maxExecutinRequests", meal.maxExecutingRequests)
+
+	metrics.GetWaitingReadonlyConcurrency().SetDenominator(float64(meal.maxWaitingRequests))
+	metrics.GetWaitingMutatingConcurrency().SetDenominator(float64(meal.maxWaitingRequests))
+	metrics.GetExecutingReadonlyConcurrency().SetDenominator(float64(meal.maxExecutingRequests))
+	metrics.GetExecutingMutatingConcurrency().SetDenominator(float64(meal.maxExecutingRequests))
+
 	return meal.fsStatusUpdates
 }
 
@@ -680,6 +671,12 @@ func (meal *cfgMeal) finishQueueSetReconfigsLocked() {
 		// difference will be negligible.
 		concurrencyLimit := int(math.Ceil(float64(meal.cfgCtlr.serverConcurrencyLimit) * float64(plState.pl.Spec.Limited.AssuredConcurrencyShares) / meal.shareSum))
 		metrics.UpdateSharedConcurrencyLimit(plName, concurrencyLimit)
+		meal.maxExecutingRequests += concurrencyLimit
+		var waitLimit int
+		if qCfg := plState.pl.Spec.Limited.LimitResponse.Queuing; qCfg != nil {
+			waitLimit = int(qCfg.Queues * qCfg.QueueLengthLimit)
+		}
+		meal.maxWaitingRequests += waitLimit
 
 		if plState.queues == nil {
 			klog.V(5).Infof("Introducing queues for priority level %q: config=%s, concurrencyLimit=%d, quiescing=%v (shares=%v, shareSum=%v)", plName, fcfmt.Fmt(plState.pl.Spec), concurrencyLimit, plState.quiescing, plState.pl.Spec.Limited.AssuredConcurrencyShares, meal.shareSum)

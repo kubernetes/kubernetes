@@ -236,10 +236,14 @@ func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, er
 }
 
 func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetResponse, error) {
-	_, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
+	rawClient, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create etcd client: %v", err)
 	}
+	// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
+	// close the client (which we can do by closing rawClient).
+	defer rawClient.Close()
+
 	response, err := etcdClient.Get(context.Background(), path, clientv3.WithPrefix())
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve secret from etcd %v", err)
@@ -249,10 +253,14 @@ func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetRespons
 }
 
 func (e *transformTest) writeRawRecordToETCD(path string, data []byte) (*clientv3.PutResponse, error) {
-	_, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
+	rawClient, etcdClient, err := integration.GetEtcdClients(e.kubeAPIServer.ServerOpts.Etcd.StorageConfig.Transport)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create etcd client: %v", err)
 	}
+	// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
+	// close the client (which we can do by closing rawClient).
+	defer rawClient.Close()
+
 	response, err := etcdClient.Put(context.Background(), path, string(data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to write secret to etcd %v", err)

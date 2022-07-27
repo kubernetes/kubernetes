@@ -79,9 +79,13 @@ type podStateProvider interface {
 //
 // kubeClient - used to fetch PV and PVC objects from the API server
 // loopSleepDuration - the amount of time the populator loop sleeps between
-//     successive executions
+//
+//	successive executions
+//
 // podManager - the kubelet podManager that is the source of truth for the pods
-//     that exist on this host
+//
+//	that exist on this host
+//
 // desiredStateOfWorld - the cache to populate
 func NewDesiredStateOfWorldPopulator(
 	kubeClient clientset.Interface,
@@ -251,7 +255,6 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			continue
 		}
 		klog.V(4).InfoS("Removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
-
 		dswp.desiredStateOfWorld.DeletePodFromVolume(
 			volumeToMount.PodName, volumeToMount.VolumeName)
 		dswp.deleteProcessedPod(volumeToMount.PodName)

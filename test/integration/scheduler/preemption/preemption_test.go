@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -623,7 +622,7 @@ func TestPodPriorityResolution(t *testing.T) {
 	// Build clientset and informers for controllers.
 	externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
 	externalClientConfig.QPS = -1
-	externalClientset := kubernetes.NewForConfigOrDie(externalClientConfig)
+	externalClientset := clientset.NewForConfigOrDie(externalClientConfig)
 	externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)

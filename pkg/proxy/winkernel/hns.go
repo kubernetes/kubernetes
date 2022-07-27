@@ -29,14 +29,27 @@ import (
 	"strings"
 )
 
-type hnsV2 struct{}
+type HostNetworkService interface {
+	getNetworkByName(name string) (*hnsNetworkInfo, error)
+	getAllEndpointsByNetwork(networkName string) (map[string]*endpointsInfo, error)
+	getEndpointByID(id string) (*endpointsInfo, error)
+	getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error)
+	getEndpointByName(id string) (*endpointsInfo, error)
+	createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error)
+	deleteEndpoint(hnsID string) error
+	getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error)
+	getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error)
+	deleteLoadBalancer(hnsID string) error
+}
+
+type hns struct{}
 
 var (
 	// LoadBalancerFlagsIPv6 enables IPV6.
 	LoadBalancerFlagsIPv6 hcn.LoadBalancerFlags = 2
 )
 
-func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
+func (hns hns) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	hnsnetwork, err := hcn.GetNetworkByName(name)
 	if err != nil {
 		klog.ErrorS(err, "Error getting network by name")
@@ -69,7 +82,7 @@ func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	}, nil
 }
 
-func (hns hnsV2) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointsInfo), error) {
+func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointsInfo), error) {
 	hcnnetwork, err := hcn.GetNetworkByName(networkName)
 	if err != nil {
 		klog.ErrorS(err, "failed to get HNS network by name", "name", networkName)
@@ -101,7 +114,7 @@ func (hns hnsV2) getAllEndpointsByNetwork(networkName string) (map[string]*(endp
 	return endpointInfos, nil
 }
 
-func (hns hnsV2) getEndpointByID(id string) (*endpointsInfo, error) {
+func (hns hns) getEndpointByID(id string) (*endpointsInfo, error) {
 	hnsendpoint, err := hcn.GetEndpointByID(id)
 	if err != nil {
 		return nil, err
@@ -114,7 +127,7 @@ func (hns hnsV2) getEndpointByID(id string) (*endpointsInfo, error) {
 		hns:        hns,
 	}, nil
 }
-func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
+func (hns hns) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
 	hnsnetwork, err := hcn.GetNetworkByName(networkName)
 	if err != nil {
 		klog.ErrorS(err, "Error getting network by name")
@@ -146,7 +159,7 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 	}
 	return nil, fmt.Errorf("Endpoint %v not found on network %s", ip, networkName)
 }
-func (hns hnsV2) getEndpointByName(name string) (*endpointsInfo, error) {
+func (hns hns) getEndpointByName(name string) (*endpointsInfo, error) {
 	hnsendpoint, err := hcn.GetEndpointByName(name)
 	if err != nil {
 		return nil, err
@@ -159,7 +172,7 @@ func (hns hnsV2) getEndpointByName(name string) (*endpointsInfo, error) {
 		hns:        hns,
 	}, nil
 }
-func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
+func (hns hns) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
 	hnsNetwork, err := hcn.GetNetworkByName(networkName)
 	if err != nil {
 		return nil, err
@@ -216,7 +229,7 @@ func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 		hns:             hns,
 	}, nil
 }
-func (hns hnsV2) deleteEndpoint(hnsID string) error {
+func (hns hns) deleteEndpoint(hnsID string) error {
 	hnsendpoint, err := hcn.GetEndpointByID(hnsID)
 	if err != nil {
 		return err
@@ -228,7 +241,7 @@ func (hns hnsV2) deleteEndpoint(hnsID string) error {
 	return err
 }
 
-func (hns hnsV2) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
+func (hns hns) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancerInfo, error) {
 	lbs, err := hcn.ListLoadBalancers()
 	var id loadBalancerIdentifier
 	if err != nil {
@@ -251,7 +264,7 @@ func (hns hnsV2) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancer
 	return loadBalancers, nil
 }
 
-func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
+func (hns hns) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
 	var id loadBalancerIdentifier
 	vips := []string{}
 	if len(vip) > 0 {
@@ -333,7 +346,7 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 	return lbInfo, err
 }
 
-func (hns hnsV2) deleteLoadBalancer(hnsID string) error {
+func (hns hns) deleteLoadBalancer(hnsID string) error {
 	lb, err := hcn.GetLoadBalancerByID(hnsID)
 	if err != nil {
 		// Return silently

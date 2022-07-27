@@ -31,6 +31,8 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
+
+	"k8s.io/klog/v2"
 )
 
 // TearDownFunc is to be called to tear down a test server.
@@ -56,12 +58,23 @@ type Logger interface {
 // and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
-// 		 files that because Golang testing's call to os.Exit will not give a stop channel go routine
-// 		 enough time to remove temporary files.
+//
+//	files that because Golang testing's call to os.Exit will not give a stop channel go routine
+//	enough time to remove temporary files.
 func StartTestServer(t Logger, customFlags []string) (result TestServer, err error) {
 	stopCh := make(chan struct{})
+	var errCh chan error
 	tearDown := func() {
 		close(stopCh)
+
+		// If the kube-controller-manager was started, let's wait for
+		// it to shutdown clearly.
+		if errCh != nil {
+			err, ok := <-errCh
+			if ok && err != nil {
+				klog.Errorf("Failed to shutdown test server clearly: %v", err)
+			}
+		}
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
 		}
@@ -105,8 +118,10 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		return result, fmt.Errorf("failed to create config from options: %v", err)
 	}
 
-	errCh := make(chan error)
+	errCh = make(chan error)
 	go func(stopCh <-chan struct{}) {
+		defer close(errCh)
+
 		if err := app.Run(config.Complete(), stopCh); err != nil {
 			errCh <- err
 		}

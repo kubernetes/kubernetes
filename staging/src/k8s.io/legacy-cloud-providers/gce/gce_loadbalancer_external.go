@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -902,6 +903,13 @@ func (g *Cloud) firewallNeedsUpdate(name, serviceName, ipAddress string, ports [
 	if !sourceRanges.Equal(actualSourceRanges) {
 		return true, true, nil
 	}
+
+	destinationRanges := []string{ipAddress}
+
+	if !reflect.DeepEqual(destinationRanges, fw.DestinationRanges) {
+		return true, true, nil
+	}
+
 	return true, false, nil
 }
 

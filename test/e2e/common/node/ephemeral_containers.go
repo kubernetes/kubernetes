@@ -33,7 +33,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("Ephemeral Containers [NodeFeature:EphemeralContainers]", func() {
+var _ = SIGDescribe("Ephemeral Containers [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("ephemeral-containers-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var podClient *framework.PodClient

@@ -8151,6 +8151,249 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				forbidden("spec.validation.openAPIV3Schema"),
 			},
 		},
+		{
+			name: "x-kubernetes-validations rule validated for escaped property name",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f/2": {
+							Type: "string",
+						},
+					},
+					XValidations: apiextensions.ValidationRules{
+						{Rule: "self.f__slash__2 == 1"}, // invalid comparison of string and int
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule validated under array items",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"a": {
+							Type: "array",
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == 1"}, // invalid comparison of string and int
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[a].items.x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule validated under array items, parent has rule",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"a": {Type: "array",
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == 1"}, // invalid comparison of string and int
+									},
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "1 == 1"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[a].items.x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule validated under additionalProperties",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"a": {
+							Type: "object",
+							AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == 1"}, // invalid comparison of string and int
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[a].additionalProperties.x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule validated under additionalProperties, parent has rule",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"a": {
+							Type: "object",
+							AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == 1"}, // invalid comparison of string and int
+									},
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "1 == 1"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[a].additionalProperties.x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule validated under unescaped property name",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == 1"}, // invalid comparison of string and int
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[f].x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule validated under unescaped property name, parent has rule",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == 1"}, // invalid comparison of string and int
+							},
+						},
+					},
+					XValidations: apiextensions.ValidationRules{
+						{Rule: "1 == 1"},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[f].x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule validated under escaped property name",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f/2": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == 1"}, // invalid comparison of string and int
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[f/2].x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule validated under escaped property name, parent has rule",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f/2": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == 1"}, // invalid comparison of string and int
+							},
+						},
+					},
+					XValidations: apiextensions.ValidationRules{
+						{Rule: "1 == 1"},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[f/2].x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule validated under unescapable property name",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f@2": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == 1"}, // invalid comparison of string and int
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[f@2].x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			name: "x-kubernetes-validations rule validated under unescapable property name, parent has rule",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"f@2": {
+							Type: "string",
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self == 1"}, // invalid comparison of string and int
+							},
+						},
+					},
+					XValidations: apiextensions.ValidationRules{
+						{Rule: "1 == 1"},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				invalid("spec.validation.openAPIV3Schema.properties[f@2].x-kubernetes-validations[0].rule"),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -8506,10 +8749,11 @@ func TestCostInfo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			curCostInfo := rootCostInfo()
 			// simulate the recursive validation calls
-			for _, schema := range tt.schema {
-				curCostInfo = curCostInfo.MultiplyByElementCost(schema)
+			schemas := append(tt.schema, &apiextensions.JSONSchemaProps{Type: "string"}) // append a leaf type
+			curCostInfo := RootCELContext(schemas[0])
+			for i := 1; i < len(schemas); i++ {
+				curCostInfo = curCostInfo.childContext(schemas[i], nil)
 			}
 			if tt.expectedMaxCardinality == nil && curCostInfo.MaxCardinality == nil {
 				// unbounded cardinality case, test ran correctly
@@ -8519,6 +8763,63 @@ func TestCostInfo(t *testing.T) {
 				t.Errorf("expected bounded cardinality of %d but got unbounded cardinality", tt.expectedMaxCardinality)
 			} else if *tt.expectedMaxCardinality != *curCostInfo.MaxCardinality {
 				t.Errorf("wrong cardinality (expected %d, got %d)", *tt.expectedMaxCardinality, curCostInfo.MaxCardinality)
+			}
+		})
+	}
+}
+
+func TestCelContext(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema *apiextensions.JSONSchemaProps
+	}{
+		{
+			name: "verify that schemas are converted only once and then reused",
+			schema: &apiextensions.JSONSchemaProps{
+				Type:         "object",
+				XValidations: []apiextensions.ValidationRule{{Rule: "self.size() < 100"}},
+				AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+					Schema: &apiextensions.JSONSchemaProps{
+						Type: "array",
+						Items: &apiextensions.JSONSchemaPropsOrArray{
+							Schema: &apiextensions.JSONSchemaProps{
+								Type:         "object",
+								XValidations: []apiextensions.ValidationRule{{Rule: "has(self.field)"}},
+								Properties: map[string]apiextensions.JSONSchemaProps{
+									"field": {
+										XValidations: []apiextensions.ValidationRule{{Rule: "self.startsWith('abc')"}},
+										Type:         "string",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// simulate the recursive validation calls
+			conversionCount := 0
+			converter := func(schema *apiextensions.JSONSchemaProps, isRoot bool) (*CELTypeInfo, error) {
+				conversionCount++
+				return defaultConverter(schema, isRoot)
+			}
+			celContext := RootCELContext(tt.schema)
+			celContext.converter = converter
+			opts := validationOptions{}
+			openAPIV3Schema := &specStandardValidatorV3{
+				allowDefaults:            opts.allowDefaults,
+				disallowDefaultsReason:   opts.disallowDefaultsReason,
+				requireValidPropertyType: opts.requireValidPropertyType,
+			}
+			errors := ValidateCustomResourceDefinitionOpenAPISchema(tt.schema, field.NewPath("openAPIV3Schema"), openAPIV3Schema, true, &opts, celContext)
+			if len(errors) != 0 {
+				t.Errorf("Expected no validate errors but got %v", errors)
+			}
+			if conversionCount != 1 {
+				t.Errorf("Expected 1 conversion to be performed by cel context during schema traversal but observed %d conversions", conversionCount)
 			}
 		})
 	}
@@ -8582,20 +8883,20 @@ func TestPerCRDEstimatedCost(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			crdCost := rootCostInfo().TotalCost
+			crdCost := TotalCost{}
 			for _, cost := range tt.costs {
-				crdCost.observeExpressionCost(nil, cost)
+				crdCost.ObserveExpressionCost(nil, cost)
 			}
-			if len(crdCost.mostExpensive) != len(tt.expectedExpensive) {
-				t.Fatalf("expected %d largest costs but got %d: %v", len(tt.expectedExpensive), len(crdCost.mostExpensive), crdCost.mostExpensive)
+			if len(crdCost.MostExpensive) != len(tt.expectedExpensive) {
+				t.Fatalf("expected %d largest costs but got %d: %v", len(tt.expectedExpensive), len(crdCost.MostExpensive), crdCost.MostExpensive)
 			}
-			for i, expensive := range crdCost.mostExpensive {
-				if tt.expectedExpensive[i] != expensive.cost {
-					t.Errorf("expected largest cost of %d at index %d but got %d", tt.expectedExpensive[i], i, expensive.cost)
+			for i, expensive := range crdCost.MostExpensive {
+				if tt.expectedExpensive[i] != expensive.Cost {
+					t.Errorf("expected largest cost of %d at index %d but got %d", tt.expectedExpensive[i], i, expensive.Cost)
 				}
 			}
-			if tt.expectedTotal != crdCost.totalCost {
-				t.Errorf("expected total cost of %d but got %d", tt.expectedTotal, crdCost.totalCost)
+			if tt.expectedTotal != crdCost.Total {
+				t.Errorf("expected total cost of %d but got %d", tt.expectedTotal, crdCost.Total)
 			}
 		})
 	}

@@ -22,14 +22,13 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 func TestTransformManagedFieldsToSubresource(t *testing.T) {
 	testTime, _ := time.ParseInLocation("2006-Jan-02", "2013-Feb-03", time.Local)
-	managedFieldTime := v1.NewTime(testTime)
+	managedFieldTime := metav1.NewTime(testTime)
 
 	tests := []struct {
 		desc     string

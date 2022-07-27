@@ -232,11 +232,13 @@ var awsVolumeRegMatch = regexp.MustCompile("^vol-[^/]*$")
 
 // KubernetesVolumeIDToEBSVolumeID translates Kubernetes volume ID to EBS volume ID
 // KubernetesVolumeID forms:
-//  * aws://<zone>/<awsVolumeId>
-//  * aws:///<awsVolumeId>
-//  * <awsVolumeId>
+//   - aws://<zone>/<awsVolumeId>
+//   - aws:///<awsVolumeId>
+//   - <awsVolumeId>
+//
 // EBS Volume ID form:
-//  * vol-<alphanumberic>
+//   - vol-<alphanumberic>
+//
 // This translation shouldn't be needed and should be fixed in long run
 // See https://github.com/kubernetes/kubernetes/issues/73730
 func KubernetesVolumeIDToEBSVolumeID(kubernetesID string) (string, error) {

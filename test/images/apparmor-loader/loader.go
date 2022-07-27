@@ -229,7 +229,8 @@ func resolveSymlink(basePath string, entry os.DirEntry) (os.FileInfo, error) {
 }
 
 // TODO: This is copied from k8s.io/kubernetes/pkg/security/apparmor.getLoadedProfiles.
-//       Refactor that method to expose it in a reusable way, and delete this version.
+//
+//	Refactor that method to expose it in a reusable way, and delete this version.
 func getLoadedProfiles() (map[string]bool, error) {
 	profilesPath := path.Join(apparmorfs, "profiles")
 	profilesFile, err := os.Open(profilesPath)
@@ -252,8 +253,10 @@ func getLoadedProfiles() (map[string]bool, error) {
 }
 
 // The profiles file is formatted with one profile per line, matching a form:
-//   namespace://profile-name (mode)
-//   profile-name (mode)
+//
+//	namespace://profile-name (mode)
+//	profile-name (mode)
+//
 // Where mode is {enforce, complain, kill}. The "namespace://" is only included for namespaced
 // profiles. For the purposes of Kubernetes, we consider the namespace part of the profile name.
 func parseProfileName(profileLine string) string {

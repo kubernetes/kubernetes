@@ -18,7 +18,6 @@ package test
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/pod-security-admission/api"
 )
@@ -26,29 +25,29 @@ import (
 func init() {
 	fixtureData_1_0 := fixtureGenerator{
 		expectErrorSubstring: "procMount",
-		generatePass: func(p *v1.Pod) []*v1.Pod {
+		generatePass: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
 				// set proc mount of container and init container to a valid value
-				tweak(p, func(copy *v1.Pod) {
-					validProcMountType := v1.DefaultProcMount
+				tweak(p, func(copy *corev1.Pod) {
+					validProcMountType := corev1.DefaultProcMount
 					copy.Spec.Containers[0].SecurityContext.ProcMount = &validProcMountType
 					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &validProcMountType
 				}),
 			}
 		},
 		failRequiresFeatures: []featuregate.Feature{"ProcMountType"},
-		generateFail: func(p *v1.Pod) []*v1.Pod {
+		generateFail: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
 				// set proc mount of container to a forbidden value
-				tweak(p, func(copy *v1.Pod) {
-					unmaskedProcMountType := v1.UnmaskedProcMount
+				tweak(p, func(copy *corev1.Pod) {
+					unmaskedProcMountType := corev1.UnmaskedProcMount
 					copy.Spec.Containers[0].SecurityContext.ProcMount = &unmaskedProcMountType
 				}),
 				// set proc mount of init container to a forbidden value
-				tweak(p, func(copy *v1.Pod) {
-					unmaskedProcMountType := v1.UnmaskedProcMount
+				tweak(p, func(copy *corev1.Pod) {
+					unmaskedProcMountType := corev1.UnmaskedProcMount
 					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &unmaskedProcMountType
 				}),
 			}

@@ -1163,7 +1163,7 @@ profiles:
 					}
 					return
 				}
-				assert.NoError(t, err)
+				t.Errorf("unexpected error to create a config: %v", err)
 				return
 			}
 

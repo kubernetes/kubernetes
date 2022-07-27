@@ -40,7 +40,6 @@ import (
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -246,6 +245,185 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 			string(createdBytes),
 			string(updatedBytes),
 		)
+	}
+}
+
+func getRV(obj runtime.Object) (string, error) {
+	acc, err := meta.Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	return acc.GetResourceVersion(), nil
+}
+
+// TestNoSemanticUpdateAppleSameResourceVersion makes sure that APPLY requests which makes no semantic changes
+// will not change the resource version (no write to etcd is done)
+//
+// Some of the non-semantic changes are:
+// - Applying an atomic struct that removes a default
+// - Changing Quantity or other fields that are normalized
+func TestNoSemanticUpdateApplySameResourceVersion(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	ssBytes := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "StatefulSet",
+		"metadata": {
+			"name": "nginx",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"serviceName": "nginx",
+			"selector": { "matchLabels": {"app": "nginx"}},
+			"template": {
+				"metadata": {
+					"labels": {"app": "nginx"}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx",
+						"resources": {
+							"limits": {"memory": "2048Mi"}
+						}
+					}]
+				}
+			},
+			"volumeClaimTemplates": [{
+				"metadata": {"name": "nginx"},
+				"spec": {
+					"accessModes": ["ReadWriteOnce"],
+					"resources": {"requests": {"storage": "1Gi"}}
+				}
+			}]
+		}
+	}`)
+
+	obj, err := client.AppsV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("statefulsets").
+		Name("nginx").
+		Body(ssBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	rvCreated, err := getRV(obj)
+	if err != nil {
+		t.Fatalf("Failed to get RV: %v", err)
+	}
+
+	// Sleep for one second to make sure that the times of each update operation is different.
+	time.Sleep(1200 * time.Millisecond)
+
+	obj, err = client.AppsV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("statefulsets").
+		Name("nginx").
+		Body(ssBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+	rvApplied, err := getRV(obj)
+	if err != nil {
+		t.Fatalf("Failed to get RV: %v", err)
+	}
+	if rvApplied != rvCreated {
+		t.Fatal("ResourceVersion changed after apply")
+	}
+}
+
+// TestNoSemanticUpdateAppleSameResourceVersion makes sure that PUT requests which makes no semantic changes
+// will not change the resource version (no write to etcd is done)
+//
+// Some of the non-semantic changes are:
+// - Applying an atomic struct that removes a default
+// - Changing Quantity or other fields that are normalized
+func TestNoSemanticUpdatePutSameResourceVersion(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	ssBytes := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "StatefulSet",
+		"metadata": {
+			"name": "nginx",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+			"serviceName": "nginx",
+			"selector": { "matchLabels": {"app": "nginx"}},
+			"template": {
+				"metadata": {
+					"labels": {"app": "nginx"}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx",
+						"resources": {
+							"limits": {"memory": "2048Mi"}
+						}
+					}]
+				}
+			},
+			"volumeClaimTemplates": [{
+				"metadata": {"name": "nginx"},
+				"spec": {
+					"accessModes": ["ReadWriteOnce"],
+					"resources": { "requests": { "storage": "1Gi"}}
+				}
+			}]
+		}
+	}`)
+
+	obj, err := client.AppsV1().RESTClient().Post().
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("statefulsets").
+		Body(ssBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+
+	rvCreated, err := getRV(obj)
+	if err != nil {
+		t.Fatalf("Failed to get RV: %v", err)
+	}
+
+	// Sleep for one second to make sure that the times of each update operation is different.
+	time.Sleep(1200 * time.Millisecond)
+
+	obj, err = client.AppsV1().RESTClient().Put().
+		Namespace("default").
+		Param("fieldManager", "apply_test").
+		Resource("statefulsets").
+		Name("nginx").
+		Body(ssBytes).
+		Do(context.TODO()).
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object: %v", err)
+	}
+	rvApplied, err := getRV(obj)
+	if err != nil {
+		t.Fatalf("Failed to get RV: %v", err)
+	}
+	if rvApplied != rvCreated {
+		t.Fatal("ResourceVersion changed after similar PUT")
 	}
 }
 
@@ -2552,7 +2730,7 @@ func BenchmarkServerSideApply(b *testing.B) {
 	benchAll(b, client, decodePod(podBytesWhenEnabled))
 }
 
-func benchAll(b *testing.B, client kubernetes.Interface, pod v1.Pod) {
+func benchAll(b *testing.B, client clientset.Interface, pod v1.Pod) {
 	// Make sure pod is ready to post
 	pod.ObjectMeta.CreationTimestamp = metav1.Time{}
 	pod.ObjectMeta.ResourceVersion = ""
@@ -2580,7 +2758,7 @@ func benchAll(b *testing.B, client kubernetes.Interface, pod v1.Pod) {
 	b.Run("Post50", benchPostPod(client, pod, 50))
 }
 
-func benchPostPod(client kubernetes.Interface, pod v1.Pod, parallel int) func(*testing.B) {
+func benchPostPod(client clientset.Interface, pod v1.Pod, parallel int) func(*testing.B) {
 	return func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
@@ -2610,7 +2788,7 @@ func benchPostPod(client kubernetes.Interface, pod v1.Pod, parallel int) func(*t
 	}
 }
 
-func createNamespace(client kubernetes.Interface, name string) error {
+func createNamespace(client clientset.Interface, name string) error {
 	namespace := v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
 	namespaceBytes, err := yaml.Marshal(namespace)
 	if err != nil {
@@ -2626,7 +2804,7 @@ func createNamespace(client kubernetes.Interface, name string) error {
 	return nil
 }
 
-func benchListPod(client kubernetes.Interface, pod v1.Pod, num int) func(*testing.B) {
+func benchListPod(client clientset.Interface, pod v1.Pod, num int) func(*testing.B) {
 	return func(b *testing.B) {
 		namespace := fmt.Sprintf("get-%d-%d", num, b.N)
 		if err := createNamespace(client, namespace); err != nil {
@@ -2661,7 +2839,7 @@ func benchListPod(client kubernetes.Interface, pod v1.Pod, num int) func(*testin
 	}
 }
 
-func benchRepeatedUpdate(client kubernetes.Interface, podName string) func(*testing.B) {
+func benchRepeatedUpdate(client clientset.Interface, podName string) func(*testing.B) {
 	return func(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()

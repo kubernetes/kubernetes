@@ -73,6 +73,22 @@ func init() {
 }
 
 func newETCD3HealthCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
+	timeout := storagebackend.DefaultHealthcheckTimeout
+	if c.HealthcheckTimeout != time.Duration(0) {
+		timeout = c.HealthcheckTimeout
+	}
+	return newETCD3Check(c, timeout, stopCh)
+}
+
+func newETCD3ReadyCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
+	timeout := storagebackend.DefaultReadinessTimeout
+	if c.ReadycheckTimeout != time.Duration(0) {
+		timeout = c.ReadycheckTimeout
+	}
+	return newETCD3Check(c, timeout, stopCh)
+}
+
+func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan struct{}) (func() error, error) {
 	// constructing the etcd v3 client blocks and times out if etcd is not available.
 	// retry in a loop in the background until we successfully create the client, storing the client or error encountered
 
@@ -129,23 +145,18 @@ func newETCD3HealthCheck(c storagebackend.Config, stopCh <-chan struct{}) (func(
 		if clientErr != nil {
 			return clientErr
 		}
-
-		healthcheckTimeout := storagebackend.DefaultHealthcheckTimeout
-		if c.HealthcheckTimeout != time.Duration(0) {
-			healthcheckTimeout = c.HealthcheckTimeout
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), healthcheckTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		// See https://github.com/etcd-io/etcd/blob/c57f8b3af865d1b531b979889c602ba14377420e/etcdctl/ctlv3/command/ep_command.go#L118
 		_, err := client.Get(ctx, path.Join("/", c.Prefix, "health"))
 		if err == nil {
 			return nil
 		}
-		return fmt.Errorf("error getting data from etcd: %v", err)
+		return fmt.Errorf("error getting data from etcd: %w", err)
 	}, nil
 }
 
-func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) {
+var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile:      c.CertFile,
 		KeyFile:       c.KeyFile,

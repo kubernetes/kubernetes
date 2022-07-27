@@ -865,9 +865,9 @@ func (m *Int64Value) GetValue() int64 {
 
 // LinuxSandboxSecurityContext holds linux security configuration that will be
 // applied to a sandbox. Note that:
-// 1) It does not apply to containers in the pods.
-// 2) It may not be applicable to a PodSandbox which does not contain any running
-//    process.
+//  1. It does not apply to containers in the pods.
+//  2. It may not be applicable to a PodSandbox which does not contain any running
+//     process.
 type LinuxSandboxSecurityContext struct {
 	// Configurations for the sandbox's namespaces.
 	// This will be used only if the PodSandbox uses namespace for isolation.
@@ -895,10 +895,11 @@ type LinuxSandboxSecurityContext struct {
 	// AppArmor profile for the sandbox.
 	Apparmor *SecurityProfile `protobuf:"bytes,10,opt,name=apparmor,proto3" json:"apparmor,omitempty"`
 	// Seccomp profile for the sandbox, candidate values are:
-	// * runtime/default: the default profile for the container runtime
-	// * unconfined: unconfined profile, ie, no seccomp sandboxing
-	// * localhost/<full-path-to-profile>: the profile installed on the node.
-	//   <full-path-to-profile> is the full path of the profile.
+	//   - runtime/default: the default profile for the container runtime
+	//   - unconfined: unconfined profile, ie, no seccomp sandboxing
+	//   - localhost/<full-path-to-profile>: the profile installed on the node.
+	//     <full-path-to-profile> is the full path of the profile.
+	//
 	// Default: "", which is identical with unconfined.
 	SeccompProfilePath   string   `protobuf:"bytes,7,opt,name=seccomp_profile_path,json=seccompProfilePath,proto3" json:"seccomp_profile_path,omitempty"` // Deprecated: Do not use.
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -1249,8 +1250,9 @@ type PodSandboxConfig struct {
 	// containers. For example, the files might be newline separated JSON
 	// structured logs, systemd-journald journal files, gRPC trace files, etc.
 	// E.g.,
-	//     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
-	//     ContainerConfig.LogPath = `containerName/Instance#.log`
+	//
+	//	PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
+	//	ContainerConfig.LogPath = `containerName/Instance#.log`
 	LogDirectory string `protobuf:"bytes,3,opt,name=log_directory,json=logDirectory,proto3" json:"log_directory,omitempty"`
 	// DNS config for the sandbox.
 	DnsConfig *DNSConfig `protobuf:"bytes,4,opt,name=dns_config,json=dnsConfig,proto3" json:"dns_config,omitempty"`
@@ -3603,17 +3605,18 @@ type LinuxContainerSecurityContext struct {
 	// AppArmor profile for the container.
 	Apparmor *SecurityProfile `protobuf:"bytes,16,opt,name=apparmor,proto3" json:"apparmor,omitempty"`
 	// AppArmor profile for the container, candidate values are:
-	// * runtime/default: equivalent to not specifying a profile.
-	// * unconfined: no profiles are loaded
-	// * localhost/<profile_name>: profile loaded on the node
-	//    (localhost) by name. The possible profile names are detailed at
-	//    https://gitlab.com/apparmor/apparmor/-/wikis/AppArmor_Core_Policy_Reference
+	//   - runtime/default: equivalent to not specifying a profile.
+	//   - unconfined: no profiles are loaded
+	//   - localhost/<profile_name>: profile loaded on the node
+	//     (localhost) by name. The possible profile names are detailed at
+	//     https://gitlab.com/apparmor/apparmor/-/wikis/AppArmor_Core_Policy_Reference
 	ApparmorProfile string `protobuf:"bytes,9,opt,name=apparmor_profile,json=apparmorProfile,proto3" json:"apparmor_profile,omitempty"` // Deprecated: Do not use.
 	// Seccomp profile for the container, candidate values are:
-	// * runtime/default: the default profile for the container runtime
-	// * unconfined: unconfined profile, ie, no seccomp sandboxing
-	// * localhost/<full-path-to-profile>: the profile installed on the node.
-	//   <full-path-to-profile> is the full path of the profile.
+	//   - runtime/default: the default profile for the container runtime
+	//   - unconfined: unconfined profile, ie, no seccomp sandboxing
+	//   - localhost/<full-path-to-profile>: the profile installed on the node.
+	//     <full-path-to-profile> is the full path of the profile.
+	//
 	// Default: "", which is identical with unconfined.
 	SeccompProfilePath   string   `protobuf:"bytes,10,opt,name=seccomp_profile_path,json=seccompProfilePath,proto3" json:"seccomp_profile_path,omitempty"` // Deprecated: Do not use.
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -4300,10 +4303,11 @@ type ContainerConfig struct {
 	Devices []*Device `protobuf:"bytes,8,rep,name=devices,proto3" json:"devices,omitempty"`
 	// Key-value pairs that may be used to scope and select individual resources.
 	// Label keys are of the form:
-	//     label-key ::= prefixed-name | name
-	//     prefixed-name ::= prefix '/' name
-	//     prefix ::= DNS_SUBDOMAIN
-	//     name ::= DNS_LABEL
+	//
+	//	label-key ::= prefixed-name | name
+	//	prefixed-name ::= prefix '/' name
+	//	prefix ::= DNS_SUBDOMAIN
+	//	name ::= DNS_LABEL
 	Labels map[string]string `protobuf:"bytes,9,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Unstructured key-value map that may be used by the kubelet to store and
 	// retrieve arbitrary metadata.
@@ -4319,8 +4323,9 @@ type ContainerConfig struct {
 	// Path relative to PodSandboxConfig.LogDirectory for container to store
 	// the log (STDOUT and STDERR) on the host.
 	// E.g.,
-	//     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
-	//     ContainerConfig.LogPath = `containerName/Instance#.log`
+	//
+	//	PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
+	//	ContainerConfig.LogPath = `containerName/Instance#.log`
 	//
 	// WARNING: Log management and how kubelet should interface with the
 	// container logs are under active discussion in
@@ -6934,10 +6939,11 @@ var xxx_messageInfo_UpdateRuntimeConfigResponse proto.InternalMessageInfo
 // 1. Required conditions: Conditions are required for kubelet to work
 // properly. If any required condition is unmet, the node will be not ready.
 // The required conditions include:
-//   * RuntimeReady: RuntimeReady means the runtime is up and ready to accept
-//   basic containers e.g. container only needs host network.
-//   * NetworkReady: NetworkReady means the runtime network is up and ready to
-//   accept containers which require container network.
+//   - RuntimeReady: RuntimeReady means the runtime is up and ready to accept
+//     basic containers e.g. container only needs host network.
+//   - NetworkReady: NetworkReady means the runtime network is up and ready to
+//     accept containers which require container network.
+//
 // 2. Optional conditions: Conditions are informative to the user, but kubelet
 // will not rely on. Since condition type is an arbitrary string, all conditions
 // not required are optional. These conditions will be exposed to users to help

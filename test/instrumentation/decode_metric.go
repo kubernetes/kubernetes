@@ -66,12 +66,10 @@ func (c *metricDecoder) decodeNewMetricCall(fc *ast.CallExpr) (metric, error) {
 		return m, newDecodeErrorf(fc, errNotDirectCall)
 	}
 	switch functionName {
-	case "NewCounter", "NewGauge", "NewHistogram":
+	case "NewCounter", "NewGauge", "NewHistogram", "NewSummary":
 		m, err = c.decodeMetric(fc)
-	case "NewCounterVec", "NewGaugeVec", "NewHistogramVec":
+	case "NewCounterVec", "NewGaugeVec", "NewHistogramVec", "NewSummaryVec":
 		m, err = c.decodeMetricVec(fc)
-	case "NewSummary", "NewSummaryVec":
-		return m, newDecodeErrorf(fc, errStableSummary)
 	default:
 		return m, newDecodeErrorf(fc, errNotDirectCall)
 	}
@@ -90,6 +88,8 @@ func getMetricType(functionName string) string {
 		return gaugeMetricType
 	case "NewHistogram", "NewHistogramVec":
 		return histogramMetricType
+	case "NewSummary", "NewSummaryVec":
+		return summaryMetricType
 	default:
 		panic("getMetricType expects correct function name")
 	}
@@ -229,6 +229,33 @@ func (c *metricDecoder) decodeOpts(expr ast.Expr) (metric, error) {
 				return m, err
 			}
 			m.StabilityLevel = string(*level)
+		case "AgeBuckets", "BufCap":
+			uintVal, err := c.decodeUint32(kv.Value)
+			if err != nil {
+				print(key)
+				return m, err
+			}
+			if key == "AgeBuckets" {
+				m.AgeBuckets = uintVal
+			}
+			if key == "BufCap" {
+				m.BufCap = uintVal
+			}
+
+		case "Objectives":
+			obj, err := c.decodeObjectives(kv.Value)
+			if err != nil {
+				print(key)
+				return m, err
+			}
+			m.Objectives = obj
+		case "MaxAge":
+			int64Val, err := c.decodeInt64(kv.Value)
+			if err != nil {
+				print(key)
+				return m, err
+			}
+			m.MaxAge = int64Val
 		default:
 			return m, newDecodeErrorf(expr, errFieldNotSupported, key)
 		}
@@ -278,6 +305,114 @@ func (c *metricDecoder) decodeBuckets(expr ast.Expr) ([]float64, error) {
 		}
 	}
 	return nil, newDecodeErrorf(expr, errBuckets)
+}
+
+func (c *metricDecoder) decodeObjectives(expr ast.Expr) (map[float64]float64, error) {
+	switch v := expr.(type) {
+	case *ast.CompositeLit:
+		return decodeFloatMap(v.Elts)
+	case *ast.Ident:
+		variableExpr, found := c.variables[v.Name]
+		if !found {
+			return nil, newDecodeErrorf(expr, errBadVariableAttribute)
+		}
+		return decodeFloatMap(variableExpr.(*ast.CompositeLit).Elts)
+	}
+	return nil, newDecodeErrorf(expr, errObjectives)
+}
+
+func (c *metricDecoder) decodeUint32(expr ast.Expr) (uint32, error) {
+	switch v := expr.(type) {
+	case *ast.BasicLit:
+		if v.Kind != token.FLOAT && v.Kind != token.INT {
+			print(v.Kind)
+		}
+		value, err := strconv.ParseUint(v.Value, 10, 32)
+		if err != nil {
+			return 0, err
+		}
+		return uint32(value), nil
+	case *ast.SelectorExpr:
+		variableName := v.Sel.String()
+		importName, ok := v.X.(*ast.Ident)
+		if ok && importName.String() == c.kubeMetricsImportName {
+			if variableName == "DefAgeBuckets" {
+				// hardcode this for now
+				return 5, nil
+			}
+			if variableName == "DefBufCap" {
+				// hardcode this for now
+				return 500, nil
+			}
+		}
+	case *ast.CallExpr:
+		_, ok := v.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return 0, newDecodeErrorf(v, errDecodeUint32)
+		}
+		return 0, nil
+	}
+	return 0, newDecodeErrorf(expr, errDecodeUint32)
+}
+
+func (c *metricDecoder) decodeInt64(expr ast.Expr) (int64, error) {
+	switch v := expr.(type) {
+	case *ast.BasicLit:
+		if v.Kind != token.FLOAT && v.Kind != token.INT {
+			print(v.Kind)
+		}
+
+		value, err := strconv.ParseInt(v.Value, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return value, nil
+	case *ast.SelectorExpr:
+		variableName := v.Sel.String()
+		importName, ok := v.X.(*ast.Ident)
+		if ok && importName.String() == c.kubeMetricsImportName {
+			if variableName == "DefMaxAge" {
+				// hardcode this for now. This is a duration but we'll output it as
+				// an int64 representing nanoseconds.
+				return 1000 * 1000 * 1000 * 60 * 10, nil
+			}
+		}
+	case *ast.CallExpr:
+		_, ok := v.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return 0, newDecodeErrorf(v, errDecodeInt64)
+		}
+		return 0, nil
+	}
+	return 0, newDecodeErrorf(expr, errDecodeInt64)
+}
+
+func decodeFloatMap(exprs []ast.Expr) (map[float64]float64, error) {
+	buckets := map[float64]float64{}
+	for _, elt := range exprs {
+		bl, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			return nil, newDecodeErrorf(bl, errObjectives)
+		}
+		keyExpr, ok := bl.Key.(*ast.BasicLit)
+		if !ok {
+			return nil, newDecodeErrorf(bl, errObjectives)
+		}
+		valueExpr, ok := bl.Value.(*ast.BasicLit)
+		if !ok {
+			return nil, newDecodeErrorf(bl, errObjectives)
+		}
+		valueForKey, err := strconv.ParseFloat(keyExpr.Value, 64)
+		if err != nil {
+			return nil, newDecodeErrorf(bl, errObjectives)
+		}
+		valueForValue, err := strconv.ParseFloat(valueExpr.Value, 64)
+		if err != nil {
+			return nil, newDecodeErrorf(bl, errObjectives)
+		}
+		buckets[valueForKey] = valueForValue
+	}
+	return buckets, nil
 }
 
 func decodeListOfFloats(exprs []ast.Expr) ([]float64, error) {

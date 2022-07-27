@@ -59,10 +59,10 @@ func Test_configController_generatePatchBytes(t *testing.T) {
 		{
 			name: "check when message has a whitespace character that can be escaped",
 			condition: flowcontrol.FlowSchemaCondition{
-				Type:   flowcontrol.FlowSchemaConditionDangling,
-				Status: flowcontrol.ConditionTrue,
-				Reason: "test reason",
-				Message: `test 		none`,
+				Type:               flowcontrol.FlowSchemaConditionDangling,
+				Status:             flowcontrol.ConditionTrue,
+				Reason:             "test reason",
+				Message:            "test \u0009\u0009none",
 				LastTransitionTime: metav1.NewTime(now),
 			},
 			want: []byte(fmt.Sprintf(`{"status":{"conditions":[{"type":"Dangling","status":"True","lastTransitionTime":"%s","reason":"test reason","message":"test \t\tnone"}]}}`, now.Format(time.RFC3339))),

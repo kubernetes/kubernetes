@@ -164,6 +164,7 @@ func TestAddFlags(t *testing.T) {
 				CountMetricPollPeriod: time.Minute,
 				DBMetricPollInterval:  storagebackend.DefaultDBMetricPollInterval,
 				HealthcheckTimeout:    storagebackend.DefaultHealthcheckTimeout,
+				ReadycheckTimeout:     storagebackend.DefaultReadinessTimeout,
 				LeaseManagerConfig: etcd3.LeaseManagerConfig{
 					ReuseDurationSeconds: 100,
 					MaxObjectCount:       1000,

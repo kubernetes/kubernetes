@@ -36,6 +36,7 @@ const (
 	DefaultCompactInterval      = 5 * time.Minute
 	DefaultDBMetricPollInterval = 30 * time.Second
 	DefaultHealthcheckTimeout   = 2 * time.Second
+	DefaultReadinessTimeout     = 2 * time.Second
 )
 
 // TransportConfig holds all connection related info,  i.e. equal TransportConfig means equal servers we talk to.
@@ -84,6 +85,8 @@ type Config struct {
 	DBMetricPollInterval time.Duration
 	// HealthcheckTimeout specifies the timeout used when checking health
 	HealthcheckTimeout time.Duration
+	// ReadycheckTimeout specifies the timeout used when checking readiness
+	ReadycheckTimeout time.Duration
 
 	LeaseManagerConfig etcd3.LeaseManagerConfig
 
@@ -117,6 +120,7 @@ func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 		CompactionInterval:   DefaultCompactInterval,
 		DBMetricPollInterval: DefaultDBMetricPollInterval,
 		HealthcheckTimeout:   DefaultHealthcheckTimeout,
+		ReadycheckTimeout:    DefaultReadinessTimeout,
 		LeaseManagerConfig:   etcd3.NewDefaultLeaseManagerConfig(),
 	}
 }

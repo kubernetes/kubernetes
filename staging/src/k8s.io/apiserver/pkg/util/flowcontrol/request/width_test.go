@@ -26,6 +26,10 @@ import (
 )
 
 func TestWorkEstimator(t *testing.T) {
+	defaultCfg := DefaultWorkEstimatorConfig()
+	minimumSeats := defaultCfg.MinimumSeats
+	maximumSeats := defaultCfg.MaximumSeats
+
 	tests := []struct {
 		name                      string
 		requestURI                string
@@ -393,13 +397,7 @@ func TestWorkEstimator(t *testing.T) {
 				return test.watchCount
 			}
 
-			// TODO(wojtek-t): Simplify it once we enable mutating work estimator
-			// by default.
-			testEstimator := &workEstimator{
-				listWorkEstimator:     newListWorkEstimator(countsFn),
-				mutatingWorkEstimator: newTestMutatingWorkEstimator(watchCountsFn, true),
-			}
-			estimator := WorkEstimatorFunc(testEstimator.estimate)
+			estimator := NewWorkEstimator(countsFn, watchCountsFn, defaultCfg)
 
 			req, err := http.NewRequest("GET", test.requestURI, nil)
 			if err != nil {

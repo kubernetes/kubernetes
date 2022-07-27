@@ -98,6 +98,11 @@ type Framework struct {
 	// Flaky operation failures in an e2e test can be captured through this.
 	flakeReport *FlakeReport
 
+	// To make sure that this framework cleans up after itself, no matter what,
+	// we install a Cleanup action before each test and clear it after.  If we
+	// should abort, the AfterSuite hook should run all Cleanup actions.
+	cleanupHandle CleanupActionHandle
+
 	// afterEaches is a map of name to function to be called after each test.  These are not
 	// cleared.  The call order is randomized so that no dependencies can grow between
 	// the various afterEaches
@@ -188,6 +193,9 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 func (f *Framework) BeforeEach() {
 	f.beforeEachStarted = true
 
+	// The fact that we need this feels like a bug in ginkgo.
+	// https://github.com/onsi/ginkgo/v2/issues/222
+	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 	if f.ClientSet == nil {
 		ginkgo.By("Creating a kubernetes client")
 		config, err := LoadConfig()
@@ -366,6 +374,8 @@ func (f *Framework) AfterEach() {
 	if !f.beforeEachStarted {
 		return
 	}
+
+	RemoveCleanupAction(f.cleanupHandle)
 
 	// This should not happen. Given ClientSet is a public field a test must have updated it!
 	// Error out early before any API calls during cleanup.

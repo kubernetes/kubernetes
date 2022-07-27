@@ -492,6 +492,17 @@
     MUST match to expected used and total allowed resource quota count within namespace.
   release: v1.16
   file: test/e2e/apimachinery/resource_quota.go
+- testname: ResourceQuota, manage lifecycle of a ResourceQuota
+  codename: '[sig-api-machinery] ResourceQuota should manage the lifecycle of a ResourceQuota
+    [Conformance]'
+  description: Attempt to create a ResourceQuota for CPU and Memory quota limits.
+    Creation MUST be successful. Attempt to list all namespaces with a label selector
+    which MUST succeed. One list MUST be found. The ResourceQuota when patched MUST
+    succeed. Given the patching of the ResourceQuota, the fields MUST equal the new
+    values. It MUST succeed at deleting a collection of ResourceQuota via a label
+    selector.
+  release: v1.25
+  file: test/e2e/apimachinery/resource_quota.go
 - testname: ResourceQuota, quota scope, BestEffort and NotBestEffort scope
   codename: '[sig-api-machinery] ResourceQuota should verify ResourceQuota with best
     effort scope. [Conformance]'

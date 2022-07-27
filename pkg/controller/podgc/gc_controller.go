@@ -61,10 +61,18 @@ type PodGCController struct {
 	nodeQueue workqueue.DelayingInterface
 
 	terminatedPodThreshold int
+	gcCheckPeriod          time.Duration
+	quarantineTime         time.Duration
 }
 
 func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *PodGCController {
+	return NewPodGCInternal(ctx, kubeClient, podInformer, nodeInformer, terminatedPodThreshold, gcCheckPeriod, quarantineTime)
+}
+
+// This function is only intended for integration tests
+func NewPodGCInternal(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
+	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int, gcCheckPeriod, quarantineTime time.Duration) *PodGCController {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
@@ -76,6 +84,8 @@ func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer c
 		nodeLister:             nodeInformer.Lister(),
 		nodeListerSynced:       nodeInformer.Informer().HasSynced,
 		nodeQueue:              workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
+		gcCheckPeriod:          gcCheckPeriod,
+		quarantineTime:         quarantineTime,
 	}
 
 	return gcc
@@ -92,7 +102,7 @@ func (gcc *PodGCController) Run(ctx context.Context) {
 		return
 	}
 
-	go wait.UntilWithContext(ctx, gcc.gc, gcCheckPeriod)
+	go wait.UntilWithContext(ctx, gcc.gc, gcc.gcCheckPeriod)
 
 	<-ctx.Done()
 }
@@ -214,7 +224,7 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 	// Add newly found unknown nodes to quarantine
 	for _, pod := range pods {
 		if pod.Spec.NodeName != "" && !existingNodeNames.Has(pod.Spec.NodeName) {
-			gcc.nodeQueue.AddAfter(pod.Spec.NodeName, quarantineTime)
+			gcc.nodeQueue.AddAfter(pod.Spec.NodeName, gcc.quarantineTime)
 		}
 	}
 	// Check if nodes are still missing after quarantine period

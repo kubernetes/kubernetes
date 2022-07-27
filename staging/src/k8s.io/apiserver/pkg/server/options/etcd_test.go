@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
@@ -230,18 +231,57 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 			}
 
 			for _, n := range tc.wantChecks {
-				found := false
-				for _, h := range serverConfig.HealthzChecks {
-					if n == h.Name() {
-						found = true
-						break
-					}
-				}
-				if !found {
+				if !hasCheck(n, serverConfig.HealthzChecks) {
 					t.Errorf("Missing HealthzChecker %s", n)
 				}
-				found = false
 			}
 		})
 	}
+}
+
+func TestReadinessCheck(t *testing.T) {
+	testCases := []struct {
+		name              string
+		wantReadyzChecks  []string
+		wantHealthzChecks []string
+	}{
+		{
+			name:              "Readyz should have etcd-readiness check",
+			wantReadyzChecks:  []string{"etcd", "etcd-readiness"},
+			wantHealthzChecks: []string{"etcd"},
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			serverConfig := server.NewConfig(codecs)
+			etcdOptions := &EtcdOptions{}
+			if err := etcdOptions.addEtcdHealthEndpoint(serverConfig); err != nil {
+				t.Fatalf("Failed to add healthz error: %v", err)
+			}
+
+			for _, n := range tc.wantReadyzChecks {
+				if !hasCheck(n, serverConfig.ReadyzChecks) {
+					t.Errorf("Missing ReadyzChecker %s", n)
+				}
+			}
+			for _, n := range tc.wantHealthzChecks {
+				if !hasCheck(n, serverConfig.HealthzChecks) {
+					t.Errorf("Missing HealthzChecker %s", n)
+				}
+			}
+		})
+	}
+}
+
+func hasCheck(want string, healthchecks []healthz.HealthChecker) bool {
+	for _, h := range healthchecks {
+		if want == h.Name() {
+			return true
+		}
+	}
+	return false
 }
