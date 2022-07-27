@@ -39,7 +39,7 @@ func VerifyGroupNames(scheme *runtime.Scheme, legacyUnsuffixedGroups sets.String
 	errs := []error{}
 	for _, gv := range scheme.PrioritizedVersionsAllGroups() {
 		if !strings.HasSuffix(gv.Group, ".k8s.io") && !legacyUnsuffixedGroups.Has(gv.Group) {
-			errs = append(errs, fmt.Errorf("Group %s does not have the standard kubernetes API group suffix of .k8s.io", gv.Group))
+			errs = append(errs, fmt.Errorf("group %s does not have the standard kubernetes API group suffix of .k8s.io", gv.Group))
 		}
 	}
 	return errors.NewAggregate(errs)
@@ -91,14 +91,14 @@ func ensureNoTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflec
 			jsonTag := f.Tag.Get("json")
 			protoTag := f.Tag.Get("protobuf")
 			if len(jsonTag) > 0 || len(protoTag) > 0 {
-				errs = append(errs, fmt.Errorf("Internal types should not have json or protobuf tags. %#v has tag on field %v: %v.\n%s", gvk, f.Name, f.Tag, fmtParentString(parents)))
+				errs = append(errs, fmt.Errorf("internal types should not have json or protobuf tags. %#v has tag on field %v: %v.\n%s", gvk, f.Name, f.Tag, fmtParentString(parents)))
 			}
 
 			errs = append(errs, ensureNoTags(gvk, f.Type, parents, typesAllowedTags)...)
 		}
 
 	default:
-		errs = append(errs, fmt.Errorf("Unexpected type %v in %#v.\n%s", tp.Kind(), gvk, fmtParentString(parents)))
+		errs = append(errs, fmt.Errorf("unexpected type %v in %#v.\n%s", tp.Kind(), gvk, fmtParentString(parents)))
 	}
 	return errs
 }
@@ -140,7 +140,7 @@ func ensureTags(gvk schema.GroupVersionKind, tp reflect.Type, parents []reflect.
 		}
 
 	default:
-		errs = append(errs, fmt.Errorf("Unexpected type %v in %#v.\n%s", tp.Kind(), gvk, fmtParentString(parents)))
+		errs = append(errs, fmt.Errorf("unexpected type %v in %#v.\n%s", tp.Kind(), gvk, fmtParentString(parents)))
 	}
 	return errs
 }
