@@ -23,6 +23,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+const (
+	DefAgeBuckets = prometheus.DefAgeBuckets
+	DefBufCap     = prometheus.DefBufCap
+	DefMaxAge     = prometheus.DefMaxAge
+)
+
 // Summary is our internal representation for our wrapping struct around prometheus
 // summaries. Summary implements both kubeCollector and ObserverMetric
 //
