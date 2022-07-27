@@ -1,0 +1,29 @@
+{
+  "kind": "DiscoveryAPIGroup",
+  "apiVersion": "v1",
+  "name": "nameValue",
+  "versions": [
+    {
+      "version": "versionValue",
+      "resources": [
+        {
+          "name": "nameValue",
+          "singularName": "singularNameValue",
+          "namespaced": true,
+          "group": "groupValue",
+          "version": "versionValue",
+          "kind": "kindValue",
+          "verbs": [
+            "verbsValue"
+          ],
+          "shortNames": [
+            "shortNamesValue"
+          ],
+          "categories": [
+            "categoriesValue"
+          ]
+        }
+      ]
+    }
+  ]
+}

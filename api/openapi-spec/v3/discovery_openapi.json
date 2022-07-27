@@ -1,0 +1,239 @@
+{
+  "components": {
+    "schemas": {
+      "io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIGroup": {
+        "description": "APIGroup contains the name, the supported versions, and the preferred version of a group.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "description": "name is the name of the group.",
+            "type": "string"
+          },
+          "versions": {
+            "description": "versions are the versions supported in this group. This will be sorted in descending order based on the preferred version",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryGroupVersion"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "version"
+            ],
+            "x-kubernetes-list-type": "map"
+          }
+        },
+        "required": [
+          "name",
+          "versions"
+        ],
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "",
+            "kind": "DiscoveryAPIGroup",
+            "version": "v1"
+          }
+        ]
+      },
+      "io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIGroupList": {
+        "description": "Discovery API Types APIGroupList is a list of APIGroup, to allow clients to discover the API at /apis.",
+        "properties": {
+          "apiVersion": {
+            "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+            "type": "string"
+          },
+          "groups": {
+            "description": "groups is a list of APIGroup.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIGroup"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "kind": {
+            "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+            "type": "string"
+          }
+        },
+        "required": [
+          "groups"
+        ],
+        "type": "object",
+        "x-kubernetes-group-version-kind": [
+          {
+            "group": "",
+            "kind": "DiscoveryAPIGroupList",
+            "version": "v1"
+          }
+        ]
+      },
+      "io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIResource": {
+        "description": "APIResource specifies the name of a resource and whether it is namespaced.",
+        "properties": {
+          "categories": {
+            "description": "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "group": {
+            "description": "group is the preferred group of the resource.  Empty implies the group of the containing resource list. For subresources, this may have a different value, for example: Scale\".",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "description": "kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "description": "name is the plural name of the resource.",
+            "type": "string"
+          },
+          "namespaced": {
+            "default": false,
+            "description": "namespaced indicates if a resource is namespaced or not.",
+            "type": "boolean"
+          },
+          "shortNames": {
+            "description": "shortNames is a list of suggested short names of the resource.",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array",
+            "x-kubernetes-list-type": "atomic"
+          },
+          "singularName": {
+            "default": "",
+            "description": "singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely. The singularName is more correct for reporting status on a single item and both singular and plural are allowed from the kubectl CLI interface.",
+            "type": "string"
+          },
+          "verbs": {
+            "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
+            "items": {
+              "default": "",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "version": {
+            "description": "version is the preferred version of the resource.  Empty implies the version of the containing resource list For subresources, this may have a different value, for example: v1 (while inside a v1beta1 version of the core resource's group)\".",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "singularName",
+          "namespaced",
+          "kind",
+          "verbs"
+        ],
+        "type": "object"
+      },
+      "io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryGroupVersion": {
+        "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
+        "properties": {
+          "resources": {
+            "description": "resources contains the name of the resources and if they are namespaced.",
+            "items": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIResource"
+                }
+              ],
+              "default": {}
+            },
+            "type": "array",
+            "x-kubernetes-list-map-keys": [
+              "name"
+            ],
+            "x-kubernetes-list-type": "map"
+          },
+          "version": {
+            "default": "",
+            "description": "version specifies the version in the form of \"version\". This is to save the clients the trouble of splitting the GroupVersion.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "resources"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "BearerToken": {
+        "description": "Bearer Token authentication",
+        "in": "header",
+        "name": "authorization",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "title": "Kubernetes",
+    "version": "unversioned"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/discovery/v1": {
+      "get": {
+        "description": "get available API groupversions and their resources",
+        "operationId": "getDiscoveryResources",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIGroupList"
+                }
+              },
+              "application/vnd.kubernetes.protobuf": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIGroupList"
+                }
+              },
+              "application/yaml": {
+                "schema": {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIGroupList"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "discovery"
+        ]
+      }
+    }
+  }
+}
