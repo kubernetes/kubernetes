@@ -28,7 +28,7 @@ const ProfileLegacy = "legacy"
 
 type ProfileApplier interface {
 	// Apply applies the profile to the given container in the pod.
-	Apply(pod *corev1.Pod, containerName string, target runtime.Object) error
+	Apply(pod *corev1.Pod, containerName string, target runtime.Object, extraArgs map[string]interface{}) error
 }
 
 // NewProfileApplier returns a new Options for the given profile name.
@@ -42,8 +42,8 @@ func NewProfileApplier(profile string) (ProfileApplier, error) {
 }
 
 // applierFunc is a function that applies a profile to a container in the pod.
-type applierFunc func(pod *corev1.Pod, containerName string, target runtime.Object) error
+type applierFunc func(pod *corev1.Pod, containerName string, target runtime.Object, extraArgs map[string]interface{}) error
 
-func (f applierFunc) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
-	return f(pod, containerName, target)
+func (f applierFunc) Apply(pod *corev1.Pod, containerName string, target runtime.Object, extraArgs map[string]interface{}) error {
+	return f(pod, containerName, target, extraArgs)
 }

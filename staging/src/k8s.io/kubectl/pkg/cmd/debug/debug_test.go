@@ -240,7 +240,7 @@ func TestGenerateDebugContainer(t *testing.T) {
 			if err != nil {
 				t.Fatalf("fail to create %s profile", ProfileLegacy)
 			}
-			tc.opts.applier = applier
+			tc.opts.Applier = applier
 
 			_, debugContainer, err := tc.opts.generateDebugContainer(tc.pod)
 			if err != nil {
@@ -1017,7 +1017,7 @@ func TestGeneratePodCopyWithDebugContainer(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
-			tc.opts.applier, err = NewProfileApplier(ProfileLegacy)
+			tc.opts.Applier, err = NewProfileApplier(ProfileLegacy)
 			if err != nil {
 				t.Fatalf("Fail to create legacy profile: %v", err)
 			}
@@ -1212,7 +1212,7 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
-			tc.opts.applier, err = NewProfileApplier(ProfileLegacy)
+			tc.opts.Applier, err = NewProfileApplier(ProfileLegacy)
 			if err != nil {
 				t.Fatalf("Fail to create legacy profile: %v", err)
 			}
@@ -1236,7 +1236,7 @@ func TestCompleteAndValidate(t *testing.T) {
 	cmpFilter := cmp.FilterPath(func(p cmp.Path) bool {
 		switch p.String() {
 		// IOStreams contains unexported fields
-		case "IOStreams":
+		case "IOStreams", "Applier", "ExtraArgs":
 			return true
 		}
 		return false

@@ -24,7 +24,7 @@ import (
 )
 
 // profileLegacy represents the legacy debugging profile which is backwards-compatible with 1.23 behavior.
-func profileLegacy(pod *corev1.Pod, containerName string, target runtime.Object) error {
+func profileLegacy(pod *corev1.Pod, containerName string, target runtime.Object, extraArgs map[string]interface{}) error {
 	switch target.(type) {
 	case *corev1.Pod:
 		// do nothing to the copied pod
