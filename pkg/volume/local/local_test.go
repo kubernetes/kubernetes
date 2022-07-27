@@ -370,7 +370,7 @@ func TestMountUnmount(t *testing.T) {
 	}
 
 	if runtime.GOOS != "windows" {
-		// skip this check in windows since the "bind mount" logic is implemented differently in mount_wiondows.go
+		// skip this check in windows since the "bind mount" logic is implemented differently in mount_windows.go
 		if _, err := os.Stat(path); err != nil {
 			if os.IsNotExist(err) {
 				t.Errorf("SetUp() failed, volume path not created: %s", path)
