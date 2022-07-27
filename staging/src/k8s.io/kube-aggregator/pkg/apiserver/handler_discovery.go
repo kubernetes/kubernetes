@@ -109,14 +109,17 @@ func (self *discoveryManager) RefreshDocument() error {
 
 	// information needed in the below loop to update a service
 	type serviceUpdateInfo struct {
-		// Handler For the service which repsonse to /discovery/v1 requests
+		// Name of service
+		name string
+
+		// Handler For the service which responds to /discovery/v1 requests
 		handler http.Handler
 
 		// ETag of the existing discovery information known about the service
 		etag string
 	}
 
-	servicesToUpdate := map[string]serviceUpdateInfo{}
+	var servicesToUpdate chan serviceUpdateInfo
 
 	// Collect all services which have no discovery document and then update them
 	// Done in two steps like this to avoid holding the lock while fetching the
@@ -125,22 +128,29 @@ func (self *discoveryManager) RefreshDocument() error {
 		self.servicesLock.Lock()
 		defer self.servicesLock.Unlock()
 
+		servicesToUpdate = make(chan serviceUpdateInfo, len(self.services))
+
+		// Close the buffered channel once we have finished populating if
+		// Note that even though it is closed it may still deliver any
+		// enqueued items to the webworkers.
+		defer close(servicesToUpdate)
+
 		for name, service := range self.services {
 			if !service.local && service.knownGroups.Len() == 0 {
 				// Clean up unused services
 				delete(self.services, name)
 			} else if !service.fresh {
-				servicesToUpdate[name] = serviceUpdateInfo{
+
+				// Should not block. Buffered channel is as large as services
+				// slice
+				servicesToUpdate <- serviceUpdateInfo{
+					name:    name,
 					handler: service.proxyHandler,
 					etag:    service.etag,
 				}
 			}
 		}
 	}()
-
-	if servicesToUpdate == nil {
-		return nil
-	}
 
 	// Download update discovery documents in parallel
 	type resultItem struct {
@@ -153,19 +163,15 @@ func (self *discoveryManager) RefreshDocument() error {
 	waitGroup := sync.WaitGroup{}
 	results := make(chan resultItem, len(servicesToUpdate))
 
-	for name, updateInfo := range servicesToUpdate {
+	webworker := func() {
+		defer waitGroup.Done()
+
 		// Send a GET request to /discovery/v1 for each service that needs to
 		// be updated
-		waitGroup.Add(1)
-
-		// Silence loop varaible capture warning?
-		name := name
-		updateInfo := updateInfo
-
-		//!TODO: probably want to use a finite amount of workers and a workqueue
-		// for this
-		go func() {
-			defer waitGroup.Done()
+		// If channel is already closed, but has buffered items, will still only
+		// stop once all enqueued items have been processed
+		for updateInfo := range servicesToUpdate {
+			name := updateInfo.name
 			handler := updateInfo.handler
 			handler = handlerWithUser(handler, &user.DefaultInfo{Name: "system:kube-aggregator", Groups: []string{"system:masters"}})
 			handler = http.TimeoutHandler(handler, 5*time.Second, "request timed out")
@@ -175,7 +181,7 @@ func (self *discoveryManager) RefreshDocument() error {
 				// NewRequest should not fail, but if it does for some reason,
 				// log it and continue
 				klog.Errorf("failed to create http.Request for /discovery/v1: %v", err)
-				return
+				continue
 			}
 			req.Header.Add("Accept", "application/json")
 
@@ -203,7 +209,7 @@ func (self *discoveryManager) RefreshDocument() error {
 						name:  name,
 						error: err,
 					}
-					return
+					continue
 				}
 
 				results <- resultItem{
@@ -220,12 +226,22 @@ func (self *discoveryManager) RefreshDocument() error {
 				}
 				klog.Infof("DiscoveryManager: Failed to download discovery for %s: %s %s", name, writer.respCode, writer.data)
 			}
-		}()
+		}
+	}
+
+	// Spawn 2 webworkers
+	for i := 0; i < 2; i++ {
+		waitGroup.Add(1)
+		go webworker()
 	}
 
 	// For for all transfers to either finish or fail
 	waitGroup.Wait()
 	close(results)
+
+	if len(results) == 0 {
+		return nil
+	}
 
 	// Merge information back into services list and inform the endpoint handler
 	//  of updated information
@@ -238,7 +254,7 @@ func (self *discoveryManager) RefreshDocument() error {
 			service.discovery = info.discovery
 			service.etag = info.etag
 		} else {
-			// If a service was in servicesToUpdate at the beginning of this
+			// If a service was in services list at the beginning of this
 			// function call but not anymore, then it was removed in the meantime
 			// so we just throw away this result.
 			continue
