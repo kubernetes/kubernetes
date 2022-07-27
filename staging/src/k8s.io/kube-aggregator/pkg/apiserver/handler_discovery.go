@@ -294,7 +294,7 @@ func (self *discoveryManager) Run(stopCh <-chan struct{}) {
 			select {
 			case <-ticker.C:
 				self.markAPIServicesDirty()
-				self.dirtyChannel <- struct{}{}
+				self.kickWorker()
 			case <-stopCh:
 				ticker.Stop()
 				return
