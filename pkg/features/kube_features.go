@@ -152,6 +152,7 @@ const (
 
 	// owner: @humblec
 	// alpha: v1.23
+	// beta: v1.25
 	//
 	// Enables the RBD in-tree driver to RBD CSI Driver  migration feature.
 	CSIMigrationRBD featuregate.Feature = "CSIMigrationRBD"
@@ -844,7 +845,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIMigrationPortworx: {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Portworx CSI driver)
 
-	CSIMigrationRBD: {Default: false, PreRelease: featuregate.Alpha}, // Off by default (requires RBD CSI driver)
+	CSIMigrationRBD: {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires RBD CSI driver)
 
 	CSIMigrationvSphere: {Default: true, PreRelease: featuregate.Beta},
 
