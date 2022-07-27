@@ -19,6 +19,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	policyv1 "k8s.io/api/policy/v1"
@@ -45,10 +46,11 @@ func TestEviction(t *testing.T) {
 
 		badNameInURL bool
 
-		expectError   bool
-		expectDeleted bool
-		podPhase      api.PodPhase
-		podName       string
+		expectError         bool
+		expectDeleted       bool
+		podPhase            api.PodPhase
+		podName             string
+		conflictingPdbNames []string
 	}{
 		{
 			name: "matching pdbs with no disruptions allowed, pod running",
@@ -135,6 +137,26 @@ func TestEviction(t *testing.T) {
 			expectError:  true,
 			podName:      "t7",
 		},
+		{
+			name: "duplicate pdbs",
+			pdbs: []runtime.Object{
+				&policyv1.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+					Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+					Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				},
+				&policyv1.PodDisruptionBudget{
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "default"},
+					Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+					Status:     policyv1.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
+				},
+			},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t2", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         false,
+			podPhase:            api.PodRunning,
+			podName:             "t2",
+			conflictingPdbNames: []string{"foo", "bar"},
+		},
 	}
 
 	for _, tc := range testcases {
@@ -168,7 +190,8 @@ func TestEviction(t *testing.T) {
 				name += "bad-name"
 			}
 
-			_, err := evictionRest.Create(testContext, name, tc.eviction, nil, &metav1.CreateOptions{})
+			status, err := evictionRest.Create(testContext, name, tc.eviction, nil, &metav1.CreateOptions{})
+
 			//_, err = evictionRest.Create(testContext, name, tc.eviction, nil, &metav1.CreateOptions{})
 			if (err != nil) != tc.expectError {
 				t.Errorf("expected error=%v, got %v; name %v", tc.expectError, err, pod.Name)
@@ -184,6 +207,19 @@ func TestEviction(t *testing.T) {
 				}
 			}
 			if tc.expectError {
+				return
+			}
+
+			if len(tc.conflictingPdbNames) > 0 {
+				status := *status.(*metav1.Status)
+				if status.Code != 500 {
+					t.Errorf("expected status code 500, got %d", status.Code)
+				}
+				for _, name := range tc.conflictingPdbNames {
+					if !strings.Contains(status.Message, name) {
+						t.Errorf("expected status message to contain %s, got %s", name, status.Message)
+					}
+				}
 				return
 			}
 
@@ -209,7 +245,6 @@ func TestEviction(t *testing.T) {
 		})
 	}
 }
-
 func TestEvictionIngorePDB(t *testing.T) {
 	testcases := []struct {
 		name     string

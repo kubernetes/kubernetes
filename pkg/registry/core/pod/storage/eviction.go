@@ -211,9 +211,10 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		}
 
 		if len(pdbs) > 1 {
+			msg := fmt.Sprintf("This pod has %d PodDisruptionBudgets (%s, %s  ...) and the eviction subresource supports 1.", len(pdbs), pdbs[0].Name, pdbs[1].Name)
 			rtStatus = &metav1.Status{
 				Status:  metav1.StatusFailure,
-				Message: "This pod has more than one PodDisruptionBudget, which the eviction subresource does not support.",
+				Message: msg,
 				Code:    500,
 			}
 			return nil
