@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -31,8 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -40,7 +39,11 @@ import (
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
 
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var fixedTimestamp = time.Date(2015, time.November, 10, 12, 30, 0, 0, time.UTC)
@@ -53,13 +56,14 @@ type metricPoint struct {
 
 type restClientTestCase struct {
 	desiredMetricValues PodMetricsInfo
-	desiredError        error
+	desiredError        string
 
 	// "timestamps" here are actually the offset in minutes from a base timestamp
 	targetTimestamp      int
 	window               time.Duration
 	reportedMetricPoints []metricPoint
 	reportedPodMetrics   []map[string]int64
+	reportedError        error
 	singleObject         *autoscalingapi.CrossVersionObjectReference
 
 	namespace           string
@@ -117,7 +121,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 				}
 				metrics.Items = append(metrics.Items, metric)
 			}
-			return true, metrics, nil
+			return true, metrics, tc.reportedError
 		})
 	} else if isExternal {
 		fakeEMClient.AddReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -135,7 +139,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 				}
 				metrics.Items = append(metrics.Items, metric)
 			}
-			return true, &metrics, nil
+			return true, &metrics, tc.reportedError
 		})
 	} else {
 		fakeCMClient.AddReactor("get", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -165,7 +169,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 					metrics.Items = append(metrics.Items, metric)
 				}
 
-				return true, &metrics, nil
+				return true, &metrics, tc.reportedError
 			} else {
 				name := getForAction.GetName()
 				mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
@@ -199,7 +203,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 					},
 				}
 
-				return true, metrics, nil
+				return true, metrics, tc.reportedError
 			}
 		})
 	}
@@ -208,24 +212,21 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 }
 
 func (tc *restClientTestCase) verifyResults(t *testing.T, metrics PodMetricsInfo, timestamp time.Time, err error) {
-	if tc.desiredError != nil {
+	if tc.desiredError != "" {
 		assert.Error(t, err, "there should be an error retrieving the metrics")
-		assert.Contains(t, fmt.Sprintf("%v", err), fmt.Sprintf("%v", tc.desiredError), "the error message should be as expected")
+		assert.Contains(t, err.Error(), tc.desiredError, "the error message should be as expected")
 		return
 	}
 	assert.NoError(t, err, "there should be no error retrieving the metrics")
 	assert.NotNil(t, metrics, "there should be metrics returned")
 
-	if len(metrics) != len(tc.desiredMetricValues) {
-		t.Errorf("Not equal:\nexpected: %v\nactual: %v", tc.desiredMetricValues, metrics)
-	} else {
-		for k, m := range metrics {
-			if !m.Timestamp.Equal(tc.desiredMetricValues[k].Timestamp) ||
-				m.Window != tc.desiredMetricValues[k].Window ||
-				m.Value != tc.desiredMetricValues[k].Value {
-				t.Errorf("Not equal:\nexpected: %v\nactual: %v", tc.desiredMetricValues, metrics)
-				break
-			}
+	require.Len(t, metrics, len(tc.desiredMetricValues))
+	for k, m := range metrics {
+		if !m.Timestamp.Equal(tc.desiredMetricValues[k].Timestamp) ||
+			m.Window != tc.desiredMetricValues[k].Window ||
+			m.Value != tc.desiredMetricValues[k].Value {
+			t.Errorf("Not equal:\nexpected: %v\nactual: %v", tc.desiredMetricValues, metrics)
+			break
 		}
 	}
 
@@ -341,6 +342,22 @@ func TestRESTClientSingleObject(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestRESTClientSingleObjectAPIError(t *testing.T) {
+	tc := restClientTestCase{
+		desiredError:         "unable to fetch metrics from custom metrics API: failed listing custom metrics",
+		metricName:           "queue-length",
+		targetTimestamp:      1,
+		reportedMetricPoints: []metricPoint{{10, 1}},
+		reportedError:        errors.New("failed listing custom metrics"),
+		singleObject: &autoscalingapi.CrossVersionObjectReference{
+			APIVersion: "apps/v1",
+			Kind:       "Deployment",
+			Name:       "some-dep",
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestRESTClientQpsSumEqualZero(t *testing.T) {
 	targetTimestamp := 0
 	tc := restClientTestCase{
@@ -369,11 +386,32 @@ func TestRESTClientExternalSumEqualZero(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestRESTClientQpsAPIError(t *testing.T) {
+	tc := restClientTestCase{
+		metricName:    "qps",
+		desiredError:  "unable to fetch metrics from custom metrics API: failed listing qps",
+		reportedError: errors.New("failed listing qps"),
+	}
+
+	tc.runTest(t)
+}
+
 func TestRESTClientQpsEmptyMetrics(t *testing.T) {
 	tc := restClientTestCase{
 		metricName:           "qps",
-		desiredError:         fmt.Errorf("no metrics returned from custom metrics API"),
+		desiredError:         "no metrics returned from custom metrics API",
 		reportedMetricPoints: []metricPoint{},
+	}
+
+	tc.runTest(t)
+}
+
+func TestRESTClientExternalAPIError(t *testing.T) {
+	tc := restClientTestCase{
+		metricName:     "external",
+		metricSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+		desiredError:   "unable to fetch metrics from external metrics API: failed listing pod cpu metrics",
+		reportedError:  errors.New("failed listing pod cpu metrics"),
 	}
 
 	tc.runTest(t)
@@ -383,8 +421,18 @@ func TestRESTClientExternalEmptyMetrics(t *testing.T) {
 	tc := restClientTestCase{
 		metricName:           "external",
 		metricSelector:       &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-		desiredError:         fmt.Errorf("no metrics returned from external metrics API"),
+		desiredError:         "no metrics returned from external metrics API",
 		reportedMetricPoints: []metricPoint{},
+	}
+
+	tc.runTest(t)
+}
+
+func TestRESTClientPodCPUAPIError(t *testing.T) {
+	tc := restClientTestCase{
+		resourceName:  v1.ResourceCPU,
+		desiredError:  "unable to fetch metrics from resource metrics API: failed listing pod cpu metrics",
+		reportedError: errors.New("failed listing pod cpu metrics"),
 	}
 
 	tc.runTest(t)
@@ -393,7 +441,7 @@ func TestRESTClientExternalEmptyMetrics(t *testing.T) {
 func TestRESTClientPodCPUEmptyMetrics(t *testing.T) {
 	tc := restClientTestCase{
 		resourceName:         v1.ResourceCPU,
-		desiredError:         fmt.Errorf("no metrics returned from resource metrics API"),
+		desiredError:         "no metrics returned from resource metrics API",
 		reportedMetricPoints: []metricPoint{},
 		reportedPodMetrics:   []map[string]int64{},
 	}
@@ -428,7 +476,7 @@ func TestRESTClientContainerCPUEmptyMetricsForOnePod(t *testing.T) {
 		container:          "test-1",
 		targetTimestamp:    targetTimestamp,
 		window:             window,
-		desiredError:       fmt.Errorf("failed to get container metrics"),
+		desiredError:       "failed to get container metrics",
 		reportedPodMetrics: []map[string]int64{{"test-1": 100}, {"test-1": 300, "test-2": 400}, {}},
 	}
 	tc.runTest(t)
