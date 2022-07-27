@@ -64,7 +64,7 @@ type resourceDiscoveryManager struct {
 
 	// Writes protected by the lock. List if all apigroups & resources indexed
 	// by the resource manager
-	apiGroups     map[string]metav1.DiscoveryAPIGroup
+	apiGroups     map[string]*metav1.DiscoveryAPIGroup
 	apiGroupNames []string // apiGroupNames preserves insertion order
 
 	serializer runtime.NegotiatedSerializer
@@ -116,7 +116,7 @@ func (rdm *resourceDiscoveryManager) AddGroupVersion(groupName string, value met
 func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, value metav1.DiscoveryGroupVersion) {
 
 	if rdm.apiGroups == nil {
-		rdm.apiGroups = make(map[string]metav1.DiscoveryAPIGroup)
+		rdm.apiGroups = make(map[string]*metav1.DiscoveryAPIGroup)
 	}
 
 	if existing, groupExists := rdm.apiGroups[groupName]; groupExists {
@@ -137,7 +137,11 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, val
 		}
 
 	} else {
-		rdm.apiGroups[groupName] = metav1.DiscoveryAPIGroup{
+		rdm.apiGroups[groupName] = &metav1.DiscoveryAPIGroup{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "DiscoveryAPIGroup",
+				APIVersion: "v1",
+			},
 			Name:     groupName,
 			Versions: []metav1.DiscoveryGroupVersion{value},
 		}
@@ -230,11 +234,17 @@ func (rdm *resourceDiscoveryManager) ServeHTTP(resp http.ResponseWriter, req *ht
 			// Re-order the apiGroups by their insertion order
 			orderedGroups := []metav1.DiscoveryAPIGroup{}
 			for _, groupName := range rdm.apiGroupNames {
-				orderedGroups = append(orderedGroups, rdm.apiGroups[groupName])
+				orderedGroups = append(orderedGroups, *rdm.apiGroups[groupName])
 			}
 
 			var err error
-			response = &metav1.DiscoveryAPIGroupList{Groups: orderedGroups}
+			response = &metav1.DiscoveryAPIGroupList{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "DiscoveryAPIGroupList",
+					APIVersion: "v1",
+				},
+				Groups: orderedGroups,
+			}
 			etag, err = CalculateETag(response)
 
 			if err != nil {
