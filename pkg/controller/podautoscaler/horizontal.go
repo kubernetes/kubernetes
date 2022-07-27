@@ -62,7 +62,7 @@ type timestampedRecommendation struct {
 }
 
 type timestampedScaleEvent struct {
-	replicaChange int32 // positive for scaleUp, negative for scaleDown
+	replicaChange int32 // absolute value, non-negative
 	timestamp     time.Time
 	outdated      bool
 }
