@@ -73,7 +73,9 @@ func fmtRawDoc(rawDoc string) string {
 		case strings.HasPrefix(leading, "TODO"): // Ignore one line TODOs
 		case strings.HasPrefix(leading, "+"): // Ignore instructions to the generators
 		default:
-			if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+			if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") ||
+				// Keep the newline for list, so won't break the markdown
+				strings.HasPrefix(line, "* ") || strings.HasPrefix(line, "- ") {
 				delPrevChar()
 				line = "\n" + line + "\n" // Replace it with newline. This is useful when we have a line with: "Example:\n\tJSON-someting..."
 			} else {

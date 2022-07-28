@@ -33,6 +33,8 @@ func TestFmtRawDoc(t *testing.T) {
 		{" \n", ""},
 		{" \n\n ", ""},
 		{"Example:\n\tl1\n\t\tl2\n", "Example:\\n\\tl1\\n\\t\\tl2"},
+		{"Example:\n* l1\n* l2\n", "Example:\\n* l1\\n* l2"},
+		{"Example:\n- l1\n- l2\n", "Example:\\n- l1\\n- l2"},
 	}
 
 	for _, test := range tests {
