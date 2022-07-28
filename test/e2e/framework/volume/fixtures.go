@@ -606,6 +606,7 @@ func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 	ec := &v1.EphemeralContainer{
 		EphemeralContainerCommon: v1.EphemeralContainerCommon(clientPod.Spec.Containers[0]),
 	}
+	ec.Resources = v1.ResourceRequirements{}
 	ec.Name = "volume-ephemeral-container"
 	err = f.PodClient().AddEphemeralContainerSync(clientPod, ec, timeouts.PodStart)
 	// The API server will return NotFound for the subresource when the feature is disabled
