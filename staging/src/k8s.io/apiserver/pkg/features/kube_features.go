@@ -201,6 +201,8 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	AggregatedDiscoveryEndpoint: {Default: false, PreRelease: featuregate.Alpha},
+
 	APIListChunking: {Default: true, PreRelease: featuregate.Beta},
 
 	APIPriorityAndFairness: {Default: true, PreRelease: featuregate.Beta},
