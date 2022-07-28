@@ -18,6 +18,7 @@ package diff
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -200,7 +201,7 @@ func TestDiffer(t *testing.T) {
 		live:   map[string]interface{}{"live": true},
 		merged: map[string]interface{}{"merged": true},
 	}
-	err = diff.Diff(&obj, Printer{})
+	err = diff.Diff(&obj, Printer{}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,6 +221,85 @@ func TestDiffer(t *testing.T) {
 	econtent = "merged: true\n"
 	if string(fcontent) != econtent {
 		t.Fatalf("File has %q, expected %q", string(fcontent), econtent)
+	}
+}
+
+func TestShowManagedFields(t *testing.T) {
+	diff, err := NewDiffer("LIVE", "MERGED")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer diff.TearDown()
+
+	testCases := []struct {
+		name                string
+		showManagedFields   bool
+		expectedFromContent string
+		expectedToContent   string
+	}{
+		{
+			name:              "without managed fields",
+			showManagedFields: false,
+			expectedFromContent: `live: true
+metadata:
+  name: foo
+`,
+			expectedToContent: `merged: true
+metadata:
+  name: foo
+`,
+		},
+		{
+			name:              "with managed fields",
+			showManagedFields: true,
+			expectedFromContent: `live: true
+metadata:
+  managedFields: mf-data
+  name: foo
+`,
+			expectedToContent: `merged: true
+metadata:
+  managedFields: mf-data
+  name: foo
+`,
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			obj := FakeObject{
+				name: fmt.Sprintf("TestCase%d", i),
+				live: map[string]interface{}{
+					"live": true,
+					"metadata": map[string]interface{}{
+						"managedFields": "mf-data",
+						"name":          "foo",
+					},
+				},
+				merged: map[string]interface{}{
+					"merged": true,
+					"metadata": map[string]interface{}{
+						"managedFields": "mf-data",
+						"name":          "foo",
+					},
+				},
+			}
+
+			err = diff.Diff(&obj, Printer{}, tc.showManagedFields)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			actualFromContent, _ := ioutil.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
+			if string(actualFromContent) != tc.expectedFromContent {
+				t.Fatalf("File has %q, expected %q", string(actualFromContent), tc.expectedFromContent)
+			}
+
+			actualToContent, _ := ioutil.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
+			if string(actualToContent) != tc.expectedToContent {
+				t.Fatalf("File has %q, expected %q", string(actualToContent), tc.expectedToContent)
+			}
+		})
 	}
 }
 
