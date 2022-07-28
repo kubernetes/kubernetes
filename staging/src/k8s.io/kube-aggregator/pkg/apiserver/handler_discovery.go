@@ -43,7 +43,7 @@ type DiscoveryAggregationController interface {
 	// Adds or Updates an APIService from the Aggregated Discovery Controller's
 	// knowledge base
 	// Thread-safe
-	AddAPIService(apiService *apiregistrationv1.APIService, handler *proxyHandler)
+	AddAPIService(apiService *apiregistrationv1.APIService, handler http.Handler)
 
 	// Removes an APIService from the Aggregated Discovery Controller's Knowledge
 	// bank
@@ -436,7 +436,7 @@ func (dm *discoveryManager) kickWorker() {
 
 // Adds an APIService to be tracked by the discovery manager. If the APIService
 // is already known
-func (dm *discoveryManager) AddAPIService(apiService *apiregistrationv1.APIService, handler *proxyHandler) {
+func (dm *discoveryManager) AddAPIService(apiService *apiregistrationv1.APIService, handler http.Handler) {
 	dm.servicesLock.Lock()
 	defer dm.servicesLock.Unlock()
 
@@ -471,12 +471,15 @@ func (dm *discoveryManager) AddAPIService(apiService *apiregistrationv1.APIServi
 			// This is to prevent the given pointer from shifting to a different
 			// service out from under us.
 			//
-			proxyHandlerCopy := *handler
+			if ph, ok := handler.(*proxyHandler); ok {
+				proxyHandlerCopy := *ph
+				handler = &proxyHandlerCopy
+			}
 
 			// APIService is new to us, so start tracking it
 			dm.services[serviceKey] = &apiServiceInfo{
 				dependentAPIServices: sets.NewString(),
-				handler:              &proxyHandlerCopy,
+				handler:              handler,
 			}
 		}
 
