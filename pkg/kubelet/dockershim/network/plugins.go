@@ -240,6 +240,10 @@ func getOnePodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceNam
 		return nil, fmt.Errorf("unexpected command output %s with error: %v", output, err)
 	}
 
+	if len(output) == 0 {
+		return nil, nil
+	}
+
 	lines := strings.Split(string(output), "\n")
 	if len(lines) < 1 {
 		return nil, fmt.Errorf("unexpected command output %s", output)
@@ -262,12 +266,16 @@ func getOnePodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceNam
 func GetPodIPs(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName string) ([]net.IP, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
 		ip, err := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-4")
-		if err != nil {
+		if ip == nil {
 			// Fall back to IPv6 address if no IPv4 address is present
 			ip, err = getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-6")
 		}
 		if err != nil {
 			return nil, err
+		}
+
+		if ip == nil {
+			return nil, fmt.Errorf("cannot find pod IP in the network namespace, netnsPath: %v, addrType: ipv6", netnsPath)
 		}
 
 		return []net.IP{ip}, nil
@@ -279,13 +287,16 @@ func GetPodIPs(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName 
 	)
 	for _, addrType := range []string{"-4", "-6"} {
 		if ip, err := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, addrType); err == nil {
-			list = append(list, ip)
+			if ip != nil {
+				list = append(list, ip)
+			}
 		} else {
+			klog.InfoS("Failed to get podIP", "netnsPath", netnsPath, "addrType", addrType, "err", err)
 			errs = append(errs, err)
 		}
 	}
 
-	if len(list) == 0 {
+	if len(errs) != 0 {
 		return nil, utilerrors.NewAggregate(errs)
 	}
 	return list, nil
@@ -414,7 +425,7 @@ func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer
 	pm.podLock(fullPodName).Lock()
 	defer pm.podUnlock(fullPodName)
 
-	klog.V(3).InfoS("Calling network plugin to set up the pod", "pod", klog.KRef(podNamespace, podName), "networkPluginName", pm.plugin.Name())
+	klog.InfoS("Calling network plugin to set up the pod", "pod", klog.KRef(podNamespace, podName), "networkPluginName", pm.plugin.Name())
 	if err := pm.plugin.SetUpPod(podNamespace, podName, id, annotations, options); err != nil {
 		recordError(operation)
 		return fmt.Errorf("networkPlugin %s failed to set up pod %q network: %v", pm.plugin.Name(), fullPodName, err)
@@ -430,7 +441,7 @@ func (pm *PluginManager) TearDownPod(podNamespace, podName string, id kubecontai
 	pm.podLock(fullPodName).Lock()
 	defer pm.podUnlock(fullPodName)
 
-	klog.V(3).InfoS("Calling network plugin to tear down the pod", "pod", klog.KRef(podNamespace, podName), "networkPluginName", pm.plugin.Name())
+	klog.InfoS("Calling network plugin to tear down the pod", "pod", klog.KRef(podNamespace, podName), "networkPluginName", pm.plugin.Name())
 	if err := pm.plugin.TearDownPod(podNamespace, podName, id); err != nil {
 		recordError(operation)
 		return fmt.Errorf("networkPlugin %s failed to teardown pod %q network: %v", pm.plugin.Name(), fullPodName, err)
