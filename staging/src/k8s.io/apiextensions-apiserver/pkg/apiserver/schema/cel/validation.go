@@ -66,7 +66,7 @@ type Validator struct {
 // only errors.
 // Adding perCallLimit as input arg for testing purpose only. Callers should always use const PerCallLimit as input
 func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *Validator {
-	return validator(s, true, model.SchemaDeclType(s, isResourceRoot), perCallLimit)
+	return validator(s, isResourceRoot, model.SchemaDeclType(s, isResourceRoot), perCallLimit)
 }
 
 // validator creates a Validator for all x-kubernetes-validations at the level of the provided schema and lower and
