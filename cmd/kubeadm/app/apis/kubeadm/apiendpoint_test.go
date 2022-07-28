@@ -50,3 +50,26 @@ func TestAPIEndpointFromString(t *testing.T) {
 		})
 	}
 }
+
+func TestString(t *testing.T) {
+	var tests = []struct {
+		name        string
+		apiEndpoint APIEndpoint
+		expected    string
+	}{
+		{name: "ipv4 and port", apiEndpoint: APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234}, expected: "1.2.3.4:1234"},
+		{name: "ipv6 and port", apiEndpoint: APIEndpoint{AdvertiseAddress: "::1", BindPort: 1234}, expected: "[::1]:1234"},
+	}
+	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
+			apiEndpointString := rt.apiEndpoint.String()
+			if apiEndpointString != rt.expected {
+				t.Errorf(
+					"failed String:\n\texpected: %s\n\t  actual: %s",
+					rt.expected,
+					apiEndpointString,
+				)
+			}
+		})
+	}
+}
