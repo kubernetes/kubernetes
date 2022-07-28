@@ -170,7 +170,7 @@ func NewApplyFlags(f cmdutil.Factory, streams genericclioptions.IOStreams) *Appl
 	return &ApplyFlags{
 		Factory:     f,
 		RecordFlags: genericclioptions.NewRecordFlags(),
-		DeleteFlags: delete.NewDeleteFlags("that contains the configuration to apply"),
+		DeleteFlags: delete.NewDeleteFlags("The files that contain the configurations to apply."),
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		Overwrite:    true,
