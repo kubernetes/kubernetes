@@ -18,7 +18,7 @@ You must install and configure Google Cloud SDK if you want to upload your relea
 
 ## Overview
 
-While it is possible to build Kubernetes using a local golang installation, we have a build process that runs in a Docker container.  This simplifies the initial setup and provides for a very consistent build and test environment.
+While it is possible to build Kubernetes using a local golang installation, we have a build process that runs in a Docker container.  This simplifies initial set up and provides for a very consistent build and test environment.
 
 ## Key scripts
 
