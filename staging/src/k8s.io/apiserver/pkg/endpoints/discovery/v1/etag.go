@@ -62,7 +62,7 @@ func ServeHTTPWithETag(
 		// ETag must be enclosed in double quotes:
 		// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag
 		quotedHash := strconv.Quote(hash)
-		w.Header().Set("Etag", quotedHash)
+		w.Header().Set("ETag", quotedHash)
 
 		// If Request includes If-None-Match and matches hash, reply with 304
 		// Otherwise, we delegate to the handler for actual content
