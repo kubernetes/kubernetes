@@ -19,13 +19,13 @@ package dra
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-helpers/cdi/resourceclaim"
 	"k8s.io/klog/v2"
@@ -118,6 +118,24 @@ func (m *ManagerImpl) setPodPendingAdmission(pod *v1.Pod) {
 	m.pendingAdmissionPod = pod
 }
 
+// Generate container annotations using CDI UpdateAnnotations API
+func generateCDIAnnotation(claimUID types.UID, driverName string, cdiDevices []string) ([]kubecontainer.Annotation, error) {
+	const maxKeyLen = 63 // max length of the CDI annotation key
+	deviceID := string(claimUID)
+	if len(deviceID) > maxKeyLen-len(driverName)-1 {
+		deviceID = deviceID[:maxKeyLen-len(driverName)-1]
+	}
+	annotations, err := cdi.UpdateAnnotations(map[string]string{}, driverName, deviceID, cdiDevices)
+	if err != nil {
+		return nil, err
+	}
+	kubeAnnotations := []kubecontainer.Annotation{}
+	for key, value := range annotations {
+		kubeAnnotations = append(kubeAnnotations, kubecontainer.Annotation{Name: key, Value: value})
+	}
+	return kubeAnnotations, nil
+}
+
 // prepareContainerResources attempts to prepare all of required resource
 // plugin resources for the input container, issues an NodePrepareResource rpc request
 // for each new resource requirement, processes their responses and updates the cached
@@ -172,20 +190,9 @@ func (m *ManagerImpl) prepareContainerResources(pod *v1.Pod, container *v1.Conta
 			}
 			klog.V(3).Infof("NodePrepareResource: response: %+v", response)
 
-			annotations := []kubecontainer.Annotation{}
-			for _, device := range response.CdiDevice {
-				deviceID := strings.Replace(strings.Replace(device, "/", "-", -1), "=", "-", -1)
-				key, err := cdi.AnnotationKey(driverName, deviceID)
-				if err != nil {
-					return fmt.Errorf("could not get annotaion key, plugin: %s, err: %+v", driverName, err)
-				}
-				value, err := cdi.AnnotationValue(response.CdiDevice)
-				if err != nil {
-					return fmt.Errorf("could not get annotation value, devices: %s", response.CdiDevice)
-				}
-
-				annotations = append(annotations, kubecontainer.Annotation{Name: key, Value: value})
-				klog.V(3).Infof("pod: %s, container: %s, annotations: %s", pod.Name, container.Name, annotations)
+			annotations, err := generateCDIAnnotation(resourceClaim.UID, driverName, response.CdiDevice)
+			if err != nil {
+				return fmt.Errorf("failed to generate container annotations, err: %+v", err)
 			}
 
 			// Cache prepared resource
