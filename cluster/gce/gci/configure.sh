@@ -28,6 +28,8 @@ DEFAULT_CNI_VERSION='v0.9.1'
 DEFAULT_CNI_HASH='b5a59660053a5f1a33b5dd5624d9ed61864482d9dc8e5b79c9b3afc3d6f62c9830e1c30f9ccba6ee76f5fb1ff0504e58984420cc0680b26cb643f1cb07afbd1c'
 DEFAULT_NPD_VERSION='v0.8.9'
 DEFAULT_NPD_HASH_AMD64='4919c47447c5f3871c1dc3171bbb817a38c8c8d07a6ce55a77d43cadc098e9ad608ceeab121eec00c13c0b6a2cc3488544d61ce84cdade1823f3fd5163a952de'
+DEFAULT_AUTH_PROVIDER_GCP_HASH_AMD64='88d9fa581002973170ca58427763f00355b24fbabd66f7fee725a0845ad88bee644e60eed2d95a5721e6ae0056a81a5990bf02148ea49817c174bcb2cc9c0626'
+DEFAULT_AUTH_PROVIDER_GCP_VERSION='v0.24.0'
 # TODO (SergeyKanzhelev): fill up for npd 0.8.9+
 DEFAULT_NPD_HASH_ARM64='8ccb42a862efdfc1f25ca9a22f3fd36f9fdff1ac618dd7d39e3b5991505dd610d432364420896ad71f42197a116f28a85dde58b129baa075ebb7312caa57f852'
 DEFAULT_CRICTL_VERSION='v1.24.2'
@@ -546,6 +548,43 @@ function install-containerd-ubuntu {
   sudo systemctl start containerd
 }
 
+function install-auth-provider-gcp {
+  local -r auth_provider_tar="auth-provider-gcp-${DEFAULT_AUTH_PROVIDER_GCP_VERSION}-${HOST_PLATFORM}_${HOST_ARCH}.tar.gz"
+  echo "Downloading auth-provider-gcp ${auth_provider_tar}" .
+
+  local -r auth_provider_release_path="https://storage.googleapis.com/cloud-provider-gcp"
+  download-or-bust "${DEFAULT_AUTH_PROVIDER_GCP_HASH_AMD64}" "${auth_provider_release_path}/${auth_provider_tar}"
+
+  # Keep in sync with --image-credential-provider-bin-dir in ../util.sh
+  local auth_provider_dir="${KUBE_HOME}/auth-provider-gcp"
+  mkdir -p "${auth_provider_dir}"
+  tar xzf "${KUBE_HOME}/${auth_provider_tar}" -C "${auth_provider_dir}" --overwrite
+  mv "${auth_provider_dir}/auth-provider-gcp" "${KUBE_BIN}"
+  chmod a+x "${KUBE_BIN}/auth-provider-gcp"
+
+  rm -f "${KUBE_HOME}/${auth_provider_tar}"
+  rmdir "${auth_provider_dir}"
+
+  # Keep in sync with --image-credential-provider-config in ../util.sh
+  local auth_config_file="${KUBE_HOME}/cri_auth_config.yaml"
+  cat >> "${auth_config_file}" << EOF
+kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1beta1
+providers:
+  - name: auth-provider-gcp
+    apiVersion: credentialprovider.kubelet.k8s.io/v1beta1
+    matchImages:
+    - "container.cloud.google.com"
+    - "gcr.io"
+    - "*.gcr.io"
+    - "*.pkg.dev"
+    args:
+    - get-credentials
+    - --v=3
+    defaultCacheDuration: 1m
+EOF
+}
+
 function ensure-container-runtime {
   # Install containerd/runc if requested
   if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" || -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
@@ -644,6 +683,17 @@ function install-kube-binary-config {
     log-wrap "RemountFlexVolume" remount-flexvolume-directory "${VOLUME_PLUGIN_DIR}"
   fi
 
+  # When ENABLE_AUTH_PROVIDER_GCP is set, following flags for out-of-tree credential provider for GCP
+  # are presented to kubelet:
+  # --image-credential-provider-config=${path-to-config}
+  # --image-credential-provider-bin-dir=${path-to-auth-provider-binary}
+  # Also, it is required that DisableKubeletCloudCredentialProviders and KubeletCredentialProviders
+  # feature gates are set to true for kubelet to use external credential provider. 
+  if [[ "${ENABLE_AUTH_PROVIDER_GCP:-}" == "true" ]]; then
+    # Install out-of-tree auth-provider-gcp binary to enable kubelet to dynamically
+    # retrieve credentials for a container image registry.
+    log-wrap "InstallCredentialProvider" install-auth-provider-gcp
+  fi
   # Install crictl on each node.
   log-wrap "InstallCrictl" install-crictl
 
