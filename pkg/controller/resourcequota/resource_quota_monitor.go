@@ -21,9 +21,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kcp-dev/logicalcluster/v2"
+	
 	"k8s.io/klog/v2"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -35,8 +36,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
-	"k8s.io/utils/clock"
 )
 
 type eventType int
@@ -101,6 +100,11 @@ type QuotaMonitor struct {
 
 	// maintains list of evaluators
 	registry quota.Registry
+
+	updateFilter UpdateFilter
+
+	// kcp
+	clusterName logicalcluster.Name
 }
 
 // NewMonitor creates a new instance of a QuotaMonitor
@@ -133,27 +137,13 @@ func (m *monitor) Run() {
 
 type monitors map[schema.GroupVersionResource]*monitor
 
+// UpdateFilter is a function that returns true if the update event should be added to the resourceChanges queue.
+type UpdateFilter func(resource schema.GroupVersionResource, oldObj, newObj interface{}) bool
+
 func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cache.Controller, error) {
 	handlers := cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			// TODO: leaky abstraction!  live w/ it for now, but should pass down an update filter func.
-			// we only want to queue the updates we care about though as too much noise will overwhelm queue.
-			notifyUpdate := false
-			switch resource.GroupResource() {
-			case schema.GroupResource{Resource: "pods"}:
-				oldPod := oldObj.(*v1.Pod)
-				newPod := newObj.(*v1.Pod)
-				notifyUpdate = core.QuotaV1Pod(oldPod, clock.RealClock{}) && !core.QuotaV1Pod(newPod, clock.RealClock{})
-			case schema.GroupResource{Resource: "services"}:
-				oldService := oldObj.(*v1.Service)
-				newService := newObj.(*v1.Service)
-				notifyUpdate = core.GetQuotaServiceType(oldService) != core.GetQuotaServiceType(newService)
-			case schema.GroupResource{Resource: "persistentvolumeclaims"}:
-				oldPVC := oldObj.(*v1.PersistentVolumeClaim)
-				newPVC := newObj.(*v1.PersistentVolumeClaim)
-				notifyUpdate = core.RequiresQuotaReplenish(newPVC, oldPVC)
-			}
-			if notifyUpdate {
+			if qm.updateFilter != nil && qm.updateFilter(resource, oldObj, newObj) {
 				event := &event{
 					eventType: updateEvent,
 					obj:       newObj,
@@ -178,15 +168,15 @@ func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cac
 	}
 	shared, err := qm.informerFactory.ForResource(resource)
 	if err == nil {
-		klog.V(4).Infof("QuotaMonitor using a shared informer for resource %q", resource.String())
+		klog.V(4).Infof("%s: QuotaMonitor using a shared informer for resource %q", qm.clusterName, resource.String())
 		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
 		return shared.Informer().GetController(), nil
 	}
-	klog.V(4).Infof("QuotaMonitor unable to use a shared informer for resource %q: %v", resource.String(), err)
+	klog.V(4).Infof("%s: QuotaMonitor unable to use a shared informer for resource %q: %v", qm.clusterName, resource.String(), err)
 
 	// TODO: if we can share storage with garbage collector, it may make sense to support other resources
 	// until that time, aggregated api servers will have to run their own controller to reconcile their own quota.
-	return nil, fmt.Errorf("unable to monitor quota for resource %q", resource.String())
+	return nil, fmt.Errorf("%s: unable to monitor quota for resource %q", qm.clusterName, resource.String())
 }
 
 // SyncMonitors rebuilds the monitor set according to the supplied resources,
@@ -219,7 +209,7 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 		}
 		c, err := qm.controllerFor(resource)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
+			errs = append(errs, fmt.Errorf("%s: couldn't start monitor for resource %q: %v", qm.clusterName, resource, err))
 			continue
 		}
 
@@ -230,7 +220,7 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 			listResourceFunc := generic.ListResourceUsingListerFunc(listerFunc, resource)
 			evaluator = generic.NewObjectCountEvaluator(resource.GroupResource(), listResourceFunc, "")
 			qm.registry.Add(evaluator)
-			klog.Infof("QuotaMonitor created object count evaluator for %s", resource.GroupResource())
+			klog.Infof("%s: QuotaMonitor created object count evaluator for %s", qm.clusterName, resource.GroupResource())
 		}
 
 		// track the monitor
@@ -245,7 +235,7 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 		}
 	}
 
-	klog.V(4).Infof("quota synced monitors; added %d, kept %d, removed %d", added, kept, len(toRemove))
+	klog.V(4).Infof("%s: quota synced monitors; added %d, kept %d, removed %d", qm.clusterName, added, kept, len(toRemove))
 	// NewAggregate returns nil if errs is 0-length
 	return utilerrors.NewAggregate(errs)
 }
@@ -277,7 +267,7 @@ func (qm *QuotaMonitor) StartMonitors() {
 			started++
 		}
 	}
-	klog.V(4).Infof("QuotaMonitor started %d new monitors, %d currently running", started, len(monitors))
+	klog.V(4).Infof("%s: QuotaMonitor started %d new monitors, %d currently running", qm.clusterName, started, len(monitors))
 }
 
 // IsSynced returns true if any monitors exist AND all those monitors'
@@ -289,13 +279,13 @@ func (qm *QuotaMonitor) IsSynced() bool {
 	defer qm.monitorLock.RUnlock()
 
 	if len(qm.monitors) == 0 {
-		klog.V(4).Info("quota monitor not synced: no monitors")
+		klog.V(4).Info("%s: quota monitor not synced: no monitors", qm.clusterName)
 		return false
 	}
 
 	for resource, monitor := range qm.monitors {
 		if !monitor.controller.HasSynced() {
-			klog.V(4).Infof("quota monitor not synced: %v", resource)
+			klog.V(4).Infof("%s: quota monitor not synced: %v", qm.clusterName, resource)
 			return false
 		}
 	}
@@ -305,8 +295,8 @@ func (qm *QuotaMonitor) IsSynced() bool {
 // Run sets the stop channel and starts monitor execution until stopCh is
 // closed. Any running monitors will be stopped before Run returns.
 func (qm *QuotaMonitor) Run(stopCh <-chan struct{}) {
-	klog.Infof("QuotaMonitor running")
-	defer klog.Infof("QuotaMonitor stopping")
+	klog.Infof("%s: QuotaMonitor running", qm.clusterName)
+	defer klog.Infof("%s: QuotaMonitor stopping", qm.clusterName)
 
 	// Set up the stop channel.
 	qm.monitorLock.Lock()
@@ -330,7 +320,7 @@ func (qm *QuotaMonitor) Run(stopCh <-chan struct{}) {
 			close(monitor.stopCh)
 		}
 	}
-	klog.Infof("QuotaMonitor stopped %d of %d monitors", stopped, len(monitors))
+	klog.Infof("%s: QuotaMonitor stopped %d of %d monitors", qm.clusterName, stopped, len(monitors))
 }
 
 func (qm *QuotaMonitor) runProcessResourceChanges() {
@@ -347,16 +337,16 @@ func (qm *QuotaMonitor) processResourceChanges() bool {
 	defer qm.resourceChanges.Done(item)
 	event, ok := item.(*event)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("expect a *event, got %v", item))
+		utilruntime.HandleError(fmt.Errorf("%s: expect a *event, got %v", qm.clusterName, item))
 		return true
 	}
 	obj := event.obj
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
+		utilruntime.HandleError(fmt.Errorf("%s: cannot access obj: %v", qm.clusterName, err))
 		return true
 	}
-	klog.V(4).Infof("QuotaMonitor process object: %s, namespace %s, name %s, uid %s, event type %v", event.gvr.String(), accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
+	klog.V(4).Infof("%s: QuotaMonitor process object: %s, namespace %s, name %s, uid %s, event type %v", qm.clusterName, event.gvr.String(), accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
 	qm.replenishmentFunc(event.gvr.GroupResource(), accessor.GetNamespace())
 	return true
 }
