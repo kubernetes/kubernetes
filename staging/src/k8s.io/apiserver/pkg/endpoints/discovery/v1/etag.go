@@ -32,11 +32,6 @@ import (
 // This file exposes helper functions used for calculating the E-Tag header
 // used in discovery endpoint responses
 
-// Unsure if there is an existing interface for this
-type Marshalable interface {
-	Marshal() ([]byte, error)
-}
-
 // Attaches Cache-Busting functionality to an endpoint
 //   - Sets ETag haeader to provided hash
 //   - Replies with 304 Not Modified, if If-None-Match header matches hash
@@ -87,7 +82,7 @@ func ServeHTTPWithETag(
 	)
 }
 
-func CalculateETag(resurces Marshalable) (string, error) {
+func CalculateETag(resurces interface{}) (string, error) {
 	serialized, err := json.Marshal(resurces)
 	if err != nil {
 		return "", err

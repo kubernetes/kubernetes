@@ -46,7 +46,7 @@ type ResourceManager interface {
 	// Thread-safe
 	RemoveGroupVersion(gv metav1.GroupVersion)
 
-	// Reset's from the manager known list of group-versions and replaces it
+	// Resets the manager's known list of group-versions and replaces them
 	// with the given groups
 	// Thread-Safe
 	SetGroups([]metav1.DiscoveryAPIGroup)
