@@ -38,13 +38,13 @@ type WorkEstimatorConfig struct {
 	*MutatingWorkEstimatorConfig `json:"mutatingWorkEstimatorConfig,omitempty"`
 
 	// MinimumSeats is the minimum number of seats a request must occupy.
-	MinimumSeats uint `json:"minimumSeats,omitempty"`
+	MinimumSeats uint64 `json:"minimumSeats,omitempty"`
 	// MaximumSeats is the maximum number of seats a request can occupy
 	//
 	// NOTE: work_estimate_seats_samples metric uses the value of maximumSeats
 	// as the upper bound, so when we change maximumSeats we should also
 	// update the buckets of the metric.
-	MaximumSeats uint `json:"maximumSeats,omitempty"`
+	MaximumSeats uint64 `json:"maximumSeats,omitempty"`
 }
 
 // ListWorkEstimatorConfig holds work estimator parameters related to list requests.
