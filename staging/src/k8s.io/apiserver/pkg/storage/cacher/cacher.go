@@ -47,7 +47,7 @@ import (
 )
 
 var (
-	emptyFunc = func() {}
+	emptyFunc = func(bool) {}
 )
 
 const (
@@ -147,6 +147,10 @@ func (i *indexedWatchers) deleteWatcher(number int, value string, supported bool
 }
 
 func (i *indexedWatchers) terminateAll(objectType reflect.Type, done func(*cacheWatcher)) {
+	// note that we don't have to call setDrainInputBufferLocked method on the watchers
+	// because we take advantage of the default value - stop immediately
+	// also watchers that have had already its draining strategy set
+	// are no longer available (they were removed from the allWatchers and the valueWatchers maps)
 	if len(i.allWatchers) > 0 || len(i.valueWatchers) > 0 {
 		klog.Warningf("Terminating all watchers from cacher %v", objectType)
 	}
@@ -183,6 +187,10 @@ func newTimeBucketWatchers(clock clock.Clock, bookmarkFrequency time.Duration) *
 // adds a watcher to the bucket, if the deadline is before the start, it will be
 // added to the first one.
 func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
+	// note that the returned time can be before t.createTime,
+	// especially in cases when the nextBookmarkTime method
+	// give us the zero value of type Time
+	// so buckedID can hold a negative value
 	nextTime, ok := w.nextBookmarkTime(t.clock.Now(), t.bookmarkFrequency)
 	if !ok {
 		return false
@@ -521,7 +529,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.Lock()
 		defer c.Unlock()
 		// Update watcher.forget function once we can compute it.
-		watcher.forget = forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
+		watcher.forget = forgetWatcher(c, watcher, c.watcherIdx, triggerValue, triggerSupported)
 		c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 
 		// Add it to the queue only when the client support watch bookmarks.
@@ -1032,10 +1040,12 @@ func (c *Cacher) Stop() {
 	c.stopWg.Wait()
 }
 
-func forgetWatcher(c *Cacher, index int, triggerValue string, triggerSupported bool) func() {
-	return func() {
+func forgetWatcher(c *Cacher, w *cacheWatcher, index int, triggerValue string, triggerSupported bool) func(bool) {
+	return func(drainWatcher bool) {
 		c.Lock()
 		defer c.Unlock()
+
+		w.setDrainInputBufferLocked(drainWatcher)
 
 		// It's possible that the watcher is already not in the structure (e.g. in case of
 		// simultaneous Stop() and terminateAllWatchers(), but it is safe to call stopLocked()
@@ -1160,7 +1170,7 @@ type cacheWatcher struct {
 	done      chan struct{}
 	filter    filterWithAttrsFunc
 	stopped   bool
-	forget    func()
+	forget    func(bool)
 	versioner storage.Versioner
 	// The watcher will be closed by server after the deadline,
 	// save it here to send bookmark events before that.
@@ -1172,9 +1182,13 @@ type cacheWatcher struct {
 	// human readable identifier that helps assigning cacheWatcher
 	// instance with request
 	identifier string
+
+	// drainInputBuffer indicates whether we should delay closing this watcher
+	// and send all event in the input buffer.
+	drainInputBuffer bool
 }
 
-func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(), versioner storage.Versioner, deadline time.Time, allowWatchBookmarks bool, objectType reflect.Type, identifier string) *cacheWatcher {
+func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(bool), versioner storage.Versioner, deadline time.Time, allowWatchBookmarks bool, objectType reflect.Type, identifier string) *cacheWatcher {
 	return &cacheWatcher{
 		input:               make(chan *watchCacheEvent, chanSize),
 		result:              make(chan watch.Event, chanSize),
@@ -1197,15 +1211,28 @@ func (c *cacheWatcher) ResultChan() <-chan watch.Event {
 
 // Implements watch.Interface.
 func (c *cacheWatcher) Stop() {
-	c.forget()
+	c.forget(false)
 }
 
 // we rely on the fact that stopLocked is actually protected by Cacher.Lock()
 func (c *cacheWatcher) stopLocked() {
 	if !c.stopped {
 		c.stopped = true
-		close(c.done)
+		// stop without draining the input channel was requested.
+		if !c.drainInputBuffer {
+			close(c.done)
+		}
 		close(c.input)
+	}
+
+	// Even if the watcher was already stopped, if it previously was
+	// using draining mode and it's not using it now we need to
+	// close the done channel now. Otherwise we could leak the
+	// processing goroutine if it will be trying to put more objects
+	// into result channel, the channel will be full and there will
+	// already be noone on the processing the events on the receiving end.
+	if !c.drainInputBuffer && !c.isDoneChannelClosedLocked() {
+		close(c.done)
 	}
 }
 
@@ -1231,7 +1258,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// we simply terminate it.
 		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v", c.objectType.String(), c.identifier, len(c.input), len(c.result))
 		metrics.TerminatedWatchersCounter.WithLabelValues(c.objectType.String()).Inc()
-		c.forget()
+		c.forget(false)
 	}
 
 	if timer == nil {
@@ -1275,6 +1302,22 @@ func (c *cacheWatcher) nextBookmarkTime(now time.Time, bookmarkFrequency time.Du
 		return time.Time{}, false
 	}
 	return heartbeatTime, true
+}
+
+// setDrainInputBufferLocked if set to true indicates that we should delay closing this watcher
+// until we send all events residing in the input buffer.
+func (c *cacheWatcher) setDrainInputBufferLocked(drain bool) {
+	c.drainInputBuffer = drain
+}
+
+// isDoneChannelClosed checks if c.done channel is closed
+func (c *cacheWatcher) isDoneChannelClosedLocked() bool {
+	select {
+	case <-c.done:
+		return true
+	default:
+	}
+	return false
 }
 
 func getMutableObject(object runtime.Object) runtime.Object {
