@@ -68,7 +68,10 @@ type resourceDiscoveryManager struct {
 	apiGroupNames []string // apiGroupNames preserves insertion order
 
 	serializer runtime.NegotiatedSerializer
+	cachedGroupList
+}
 
+type cachedGroupList struct {
 	// Most up to date version of all discovery api groups
 	cachedResponse *metav1.DiscoveryAPIGroupList
 	// Hash of the cachedResponse used for cache-busting
@@ -86,7 +89,7 @@ func (rdm *resourceDiscoveryManager) SetGroups(groups []metav1.DiscoveryAPIGroup
 
 	rdm.apiGroups = nil
 	rdm.apiGroupNames = nil
-	rdm.cachedResponse = nil
+	rdm.cachedGroupList = cachedGroupList{}
 
 	for _, group := range groups {
 		for _, version := range group.Versions {
@@ -149,7 +152,7 @@ func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, val
 	}
 
 	// Reset response document so it is recreated lazily
-	rdm.cachedResponse = nil
+	rdm.cachedGroupList = cachedGroupList{}
 }
 
 func (rdm *resourceDiscoveryManager) RemoveGroupVersion(apiGroup metav1.GroupVersion) {
@@ -179,7 +182,7 @@ func (rdm *resourceDiscoveryManager) RemoveGroupVersion(apiGroup metav1.GroupVer
 	}
 
 	// Reset response document so it is recreated lazily
-	rdm.cachedResponse = nil
+	rdm.cachedGroupList = cachedGroupList{}
 }
 
 func (rdm *resourceDiscoveryManager) RemoveGroup(groupName string) {
@@ -195,7 +198,7 @@ func (rdm *resourceDiscoveryManager) RemoveGroup(groupName string) {
 	}
 
 	// Reset response document so it is recreated lazily
-	rdm.cachedResponse = nil
+	rdm.cachedGroupList = cachedGroupList{}
 }
 
 func (rdm *resourceDiscoveryManager) WebService() *restful.WebService {
