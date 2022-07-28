@@ -419,7 +419,9 @@ func (rq *Controller) Sync(discoveryFunc NamespacedResourcesFunc, period time.Du
 			if discovery.IsGroupDiscoveryFailedError(err) && len(newResources) > 0 {
 				// In partial discovery cases, don't remove any existing informers, just add new ones
 				for k, v := range oldResources {
-					newResources[k] = v
+					if _, ok := newResources[k]; !ok {
+						newResources[k] = v
+					}
 				}
 			} else {
 				// short circuit in non-discovery error cases or if discovery returned zero resources
