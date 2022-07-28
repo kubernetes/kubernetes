@@ -487,6 +487,7 @@ func TestApplyCRDUnhandledSchema(t *testing.T) {
 	var c apiextensionsv1beta1.CustomResourceValidation
 	err = json.Unmarshal([]byte(`{
 		"openAPIV3Schema": {
+            "type": "object",
 			"properties": {
 				"TypeFooBar": {
 					"type": "array"
