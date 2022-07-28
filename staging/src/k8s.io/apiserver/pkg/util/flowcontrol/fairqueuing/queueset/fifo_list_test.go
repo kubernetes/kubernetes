@@ -195,7 +195,7 @@ func TestFIFOQueueWorkEstimate(t *testing.T) {
 		}
 	}
 
-	newRequest := func(initialSeats, finalSeats uint, additionalLatency time.Duration) *request {
+	newRequest := func(initialSeats, finalSeats uint64, additionalLatency time.Duration) *request {
 		return &request{workEstimate: qs.completeWorkEstimate(&fcrequest.WorkEstimate{
 			InitialSeats:      initialSeats,
 			FinalSeats:        finalSeats,

@@ -74,7 +74,7 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priori
 	// is taking 1/Nth of a seat for M milliseconds.
 	// We allow the accounting of that work in P&F to be reshaped into another
 	// rectangle of equal area for practical reasons.
-	var finalSeats uint
+	var finalSeats uint64
 	var additionalLatency time.Duration
 
 	// TODO: Make this unconditional after we tune the algorithm better.
@@ -86,7 +86,7 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priori
 		// TODO: As described in the KEP, we should take into account that not all
 		//   events are equal and try to estimate the cost of a single event based on
 		//   some historical data about size of events.
-		finalSeats = uint(math.Ceil(float64(watchCount) / e.config.WatchesPerSeat))
+		finalSeats = uint64(math.Ceil(float64(watchCount) / e.config.WatchesPerSeat))
 		finalWork := SeatsTimesDuration(float64(finalSeats), e.config.eventAdditionalDuration())
 
 		// While processing individual events is highly parallel,

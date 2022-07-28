@@ -30,11 +30,11 @@ import (
 type WorkEstimate struct {
 	// InitialSeats is the number of seats occupied while the server is
 	// executing this request.
-	InitialSeats uint
+	InitialSeats uint64
 
 	// FinalSeats is the number of seats occupied at the end,
 	// during the AdditionalLatency.
-	FinalSeats uint
+	FinalSeats uint64
 
 	// AdditionalLatency specifies the additional duration the seats allocated
 	// to this request must be reserved after the given request had finished.
@@ -85,9 +85,9 @@ func (e WorkEstimatorFunc) EstimateWork(r *http.Request, flowSchemaName, priorit
 
 type workEstimator struct {
 	// the minimum number of seats a request must occupy
-	minimumSeats uint
+	minimumSeats uint64
 	// the maximum number of seats a request can occupy
-	maximumSeats uint
+	maximumSeats uint64
 	// listWorkEstimator estimates work for list request(s)
 	listWorkEstimator WorkEstimatorFunc
 	// mutatingWorkEstimator calculates the width of mutating request(s)
