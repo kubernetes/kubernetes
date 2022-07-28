@@ -1367,6 +1367,17 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		}
 	}
 
+	// add namespace indexer
+	if isNamespaced {
+		if options.Indexers == nil {
+			options.Indexers = &cache.Indexers{}
+		}
+		_, ok := (*options.Indexers)[storage.FieldIndex("metadata.namespace")]
+		if !ok {
+			(*options.Indexers)[storage.FieldIndex("metadata.namespace")] = cache.MetaNamespaceIndexFunc
+		}
+	}
+
 	err := validateIndexers(options.Indexers)
 	if err != nil {
 		return err

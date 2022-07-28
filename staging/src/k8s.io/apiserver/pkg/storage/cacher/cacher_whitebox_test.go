@@ -41,8 +41,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -276,6 +278,24 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 	return cacher, testVersioner{}, err
 }
 
+func newTestCacherWithNamespaceIndex(s storage.Interface) (*Cacher, storage.Versioner, error) {
+	prefix := "pods"
+	config := Config{
+		Storage:        s,
+		Versioner:      testVersioner{},
+		ResourcePrefix: prefix,
+		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
+		GetAttrsFunc:   storage.DefaultNamespaceScopedAttr,
+		NewFunc:        func() runtime.Object { return &example.Pod{} },
+		NewListFunc:    func() runtime.Object { return &example.PodList{} },
+		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:          clock.RealClock{},
+		Indexers:       &cache.Indexers{storage.FieldIndex("metadata.namespace"): cache.MetaNamespaceIndexFunc},
+	}
+	cacher, err := NewCacherFromConfig(config)
+	return cacher, testVersioner{}, err
+}
+
 type dummyStorage struct {
 	err error
 }
@@ -321,6 +341,62 @@ func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.O
 }
 func (d *dummyStorage) Count(_ string) (int64, error) {
 	return 0, fmt.Errorf("unimplemented")
+}
+
+func TestListItems(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacherWithNamespaceIndex(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	if err := cacher.ready.wait(); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready")
+	}
+
+	makePod := func(i int, namespace string) *examplev1.Pod {
+		return &examplev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", 1000+i),
+				Namespace:       namespace,
+				ResourceVersion: fmt.Sprintf("%d", 1000+i),
+			},
+		}
+	}
+	if err := cacher.watchCache.Add(makePod(0, "ns1")); err != nil {
+		t.Errorf("error: %v", err)
+	}
+	if err := cacher.watchCache.Add(makePod(1, "ns1")); err != nil {
+		t.Errorf("error: %v", err)
+	}
+	if err := cacher.watchCache.Add(makePod(2, "ns2")); err != nil {
+		t.Errorf("error: %v", err)
+	}
+	if err := cacher.watchCache.Add(makePod(3, "ns2")); err != nil {
+		t.Errorf("error: %v", err)
+	}
+
+	ctx := context.TODO()
+	objs, _, _, err := cacher.listItems(ctx, 0, "pods", storage.SelectionPredicate{}, nil, true)
+	if err != nil {
+		t.Errorf("listItems with RV=0 should be served from cache: %v", err)
+	}
+
+	if len(objs) != 4 {
+		t.Errorf("not hit indexer, expect 4 objects, but got %v objects", len(objs))
+	}
+
+	ctx = endpointsrequest.WithNamespace(ctx, "ns1")
+	objs, _, _, err = cacher.listItems(ctx, 0, "pods", storage.SelectionPredicate{}, nil, true)
+	if err != nil {
+		t.Errorf("listItems with RV=0 should be served from cache: %v", err)
+	}
+
+	if len(objs) != 2 {
+		t.Errorf("hit namespace indexer, expect 2 objects, but got %v objects", len(objs))
+	}
 }
 
 func TestGetListCacheBypass(t *testing.T) {

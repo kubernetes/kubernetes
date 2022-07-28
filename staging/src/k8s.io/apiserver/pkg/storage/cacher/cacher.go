@@ -611,7 +611,7 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
 }
 
-func (c *Cacher) listItems(listRV uint64, key string, pred storage.SelectionPredicate, trace *utiltrace.Trace, recursive bool) ([]interface{}, uint64, string, error) {
+func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, trace *utiltrace.Trace, recursive bool) ([]interface{}, uint64, string, error) {
 	if !recursive {
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(listRV, key, trace)
 		if err != nil {
@@ -622,7 +622,13 @@ func (c *Cacher) listItems(listRV uint64, key string, pred storage.SelectionPred
 		}
 		return nil, readResourceVersion, "", nil
 	}
-	return c.watchCache.WaitUntilFreshAndList(listRV, pred.MatcherIndex(), trace)
+	matchValues := pred.MatcherIndex()
+	// add namespace index
+	namespace, ok := endpointsrequest.NamespaceFrom(ctx)
+	if ok && namespace != "" {
+		matchValues = append(matchValues, storage.MatchValue{storage.FieldIndex("metadata.namespace"), namespace})
+	}
+	return c.watchCache.WaitUntilFreshAndList(listRV, matchValues, trace)
 }
 
 // GetList implements storage.Interface
@@ -672,7 +678,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 	filter := filterWithAttrsFunction(key, pred)
 
-	objs, readResourceVersion, indexUsed, err := c.listItems(listRV, key, pred, trace, recursive)
+	objs, readResourceVersion, indexUsed, err := c.listItems(ctx, listRV, key, pred, trace, recursive)
 	if err != nil {
 		return err
 	}
