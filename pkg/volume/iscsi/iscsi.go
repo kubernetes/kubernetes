@@ -24,7 +24,9 @@ import (
 	"strconv"
 	"strings"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/io"
@@ -366,9 +368,12 @@ func (b *iscsiDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	if err != nil {
 		klog.Errorf("iscsi: failed to setup")
 	}
-	// The volume must have been mounted in MountDevice with -o context.
-	// TODO: extract from mount table in GetAttributes() to be sure?
-	b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		// The volume must have been mounted in MountDevice with -o context.
+		// TODO: extract from mount table in GetAttributes() to be sure?
+		b.mountedWithSELinuxContext = mounterArgs.SELinuxLabel != ""
+	}
 	return err
 }
 
