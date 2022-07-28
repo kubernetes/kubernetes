@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -50,6 +52,25 @@ const (
 	dnsSubdomainLabelErrMsg = "a lowercase RFC 1123 subdomain"
 	envVarNameErrMsg        = "a valid environment variable name must consist of"
 )
+
+func line() string {
+	_, _, line, ok := runtime.Caller(1)
+	var s string
+	if ok {
+		s = fmt.Sprintf("%d", line)
+	} else {
+		s = "<??>"
+	}
+	return s
+}
+
+func prettyErrorList(errs field.ErrorList) string {
+	var s string
+	for _, e := range errs {
+		s += fmt.Sprintf("\t%s\n", e)
+	}
+	return s
+}
 
 func newHostPathType(pathType string) *core.HostPathType {
 	hostPathType := new(core.HostPathType)
@@ -6714,74 +6735,102 @@ func TestValidateEphemeralContainers(t *testing.T) {
 
 	// Failure Cases
 	tcs := []struct {
-		title               string
+		title, line         string
 		ephemeralContainers []core.EphemeralContainer
-		expectedError       field.Error
+		expectedErrors      field.ErrorList
 	}{
 		{
 			"Name Collision with Container.Containers",
+			line(),
 			[]core.EphemeralContainer{
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
-			field.Error{Type: field.ErrorTypeDuplicate, Field: "ephemeralContainers[0].name"},
+			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "ephemeralContainers[0].name"}},
 		},
 		{
 			"Name Collision with Container.InitContainers",
+			line(),
 			[]core.EphemeralContainer{
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "ictr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
-			field.Error{Type: field.ErrorTypeDuplicate, Field: "ephemeralContainers[0].name"},
+			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "ephemeralContainers[0].name"}},
 		},
 		{
 			"Name Collision with EphemeralContainers",
+			line(),
 			[]core.EphemeralContainer{
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
-			field.Error{Type: field.ErrorTypeDuplicate, Field: "ephemeralContainers[1].name"},
+			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "ephemeralContainers[1].name"}},
 		},
 		{
-			"empty Container Container",
+			"empty Container",
+			line(),
 			[]core.EphemeralContainer{
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{}},
 			},
-			field.Error{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0].name"},
+			field.ErrorList{
+				{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0].name"},
+				{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0].image"},
+				{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0].terminationMessagePolicy"},
+				{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0].imagePullPolicy"},
+			},
 		},
 		{
 			"empty Container Name",
+			line(),
 			[]core.EphemeralContainer{
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
-			field.Error{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0].name"},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "ephemeralContainers[0].name"}},
 		},
 		{
 			"whitespace padded image name",
+			line(),
 			[]core.EphemeralContainer{
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: " image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			},
-			field.Error{Type: field.ErrorTypeInvalid, Field: "ephemeralContainers[0].image"},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "ephemeralContainers[0].image"}},
 		},
 		{
 			"invalid image pull policy",
+			line(),
 			[]core.EphemeralContainer{
 				{EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "PullThreeTimes", TerminationMessagePolicy: "File"}},
 			},
-			field.Error{Type: field.ErrorTypeNotSupported, Field: "ephemeralContainers[0].imagePullPolicy"},
+			field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "ephemeralContainers[0].imagePullPolicy"}},
 		},
 		{
 			"TargetContainerName doesn't exist",
+			line(),
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 					TargetContainerName:      "bogus",
 				},
 			},
-			field.Error{Type: field.ErrorTypeNotFound, Field: "ephemeralContainers[0].targetContainerName"},
+			field.ErrorList{{Type: field.ErrorTypeNotFound, Field: "ephemeralContainers[0].targetContainerName"}},
+		},
+		{
+			"Targets an ephemeral container",
+			line(),
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debug", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+				},
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{Name: "debugception", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+					TargetContainerName:      "debug",
+				},
+			},
+			field.ErrorList{{Type: field.ErrorTypeNotFound, Field: "ephemeralContainers[1].targetContainerName"}},
 		},
 		{
 			"Container uses disallowed field: Lifecycle",
+			line(),
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{
@@ -6797,10 +6846,11 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					},
 				},
 			},
-			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].lifecycle"},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].lifecycle"}},
 		},
 		{
 			"Container uses disallowed field: LivenessProbe",
+			line(),
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{
@@ -6817,10 +6867,11 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					},
 				},
 			},
-			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].livenessProbe"},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].livenessProbe"}},
 		},
 		{
 			"Container uses disallowed field: Ports",
+			line(),
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{
@@ -6834,10 +6885,11 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					},
 				},
 			},
-			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].ports"},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].ports"}},
 		},
 		{
 			"Container uses disallowed field: ReadinessProbe",
+			line(),
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{
@@ -6853,10 +6905,11 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					},
 				},
 			},
-			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].readinessProbe"},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].readinessProbe"}},
 		},
 		{
 			"Container uses disallowed field: StartupProbe",
+			line(),
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{
@@ -6873,10 +6926,11 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					},
 				},
 			},
-			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].startupProbe"},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].startupProbe"}},
 		},
 		{
 			"Container uses disallowed field: Resources",
+			line(),
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{
@@ -6892,10 +6946,11 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					},
 				},
 			},
-			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].resources"},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].resources"}},
 		},
 		{
 			"Container uses disallowed field: VolumeMount.SubPath",
+			line(),
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{
@@ -6910,10 +6965,11 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					},
 				},
 			},
-			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].volumeMounts[1].subPath"},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].volumeMounts[1].subPath"}},
 		},
 		{
 			"Container uses disallowed field: VolumeMount.SubPathExpr",
+			line(),
 			[]core.EphemeralContainer{
 				{
 					EphemeralContainerCommon: core.EphemeralContainerCommon{
@@ -6928,25 +6984,40 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					},
 				},
 			},
-			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].volumeMounts[1].subPathExpr"},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].volumeMounts[1].subPathExpr"}},
+		},
+		{
+			"Disallowed field with other errors should only return a single Forbidden",
+			line(),
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						Lifecycle: &core.Lifecycle{
+							PreStop: &core.LifecycleHandler{
+								Exec: &core.ExecAction{Command: []string{}},
+							},
+						},
+					},
+				},
+			},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].lifecycle"}},
 		},
 	}
 
 	for _, tc := range tcs {
-		t.Run(tc.title, func(t *testing.T) {
+		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
 			errs := validateEphemeralContainers(tc.ephemeralContainers, containers, initContainers, vols, field.NewPath("ephemeralContainers"), PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
 
-			if len(errs) > 1 {
-				t.Errorf("expected 1 error but received %d: %q", len(errs), errs)
-			}
-			if errs[0].Type != tc.expectedError.Type {
-				t.Errorf("expected error type %q but received %q: %q", string(tc.expectedError.Type), string(errs[0].Type), errs)
-			}
-			if errs[0].Field != tc.expectedError.Field {
-				t.Errorf("expected error for field %q but received error for field %q: %q", tc.expectedError.Field, errs[0].Field, errs)
+			if diff := cmp.Diff(tc.expectedErrors, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")); diff != "" {
+				t.Errorf("unexpected diff in errors (-want, +got):\n%s", diff)
+				t.Errorf("INFO: all errors:\n%s", prettyErrorList(errs))
 			}
 		})
 	}
@@ -7226,70 +7297,80 @@ func TestValidateContainers(t *testing.T) {
 		AllowPrivileged: false,
 	})
 	errorCases := []struct {
-		title          string
+		title, line    string
 		containers     []core.Container
-		expectedErrors []field.Error
+		expectedErrors field.ErrorList
 	}{
 		{
 			"zero-length name",
+			line(),
 			[]core.Container{{Name: "", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			[]field.Error{{Type: field.ErrorTypeRequired, Field: "containers[0].name"}},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "containers[0].name"}},
 		},
 		{
 			"zero-length-image",
+			line(),
 			[]core.Container{{Name: "abc", Image: "", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			[]field.Error{{Type: field.ErrorTypeRequired, Field: "containers[0].image"}},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "containers[0].image"}},
 		},
 		{
 			"name > 63 characters",
+			line(),
 			[]core.Container{{Name: strings.Repeat("a", 64), Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].name"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].name"}},
 		},
 		{
 			"name not a DNS label",
+			line(),
 			[]core.Container{{Name: "a.b.c", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].name"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].name"}},
 		},
 		{
 			"name not unique",
+			line(),
 			[]core.Container{
 				{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 				{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 			},
-			[]field.Error{{Type: field.ErrorTypeDuplicate, Field: "containers[1].name"}},
+			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "containers[1].name"}},
 		},
 		{
 			"zero-length image",
+			line(),
 			[]core.Container{{Name: "abc", Image: "", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			[]field.Error{{Type: field.ErrorTypeRequired, Field: "containers[0].image"}},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "containers[0].image"}},
 		},
 		{
 			"host port not unique",
+			line(),
 			[]core.Container{
 				{Name: "abc", Image: "image", Ports: []core.ContainerPort{{ContainerPort: 80, HostPort: 80, Protocol: "TCP"}},
 					ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 				{Name: "def", Image: "image", Ports: []core.ContainerPort{{ContainerPort: 81, HostPort: 80, Protocol: "TCP"}},
 					ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 			},
-			[]field.Error{{Type: field.ErrorTypeDuplicate, Field: "containers[1].ports[0].hostPort"}},
+			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "containers[1].ports[0].hostPort"}},
 		},
 		{
 			"invalid env var name",
+			line(),
 			[]core.Container{
 				{Name: "abc", Image: "image", Env: []core.EnvVar{{Name: "ev!1"}}, ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].env[0].name"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].env[0].name"}},
 		},
 		{
 			"unknown volume name",
+			line(),
 			[]core.Container{
 				{Name: "abc", Image: "image", VolumeMounts: []core.VolumeMount{{Name: "anything", MountPath: "/foo"}},
 					ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 			},
-			[]field.Error{{Type: field.ErrorTypeNotFound, Field: "containers[0].volumeMounts[0].name"}},
+			field.ErrorList{{Type: field.ErrorTypeNotFound, Field: "containers[0].volumeMounts[0].name"}},
 		},
 		{
 			"invalid lifecycle, no exec command.",
+			line(),
 			[]core.Container{
 				{
 					Name:  "life-123",
@@ -7303,10 +7384,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeRequired, Field: "containers[0].lifecycle.preStop.exec.command"}},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "containers[0].lifecycle.preStop.exec.command"}},
 		},
 		{
 			"invalid lifecycle, no http path.",
+			line(),
 			[]core.Container{
 				{
 					Name:  "life-123",
@@ -7323,10 +7405,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeRequired, Field: "containers[0].lifecycle.preStop.httpGet.path"}},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "containers[0].lifecycle.preStop.httpGet.path"}},
 		},
 		{
 			"invalid lifecycle, no http port.",
+			line(),
 			[]core.Container{
 				{
 					Name:  "life-123",
@@ -7343,10 +7426,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].lifecycle.preStop.httpGet.port"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].lifecycle.preStop.httpGet.port"}},
 		},
 		{
 			"invalid lifecycle, no http scheme.",
+			line(),
 			[]core.Container{
 				{
 					Name:  "life-123",
@@ -7363,10 +7447,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeNotSupported, Field: "containers[0].lifecycle.preStop.httpGet.scheme"}},
+			field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "containers[0].lifecycle.preStop.httpGet.scheme"}},
 		},
 		{
 			"invalid lifecycle, no tcp socket port.",
+			line(),
 			[]core.Container{
 				{
 					Name:  "life-123",
@@ -7380,10 +7465,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].lifecycle.preStop.tcpSocket.port"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].lifecycle.preStop.tcpSocket.port"}},
 		},
 		{
 			"invalid lifecycle, zero tcp socket port.",
+			line(),
 			[]core.Container{
 				{
 					Name:  "life-123",
@@ -7399,10 +7485,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].lifecycle.preStop.tcpSocket.port"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].lifecycle.preStop.tcpSocket.port"}},
 		},
 		{
 			"invalid lifecycle, no action.",
+			line(),
 			[]core.Container{
 				{
 					Name:  "life-123",
@@ -7414,10 +7501,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeRequired, Field: "containers[0].lifecycle.preStop"}},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "containers[0].lifecycle.preStop"}},
 		},
 		{
 			"invalid readiness probe, terminationGracePeriodSeconds set.",
+			line(),
 			[]core.Container{
 				{
 					Name:  "life-123",
@@ -7434,10 +7522,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].readinessProbe.terminationGracePeriodSeconds"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].readinessProbe.terminationGracePeriodSeconds"}},
 		},
 		{
 			"invalid liveness probe, no tcp socket port.",
+			line(),
 			[]core.Container{
 				{
 					Name:  "live-123",
@@ -7452,10 +7541,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].livenessProbe.tcpSocket.port"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].livenessProbe.tcpSocket.port"}},
 		},
 		{
 			"invalid liveness probe, no action.",
+			line(),
 			[]core.Container{
 				{
 					Name:  "live-123",
@@ -7468,10 +7558,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeRequired, Field: "containers[0].livenessProbe"}},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "containers[0].livenessProbe"}},
 		},
 		{
 			"invalid liveness probe, successThreshold != 1",
+			line(),
 			[]core.Container{
 				{
 					Name:  "live-123",
@@ -7488,10 +7579,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].livenessProbe.successThreshold"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].livenessProbe.successThreshold"}},
 		},
 		{
 			"invalid startup probe, successThreshold != 1",
+			line(),
 			[]core.Container{
 				{
 					Name:  "startup-123",
@@ -7508,10 +7600,116 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].startupProbe.successThreshold"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].startupProbe.successThreshold"}},
+		},
+		{
+			"invalid liveness probe, negative numbers",
+			line(),
+			[]core.Container{
+				{
+					Name:  "live-123",
+					Image: "image",
+					LivenessProbe: &core.Probe{
+						ProbeHandler: core.ProbeHandler{
+							TCPSocket: &core.TCPSocketAction{
+								Port: intstr.FromInt(80),
+							},
+						},
+						InitialDelaySeconds:           -1,
+						TimeoutSeconds:                -1,
+						PeriodSeconds:                 -1,
+						SuccessThreshold:              -1,
+						FailureThreshold:              -1,
+						TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+			field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].livenessProbe.initialDelaySeconds"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].livenessProbe.timeoutSeconds"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].livenessProbe.periodSeconds"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].livenessProbe.successThreshold"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].livenessProbe.failureThreshold"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].livenessProbe.terminationGracePeriodSeconds"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].livenessProbe.successThreshold"},
+			},
+		},
+		{
+			"invalid readiness probe, negative numbers",
+			line(),
+			[]core.Container{
+				{
+					Name:  "ready-123",
+					Image: "image",
+					ReadinessProbe: &core.Probe{
+						ProbeHandler: core.ProbeHandler{
+							TCPSocket: &core.TCPSocketAction{
+								Port: intstr.FromInt(80),
+							},
+						},
+						InitialDelaySeconds:           -1,
+						TimeoutSeconds:                -1,
+						PeriodSeconds:                 -1,
+						SuccessThreshold:              -1,
+						FailureThreshold:              -1,
+						TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+			field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].readinessProbe.initialDelaySeconds"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].readinessProbe.timeoutSeconds"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].readinessProbe.periodSeconds"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].readinessProbe.successThreshold"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].readinessProbe.failureThreshold"},
+				// terminationGracePeriodSeconds returns multiple validation errors here:
+				// containers[0].readinessProbe.terminationGracePeriodSeconds: Invalid value: -1: must be greater than 0
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].readinessProbe.terminationGracePeriodSeconds"},
+				// containers[0].readinessProbe.terminationGracePeriodSeconds: Invalid value: -1: must not be set for readinessProbes
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].readinessProbe.terminationGracePeriodSeconds"},
+			},
+		},
+		{
+			"invalid startup probe, negative numbers",
+			line(),
+			[]core.Container{
+				{
+					Name:  "startup-123",
+					Image: "image",
+					StartupProbe: &core.Probe{
+						ProbeHandler: core.ProbeHandler{
+							TCPSocket: &core.TCPSocketAction{
+								Port: intstr.FromInt(80),
+							},
+						},
+						InitialDelaySeconds:           -1,
+						TimeoutSeconds:                -1,
+						PeriodSeconds:                 -1,
+						SuccessThreshold:              -1,
+						FailureThreshold:              -1,
+						TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
+					},
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+			field.ErrorList{
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].startupProbe.initialDelaySeconds"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].startupProbe.timeoutSeconds"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].startupProbe.periodSeconds"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].startupProbe.successThreshold"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].startupProbe.failureThreshold"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].startupProbe.terminationGracePeriodSeconds"},
+				{Type: field.ErrorTypeInvalid, Field: "containers[0].startupProbe.successThreshold"},
+			},
 		},
 		{
 			"invalid message termination policy",
+			line(),
 			[]core.Container{
 				{
 					Name:                     "life-123",
@@ -7520,10 +7718,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "Unknown",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].terminationMessagePolicy"}},
+			field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "containers[0].terminationMessagePolicy"}},
 		},
 		{
 			"empty message termination policy",
+			line(),
 			[]core.Container{
 				{
 					Name:                     "life-123",
@@ -7532,10 +7731,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeRequired, Field: "containers[0].terminationMessagePolicy"}},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "containers[0].terminationMessagePolicy"}},
 		},
 		{
 			"privilege disabled",
+			line(),
 			[]core.Container{
 				{
 					Name:                     "abc",
@@ -7545,10 +7745,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeForbidden, Field: "containers[0].securityContext.privileged"}},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "containers[0].securityContext.privileged"}},
 		},
 		{
 			"invalid compute resource",
+			line(),
 			[]core.Container{
 				{
 					Name:  "abc-123",
@@ -7562,13 +7763,14 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{
+			field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.limits[disk]"},
 				{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.limits[disk]"},
 			},
 		},
 		{
 			"Resource CPU invalid",
+			line(),
 			[]core.Container{
 				{
 					Name:  "abc-123",
@@ -7580,10 +7782,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.limits[cpu]"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.limits[cpu]"}},
 		},
 		{
 			"Resource Requests CPU invalid",
+			line(),
 			[]core.Container{
 				{
 					Name:  "abc-123",
@@ -7595,10 +7798,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests[cpu]"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests[cpu]"}},
 		},
 		{
 			"Resource Memory invalid",
+			line(),
 			[]core.Container{
 				{
 					Name:  "abc-123",
@@ -7610,10 +7814,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.limits[memory]"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.limits[memory]"}},
 		},
 		{
 			"Request limit simple invalid",
+			line(),
 			[]core.Container{
 				{
 					Name:  "abc-123",
@@ -7626,10 +7831,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests"}},
 		},
 		{
 			"Invalid storage limit request",
+			line(),
 			[]core.Container{
 				{
 					Name:  "abc-123",
@@ -7643,13 +7849,14 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{
+			field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.limits[attachable-volumes-aws-ebs]"},
 				{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.limits[attachable-volumes-aws-ebs]"},
 			},
 		},
 		{
 			"CPU request limit multiple invalid",
+			line(),
 			[]core.Container{
 				{
 					Name:  "abc-123",
@@ -7662,10 +7869,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests"}},
 		},
 		{
 			"Memory request limit multiple invalid",
+			line(),
 			[]core.Container{
 				{
 					Name:  "abc-123",
@@ -7678,10 +7886,11 @@ func TestValidateContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].resources.requests"}},
 		},
 		{
 			"Invalid env from",
+			line(),
 			[]core.Container{
 				{
 					Name:                     "env-from-source",
@@ -7699,27 +7908,19 @@ func TestValidateContainers(t *testing.T) {
 					},
 				},
 			},
-			[]field.Error{{Type: field.ErrorTypeInvalid, Field: "containers[0].envFrom[0].configMapRef.name"}},
+			field.ErrorList{{Type: field.ErrorTypeInvalid, Field: "containers[0].envFrom[0].configMapRef.name"}},
 		},
 	}
 	for _, tc := range errorCases {
-		t.Run(tc.title, func(t *testing.T) {
+		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
 			errs := validateContainers(tc.containers, volumeDevices, field.NewPath("containers"), PodValidationOptions{})
 			if len(errs) == 0 {
-				t.Fatalf("expected error but received none")
+				t.Fatal("expected error but received none")
 			}
 
-			if len(errs) != len(tc.expectedErrors) {
-				t.Fatalf("unexpected number of errors (got %d, want %d) in validation result %q", len(errs), len(tc.expectedErrors), errs)
-			}
-
-			for i, err := range errs {
-				if err.Type != tc.expectedErrors[i].Type {
-					t.Errorf("returned error %d of %d: got error type %q but wanted %q: %q", i+1, len(errs), string(err.Type), string(tc.expectedErrors[i].Type), err)
-				}
-				if errs[i].Field != tc.expectedErrors[i].Field {
-					t.Errorf("returned error %d of %d: got error for field %q but wanted error for field %q: %q", i+1, len(errs), err.Field, tc.expectedErrors[i].Field, err)
-				}
+			if diff := cmp.Diff(tc.expectedErrors, errs, cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")); diff != "" {
+				t.Errorf("unexpected diff in errors (-want, +got):\n%s", diff)
+				t.Errorf("INFO: all errors:\n%s", prettyErrorList(errs))
 			}
 		})
 	}
@@ -7770,12 +7971,26 @@ func TestValidateInitContainers(t *testing.T) {
 		AllowPrivileged: false,
 	})
 	errorCases := []struct {
-		title          string
+		title, line    string
 		initContainers []core.Container
-		expectedError  field.Error
+		expectedErrors field.ErrorList
 	}{
 		{
+			"empty name",
+			line(),
+			[]core.Container{
+				{
+					Name:                     "",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			},
+			field.ErrorList{{Type: field.ErrorTypeRequired, Field: "initContainers[0].name", BadValue: ""}},
+		},
+		{
 			"name collision with regular container",
+			line(),
 			[]core.Container{
 				{
 					Name:                     "app",
@@ -7784,22 +7999,24 @@ func TestValidateInitContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			field.Error{Type: field.ErrorTypeDuplicate, Field: "initContainers[0].name"},
+			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "initContainers[0].name", BadValue: "app"}},
 		},
 		{
 			"invalid termination message policy",
+			line(),
 			[]core.Container{
 				{
 					Name:                     "init",
 					Image:                    "image",
 					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "INVALID_POLICY_NAME",
+					TerminationMessagePolicy: "Unknown",
 				},
 			},
-			field.Error{Type: field.ErrorTypeInvalid, Field: "initContainers[0].terminationMessagePolicy"},
+			field.ErrorList{{Type: field.ErrorTypeNotSupported, Field: "initContainers[0].terminationMessagePolicy", BadValue: core.TerminationMessagePolicy("Unknown")}},
 		},
 		{
 			"duplicate names",
+			line(),
 			[]core.Container{
 				{
 					Name:                     "init",
@@ -7814,10 +8031,11 @@ func TestValidateInitContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			field.Error{Type: field.ErrorTypeDuplicate, Field: "initContainers[1].name"},
+			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "initContainers[1].name", BadValue: "init"}},
 		},
 		{
 			"duplicate ports",
+			line(),
 			[]core.Container{
 				{
 					Name:  "abc",
@@ -7834,10 +8052,11 @@ func TestValidateInitContainers(t *testing.T) {
 					TerminationMessagePolicy: "File",
 				},
 			},
-			field.Error{Type: field.ErrorTypeDuplicate, Field: "initContainers[0].ports[1].hostPort"},
+			field.ErrorList{{Type: field.ErrorTypeDuplicate, Field: "initContainers[0].ports[1].hostPort", BadValue: "TCP//8080"}},
 		},
 		{
 			"uses disallowed field: Lifecycle",
+			line(),
 			[]core.Container{
 				{
 					Name:                     "debug",
@@ -7851,10 +8070,11 @@ func TestValidateInitContainers(t *testing.T) {
 					},
 				},
 			},
-			field.Error{Type: field.ErrorTypeInvalid, Field: "initContainers[0].lifecycle"},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].lifecycle", BadValue: ""}},
 		},
 		{
 			"uses disallowed field: LivenessProbe",
+			line(),
 			[]core.Container{
 				{
 					Name:                     "debug",
@@ -7869,10 +8089,11 @@ func TestValidateInitContainers(t *testing.T) {
 					},
 				},
 			},
-			field.Error{Type: field.ErrorTypeInvalid, Field: "initContainers[0].livenessProbe"},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].livenessProbe", BadValue: ""}},
 		},
 		{
 			"uses disallowed field: ReadinessProbe",
+			line(),
 			[]core.Container{
 				{
 					Name:                     "debug",
@@ -7886,10 +8107,11 @@ func TestValidateInitContainers(t *testing.T) {
 					},
 				},
 			},
-			field.Error{Type: field.ErrorTypeInvalid, Field: "initContainers[0].readinessProbe"},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].readinessProbe", BadValue: ""}},
 		},
 		{
 			"Container uses disallowed field: StartupProbe",
+			line(),
 			[]core.Container{
 				{
 					Name:                     "debug",
@@ -7904,24 +8126,43 @@ func TestValidateInitContainers(t *testing.T) {
 					},
 				},
 			},
-			field.Error{Type: field.ErrorTypeInvalid, Field: "initContainers[0].startupProbe"},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].startupProbe", BadValue: ""}},
+		},
+		{
+			"Disallowed field with other errors should only return a single Forbidden",
+			line(),
+			[]core.Container{
+				{
+					Name:                     "debug",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+					StartupProbe: &core.Probe{
+						ProbeHandler: core.ProbeHandler{
+							TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt(80)},
+						},
+						InitialDelaySeconds:           -1,
+						TimeoutSeconds:                -1,
+						PeriodSeconds:                 -1,
+						SuccessThreshold:              -1,
+						FailureThreshold:              -1,
+						TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
+					},
+				},
+			},
+			field.ErrorList{{Type: field.ErrorTypeForbidden, Field: "initContainers[0].startupProbe", BadValue: ""}},
 		},
 	}
 	for _, tc := range errorCases {
-		t.Run(tc.title, func(t *testing.T) {
+		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
 			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, field.NewPath("initContainers"), PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
 
-			if len(errs) > 1 {
-				t.Errorf("expected 1 error but received %d: %q", len(errs), errs)
-			}
-			if errs[0].Type != tc.expectedError.Type {
-				t.Errorf("expected error type %q but received %q: %q", string(tc.expectedError.Type), string(errs[0].Type), errs)
-			}
-			if errs[0].Field != tc.expectedError.Field {
-				t.Errorf("expected error for field %q but received error for field %q: %q", tc.expectedError.Field, errs[0].Field, errs)
+			if diff := cmp.Diff(tc.expectedErrors, errs, cmpopts.IgnoreFields(field.Error{}, "Detail")); diff != "" {
+				t.Errorf("unexpected diff in errors (-want, +got):\n%s", diff)
+				t.Errorf("INFO: all errors:\n%s", prettyErrorList(errs))
 			}
 		})
 	}
