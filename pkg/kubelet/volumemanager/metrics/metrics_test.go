@@ -32,7 +32,8 @@ import (
 
 func TestMetricCollection(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(k8stypes.NodeName("node-name"), volumePluginMgr)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

@@ -70,7 +70,8 @@ func hasAddedPods() bool { return true }
 func Test_Run_Positive_DoNothing(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -114,7 +115,8 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -204,7 +206,8 @@ func Test_Run_Positive_VolumeAttachAndMountMigrationEnabled(t *testing.T) {
 		},
 	}
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient(v1.AttachedVolume{
@@ -309,7 +312,8 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		},
 	}
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -388,7 +392,8 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 func Test_Run_Negative_VolumeMountControllerAttachEnabled(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -466,7 +471,8 @@ func Test_Run_Negative_VolumeMountControllerAttachEnabled(t *testing.T) {
 func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -568,7 +574,8 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		},
 	}
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -691,7 +698,8 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc)
 	fakeRecorder := &record.FakeRecorder{}
@@ -803,7 +811,8 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
 		Name:       "fake-plugin/fake-device1",
@@ -903,7 +912,8 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc)
 	fakeRecorder := &record.FakeRecorder{}
@@ -1024,7 +1034,8 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createtestClientWithPVPVC(gcepv, gcepvc, v1.AttachedVolume{
 		Name:       "fake-plugin/fake-device1",
@@ -1293,7 +1304,8 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				},
 			}
 			volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
-			dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+			seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+			dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 			asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 			kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
 				Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.pvName)),
@@ -1547,8 +1559,9 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 				}
 				volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
 				fakePlugin.SupportsRemount = tc.supportRemount
+				seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 
-				dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+				dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 				asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 				kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
 					Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.volumeName)),
@@ -1770,7 +1783,8 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 
 				volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
 				fakePlugin.SupportsRemount = tc.supportRemount
-				dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+				seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+				dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 				asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 				kubeClient := createtestClientWithPVPVC(pv, pvc, v1.AttachedVolume{
 					Name:       v1.UniqueVolumeName(fmt.Sprintf("fake-plugin/%s", tc.volumeName)),
@@ -2087,8 +2101,9 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		},
 	}
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNode(t, node)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}
@@ -2234,8 +2249,9 @@ func getReconciler(kubeletDir string, t *testing.T, volumePaths []string) (Recon
 	node := getFakeNode()
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgrWithNodeAndRoot(t, node, kubeletDir)
 	tmpKubeletPodDir := filepath.Join(kubeletDir, "pods")
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
 
-	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	asw := cache.NewActualStateOfWorld(nodeName, volumePluginMgr)
 	kubeClient := createTestClient()
 	fakeRecorder := &record.FakeRecorder{}

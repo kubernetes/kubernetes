@@ -142,14 +142,15 @@ type VolumeToMount struct {
 }
 
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
-func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorld {
+func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr, seLinuxTranslator util.SELinuxLabelTranslator) DesiredStateOfWorld {
 	if feature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		registerSELinuxMetrics()
 	}
 	return &desiredStateOfWorld{
-		volumesToMount:  make(map[v1.UniqueVolumeName]volumeToMount),
-		volumePluginMgr: volumePluginMgr,
-		podErrors:       make(map[types.UniquePodName]sets.String),
+		volumesToMount:    make(map[v1.UniqueVolumeName]volumeToMount),
+		volumePluginMgr:   volumePluginMgr,
+		podErrors:         make(map[types.UniquePodName]sets.String),
+		seLinuxTranslator: seLinuxTranslator,
 	}
 }
 
@@ -164,6 +165,8 @@ type desiredStateOfWorld struct {
 	volumePluginMgr *volume.VolumePluginMgr
 	// podErrors are errors caught by desiredStateOfWorldPopulator about volumes for a given pod.
 	podErrors map[types.UniquePodName]sets.String
+	// seLinuxTranslator translates v1.SELinuxOptions to a file SELinux label.
+	seLinuxTranslator util.SELinuxLabelTranslator
 
 	sync.RWMutex
 }
@@ -373,6 +376,11 @@ func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinux
 
 	if feature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		var err error
+
+		if !dsw.seLinuxTranslator.SELinuxEnabled() {
+			return "", false, nil
+		}
+
 		pluginSupportsSELinuxContextMount, err = dsw.getSELinuxMountSupport(volumeSpec)
 		if err != nil {
 			return "", false, err
@@ -382,7 +390,7 @@ func (dsw *desiredStateOfWorld) getSELinuxLabel(volumeSpec *volume.Spec, seLinux
 			// Ensure that a volume that can be mounted with "-o context=XYZ" is
 			// used only by containers with the same SELinux contexts.
 			for _, containerContext := range seLinuxContainerContexts {
-				newLabel, err := util.SELinuxOptionsToFileLabel(containerContext)
+				newLabel, err := dsw.seLinuxTranslator.SELinuxOptionsToFileLabel(containerContext)
 				if err != nil {
 					fullErr := fmt.Errorf("failed to construct SELinux label from context %q: %s", containerContext, err)
 					if err := handlerSELinuxMetricError(fullErr, isRWOP, seLinuxContainerContextWarnings, seLinuxContainerContextErrors); err != nil {

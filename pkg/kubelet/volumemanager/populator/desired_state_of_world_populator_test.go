@@ -1308,7 +1308,8 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 	fakePodManager := kubepod.NewBasicPodManager(
 		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager)
 
-	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	fakesDSW := cache.NewDesiredStateOfWorld(fakeVolumePluginMgr, seLinuxTranslator)
 	fakeASW := cache.NewActualStateOfWorld("fake", fakeVolumePluginMgr)
 	fakeRuntime := &containertest.FakeRuntime{}
 	fakeStateProvider := &fakePodStateProvider{}

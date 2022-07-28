@@ -37,7 +37,8 @@ import (
 func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod3",
@@ -82,7 +83,8 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod3",
@@ -156,7 +158,8 @@ func Test_AddPodToVolume_Positive_NamesForDifferentPodsAndDifferentVolumes(t *te
 	}
 	volumePluginMgr := volume.VolumePluginMgr{}
 	volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
-	dsw := NewDesiredStateOfWorld(&volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
 
 	testcases := map[string]struct {
 		pod1 *v1.Pod
@@ -289,7 +292,8 @@ func Test_AddPodToVolume_Positive_NamesForDifferentPodsAndDifferentVolumes(t *te
 func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod3",
@@ -341,7 +345,8 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 
 	pod1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -466,7 +471,8 @@ func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 
 func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
 	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
-	dsw := NewDesiredStateOfWorld(volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := NewDesiredStateOfWorld(volumePluginMgr, seLinuxTranslator)
 	quantity1Gi := resource.MustParse("1Gi")
 	quantity2Gi := resource.MustParse("2Gi")
 	quantity3Gi := resource.MustParse("3Gi")
@@ -621,7 +627,8 @@ func Test_AddPodToVolume_Positive_SELinuxNoRWOP(t *testing.T) {
 		nil, /* plugins */
 	)
 	volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
-	dsw := NewDesiredStateOfWorld(&volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
 	seLinux := v1.SELinuxOptions{
 		User:  "system_u",
 		Role:  "object_r",
@@ -701,7 +708,8 @@ func Test_AddPodToVolume_Positive_NoSELinuxPlugin(t *testing.T) {
 		nil, /* plugins */
 	)
 	volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
-	dsw := NewDesiredStateOfWorld(&volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
 	seLinux := v1.SELinuxOptions{
 		User:  "system_u",
 		Role:  "object_r",
@@ -782,7 +790,8 @@ func Test_AddPodToVolume_Positive_ExistingPodSameSELinuxRWOP(t *testing.T) {
 		nil, /* plugins */
 	)
 	volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
-	dsw := NewDesiredStateOfWorld(&volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
 	seLinux := v1.SELinuxOptions{
 		User:  "system_u",
 		Role:  "object_r",
@@ -882,7 +891,8 @@ func Test_AddPodToVolume_Negative_ExistingPodDifferentSELinuxRWOP(t *testing.T) 
 		nil, /* plugins */
 	)
 	volumePluginMgr.InitPlugins(plugins, nil /* prober */, fakeVolumeHost)
-	dsw := NewDesiredStateOfWorld(&volumePluginMgr)
+	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
+	dsw := NewDesiredStateOfWorld(&volumePluginMgr, seLinuxTranslator)
 	seLinux1 := v1.SELinuxOptions{
 		User:  "system_u",
 		Role:  "object_r",

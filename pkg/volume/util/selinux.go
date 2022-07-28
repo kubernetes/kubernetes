@@ -28,8 +28,36 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-// SELinuxOptionsToFileLabel returns SELinux file label for given options.
-func SELinuxOptionsToFileLabel(opts *v1.SELinuxOptions) (string, error) {
+// SELinuxLabelTranslator translates v1.SELinuxOptions of a process to SELinux file label.
+type SELinuxLabelTranslator interface {
+	// SELinuxOptionsToFileLabel returns SELinux file label for given SELinuxOptions
+	// of a container process.
+	// When Role, User or Type are empty, they're read from the system defaults.
+	// It returns "" and no error on platforms that do not have SELinux enabled
+	// or don't support SELinux at all.
+	SELinuxOptionsToFileLabel(opts *v1.SELinuxOptions) (string, error)
+
+	// SELinuxEnabled returns true when the OS has enabled SELinux support.
+	SELinuxEnabled() bool
+}
+
+// Real implementation of the interface.
+// On Linux with SELinux enabled it translates. Otherwise it always returns an empty string and no error.
+type translator struct{}
+
+var _ SELinuxLabelTranslator = &translator{}
+
+// NewSELinuxLabelTranslator returns new SELinuxLabelTranslator for the platform.
+func NewSELinuxLabelTranslator() SELinuxLabelTranslator {
+	return &translator{}
+}
+
+// SELinuxOptionsToFileLabel returns SELinux file label for given SELinuxOptions
+// of a container process.
+// When Role, User or Type are empty, they're read from the system defaults.
+// It returns "" and no error on platforms that do not have SELinux enabled
+// or don't support SELinux at all.
+func (l *translator) SELinuxOptionsToFileLabel(opts *v1.SELinuxOptions) (string, error) {
 	if opts == nil {
 		return "", nil
 	}
@@ -39,7 +67,6 @@ func SELinuxOptionsToFileLabel(opts *v1.SELinuxOptions) (string, error) {
 		return "", nil
 	}
 
-	// TODO: use interface for InitLabels for unit tests.
 	processLabel, fileLabel, err := label.InitLabels(args)
 	if err != nil {
 		// In theory, this should be unreachable. InitLabels can fail only when args contain an unknown option,
@@ -75,13 +102,62 @@ func contextOptions(opts *v1.SELinuxOptions) []string {
 	return args
 }
 
-// SupportsSELinuxContextMount checks if the given volumeSpec supports with mount -o context
-func SupportsSELinuxContextMount(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumePluginMgr) (bool, error) {
-	// This is cheap
-	if !selinux.GetEnabled() {
-		return false, nil
+func (l *translator) SELinuxEnabled() bool {
+	return selinux.GetEnabled()
+}
+
+// Fake implementation of the interface for unit tests.
+type fakeTranslator struct{}
+
+var _ SELinuxLabelTranslator = &fakeTranslator{}
+
+// NewFakeSELinuxLabelTranslator returns a fake translator for unit tests.
+// It imitates a real translator on platforms that do not have SELinux enabled
+// or don't support SELinux at all.
+func NewFakeSELinuxLabelTranslator() SELinuxLabelTranslator {
+	return &fakeTranslator{}
+}
+
+// SELinuxOptionsToFileLabel returns SELinux file label for given options.
+func (l *fakeTranslator) SELinuxOptionsToFileLabel(opts *v1.SELinuxOptions) (string, error) {
+	if opts == nil {
+		return "", nil
+	}
+	// Fill empty values from "system defaults" (taken from Fedora Linux).
+	user := opts.User
+	if user == "" {
+		user = "system_u"
 	}
 
+	role := opts.Role
+	if role == "" {
+		role = "object_r"
+	}
+
+	// opts is context of the *process* to run in a container. Translate
+	// process type "container_t" to file label type "container_file_t".
+	// (The rest of the context is the same for processes and files).
+	fileType := opts.Type
+	if fileType == "" || fileType == "container_t" {
+		fileType = "container_file_t"
+	}
+
+	level := opts.Level
+	if level == "" {
+		// If empty, level is allocated randomly.
+		level = "s0:c998,c999"
+	}
+
+	ctx := fmt.Sprintf("%s:%s:%s:%s", user, role, fileType, level)
+	return ctx, nil
+}
+
+func (l *fakeTranslator) SELinuxEnabled() bool {
+	return true
+}
+
+// SupportsSELinuxContextMount checks if the given volumeSpec supports with mount -o context
+func SupportsSELinuxContextMount(volumeSpec *volume.Spec, volumePluginMgr *volume.VolumePluginMgr) (bool, error) {
 	plugin, _ := volumePluginMgr.FindPluginBySpec(volumeSpec)
 	if plugin != nil {
 		return plugin.SupportsSELinuxContextMount(volumeSpec)
