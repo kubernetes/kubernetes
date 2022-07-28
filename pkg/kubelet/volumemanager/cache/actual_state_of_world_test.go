@@ -18,13 +18,17 @@ package cache
 
 import (
 	"fmt"
+	"testing"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	"testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -749,6 +753,137 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 	verifyVolumeExistsInGloballyMountedVolumes(t, generatedVolumeName, asw)
 }
 
+// Populates data struct with a volume with a SELinux context.
+// Calls AddPodToVolume() to add a pod to the volume
+// Verifies volume/pod combo exist using PodExistsInVolume()
+func Test_AddPodToVolume_Positive_SELinux(t *testing.T) {
+	// Arrange
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	devicePath := "fake/device/path"
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+			},
+		},
+	}
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	generatedVolumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	if err != nil {
+		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	if err != nil {
+		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+	}
+	podName := util.GetUniquePodName(pod)
+
+	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
+		PodName:             podName,
+		PodUID:              pod.UID,
+		VolumeName:          generatedVolumeName,
+		Mounter:             mounter,
+		BlockVolumeMapper:   mapper,
+		OuterVolumeSpecName: volumeSpec.Name(),
+		VolumeSpec:          volumeSpec,
+		SELinuxMountContext: "system_u:object_r:container_file_t:s0:c0,c1",
+		VolumeMountState:    operationexecutor.VolumeMounted,
+	}
+	err = asw.AddPodToVolume(markVolumeOpts)
+	// Assert
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	verifyVolumeExistsAswWithSELinux(t, generatedVolumeName, "system_u:object_r:container_file_t:s0:c0,c1", asw)
+	verifyVolumeDoesntExistInUnmountedVolumes(t, generatedVolumeName, asw)
+	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
+	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
+	verifyVolumeExistsWithSpecNameInVolumeAsw(t, podName, volumeSpec.Name(), asw)
+	verifyVolumeMountedElsewhere(t, podName, generatedVolumeName, false /*expectedMountedElsewhere */, asw)
+}
+
+// Calls MarkVolumeAsAttached() once to add volume
+// Calls MarkDeviceAsMounted() with SELinux to mark volume as globally mounted.
+// Verifies newly added volume exists in GetUnmountedVolumes()
+// Verifies newly added volume exists in GetGloballyMountedVolumes()
+func Test_MarkDeviceAsMounted_Positive_SELinux(t *testing.T) {
+	// Arrange
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+			},
+		},
+	}
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	devicePath := "fake/device/path"
+	deviceMountPath := "fake/device/mount/path"
+	generatedVolumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	if err != nil {
+		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	err = asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	if err != nil {
+		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	err = asw.MarkDeviceAsMounted(generatedVolumeName, devicePath, deviceMountPath, "system_u:system_r:container_t:s0:c0,c1")
+
+	// Assert
+	if err != nil {
+		t.Fatalf("MarkDeviceAsMounted failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	verifyVolumeExistsAsw(t, generatedVolumeName, true /* shouldExist */, asw)
+	verifyVolumeExistsInUnmountedVolumes(t, generatedVolumeName, asw)
+	verifyVolumeExistsInGloballyMountedVolumesWithSELinux(t, generatedVolumeName, "system_u:system_r:container_t:s0:c0,c1", asw)
+}
+
 func TestUncertainVolumeMounts(t *testing.T) {
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
@@ -849,6 +984,28 @@ func verifyVolumeExistsInGloballyMountedVolumes(
 		globallyMountedVolumes)
 }
 
+func verifyVolumeExistsInGloballyMountedVolumesWithSELinux(
+	t *testing.T, expectedVolumeName v1.UniqueVolumeName, expectedSELinuxContext string, asw ActualStateOfWorld) {
+	globallyMountedVolumes := asw.GetGloballyMountedVolumes()
+	for _, volume := range globallyMountedVolumes {
+		if volume.VolumeName == expectedVolumeName {
+			if volume.SELinuxMountContext == expectedSELinuxContext {
+				return
+			}
+			t.Errorf(
+				"Volume %q has wrong SELinux context. Expected %q, got %q",
+				expectedVolumeName,
+				expectedSELinuxContext,
+				volume.SELinuxMountContext)
+		}
+	}
+
+	t.Fatalf(
+		"Could not find volume %v in the list of GloballyMountedVolumes for actual state of world %+v",
+		expectedVolumeName,
+		globallyMountedVolumes)
+}
+
 func verifyVolumeDoesntExistInGloballyMountedVolumes(
 	t *testing.T, volumeToCheck v1.UniqueVolumeName, asw ActualStateOfWorld) {
 	globallyMountedVolumes := asw.GetGloballyMountedVolumes()
@@ -874,6 +1031,27 @@ func verifyVolumeExistsAsw(
 			shouldExist,
 			volumeExists)
 	}
+}
+
+func verifyVolumeExistsAswWithSELinux(
+	t *testing.T,
+	expectedVolumeName v1.UniqueVolumeName,
+	expectedSELinuxContext string,
+	asw ActualStateOfWorld) {
+	volumes := asw.GetMountedVolumes()
+	for _, vol := range volumes {
+		if vol.VolumeName == expectedVolumeName {
+			if vol.SELinuxMountContext == expectedSELinuxContext {
+				return
+			}
+			t.Errorf(
+				"Volume %q has wrong SELinux context, expected %q, got %q",
+				expectedVolumeName,
+				expectedSELinuxContext,
+				vol.SELinuxMountContext)
+		}
+	}
+	t.Errorf("Volume %q not found in ASW", expectedVolumeName)
 }
 
 func verifyVolumeExistsInUnmountedVolumes(

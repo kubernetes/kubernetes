@@ -1073,7 +1073,8 @@ func (asw *actualStateOfWorld) newAttachedVolume(
 			DeviceMountPath:     attachedVolume.deviceMountPath,
 			PluginName:          attachedVolume.pluginName,
 			SELinuxMountContext: seLinuxMountContext},
-		DeviceMountState: attachedVolume.deviceMountState,
+		DeviceMountState:    attachedVolume.deviceMountState,
+		SELinuxMountContext: seLinuxMountContext,
 	}
 }
 
