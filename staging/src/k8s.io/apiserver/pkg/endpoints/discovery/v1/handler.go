@@ -219,13 +219,17 @@ func (rdm *resourceDiscoveryManager) ServeHTTP(resp http.ResponseWriter, req *ht
 	rdm.lock.RLock()
 	response := rdm.cachedResponse
 	etag := rdm.cachedResponseETag
-	rdm.lock.RUnlock()
 
 	// The cachedResponse is wiped out every time there might be a change to its
 	// contents.
-	if response == nil {
+	if response != nil {
+		defer rdm.lock.RUnlock()
+	} else {
+		rdm.lock.RUnlock()
+
 		// Document does not exist, recreate it
 		rdm.lock.Lock()
+		defer rdm.lock.Unlock()
 
 		// Now that we have taken exclusive lock, check to see if another thread
 		// recreated the document while we were waiting for the lock
@@ -255,7 +259,6 @@ func (rdm *resourceDiscoveryManager) ServeHTTP(resp http.ResponseWriter, req *ht
 			rdm.cachedResponseETag = etag
 		}
 
-		rdm.lock.Unlock()
 	}
 
 	ServeHTTPWithETag(
