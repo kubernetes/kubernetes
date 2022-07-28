@@ -181,6 +181,7 @@ type FakeVolumePlugin struct {
 	LimitKey               string
 	ProvisionDelaySeconds  int
 	SupportsRemount        bool
+	SupportsSELinux        bool
 	DisableNodeExpansion   bool
 
 	// default to false which means it is attachable by default
@@ -285,7 +286,7 @@ func (plugin *FakeVolumePlugin) SupportsBulkVolumeVerification() bool {
 }
 
 func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
-	return false, nil
+	return plugin.SupportsSELinux, nil
 }
 
 func (plugin *FakeVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {

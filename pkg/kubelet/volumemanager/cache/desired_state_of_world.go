@@ -304,6 +304,10 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				}
 			}
 		}
+		if !util.IsRWOP(volumeSpec) {
+			// Clear SELinux label for the volume with unsupported access modes.
+			seLinuxFileLabel = ""
+		}
 		if seLinuxFileLabel != "" {
 			seLinuxVolumesAdmitted.Add(1.0)
 		}
