@@ -79,6 +79,11 @@ func TestMain(m *testing.M) {
 	// Register test flags, then parse flags.
 	handleFlags()
 
+	klog.Errorf("Hanging forever ...")
+	for {
+		time.Sleep(10)
+	}
+
 	if framework.TestContext.ListImages {
 		for _, v := range image.GetImageConfigs() {
 			fmt.Println(v.GetE2EImage())
