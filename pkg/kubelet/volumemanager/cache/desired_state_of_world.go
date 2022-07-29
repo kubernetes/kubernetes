@@ -485,6 +485,19 @@ func (dsw *desiredStateOfWorld) VolumeExists(
 		return false
 	}
 	if feature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		// Handling two volumes with the same name and different SELinux context
+		// as two *different* volumes here. Because if a volume is mounted with
+		// an old SELinux context, it must be unmounted first and then mounted again
+		// with the new context.
+		//
+		// This will happen when a pod A with context alpha_t runs and is being
+		// terminated by kubelet and its volumes are being torn down, while a
+		// pod B with context beta_t is already scheduled on the same node,
+		// using the same volumes
+		// The volumes from Pod A must be fully unmounted (incl. UnmountDevice)
+		// and mounted with new SELinux mount options for pod B.
+		// Without SELinux, kubelet can (and often does) reuse device mounted
+		// for A.
 		return vol.seLinuxFileLabel == seLinuxMountContext
 	}
 	return true
