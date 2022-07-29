@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v2
 
 import (
 	"net/http"
@@ -29,7 +29,7 @@ import (
 
 const DiscoveryEndpointRoot = "/discovery"
 
-// This handler serves the /discovery/v1 endpoint for a given list of
+// This handler serves the /discovery/<version> endpoint for a given list of
 // api resources indexed by their group version.
 type ResourceManager interface {
 	// Adds knowledge of the given groupversion to the discovery document
@@ -207,7 +207,7 @@ func (rdm *resourceDiscoveryManager) WebService() *restful.WebService {
 	ws.Path(DiscoveryEndpointRoot)
 	ws.Doc("get available API groupversions and resources")
 
-	ws.Route(ws.GET("/v1").To(func(req *restful.Request, resp *restful.Response) {
+	ws.Route(ws.GET("/v2").To(func(req *restful.Request, resp *restful.Response) {
 		rdm.ServeHTTP(resp.ResponseWriter, req.Request)
 	}).
 		Doc("get available API groupversions and their resources").

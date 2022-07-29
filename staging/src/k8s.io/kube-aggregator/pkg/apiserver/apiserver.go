@@ -155,7 +155,7 @@ type APIAggregator struct {
 
 	// discoveryAggregationController downloads and caches discovery documents
 	// from all aggregated apiservices so they may be served as a unified
-	// document from /discovery/v1
+	// document from /discovery/<version>
 	discoveryAggregationController DiscoveryAggregationController
 
 	// egressSelector selects the proper egress dialer to communicate with the custom apiserver

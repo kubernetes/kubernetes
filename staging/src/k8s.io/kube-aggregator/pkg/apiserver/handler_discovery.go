@@ -30,7 +30,7 @@ import (
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
-	discoveryv1 "k8s.io/apiserver/pkg/endpoints/discovery/v1"
+	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/v2"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -82,7 +82,7 @@ type discoveryManager struct {
 	services map[serviceKey]*apiServiceInfo
 
 	// Merged handler which stores all known groupversions
-	mergedDiscoveryHandler discoveryv1.ResourceManager
+	mergedDiscoveryHandler discoveryendpoint.ResourceManager
 }
 
 // Either a ServiceReference or a Local Service Name for use as a key in a map
@@ -159,7 +159,7 @@ func NewDiscoveryManager(
 ) DiscoveryAggregationController {
 	return &discoveryManager{
 		serializer:             serializer,
-		mergedDiscoveryHandler: discoveryv1.NewResourceManager(serializer),
+		mergedDiscoveryHandler: discoveryendpoint.NewResourceManager(serializer),
 		services:               make(map[serviceKey]*apiServiceInfo),
 		dirtyChannel:           make(chan struct{}),
 	}
@@ -252,11 +252,11 @@ func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 			handler = handlerWithUser(handler, &user.DefaultInfo{Name: "system:kube-aggregator", Groups: []string{"system:masters"}})
 			handler = http.TimeoutHandler(handler, 5*time.Second, "request timed out")
 
-			req, err := http.NewRequest("GET", "/discovery/v1", nil)
+			req, err := http.NewRequest("GET", "/discovery/v2", nil)
 			if err != nil {
 				// NewRequest should not fail, but if it does for some reason,
 				// log it and continue
-				klog.Errorf("failed to create http.Request for /discovery/v1: %v", err)
+				klog.Errorf("failed to create http.Request for /discovery/v2: %v", err)
 				continue
 			}
 			req.Header.Add("Accept", "application/json")

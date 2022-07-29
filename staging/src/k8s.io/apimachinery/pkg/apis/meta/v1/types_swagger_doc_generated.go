@@ -146,7 +146,7 @@ func (DiscoveryAPIGroup) SwaggerDoc() map[string]string {
 }
 
 var map_DiscoveryAPIGroupList = map[string]string{
-	"":       "Discovery API Types APIGroupList is a list of APIGroup, to allow clients to discover the API at /apis.",
+	"":       "Discovery API Types DiscoveryAPIGroupList is a list of APIGroup, to allow clients to discover the API at /discovery/v2.",
 	"groups": "groups is a list of APIGroup.",
 }
 

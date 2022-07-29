@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1_test
+package v2_test
 
 import (
 	"encoding/json"
@@ -33,13 +33,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	discoveryv1 "k8s.io/apiserver/pkg/endpoints/discovery/v1"
+	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/v2"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 var scheme = runtime.NewScheme()
 var codecs = runtimeserializer.NewCodecFactory(scheme)
 var serializer runtime.NegotiatedSerializer
+
+const discoveryPath = "/discovery/v2"
 
 func init() {
 	// Add all builtin types to scheme
@@ -86,7 +88,7 @@ func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) metav1.Discov
 func fetchPath(handler http.Handler, path string, etag string) (*http.Response, []byte, *metav1.DiscoveryAPIGroupList) {
 	// Expect json-formatted apis group list
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/discovery/v1", nil)
+	req := httptest.NewRequest("GET", discoveryPath, nil)
 
 	// Ask for JSON response
 	req.Header.Set("Accept", "application/json")
@@ -114,12 +116,12 @@ func fetchPath(handler http.Handler, path string, etag string) (*http.Response, 
 
 // Add all builtin APIServices to the manager and check the output
 func TestBasicResponse(t *testing.T) {
-	manager := discoveryv1.NewResourceManager(serializer)
+	manager := discoveryendpoint.NewResourceManager(serializer)
 
 	apis := fuzzAPIGroups(1, 3, 10)
 	manager.SetGroups(apis.Groups)
 
-	response, body, decoded := fetchPath(manager, "/discovery/v1", "")
+	response, body, decoded := fetchPath(manager, discoveryPath, "")
 
 	jsonFormatted, err := json.Marshal(&apis)
 	require.NoError(t, err, "json marshal should always succeed")
@@ -137,16 +139,16 @@ func TestBasicResponse(t *testing.T) {
 // e.g.: Multiple services with the same contents should have the same etag.
 func TestEtagConsistent(t *testing.T) {
 	// Create 2 managers, add a bunch of services to each
-	manager1 := discoveryv1.NewResourceManager(serializer)
-	manager2 := discoveryv1.NewResourceManager(serializer)
+	manager1 := discoveryendpoint.NewResourceManager(serializer)
+	manager2 := discoveryendpoint.NewResourceManager(serializer)
 
 	apis := fuzzAPIGroups(1, 3, 11)
 	manager1.SetGroups(apis.Groups)
 	manager2.SetGroups(apis.Groups)
 
 	// Make sure etag of each is the same
-	res1_initial, _, _ := fetchPath(manager1, "/discovery/v1", "")
-	res2_initial, _, _ := fetchPath(manager2, "/discovery/v1", "")
+	res1_initial, _, _ := fetchPath(manager1, discoveryPath, "")
+	res2_initial, _, _ := fetchPath(manager2, discoveryPath, "")
 
 	assert.NotEmpty(t, res1_initial.Header.Get("ETag"), "Etag should be populated")
 	assert.NotEmpty(t, res2_initial.Header.Get("ETag"), "Etag should be populated")
@@ -161,8 +163,8 @@ func TestEtagConsistent(t *testing.T) {
 		}
 	}
 
-	res1_addedToOne, _, _ := fetchPath(manager1, "/discovery/v1", "")
-	res2_addedToOne, _, _ := fetchPath(manager2, "/discovery/v1", "")
+	res1_addedToOne, _, _ := fetchPath(manager1, discoveryPath, "")
+	res2_addedToOne, _, _ := fetchPath(manager2, discoveryPath, "")
 
 	assert.NotEmpty(t, res1_addedToOne.Header.Get("ETag"), "Etag should be populated")
 	assert.NotEmpty(t, res2_addedToOne.Header.Get("ETag"), "Etag should be populated")
@@ -177,8 +179,8 @@ func TestEtagConsistent(t *testing.T) {
 		}
 	}
 
-	res1_addedToBoth, _, _ := fetchPath(manager1, "/discovery/v1", "")
-	res2_addedToBoth, _, _ := fetchPath(manager2, "/discovery/v1", "")
+	res1_addedToBoth, _, _ := fetchPath(manager1, discoveryPath, "")
+	res2_addedToBoth, _, _ := fetchPath(manager2, discoveryPath, "")
 
 	assert.NotEmpty(t, res1_addedToOne.Header.Get("ETag"), "Etag should be populated")
 	assert.NotEmpty(t, res2_addedToOne.Header.Get("ETag"), "Etag should be populated")
@@ -199,8 +201,8 @@ func TestEtagConsistent(t *testing.T) {
 		}
 	}
 
-	res1_removeFromBoth, _, _ := fetchPath(manager1, "/discovery/v1", "")
-	res2_removeFromBoth, _, _ := fetchPath(manager2, "/discovery/v1", "")
+	res1_removeFromBoth, _, _ := fetchPath(manager1, discoveryPath, "")
+	res2_removeFromBoth, _, _ := fetchPath(manager2, discoveryPath, "")
 
 	assert.NotEmpty(t, res1_addedToOne.Header.Get("ETag"), "Etag should be populated")
 	assert.NotEmpty(t, res2_addedToOne.Header.Get("ETag"), "Etag should be populated")
@@ -211,17 +213,17 @@ func TestEtagConsistent(t *testing.T) {
 // Test that if a request comes in with an If-None-Match header with an incorrect
 // E-Tag, that fresh content is returned.
 func TestEtagNonMatching(t *testing.T) {
-	manager := discoveryv1.NewResourceManager(serializer)
+	manager := discoveryendpoint.NewResourceManager(serializer)
 	apis := fuzzAPIGroups(1, 3, 12)
 	manager.SetGroups(apis.Groups)
 
 	// fetch the document once
-	initial, _, _ := fetchPath(manager, "/discovery/v1", "")
+	initial, _, _ := fetchPath(manager, discoveryPath, "")
 	assert.NotEmpty(t, initial.Header.Get("ETag"), "ETag should be populated")
 
 	// Send another request with a wrong e-tag. The same response should
 	// get sent again
-	second, _, _ := fetchPath(manager, "/discovery/v1", "wrongetag")
+	second, _, _ := fetchPath(manager, discoveryPath, "wrongetag")
 
 	assert.Equal(t, http.StatusOK, initial.StatusCode, "response should be 200 OK")
 	assert.Equal(t, http.StatusOK, second.StatusCode, "response should be 200 OK")
@@ -231,18 +233,18 @@ func TestEtagNonMatching(t *testing.T) {
 // Test that if a request comes in with an If-None-Match header with a correct
 // E-Tag, that 304 Not Modified is returned
 func TestEtagMatching(t *testing.T) {
-	manager := discoveryv1.NewResourceManager(serializer)
+	manager := discoveryendpoint.NewResourceManager(serializer)
 	apis := fuzzAPIGroups(1, 3, 12)
 	manager.SetGroups(apis.Groups)
 
 	// fetch the document once
-	initial, initialBody, _ := fetchPath(manager, "/discovery/v1", "")
+	initial, initialBody, _ := fetchPath(manager, discoveryPath, "")
 	assert.NotEmpty(t, initial.Header.Get("ETag"), "ETag should be populated")
 	assert.NotEmpty(t, initialBody, "body should not be empty")
 
 	// Send another request with a wrong e-tag. The same response should
 	// get sent again
-	second, secondBody, _ := fetchPath(manager, "/discovery/v1", initial.Header.Get("ETag"))
+	second, secondBody, _ := fetchPath(manager, discoveryPath, initial.Header.Get("ETag"))
 
 	assert.Equal(t, http.StatusOK, initial.StatusCode, "initial response should be 200 OK")
 	assert.Equal(t, http.StatusNotModified, second.StatusCode, "second response should be 304 Not Modified")
@@ -253,12 +255,12 @@ func TestEtagMatching(t *testing.T) {
 // Test that if a request comes in with an If-None-Match header with an old
 // E-Tag, that fresh content is returned
 func TestEtagOutdated(t *testing.T) {
-	manager := discoveryv1.NewResourceManager(serializer)
+	manager := discoveryendpoint.NewResourceManager(serializer)
 	apis := fuzzAPIGroups(1, 3, 15)
 	manager.SetGroups(apis.Groups)
 
 	// fetch the document once
-	initial, initialBody, _ := fetchPath(manager, "/discovery/v1", "")
+	initial, initialBody, _ := fetchPath(manager, discoveryPath, "")
 	assert.NotEmpty(t, initial.Header.Get("ETag"), "ETag should be populated")
 	assert.NotEmpty(t, initialBody, "body should not be empty")
 
@@ -271,7 +273,7 @@ func TestEtagOutdated(t *testing.T) {
 	}
 
 	// Send another request with the old e-tag. Response should not be 304 Not Modified
-	second, secondBody, _ := fetchPath(manager, "/discovery/v1", initial.Header.Get("ETag"))
+	second, secondBody, _ := fetchPath(manager, discoveryPath, initial.Header.Get("ETag"))
 
 	assert.Equal(t, http.StatusOK, initial.StatusCode, "initial response should be 200 OK")
 	assert.Equal(t, http.StatusOK, second.StatusCode, "second response should be 304 Not Modified")
@@ -281,7 +283,7 @@ func TestEtagOutdated(t *testing.T) {
 
 // Test that an api service can be added or removed
 func TestAddRemove(t *testing.T) {
-	manager := discoveryv1.NewResourceManager(serializer)
+	manager := discoveryendpoint.NewResourceManager(serializer)
 	apis := fuzzAPIGroups(1, 3, 15)
 	for _, group := range apis.Groups {
 		for _, version := range group.Versions {
@@ -289,7 +291,7 @@ func TestAddRemove(t *testing.T) {
 		}
 	}
 
-	_, _, initialDocument := fetchPath(manager, "/discovery/v1", "")
+	_, _, initialDocument := fetchPath(manager, discoveryPath, "")
 
 	for _, group := range apis.Groups {
 		for _, version := range group.Versions {
@@ -300,7 +302,7 @@ func TestAddRemove(t *testing.T) {
 		}
 	}
 
-	_, _, secondDocument := fetchPath(manager, "/discovery/v1", "")
+	_, _, secondDocument := fetchPath(manager, discoveryPath, "")
 
 	require.NotNil(t, initialDocument, "initial document should parse")
 	require.NotNil(t, secondDocument, "second document should parse")
@@ -311,7 +313,7 @@ func TestAddRemove(t *testing.T) {
 // Show that updating an existing service replaces and does not add the entry
 // and instead replaces it
 func TestUpdateService(t *testing.T) {
-	manager := discoveryv1.NewResourceManager(serializer)
+	manager := discoveryendpoint.NewResourceManager(serializer)
 	apis := fuzzAPIGroups(1, 3, 15)
 	for _, group := range apis.Groups {
 		for _, version := range group.Versions {
@@ -319,7 +321,7 @@ func TestUpdateService(t *testing.T) {
 		}
 	}
 
-	_, _, initialDocument := fetchPath(manager, "/discovery/v1", "")
+	_, _, initialDocument := fetchPath(manager, discoveryPath, "")
 
 	assert.Equal(t, initialDocument, &apis, "should have returned expected document")
 
@@ -331,7 +333,7 @@ func TestUpdateService(t *testing.T) {
 		}
 	}
 
-	_, _, secondDocument := fetchPath(manager, "/discovery/v1", "")
+	_, _, secondDocument := fetchPath(manager, discoveryPath, "")
 	assert.Equal(t, secondDocument, &apis, "should have returned expected document")
 	assert.NotEqual(t, secondDocument, initialDocument, "should have returned expected document")
 }
@@ -339,7 +341,7 @@ func TestUpdateService(t *testing.T) {
 // Show the discovery manager is capable of serving requests to multiple users
 // with unchanging data
 func TestConcurrentRequests(t *testing.T) {
-	manager := discoveryv1.NewResourceManager(serializer)
+	manager := discoveryendpoint.NewResourceManager(serializer)
 	apis := fuzzAPIGroups(1, 3, 15)
 	manager.SetGroups(apis.Groups)
 
@@ -360,7 +362,7 @@ func TestConcurrentRequests(t *testing.T) {
 					// Disable use of etag for every second request
 					usedEtag = ""
 				}
-				response, body, document := fetchPath(manager, "/discovery/v1", usedEtag)
+				response, body, document := fetchPath(manager, discoveryPath, usedEtag)
 
 				if usedEtag != "" {
 					assert.Equal(t, http.StatusNotModified, response.StatusCode, "response should be Not Modified if etag was used")
@@ -381,7 +383,7 @@ func TestConcurrentRequests(t *testing.T) {
 // concurrent writers without tripping up. Good to run with go '-race' detector
 // since there are not many "correctness" checks
 func TestAbuse(t *testing.T) {
-	manager := discoveryv1.NewResourceManager(serializer)
+	manager := discoveryendpoint.NewResourceManager(serializer)
 
 	numReaders := 100
 	numRequestsPerReader := 1000
@@ -426,7 +428,7 @@ func TestAbuse(t *testing.T) {
 					} else {
 						// Send a request and try to remove a group someone else
 						// might have added
-						_, _, document := fetchPath(manager, "/discovery/v1", "")
+						_, _, document := fetchPath(manager, discoveryPath, "")
 						assert.NotNil(t, document, "manager should always succeed in returning a document")
 
 						if len(document.Groups) > 0 {
@@ -456,7 +458,7 @@ func TestAbuse(t *testing.T) {
 
 			etag := ""
 			for j := 0; j < numRequestsPerReader; j++ {
-				response, body, document := fetchPath(manager, "/discovery/v1", etag)
+				response, body, document := fetchPath(manager, discoveryPath, etag)
 
 				if response.StatusCode == http.StatusNotModified {
 					assert.Equal(t, etag, response.Header.Get("ETag"))

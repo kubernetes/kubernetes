@@ -117,7 +117,7 @@
         ]
       },
       "io.k8s.apimachinery.pkg.apis.meta.v1.DiscoveryAPIGroupList": {
-        "description": "Discovery API Types APIGroupList is a list of APIGroup, to allow clients to discover the API at /apis.",
+        "description": "Discovery API Types DiscoveryAPIGroupList is a list of APIGroup, to allow clients to discover the API at /discovery/v2.",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
@@ -203,7 +203,7 @@
   },
   "openapi": "3.0.0",
   "paths": {
-    "/discovery/v1": {
+    "/discovery/v2": {
       "get": {
         "description": "get available API groupversions and their resources",
         "operationId": "getDiscoveryResources",

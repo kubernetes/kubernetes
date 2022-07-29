@@ -751,7 +751,7 @@ func schema_pkg_apis_meta_v1_DiscoveryAPIGroupList(ref common.ReferenceCallback)
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Discovery API Types APIGroupList is a list of APIGroup, to allow clients to discover the API at /apis.",
+				Description: "Discovery API Types DiscoveryAPIGroupList is a list of APIGroup, to allow clients to discover the API at /discovery/v2.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {

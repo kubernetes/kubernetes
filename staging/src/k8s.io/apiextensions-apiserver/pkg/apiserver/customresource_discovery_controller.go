@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
-	discoveryv1 "k8s.io/apiserver/pkg/endpoints/discovery/v1"
+	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/v2"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
@@ -46,7 +46,7 @@ import (
 type DiscoveryController struct {
 	versionHandler  *versionDiscoveryHandler
 	groupHandler    *groupDiscoveryHandler
-	resourceManager discoveryv1.ResourceManager
+	resourceManager discoveryendpoint.ResourceManager
 
 	crdLister  listers.CustomResourceDefinitionLister
 	crdsSynced cache.InformerSynced
@@ -61,7 +61,7 @@ func NewDiscoveryController(
 	crdInformer informers.CustomResourceDefinitionInformer,
 	versionHandler *versionDiscoveryHandler,
 	groupHandler *groupDiscoveryHandler,
-	resourceManager discoveryv1.ResourceManager,
+	resourceManager discoveryendpoint.ResourceManager,
 ) *DiscoveryController {
 	c := &DiscoveryController{
 		versionHandler:  versionHandler,

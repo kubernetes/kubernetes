@@ -1116,7 +1116,7 @@ type APIResource struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Discovery API Types
-// DiscopyAPIGroupList is a list of APIGroup, to allow clients to discover the
+// DiscoveryAPIGroupList is a list of APIGroup, to allow clients to discover the
 // API at /discovery/v2.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type DiscoveryAPIGroupList struct {

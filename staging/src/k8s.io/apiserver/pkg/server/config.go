@@ -48,7 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
-	discoveryv1 "k8s.io/apiserver/pkg/endpoints/discovery/v1"
+	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/v2"
 	"k8s.io/apiserver/pkg/endpoints/filterlatency"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
@@ -122,7 +122,7 @@ type Config struct {
 	EnableProfiling bool
 	EnableDiscovery bool
 
-	// Toggles whether /discovery/v1 endpoint with ALL resources known to
+	// Toggles whether /discovery/<version> endpoint with ALL resources known to
 	// apiserver is added to the http handler
 	EnableAggregatedDiscoveryEndpoint bool
 
@@ -671,7 +671,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
-		s.DiscoveryResourceManager = discoveryv1.NewResourceManager(c.Serializer)
+		s.DiscoveryResourceManager = discoveryendpoint.NewResourceManager(c.Serializer)
 	}
 
 	for {
