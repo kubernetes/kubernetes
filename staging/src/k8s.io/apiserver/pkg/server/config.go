@@ -53,7 +53,6 @@ import (
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -381,7 +380,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		StorageVersionManager: storageversion.NewDefaultManager(),
 		TracerProvider:        oteltrace.NewNoopTracerProvider(),
 		// Default is to advertise /discovery endpoint is the feature is enabled
-		EnableAggregatedDiscoveryEndpoint: utilfeature.DefaultFeatureGate.Enabled(features.AggregatedDiscoveryEndpoint),
+		EnableAggregatedDiscoveryEndpoint: utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint),
 	}
 }
 
@@ -671,7 +670,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		s.DiscoveryResourceManager = discoveryv1.NewResourceManager(c.Serializer)
 	}
 
@@ -907,7 +906,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
 	}
-	if c.EnableAggregatedDiscoveryEndpoint && utilfeature.DefaultFeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
+	if c.EnableAggregatedDiscoveryEndpoint && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryResourceManager.WebService())
 	}
 	if c.FlowControl != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
