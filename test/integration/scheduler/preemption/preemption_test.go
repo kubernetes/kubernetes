@@ -37,7 +37,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-scheduler/config/v1beta3"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -150,17 +150,17 @@ func TestPreemption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error registering a filter: %v", err)
 	}
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta3.Plugins{
-				Filter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
+			Plugins: &configv1.Plugins{
+				Filter: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
 						{Name: filterPluginName},
 					},
 				},
-				PreFilter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
+				PreFilter: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
 						{Name: filterPluginName},
 					},
 				},
@@ -986,7 +986,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 		podNamesToDelete []string
 
 		// Register dummy plugin to simulate particular scheduling failures. Optional.
-		customPlugins     *v1beta3.Plugins
+		customPlugins     *configv1.Plugins
 		outOfTreeRegistry frameworkruntime.Registry
 	}{
 		{
@@ -1068,9 +1068,9 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 				waitForNominatedNodeName,
 			},
 			podNamesToDelete: []string{fmt.Sprintf("low-%v", doNotFailMe)},
-			customPlugins: &v1beta3.Plugins{
-				PreBind: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
+			customPlugins: &configv1.Plugins{
+				PreBind: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
 						{Name: alwaysFailPlugin},
 					},
 				},
@@ -1081,8 +1081,8 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-				Profiles: []v1beta3.KubeSchedulerProfile{{
+			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+				Profiles: []configv1.KubeSchedulerProfile{{
 					SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
 					Plugins:       tt.customPlugins,
 				}},
