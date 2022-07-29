@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kube-scheduler/config/v1beta3"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -74,15 +74,15 @@ const (
 
 // This file tests the scheduler priority functions.
 func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *testutils.TestContext {
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta3.Plugins{
-				Score: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
+			Plugins: &configv1.Plugins{
+				Score: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
 						{Name: scorePluginName, Weight: pointer.Int32Ptr(1)},
 					},
-					Disabled: []v1beta3.Plugin{
+					Disabled: []configv1.Plugin{
 						{Name: "*"},
 					},
 				},
@@ -101,20 +101,20 @@ func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *tes
 }
 
 func initTestSchedulerForNodeResourcesTest(t *testing.T) *testutils.TestContext {
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{
 			{
 				SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
 			},
 			{
 				SchedulerName: pointer.StringPtr("gpu-binpacking-scheduler"),
-				PluginConfig: []v1beta3.PluginConfig{
+				PluginConfig: []configv1.PluginConfig{
 					{
 						Name: noderesources.Name,
-						Args: runtime.RawExtension{Object: &v1beta3.NodeResourcesFitArgs{
-							ScoringStrategy: &v1beta3.ScoringStrategy{
-								Type: v1beta3.MostAllocated,
-								Resources: []v1beta3.ResourceSpec{
+						Args: runtime.RawExtension{Object: &configv1.NodeResourcesFitArgs{
+							ScoringStrategy: &configv1.ScoringStrategy{
+								Type: configv1.MostAllocated,
+								Resources: []configv1.ResourceSpec{
 									{Name: string(v1.ResourceCPU), Weight: 1},
 									{Name: string(v1.ResourceMemory), Weight: 1},
 									{Name: resourceGPU, Weight: 2}},

@@ -134,6 +134,10 @@ var invalidPluginsByVersion = []invalidPlugins{
 		schemeGroupVersion: v1beta3.SchemeGroupVersion.String(),
 		plugins:            []string{},
 	},
+	{
+		schemeGroupVersion: v1.SchemeGroupVersion.String(),
+		plugins:            []string{"SelectorSpread"},
+	},
 }
 
 // isPluginInvalid checks if a given plugin was removed/deprecated in the given component

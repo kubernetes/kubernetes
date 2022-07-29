@@ -34,7 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kube-scheduler/config/v1beta3"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -252,14 +252,14 @@ func TestMultipleSchedulers(t *testing.T) {
 	}
 
 	// 5. create and start a scheduler with name "foo-scheduler"
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(fooScheduler),
-			PluginConfig: []v1beta3.PluginConfig{
+			PluginConfig: []configv1.PluginConfig{
 				{
 					Name: "VolumeBinding",
 					Args: runtime.RawExtension{
-						Object: &v1beta3.VolumeBindingArgs{
+						Object: &configv1.VolumeBindingArgs{
 							BindTimeoutSeconds: pointer.Int64Ptr(30),
 						},
 					},
@@ -328,8 +328,8 @@ func TestMultipleSchedulers(t *testing.T) {
 }
 
 func TestMultipleSchedulingProfiles(t *testing.T) {
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{
 			{SchedulerName: pointer.StringPtr("default-scheduler")},
 			{SchedulerName: pointer.StringPtr("custom-scheduler")},
 		},
