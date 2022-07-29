@@ -578,11 +578,14 @@ func TestMakeAbsolutePath(t *testing.T) {
 }
 
 func TestGetPodVolumeNames(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReadWriteOncePod, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
 	tests := []struct {
-		name            string
-		pod             *v1.Pod
-		expectedMounts  sets.String
-		expectedDevices sets.String
+		name                    string
+		pod                     *v1.Pod
+		expectedMounts          sets.String
+		expectedDevices         sets.String
+		expectedSELinuxContexts map[string][]*v1.SELinuxOptions
 	}{
 		{
 			name: "empty pod",
@@ -781,16 +784,122 @@ func TestGetPodVolumeNames(t *testing.T) {
 			expectedMounts:  sets.NewString("vol1", "vol2"),
 			expectedDevices: sets.NewString(),
 		},
+		{
+			name: "pod with SELinuxOptions",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						SELinuxOptions: &v1.SELinuxOptions{
+							Type:  "global_context_t",
+							Level: "s0:c1,c2",
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name: "initContainer1",
+							SecurityContext: &v1.SecurityContext{
+								SELinuxOptions: &v1.SELinuxOptions{
+									Type:  "initcontainer1_context_t",
+									Level: "s0:c3,c4",
+								},
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol1",
+								},
+							},
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Name: "container1",
+							SecurityContext: &v1.SecurityContext{
+								SELinuxOptions: &v1.SELinuxOptions{
+									Type:  "container1_context_t",
+									Level: "s0:c5,c6",
+								},
+							},
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol1",
+								},
+								{
+									Name: "vol2",
+								},
+							},
+						},
+						{
+							Name: "container2",
+							// No SELinux context, will be inherited from PodSecurityContext
+							VolumeMounts: []v1.VolumeMount{
+								{
+									Name: "vol2",
+								},
+								{
+									Name: "vol3",
+								},
+							},
+						},
+					},
+					Volumes: []v1.Volume{
+						{
+							Name: "vol1",
+						},
+						{
+							Name: "vol2",
+						},
+						{
+							Name: "vol3",
+						},
+					},
+				},
+			},
+			expectedMounts: sets.NewString("vol1", "vol2", "vol3"),
+			expectedSELinuxContexts: map[string][]*v1.SELinuxOptions{
+				"vol1": {
+					{
+						Type:  "initcontainer1_context_t",
+						Level: "s0:c3,c4",
+					},
+					{
+						Type:  "container1_context_t",
+						Level: "s0:c5,c6",
+					},
+				},
+				"vol2": {
+					{
+						Type:  "container1_context_t",
+						Level: "s0:c5,c6",
+					},
+					{
+						Type:  "global_context_t",
+						Level: "s0:c1,c2",
+					},
+				},
+				"vol3": {
+					{
+						Type:  "global_context_t",
+						Level: "s0:c1,c2",
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mounts, devices, _ := GetPodVolumeNames(test.pod)
+			mounts, devices, contexts := GetPodVolumeNames(test.pod)
 			if !mounts.Equal(test.expectedMounts) {
 				t.Errorf("Expected mounts: %q, got %q", mounts.List(), test.expectedMounts.List())
 			}
 			if !devices.Equal(test.expectedDevices) {
 				t.Errorf("Expected devices: %q, got %q", devices.List(), test.expectedDevices.List())
+			}
+			if len(contexts) == 0 {
+				contexts = nil
+			}
+			if !reflect.DeepEqual(test.expectedSELinuxContexts, contexts) {
+				t.Errorf("Expected SELinuxContexts: %+v\ngot: %+v", test.expectedSELinuxContexts, contexts)
 			}
 		})
 	}
