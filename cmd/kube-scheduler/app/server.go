@@ -32,7 +32,6 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/server"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
@@ -126,20 +125,12 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 	}
 	cliflag.PrintFlags(cmd.Flags())
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		stopCh := server.SetupSignalHandler()
-		<-stopCh
-		cancel()
-	}()
-
-	cc, sched, err := Setup(ctx, opts, registryOptions...)
+	cc, sched, err := Setup(cmd.Context(), opts, registryOptions...)
 	if err != nil {
 		return err
 	}
 
-	return Run(ctx, cc, sched)
+	return Run(cmd.Context(), cc, sched)
 }
 
 // Run executes the scheduler based on the given configuration. It only returns on error or when context is done.

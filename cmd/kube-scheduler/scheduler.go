@@ -19,6 +19,7 @@ package main
 import (
 	"os"
 
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/cli"
 	_ "k8s.io/component-base/logs/json/register" // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/clientgo"
@@ -28,6 +29,6 @@ import (
 
 func main() {
 	command := app.NewSchedulerCommand()
-	code := cli.Run(command)
+	code := cli.RunContext(genericapiserver.SetupSignalContext(), command)
 	os.Exit(code)
 }

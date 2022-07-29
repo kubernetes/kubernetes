@@ -17,6 +17,7 @@ limitations under the License.
 package cli
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -43,7 +44,11 @@ import (
 // Commands like kubectl where logging is not normally part of the runtime output
 // should use RunNoErrOutput instead and deal with the returned error themselves.
 func Run(cmd *cobra.Command) int {
-	if logsInitialized, err := run(cmd); err != nil {
+	return RunContext(context.Background(), cmd)
+}
+
+func RunContext(ctx context.Context, cmd *cobra.Command) int {
+	if logsInitialized, err := run(ctx, cmd); err != nil {
 		// If the error is about flag parsing, then printing that error
 		// with the decoration that klog would add ("E0923
 		// 23:02:03.219216 4168816 run.go:61] unknown shorthand flag")
@@ -81,11 +86,11 @@ func Run(cmd *cobra.Command) int {
 // RunNoErrOutput is a version of Run which returns the cobra command error
 // instead of printing it.
 func RunNoErrOutput(cmd *cobra.Command) error {
-	_, err := run(cmd)
+	_, err := run(context.Background(), cmd)
 	return err
 }
 
-func run(cmd *cobra.Command) (logsInitialized bool, err error) {
+func run(ctx context.Context, cmd *cobra.Command) (logsInitialized bool, err error) {
 	rand.Seed(time.Now().UnixNano())
 	defer logs.FlushLogs()
 
@@ -143,6 +148,6 @@ func run(cmd *cobra.Command) (logsInitialized bool, err error) {
 		}
 	}
 
-	err = cmd.Execute()
+	err = cmd.ExecuteContext(ctx)
 	return
 }
