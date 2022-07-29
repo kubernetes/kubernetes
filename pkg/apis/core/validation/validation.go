@@ -3819,7 +3819,6 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod) field.ErrorList {
 	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.ContainerStatuses, oldPod.Status.ContainerStatuses, fldPath.Child("containerStatuses"), oldPod.Spec.RestartPolicy)...)
 	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.InitContainerStatuses, oldPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), oldPod.Spec.RestartPolicy)...)
 
-
 	return allErrs
 }
 
@@ -4527,7 +4526,7 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 		allErrs = append(allErrs, validateNodeTaints(node.Spec.Taints, fldPath.Child("taints"))...)
 	}
 
-	if node.Spec.DoNotUseExternalID != oldNode.Spec.DoNotUseExternalID {
+	if node.Spec.DoNotUse_ExternalID != oldNode.Spec.DoNotUse_ExternalID {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "externalID"), "may not be updated"))
 	}
 
@@ -4538,7 +4537,7 @@ func ValidateNodeUpdate(node, oldNode *core.Node) field.ErrorList {
 	//  3. Unschedulable - allowed to change
 	//  4. Taints - allowed to change
 	//  5. ConfigSource - allowed to change (and checked above)
-	//  6. DoNotUseExternalID - immutable - checked above
+	//  6. DoNotUse_ExternalID - immutable - checked above
 
 	return allErrs
 }
