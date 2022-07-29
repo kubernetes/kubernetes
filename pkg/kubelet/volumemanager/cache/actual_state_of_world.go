@@ -822,7 +822,7 @@ func (asw *actualStateOfWorld) PodExistsInVolume(podName volumetypes.UniquePodNa
 			// The volume is mounted, check its SELinux context mount option
 			if *volumeObj.seLinuxMountContext != seLinuxLabel {
 				fullErr := newSELinuxMountMismatchError(volumeName)
-				if util.IsRWOP(volumeObj.spec) {
+				if util.VolumeSupportsSELinuxMount(volumeObj.spec) {
 					return false, volumeObj.devicePath, fullErr
 				}
 			}
