@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	goruntime "runtime"
 	"testing"
 
 	"github.com/lithammer/dedent"
@@ -241,20 +242,26 @@ func TestDownloadCerts(t *testing.T) {
 		// Check that the written files are either certificates or keys, and that they have
 		// the expected permissions
 		if _, err := keyutil.ParsePrivateKeyPEM(diskCertData); err == nil {
-			if stat, err := os.Stat(certPath); err == nil {
-				if stat.Mode() != keyFileMode {
-					t.Errorf("key %q should have mode %#o, has %#o", certName, keyFileMode, stat.Mode())
+			// File permissions are set differently on Windows, which does not match the expectation below.
+			if goruntime.GOOS != "windows" {
+				if stat, err := os.Stat(certPath); err == nil {
+					if stat.Mode() != keyFileMode {
+						t.Errorf("key %q should have mode %#o, has %#o", certName, keyFileMode, stat.Mode())
+					}
+				} else {
+					t.Errorf("could not stat key %q: %v", certName, err)
 				}
-			} else {
-				t.Errorf("could not stat key %q: %v", certName, err)
 			}
 		} else if _, err := keyutil.ParsePublicKeysPEM(diskCertData); err == nil {
-			if stat, err := os.Stat(certPath); err == nil {
-				if stat.Mode() != certFileMode {
-					t.Errorf("cert %q should have mode %#o, has %#o", certName, certFileMode, stat.Mode())
+			// File permissions are set differently on Windows, which does not match the expectation below.
+			if goruntime.GOOS != "windows" {
+				if stat, err := os.Stat(certPath); err == nil {
+					if stat.Mode() != certFileMode {
+						t.Errorf("cert %q should have mode %#o, has %#o", certName, certFileMode, stat.Mode())
+					}
+				} else {
+					t.Errorf("could not stat cert %q: %v", certName, err)
 				}
-			} else {
-				t.Errorf("could not stat cert %q: %v", certName, err)
 			}
 		} else {
 			t.Errorf("secret %q was not identified as a cert or as a key", certName)
