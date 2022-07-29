@@ -17,10 +17,11 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/pkg/errors"
 )
 
 func TestGetHostname(t *testing.T) {
@@ -41,6 +42,12 @@ func TestGetHostname(t *testing.T) {
 		{
 			desc:        "overridden hostname uppercase",
 			hostname:    "OVERRIDDEN",
+			result:      "overridden",
+			expectedErr: nil,
+		},
+		{
+			desc:        "hostname contains spaces",
+			hostname:    " OVERRIDDEN ",
 			result:      "overridden",
 			expectedErr: nil,
 		},

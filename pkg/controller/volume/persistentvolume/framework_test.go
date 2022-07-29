@@ -41,11 +41,10 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/volume"
-	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
 
@@ -72,9 +71,10 @@ func init() {
 // function to call as the actual test. Available functions are:
 //   - testSyncClaim - calls syncClaim on the first claim in initialClaims.
 //   - testSyncClaimError - calls syncClaim on the first claim in initialClaims
-//                          and expects an error to be returned.
+//     and expects an error to be returned.
 //   - testSyncVolume - calls syncVolume on the first volume in initialVolumes.
 //   - any custom function for specialized tests.
+//
 // The test then contains list of volumes/claims that are expected at the end
 // of the test and list of generated events.
 type controllerTest struct {
@@ -226,7 +226,7 @@ func newTestController(kubeClient clientset.Interface, informerFactory informers
 	params := ControllerParameters{
 		KubeClient:                kubeClient,
 		SyncPeriod:                5 * time.Second,
-		VolumePlugins:             []vol.VolumePlugin{},
+		VolumePlugins:             []volume.VolumePlugin{},
 		VolumeInformer:            informerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             informerFactory.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             informerFactory.Storage().V1().StorageClasses(),
@@ -286,7 +286,7 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase v
 		volume.Annotations = make(map[string]string)
 		for _, a := range annotations {
 			switch a {
-			case pvutil.AnnDynamicallyProvisioned:
+			case storagehelpers.AnnDynamicallyProvisioned:
 				volume.Annotations[a] = mockPluginName
 			default:
 				volume.Annotations[a] = "yes"
@@ -295,6 +295,72 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase v
 	}
 
 	return &volume
+}
+
+// newExternalProvisionedVolume returns a new volume with given attributes
+func newExternalProvisionedVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase v1.PersistentVolumePhase, reclaimPolicy v1.PersistentVolumeReclaimPolicy, class string, driverName string, finalizers []string, annotations ...string) *v1.PersistentVolume {
+	fs := v1.PersistentVolumeFilesystem
+	volume := v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			ResourceVersion: "1",
+			Finalizers:      finalizers,
+		},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse(capacity),
+			},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:       driverName,
+					VolumeHandle: "527b55dc-c7db-4574-9226-2e33318b06a3",
+					ReadOnly:     false,
+					FSType:       "ext4",
+					VolumeAttributes: map[string]string{
+						"Test-Key": "Test-Value",
+					},
+				},
+			},
+			AccessModes:                   []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce, v1.ReadOnlyMany},
+			PersistentVolumeReclaimPolicy: reclaimPolicy,
+			StorageClassName:              class,
+			VolumeMode:                    &fs,
+		},
+		Status: v1.PersistentVolumeStatus{
+			Phase: phase,
+		},
+	}
+
+	if boundToClaimName != "" {
+		volume.Spec.ClaimRef = &v1.ObjectReference{
+			Kind:       "PersistentVolumeClaim",
+			APIVersion: "v1",
+			UID:        types.UID(boundToClaimUID),
+			Namespace:  testNamespace,
+			Name:       boundToClaimName,
+		}
+	}
+
+	if len(annotations) > 0 {
+		volume.Annotations = make(map[string]string)
+		for _, a := range annotations {
+			switch a {
+			case storagehelpers.AnnDynamicallyProvisioned:
+				volume.Annotations[a] = driverName
+			default:
+				volume.Annotations[a] = "yes"
+			}
+		}
+	}
+
+	return &volume
+}
+
+// newVolume returns a new volume with given attributes
+func newVolumeWithFinalizers(name, capacity, boundToClaimUID, boundToClaimName string, phase v1.PersistentVolumePhase, reclaimPolicy v1.PersistentVolumeReclaimPolicy, class string, finalizers []string, annotations ...string) *v1.PersistentVolume {
+	retVolume := newVolume(name, capacity, boundToClaimUID, boundToClaimName, phase, reclaimPolicy, class, annotations...)
+	retVolume.SetFinalizers(finalizers)
+	return retVolume
 }
 
 // withLabels applies the given labels to the first volume in the array and
@@ -409,7 +475,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 		claim.Annotations = make(map[string]string)
 		for _, a := range annotations {
 			switch a {
-			case pvutil.AnnBetaStorageProvisioner, pvutil.AnnStorageProvisioner:
+			case storagehelpers.AnnBetaStorageProvisioner, storagehelpers.AnnStorageProvisioner:
 				claim.Annotations[a] = mockPluginName
 			default:
 				claim.Annotations[a] = "yes"
@@ -537,10 +603,10 @@ var (
 )
 
 // wrapTestWithPluginCalls returns a testCall that:
-// - configures controller with a volume plugin that implements recycler,
-//   deleter and provisioner. The plugin returns provided errors when a volume
-//   is deleted, recycled or provisioned.
-// - calls given testCall
+//   - configures controller with a volume plugin that implements recycler,
+//     deleter and provisioner. The plugin returns provided errors when a volume
+//     is deleted, recycled or provisioned.
+//   - calls given testCall
 func wrapTestWithPluginCalls(expectedRecycleCalls, expectedDeleteCalls []error, expectedProvisionCalls []provisionCall, toWrap testCall) testCall {
 	return func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 		plugin := &mockVolumePlugin{
@@ -548,15 +614,15 @@ func wrapTestWithPluginCalls(expectedRecycleCalls, expectedDeleteCalls []error, 
 			deleteCalls:    expectedDeleteCalls,
 			provisionCalls: expectedProvisionCalls,
 		}
-		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, nil /* prober */, ctrl)
+		ctrl.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plugin}, nil /* prober */, ctrl)
 		return toWrap(ctrl, reactor, test)
 	}
 }
 
 // wrapTestWithReclaimCalls returns a testCall that:
-// - configures controller with recycler or deleter which will return provided
-//   errors when a volume is deleted or recycled
-// - calls given testCall
+//   - configures controller with recycler or deleter which will return provided
+//     errors when a volume is deleted or recycled
+//   - calls given testCall
 func wrapTestWithReclaimCalls(operation operationType, expectedOperationCalls []error, toWrap testCall) testCall {
 	if operation == operationDelete {
 		return wrapTestWithPluginCalls(nil, expectedOperationCalls, nil, toWrap)
@@ -566,9 +632,9 @@ func wrapTestWithReclaimCalls(operation operationType, expectedOperationCalls []
 }
 
 // wrapTestWithProvisionCalls returns a testCall that:
-// - configures controller with a provisioner which will return provided errors
-//   when a claim is provisioned
-// - calls given testCall
+//   - configures controller with a provisioner which will return provided errors
+//     when a claim is provisioned
+//   - calls given testCall
 func wrapTestWithProvisionCalls(expectedProvisionCalls []provisionCall, toWrap testCall) testCall {
 	return wrapTestWithPluginCalls(nil, nil, expectedProvisionCalls, toWrap)
 }
@@ -591,7 +657,7 @@ func (t fakeCSIMigratedPluginManager) IsMigrationEnabledForPlugin(pluginName str
 func wrapTestWithCSIMigrationProvisionCalls(toWrap testCall) testCall {
 	plugin := &mockVolumePlugin{}
 	return func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, nil /* prober */, ctrl)
+		ctrl.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plugin}, nil /* prober */, ctrl)
 		ctrl.translator = fakeCSINameTranslator{}
 		ctrl.csiMigratedPluginManager = fakeCSIMigratedPluginManager{}
 		return toWrap(ctrl, reactor, test)
@@ -599,11 +665,11 @@ func wrapTestWithCSIMigrationProvisionCalls(toWrap testCall) testCall {
 }
 
 // wrapTestWithInjectedOperation returns a testCall that:
-// - starts the controller and lets it run original testCall until
-//   scheduleOperation() call. It blocks the controller there and calls the
-//   injected function to simulate that something is happening when the
-//   controller waits for the operation lock. Controller is then resumed and we
-//   check how it behaves.
+//   - starts the controller and lets it run original testCall until
+//     scheduleOperation() call. It blocks the controller there and calls the
+//     injected function to simulate that something is happening when the
+//     controller waits for the operation lock. Controller is then resumed and we
+//     check how it behaves.
 func wrapTestWithInjectedOperation(toWrap testCall, injectBeforeOperation func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor)) testCall {
 
 	return func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
@@ -651,10 +717,10 @@ func evaluateTestResults(ctrl *PersistentVolumeController, reactor *pvtesting.Vo
 
 // Test single call to syncClaim and syncVolume methods.
 // For all tests:
-// 1. Fill in the controller with initial data
-// 2. Call the tested function (syncClaim/syncVolume) via
-//    controllerTest.testCall *once*.
-// 3. Compare resulting volumes and claims with expected volumes and claims.
+//  1. Fill in the controller with initial data
+//  2. Call the tested function (syncClaim/syncVolume) via
+//     controllerTest.testCall *once*.
+//  3. Compare resulting volumes and claims with expected volumes and claims.
 func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass, pods []*v1.Pod) {
 	doit := func(t *testing.T, test controllerTest) {
 		// Initialize the controller
@@ -718,17 +784,18 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
 // volume/claims. For all tests, the test follows this pattern:
-// 0. Load the controller with initial data.
-// 1. Call controllerTest.testCall() once as in TestSync()
-// 2. For all volumes/claims changed by previous syncVolume/syncClaim calls,
-//    call appropriate syncVolume/syncClaim (simulating "volume/claim changed"
-//    events). Go to 2. if these calls change anything.
-// 3. When all changes are processed and no new changes were made, call
-//    syncVolume/syncClaim on all volumes/claims (simulating "periodic sync").
-// 4. If some changes were done by step 3., go to 2. (simulation of
-//    "volume/claim updated" events, eventually performing step 3. again)
-// 5. When 3. does not do any changes, finish the tests and compare final set
-//    of volumes/claims with expected claims/volumes and report differences.
+//  0. Load the controller with initial data.
+//  1. Call controllerTest.testCall() once as in TestSync()
+//  2. For all volumes/claims changed by previous syncVolume/syncClaim calls,
+//     call appropriate syncVolume/syncClaim (simulating "volume/claim changed"
+//     events). Go to 2. if these calls change anything.
+//  3. When all changes are processed and no new changes were made, call
+//     syncVolume/syncClaim on all volumes/claims (simulating "periodic sync").
+//  4. If some changes were done by step 3., go to 2. (simulation of
+//     "volume/claim updated" events, eventually performing step 3. again)
+//  5. When 3. does not do any changes, finish the tests and compare final set
+//     of volumes/claims with expected claims/volumes and report differences.
+//
 // Some limit of calls in enforced to prevent endless loops.
 func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass, defaultStorageClass string) {
 	run := func(t *testing.T, test controllerTest) {
@@ -858,7 +925,7 @@ type mockVolumePlugin struct {
 	deleteCallCounter    int
 	recycleCalls         []error
 	recycleCallCounter   int
-	provisionOptions     vol.VolumeOptions
+	provisionOptions     volume.VolumeOptions
 }
 
 type provisionCall struct {
@@ -866,12 +933,12 @@ type provisionCall struct {
 	ret                error
 }
 
-var _ vol.VolumePlugin = &mockVolumePlugin{}
-var _ vol.RecyclableVolumePlugin = &mockVolumePlugin{}
-var _ vol.DeletableVolumePlugin = &mockVolumePlugin{}
-var _ vol.ProvisionableVolumePlugin = &mockVolumePlugin{}
+var _ volume.VolumePlugin = &mockVolumePlugin{}
+var _ volume.RecyclableVolumePlugin = &mockVolumePlugin{}
+var _ volume.DeletableVolumePlugin = &mockVolumePlugin{}
+var _ volume.ProvisionableVolumePlugin = &mockVolumePlugin{}
 
-func (plugin *mockVolumePlugin) Init(host vol.VolumeHost) error {
+func (plugin *mockVolumePlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
@@ -879,11 +946,11 @@ func (plugin *mockVolumePlugin) GetPluginName() string {
 	return mockPluginName
 }
 
-func (plugin *mockVolumePlugin) GetVolumeName(spec *vol.Spec) (string, error) {
+func (plugin *mockVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 	return spec.Name(), nil
 }
 
-func (plugin *mockVolumePlugin) CanSupport(spec *vol.Spec) bool {
+func (plugin *mockVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return true
 }
 
@@ -899,21 +966,21 @@ func (plugin *mockVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
-func (plugin *mockVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol.Spec, error) {
+func (plugin *mockVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	return nil, nil
 }
 
-func (plugin *mockVolumePlugin) NewMounter(spec *vol.Spec, podRef *v1.Pod, opts vol.VolumeOptions) (vol.Mounter, error) {
+func (plugin *mockVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return nil, fmt.Errorf("Mounter is not supported by this plugin")
 }
 
-func (plugin *mockVolumePlugin) NewUnmounter(name string, podUID types.UID) (vol.Unmounter, error) {
+func (plugin *mockVolumePlugin) NewUnmounter(name string, podUID types.UID) (volume.Unmounter, error) {
 	return nil, fmt.Errorf("Unmounter is not supported by this plugin")
 }
 
 // Provisioner interfaces
 
-func (plugin *mockVolumePlugin) NewProvisioner(options vol.VolumeOptions) (vol.Provisioner, error) {
+func (plugin *mockVolumePlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
 	if len(plugin.provisionCalls) > 0 {
 		// mockVolumePlugin directly implements Provisioner interface
 		klog.V(4).Infof("mock plugin NewProvisioner called, returning mock provisioner")
@@ -967,7 +1034,7 @@ func (plugin *mockVolumePlugin) Provision(selectedNode *v1.Node, allowedTopologi
 
 // Deleter interfaces
 
-func (plugin *mockVolumePlugin) NewDeleter(spec *vol.Spec) (vol.Deleter, error) {
+func (plugin *mockVolumePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	if len(plugin.deleteCalls) > 0 {
 		// mockVolumePlugin directly implements Deleter interface
 		klog.V(4).Infof("mock plugin NewDeleter called, returning mock deleter")
@@ -993,13 +1060,13 @@ func (plugin *mockVolumePlugin) GetPath() string {
 	return ""
 }
 
-func (plugin *mockVolumePlugin) GetMetrics() (*vol.Metrics, error) {
+func (plugin *mockVolumePlugin) GetMetrics() (*volume.Metrics, error) {
 	return nil, nil
 }
 
 // Recycler interfaces
 
-func (plugin *mockVolumePlugin) Recycle(pvName string, spec *vol.Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
+func (plugin *mockVolumePlugin) Recycle(pvName string, spec *volume.Spec, eventRecorder recyclerclient.RecycleEventRecorder) error {
 	if len(plugin.recycleCalls) == 0 {
 		return fmt.Errorf("Mock plugin error: no recycleCalls configured")
 	}

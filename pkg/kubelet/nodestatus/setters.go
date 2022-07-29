@@ -34,6 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
+	cloudprovidernodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/component-base/version"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -93,14 +94,28 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 			klog.V(4).InfoS("Using secondary node IP", "IP", secondaryNodeIP.String())
 		}
 
-		if externalCloudProvider {
+		if externalCloudProvider || cloud != nil {
+			// Annotate the Node object with nodeIP for external cloud provider.
+			//
+			// We do this even when external CCM is not configured to cover a situation
+			// during migration from legacy to external CCM: when CCM is running the
+			// node controller in the cluster but kubelet is still running the in-tree
+			// provider. Adding this annotation in all cases ensures that while
+			// Addresses flap between the competing controllers, they at least flap
+			// consistently.
+			//
+			// We do not add the annotation in the case where there is no cloud
+			// controller at all, as we don't expect to migrate these clusters to use an
+			// external CCM.
 			if nodeIPSpecified {
 				if node.ObjectMeta.Annotations == nil {
 					node.ObjectMeta.Annotations = make(map[string]string)
 				}
 				node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr] = nodeIP.String()
 			}
+		}
 
+		if externalCloudProvider {
 			// If --cloud-provider=external and node address is already set,
 			// then we return early because provider set addresses should take precedence.
 			// Otherwise, we try to look up the node IP and let the cloud provider override it later
@@ -115,56 +130,9 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 				return err
 			}
 
-			var nodeAddresses []v1.NodeAddress
-
-			// For every address supplied by the cloud provider that matches nodeIP, nodeIP is the enforced node address for
-			// that address Type (like InternalIP and ExternalIP), meaning other addresses of the same Type are discarded.
-			// See #61921 for more information: some cloud providers may supply secondary IPs, so nodeIP serves as a way to
-			// ensure that the correct IPs show up on a Node object.
-			if nodeIPSpecified {
-				enforcedNodeAddresses := []v1.NodeAddress{}
-
-				nodeIPTypes := make(map[v1.NodeAddressType]bool)
-				for _, nodeAddress := range cloudNodeAddresses {
-					if netutils.ParseIPSloppy(nodeAddress.Address).Equal(nodeIP) {
-						enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
-						nodeIPTypes[nodeAddress.Type] = true
-					}
-				}
-
-				// nodeIP must be among the addresses supplied by the cloud provider
-				if len(enforcedNodeAddresses) == 0 {
-					return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", nodeIP)
-				}
-
-				// nodeIP was found, now use all other addresses supplied by the cloud provider NOT of the same Type as nodeIP.
-				for _, nodeAddress := range cloudNodeAddresses {
-					if !nodeIPTypes[nodeAddress.Type] {
-						enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
-					}
-				}
-
-				nodeAddresses = enforcedNodeAddresses
-			} else if nodeIP != nil {
-				// nodeIP is "0.0.0.0" or "::"; sort cloudNodeAddresses to
-				// prefer addresses of the matching family
-				sortedAddresses := make([]v1.NodeAddress, 0, len(cloudNodeAddresses))
-				for _, nodeAddress := range cloudNodeAddresses {
-					ip := netutils.ParseIPSloppy(nodeAddress.Address)
-					if ip == nil || isPreferredIPFamily(ip) {
-						sortedAddresses = append(sortedAddresses, nodeAddress)
-					}
-				}
-				for _, nodeAddress := range cloudNodeAddresses {
-					ip := netutils.ParseIPSloppy(nodeAddress.Address)
-					if ip != nil && !isPreferredIPFamily(ip) {
-						sortedAddresses = append(sortedAddresses, nodeAddress)
-					}
-				}
-				nodeAddresses = sortedAddresses
-			} else {
-				// If nodeIP is unset, just use the addresses provided by the cloud provider as-is
-				nodeAddresses = cloudNodeAddresses
+			nodeAddresses, err := cloudprovidernodeutil.PreferNodeIP(nodeIP, cloudNodeAddresses)
+			if err != nil {
+				return err
 			}
 
 			switch {

@@ -389,7 +389,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 	resourcename = strings.ToLower(resourcename)
 	resourcePaths := sets.NewString()
 
-	if tp.Kind() == reflect.Ptr {
+	if tp.Kind() == reflect.Pointer {
 		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
 		return resourcePaths
 	}
@@ -399,7 +399,7 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 	}
 
 	switch tp.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		resourcePaths.Insert(collectResourcePaths(t, resourcename, path, name, tp.Elem()).List()...)
 	case reflect.Struct:
 		// ObjectMeta is generic and therefore should never have a field with a specific resource's name;
@@ -1687,84 +1687,246 @@ func TestDropDisabledTopologySpreadConstraintsFields(t *testing.T) {
 	}
 }
 
-func TestDropOSField(t *testing.T) {
-	podWithOSField := func() *api.Pod {
-		osField := api.PodOS{Name: "linux"}
-		return &api.Pod{
-			Spec: api.PodSpec{
-				OS: &osField,
-			},
-		}
-	}
-	podWithoutOSField := func() *api.Pod { return &api.Pod{} }
-	podInfo := []struct {
-		description   string
-		hasPodOSField bool
-		pod           func() *api.Pod
+func TestDropNodeInclusionPolicyFields(t *testing.T) {
+	ignore := api.NodeInclusionPolicyIgnore
+	honor := api.NodeInclusionPolicyHonor
+
+	tests := []struct {
+		name        string
+		enabled     bool
+		podSpec     *api.PodSpec
+		oldPodSpec  *api.PodSpec
+		wantPodSpec *api.PodSpec
 	}{
 		{
-			description:   "has PodOS field",
-			hasPodOSField: true,
-			pod:           podWithOSField,
+			name:    "feature disabled, both pods don't use the fields",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
 		},
 		{
-			description:   "does not have PodOS field",
-			hasPodOSField: false,
-			pod:           podWithoutOSField,
+			name:    "feature disabled, only old pod use NodeAffinityPolicy field",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeAffinityPolicy: &honor},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
 		},
 		{
-			description:   "is nil",
-			hasPodOSField: false,
-			pod:           func() *api.Pod { return nil },
+			name:    "feature disabled, only old pod use NodeTaintsPolicy field",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeTaintsPolicy: &ignore},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+		},
+		{
+			name:    "feature disabled, only current pod use NodeAffinityPolicy field",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeAffinityPolicy: &honor},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					NodeAffinityPolicy: nil,
+				}},
+			},
+		},
+		{
+			name:    "feature disabled, only current pod use NodeTaintsPolicy field",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeTaintsPolicy: &ignore},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeTaintsPolicy: nil},
+				},
+			},
+		},
+		{
+			name:    "feature disabled, both pods use NodeAffinityPolicy fields",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeAffinityPolicy: &honor},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeAffinityPolicy: &ignore},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeAffinityPolicy: &ignore},
+				},
+			},
+		},
+		{
+			name:    "feature disabled, both pods use NodeTaintsPolicy fields",
+			enabled: false,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeTaintsPolicy: &ignore},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeTaintsPolicy: &honor},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{NodeTaintsPolicy: &honor},
+				},
+			},
+		},
+		{
+			name:    "feature enabled, both pods use the fields",
+			enabled: true,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeAffinityPolicy: &ignore,
+						NodeTaintsPolicy:   &honor,
+					},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeAffinityPolicy: &honor,
+						NodeTaintsPolicy:   &ignore,
+					},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeAffinityPolicy: &honor,
+						NodeTaintsPolicy:   &ignore,
+					},
+				},
+			},
+		},
+		{
+			name:    "feature enabled, only old pod use NodeAffinityPolicy field",
+			enabled: true,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeAffinityPolicy: &honor,
+					},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+		},
+		{
+			name:    "feature enabled, only old pod use NodeTaintsPolicy field",
+			enabled: true,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeTaintsPolicy: &ignore,
+					},
+				},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+		},
+		{
+			name:    "feature enabled, only current pod use NodeAffinityPolicy field",
+			enabled: true,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeAffinityPolicy: &ignore,
+					},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeAffinityPolicy: &ignore,
+					},
+				},
+			},
+		},
+		{
+			name:    "feature enabled, only current pod use NodeTaintsPolicy field",
+			enabled: true,
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{},
+			},
+			podSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeTaintsPolicy: &honor,
+					},
+				},
+			},
+			wantPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{
+					{
+						NodeTaintsPolicy: &honor,
+					},
+				},
+			},
 		},
 	}
 
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasOsField, oldPod := oldPodInfo.hasPodOSField, oldPodInfo.pod()
-				newPodHasOSField, newPod := newPodInfo.hasPodOSField, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, test.enabled)()
 
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, enabled)()
-
-					var oldPodSpec *api.PodSpec
-					if oldPod != nil {
-						oldPodSpec = &oldPod.Spec
-					}
-					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
-					}
-
-					switch {
-					case enabled || oldPodHasOsField:
-						// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasOSField:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have OSfield
-						if !reflect.DeepEqual(newPod, podWithoutOSField()) {
-							t.Errorf("new pod has OS field: %v", cmp.Diff(newPod, podWithoutOSField()))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					}
-				})
+			dropDisabledFields(test.podSpec, nil, test.oldPodSpec, nil)
+			if diff := cmp.Diff(test.wantPodSpec, test.podSpec); diff != "" {
+				t.Errorf("unexpected pod spec (-want, +got):\n%s", diff)
 			}
-		}
+		})
 	}
 }

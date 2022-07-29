@@ -70,6 +70,15 @@ func TestAuditValidOptions(t *testing.T) {
 		},
 		expected: "ignoreErrors<log>",
 	}, {
+		name: "create audit log path dir",
+		options: func() *AuditOptions {
+			o := NewAuditOptions()
+			o.LogOptions.Path = filepath.Join(tmpDir, "non-existing-dir1", "non-existing-dir2", "audit")
+			o.PolicyFile = policy
+			return o
+		},
+		expected: "ignoreErrors<log>",
+	}, {
 		name: "default log no policy",
 		options: func() *AuditOptions {
 			o := NewAuditOptions()

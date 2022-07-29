@@ -316,7 +316,7 @@ func doubleToUint64Checked(v float64) (uint64, error) {
 	return uint64(v), nil
 }
 
-// int64toUint64Checked converts an int64 to a uint64 value.
+// int64ToUint64Checked converts an int64 to a uint64 value.
 //
 // If the conversion fails due to overflow the error return value will be non-nil.
 func int64ToUint64Checked(v int64) (uint64, error) {
@@ -326,7 +326,7 @@ func int64ToUint64Checked(v int64) (uint64, error) {
 	return uint64(v), nil
 }
 
-// int64toInt32Checked converts an int64 to an int32 value.
+// int64ToInt32Checked converts an int64 to an int32 value.
 //
 // If the conversion fails due to overflow the error return value will be non-nil.
 func int64ToInt32Checked(v int64) (int32, error) {
@@ -336,7 +336,7 @@ func int64ToInt32Checked(v int64) (int32, error) {
 	return int32(v), nil
 }
 
-// uint64toUint32Checked converts a uint64 to a uint32 value.
+// uint64ToUint32Checked converts a uint64 to a uint32 value.
 //
 // If the conversion fails due to overflow the error return value will be non-nil.
 func uint64ToUint32Checked(v uint64) (uint32, error) {
@@ -346,7 +346,7 @@ func uint64ToUint32Checked(v uint64) (uint32, error) {
 	return uint32(v), nil
 }
 
-// uint64toInt64Checked converts a uint64 to an int64 value.
+// uint64ToInt64Checked converts a uint64 to an int64 value.
 //
 // If the conversion fails due to overflow the error return value will be non-nil.
 func uint64ToInt64Checked(v uint64) (int64, error) {

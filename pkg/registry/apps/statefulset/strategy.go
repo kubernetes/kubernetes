@@ -79,6 +79,18 @@ func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
 }
 
+// maxUnavailableInUse returns true if StatefulSet's maxUnavailable set(used)
+func maxUnavailableInUse(statefulset *apps.StatefulSet) bool {
+	if statefulset == nil {
+		return false
+	}
+	if statefulset.Spec.UpdateStrategy.RollingUpdate == nil {
+		return false
+	}
+
+	return statefulset.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable != nil
+}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newStatefulSet := obj.(*apps.StatefulSet)
@@ -100,32 +112,21 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 // dropStatefulSetDisabledFields drops fields that are not used if their associated feature gates
 // are not enabled.
 // The typical pattern is:
-//     if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
-//         newSvc.Spec.MyFeature = nil
-//     }
+//
+//	if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//	    newSvc.Spec.MyFeature = nil
+//	}
 func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.StatefulSet) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
-		if !minReadySecondsFieldsInUse(oldSS) {
-			newSS.Spec.MinReadySeconds = int32(0)
-		}
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
 		if oldSS == nil || oldSS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
 			newSS.Spec.PersistentVolumeClaimRetentionPolicy = nil
 		}
 	}
-}
-
-// minReadySecondsFieldsInUse returns true if fields related to StatefulSet minReadySeconds are set and
-// are greater than 0
-func minReadySecondsFieldsInUse(ss *apps.StatefulSet) bool {
-	if ss == nil {
-		return false
-	} else if ss.Spec.MinReadySeconds >= 0 {
-		return true
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) && !maxUnavailableInUse(oldSS) {
+		if newSS.Spec.UpdateStrategy.RollingUpdate != nil {
+			newSS.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
+		}
 	}
-	return false
 }
 
 // Validate validates a new StatefulSet.
@@ -156,9 +157,7 @@ func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 	oldStatefulSet := old.(*apps.StatefulSet)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
-	validationErrorList := validation.ValidateStatefulSet(newStatefulSet, opts)
-	updateErrorList := validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet)
-	return append(validationErrorList, updateErrorList...)
+	return validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

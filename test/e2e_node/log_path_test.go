@@ -26,8 +26,9 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -37,6 +38,7 @@ const (
 
 var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var podClient *framework.PodClient
 
 	ginkgo.Describe("Pod with a container", func() {

@@ -42,9 +42,12 @@ var BuildAnnotations = []string{
 	kioutil.PathAnnotation,
 	kioutil.IndexAnnotation,
 	kioutil.SeqIndentAnnotation,
+	kioutil.IdAnnotation,
+	kioutil.InternalAnnotationsMigrationResourceIDAnnotation,
 
 	kioutil.LegacyPathAnnotation,
 	kioutil.LegacyIndexAnnotation,
+	kioutil.LegacyIdAnnotation,
 }
 
 func (r *Resource) ResetRNode(incoming *Resource) {
@@ -62,6 +65,70 @@ func (r *Resource) Hash(h ifc.KustHasher) (string, error) {
 func (r *Resource) SetGvk(gvk resid.Gvk) {
 	r.SetKind(gvk.Kind)
 	r.SetApiVersion(gvk.ApiVersion())
+}
+
+func (r *Resource) GetOrigin() (*Origin, error) {
+	annotations := r.GetAnnotations()
+	originAnnotations, ok := annotations[utils.OriginAnnotationKey]
+	if !ok {
+		return nil, nil
+	}
+	var origin Origin
+	if err := yaml.Unmarshal([]byte(originAnnotations), &origin); err != nil {
+		return nil, err
+	}
+	return &origin, nil
+}
+
+func (r *Resource) SetOrigin(origin *Origin) error {
+	annotations := r.GetAnnotations()
+	if origin == nil {
+		delete(annotations, utils.OriginAnnotationKey)
+	} else {
+		originStr, err := origin.String()
+		if err != nil {
+			return err
+		}
+		annotations[utils.OriginAnnotationKey] = originStr
+	}
+	return r.SetAnnotations(annotations)
+}
+
+func (r *Resource) GetTransformations() (Transformations, error) {
+	annotations := r.GetAnnotations()
+	transformerAnnotations, ok := annotations[utils.TransformerAnnotationKey]
+	if !ok {
+		return nil, nil
+	}
+	var transformations Transformations
+	if err := yaml.Unmarshal([]byte(transformerAnnotations), &transformations); err != nil {
+		return nil, err
+	}
+	return transformations, nil
+}
+
+func (r *Resource) AddTransformation(origin *Origin) error {
+	annotations := r.GetAnnotations()
+	transformations, err := r.GetTransformations()
+	if err != nil {
+		return err
+	}
+	if transformations == nil {
+		transformations = Transformations{}
+	}
+	transformations = append(transformations, origin)
+	transformationStr, err := transformations.String()
+	if err != nil {
+		return err
+	}
+	annotations[utils.TransformerAnnotationKey] = transformationStr
+	return r.SetAnnotations(annotations)
+}
+
+func (r *Resource) ClearTransformations() error {
+	annotations := r.GetAnnotations()
+	delete(annotations, utils.TransformerAnnotationKey)
+	return r.SetAnnotations(annotations)
 }
 
 // ResCtx is an interface describing the contextual added

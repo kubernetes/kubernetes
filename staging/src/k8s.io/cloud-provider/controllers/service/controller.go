@@ -75,7 +75,7 @@ type serviceCache struct {
 type Controller struct {
 	cloud            cloudprovider.Interface
 	knownHosts       []*v1.Node
-	servicesToUpdate []*v1.Service
+	servicesToUpdate sets.String
 	kubeClient       clientset.Interface
 	clusterName      string
 	balancer         cloudprovider.LoadBalancer
@@ -110,8 +110,6 @@ func New(
 	featureGate featuregate.FeatureGate,
 ) (*Controller, error) {
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartStructuredLogging(0)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
@@ -230,6 +228,11 @@ func (s *Controller) Run(ctx context.Context, workers int) {
 	defer runtime.HandleCrash()
 	defer s.queue.ShutDown()
 
+	// Start event processing pipeline.
+	s.eventBroadcaster.StartStructuredLogging(0)
+	s.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.kubeClient.CoreV1().Events("")})
+	defer s.eventBroadcaster.Shutdown()
+
 	klog.Info("Starting service controller")
 	defer klog.Info("Shutting down service controller")
 
@@ -287,11 +290,15 @@ func (s *Controller) worker(ctx context.Context) {
 // nodeSyncLoop takes nodeSync signal and triggers nodeSync
 func (s *Controller) nodeSyncLoop(ctx context.Context, workers int) {
 	klog.V(4).Info("nodeSyncLoop Started")
-	for range s.nodeSyncCh {
-		klog.V(4).Info("nodeSync has been triggered")
-		s.nodeSyncInternal(ctx, workers)
+	for {
+		select {
+		case <-s.nodeSyncCh:
+			klog.V(4).Info("nodeSync has been triggered")
+			s.nodeSyncInternal(ctx, workers)
+		case <-ctx.Done():
+			return
+		}
 	}
-	klog.V(2).Info("s.nodeSyncCh is closed. Exiting nodeSyncLoop")
 }
 
 func (s *Controller) processNextWorkItem(ctx context.Context) bool {
@@ -388,7 +395,11 @@ func (s *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 			klog.V(2).Infof("Deleting existing load balancer for service %s", key)
 			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
 			if err := s.balancer.EnsureLoadBalancerDeleted(ctx, s.clusterName, service); err != nil {
-				return op, fmt.Errorf("failed to delete load balancer: %v", err)
+				if err == cloudprovider.ImplementedElsewhere {
+					klog.V(4).Infof("LoadBalancer for service %s implemented by a different controller %s, Ignoring error on deletion", key, s.cloud.ProviderName())
+				} else {
+					return op, fmt.Errorf("failed to delete load balancer: %v", err)
+				}
 			}
 		}
 		// Always remove finalizer when load balancer is deleted, this ensures Services
@@ -735,16 +746,28 @@ func (s *Controller) nodeSyncInternal(ctx context.Context, workers int) {
 	if !s.needFullSyncAndUnmark() {
 		// The set of nodes in the cluster hasn't changed, but we can retry
 		// updating any services that we failed to update last time around.
-		s.servicesToUpdate = s.updateLoadBalancerHosts(ctx, s.servicesToUpdate, workers)
+		// It is required to call `s.cache.get()` on each Service in case there was
+		// an update event that occurred between retries.
+		var servicesToUpdate []*v1.Service
+		for key := range s.servicesToUpdate {
+			cachedService, exist := s.cache.get(key)
+			if !exist {
+				klog.Errorf("Service %q should be in the cache but not", key)
+				continue
+			}
+			servicesToUpdate = append(servicesToUpdate, cachedService.state)
+		}
+
+		s.servicesToUpdate = s.updateLoadBalancerHosts(ctx, servicesToUpdate, workers)
 		return
 	}
 	klog.V(2).Infof("Syncing backends for all LB services.")
 
-	// Try updating all services, and save the ones that fail to try again next
+	// Try updating all services, and save the failed ones to try again next
 	// round.
-	s.servicesToUpdate = s.cache.allServices()
-	numServices := len(s.servicesToUpdate)
-	s.servicesToUpdate = s.updateLoadBalancerHosts(ctx, s.servicesToUpdate, workers)
+	servicesToUpdate := s.cache.allServices()
+	numServices := len(servicesToUpdate)
+	s.servicesToUpdate = s.updateLoadBalancerHosts(ctx, servicesToUpdate, workers)
 	klog.V(2).Infof("Successfully updated %d out of %d load balancers to direct traffic to the updated set of nodes",
 		numServices-len(s.servicesToUpdate), numServices)
 }
@@ -772,10 +795,11 @@ func (s *Controller) nodeSyncService(svc *v1.Service) bool {
 // updateLoadBalancerHosts updates all existing load balancers so that
 // they will match the latest list of nodes with input number of workers.
 // Returns the list of services that couldn't be updated.
-func (s *Controller) updateLoadBalancerHosts(ctx context.Context, services []*v1.Service, workers int) (servicesToRetry []*v1.Service) {
+func (s *Controller) updateLoadBalancerHosts(ctx context.Context, services []*v1.Service, workers int) (servicesToRetry sets.String) {
 	klog.V(4).Infof("Running updateLoadBalancerHosts(len(services)==%d, workers==%d)", len(services), workers)
 
 	// lock for servicesToRetry
+	servicesToRetry = sets.NewString()
 	lock := sync.Mutex{}
 	doWork := func(piece int) {
 		if shouldRetry := s.nodeSyncService(services[piece]); !shouldRetry {
@@ -783,7 +807,8 @@ func (s *Controller) updateLoadBalancerHosts(ctx context.Context, services []*v1
 		}
 		lock.Lock()
 		defer lock.Unlock()
-		servicesToRetry = append(servicesToRetry, services[piece])
+		key := fmt.Sprintf("%s/%s", services[piece].Namespace, services[piece].Name)
+		servicesToRetry.Insert(key)
 	}
 
 	workqueue.ParallelizeUntil(ctx, workers, len(services), doWork)
@@ -862,7 +887,10 @@ func (s *Controller) syncService(ctx context.Context, key string) error {
 	case err != nil:
 		runtime.HandleError(fmt.Errorf("Unable to retrieve service %v from store: %v", key, err))
 	default:
-		err = s.processServiceCreateOrUpdate(ctx, service, key)
+		// It is not safe to modify an object returned from an informer.
+		// As reconcilers may modify the service object we need to copy
+		// it first.
+		err = s.processServiceCreateOrUpdate(ctx, service.DeepCopy(), key)
 	}
 
 	return err

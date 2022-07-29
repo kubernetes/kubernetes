@@ -26,10 +26,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -123,10 +121,9 @@ func TestTaintBasedEvictions(t *testing.T) {
 			testCtx := testutils.InitTestAPIServer(t, "taint-based-evictions", admission)
 
 			// Build clientset and informers for controllers.
-			externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
-				QPS:           -1,
-				Host:          testCtx.HTTPServer.URL,
-				ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+			externalClientConfig := restclient.CopyConfig(testCtx.KubeConfig)
+			externalClientConfig.QPS = -1
+			externalClientset := clientset.NewForConfigOrDie(externalClientConfig)
 			externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 			podTolerations.SetExternalKubeClientSet(externalClientset)
 			podTolerations.SetExternalKubeInformerFactory(externalInformers)
@@ -134,10 +131,6 @@ func TestTaintBasedEvictions(t *testing.T) {
 			testCtx = testutils.InitTestScheduler(t, testCtx)
 			defer testutils.CleanupTest(t, testCtx)
 			cs := testCtx.ClientSet
-			_, err := cs.CoreV1().Namespaces().Create(context.TODO(), testCtx.NS, metav1.CreateOptions{})
-			if err != nil {
-				t.Errorf("Failed to create namespace %+v", err)
-			}
 
 			// Start NodeLifecycleController for taint.
 			nc, err := nodelifecycle.NewNodeLifecycleController(

@@ -170,7 +170,6 @@ func TestUnstructuredGetters(t *testing.T) {
 					"finalizer.1",
 					"finalizer.2",
 				},
-				"clusterName": "cluster123",
 			},
 		},
 	}
@@ -245,9 +244,6 @@ func TestUnstructuredGetters(t *testing.T) {
 	if got, want := unstruct.GetFinalizers(), []string{"finalizer.1", "finalizer.2"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("GetFinalizers()=%v, want %v", got, want)
 	}
-	if got, want := unstruct.GetClusterName(), "cluster123"; got != want {
-		t.Errorf("GetClusterName()=%v, want %v", got, want)
-	}
 	if got, want := unstruct.GetDeletionGracePeriodSeconds(), &ten; !reflect.DeepEqual(got, want) {
 		t.Errorf("GetDeletionGracePeriodSeconds()=%v, want %v", got, want)
 	}
@@ -302,7 +298,6 @@ func TestUnstructuredSetters(t *testing.T) {
 					"finalizer.1",
 					"finalizer.2",
 				},
-				"clusterName": "cluster123",
 			},
 		},
 	}
@@ -338,7 +333,6 @@ func TestUnstructuredSetters(t *testing.T) {
 	}
 	unstruct.SetOwnerReferences(newOwnerReferences)
 	unstruct.SetFinalizers([]string{"finalizer.1", "finalizer.2"})
-	unstruct.SetClusterName("cluster123")
 	unstruct.SetDeletionGracePeriodSeconds(&ten)
 	unstruct.SetGeneration(ten)
 
@@ -534,7 +528,6 @@ func TestAccessorMethods(t *testing.T) {
 		{accessor: "Annotations", val: map[string]string{"foo": "bar"}},
 		{accessor: "Finalizers", val: []string{"foo"}},
 		{accessor: "OwnerReferences", val: []metav1.OwnerReference{{Name: "foo"}}},
-		{accessor: "ClusterName", val: "foo"},
 	}
 	for i, test := range tests {
 		t.Logf("evaluating test %d (%s)", i, test.accessor)

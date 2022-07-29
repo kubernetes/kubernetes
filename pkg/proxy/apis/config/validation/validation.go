@@ -102,6 +102,12 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 
 	allErrs = append(allErrs, validateKubeProxyNodePortAddress(config.NodePortAddresses, newPath.Child("NodePortAddresses"))...)
 	allErrs = append(allErrs, validateShowHiddenMetricsVersion(config.ShowHiddenMetricsForVersion, newPath.Child("ShowHiddenMetricsForVersion"))...)
+	if config.DetectLocalMode == kubeproxyconfig.LocalModeBridgeInterface {
+		allErrs = append(allErrs, validateInterface(config.DetectLocal.BridgeInterface, newPath.Child("InterfaceName"))...)
+	}
+	if config.DetectLocalMode == kubeproxyconfig.LocalModeInterfaceNamePrefix {
+		allErrs = append(allErrs, validateInterface(config.DetectLocal.InterfaceNamePrefix, newPath.Child("InterfacePrefix"))...)
+	}
 
 	return allErrs
 }
@@ -205,7 +211,7 @@ func validateProxyModeWindows(mode kubeproxyconfig.ProxyMode, fldPath *field.Pat
 		return nil
 	}
 
-	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace])", strings.Join(validModes.List(), ","))
+	errMsg := fmt.Sprintf("must be %s or blank (blank means the most-available proxy [currently userspace(will be 'kernelspace' in a future release)])", strings.Join(validModes.List(), ","))
 	return field.ErrorList{field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg)}
 }
 
@@ -315,5 +321,13 @@ func validateShowHiddenMetricsVersion(version string, fldPath *field.Path) field
 		allErrs = append(allErrs, field.Invalid(fldPath, version, e.Error()))
 	}
 
+	return allErrs
+}
+
+func validateInterface(iface string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(iface) == 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, iface, "must not be empty"))
+	}
 	return allErrs
 }

@@ -82,6 +82,12 @@ func (r *RequestConstructionError) Error() string {
 
 var noBackoff = &NoBackoff{}
 
+type requestRetryFunc func(maxRetries int) WithRetry
+
+func defaultRequestRetryFn(maxRetries int) WithRetry {
+	return &withRetry{maxRetries: maxRetries}
+}
+
 // Request allows for building up a request to a server in a chained fashion.
 // Any errors are stored until the end of your call, so you only have to
 // check once.
@@ -93,6 +99,7 @@ type Request struct {
 	rateLimiter flowcontrol.RateLimiter
 	backoff     BackoffManager
 	timeout     time.Duration
+	maxRetries  int
 
 	// generic components accessible via method setters
 	verb       string
@@ -109,9 +116,10 @@ type Request struct {
 	subresource  string
 
 	// output
-	err   error
-	body  io.Reader
-	retry WithRetry
+	err  error
+	body io.Reader
+
+	retryFn requestRetryFunc
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
@@ -142,7 +150,8 @@ func NewRequest(c *RESTClient) *Request {
 		backoff:        backoff,
 		timeout:        timeout,
 		pathPrefix:     pathPrefix,
-		retry:          &withRetry{maxRetries: 10},
+		maxRetries:     10,
+		retryFn:        defaultRequestRetryFn,
 		warningHandler: c.warningHandler,
 	}
 
@@ -408,7 +417,10 @@ func (r *Request) Timeout(d time.Duration) *Request {
 // function is specifically called with a different value.
 // A zero maxRetries prevent it from doing retires and return an error immediately.
 func (r *Request) MaxRetries(maxRetries int) *Request {
-	r.retry.SetMaxRetries(maxRetries)
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+	r.maxRetries = maxRetries
 	return r
 }
 
@@ -504,7 +516,9 @@ func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) err
 	now := time.Now()
 
 	err := r.rateLimiter.Wait(ctx)
-
+	if err != nil {
+		err = fmt.Errorf("client rate limiter Wait returned an error: %w", err)
+	}
 	latency := time.Since(now)
 
 	var message string
@@ -610,20 +624,21 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		}
 		return false
 	}
+	retry := r.retryFn(r.maxRetries)
 	url := r.URL().String()
 	for {
+		if err := retry.Before(ctx, r); err != nil {
+			return nil, retry.WrapPreviousError(err)
+		}
+
 		req, err := r.newHTTPRequest(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := r.retry.Before(ctx, r); err != nil {
-			return nil, err
-		}
-
 		resp, err := client.Do(req)
 		updateURLMetrics(ctx, r, resp, err)
-		r.retry.After(ctx, r, resp, err)
+		retry.After(ctx, r, resp, err)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			return r.newStreamWatcher(resp)
 		}
@@ -631,7 +646,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		done, transformErr := func() (bool, error) {
 			defer readAndCloseResponseBody(resp)
 
-			if r.retry.IsNextRetry(ctx, r, req, resp, err, isErrRetryableFunc) {
+			if retry.IsNextRetry(ctx, r, req, resp, err, isErrRetryableFunc) {
 				return false, nil
 			}
 
@@ -653,7 +668,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 				// we need to return the error object from that.
 				err = transformErr
 			}
-			return nil, err
+			return nil, retry.WrapPreviousError(err)
 		}
 	}
 }
@@ -695,7 +710,7 @@ func updateURLMetrics(ctx context.Context, req *Request, resp *http.Response, er
 	if err != nil {
 		metrics.RequestResult.Increment(ctx, "<error>", req.verb, url)
 	} else {
-		//Metrics for failure codes
+		// Metrics for failure codes
 		metrics.RequestResult.Increment(ctx, strconv.Itoa(resp.StatusCode), req.verb, url)
 	}
 }
@@ -718,8 +733,13 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 		client = http.DefaultClient
 	}
 
+	retry := r.retryFn(r.maxRetries)
 	url := r.URL().String()
 	for {
+		if err := retry.Before(ctx, r); err != nil {
+			return nil, err
+		}
+
 		req, err := r.newHTTPRequest(ctx)
 		if err != nil {
 			return nil, err
@@ -727,14 +747,9 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 		if r.body != nil {
 			req.Body = ioutil.NopCloser(r.body)
 		}
-
-		if err := r.retry.Before(ctx, r); err != nil {
-			return nil, err
-		}
-
 		resp, err := client.Do(req)
 		updateURLMetrics(ctx, r, resp, err)
-		r.retry.After(ctx, r, resp, err)
+		retry.After(ctx, r, resp, err)
 		if err != nil {
 			// we only retry on an HTTP response with 'Retry-After' header
 			return nil, err
@@ -749,7 +764,7 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 			done, transformErr := func() (bool, error) {
 				defer resp.Body.Close()
 
-				if r.retry.IsNextRetry(ctx, r, req, resp, err, neverRetryError) {
+				if retry.IsNextRetry(ctx, r, req, resp, err, neverRetryError) {
 					return false, nil
 				}
 				result := r.transformResponse(resp, req)
@@ -808,7 +823,7 @@ func (r *Request) newHTTPRequest(ctx context.Context) (*http.Request, error) {
 // fn at most once. It will return an error if a problem occurred prior to connecting to the
 // server - the provided function is responsible for handling server errors.
 func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Response)) error {
-	//Metrics for total request latency
+	// Metrics for total request latency
 	start := time.Now()
 	defer func() {
 		metrics.RequestLatency.Observe(ctx, r.verb, *r.URL(), time.Since(start))
@@ -856,13 +871,13 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 	}
 
 	// Right now we make about ten retry attempts if we get a Retry-After response.
+	retry := r.retryFn(r.maxRetries)
 	for {
+		if err := retry.Before(ctx, r); err != nil {
+			return retry.WrapPreviousError(err)
+		}
 		req, err := r.newHTTPRequest(ctx)
 		if err != nil {
-			return err
-		}
-
-		if err := r.retry.Before(ctx, r); err != nil {
 			return err
 		}
 		resp, err := client.Do(req)
@@ -872,12 +887,12 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		if req.ContentLength >= 0 && !(req.Body != nil && req.ContentLength == 0) {
 			metrics.RequestSize.Observe(ctx, r.verb, r.URL().Host, float64(req.ContentLength))
 		}
-		r.retry.After(ctx, r, resp, err)
+		retry.After(ctx, r, resp, err)
 
 		done := func() bool {
 			defer readAndCloseResponseBody(resp)
 
-			// if the the server returns an error in err, the response will be nil.
+			// if the server returns an error in err, the response will be nil.
 			f := func(req *http.Request, resp *http.Response) {
 				if resp == nil {
 					return
@@ -885,7 +900,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 				fn(req, resp)
 			}
 
-			if r.retry.IsNextRetry(ctx, r, req, resp, err, isErrRetryableFunc) {
+			if retry.IsNextRetry(ctx, r, req, resp, err, isErrRetryableFunc) {
 				return false
 			}
 
@@ -893,7 +908,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			return true
 		}()
 		if done {
-			return err
+			return retry.WrapPreviousError(err)
 		}
 	}
 }
@@ -902,8 +917,8 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 // processing.
 //
 // Error type:
-//  * If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
-//  * http.Client.Do errors are returned directly.
+//   - If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
+//   - http.Client.Do errors are returned directly.
 func (r *Request) Do(ctx context.Context) Result {
 	var result Result
 	err := r.request(ctx, func(req *http.Request, resp *http.Response) {
@@ -1049,13 +1064,13 @@ func truncateBody(body string) string {
 // allocating a new string for the body output unless necessary. Uses a simple heuristic to determine
 // whether the body is printable.
 func glogBody(prefix string, body []byte) {
-	if klog.V(8).Enabled() {
+	if klogV := klog.V(8); klogV.Enabled() {
 		if bytes.IndexFunc(body, func(r rune) bool {
 			return r < 0x0a
 		}) != -1 {
-			klog.Infof("%s:\n%s", prefix, truncateBody(hex.Dump(body)))
+			klogV.Infof("%s:\n%s", prefix, truncateBody(hex.Dump(body)))
 		} else {
-			klog.Infof("%s: %s", prefix, truncateBody(string(body)))
+			klogV.Infof("%s: %s", prefix, truncateBody(string(body)))
 		}
 	}
 }
@@ -1070,15 +1085,15 @@ const maxUnstructuredResponseTextBytes = 2048
 // unexpected responses. The rough structure is:
 //
 // 1. Assume the server sends you something sane - JSON + well defined error objects + proper codes
-//    - this is the happy path
-//    - when you get this output, trust what the server sends
-// 2. Guard against empty fields / bodies in received JSON and attempt to cull sufficient info from them to
-//    generate a reasonable facsimile of the original failure.
-//    - Be sure to use a distinct error type or flag that allows a client to distinguish between this and error 1 above
-// 3. Handle true disconnect failures / completely malformed data by moving up to a more generic client error
-// 4. Distinguish between various connection failures like SSL certificates, timeouts, proxy errors, unexpected
-//    initial contact, the presence of mismatched body contents from posted content types
-//    - Give these a separate distinct error type and capture as much as possible of the original message
+//   - this is the happy path
+//   - when you get this output, trust what the server sends
+//     2. Guard against empty fields / bodies in received JSON and attempt to cull sufficient info from them to
+//     generate a reasonable facsimile of the original failure.
+//   - Be sure to use a distinct error type or flag that allows a client to distinguish between this and error 1 above
+//     3. Handle true disconnect failures / completely malformed data by moving up to a more generic client error
+//     4. Distinguish between various connection failures like SSL certificates, timeouts, proxy errors, unexpected
+//     initial contact, the presence of mismatched body contents from posted content types
+//   - Give these a separate distinct error type and capture as much as possible of the original message
 //
 // TODO: introduce transformation of generic http.Client.Do() errors that separates 4.
 func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *http.Request, body []byte) error {

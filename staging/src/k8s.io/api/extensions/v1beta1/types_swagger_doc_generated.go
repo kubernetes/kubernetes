@@ -365,6 +365,7 @@ var map_NetworkPolicy = map[string]string{
 	"":         "DEPRECATED 1.9 - This group version of NetworkPolicy is deprecated by networking/v1/NetworkPolicy. NetworkPolicy describes what network traffic is allowed for a set of Pods",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "Specification of the desired behavior for this NetworkPolicy.",
+	"status":   "Status is the current state of the NetworkPolicy. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
 func (NetworkPolicy) SwaggerDoc() map[string]string {
@@ -416,7 +417,7 @@ var map_NetworkPolicyPort = map[string]string{
 	"":         "DEPRECATED 1.9 - This group version of NetworkPolicyPort is deprecated by networking/v1/NetworkPolicyPort.",
 	"protocol": "Optional.  The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.",
 	"port":     "The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.",
-	"endPort":  "If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Beta state and is enabled by default. It can be disabled using the Feature Gate \"NetworkPolicyEndPort\".",
+	"endPort":  "If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.",
 }
 
 func (NetworkPolicyPort) SwaggerDoc() map[string]string {
@@ -433,6 +434,15 @@ var map_NetworkPolicySpec = map[string]string{
 
 func (NetworkPolicySpec) SwaggerDoc() map[string]string {
 	return map_NetworkPolicySpec
+}
+
+var map_NetworkPolicyStatus = map[string]string{
+	"":           "NetworkPolicyStatus describe the current state of the NetworkPolicy.",
+	"conditions": "Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy. Current service state",
+}
+
+func (NetworkPolicyStatus) SwaggerDoc() map[string]string {
+	return map_NetworkPolicyStatus
 }
 
 var map_PodSecurityPolicy = map[string]string{

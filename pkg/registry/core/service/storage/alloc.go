@@ -899,6 +899,13 @@ func (al *Allocators) releaseClusterIPs(service *api.Service) (released map[api.
 	return al.releaseIPs(toRelease)
 }
 
+func (al *Allocators) Destroy() {
+	al.serviceNodePorts.Destroy()
+	for _, a := range al.serviceIPAllocatorsByFamily {
+		a.Destroy()
+	}
+}
+
 // This is O(N), but we expect haystack to be small;
 // so small that we expect a linear search to be faster
 func containsNumber(haystack []int, needle int) bool {
@@ -1005,7 +1012,7 @@ func isMatchingPreferDualStackClusterIPFields(after After, before Before) bool {
 
 // Helper to avoid nil-checks all over.  Callers of this need to be checking
 // for an exact value.
-func getIPFamilyPolicy(svc *api.Service) api.IPFamilyPolicyType {
+func getIPFamilyPolicy(svc *api.Service) api.IPFamilyPolicy {
 	if svc.Spec.IPFamilyPolicy == nil {
 		return "" // callers need to handle this
 	}

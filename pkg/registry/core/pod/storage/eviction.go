@@ -95,6 +95,12 @@ func (r *EvictionREST) New() runtime.Object {
 	return &policy.Eviction{}
 }
 
+// Destroy cleans up resources on shutdown.
+func (r *EvictionREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
+}
+
 // Propagate dry-run takes the dry-run option from the request and pushes it into the eviction object.
 // It returns an error if they have non-matching dry-run options.
 func propagateDryRun(eviction *policy.Eviction, options *metav1.CreateOptions) (*metav1.DeleteOptions, error) {

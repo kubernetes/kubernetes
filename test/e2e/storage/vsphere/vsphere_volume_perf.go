@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -33,9 +33,12 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-/* This test calculates latency numbers for volume lifecycle operations
+/*
+	This test calculates latency numbers for volume lifecycle operations
+
 1. Create 4 type of storage classes
 2. Read the total number of volumes to be created and volumes per pod
 3. Create total PVCs (number of volumes)
@@ -54,6 +57,7 @@ const (
 
 var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("vcp-performance")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		client           clientset.Interface

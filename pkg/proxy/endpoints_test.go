@@ -1897,7 +1897,6 @@ func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[Ser
 				newEp, ok := newMap[x][i].(*BaseEndpointInfo)
 				if !ok {
 					t.Fatalf("Failed to cast endpointsInfo")
-					continue
 				}
 				if !endpointEqual(newEp, expected[x][i]) {
 					t.Fatalf("expected new[%v][%d] to be %v, got %v"+

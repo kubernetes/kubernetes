@@ -123,9 +123,6 @@ func TestDeduping(t *testing.T) {
 	if q.Len() != 0 {
 		t.Errorf("should not have added")
 	}
-	if q.Len() != 0 {
-		t.Errorf("should not have added")
-	}
 }
 
 func TestAddTwoFireEarly(t *testing.T) {

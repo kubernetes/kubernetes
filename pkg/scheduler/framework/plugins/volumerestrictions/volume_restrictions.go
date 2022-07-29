@@ -18,7 +18,6 @@ package volumerestrictions
 
 import (
 	"context"
-	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -27,16 +26,14 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // VolumeRestrictions is a plugin that checks volume restrictions.
 type VolumeRestrictions struct {
-	parallelizer           parallelize.Parallelizer
 	pvcLister              corelisters.PersistentVolumeClaimLister
-	nodeInfoLister         framework.SharedLister
+	sharedLister           framework.SharedLister
 	enableReadWriteOncePod bool
 }
 
@@ -132,12 +129,6 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framewo
 // use a ReadWriteOncePod PVC, mark any other pods attempting to use this PVC as UnschedulableAndUnresolvable.
 // TODO(#103132): Mark pod as Unschedulable and add preemption logic.
 func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(ctx context.Context, pod *v1.Pod) *framework.Status {
-	nodeInfos, err := pl.nodeInfoLister.NodeInfos().List()
-	if err != nil {
-		return framework.NewStatus(framework.Error, "error while getting node info")
-	}
-
-	var pvcKeys []string
 	for _, volume := range pod.Spec.Volumes {
 		if volume.PersistentVolumeClaim == nil {
 			continue
@@ -155,28 +146,10 @@ func (pl *VolumeRestrictions) isReadWriteOncePodAccessModeConflict(ctx context.C
 			continue
 		}
 
-		key := pod.Namespace + "/" + volume.PersistentVolumeClaim.ClaimName
-		pvcKeys = append(pvcKeys, key)
-	}
-
-	subCtx, cancel := context.WithCancel(ctx)
-	var conflicts uint32
-
-	processNode := func(i int) {
-		nodeInfo := nodeInfos[i]
-		for _, key := range pvcKeys {
-			refCount := nodeInfo.PVCRefCounts[key]
-			if refCount > 0 {
-				atomic.AddUint32(&conflicts, 1)
-				cancel()
-			}
+		key := framework.GetNamespacedName(pod.Namespace, volume.PersistentVolumeClaim.ClaimName)
+		if pl.sharedLister.StorageInfos().IsPVCUsedByPods(key) {
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodConflict)
 		}
-	}
-	pl.parallelizer.Until(subCtx, len(nodeInfos), processNode)
-
-	// Enforce ReadWriteOncePod access mode. This is also enforced during volume mount in kubelet.
-	if conflicts > 0 {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonReadWriteOncePodConflict)
 	}
 
 	return nil
@@ -232,12 +205,11 @@ func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEvent {
 func New(_ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
-	nodeInfoLister := handle.SnapshotSharedLister()
+	sharedLister := handle.SnapshotSharedLister()
 
 	return &VolumeRestrictions{
-		parallelizer:           handle.Parallelizer(),
 		pvcLister:              pvcLister,
-		nodeInfoLister:         nodeInfoLister,
+		sharedLister:           sharedLister,
 		enableReadWriteOncePod: fts.EnableReadWriteOncePod,
 	}, nil
 }

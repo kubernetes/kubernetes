@@ -25,14 +25,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
-//TODO : Consolidate this code with the code for emptyDir.
-//This will require some smart.
+// TODO : Consolidate this code with the code for emptyDir.
+// This will require some smart.
 var _ = SIGDescribe("HostPath", func() {
 	f := framework.NewDefaultFramework("hostpath")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		// TODO permission denied cleanup failures
@@ -128,8 +130,8 @@ var _ = SIGDescribe("HostPath", func() {
 	})
 })
 
-//These constants are borrowed from the other test.
-//const volumeName = "test-volume"
+// These constants are borrowed from the other test.
+// const volumeName = "test-volume"
 const containerName1 = "test-container-1"
 const containerName2 = "test-container-2"
 
@@ -144,7 +146,7 @@ func mount(source *v1.HostPathVolumeSource) []v1.Volume {
 	}
 }
 
-//TODO: To merge this with the emptyDir tests, we can make source a lambda.
+// TODO: To merge this with the emptyDir tests, we can make source a lambda.
 func testPodWithHostVol(path string, source *v1.HostPathVolumeSource, privileged bool) *v1.Pod {
 	podName := "pod-host-path-test"
 

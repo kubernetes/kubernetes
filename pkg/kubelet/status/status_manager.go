@@ -859,7 +859,7 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 	// the Kubelet exclusively owns must be released prior to a pod being reported terminal,
 	// while resources that have participanting components above the API use the pod's
 	// transition to a terminal phase (or full deletion) to release those resources.
-	if !isPhaseTerminal(oldPodStatus.Phase) && isPhaseTerminal(newPodStatus.Phase) {
+	if !podutil.IsPodPhaseTerminal(oldPodStatus.Phase) && podutil.IsPodPhaseTerminal(newPodStatus.Phase) {
 		if couldHaveRunningContainers {
 			newPodStatus.Phase = oldPodStatus.Phase
 			newPodStatus.Reason = oldPodStatus.Reason
@@ -867,12 +867,21 @@ func mergePodStatus(oldPodStatus, newPodStatus v1.PodStatus, couldHaveRunningCon
 		}
 	}
 
-	return newPodStatus
-}
+	// If the new phase is terminal, explicitly set the ready condition to false for v1.PodReady and v1.ContainersReady.
+	// It may take some time for kubelet to reconcile the ready condition, so explicitly set ready conditions to false if the phase is terminal.
+	// This is done to ensure kubelet does not report a status update with terminal pod phase and ready=true.
+	// See https://issues.k8s.io/108594 for more details.
+	if podutil.IsPodPhaseTerminal(newPodStatus.Phase) {
+		if podutil.IsPodReadyConditionTrue(newPodStatus) || podutil.IsContainersReadyConditionTrue(newPodStatus) {
+			containersReadyCondition := generateContainersReadyConditionForTerminalPhase(newPodStatus.Phase)
+			podutil.UpdatePodCondition(&newPodStatus, &containersReadyCondition)
 
-// isPhaseTerminal returns true if the pod's phase is terminal.
-func isPhaseTerminal(phase v1.PodPhase) bool {
-	return phase == v1.PodFailed || phase == v1.PodSucceeded
+			podReadyCondition := generatePodReadyConditionForTerminalPhase(newPodStatus.Phase)
+			podutil.UpdatePodCondition(&newPodStatus, &podReadyCondition)
+		}
+	}
+
+	return newPodStatus
 }
 
 // NeedToReconcilePodReadiness returns if the pod "Ready" condition need to be reconcile

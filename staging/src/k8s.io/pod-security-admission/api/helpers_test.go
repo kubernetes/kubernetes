@@ -53,3 +53,67 @@ func TestParseVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestLevelVersionEquals(t *testing.T) {
+	t.Run("a LevelVersion should be equal to itself", func(t *testing.T) {
+		for _, l := range []Level{LevelPrivileged, LevelBaseline, LevelRestricted} {
+			for _, v := range []Version{LatestVersion(), MajorMinorVersion(1, 18), MajorMinorVersion(1, 30)} {
+				lv := LevelVersion{l, v}
+				other := lv
+				assert.True(t, lv.Equivalent(&other), lv.String())
+			}
+		}
+	})
+	t.Run("different levels should not be equal", func(t *testing.T) {
+		for _, l1 := range []Level{LevelPrivileged, LevelBaseline, LevelRestricted} {
+			for _, l2 := range []Level{LevelPrivileged, LevelBaseline, LevelRestricted} {
+				if l1 != l2 {
+					lv1 := LevelVersion{l1, LatestVersion()}
+					lv2 := LevelVersion{l2, LatestVersion()}
+					assert.False(t, lv1.Equivalent(&lv2), "%#v != %#v", lv1, lv2)
+				}
+			}
+		}
+	})
+	t.Run("different non-privileged versions should not be equal", func(t *testing.T) {
+		for _, l := range []Level{LevelBaseline, LevelRestricted} {
+			for _, v1 := range []Version{LatestVersion(), MajorMinorVersion(1, 18), MajorMinorVersion(1, 30)} {
+				for _, v2 := range []Version{MajorMinorVersion(1, 16), MajorMinorVersion(1, 13)} {
+					lv1 := LevelVersion{l, v1}
+					lv2 := LevelVersion{l, v2}
+					assert.False(t, lv1.Equivalent(&lv2), "%#v != %#v", lv1, lv2)
+				}
+			}
+		}
+	})
+	t.Run("different privileged versions should be equal", func(t *testing.T) {
+		for _, v1 := range []Version{LatestVersion(), MajorMinorVersion(1, 18), MajorMinorVersion(1, 30)} {
+			for _, v2 := range []Version{MajorMinorVersion(1, 16), MajorMinorVersion(1, 13)} {
+				lv1 := LevelVersion{LevelPrivileged, v1}
+				lv2 := LevelVersion{LevelPrivileged, v2}
+				assert.True(t, lv1.Equivalent(&lv2), "%#v == %#v", lv1, lv2)
+			}
+		}
+	})
+}
+
+func TestPolicyEquals(t *testing.T) {
+	privileged := Policy{
+		Enforce: LevelVersion{LevelPrivileged, LatestVersion()},
+		Audit:   LevelVersion{LevelPrivileged, LatestVersion()},
+		Warn:    LevelVersion{LevelPrivileged, LatestVersion()},
+	}
+	require.True(t, privileged.FullyPrivileged())
+
+	privileged2 := privileged
+	privileged2.Enforce.Version = MajorMinorVersion(1, 20)
+	require.True(t, privileged2.FullyPrivileged())
+
+	baseline := privileged
+	baseline.Audit.Level = LevelBaseline
+	require.False(t, baseline.FullyPrivileged())
+
+	assert.True(t, privileged.Equivalent(&privileged2), "ignore privileged versions")
+	assert.True(t, baseline.Equivalent(&baseline), "baseline policy equals itself")
+	assert.False(t, privileged.Equivalent(&baseline), "privileged != baseline")
+}

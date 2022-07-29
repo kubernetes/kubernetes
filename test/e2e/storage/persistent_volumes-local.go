@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -49,6 +49,7 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 type localTestConfig struct {
@@ -149,6 +150,7 @@ var (
 
 var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		config *localTestConfig

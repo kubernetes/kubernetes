@@ -40,22 +40,24 @@ import (
 	testclocks "k8s.io/utils/clock/testing"
 )
 
-/* fightTest configures a test of how API Priority and Fairness config
-   controllers fight when they disagree on how to set FlowSchemaStatus.
-   In particular, they set the condition that indicates integrity of
-   the reference to the PriorityLevelConfiguration.  The scenario tested is
-   two teams of controllers, where the controllers in one team set the
-   condition normally and the controllers in the other team set the condition
-   to the opposite value.
+/*
+fightTest configures a test of how API Priority and Fairness config
 
-   This is a behavioral test: it instantiates these controllers and runs them
-   almost normally.  The test aims to run the controllers for a little under
-   2 minutes.  The test takes clock readings to get upper and lower bounds on
-   how long each controller ran, and calculates consequent bounds on the number
-   of writes that should happen to each FlowSchemaStatus.  The test creates
-   an informer to observe the writes.  The calculated lower bound on the
-   number of writes is very lax, assuming only that one write can be done
-   every 10 seconds.
+	controllers fight when they disagree on how to set FlowSchemaStatus.
+	In particular, they set the condition that indicates integrity of
+	the reference to the PriorityLevelConfiguration.  The scenario tested is
+	two teams of controllers, where the controllers in one team set the
+	condition normally and the controllers in the other team set the condition
+	to the opposite value.
+
+	This is a behavioral test: it instantiates these controllers and runs them
+	almost normally.  The test aims to run the controllers for a little under
+	2 minutes.  The test takes clock readings to get upper and lower bounds on
+	how long each controller ran, and calculates consequent bounds on the number
+	of writes that should happen to each FlowSchemaStatus.  The test creates
+	an informer to observe the writes.  The calculated lower bound on the
+	number of writes is very lax, assuming only that one write can be done
+	every 10 seconds.
 */
 type fightTest struct {
 	t              *testing.T
@@ -139,8 +141,8 @@ func (ft *fightTest) createController(invert bool, i int) {
 		FlowcontrolClient:      fcIfc,
 		ServerConcurrencyLimit: 200,             // server concurrency limit
 		RequestWaitLimit:       time.Minute / 4, // request wait limit
-		ReqsObsPairGenerator:   metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		ExecSeatsObsGenerator:  metrics.PriorityLevelExecutionSeatsObserverGenerator,
+		ReqsGaugeVec:           metrics.PriorityLevelConcurrencyGaugeVec,
+		ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 		QueueSetFactory:        fqtesting.NewNoRestraintFactory(),
 	})
 	ft.ctlrs[invert][i] = ctlr
@@ -170,10 +172,10 @@ func (ft *fightTest) evaluate(tBeforeCreate, tAfterCreate time.Time) {
 }
 func TestConfigConsumerFight(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
-	_, loopbackConfig, closeFn := setup(t, 100, 100)
+	kubeConfig, closeFn := setup(t, 100, 100)
 	defer closeFn()
 	const teamSize = 3
-	ft := newFightTest(t, loopbackConfig, teamSize)
+	ft := newFightTest(t, kubeConfig, teamSize)
 	tBeforeCreate := time.Now()
 	ft.createMainInformer()
 	ft.foreach(ft.createController)

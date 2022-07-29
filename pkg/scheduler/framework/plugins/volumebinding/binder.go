@@ -25,31 +25,26 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/storage/etcd3"
+	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
-	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
-	storagelistersv1beta1 "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/component-helpers/storage/ephemeral"
-	storagehelpers "k8s.io/component-helpers/storage/volume"
+	"k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	csiplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // ConflictReason is used for the special strings which explain why
@@ -128,26 +123,26 @@ type InTreeToCSITranslator interface {
 // also considered along with the pod's other scheduling requirements.
 //
 // This integrates into the existing scheduler workflow as follows:
-// 1. The scheduler takes a Pod off the scheduler queue and processes it serially:
-//    a. Invokes all pre-filter plugins for the pod. GetPodVolumes() is invoked
-//    here, pod volume information will be saved in current scheduling cycle state for later use.
-//    b. Invokes all filter plugins, parallelized across nodes.  FindPodVolumes() is invoked here.
-//    c. Invokes all score plugins.  Future/TBD
-//    d. Selects the best node for the Pod.
-//    e. Invokes all reserve plugins. AssumePodVolumes() is invoked here.
-//       i.  If PVC binding is required, cache in-memory only:
-//           * For manual binding: update PV objects for prebinding to the corresponding PVCs.
-//           * For dynamic provisioning: update PVC object with a selected node from c)
-//           * For the pod, which PVCs and PVs need API updates.
-//       ii. Afterwards, the main scheduler caches the Pod->Node binding in the scheduler's pod cache,
-//           This is handled in the scheduler and not here.
-//    f. Asynchronously bind volumes and pod in a separate goroutine
-//        i.  BindPodVolumes() is called first in PreBind phase. It makes all the necessary API updates and waits for
-//            PV controller to fully bind and provision the PVCs. If binding fails, the Pod is sent
-//            back through the scheduler.
-//        ii. After BindPodVolumes() is complete, then the scheduler does the final Pod->Node binding.
-// 2. Once all the assume operations are done in e), the scheduler processes the next Pod in the scheduler queue
-//    while the actual binding operation occurs in the background.
+//  1. The scheduler takes a Pod off the scheduler queue and processes it serially:
+//     a. Invokes all pre-filter plugins for the pod. GetPodVolumes() is invoked
+//     here, pod volume information will be saved in current scheduling cycle state for later use.
+//     b. Invokes all filter plugins, parallelized across nodes.  FindPodVolumes() is invoked here.
+//     c. Invokes all score plugins.  Future/TBD
+//     d. Selects the best node for the Pod.
+//     e. Invokes all reserve plugins. AssumePodVolumes() is invoked here.
+//     i.  If PVC binding is required, cache in-memory only:
+//     * For manual binding: update PV objects for prebinding to the corresponding PVCs.
+//     * For dynamic provisioning: update PVC object with a selected node from c)
+//     * For the pod, which PVCs and PVs need API updates.
+//     ii. Afterwards, the main scheduler caches the Pod->Node binding in the scheduler's pod cache,
+//     This is handled in the scheduler and not here.
+//     f. Asynchronously bind volumes and pod in a separate goroutine
+//     i.  BindPodVolumes() is called first in PreBind phase. It makes all the necessary API updates and waits for
+//     PV controller to fully bind and provision the PVCs. If binding fails, the Pod is sent
+//     back through the scheduler.
+//     ii. After BindPodVolumes() is complete, then the scheduler does the final Pod->Node binding.
+//  2. Once all the assume operations are done in e), the scheduler processes the next Pod in the scheduler queue
+//     while the actual binding operation occurs in the background.
 type SchedulerVolumeBinder interface {
 	// GetPodVolumes returns a pod's PVCs separated into bound, unbound with delayed binding (including provisioning)
 	// and unbound with immediate binding (including prebound)
@@ -190,7 +185,7 @@ type SchedulerVolumeBinder interface {
 	// 3. Wait for PVCs to be completely bound by the PV controller
 	//
 	// This function can be called in parallel.
-	BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes) error
+	BindPodVolumes(ctx context.Context, assumedPod *v1.Pod, podVolumes *PodVolumes) error
 }
 
 type volumeBinder struct {
@@ -209,9 +204,8 @@ type volumeBinder struct {
 
 	translator InTreeToCSITranslator
 
-	capacityCheckEnabled     bool
 	csiDriverLister          storagelisters.CSIDriverLister
-	csiStorageCapacityLister storagelistersv1beta1.CSIStorageCapacityLister
+	csiStorageCapacityLister storagelisters.CSIStorageCapacityLister
 }
 
 // CapacityCheck contains additional parameters for NewVolumeBinder that
@@ -219,12 +213,12 @@ type volumeBinder struct {
 // capacity is desired.
 type CapacityCheck struct {
 	CSIDriverInformer          storageinformers.CSIDriverInformer
-	CSIStorageCapacityInformer storageinformersv1beta1.CSIStorageCapacityInformer
+	CSIStorageCapacityInformer storageinformers.CSIStorageCapacityInformer
 }
 
 // NewVolumeBinder sets up all the caches needed for the scheduler to make volume binding decisions.
 //
-// capacityCheck determines whether storage capacity is checked (CSIStorageCapacity feature).
+// capacityCheck determines how storage capacity is checked (CSIStorageCapacity feature).
 func NewVolumeBinder(
 	kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer,
@@ -233,7 +227,7 @@ func NewVolumeBinder(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	storageClassInformer storageinformers.StorageClassInformer,
-	capacityCheck *CapacityCheck,
+	capacityCheck CapacityCheck,
 	bindTimeout time.Duration) SchedulerVolumeBinder {
 	b := &volumeBinder{
 		kubeClient:    kubeClient,
@@ -247,11 +241,8 @@ func NewVolumeBinder(
 		translator:    csitrans.New(),
 	}
 
-	if capacityCheck != nil {
-		b.capacityCheckEnabled = true
-		b.csiDriverLister = capacityCheck.CSIDriverInformer.Lister()
-		b.csiStorageCapacityLister = capacityCheck.CSIStorageCapacityInformer.Lister()
-	}
+	b.csiDriverLister = capacityCheck.CSIDriverInformer.Lister()
+	b.csiStorageCapacityLister = capacityCheck.CSIStorageCapacityInformer.Lister()
 
 	return b
 }
@@ -330,7 +321,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 
 		// Filter out claims to provision
 		for _, claim := range claimsToBind {
-			if selectedNode, ok := claim.Annotations[pvutil.AnnSelectedNode]; ok {
+			if selectedNode, ok := claim.Annotations[volume.AnnSelectedNode]; ok {
 				if selectedNode != node.Name {
 					// Fast path, skip unmatched node.
 					unboundVolumesSatisfied = false
@@ -386,7 +377,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, pod
 	// Assume PV
 	newBindings := []*BindingInfo{}
 	for _, binding := range podVolumes.StaticBindings {
-		newPV, dirty, err := pvutil.GetBindVolumeToClaim(binding.pv, binding.pvc)
+		newPV, dirty, err := volume.GetBindVolumeToClaim(binding.pv, binding.pvc)
 		klog.V(5).InfoS("AssumePodVolumes: GetBindVolumeToClaim",
 			"pod", klog.KObj(assumedPod),
 			"PV", klog.KObj(binding.pv),
@@ -399,7 +390,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, pod
 			b.revertAssumedPVs(newBindings)
 			return false, err
 		}
-		// TODO: can we assume everytime?
+		// TODO: can we assume every time?
 		if dirty {
 			err = b.pvCache.Assume(newPV)
 			if err != nil {
@@ -416,7 +407,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, pod
 		// The claims from method args can be pointing to watcher cache. We must not
 		// modify these, therefore create a copy.
 		claimClone := claim.DeepCopy()
-		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnSelectedNode, nodeName)
+		metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, volume.AnnSelectedNode, nodeName)
 		err = b.pvcCache.Assume(claimClone)
 		if err != nil {
 			b.revertAssumedPVs(newBindings)
@@ -441,7 +432,7 @@ func (b *volumeBinder) RevertAssumedPodVolumes(podVolumes *PodVolumes) {
 // BindPodVolumes gets the cached bindings and PVCs to provision in pod's volumes information,
 // makes the API update for those PVs/PVCs, and waits for the PVCs to be completely bound
 // by the PV controller.
-func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes) (err error) {
+func (b *volumeBinder) BindPodVolumes(ctx context.Context, assumedPod *v1.Pod, podVolumes *PodVolumes) (err error) {
 	klog.V(4).InfoS("BindPodVolumes", "pod", klog.KObj(assumedPod), "node", klog.KRef("", assumedPod.Spec.NodeName))
 
 	defer func() {
@@ -454,7 +445,7 @@ func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes
 	claimsToProvision := podVolumes.DynamicProvisions
 
 	// Start API operations
-	err = b.bindAPIUpdate(assumedPod, bindings, claimsToProvision)
+	err = b.bindAPIUpdate(ctx, assumedPod, bindings, claimsToProvision)
 	if err != nil {
 		return err
 	}
@@ -478,7 +469,7 @@ func getPVCName(pvc *v1.PersistentVolumeClaim) string {
 }
 
 // bindAPIUpdate makes the API update for those PVs/PVCs.
-func (b *volumeBinder) bindAPIUpdate(pod *v1.Pod, bindings []*BindingInfo, claimsToProvision []*v1.PersistentVolumeClaim) error {
+func (b *volumeBinder) bindAPIUpdate(ctx context.Context, pod *v1.Pod, bindings []*BindingInfo, claimsToProvision []*v1.PersistentVolumeClaim) error {
 	podName := getPodName(pod)
 	if bindings == nil {
 		return fmt.Errorf("failed to get cached bindings for pod %q", podName)
@@ -512,7 +503,7 @@ func (b *volumeBinder) bindAPIUpdate(pod *v1.Pod, bindings []*BindingInfo, claim
 		klog.V(5).InfoS("bindAPIUpdate: binding PV to PVC", "pod", klog.KObj(pod), "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc))
 		// TODO: does it hurt if we make an api call and nothing needs to be updated?
 		klog.V(2).InfoS("Claim bound to volume", "PVC", klog.KObj(binding.pvc), "PV", klog.KObj(binding.pv))
-		newPV, err := b.kubeClient.CoreV1().PersistentVolumes().Update(context.TODO(), binding.pv, metav1.UpdateOptions{})
+		newPV, err := b.kubeClient.CoreV1().PersistentVolumes().Update(ctx, binding.pv, metav1.UpdateOptions{})
 		if err != nil {
 			klog.V(4).InfoS("Updating PersistentVolume: binding to claim failed", "PV", klog.KObj(binding.pv), "PVC", klog.KObj(binding.pvc), "err", err)
 			return err
@@ -527,7 +518,7 @@ func (b *volumeBinder) bindAPIUpdate(pod *v1.Pod, bindings []*BindingInfo, claim
 	// PV controller is expected to signal back by removing related annotations if actual provisioning fails
 	for i, claim = range claimsToProvision {
 		klog.V(5).InfoS("Updating claims objects to trigger volume provisioning", "pod", klog.KObj(pod), "PVC", klog.KObj(claim))
-		newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claim, metav1.UpdateOptions{})
+		newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
@@ -540,7 +531,7 @@ func (b *volumeBinder) bindAPIUpdate(pod *v1.Pod, bindings []*BindingInfo, claim
 }
 
 var (
-	versioner = etcd3.APIObjectVersioner{}
+	versioner = storage.APIObjectVersioner{}
 )
 
 // checkBindings runs through all the PVCs in the Pod and checks:
@@ -608,7 +599,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 		}
 
 		// Check PV's node affinity (the node might not have the proper label)
-		if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
+		if err := volume.CheckNodeAffinity(pv, node.Labels); err != nil {
 			return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %w", pv.Name, node.Name, err)
 		}
 
@@ -639,7 +630,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 		if pvc.Annotations == nil {
 			return false, fmt.Errorf("selectedNode annotation reset for PVC %q", pvc.Name)
 		}
-		selectedNode := pvc.Annotations[pvutil.AnnSelectedNode]
+		selectedNode := pvc.Annotations[volume.AnnSelectedNode]
 		if selectedNode != pod.Spec.NodeName {
 			// If provisioner fails to provision a volume, selectedNode
 			// annotation will be removed to signal back to the scheduler to
@@ -666,7 +657,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 				return false, err
 			}
 
-			if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
+			if err := volume.CheckNodeAffinity(pv, node.Labels); err != nil {
 				return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %w", pv.Name, node.Name, err)
 			}
 		}
@@ -734,7 +725,7 @@ func (b *volumeBinder) isPVCBound(namespace, pvcName string) (bool, *v1.Persiste
 }
 
 func (b *volumeBinder) isPVCFullyBound(pvc *v1.PersistentVolumeClaim) bool {
-	return pvc.Spec.VolumeName != "" && metav1.HasAnnotation(pvc.ObjectMeta, pvutil.AnnBindCompleted)
+	return pvc.Spec.VolumeName != "" && metav1.HasAnnotation(pvc.ObjectMeta, volume.AnnBindCompleted)
 }
 
 // arePodVolumesBound returns true if all volumes are fully bound
@@ -766,7 +757,7 @@ func (b *volumeBinder) GetPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 		if volumeBound {
 			boundClaims = append(boundClaims, pvc)
 		} else {
-			delayBindingMode, err := pvutil.IsDelayBindingMode(pvc, b.classLister)
+			delayBindingMode, err := volume.IsDelayBindingMode(pvc, b.classLister)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -806,7 +797,7 @@ func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node
 			return false, true, err
 		}
 
-		err = volumeutil.CheckNodeAffinity(pv, node.Labels)
+		err = volume.CheckNodeAffinity(pv, node.Labels)
 		if err != nil {
 			klog.V(4).InfoS("PersistentVolume and node mismatch for pod", "PV", klog.KRef("", pvName), "node", klog.KObj(node), "pod", klog.KObj(pod), "err", err)
 			return false, true, nil
@@ -830,11 +821,11 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.Persi
 
 	for _, pvc := range claimsToBind {
 		// Get storage class name from each PVC
-		storageClassName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
+		storageClassName := volume.GetPersistentVolumeClaimClass(pvc)
 		allPVs := b.pvCache.ListPVs(storageClassName)
 
 		// Find a matching PV
-		pv, err := pvutil.FindMatchingVolume(pvc, allPVs, node, chosenPVs, true)
+		pv, err := volume.FindMatchingVolume(pvc, allPVs, node, chosenPVs, true)
 		if err != nil {
 			return false, nil, nil, err
 		}
@@ -868,7 +859,7 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 	// fails or we encounter an error.
 	for _, claim := range claimsToProvision {
 		pvcName := getPVCName(claim)
-		className := storagehelpers.GetPersistentVolumeClaimClass(claim)
+		className := volume.GetPersistentVolumeClaimClass(claim)
 		if className == "" {
 			return false, false, nil, fmt.Errorf("no class for claim %q", pvcName)
 		}
@@ -878,7 +869,7 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 			return false, false, nil, fmt.Errorf("failed to find storage class %q", className)
 		}
 		provisioner := class.Provisioner
-		if provisioner == "" || provisioner == pvutil.NotSupportedProvisioner {
+		if provisioner == "" || provisioner == volume.NotSupportedProvisioner {
 			klog.V(4).InfoS("Storage class of claim does not support dynamic provisioning", "storageClassName", className, "PVC", klog.KObj(claim))
 			return false, true, nil, nil
 		}
@@ -922,12 +913,6 @@ func (b *volumeBinder) revertAssumedPVCs(claims []*v1.PersistentVolumeClaim) {
 // hasEnoughCapacity checks whether the provisioner has enough capacity left for a new volume of the given size
 // that is available from the node.
 func (b *volumeBinder) hasEnoughCapacity(provisioner string, claim *v1.PersistentVolumeClaim, storageClass *storagev1.StorageClass, node *v1.Node) (bool, error) {
-	// This is an optional feature. If disabled, we assume that
-	// there is enough storage.
-	if !b.capacityCheckEnabled {
-		return true, nil
-	}
-
 	quantity, ok := claim.Spec.Resources.Requests[v1.ResourceStorage]
 	if !ok {
 		// No capacity to check for.
@@ -973,7 +958,7 @@ func (b *volumeBinder) hasEnoughCapacity(provisioner string, claim *v1.Persisten
 	return false, nil
 }
 
-func capacitySufficient(capacity *storagev1beta1.CSIStorageCapacity, sizeInBytes int64) bool {
+func capacitySufficient(capacity *storagev1.CSIStorageCapacity, sizeInBytes int64) bool {
 	limit := capacity.Capacity
 	if capacity.MaximumVolumeSize != nil {
 		// Prefer MaximumVolumeSize if available, it is more precise.
@@ -982,7 +967,7 @@ func capacitySufficient(capacity *storagev1beta1.CSIStorageCapacity, sizeInBytes
 	return limit != nil && limit.Value() >= sizeInBytes
 }
 
-func (b *volumeBinder) nodeHasAccess(node *v1.Node, capacity *storagev1beta1.CSIStorageCapacity) bool {
+func (b *volumeBinder) nodeHasAccess(node *v1.Node, capacity *storagev1.CSIStorageCapacity) bool {
 	if capacity.NodeTopology == nil {
 		// Unavailable
 		return false
@@ -1058,10 +1043,6 @@ func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) 
 // tryTranslatePVToCSI will translate the in-tree PV to CSI if it meets the criteria. If not, it returns the unmodified in-tree PV.
 func (b *volumeBinder) tryTranslatePVToCSI(pv *v1.PersistentVolume, csiNode *storagev1.CSINode) (*v1.PersistentVolume, error) {
 	if !b.translator.IsPVMigratable(pv) {
-		return pv, nil
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 		return pv, nil
 	}
 

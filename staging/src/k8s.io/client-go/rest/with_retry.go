@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -51,12 +52,6 @@ var neverRetryError = IsRetryableErrorFunc(func(_ *http.Request, _ error) bool {
 // Note that WithRetry is not safe for concurrent use by multiple
 // goroutines without additional locking or coordination.
 type WithRetry interface {
-	// SetMaxRetries makes the request use the specified integer as a ceiling
-	// for retries upon receiving a 429 status code  and the "Retry-After" header
-	// in the response.
-	// A zero maxRetries should prevent from doing any retry and return immediately.
-	SetMaxRetries(maxRetries int)
-
 	// IsNextRetry advances the retry counter appropriately
 	// and returns true if the request should be retried,
 	// otherwise it returns false, if:
@@ -77,12 +72,32 @@ type WithRetry interface {
 	IsNextRetry(ctx context.Context, restReq *Request, httpReq *http.Request, resp *http.Response, err error, f IsRetryableErrorFunc) bool
 
 	// Before should be invoked prior to each attempt, including
-	// the first one. if an error is returned, the request
-	// should be aborted immediately.
+	// the first one. If an error is returned, the request should
+	// be aborted immediately.
+	//
+	// Before may also be additionally responsible for preparing
+	// the request for the next retry, namely in terms of resetting
+	// the request body in case it has been read.
 	Before(ctx context.Context, r *Request) error
 
 	// After should be invoked immediately after an attempt is made.
 	After(ctx context.Context, r *Request, resp *http.Response, err error)
+
+	// WrapPreviousError wraps the error from any previous attempt into
+	// the final error specified in 'finalErr', so the user has more
+	// context why the request failed.
+	// For example, if a request times out after multiple retries then
+	// we see a generic context.Canceled or context.DeadlineExceeded
+	// error which is not very useful in debugging. This function can
+	// wrap any error from previous attempt(s) to provide more context to
+	// the user. The error returned in 'err' must satisfy the
+	// following conditions:
+	//  a: errors.Unwrap(err) = errors.Unwrap(finalErr) if finalErr
+	//     implements Unwrap
+	//  b: errors.Unwrap(err) = finalErr if finalErr does not
+	//     implements Unwrap
+	//  c: errors.Is(err, otherErr) = errors.Is(finalErr, otherErr)
+	WrapPreviousError(finalErr error) (err error)
 }
 
 // RetryAfter holds information associated with the next retry.
@@ -111,16 +126,29 @@ type withRetry struct {
 	//  - for consecutive attempts, it is non nil and holds the
 	//    retry after parameters for the next attempt to be made.
 	retryAfter *RetryAfter
+
+	// we keep track of two most recent errors, if the most
+	// recent attempt is labeled as 'N' then:
+	//  - currentErr represents the error returned by attempt N, it
+	//    can be nil if attempt N did not return an error.
+	//  - previousErr represents an error from an attempt 'M' which
+	//    precedes attempt 'N' (N - M >= 1), it is non nil only when:
+	//      - for a sequence of attempt(s) 1..n (n>1), there
+	//        is an attempt k (k<n) that returned an error.
+	previousErr, currentErr error
 }
 
-func (r *withRetry) SetMaxRetries(maxRetries int) {
-	if maxRetries < 0 {
-		maxRetries = 0
+func (r *withRetry) trackPreviousError(err error) {
+	// keep track of two most recent errors
+	if r.currentErr != nil {
+		r.previousErr = r.currentErr
 	}
-	r.maxRetries = maxRetries
+	r.currentErr = err
 }
 
 func (r *withRetry) IsNextRetry(ctx context.Context, restReq *Request, httpReq *http.Request, resp *http.Response, err error, f IsRetryableErrorFunc) bool {
+	defer r.trackPreviousError(err)
+
 	if httpReq == nil || (resp == nil && err == nil) {
 		// bad input, we do nothing.
 		return false
@@ -157,45 +185,18 @@ func (r *withRetry) IsNextRetry(ctx context.Context, restReq *Request, httpReq *
 	r.retryAfter.Wait = time.Duration(seconds) * time.Second
 	r.retryAfter.Reason = getRetryReason(r.attempts, seconds, resp, err)
 
-	if err := r.prepareForNextRetry(ctx, restReq); err != nil {
-		klog.V(4).Infof("Could not retry request - %v", err)
-		return false
-	}
-
 	return true
 }
 
-// prepareForNextRetry is responsible for carrying out operations that need
-// to be completed before the next retry is initiated:
-// - if the request context is already canceled there is no need to
-//   retry, the function will return ctx.Err().
-// - we need to seek to the beginning of the request body before we
-//   initiate the next retry, the function should return an error if
-//   it fails to do so.
-func (r *withRetry) prepareForNextRetry(ctx context.Context, request *Request) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-
-	// Ensure the response body is fully read and closed before
-	// we reconnect, so that we reuse the same TCP connection.
-	if seeker, ok := request.body.(io.Seeker); ok && request.body != nil {
-		if _, err := seeker.Seek(0, 0); err != nil {
-			return fmt.Errorf("can't Seek() back to beginning of body for %T", request)
-		}
-	}
-
-	klog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", r.retryAfter.Wait, r.retryAfter.Attempt, request.URL().String())
-	return nil
-}
-
 func (r *withRetry) Before(ctx context.Context, request *Request) error {
+	// If the request context is already canceled there
+	// is no need to retry.
 	if ctx.Err() != nil {
+		r.trackPreviousError(ctx.Err())
 		return ctx.Err()
 	}
 
 	url := request.URL()
-
 	// r.retryAfter represents the retry after parameters calculated
 	// from the (response, err) tuple from the last attempt, so 'Before'
 	// can apply these retry after parameters prior to the next attempt.
@@ -203,27 +204,42 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 	if r.retryAfter == nil {
 		// we do a backoff sleep before the first attempt is made,
 		// (preserving current behavior).
-		request.backoff.Sleep(request.backoff.CalculateBackoff(url))
+		if request.backoff != nil {
+			request.backoff.Sleep(request.backoff.CalculateBackoff(url))
+		}
 		return nil
 	}
 
-	// if we are here, we have made attempt(s) al least once before.
+	// At this point we've made atleast one attempt, post which the response
+	// body should have been fully read and closed in order for it to be safe
+	// to reset the request body before we reconnect, in order for us to reuse
+	// the same TCP connection.
+	if seeker, ok := request.body.(io.Seeker); ok && request.body != nil {
+		if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+			err = fmt.Errorf("failed to reset the request body while retrying a request: %v", err)
+			r.trackPreviousError(err)
+			return err
+		}
+	}
+
+	// if we are here, we have made attempt(s) at least once before.
 	if request.backoff != nil {
-		// TODO(tkashem) with default set to use exponential backoff
-		//  we can merge these two sleeps:
-		//  BackOffManager.Sleep(max(backoffManager.CalculateBackoff(), retryAfter))
-		//  see https://github.com/kubernetes/kubernetes/issues/108302
-		request.backoff.Sleep(r.retryAfter.Wait)
-		request.backoff.Sleep(request.backoff.CalculateBackoff(url))
+		delay := request.backoff.CalculateBackoff(url)
+		if r.retryAfter.Wait > delay {
+			delay = r.retryAfter.Wait
+		}
+		request.backoff.Sleep(delay)
 	}
 
 	// We are retrying the request that we already send to
 	// apiserver at least once before. This request should
 	// also be throttled with the client-internal rate limiter.
 	if err := request.tryThrottleWithInfo(ctx, r.retryAfter.Reason); err != nil {
+		r.trackPreviousError(ctx.Err())
 		return err
 	}
 
+	klog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", r.retryAfter.Wait, r.retryAfter.Attempt, request.URL().String())
 	return nil
 }
 
@@ -243,6 +259,45 @@ func (r *withRetry) After(ctx context.Context, request *Request, resp *http.Resp
 			request.backoff.UpdateBackoff(request.URL(), err, resp.StatusCode)
 		}
 	}
+}
+
+func (r *withRetry) WrapPreviousError(currentErr error) error {
+	if currentErr == nil || r.previousErr == nil {
+		return currentErr
+	}
+
+	// if both previous and current error objects represent the error,
+	// then there is no need to wrap the previous error.
+	if currentErr.Error() == r.previousErr.Error() {
+		return currentErr
+	}
+
+	previousErr := r.previousErr
+	// net/http wraps the underlying error with an url.Error, if the
+	// previous err object is an instance of url.Error, then we can
+	// unwrap it to get to the inner error object, this is so we can
+	// avoid error message like:
+	//  Error: Get "http://foo.bar/api/v1": context deadline exceeded - error \
+	//  from a previous attempt: Error: Get "http://foo.bar/api/v1": EOF
+	if urlErr, ok := r.previousErr.(*url.Error); ok && urlErr != nil {
+		if urlErr.Unwrap() != nil {
+			previousErr = urlErr.Unwrap()
+		}
+	}
+
+	return &wrapPreviousError{
+		currentErr:    currentErr,
+		previousError: previousErr,
+	}
+}
+
+type wrapPreviousError struct {
+	currentErr, previousError error
+}
+
+func (w *wrapPreviousError) Unwrap() error { return w.currentErr }
+func (w *wrapPreviousError) Error() string {
+	return fmt.Sprintf("%s - error from a previous attempt: %s", w.currentErr.Error(), w.previousError.Error())
 }
 
 // checkWait returns true along with a number of seconds if
@@ -295,8 +350,12 @@ func readAndCloseResponseBody(resp *http.Response) {
 }
 
 func retryAfterResponse() *http.Response {
+	return retryAfterResponseWithDelay("1")
+}
+
+func retryAfterResponseWithDelay(delay string) *http.Response {
 	return &http.Response{
 		StatusCode: http.StatusInternalServerError,
-		Header:     http.Header{"Retry-After": []string{"1"}},
+		Header:     http.Header{"Retry-After": []string{delay}},
 	}
 }

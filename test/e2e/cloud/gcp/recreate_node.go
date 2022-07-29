@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -43,6 +44,7 @@ const (
 
 var _ = SIGDescribe("Recreate [Feature:Recreate]", func() {
 	f := framework.NewDefaultFramework("recreate")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var originalNodes []v1.Node
 	var originalPodNames []string
 	var ps *testutils.PodStore
@@ -73,7 +75,7 @@ var _ = SIGDescribe("Recreate [Feature:Recreate]", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			// Make sure that addon/system pods are running, so dump
 			// events for the kube-system namespace on failures
 			ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", systemNamespace))

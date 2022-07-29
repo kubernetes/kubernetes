@@ -53,8 +53,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -92,6 +93,7 @@ const (
 
 var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	f := framework.NewDefaultFramework("autoscaling")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var nodeCount int
 	var memAllocatableMb int

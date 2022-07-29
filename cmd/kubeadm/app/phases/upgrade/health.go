@@ -65,7 +65,6 @@ func (c *healthCheck) Name() string {
 // CheckClusterHealth makes sure:
 // - the API /healthz endpoint is healthy
 // - all control-plane Nodes are Ready
-// - (if self-hosted) that there are DaemonSets with at least one Pod for all control plane components
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
 func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.String) error {
 	fmt.Println("[upgrade] Running cluster health checks")

@@ -27,13 +27,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Kubelet", func() {
 	f := framework.NewDefaultFramework("kubelet-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()

@@ -18,7 +18,6 @@ package podgc
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -27,13 +26,17 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/workqueue"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	"k8s.io/kubernetes/pkg/features"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -58,6 +61,17 @@ func compareStringSetToList(set sets.String, list []string) bool {
 		return false
 	}
 	return true
+}
+
+func getDeletedPodNames(client *fake.Clientset) []string {
+	deletedPodNames := make([]string, 0)
+	for _, action := range client.Actions() {
+		if action.GetVerb() == "delete" && action.GetResource().Resource == "pods" {
+			deleteAction := action.(clienttesting.DeleteAction)
+			deletedPodNames = append(deletedPodNames, deleteAction.GetName())
+		}
+	}
+	return deletedPodNames
 }
 
 func TestGCTerminated(t *testing.T) {
@@ -126,14 +140,6 @@ func TestGCTerminated(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node")}})
 			gcc, podInformer, _ := NewFromClient(client, test.threshold)
-			deletedPodNames := make([]string, 0)
-			var lock sync.Mutex
-			gcc.deletePod = func(_, name string) error {
-				lock.Lock()
-				defer lock.Unlock()
-				deletedPodNames = append(deletedPodNames, name)
-				return nil
-			}
 
 			creationTime := time.Unix(0, 0)
 			for _, pod := range test.pods {
@@ -146,6 +152,8 @@ func TestGCTerminated(t *testing.T) {
 			}
 
 			gcc.gc(context.TODO())
+
+			deletedPodNames := getDeletedPodNames(client)
 
 			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
 				t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v",
@@ -326,17 +334,10 @@ func TestGCOrphaned(t *testing.T) {
 			gcc.nodeQueue.ShutDown()
 			gcc.nodeQueue = workqueue.NewDelayingQueueWithCustomClock(fakeClock, "podgc_test_queue")
 
-			deletedPodNames := make([]string, 0)
-			var lock sync.Mutex
-			gcc.deletePod = func(_, name string) error {
-				lock.Lock()
-				defer lock.Unlock()
-				deletedPodNames = append(deletedPodNames, name)
-				return nil
-			}
-
 			// First GC of orphaned pods
 			gcc.gc(context.TODO())
+			deletedPodNames := getDeletedPodNames(client)
+
 			if len(deletedPodNames) > 0 {
 				t.Errorf("no pods should be deleted at this point.\n\tactual: %v", deletedPodNames)
 			}
@@ -368,6 +369,7 @@ func TestGCOrphaned(t *testing.T) {
 
 			// Actual pod deletion
 			gcc.gc(context.TODO())
+			deletedPodNames = getDeletedPodNames(client)
 
 			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
 				t.Errorf("pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v",
@@ -414,14 +416,6 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset()
 			gcc, podInformer, _ := NewFromClient(client, -1)
-			deletedPodNames := make([]string, 0)
-			var lock sync.Mutex
-			gcc.deletePod = func(_, name string) error {
-				lock.Lock()
-				defer lock.Unlock()
-				deletedPodNames = append(deletedPodNames, name)
-				return nil
-			}
 
 			creationTime := time.Unix(0, 0)
 			for _, pod := range test.pods {
@@ -439,11 +433,158 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 				t.Errorf("Error while listing all Pods: %v", err)
 				return
 			}
-			gcc.gcUnscheduledTerminating(pods)
+			gcc.gcUnscheduledTerminating(context.TODO(), pods)
+			deletedPodNames := getDeletedPodNames(client)
 
 			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
 				t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v, test: %v",
 					i, test.deletedPodNames.List(), deletedPodNames, test.name)
+			}
+		})
+	}
+}
+
+func TestGCTerminating(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeOutOfServiceVolumeDetach, true)()
+	type node struct {
+		name           string
+		readyCondition v1.ConditionStatus
+		taints         []v1.Taint
+	}
+
+	type nameToPodConfig struct {
+		name              string
+		phase             v1.PodPhase
+		deletionTimeStamp *metav1.Time
+		nodeName          string
+	}
+
+	testCases := []struct {
+		name            string
+		pods            []nameToPodConfig
+		nodes           []node
+		deletedPodNames sets.String
+	}{
+		{
+			name: "pods have deletion timestamp set and the corresponding nodes are not ready",
+			nodes: []node{
+				{name: "worker-0", readyCondition: v1.ConditionFalse},
+				{name: "worker-1", readyCondition: v1.ConditionFalse},
+			},
+			pods: []nameToPodConfig{
+				{name: "a", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-0"},
+				{name: "b", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-1"},
+			},
+			deletedPodNames: sets.NewString(),
+		},
+
+		{
+			name: "some pods have deletion timestamp and/or phase set and some of the corresponding nodes have an" +
+				"outofservice taint that are not ready",
+			nodes: []node{
+				// terminated pods on this node should be force deleted
+				{name: "worker-0", readyCondition: v1.ConditionFalse, taints: []v1.Taint{{Key: v1.TaintNodeOutOfService,
+					Effect: v1.TaintEffectNoExecute}}},
+				// terminated pods on this node should not be force deleted
+				{name: "worker-1", readyCondition: v1.ConditionFalse},
+				// terminated pods on this node should not be force deleted
+				{name: "worker-2", readyCondition: v1.ConditionTrue},
+				// terminated pods on this node should be force deleted
+				{name: "worker-3", readyCondition: v1.ConditionFalse, taints: []v1.Taint{{Key: v1.TaintNodeOutOfService,
+					Effect: v1.TaintEffectNoSchedule}}},
+				// terminated pods on this node should be force deleted
+				{name: "worker-4", readyCondition: v1.ConditionFalse, taints: []v1.Taint{{Key: v1.TaintNodeOutOfService,
+					Effect: v1.TaintEffectPreferNoSchedule}}},
+				// terminated pods on this node should be force deleted
+				{name: "worker-5", readyCondition: v1.ConditionFalse, taints: []v1.Taint{{Key: v1.TaintNodeOutOfService,
+					Value: "any-value", Effect: v1.TaintEffectNoExecute}}},
+			},
+			pods: []nameToPodConfig{
+				// pods a1, b1, c1, d1 and e1 are on node worker-0
+				{name: "a1", nodeName: "worker-0"},
+				{name: "b1", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-0"},
+				{name: "c1", phase: v1.PodPending, nodeName: "worker-0"},
+				{name: "d1", phase: v1.PodRunning, nodeName: "worker-0"},
+				{name: "e1", phase: v1.PodUnknown, nodeName: "worker-0"},
+
+				// pods a2, b2, c2, d2 and e2 are on node worker-1
+				{name: "a2", nodeName: "worker-1"},
+				{name: "b2", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-1"},
+				{name: "c2", phase: v1.PodPending, nodeName: "worker-1"},
+				{name: "d2", phase: v1.PodRunning, nodeName: "worker-1"},
+				{name: "e2", phase: v1.PodUnknown, nodeName: "worker-1"},
+
+				// pods a3, b3, c3, d3 and e3 are on node worker-2
+				{name: "a3", nodeName: "worker-2"},
+				{name: "b3", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-2"},
+				{name: "c3", phase: v1.PodPending, nodeName: "worker-2"},
+				{name: "d3", phase: v1.PodRunning, nodeName: "worker-2"},
+				{name: "e3", phase: v1.PodUnknown, nodeName: "worker-2"},
+
+				// pods a4, b4, c4, d4 and e4 are on node worker-3
+				{name: "a4", nodeName: "worker-3"},
+				{name: "b4", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-3"},
+				{name: "c4", phase: v1.PodPending, nodeName: "worker-3"},
+				{name: "d4", phase: v1.PodRunning, nodeName: "worker-3"},
+				{name: "e4", phase: v1.PodUnknown, nodeName: "worker-3"},
+
+				// pods a5, b5, c5, d5 and e5 are on node worker-4
+				{name: "a5", nodeName: "worker-3"},
+				{name: "b5", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-4"},
+				{name: "c5", phase: v1.PodPending, nodeName: "worker-4"},
+				{name: "d5", phase: v1.PodRunning, nodeName: "worker-4"},
+				{name: "e5", phase: v1.PodUnknown, nodeName: "worker-4"},
+
+				// pods a6, b6, c6, d6 and e6 are on node worker-5
+				{name: "a6", nodeName: "worker-5"},
+				{name: "b6", deletionTimeStamp: &metav1.Time{}, nodeName: "worker-5"},
+				{name: "c6", phase: v1.PodPending, nodeName: "worker-5"},
+				{name: "d6", phase: v1.PodRunning, nodeName: "worker-5"},
+				{name: "e6", phase: v1.PodUnknown, nodeName: "worker-5"},
+			},
+			deletedPodNames: sets.NewString("b1", "b4", "b5", "b6"),
+		},
+	}
+	for i, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			client := fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*testutil.NewNode("node-a")}})
+			gcc, podInformer, nodeInformer := NewFromClient(client, -1)
+
+			creationTime := time.Unix(0, 0)
+			for _, node := range test.nodes {
+				creationTime = creationTime.Add(2 * time.Hour)
+				nodeInformer.Informer().GetStore().Add(&v1.Node{
+					ObjectMeta: metav1.ObjectMeta{Name: node.name, CreationTimestamp: metav1.Time{Time: creationTime}},
+					Spec: v1.NodeSpec{
+						Taints: node.taints,
+					},
+					Status: v1.NodeStatus{
+						Conditions: []v1.NodeCondition{
+							{
+								Type:   v1.NodeReady,
+								Status: node.readyCondition,
+							},
+						},
+					},
+				})
+			}
+
+			for _, pod := range test.pods {
+				creationTime = creationTime.Add(1 * time.Hour)
+				podInformer.Informer().GetStore().Add(&v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: pod.name, CreationTimestamp: metav1.Time{Time: creationTime},
+						DeletionTimestamp: pod.deletionTimeStamp},
+					Status: v1.PodStatus{Phase: pod.phase},
+					Spec:   v1.PodSpec{NodeName: pod.nodeName},
+				})
+			}
+
+			gcc.gc(context.TODO())
+			deletedPodNames := getDeletedPodNames(client)
+
+			if pass := compareStringSetToList(test.deletedPodNames, deletedPodNames); !pass {
+				t.Errorf("[%v]pod's deleted expected and actual did not match.\n\texpected: %v\n\tactual: %v",
+					i, test.deletedPodNames.List(), deletedPodNames)
 			}
 		})
 	}

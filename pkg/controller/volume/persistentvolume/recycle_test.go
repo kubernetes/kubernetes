@@ -20,11 +20,11 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/component-helpers/storage/volume"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 )
 
 // Test single call to syncVolume, expecting recycling to happen.
@@ -74,7 +74,7 @@ func TestRecycleSync(t *testing.T) {
 		{
 			// recycle volume bound by controller
 			"6-1 - successful recycle",
-			newVolumeArray("volume6-1", "1Gi", "uid6-1", "claim6-1", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, pvutil.AnnBoundByController),
+			newVolumeArray("volume6-1", "1Gi", "uid6-1", "claim6-1", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, volume.AnnBoundByController),
 			newVolumeArray("volume6-1", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
 			noclaims,
 			noclaims,
@@ -142,7 +142,7 @@ func TestRecycleSync(t *testing.T) {
 			// at the time new doRecycle() starts. This simulates "volume no
 			// longer needs recycling, skipping".
 			"6-7 - volume is deleted before recycling",
-			newVolumeArray("volume6-7", "1Gi", "uid6-7", "claim6-7", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, pvutil.AnnBoundByController),
+			newVolumeArray("volume6-7", "1Gi", "uid6-7", "claim6-7", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, volume.AnnBoundByController),
 			newVolumeArray("volume6-7", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
 			noclaims,
 			noclaims,
@@ -193,8 +193,8 @@ func TestRecycleSync(t *testing.T) {
 		{
 			// volume is used by a running pod - failure expected
 			"6-11 - used by running pod",
-			newVolumeArray("volume6-11", "1Gi", "uid6-11", "runningClaim", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, pvutil.AnnBoundByController),
-			newVolumeArray("volume6-11", "1Gi", "uid6-11", "runningClaim", v1.VolumeReleased, v1.PersistentVolumeReclaimRecycle, classEmpty, pvutil.AnnBoundByController),
+			newVolumeArray("volume6-11", "1Gi", "uid6-11", "runningClaim", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, volume.AnnBoundByController),
+			newVolumeArray("volume6-11", "1Gi", "uid6-11", "runningClaim", v1.VolumeReleased, v1.PersistentVolumeReclaimRecycle, classEmpty, volume.AnnBoundByController),
 			noclaims,
 			noclaims,
 			[]string{"Normal VolumeFailedRecycle"}, noerrors, testSyncVolume,
@@ -202,8 +202,8 @@ func TestRecycleSync(t *testing.T) {
 		{
 			// volume is used by a pending pod - failure expected
 			"6-12 - used by pending pod",
-			newVolumeArray("volume6-12", "1Gi", "uid6-12", "pendingClaim", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, pvutil.AnnBoundByController),
-			newVolumeArray("volume6-12", "1Gi", "uid6-12", "pendingClaim", v1.VolumeReleased, v1.PersistentVolumeReclaimRecycle, classEmpty, pvutil.AnnBoundByController),
+			newVolumeArray("volume6-12", "1Gi", "uid6-12", "pendingClaim", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, volume.AnnBoundByController),
+			newVolumeArray("volume6-12", "1Gi", "uid6-12", "pendingClaim", v1.VolumeReleased, v1.PersistentVolumeReclaimRecycle, classEmpty, volume.AnnBoundByController),
 			noclaims,
 			noclaims,
 			[]string{"Normal VolumeFailedRecycle"}, noerrors, testSyncVolume,
@@ -211,7 +211,7 @@ func TestRecycleSync(t *testing.T) {
 		{
 			// volume is used by a completed pod - recycle succeeds
 			"6-13 - used by completed pod",
-			newVolumeArray("volume6-13", "1Gi", "uid6-13", "completedClaim", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, pvutil.AnnBoundByController),
+			newVolumeArray("volume6-13", "1Gi", "uid6-13", "completedClaim", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, volume.AnnBoundByController),
 			newVolumeArray("volume6-13", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
 			noclaims,
 			noclaims,
@@ -223,7 +223,7 @@ func TestRecycleSync(t *testing.T) {
 		{
 			// volume is used by a completed pod, pod using claim with the same name bound to different pv is running, should recycle
 			"6-14 - seemingly used by running pod",
-			newVolumeArray("volume6-14", "1Gi", "uid6-14", "completedClaim", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, pvutil.AnnBoundByController),
+			newVolumeArray("volume6-14", "1Gi", "uid6-14", "completedClaim", v1.VolumeBound, v1.PersistentVolumeReclaimRecycle, classEmpty, volume.AnnBoundByController),
 			newVolumeArray("volume6-14", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRecycle, classEmpty),
 			newClaimArray("completedClaim", "uid6-14-x", "10Gi", "", v1.ClaimBound, nil),
 			newClaimArray("completedClaim", "uid6-14-x", "10Gi", "", v1.ClaimBound, nil),
@@ -236,17 +236,18 @@ func TestRecycleSync(t *testing.T) {
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
 // volume/claims. The test follows this pattern:
-// 0. Load the controller with initial data.
-// 1. Call controllerTest.testCall() once as in TestSync()
-// 2. For all volumes/claims changed by previous syncVolume/syncClaim calls,
-//    call appropriate syncVolume/syncClaim (simulating "volume/claim changed"
-//    events). Go to 2. if these calls change anything.
-// 3. When all changes are processed and no new changes were made, call
-//    syncVolume/syncClaim on all volumes/claims (simulating "periodic sync").
-// 4. If some changes were done by step 3., go to 2. (simulation of
-//    "volume/claim updated" events, eventually performing step 3. again)
-// 5. When 3. does not do any changes, finish the tests and compare final set
-//    of volumes/claims with expected claims/volumes and report differences.
+//  0. Load the controller with initial data.
+//  1. Call controllerTest.testCall() once as in TestSync()
+//  2. For all volumes/claims changed by previous syncVolume/syncClaim calls,
+//     call appropriate syncVolume/syncClaim (simulating "volume/claim changed"
+//     events). Go to 2. if these calls change anything.
+//  3. When all changes are processed and no new changes were made, call
+//     syncVolume/syncClaim on all volumes/claims (simulating "periodic sync").
+//  4. If some changes were done by step 3., go to 2. (simulation of
+//     "volume/claim updated" events, eventually performing step 3. again)
+//  5. When 3. does not do any changes, finish the tests and compare final set
+//     of volumes/claims with expected claims/volumes and report differences.
+//
 // Some limit of calls in enforced to prevent endless loops.
 func TestRecycleMultiSync(t *testing.T) {
 	tests := []controllerTest{

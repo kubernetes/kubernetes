@@ -25,14 +25,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"fmt"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Kubelet Volume Manager", func() {
 	f := framework.NewDefaultFramework("kubelet-volume-manager")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Describe("Volume Manager", func() {
 		ginkgo.Context("On termination of pod with memory backed volume", func() {
 			ginkgo.It("should remove the volume from the node [NodeConformance]", func() {

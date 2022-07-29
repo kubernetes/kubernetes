@@ -241,6 +241,51 @@ func TestSyncServicePodSelection(t *testing.T) {
 	assert.EqualValues(t, endpoint.TargetRef, &v1.ObjectReference{Kind: "Pod", Namespace: ns, Name: pod1.Name})
 }
 
+func TestSyncServiceEndpointSlicePendingDeletion(t *testing.T) {
+	client, esController := newController([]string{"node-1"}, time.Duration(0))
+	ns := metav1.NamespaceDefault
+	serviceName := "testing-1"
+	service := createService(t, esController, ns, serviceName)
+	err := esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	assert.Nil(t, err, "Expected no error syncing service")
+
+	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Service"}
+	ownerRef := metav1.NewControllerRef(service, gvk)
+
+	deletedTs := metav1.Now()
+	endpointSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "epSlice-1",
+			Namespace:       ns,
+			OwnerReferences: []metav1.OwnerReference{*ownerRef},
+			Labels: map[string]string{
+				discovery.LabelServiceName: serviceName,
+				discovery.LabelManagedBy:   controllerName,
+			},
+			DeletionTimestamp: &deletedTs,
+		},
+		AddressType: discovery.AddressTypeIPv4,
+	}
+	err = esController.endpointSliceStore.Add(endpointSlice)
+	if err != nil {
+		t.Fatalf("Expected no error adding EndpointSlice: %v", err)
+	}
+	_, err = client.DiscoveryV1().EndpointSlices(ns).Create(context.TODO(), endpointSlice, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Expected no error creating EndpointSlice: %v", err)
+	}
+
+	numActionsBefore := len(client.Actions())
+	err = esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
+	assert.Nil(t, err, "Expected no error syncing service")
+
+	// The EndpointSlice marked for deletion should be ignored by the controller, and thus
+	// should not result in any action.
+	if len(client.Actions()) != numActionsBefore {
+		t.Errorf("Expected 0 more actions, got %d", len(client.Actions())-numActionsBefore)
+	}
+}
+
 // Ensure SyncService correctly selects and labels EndpointSlices.
 func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 	client, esController := newController([]string{"node-1"}, time.Duration(0))
@@ -1806,5 +1851,62 @@ func (cmc *cacheMutationCheck) Check(t *testing.T) {
 			// copied before changed in any way.
 			t.Errorf("Cached object was unexpectedly mutated. Original: %+v, Mutated: %+v", o.deepCopy, o.original)
 		}
+	}
+}
+
+func Test_dropEndpointSlicesPendingDeletion(t *testing.T) {
+	now := metav1.Now()
+	endpointSlices := []*discovery.EndpointSlice{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "epSlice1",
+				DeletionTimestamp: &now,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "epSlice2",
+			},
+			AddressType: discovery.AddressTypeIPv4,
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses: []string{"172.18.0.2"},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "epSlice3",
+			},
+			AddressType: discovery.AddressTypeIPv6,
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses: []string{"3001:0da8:75a3:0000:0000:8a2e:0370:7334"},
+				},
+			},
+		},
+	}
+
+	epSlice2 := endpointSlices[1]
+	epSlice3 := endpointSlices[2]
+
+	result := dropEndpointSlicesPendingDeletion(endpointSlices)
+
+	assert.Len(t, result, 2)
+	for _, epSlice := range result {
+		if epSlice.Name == "epSlice1" {
+			t.Errorf("Expected EndpointSlice marked for deletion to be dropped.")
+		}
+	}
+
+	// We don't use endpointSlices and instead check manually for equality, because
+	// `dropEndpointSlicesPendingDeletion` mutates the slice it receives, so it's easy
+	// to break this test later. This way, we can be absolutely sure that the result
+	// has exactly what we expect it to.
+	if !reflect.DeepEqual(epSlice2, result[0]) {
+		t.Errorf("EndpointSlice was unexpectedly mutated. Expected: %+v, Mutated: %+v", epSlice2, result[0])
+	}
+	if !reflect.DeepEqual(epSlice3, result[1]) {
+		t.Errorf("EndpointSlice was unexpectedly mutated. Expected: %+v, Mutated: %+v", epSlice3, result[1])
 	}
 }

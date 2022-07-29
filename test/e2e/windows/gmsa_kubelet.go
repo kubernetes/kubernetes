@@ -30,13 +30,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:Windows] GMSA Kubelet [Slow]", func() {
 	f := framework.NewDefaultFramework("gmsa-kubelet-test-windows")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Describe("kubelet GMSA support", func() {
 		ginkgo.Context("when creating a pod with correct GMSA credential specs", func() {

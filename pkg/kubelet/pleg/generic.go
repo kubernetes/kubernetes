@@ -325,29 +325,25 @@ func (g *GenericPLEG) relist() {
 func getContainersFromPods(pods ...*kubecontainer.Pod) []*kubecontainer.Container {
 	cidSet := sets.NewString()
 	var containers []*kubecontainer.Container
+	fillCidSet := func(cs []*kubecontainer.Container) {
+		for _, c := range cs {
+			cid := c.ID.ID
+			if cidSet.Has(cid) {
+				continue
+			}
+			cidSet.Insert(cid)
+			containers = append(containers, c)
+		}
+	}
+
 	for _, p := range pods {
 		if p == nil {
 			continue
 		}
-		for _, c := range p.Containers {
-			cid := string(c.ID.ID)
-			if cidSet.Has(cid) {
-				continue
-			}
-			cidSet.Insert(cid)
-			containers = append(containers, c)
-		}
+		fillCidSet(p.Containers)
 		// Update sandboxes as containers
 		// TODO: keep track of sandboxes explicitly.
-		for _, c := range p.Sandboxes {
-			cid := string(c.ID.ID)
-			if cidSet.Has(cid) {
-				continue
-			}
-			cidSet.Insert(cid)
-			containers = append(containers, c)
-		}
-
+		fillCidSet(p.Sandboxes)
 	}
 	return containers
 }
@@ -406,6 +402,9 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 	// all containers again.
 	status, err := g.runtime.GetPodStatus(pod.ID, pod.Name, pod.Namespace)
 	if err != nil {
+		// nolint:logcheck // Not using the result of klog.V inside the
+		// if branch is okay, we just use it to determine whether the
+		// additional "podStatus" key and its value should be added.
 		if klog.V(6).Enabled() {
 			klog.ErrorS(err, "PLEG: Write status", "pod", klog.KRef(pod.Namespace, pod.Name), "podStatus", status)
 		} else {

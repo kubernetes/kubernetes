@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/vmware/govmomi/object"
 	vimtypes "github.com/vmware/govmomi/vim25/types"
@@ -37,15 +37,17 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 /*
-	Test to verify volume status after node power off:
-	1. Verify the pod got provisioned on a different node with volume attached to it
-	2. Verify the volume is detached from the powered off node
+Test to verify volume status after node power off:
+1. Verify the pod got provisioned on a different node with volume attached to it
+2. Verify the volume is detached from the powered off node
 */
 var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("node-poweroff")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		client    clientset.Interface
 		namespace string

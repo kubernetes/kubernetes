@@ -316,7 +316,7 @@ func phaseBuilder6(name string, args cobra.PositionalArgs, phases ...Phase) Phas
 func customArgs(cmd *cobra.Command, args []string) error {
 	for _, a := range args {
 		if a != "qux" {
-			return fmt.Errorf("arg %s does not equal qux", a)
+			return errors.Errorf("arg %s does not equal qux", a)
 		}
 	}
 	return nil
@@ -403,7 +403,7 @@ func TestBindToCommandArgRequirements(t *testing.T) {
 
 				// Ensure it is the expected function
 				if reflect.ValueOf(cCmd.Args).Pointer() != reflect.ValueOf(args.args).Pointer() {
-					t.Error("The function poiners where not equal.")
+					t.Error("The function pointers where not equal.")
 				}
 
 				// Test passing argument set

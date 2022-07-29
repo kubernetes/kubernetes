@@ -24,11 +24,14 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/config"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
+
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -52,24 +55,24 @@ const (
 // into the code which uses the settings.
 //
 // The recommendation for those settings is:
-// - They are stored in their own context structure or local
-//   variables.
-// - The standard `flag` package is used to register them.
-//   The flag name should follow the pattern <part1>.<part2>....<partn>
-//   where the prefix is unlikely to conflict with other tests or
-//   standard packages and each part is in lower camel case. For
-//   example, test/e2e/storage/csi/context.go could define
-//   storage.csi.numIterations.
-// - framework/config can be used to simplify the registration of
-//   multiple options with a single function call:
-//   var storageCSI {
-//       NumIterations `default:"1" usage:"number of iterations"`
-//   }
-//   _ config.AddOptions(&storageCSI, "storage.csi")
-// - The direct use Viper in tests is possible, but discouraged because
-//   it only works in test suites which use Viper (which is not
-//   required) and the supported options cannot be
-//   discovered by a test suite user.
+//   - They are stored in their own context structure or local
+//     variables.
+//   - The standard `flag` package is used to register them.
+//     The flag name should follow the pattern <part1>.<part2>....<partn>
+//     where the prefix is unlikely to conflict with other tests or
+//     standard packages and each part is in lower camel case. For
+//     example, test/e2e/storage/csi/context.go could define
+//     storage.csi.numIterations.
+//   - framework/config can be used to simplify the registration of
+//     multiple options with a single function call:
+//     var storageCSI {
+//     NumIterations `default:"1" usage:"number of iterations"`
+//     }
+//     _ config.AddOptions(&storageCSI, "storage.csi")
+//   - The direct use Viper in tests is possible, but discouraged because
+//     it only works in test suites which use Viper (which is not
+//     required) and the supported options cannot be
+//     discovered by a test suite user.
 //
 // Test suite authors can use framework/viper to make all command line
 // parameters also configurable via a configuration file.
@@ -150,8 +153,6 @@ type TestContextType struct {
 	DisableLogDump bool
 	// Path to the GCS artifacts directory to dump logs from nodes. Logexporter gets enabled if this is non-empty.
 	LogexporterGCSPath string
-	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
-	FeatureGates map[string]bool
 	// Node e2e specific test context
 	NodeTestContextType
 
@@ -278,20 +279,11 @@ func (tc TestContextType) ClusterIsIPv6() bool {
 // options themselves, copy flags from test/e2e/framework/config
 // as shown in HandleFlags.
 func RegisterCommonFlags(flags *flag.FlagSet) {
-	// Turn on verbose by default to get spec names
-	config.DefaultReporterConfig.Verbose = true
-
-	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
-	config.GinkgoConfig.EmitSpecProgress = true
-
-	// Randomize specs as well as suites
-	config.GinkgoConfig.RandomizeAllSpecs = true
-
 	flags.StringVar(&TestContext.GatherKubeSystemResourceUsageData, "gather-resource-usage", "false", "If set to 'true' or 'all' framework will be monitoring resource usage of system all add-ons in (some) e2e tests, if set to 'master' framework will be monitoring master node only, if set to 'none' of 'false' monitoring will be turned off.")
 	flags.BoolVar(&TestContext.GatherLogsSizes, "gather-logs-sizes", false, "If set to true framework will be monitoring logs sizes on all machines running e2e tests.")
 	flags.IntVar(&TestContext.MaxNodesToGather, "max-nodes-to-gather-from", 20, "The maximum number of nodes to gather extended info from on test failure.")
 	flags.StringVar(&TestContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", "false", "If set to 'true' framework will gather metrics from all components after each test. If set to 'master' only master component metrics would be gathered.")
-	flags.BoolVar(&TestContext.GatherSuiteMetricsAfterTest, "gather-suite-metrics-at-teardown", false, "If set to true framwork will gather metrics from all components after the whole test suite completes.")
+	flags.BoolVar(&TestContext.GatherSuiteMetricsAfterTest, "gather-suite-metrics-at-teardown", false, "If set to true framework will gather metrics from all components after the whole test suite completes.")
 	flags.BoolVar(&TestContext.IncludeClusterAutoscalerMetrics, "include-cluster-autoscaler", false, "If set to true, framework will include Cluster Autoscaler when gathering metrics.")
 	flags.StringVar(&TestContext.OutputPrintType, "output-print-type", "json", "Format in which summaries should be printed: 'hr' for human readable, 'json' for JSON ones.")
 	flags.BoolVar(&TestContext.DumpLogsOnFailure, "dump-logs-on-failure", true, "If set to true test will dump data about the namespace in which test was running.")
@@ -303,8 +295,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.Host, "host", "", fmt.Sprintf("The host, or apiserver, to connect to. Will default to %s if this argument and --kubeconfig are not set.", defaultHost))
 	flags.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
-	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
-	flags.Var(cliflag.NewMapStringBool(&TestContext.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
+	flags.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports and other tests results should be saved. Default is empty, which doesn't generate these reports. If ginkgo's -junit-report parameter is used, that parameter instead of -report-dir determines the location of a single JUnit report.")
 	flags.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "unix:///var/run/containerd/containerd.sock", "The container runtime endpoint of cluster VM instances.")
 	flags.StringVar(&TestContext.ContainerRuntimeProcessName, "container-runtime-process-name", "dockerd", "The name of the container runtime process.")
 	flags.StringVar(&TestContext.ContainerRuntimePidFile, "container-runtime-pid-file", "/var/run/docker.pid", "The pid file of the container runtime.")
@@ -318,7 +309,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	// suite to work with this legacy non-blocking taint.
 	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/control-plane,node-role.kubernetes.io/master`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests. The default taint 'node-role.kubernetes.io/master' is DEPRECATED and will be removed from the list in a future release.")
 
-	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for runnning tests.")
+	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for running tests.")
 	flags.BoolVar(&TestContext.ListConformanceTests, "list-conformance-tests", false, "If true, will show list of conformance tests.")
 	flags.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 
@@ -328,6 +319,30 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.SnapshotControllerPodName, "snapshot-controller-pod-name", "", "The pod name to use for identifying the snapshot controller in the kube-system namespace.")
 	flags.IntVar(&TestContext.SnapshotControllerHTTPPort, "snapshot-controller-http-port", 0, "The port to use for snapshot controller HTTP communication.")
+}
+
+func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
+	// fetch the current config
+	suiteConfig, reporterConfig := ginkgo.GinkgoConfiguration()
+	// Turn on EmitSpecProgress to get spec progress (especially on interrupt)
+	suiteConfig.EmitSpecProgress = true
+	// Randomize specs as well as suites
+	suiteConfig.RandomizeAllSpecs = true
+	// Turn on verbose by default to get spec names
+	reporterConfig.Verbose = true
+	// Enable JUnit output to the result directory, but only if not already specified
+	// via -junit-report.
+	if reporterConfig.JUnitReport == "" && TestContext.ReportDir != "" {
+		// With Ginkgo v1, we used to write one file per parallel node. Now Ginkgo v2 automatically
+		// merges all results into a single file for us. The 01 suffix is kept in case that users
+		// expect files to be called "junit_<prefix><number>.xml".
+		reporterConfig.JUnitReport = path.Join(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
+	}
+	// Disable skipped tests unless they are explicitly requested.
+	if len(suiteConfig.FocusStrings) == 0 && len(suiteConfig.SkipStrings) == 0 {
+		suiteConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
+	}
+	return suiteConfig, reporterConfig
 }
 
 // RegisterClusterFlags registers flags specific to the cluster e2e test suite.
@@ -444,8 +459,21 @@ func GenerateSecureToken(tokenLen int) (string, error) {
 }
 
 // AfterReadingAllFlags makes changes to the context after all flags
-// have been read.
+// have been read and prepares the process for a test run.
 func AfterReadingAllFlags(t *TestContextType) {
+	// Reconfigure klog so that output goes to the GinkgoWriter instead
+	// of stderr. The advantage is that it then gets interleaved properly
+	// with output that goes to GinkgoWriter (By, Logf).
+
+	// These flags are not exposed via the normal command line flag set,
+	// therefore we have to use our own private one here.
+	var fs flag.FlagSet
+	klog.InitFlags(&fs)
+	fs.Set("logtostderr", "false")
+	fs.Set("alsologtostderr", "false")
+	fs.Set("one_output", "true")
+	klog.SetOutput(ginkgo.GinkgoWriter)
+
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
 		// Check if we can use the in-cluster config

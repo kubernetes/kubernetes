@@ -764,7 +764,13 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 			w.Write(LEVEL_0, "Priority:\t%d\n", *pod.Spec.Priority)
 		}
 		if len(pod.Spec.PriorityClassName) > 0 {
-			w.Write(LEVEL_0, "Priority Class Name:\t%s\n", stringOrNone(pod.Spec.PriorityClassName))
+			w.Write(LEVEL_0, "Priority Class Name:\t%s\n", pod.Spec.PriorityClassName)
+		}
+		if pod.Spec.RuntimeClassName != nil && len(*pod.Spec.RuntimeClassName) > 0 {
+			w.Write(LEVEL_0, "Runtime Class Name:\t%s\n", *pod.Spec.RuntimeClassName)
+		}
+		if len(pod.Spec.ServiceAccountName) > 0 {
+			w.Write(LEVEL_0, "Service Account:\t%s\n", pod.Spec.ServiceAccountName)
 		}
 		if pod.Spec.NodeName == "" {
 			w.Write(LEVEL_0, "Node:\t<none>\n")
@@ -840,6 +846,7 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		}
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
+		describeTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, w, "")
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -862,6 +869,32 @@ func describePodIPs(pod *corev1.Pod, w PrefixWriter, space string) {
 	w.Write(LEVEL_0, "%sIPs:\n", space)
 	for _, ipInfo := range pod.Status.PodIPs {
 		w.Write(LEVEL_1, "IP:\t%s\n", ipInfo.IP)
+	}
+}
+
+func describeTopologySpreadConstraints(tscs []corev1.TopologySpreadConstraint, w PrefixWriter, space string) {
+	if len(tscs) == 0 {
+		return
+	}
+
+	sort.Slice(tscs, func(i, j int) bool {
+		return tscs[i].TopologyKey < tscs[j].TopologyKey
+	})
+
+	w.Write(LEVEL_0, "%sTopology Spread Constraints:\t", space)
+	for i, tsc := range tscs {
+		if i != 0 {
+			w.Write(LEVEL_0, "%s", space)
+			w.Write(LEVEL_0, "%s", "\t")
+		}
+
+		w.Write(LEVEL_0, "%s:", tsc.TopologyKey)
+		w.Write(LEVEL_0, "%v", tsc.WhenUnsatisfiable)
+		w.Write(LEVEL_0, " when max skew %d is exceeded", tsc.MaxSkew)
+		if tsc.LabelSelector != nil {
+			w.Write(LEVEL_0, " for selector %s", metav1.FormatLabelSelector(tsc.LabelSelector))
+		}
+		w.Write(LEVEL_0, "\n")
 	}
 }
 
@@ -2110,6 +2143,7 @@ func DescribePodTemplate(template *corev1.PodTemplateSpec, w PrefixWriter) {
 	}
 	describeContainers("Containers", template.Spec.Containers, nil, nil, w, "  ")
 	describeVolumes(template.Spec.Volumes, w, "  ")
+	describeTopologySpreadConstraints(template.Spec.TopologySpreadConstraints, w, "  ")
 	if len(template.Spec.PriorityClassName) > 0 {
 		w.Write(LEVEL_1, "Priority Class Name:\t%s\n", template.Spec.PriorityClassName)
 	}
@@ -3519,8 +3553,17 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 			klog.Errorf("Unable to construct reference to '%#v': %v", node, err)
 		} else {
 			// TODO: We haven't decided the namespace for Node object yet.
-			ref.UID = types.UID(ref.Name)
+			// there are two UIDs for host events:
+			// controller use node.uid
+			// kubelet use node.name
+			// TODO: Uniform use of UID
 			events, _ = searchEvents(d.CoreV1(), ref, describerSettings.ChunkSize)
+
+			ref.UID = types.UID(ref.Name)
+			eventsInvName, _ := searchEvents(d.CoreV1(), ref, describerSettings.ChunkSize)
+
+			// Merge the results of two queries
+			events.Items = append(events.Items, eventsInvName.Items...)
 		}
 	}
 
@@ -3693,6 +3736,9 @@ func describeStatefulSet(ps *appsv1.StatefulSet, selector labels.Selector, event
 			ru := ps.Spec.UpdateStrategy.RollingUpdate
 			if ru.Partition != nil {
 				w.Write(LEVEL_1, "Partition:\t%d\n", *ru.Partition)
+				if ru.MaxUnavailable != nil {
+					w.Write(LEVEL_1, "MaxUnavailable:\t%s\n", ru.MaxUnavailable.String())
+				}
 			}
 		}
 
@@ -4758,6 +4804,7 @@ func describePriorityClass(pc *schedulingv1.PriorityClass, events *corev1.EventL
 		w.Write(LEVEL_0, "Name:\t%s\n", pc.Name)
 		w.Write(LEVEL_0, "Value:\t%v\n", pc.Value)
 		w.Write(LEVEL_0, "GlobalDefault:\t%v\n", pc.GlobalDefault)
+		w.Write(LEVEL_0, "PreemptionPolicy:\t%s\n", *pc.PreemptionPolicy)
 		w.Write(LEVEL_0, "Description:\t%s\n", pc.Description)
 
 		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(pc.Annotations))
@@ -4990,7 +5037,7 @@ func (d *Describers) DescribeObject(exact interface{}, extra ...interface{}) (st
 // Add adds one or more describer functions to the Describer. The passed function must
 // match the signature:
 //
-//     func(...) (string, error)
+//	func(...) (string, error)
 //
 // Any number of arguments may be provided.
 func (d *Describers) Add(fns ...interface{}) error {

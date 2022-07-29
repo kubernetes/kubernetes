@@ -53,12 +53,12 @@ func NewMasterCountEndpointReconciler(masterCount int, epAdapter EndpointsAdapte
 // understand the requirements and the body of this function.
 //
 // Requirements:
-//  * All apiservers MUST use the same ports for their {rw, ro} services.
-//  * All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
-//      endpoints for their {rw, ro} services.
-//  * All apiservers MUST know and agree on the number of apiservers expected
-//      to be running (c.masterCount).
-//  * ReconcileEndpoints is called periodically from all apiservers.
+//   - All apiservers MUST use the same ports for their {rw, ro} services.
+//   - All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
+//     endpoints for their {rw, ro} services.
+//   - All apiservers MUST know and agree on the number of apiservers expected
+//     to be running (c.masterCount).
+//   - ReconcileEndpoints is called periodically from all apiservers.
 func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
@@ -181,13 +181,16 @@ func (r *masterCountEndpointReconciler) StopReconciling() {
 	r.stopReconcilingCalled = true
 }
 
+func (r *masterCountEndpointReconciler) Destroy() {
+}
+
 // Determine if the endpoint is in the format ReconcileEndpoints expects.
 //
 // Return values:
-// * formatCorrect is true if exactly one subset is found.
-// * ipCorrect is true when current master's IP is found and the number
+//   - formatCorrect is true if exactly one subset is found.
+//   - ipCorrect is true when current master's IP is found and the number
 //     of addresses is less than or equal to the master count.
-// * portsCorrect is true when endpoint ports exactly match provided ports.
+//   - portsCorrect is true when endpoint ports exactly match provided ports.
 //     portsCorrect is only evaluated when reconcilePorts is set to true.
 func checkEndpointSubsetFormat(e *corev1.Endpoints, ip string, ports []corev1.EndpointPort, count int, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
 	if len(e.Subsets) != 1 {
@@ -213,47 +216,4 @@ func checkEndpointSubsetFormat(e *corev1.Endpoints, ip string, ports []corev1.En
 		}
 	}
 	return true, ipCorrect, portsCorrect
-}
-
-// GetMasterServiceUpdateIfNeeded sets service attributes for the
-//     given apiserver service.
-// * GetMasterServiceUpdateIfNeeded expects that the service object it
-//     manages will be managed only by GetMasterServiceUpdateIfNeeded;
-//     therefore, to understand this, you need only understand the
-//     requirements and the body of this function.
-// * GetMasterServiceUpdateIfNeeded ensures that the correct ports are
-//     are set.
-//
-// Requirements:
-// * All apiservers MUST use GetMasterServiceUpdateIfNeeded and only
-//     GetMasterServiceUpdateIfNeeded to manage service attributes
-// * updateMasterService is called periodically from all apiservers.
-func GetMasterServiceUpdateIfNeeded(svc *corev1.Service, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType) (s *corev1.Service, updated bool) {
-	// Determine if the service is in the format we expect
-	// (servicePorts are present and service type matches)
-	formatCorrect := checkServiceFormat(svc, servicePorts, serviceType)
-	if formatCorrect {
-		return svc, false
-	}
-	svc.Spec.Ports = servicePorts
-	svc.Spec.Type = serviceType
-	return svc, true
-}
-
-// Determine if the service is in the correct format
-// GetMasterServiceUpdateIfNeeded expects (servicePorts are correct
-// and service type matches).
-func checkServiceFormat(s *corev1.Service, ports []corev1.ServicePort, serviceType corev1.ServiceType) (formatCorrect bool) {
-	if s.Spec.Type != serviceType {
-		return false
-	}
-	if len(ports) != len(s.Spec.Ports) {
-		return false
-	}
-	for i, port := range ports {
-		if port != s.Spec.Ports[i] {
-			return false
-		}
-	}
-	return true
 }

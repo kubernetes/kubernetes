@@ -648,17 +648,6 @@ function Test-IsTestCluster {
   return $false
 }
 
-# Returns true if this node uses a plugin to support authentication to the
-# master, e.g. for TPM-based authentication. $KubeEnv is a hash table
-# containing the kube-env metadata keys+values.
-function Test-NodeUsesAuthPlugin {
-  param (
-    [parameter(Mandatory=$true)] [hashtable]$KubeEnv
-  )
-
-  return $KubeEnv.Contains('EXEC_AUTH_PLUGIN_URL')
-}
-
 # Permanently adds a directory to the $env:PATH environment variable.
 function Add-MachineEnvironmentPath {
   param (

@@ -324,3 +324,12 @@ func (in instrumentedImageManagerService) ImageFsInfo() ([]*runtimeapi.Filesyste
 	recordError(operation, err)
 	return fsInfo, nil
 }
+
+func (in instrumentedRuntimeService) CheckpointContainer(options *runtimeapi.CheckpointContainerRequest) error {
+	const operation = "checkpoint_container"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.CheckpointContainer(options)
+	recordError(operation, err)
+	return err
+}

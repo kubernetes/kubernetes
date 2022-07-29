@@ -131,6 +131,15 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		storage[resource] = csiDriverStorage.CSIDriver
 	}
 
+	// register csistoragecapacities
+	if resource := "csistoragecapacities"; apiResourceConfigSource.ResourceEnabled(storageapiv1.SchemeGroupVersion.WithResource(resource)) {
+		csiStorageStorage, err := csistoragecapacitystore.NewStorage(restOptionsGetter)
+		if err != nil {
+			return storage, err
+		}
+		storage[resource] = csiStorageStorage.CSIStorageCapacity
+	}
+
 	return storage, nil
 }
 

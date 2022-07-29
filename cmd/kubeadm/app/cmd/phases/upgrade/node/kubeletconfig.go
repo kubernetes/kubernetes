@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -55,6 +54,7 @@ func NewKubeletConfigPhase() workflow.Phase {
 		InheritFlags: []string{
 			options.DryRun,
 			options.KubeconfigPath,
+			options.Patches,
 		},
 	}
 	return phase
@@ -80,7 +80,7 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 		// TODO: Checkpoint the current configuration first so that if something goes wrong it can be recovered
 
 		// Store the kubelet component configuration.
-		if err = kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir); err != nil {
+		if err = kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, data.PatchesDir(), data.OutputWriter()); err != nil {
 			return err
 		}
 
@@ -92,38 +92,29 @@ func runKubeletConfigPhase() func(c workflow.RunData) error {
 			return nil
 		}
 
-		// Handle a missing URL scheme in the Node CRI socket.
-		// Older versions of kubeadm tolerate CRI sockets without URL schemes (/var/run/foo without unix://).
-		// During "upgrade node" for worker nodes the cfg.NodeRegistration would be left empty.
-		// This requires to call GetNodeRegistration on demand and fetch the node name and CRI socket.
-		// If the NodeRegistration (nro) contains a socket without a URL scheme, update it.
-		//
-		// TODO: this workaround can be removed in 1.25 once all user node sockets have a URL scheme:
+		// Handle a dupliate prefix URL scheme in the Node CRI socket.
+		// Older versions of kubeadm(v1.24.0~2) upgrade may add one or two extra prefix `unix://`
+		// TODO: this fix can be removed in 1.26 once all user node sockets have a correct URL scheme:
 		// https://github.com/kubernetes/kubeadm/issues/2426
-		var missingURLScheme bool
+		var dupURLScheme bool
 		nro := &kubeadmapi.NodeRegistrationOptions{}
 		if !dryRun {
 			if err := configutil.GetNodeRegistration(data.KubeConfigPath(), data.Client(), nro); err != nil {
 				return errors.Wrap(err, "could not retrieve the node registration options for this node")
 			}
-			missingURLScheme = strings.HasPrefix(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme)
+			dupURLScheme = strings.HasPrefix(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://"+kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://")
 		}
-		if missingURLScheme {
+		if dupURLScheme {
 			if !dryRun {
-				newSocket := kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + nro.CRISocket
-				klog.V(2).Infof("ensuring that Node %q has a CRI socket annotation with URL scheme %q", nro.Name, newSocket)
+				newSocket := strings.ReplaceAll(nro.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://", "")
+				newSocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + newSocket
+				klog.V(2).Infof("ensuring that Node %q has a CRI socket annotation with correct URL scheme %q", nro.Name, newSocket)
 				if err := patchnodephase.AnnotateCRISocket(data.Client(), nro.Name, newSocket); err != nil {
 					return errors.Wrapf(err, "error updating the CRI socket for Node %q", nro.Name)
 				}
 			} else {
-				fmt.Println("[upgrade] Would update the node CRI socket path to include an URL scheme")
+				fmt.Println("[upgrade] Would update the node CRI socket path to remove dup URL scheme prefix")
 			}
-		}
-
-		// TODO: Temporary workaround. Remove in 1.25:
-		// https://github.com/kubernetes/kubeadm/issues/2426
-		if err := upgrade.UpdateKubeletDynamicEnvFileWithURLScheme(dryRun); err != nil {
-			return err
 		}
 
 		fmt.Println("[upgrade] The configuration for this node was successfully updated!")

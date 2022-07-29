@@ -7,6 +7,6 @@ spec:
   hostNetwork: true
   containers:
   - name: etcd-version-monitor
-    image: k8s.gcr.io/etcd-version-monitor:0.1.3
+    image: registry.k8s.io/etcd-version-monitor:0.1.3
     command:
     - /etcd-version-monitor

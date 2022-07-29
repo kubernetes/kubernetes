@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -55,6 +55,7 @@ import (
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -133,6 +134,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	})
 
 	f = framework.NewDefaultFramework("daemonsets")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	image := WebserverImage
 	dsName := "daemon-set"

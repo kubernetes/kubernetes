@@ -57,8 +57,7 @@ func (adapter *EndpointsAdapter) Get(namespace, name string, getOpts metav1.GetO
 }
 
 // Create accepts a namespace and Endpoints object and creates the Endpoints
-// object. If an endpointSliceClient exists, a matching EndpointSlice will also
-// be created or updated. The created Endpoints object or an error will be
+// object and matching EndpointSlice. The created Endpoints object or an error will be
 // returned.
 func (adapter *EndpointsAdapter) Create(namespace string, endpoints *corev1.Endpoints) (*corev1.Endpoints, error) {
 	endpoints, err := adapter.endpointClient.Endpoints(namespace).Create(context.TODO(), endpoints, metav1.CreateOptions{})
@@ -68,9 +67,8 @@ func (adapter *EndpointsAdapter) Create(namespace string, endpoints *corev1.Endp
 	return endpoints, err
 }
 
-// Update accepts a namespace and Endpoints object and updates it. If an
-// endpointSliceClient exists, a matching EndpointSlice will also be created or
-// updated. The updated Endpoints object or an error will be returned.
+// Update accepts a namespace and Endpoints object and updates it and its
+// matching EndpointSlice. The updated Endpoints object or an error will be returned.
 func (adapter *EndpointsAdapter) Update(namespace string, endpoints *corev1.Endpoints) (*corev1.Endpoints, error) {
 	endpoints, err := adapter.endpointClient.Endpoints(namespace).Update(context.TODO(), endpoints, metav1.UpdateOptions{})
 	if err == nil {
@@ -80,12 +78,9 @@ func (adapter *EndpointsAdapter) Update(namespace string, endpoints *corev1.Endp
 }
 
 // EnsureEndpointSliceFromEndpoints accepts a namespace and Endpoints resource
-// and creates or updates a corresponding EndpointSlice if an endpointSliceClient
-// exists. An error will be returned if it fails to sync the EndpointSlice.
+// and creates or updates a corresponding EndpointSlice. An error will be returned
+// if it fails to sync the EndpointSlice.
 func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace string, endpoints *corev1.Endpoints) error {
-	if adapter.endpointSliceClient == nil {
-		return nil
-	}
 	endpointSlice := endpointSliceFromEndpoints(endpoints)
 	currentEndpointSlice, err := adapter.endpointSliceClient.EndpointSlices(namespace).Get(context.TODO(), endpointSlice.Name, metav1.GetOptions{})
 
@@ -123,6 +118,7 @@ func (adapter *EndpointsAdapter) EnsureEndpointSliceFromEndpoints(namespace stri
 func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.EndpointSlice {
 	endpointSlice := &discovery.EndpointSlice{}
 	endpointSlice.Name = endpoints.Name
+	endpointSlice.Namespace = endpoints.Namespace
 	endpointSlice.Labels = map[string]string{discovery.LabelServiceName: endpoints.Name}
 
 	// TODO: Add support for dual stack here (and in the rest of

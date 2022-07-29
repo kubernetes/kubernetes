@@ -56,9 +56,9 @@ func NewScaleHandler(parentEntries []metav1.ManagedFieldsEntry, groupVersion sch
 // ToSubresource filter the managed fields of the main resource and convert
 // them so that they can be handled by scale.
 // For the managed fields that have a replicas path it performs two changes:
-// 1. APIVersion is changed to the APIVersion of the scale subresource
-// 2. Replicas path of the main resource is transformed to the replicas path of
-//    the scale subresource
+//  1. APIVersion is changed to the APIVersion of the scale subresource
+//  2. Replicas path of the main resource is transformed to the replicas path of
+//     the scale subresource
 func (h *ScaleHandler) ToSubresource() ([]metav1.ManagedFieldsEntry, error) {
 	managed, err := DecodeManagedFields(h.parentEntries)
 	if err != nil {

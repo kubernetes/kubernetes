@@ -16,7 +16,7 @@ limitations under the License.
 
 package kubeadm
 
-import "github.com/onsi/ginkgo"
+import "github.com/onsi/ginkgo/v2"
 
 // Describe annotates the test with the Kubeadm label.
 func Describe(text string, body func()) bool {

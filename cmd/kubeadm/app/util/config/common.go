@@ -18,6 +18,7 @@ package config
 
 import (
 	"bytes"
+	"fmt"
 	"net"
 	"reflect"
 	"strings"
@@ -90,8 +91,10 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 // image registry if requested for CI builds, and validates minimal
 // version that kubeadm SetInitDynamicDefaultssupports.
 func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
+	isCIVersion := kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion)
+
 	// Requested version is automatic CI build, thus use KubernetesCI Image Repository for core images
-	if kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion) {
+	if isCIVersion && cfg.ImageRepository == kubeadmapiv1.DefaultImageRepository {
 		cfg.CIImageRepository = constants.DefaultCIImageRepository
 	}
 
@@ -100,6 +103,12 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	if err != nil {
 		return err
 	}
+
+	// Requested version is automatic CI build, thus mark CIKubernetesVersion as `ci/<resolved-version>`
+	if isCIVersion {
+		cfg.CIKubernetesVersion = fmt.Sprintf("%s%s", constants.CIKubernetesVersionPrefix, ver)
+	}
+
 	cfg.KubernetesVersion = ver
 
 	// Parse the given kubernetes version and make sure it's higher than the lowest supported

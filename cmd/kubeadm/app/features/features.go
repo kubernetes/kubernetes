@@ -33,7 +33,7 @@ const (
 	PublicKeysECDSA = "PublicKeysECDSA"
 	// RootlessControlPlane is expected to be in alpha in v1.22
 	RootlessControlPlane = "RootlessControlPlane"
-	// UnversionedKubeletConfigMap is expected to be beta in 1.24
+	// UnversionedKubeletConfigMap is expected to be GA in 1.25
 	UnversionedKubeletConfigMap = "UnversionedKubeletConfigMap"
 )
 
@@ -41,7 +41,7 @@ const (
 var InitFeatureGates = FeatureList{
 	PublicKeysECDSA:             {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
 	RootlessControlPlane:        {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
-	UnversionedKubeletConfigMap: {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
+	UnversionedKubeletConfigMap: {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.GA, LockToDefault: true}},
 }
 
 // Feature represents a feature being gated

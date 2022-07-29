@@ -25,16 +25,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/kubectl/pkg/util/podutils"
 
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -155,70 +153,6 @@ func (r ProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 	return true, nil
 }
 
-func podRunning(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		switch pod.Status.Phase {
-		case v1.PodRunning:
-			return true, nil
-		case v1.PodFailed, v1.PodSucceeded:
-			return false, errPodCompleted
-		}
-		return false, nil
-	}
-}
-
-func podCompleted(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		switch pod.Status.Phase {
-		case v1.PodFailed, v1.PodSucceeded:
-			return true, nil
-		}
-		return false, nil
-	}
-}
-
-func podRunningAndReady(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		switch pod.Status.Phase {
-		case v1.PodFailed, v1.PodSucceeded:
-			e2elog.Logf("The status of Pod %s is %s which is unexpected", podName, pod.Status.Phase)
-			return false, errPodCompleted
-		case v1.PodRunning:
-			e2elog.Logf("The status of Pod %s is %s (Ready = %v)", podName, pod.Status.Phase, podutils.IsPodReady(pod))
-			return podutils.IsPodReady(pod), nil
-		}
-		e2elog.Logf("The status of Pod %s is %s, waiting for it to be Running (with Ready = true)", podName, pod.Status.Phase)
-		return false, nil
-	}
-}
-
-func podNotPending(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		switch pod.Status.Phase {
-		case v1.PodPending:
-			return false, nil
-		default:
-			return true, nil
-		}
-	}
-}
-
 // PodsCreated returns a pod list matched by the given name.
 func PodsCreated(c clientset.Interface, ns, name string, replicas int32) (*v1.PodList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
@@ -303,60 +237,6 @@ func podsRunning(c clientset.Interface, pods *v1.PodList) []error {
 	}
 
 	return e
-}
-
-func podContainerFailed(c clientset.Interface, namespace, podName string, containerIndex int, reason string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		switch pod.Status.Phase {
-		case v1.PodPending:
-			if len(pod.Status.ContainerStatuses) == 0 {
-				return false, nil
-			}
-			containerStatus := pod.Status.ContainerStatuses[containerIndex]
-			if containerStatus.State.Waiting != nil && containerStatus.State.Waiting.Reason == reason {
-				return true, nil
-			}
-			return false, nil
-		case v1.PodFailed, v1.PodRunning, v1.PodSucceeded:
-			return false, fmt.Errorf("pod was expected to be pending, but it is in the state: %s", pod.Status.Phase)
-		}
-		return false, nil
-	}
-}
-
-func podContainerStarted(c clientset.Interface, namespace, podName string, containerIndex int) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		if containerIndex > len(pod.Status.ContainerStatuses)-1 {
-			return false, nil
-		}
-		containerStatus := pod.Status.ContainerStatuses[containerIndex]
-		return *containerStatus.Started, nil
-	}
-}
-
-func isContainerRunning(c clientset.Interface, namespace, podName, containerName string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		for _, statuses := range [][]v1.ContainerStatus{pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses, pod.Status.EphemeralContainerStatuses} {
-			for _, cs := range statuses {
-				if cs.Name == containerName {
-					return cs.State.Running != nil, nil
-				}
-			}
-		}
-		return false, nil
-	}
 }
 
 // LogPodStates logs basic info of provided pods for debugging.
@@ -565,15 +445,31 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 	}
 	execPod, err := client.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 	expectNoError(err, "failed to create new exec pod in namespace: %s", ns)
-	err = wait.PollImmediate(poll, 5*time.Minute, func() (bool, error) {
-		retrievedPod, err := client.CoreV1().Pods(execPod.Namespace).Get(context.TODO(), execPod.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		return retrievedPod.Status.Phase == v1.PodRunning, nil
-	})
+	err = WaitForPodNameRunningInNamespace(client, execPod.Name, execPod.Namespace)
 	expectNoError(err, "failed to create new exec pod in namespace: %s", ns)
 	return execPod
+}
+
+// WithWindowsHostProcess sets the Pod's Windows HostProcess option to true. When this option is set,
+// HostNetwork can be enabled.
+// Containers running as HostProcess will require certain usernames to be set, otherwise the Pod will
+// not start: NT AUTHORITY\SYSTEM, NT AUTHORITY\Local service, NT AUTHORITY\NetworkService.
+// If the given username is empty, NT AUTHORITY\SYSTEM will be used instead.
+// See: https://kubernetes.io/docs/tasks/configure-pod-container/create-hostprocess-pod/
+func WithWindowsHostProcess(pod *v1.Pod, username string) {
+	if pod.Spec.SecurityContext == nil {
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{}
+	}
+	if pod.Spec.SecurityContext.WindowsOptions == nil {
+		pod.Spec.SecurityContext.WindowsOptions = &v1.WindowsSecurityContextOptions{}
+	}
+
+	trueVar := true
+	if username == "" {
+		username = "NT AUTHORITY\\SYSTEM"
+	}
+	pod.Spec.SecurityContext.WindowsOptions.HostProcess = &trueVar
+	pod.Spec.SecurityContext.WindowsOptions.RunAsUserName = &username
 }
 
 // CheckPodsRunningReady returns whether all pods whose names are listed in
@@ -746,4 +642,16 @@ func IsPodActive(p *v1.Pod) bool {
 	return v1.PodSucceeded != p.Status.Phase &&
 		v1.PodFailed != p.Status.Phase &&
 		p.DeletionTimestamp == nil
+}
+
+func podIdentifier(namespace, name string) string {
+	return fmt.Sprintf("%s/%s", namespace, name)
+}
+
+func identifier(pod *v1.Pod) string {
+	id := podIdentifier(pod.Namespace, pod.Name)
+	if pod.UID != "" {
+		id += fmt.Sprintf("(%s)", pod.UID)
+	}
+	return id
 }

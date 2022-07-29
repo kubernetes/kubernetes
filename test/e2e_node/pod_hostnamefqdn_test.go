@@ -30,13 +30,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 func generatePodName(base string) string {
@@ -71,6 +72,7 @@ func testPod(podnamebase string) *v1.Pod {
 
 var _ = SIGDescribe("Hostname of Pod [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("hostfqdn")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	/*
 	   Release: v1.19
 	   Testname: Create Pod without fully qualified domain name (FQDN)

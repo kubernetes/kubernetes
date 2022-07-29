@@ -35,10 +35,10 @@ type RecorderFactory func(string) events.EventRecorder
 
 // newProfile builds a Profile for the given configuration.
 func newProfile(cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
-	opts ...frameworkruntime.Option) (framework.Framework, error) {
+	stopCh <-chan struct{}, opts ...frameworkruntime.Option) (framework.Framework, error) {
 	recorder := recorderFact(cfg.SchedulerName)
 	opts = append(opts, frameworkruntime.WithEventRecorder(recorder))
-	return frameworkruntime.NewFramework(r, &cfg, opts...)
+	return frameworkruntime.NewFramework(r, &cfg, stopCh, opts...)
 }
 
 // Map holds frameworks indexed by scheduler name.
@@ -46,12 +46,12 @@ type Map map[string]framework.Framework
 
 // NewMap builds the frameworks given by the configuration, indexed by name.
 func NewMap(cfgs []config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
-	opts ...frameworkruntime.Option) (Map, error) {
+	stopCh <-chan struct{}, opts ...frameworkruntime.Option) (Map, error) {
 	m := make(Map)
 	v := cfgValidator{m: m}
 
 	for _, cfg := range cfgs {
-		p, err := newProfile(cfg, r, recorderFact, opts...)
+		p, err := newProfile(cfg, r, recorderFact, stopCh, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("creating profile for scheduler name %s: %v", cfg.SchedulerName, err)
 		}

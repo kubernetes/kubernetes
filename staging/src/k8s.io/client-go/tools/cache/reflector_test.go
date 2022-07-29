@@ -138,8 +138,7 @@ func TestReflectorWatchHandlerError(t *testing.T) {
 	go func() {
 		fw.Stop()
 	}()
-	var resumeRV string
-	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, wait.NeverStop)
+	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.expectedTypeName, g.setLastSyncResourceVersion, g.clock, nevererrc, wait.NeverStop)
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -158,8 +157,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 		fw.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "baz", ResourceVersion: "32"}})
 		fw.Stop()
 	}()
-	var resumeRV string
-	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, wait.NeverStop)
+	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.expectedTypeName, g.setLastSyncResourceVersion, g.clock, nevererrc, wait.NeverStop)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -191,7 +189,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 	}
 
 	// RV should send the last version we see.
-	if e, a := "32", resumeRV; e != a {
+	if e, a := "32", g.LastSyncResourceVersion(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -205,10 +203,9 @@ func TestReflectorStopWatch(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
 	g := NewReflector(&testLW{}, &v1.Pod{}, s, 0)
 	fw := watch.NewFake()
-	var resumeRV string
 	stopWatch := make(chan struct{}, 1)
 	stopWatch <- struct{}{}
-	err := g.watchHandler(time.Now(), fw, &resumeRV, nevererrc, stopWatch)
+	err := watchHandler(time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.expectedTypeName, g.setLastSyncResourceVersion, g.clock, nevererrc, stopWatch)
 	if err != errorStopRequested {
 		t.Errorf("expected stop error, got %q", err)
 	}
@@ -487,6 +484,79 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 	close(stopCh)
 	if bm.calls != 2 {
 		t.Errorf("unexpected watch backoff calls: %d", bm.calls)
+	}
+}
+
+func TestRetryInternalError(t *testing.T) {
+	testCases := []struct {
+		name                string
+		maxInternalDuration time.Duration
+		rewindTime          int
+		wantRetries         int
+	}{
+		{
+			name:                "retries off",
+			maxInternalDuration: time.Duration(0),
+			wantRetries:         0,
+		},
+		{
+			name:                "retries on, all calls fail",
+			maxInternalDuration: time.Second * 30,
+			wantRetries:         31,
+		},
+		{
+			name:                "retries on, one call successful",
+			maxInternalDuration: time.Second * 30,
+			rewindTime:          10,
+			wantRetries:         40,
+		},
+	}
+
+	for _, tc := range testCases {
+		err := apierrors.NewInternalError(fmt.Errorf("etcdserver: no leader"))
+		fakeClock := testingclock.NewFakeClock(time.Now())
+		bm := &fakeBackoff{clock: fakeClock}
+
+		counter := 0
+
+		lw := &testLW{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				counter = counter + 1
+				t.Logf("Counter: %v", counter)
+				if counter == tc.rewindTime {
+					t.Logf("Rewinding")
+					fakeClock.Step(time.Minute)
+				}
+
+				fakeClock.Step(time.Second)
+				w := watch.NewFakeWithChanSize(1, false)
+				status := err.Status()
+				w.Error(&status)
+				return w, nil
+			},
+		}
+
+		r := &Reflector{
+			name:                   "test-reflector",
+			listerWatcher:          lw,
+			store:                  NewFIFO(MetaNamespaceKeyFunc),
+			initConnBackoffManager: bm,
+			clock:                  fakeClock,
+			watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
+		}
+
+		r.MaxInternalErrorRetryDuration = tc.maxInternalDuration
+
+		stopCh := make(chan struct{})
+		r.ListAndWatch(stopCh)
+		close(stopCh)
+
+		if counter-1 != tc.wantRetries {
+			t.Errorf("%v unexpected number of retries: %d", tc, counter-1)
+		}
 	}
 }
 

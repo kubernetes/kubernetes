@@ -66,6 +66,21 @@ run_kubectl_version_tests() {
   kube::test::version::yaml_object_to_file "" "${TEMP}/client_server_yaml_version_test"
   kube::test::version::diff_assert "${TEMP}/client_server_json_version_test" "eq" "${TEMP}/client_server_yaml_version_test" "--output json/yaml has identical information"
 
+  kube::log::status "Testing kubectl version: contains semantic version of embedded kustomize"
+  output_message=$(kubectl version)
+  kube::test::if_has_not_string "${output_message}" "Kustomize Version\: unknown" "kustomize version should not be unknown"
+  kube::test::if_has_string "${output_message}" "Kustomize Version\: v[[:digit:]][[:digit:]]*\.[[:digit:]][[:digit:]]*\.[[:digit:]][[:digit:]]*" "kubectl kustomize version should have a reasonable value"
+
+  kube::log::status "Testing kubectl version: all output formats include kustomize version"
+  output_message=$(kubectl version --client)
+  kube::test::if_has_string "${output_message}" "Kustomize Version" "kustomize version should be printed when --client is specified"
+  output_message=$(kubectl version --short)
+  kube::test::if_has_string "${output_message}" "Kustomize Version" "kustomize version should be printed when --short is specified"
+  output_message=$(kubectl version -o yaml)
+  kube::test::if_has_string "${output_message}" "kustomizeVersion" "kustomize version should be printed when -o yaml is used"
+  output_message=$(kubectl version -o json)
+  kube::test::if_has_string "${output_message}" "kustomizeVersion" "kustomize version should be printed when -o json is used"
+
   set +o nounset
   set +o errexit
 }

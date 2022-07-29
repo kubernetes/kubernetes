@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +36,7 @@ import (
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // Validate PV/PVC, create and verify writer pod, delete the PVC, and validate the PV's
@@ -59,7 +60,8 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 // PV. Ensure each step succeeds.
 // Note: the PV is deleted in the AfterEach, not here.
 // Note: this func is serialized, we wait for each pod to be deleted before creating the
-//   next pod. Adding concurrency is a TODO item.
+//
+//	next pod. Adding concurrency is a TODO item.
 func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string, pvols e2epv.PVMap, claims e2epv.PVCMap, expectPhase v1.PersistentVolumePhase) error {
 	var err error
 
@@ -96,6 +98,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 
 	// global vars for the ginkgo.Context()s and ginkgo.It()'s below
 	f := framework.NewDefaultFramework("pv")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var (
 		c         clientset.Interface
 		ns        string
@@ -107,6 +110,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		pvc       *v1.PersistentVolumeClaim
 		err       error
 	)
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
@@ -439,7 +443,8 @@ func makeStatefulSetWithPVCs(ns, cmd string, mounts []v1.VolumeMount, claims []v
 
 // createWaitAndDeletePod creates the test pod, wait for (hopefully) success, and then delete the pod.
 // Note: need named return value so that the err assignment in the defer sets the returned error.
-//       Has been shown to be necessary using Go 1.7.
+//
+//	Has been shown to be necessary using Go 1.7.
 func createWaitAndDeletePod(c clientset.Interface, t *framework.TimeoutContext, ns string, pvc *v1.PersistentVolumeClaim, command string) (err error) {
 	framework.Logf("Creating nfs test pod")
 	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, command)

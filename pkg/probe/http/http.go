@@ -38,7 +38,8 @@ const (
 
 // New creates Prober that will skip TLS verification while probing.
 // followNonLocalRedirects configures whether the prober should follow redirects to a different hostname.
-//   If disabled, redirects to other hosts will trigger a warning result.
+//
+//	If disabled, redirects to other hosts will trigger a warning result.
 func New(followNonLocalRedirects bool) Prober {
 	tlsConfig := &tls.Config{InsecureSkipVerify: true}
 	return NewWithTLSConfig(tlsConfig, followNonLocalRedirects)
@@ -46,14 +47,16 @@ func New(followNonLocalRedirects bool) Prober {
 
 // NewWithTLSConfig takes tls config as parameter.
 // followNonLocalRedirects configures whether the prober should follow redirects to a different hostname.
-//   If disabled, redirects to other hosts will trigger a warning result.
+//
+//	If disabled, redirects to other hosts will trigger a warning result.
 func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) Prober {
 	// We do not want the probe use node's local proxy set.
 	transport := utilnet.SetTransportDefaults(
 		&http.Transport{
-			TLSClientConfig:   config,
-			DisableKeepAlives: true,
-			Proxy:             http.ProxyURL(nil),
+			TLSClientConfig:    config,
+			DisableKeepAlives:  true,
+			Proxy:              http.ProxyURL(nil),
+			DisableCompression: true, // removes Accept-Encoding header
 		})
 	return httpProber{transport, followNonLocalRedirects}
 }
@@ -68,9 +71,8 @@ type httpProber struct {
 	followNonLocalRedirects bool
 }
 
-// Probe returns a ProbeRunner capable of running an HTTP check.
+// Probe returns a probing result. The only case the err will not be nil is when there is a problem reading the response body.
 func (pr httpProber) Probe(url *url.URL, headers http.Header, timeout time.Duration) (probe.Result, string, error) {
-	pr.transport.DisableCompression = true // removes Accept-Encoding header
 	client := &http.Client{
 		Timeout:       timeout,
 		Transport:     pr.transport,

@@ -28,13 +28,15 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature:SystemNodeCriticalPod]", func() {
 	f := framework.NewDefaultFramework("system-node-critical-pod-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	// this test only manipulates pods in kube-system
 	f.SkipNamespaceCreation = true
 

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +38,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/network/common"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -57,6 +58,7 @@ except:
 
 var _ = common.SIGDescribe("ClusterDns [Feature:Example]", func() {
 	f := framework.NewDefaultFramework("cluster-dns")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var c clientset.Interface
 	ginkgo.BeforeEach(func() {

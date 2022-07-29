@@ -33,8 +33,15 @@ import (
 	core "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
-	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+)
+
+const (
+	// AllowAny is the wildcard used to allow any profile.
+	seccompAllowAny = "*"
+	// DefaultProfileAnnotationKey specifies the default seccomp profile.
+	seccompDefaultProfileAnnotationKey = "seccomp.security.alpha.kubernetes.io/defaultProfileName"
+	// AllowedProfilesAnnotationKey specifies the allowed seccomp profiles.
+	seccompAllowedProfilesAnnotationKey = "seccomp.security.alpha.kubernetes.io/allowedProfileNames"
 )
 
 // ValidatePodDisruptionBudget validates a PodDisruptionBudget and returns an ErrorList
@@ -149,15 +156,15 @@ func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string,
 		}
 	}
 
-	if p := annotations[seccomp.DefaultProfileAnnotationKey]; p != "" {
-		allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath.Key(seccomp.DefaultProfileAnnotationKey))...)
+	if p := annotations[seccompDefaultProfileAnnotationKey]; p != "" {
+		allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath.Key(seccompDefaultProfileAnnotationKey))...)
 	}
-	if allowed := annotations[seccomp.AllowedProfilesAnnotationKey]; allowed != "" {
+	if allowed := annotations[seccompAllowedProfilesAnnotationKey]; allowed != "" {
 		for _, p := range strings.Split(allowed, ",") {
-			if p == seccomp.AllowAny {
+			if p == seccompAllowAny {
 				continue
 			}
-			allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath.Key(seccomp.AllowedProfilesAnnotationKey))...)
+			allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath.Key(seccompAllowedProfilesAnnotationKey))...)
 		}
 	}
 	return allErrs
@@ -321,7 +328,7 @@ func validatePSPSupplementalGroup(fldPath *field.Path, groupOptions *policy.Supp
 // validatePodSecurityPolicyVolumes validates the volume fields of PodSecurityPolicy.
 func validatePodSecurityPolicyVolumes(fldPath *field.Path, volumes []policy.FSType) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allowed := psputil.GetAllFSTypesAsSet()
+	allowed := getAllFSTypesAsSet()
 	// add in the * value since that is a pseudo type that is not included by default
 	allowed.Insert(string(policy.All))
 	for _, v := range volumes {
@@ -330,6 +337,44 @@ func validatePodSecurityPolicyVolumes(fldPath *field.Path, volumes []policy.FSTy
 		}
 	}
 	return allErrs
+}
+
+// getAllFSTypesAsSet returns all actual volume types, regardless
+// of feature gates. The special policy.All pseudo type is not included.
+func getAllFSTypesAsSet() sets.String {
+	fstypes := sets.NewString()
+	fstypes.Insert(
+		string(policy.HostPath),
+		string(policy.AzureFile),
+		string(policy.Flocker),
+		string(policy.FlexVolume),
+		string(policy.EmptyDir),
+		string(policy.GCEPersistentDisk),
+		string(policy.AWSElasticBlockStore),
+		string(policy.GitRepo),
+		string(policy.Secret),
+		string(policy.NFS),
+		string(policy.ISCSI),
+		string(policy.Glusterfs),
+		string(policy.PersistentVolumeClaim),
+		string(policy.RBD),
+		string(policy.Cinder),
+		string(policy.CephFS),
+		string(policy.DownwardAPI),
+		string(policy.FC),
+		string(policy.ConfigMap),
+		string(policy.VsphereVolume),
+		string(policy.Quobyte),
+		string(policy.AzureDisk),
+		string(policy.PhotonPersistentDisk),
+		string(policy.StorageOS),
+		string(policy.Projected),
+		string(policy.PortworxVolume),
+		string(policy.ScaleIO),
+		string(policy.CSI),
+		string(policy.Ephemeral),
+	)
+	return fstypes
 }
 
 // validatePSPDefaultAllowPrivilegeEscalation validates the DefaultAllowPrivilegeEscalation field against the AllowPrivilegeEscalation field of a PodSecurityPolicy.
@@ -355,29 +400,22 @@ func validatePSPAllowedProcMountTypes(fldPath *field.Path, allowedProcMountTypes
 
 const sysctlPatternSegmentFmt string = "([a-z0-9][-_a-z0-9]*)?[a-z0-9*]"
 
-// SysctlPatternFmt is a regex used for matching valid sysctl patterns.
-const SysctlPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "\\.)*" + sysctlPatternSegmentFmt
-
 // SysctlContainSlashPatternFmt is a regex that contains a slash used for matching valid sysctl patterns.
 const SysctlContainSlashPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "[\\./])*" + sysctlPatternSegmentFmt
-
-var sysctlPatternRegexp = regexp.MustCompile("^" + SysctlPatternFmt + "$")
 
 var sysctlContainSlashPatternRegexp = regexp.MustCompile("^" + SysctlContainSlashPatternFmt + "$")
 
 // IsValidSysctlPattern checks if name is a valid sysctl pattern.
-// i.e. matches sysctlPatternRegexp (or sysctlContainSlashPatternRegexp if canContainSlash is true).
+// i.e. matches sysctlContainSlashPatternRegexp.
 // More info:
-//   https://man7.org/linux/man-pages/man8/sysctl.8.html
-//   https://man7.org/linux/man-pages/man5/sysctl.d.5.html
-func IsValidSysctlPattern(name string, canContainSlash bool) bool {
+//
+//	https://man7.org/linux/man-pages/man8/sysctl.8.html
+//	https://man7.org/linux/man-pages/man5/sysctl.d.5.html
+func IsValidSysctlPattern(name string) bool {
 	if len(name) > apivalidation.SysctlMaxLength {
 		return false
 	}
-	if canContainSlash {
-		return sysctlContainSlashPatternRegexp.MatchString(name)
-	}
-	return sysctlPatternRegexp.MatchString(name)
+	return sysctlContainSlashPatternRegexp.MatchString(name)
 }
 
 func validatePodSecurityPolicySysctlListsDoNotOverlap(allowedSysctlsFldPath, forbiddenSysctlsFldPath *field.Path, allowedUnsafeSysctls, forbiddenSysctls []string) field.ErrorList {
@@ -433,12 +471,12 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 	for i, s := range sysctls {
 		if len(s) == 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), sysctls[i], "empty sysctl not allowed"))
-		} else if !IsValidSysctlPattern(string(s), false) {
+		} else if !IsValidSysctlPattern(string(s)) {
 			allErrs = append(
 				allErrs,
 				field.Invalid(fldPath.Index(i), sysctls[i], fmt.Sprintf("must have at most %d characters and match regex %s",
 					apivalidation.SysctlMaxLength,
-					SysctlPatternFmt,
+					SysctlContainSlashPatternFmt,
 				)),
 			)
 		} else if s[0] == '*' {

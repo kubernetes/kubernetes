@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,10 +33,12 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = utils.SIGDescribe("Volume Placement [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-placement")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	const (
 		NodeLabelKey = "vsphere_e2e_label_volume_placement"
 	)

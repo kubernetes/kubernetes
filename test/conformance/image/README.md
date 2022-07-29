@@ -7,26 +7,26 @@
 
 ```console
 # First, build the binaries by running make from the root directory
-$ make WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/ginkgo cmd/kubectl test/conformance/image/go-runner"
+$ make WHAT="test/e2e/e2e.test github.com/onsi/ginkgo/v2/ginkgo cmd/kubectl test/conformance/image/go-runner"
 
 # Build for linux/amd64 (default)
-# export REGISTRY=$HOST/$ORG to switch from k8s.gcr.io
+# export REGISTRY=$HOST/$ORG to switch from registry.k8s.io
 
 $ make push VERSION={target_version} ARCH=amd64
-# ---> k8s.gcr.io/conformance-amd64:VERSION
-# ---> k8s.gcr.io/conformance:VERSION (image with backwards-compatible naming)
+# ---> registry.k8s.io/conformance-amd64:VERSION
+# ---> registry.k8s.io/conformance:VERSION (image with backwards-compatible naming)
 
 $ make push VERSION={target_version} ARCH=arm
-# ---> k8s.gcr.io/conformance-arm:VERSION
+# ---> registry.k8s.io/conformance-arm:VERSION
 
 $ make push VERSION={target_version} ARCH=arm64
-# ---> k8s.gcr.io/conformance-arm64:VERSION
+# ---> registry.k8s.io/conformance-arm64:VERSION
 
 $ make push VERSION={target_version} ARCH=ppc64le
-# ---> k8s.gcr.io/conformance-ppc64le:VERSION
+# ---> registry.k8s.io/conformance-ppc64le:VERSION
 
 $ make push VERSION={target_version} ARCH=s390x
-# ---> k8s.gcr.io/conformance-s390x:VERSION
+# ---> registry.k8s.io/conformance-s390x:VERSION
 ```
 
 If you don't want to push the images, run `make` or `make build` instead

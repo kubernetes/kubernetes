@@ -27,10 +27,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	. "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -172,9 +175,19 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 	}
 }
 
+func getMaxUnavailable(maxUnavailable int) *intstr.IntOrString {
+	maxUnavailableIntOrStr := intstr.FromInt(maxUnavailable)
+	return &maxUnavailableIntOrStr
+}
+
+func getPartition(partition int32) *int32 {
+	return &partition
+}
+
 func TestSetDefaultStatefulSet(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}
 	var defaultPartition int32 = 0
+	var notTheDefaultPartition int32 = 42
 	var defaultReplicas int32 = 1
 
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
@@ -192,10 +205,13 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 	}
 
 	tests := []struct {
-		original *appsv1beta2.StatefulSet
-		expected *appsv1beta2.StatefulSet
+		name                       string
+		original                   *appsv1beta2.StatefulSet
+		expected                   *appsv1beta2.StatefulSet
+		enableMaxUnavailablePolicy bool
 	}{
-		{ // labels and default update strategy
+		{
+			name: "labels and default update strategy",
 			original: &appsv1beta2.StatefulSet{
 				Spec: appsv1beta2.StatefulSetSpec{
 					Template: defaultTemplate,
@@ -220,7 +236,8 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 			},
 		},
-		{ // Alternate update strategy
+		{
+			name: "Alternate update strategy",
 			original: &appsv1beta2.StatefulSet{
 				Spec: appsv1beta2.StatefulSetSpec{
 					Template: defaultTemplate,
@@ -245,7 +262,8 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 			},
 		},
-		{ // Parallel pod management policy.
+		{
+			name: "Parallel pod management policy.",
 			original: &appsv1beta2.StatefulSet{
 				Spec: appsv1beta2.StatefulSetSpec{
 					Template:            defaultTemplate,
@@ -270,21 +288,175 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
 				},
 			},
+		},
+		{
+			name: "MaxUnavailable disabled, with maxUnavailable not specified",
+			original: &appsv1beta2.StatefulSet{
+				Spec: appsv1beta2.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1beta2.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1beta2.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta2.RollingUpdateStatefulSetStrategy{
+							Partition: getPartition(0),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enableMaxUnavailablePolicy: false,
+		},
+		{
+			name: "MaxUnavailable disabled, with default maxUnavailable specified",
+			original: &appsv1beta2.StatefulSet{
+				Spec: appsv1beta2.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						RollingUpdate: &appsv1beta2.RollingUpdateStatefulSetStrategy{
+							Partition:      &defaultPartition,
+							MaxUnavailable: getMaxUnavailable(1),
+						},
+					},
+				},
+			},
+			expected: &appsv1beta2.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1beta2.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta2.RollingUpdateStatefulSetStrategy{
+							Partition:      getPartition(0),
+							MaxUnavailable: getMaxUnavailable(1),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enableMaxUnavailablePolicy: false,
+		},
+		{
+			name: "MaxUnavailable disabled, with non default maxUnavailable specified",
+			original: &appsv1beta2.StatefulSet{
+				Spec: appsv1beta2.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						RollingUpdate: &appsv1beta2.RollingUpdateStatefulSetStrategy{
+							Partition:      &notTheDefaultPartition,
+							MaxUnavailable: getMaxUnavailable(3),
+						},
+					},
+				},
+			},
+			expected: &appsv1beta2.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1beta2.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta2.RollingUpdateStatefulSetStrategy{
+							Partition:      getPartition(42),
+							MaxUnavailable: getMaxUnavailable(3),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enableMaxUnavailablePolicy: false,
+		},
+		{
+			name: "MaxUnavailable enabled, with no maxUnavailable specified",
+			original: &appsv1beta2.StatefulSet{
+				Spec: appsv1beta2.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1beta2.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1beta2.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta2.RollingUpdateStatefulSetStrategy{
+							Partition:      getPartition(0),
+							MaxUnavailable: getMaxUnavailable(1),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enableMaxUnavailablePolicy: true,
+		},
+		{
+			name: "MaxUnavailable enabled, with non default maxUnavailable specified",
+			original: &appsv1beta2.StatefulSet{
+				Spec: appsv1beta2.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						RollingUpdate: &appsv1beta2.RollingUpdateStatefulSetStrategy{
+							Partition:      &notTheDefaultPartition,
+							MaxUnavailable: getMaxUnavailable(3),
+						},
+					},
+				},
+			},
+			expected: &appsv1beta2.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1beta2.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1beta2.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1beta2.StatefulSetUpdateStrategy{
+						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1beta2.RollingUpdateStatefulSetStrategy{
+							Partition:      getPartition(42),
+							MaxUnavailable: getMaxUnavailable(3),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enableMaxUnavailablePolicy: true,
 		},
 	}
 
-	for i, test := range tests {
-		original := test.original
-		expected := test.expected
-		obj2 := roundTrip(t, runtime.Object(original))
-		got, ok := obj2.(*appsv1beta2.StatefulSet)
-		if !ok {
-			t.Errorf("(%d) unexpected object: %v", i, got)
-			t.FailNow()
-		}
-		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
-			t.Errorf("(%d) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", i, got.Spec, expected.Spec)
-		}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)()
+			obj2 := roundTrip(t, runtime.Object(test.original))
+			got, ok := obj2.(*appsv1beta2.StatefulSet)
+			if !ok {
+				t.Errorf("unexpected object: %v", got)
+				t.FailNow()
+			}
+			if !apiequality.Semantic.DeepEqual(got.Spec, test.expected.Spec) {
+				t.Errorf("got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", got.Spec, test.expected.Spec)
+			}
+		})
 	}
 }
 

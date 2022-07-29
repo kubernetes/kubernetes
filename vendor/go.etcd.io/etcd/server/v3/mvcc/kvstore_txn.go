@@ -78,7 +78,7 @@ type storeTxnWrite struct {
 func (s *store) Write(trace *traceutil.Trace) TxnWrite {
 	s.mu.RLock()
 	tx := s.b.BatchTx()
-	tx.Lock()
+	tx.LockInsideApply()
 	tw := &storeTxnWrite{
 		storeTxnRead: storeTxnRead{s, tx, 0, 0, trace},
 		tx:           tx,

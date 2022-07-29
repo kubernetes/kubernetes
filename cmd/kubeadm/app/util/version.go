@@ -57,12 +57,13 @@ var (
 // servers and then return actual semantic version.
 //
 // Available names on release servers:
-//  stable      (latest stable release)
-//  stable-1    (latest stable release in 1.x)
-//  stable-1.0  (and similarly 1.1, 1.2, 1.3, ...)
-//  latest      (latest release, including alpha/beta)
-//  latest-1    (latest release in 1.x, including alpha/beta)
-//  latest-1.0  (and similarly 1.1, 1.2, 1.3, ...)
+//
+//	stable      (latest stable release)
+//	stable-1    (latest stable release in 1.x)
+//	stable-1.0  (and similarly 1.1, 1.2, 1.3, ...)
+//	latest      (latest release, including alpha/beta)
+//	latest-1    (latest release in 1.x, including alpha/beta)
+//	latest-1.0  (and similarly 1.1, 1.2, 1.3, ...)
 func KubernetesReleaseVersion(version string) (string, error) {
 	return kubernetesReleaseVersion(version, fetchFromURL)
 }

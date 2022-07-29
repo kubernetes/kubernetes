@@ -30,7 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func getPatchBytes(oldLease, newLease *coordinationv1.Lease) ([]byte, error) {
@@ -51,6 +54,7 @@ func getPatchBytes(oldLease, newLease *coordinationv1.Lease) ([]byte, error) {
 
 var _ = SIGDescribe("Lease", func() {
 	f := framework.NewDefaultFramework("lease-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	/*
 		Release: v1.17
@@ -87,7 +91,9 @@ var _ = SIGDescribe("Lease", func() {
 
 		readLease, err := leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")
-		framework.ExpectEqual(apiequality.Semantic.DeepEqual(lease.Spec, readLease.Spec), true)
+		if !apiequality.Semantic.DeepEqual(lease.Spec, readLease.Spec) {
+			framework.Failf("Leases don't match. Diff (- for expected, + for actual):\n%s", cmp.Diff(lease.Spec, readLease.Spec))
+		}
 
 		createdLease.Spec = coordinationv1.LeaseSpec{
 			HolderIdentity:       pointer.StringPtr("holder2"),
@@ -102,7 +108,9 @@ var _ = SIGDescribe("Lease", func() {
 
 		readLease, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")
-		framework.ExpectEqual(apiequality.Semantic.DeepEqual(createdLease.Spec, readLease.Spec), true)
+		if !apiequality.Semantic.DeepEqual(createdLease.Spec, readLease.Spec) {
+			framework.Failf("Leases don't match. Diff (- for expected, + for actual):\n%s", cmp.Diff(createdLease.Spec, readLease.Spec))
+		}
 
 		patchedLease := readLease.DeepCopy()
 		patchedLease.Spec = coordinationv1.LeaseSpec{
@@ -120,7 +128,9 @@ var _ = SIGDescribe("Lease", func() {
 
 		readLease, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "couldn't read Lease")
-		framework.ExpectEqual(apiequality.Semantic.DeepEqual(patchedLease.Spec, readLease.Spec), true)
+		if !apiequality.Semantic.DeepEqual(patchedLease.Spec, readLease.Spec) {
+			framework.Failf("Leases don't match. Diff (- for expected, + for actual):\n%s", cmp.Diff(patchedLease.Spec, readLease.Spec))
+		}
 
 		name2 := "lease2"
 		lease2 := &coordinationv1.Lease{
@@ -155,7 +165,9 @@ var _ = SIGDescribe("Lease", func() {
 		framework.ExpectNoError(err, "deleting Lease failed")
 
 		_, err = leaseClient.Get(context.TODO(), name, metav1.GetOptions{})
-		framework.ExpectEqual(apierrors.IsNotFound(err), true)
+		if !apierrors.IsNotFound(err) {
+			framework.Failf("expected IsNotFound error, got %#v", err)
+		}
 
 		leaseClient = f.ClientSet.CoordinationV1().Leases(metav1.NamespaceAll)
 		// Number of leases may be high in large clusters, as Lease object is

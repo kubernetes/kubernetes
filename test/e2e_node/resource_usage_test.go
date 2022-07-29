@@ -30,8 +30,9 @@ import (
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
@@ -46,6 +47,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 	)
 
 	f := framework.NewDefaultFramework("resource-usage")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		om = e2ekubelet.NewRuntimeOperationMonitor(f.ClientSet)

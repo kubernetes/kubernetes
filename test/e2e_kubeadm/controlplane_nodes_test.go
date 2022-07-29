@@ -24,16 +24,14 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 const (
 	controlPlaneLabel = "node-role.kubernetes.io/control-plane"
-	// TODO: remove the legacy label in 1.25:
-	// https://github.com/kubernetes/kubeadm/issues/2200
-	controlPlaneLabelLegacy = "node-role.kubernetes.io/master"
 )
 
 // Define container for all the test specification aimed at verifying
@@ -42,6 +40,7 @@ var _ = Describe("control-plane node", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("control-plane node")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// Tests in this container are not expected to create new objects in the cluster
 	// so we are disabling the creation of a namespace in order to get a faster execution
@@ -57,11 +56,8 @@ var _ = Describe("control-plane node", func() {
 		gomega.Expect(controlPlanes.Items).NotTo(gomega.BeEmpty(), "at least one node with label %s should exist. if you are running test on a single-node cluster, you can skip this test with SKIP=multi-node", controlPlaneLabel)
 
 		// checks that the control-plane nodes have the expected taints
-		// TODO: remove the legacy taint check in 1.25:
-		// https://github.com/kubernetes/kubeadm/issues/2200
 		for _, cp := range controlPlanes.Items {
 			framework.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabel, Effect: corev1.TaintEffectNoSchedule})
-			framework.ExpectNodeHasTaint(f.ClientSet, cp.GetName(), &corev1.Taint{Key: controlPlaneLabelLegacy, Effect: corev1.TaintEffectNoSchedule})
 		}
 	})
 })

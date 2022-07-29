@@ -81,10 +81,11 @@ type namespacedResourcesDeleter struct {
 
 // Delete deletes all resources in the given namespace.
 // Before deleting resources:
-// * It ensures that deletion timestamp is set on the
-//   namespace (does nothing if deletion timestamp is missing).
-// * Verifies that the namespace is in the "terminating" phase
-//   (updates the namespace phase if it is not yet marked terminating)
+//   - It ensures that deletion timestamp is set on the
+//     namespace (does nothing if deletion timestamp is missing).
+//   - Verifies that the namespace is in the "terminating" phase
+//     (updates the namespace phase if it is not yet marked terminating)
+//
 // After deleting the resources:
 // * It removes finalizer token from the given namespace.
 //
@@ -339,9 +340,10 @@ func (d *namespacedResourcesDeleter) deleteCollection(gvr schema.GroupVersionRes
 
 // listCollection will list the items in the specified namespace
 // it returns the following:
-//  the list of items in the collection (if found)
-//  a boolean if the operation is supported
-//  an error if the operation is supported but could not be completed.
+//
+//	the list of items in the collection (if found)
+//	a boolean if the operation is supported
+//	an error if the operation is supported but could not be completed.
 func (d *namespacedResourcesDeleter) listCollection(gvr schema.GroupVersionResource, namespace string) (*metav1.PartialObjectMetadataList, bool, error) {
 	klog.V(5).Infof("namespace controller - listCollection - namespace: %s, gvr: %v", namespace, gvr)
 

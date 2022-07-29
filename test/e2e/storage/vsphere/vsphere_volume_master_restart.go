@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	"k8s.io/api/core/v1"
@@ -37,6 +37,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // waitForKubeletUp waits for the kubelet on the given host to be up.
@@ -89,18 +90,19 @@ func restartKubelet(host string) error {
 }
 
 /*
-	Test to verify volume remains attached after kubelet restart on master node
-	For the number of schedulable nodes,
-	1. Create a volume with default volume options
-	2. Create a Pod
-	3. Verify the volume is attached
-	4. Restart the kubelet on master node
-	5. Verify again that the volume is attached
-	6. Delete the pod and wait for the volume to be detached
-	7. Delete the volume
+Test to verify volume remains attached after kubelet restart on master node
+For the number of schedulable nodes,
+1. Create a volume with default volume options
+2. Create a Pod
+3. Verify the volume is attached
+4. Restart the kubelet on master node
+5. Verify again that the volume is attached
+6. Delete the pod and wait for the volume to be detached
+7. Delete the volume
 */
 var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disruptive]", func() {
 	f := framework.NewDefaultFramework("restart-master")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	const labelKey = "vsphere_e2e_label"
 	var (

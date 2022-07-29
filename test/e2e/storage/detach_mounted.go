@@ -33,8 +33,9 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var (
@@ -45,6 +46,7 @@ var (
 
 var _ = utils.SIGDescribe("[Feature:Flexvolumes] Detaching volumes", func() {
 	f := framework.NewDefaultFramework("flexvolume")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// note that namespace deletion is handled by delete-namespace flag
 

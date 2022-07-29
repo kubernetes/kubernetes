@@ -35,7 +35,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 
@@ -53,7 +53,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
@@ -439,7 +438,7 @@ func CheckTestingNSDeletedExcept(c clientset.Interface, skip string) error {
 	return fmt.Errorf("Waiting for terminating namespaces to be deleted timed out")
 }
 
-//WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
+// WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
 func WaitForServiceEndpointsNum(c clientset.Interface, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
@@ -489,10 +488,13 @@ type ClientConfigGetter func() (*restclient.Config, error)
 func LoadConfig() (config *restclient.Config, err error) {
 	defer func() {
 		if err == nil && config != nil {
-			testDesc := ginkgo.CurrentGinkgoTestDescription()
-			if len(testDesc.ComponentTexts) > 0 {
-				componentTexts := strings.Join(testDesc.ComponentTexts, " ")
-				config.UserAgent = fmt.Sprintf("%s -- %s", rest.DefaultKubernetesUserAgent(), componentTexts)
+			testDesc := ginkgo.CurrentSpecReport()
+			if len(testDesc.ContainerHierarchyTexts) > 0 {
+				testName := strings.Join(testDesc.ContainerHierarchyTexts, " ")
+				if len(testDesc.LeafNodeText) > 0 {
+					testName = testName + " " + testDesc.LeafNodeText
+				}
+				config.UserAgent = fmt.Sprintf("%s -- %s", restclient.DefaultKubernetesUserAgent(), testName)
 			}
 		}
 	}()
@@ -1357,7 +1359,7 @@ func PrettyPrintJSON(metrics interface{}) string {
 		Logf("Error indenting: %v", err)
 		return ""
 	}
-	return string(formatted.Bytes())
+	return formatted.String()
 }
 
 // taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
@@ -1372,18 +1374,22 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 
 // WatchEventSequenceVerifier ...
 // manages a watch for a given resource, ensures that events take place in a given order, retries the test on failure
-//   testContext         cancelation signal across API boundries, e.g: context.TODO()
-//   dc                  sets up a client to the API
-//   resourceType        specify the type of resource
-//   namespace           select a namespace
-//   resourceName        the name of the given resource
-//   listOptions         options used to find the resource, recommended to use listOptions.labelSelector
-//   expectedWatchEvents array of events which are expected to occur
-//   scenario            the test itself
-//   retryCleanup        a function to run which ensures that there are no dangling resources upon test failure
+//
+//	testContext         cancelation signal across API boundries, e.g: context.TODO()
+//	dc                  sets up a client to the API
+//	resourceType        specify the type of resource
+//	namespace           select a namespace
+//	resourceName        the name of the given resource
+//	listOptions         options used to find the resource, recommended to use listOptions.labelSelector
+//	expectedWatchEvents array of events which are expected to occur
+//	scenario            the test itself
+//	retryCleanup        a function to run which ensures that there are no dangling resources upon test failure
+//
 // this tooling relies on the test to return the events as they occur
 // the entire scenario must be run to ensure that the desired watch events arrive in order (allowing for interweaving of watch events)
-//   if an expected watch event is missing we elect to clean up and run the entire scenario again
+//
+//	if an expected watch event is missing we elect to clean up and run the entire scenario again
+//
 // we try the scenario three times to allow the sequencing to fail a couple of times
 func WatchEventSequenceVerifier(ctx context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watchtools.RetryWatcher) []watch.Event, retryCleanup func() error) {
 	listWatcher := &cache.ListWatch{
@@ -1422,7 +1428,7 @@ retriesLoop:
 					break actualWatchEventsLoop
 				}
 			}
-			if foundExpectedWatchEvent == false {
+			if !foundExpectedWatchEvent {
 				errs.Insert(fmt.Sprintf("Watch event %v not found", expectedWatchEvent.Type))
 			}
 			totalValidWatchEvents++

@@ -31,7 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/google/go-cmp/cmp"
 	compute "google.golang.org/api/compute/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
@@ -166,11 +166,6 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		}()
 	}
 
-	// Ensure firewall rules if necessary
-	if err = g.ensureInternalFirewalls(loadBalancerName, ipToUse, clusterID, nm, svc, strconv.Itoa(int(hcPort)), sharedHealthCheck, nodes); err != nil {
-		return nil, err
-	}
-
 	fwdRuleDescription := &forwardingRuleDescription{ServiceName: nm.String()}
 	fwdRuleDescriptionString, err := fwdRuleDescription.marshal()
 	if err != nil {
@@ -202,9 +197,9 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		// Delete existing forwarding rule before making changes to the backend service. For example - changing protocol
 		// of backend service without first deleting forwarding rule will throw an error since the linked forwarding
 		// rule would show the old protocol.
-		if klog.V(2).Enabled() {
+		if klogV := klog.V(2); klogV.Enabled() {
 			frDiff := cmp.Diff(existingFwdRule, newFwdRule)
-			klog.V(2).Infof("ensureInternalLoadBalancer(%v): forwarding rule changed - Existing - %+v\n, New - %+v\n, Diff(-existing, +new) - %s\n. Deleting existing forwarding rule.", loadBalancerName, existingFwdRule, newFwdRule, frDiff)
+			klogV.Infof("ensureInternalLoadBalancer(%v): forwarding rule changed - Existing - %+v\n, New - %+v\n, Diff(-existing, +new) - %s\n. Deleting existing forwarding rule.", loadBalancerName, existingFwdRule, newFwdRule, frDiff)
 		}
 		if err = ignoreNotFound(g.DeleteRegionForwardingRule(loadBalancerName, g.region)); err != nil {
 			return nil, err
@@ -225,15 +220,21 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		}
 	}
 
-	// Delete the previous internal load balancer resources if necessary
-	if existingBackendService != nil {
-		g.clearPreviousInternalResources(svc, loadBalancerName, existingBackendService, backendServiceName, hcName)
-	}
-
 	// Get the most recent forwarding rule for the address.
 	updatedFwdRule, err := g.GetRegionForwardingRule(loadBalancerName, g.region)
 	if err != nil {
 		return nil, err
+	}
+
+	ipToUse = updatedFwdRule.IPAddress
+	// Ensure firewall rules if necessary
+	if err = g.ensureInternalFirewalls(loadBalancerName, ipToUse, clusterID, nm, svc, strconv.Itoa(int(hcPort)), sharedHealthCheck, nodes); err != nil {
+		return nil, err
+	}
+
+	// Delete the previous internal load balancer resources if necessary
+	if existingBackendService != nil {
+		g.clearPreviousInternalResources(svc, loadBalancerName, existingBackendService, backendServiceName, hcName)
 	}
 
 	serviceState.InSuccess = true
@@ -416,7 +417,7 @@ func (g *Cloud) teardownInternalHealthCheckAndFirewall(svc *v1.Service, hcName s
 	return nil
 }
 
-func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, sourceRanges []string, portRanges []string, protocol v1.Protocol, nodes []*v1.Node, legacyFwName string) error {
+func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc, destinationIP string, sourceRanges []string, portRanges []string, protocol v1.Protocol, nodes []*v1.Node, legacyFwName string) error {
 	klog.V(2).Infof("ensureInternalFirewall(%v): checking existing firewall", fwName)
 	targetTags, err := g.GetNodeTags(nodeNames(nodes))
 	if err != nil {
@@ -465,6 +466,10 @@ func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, s
 		},
 	}
 
+	if destinationIP != "" {
+		expectedFirewall.DestinationRanges = []string{destinationIP}
+	}
+
 	if existingFirewall == nil {
 		klog.V(2).Infof("ensureInternalFirewall(%v): creating firewall", fwName)
 		err = g.CreateFirewall(expectedFirewall)
@@ -481,7 +486,7 @@ func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, s
 	}
 
 	klog.V(2).Infof("ensureInternalFirewall(%v): updating firewall", fwName)
-	err = g.UpdateFirewall(expectedFirewall)
+	err = g.PatchFirewall(expectedFirewall)
 	if err != nil && isForbidden(err) && g.OnXPN() {
 		klog.V(2).Infof("ensureInternalFirewall(%v): do not have permission to update firewall rule (on XPN). Raising event.", fwName)
 		g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudUpdateCmd(expectedFirewall, g.NetworkProjectID()))
@@ -498,7 +503,7 @@ func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID s
 	if err != nil {
 		return err
 	}
-	err = g.ensureInternalFirewall(svc, MakeFirewallName(loadBalancerName), fwDesc, sourceRanges.StringSlice(), portRanges, protocol, nodes, loadBalancerName)
+	err = g.ensureInternalFirewall(svc, MakeFirewallName(loadBalancerName), fwDesc, ipAddress, sourceRanges.StringSlice(), portRanges, protocol, nodes, loadBalancerName)
 	if err != nil {
 		return err
 	}
@@ -506,7 +511,7 @@ func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID s
 	// Second firewall is for health checking nodes / services
 	fwHCName := makeHealthCheckFirewallName(loadBalancerName, clusterID, sharedHealthCheck)
 	hcSrcRanges := L4LoadBalancerSrcRanges()
-	return g.ensureInternalFirewall(svc, fwHCName, "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes, "")
+	return g.ensureInternalFirewall(svc, fwHCName, "", "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes, "")
 }
 
 func (g *Cloud) ensureInternalHealthCheck(name string, svcName types.NamespacedName, shared bool, path string, port int32) (*compute.HealthCheck, error) {
@@ -771,6 +776,7 @@ func firewallRuleEqual(a, b *compute.Firewall) bool {
 		a.Allowed[0].IPProtocol == b.Allowed[0].IPProtocol &&
 		equalStringSets(a.Allowed[0].Ports, b.Allowed[0].Ports) &&
 		equalStringSets(a.SourceRanges, b.SourceRanges) &&
+		equalStringSets(a.DestinationRanges, b.DestinationRanges) &&
 		equalStringSets(a.TargetTags, b.TargetTags)
 }
 

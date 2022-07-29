@@ -26,7 +26,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
-	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 const (
@@ -67,7 +67,7 @@ func TestVersion(t *testing.T) {
 
 	r := createRemoteRuntimeService(endpoint, t)
 	version, err := r.Version(apitest.FakeVersion)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, apitest.FakeVersion, version.Version)
 	assert.Equal(t, apitest.FakeRuntimeName, version.RuntimeName)
 }

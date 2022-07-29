@@ -18,8 +18,15 @@ package metrics
 
 import (
 	"context"
-	"github.com/blang/semver"
+
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
+)
+
+const (
+	DefAgeBuckets = prometheus.DefAgeBuckets
+	DefBufCap     = prometheus.DefBufCap
+	DefMaxAge     = prometheus.DefMaxAge
 )
 
 // Summary is our internal representation for our wrapping struct around prometheus
@@ -93,7 +100,9 @@ type SummaryVec struct {
 
 // NewSummaryVec returns an object which satisfies kubeCollector and wraps the
 // prometheus.SummaryVec object. However, the object returned will not measure
-// anything unless the collector is first registered, since the metric is lazily instantiated.
+// anything unless the collector is first registered, since the metric is lazily instantiated,
+// and only members extracted after
+// registration will actually measure anything.
 //
 // DEPRECATED: as per the metrics overhaul KEP
 func NewSummaryVec(opts *SummaryOpts, labels []string) *SummaryVec {
@@ -130,13 +139,16 @@ func (v *SummaryVec) initializeDeprecatedMetric() {
 	v.initializeMetric()
 }
 
-// Default Prometheus behavior actually results in the creation of a new metric
-// if a metric with the unique label values is not found in the underlying stored metricMap.
+// Default Prometheus Vec behavior is that member extraction results in creation of a new element
+// if one with the unique label values is not found in the underlying stored metricMap.
 // This means  that if this function is called but the underlying metric is not registered
 // (which means it will never be exposed externally nor consumed), the metric will exist in memory
 // for perpetuity (i.e. throughout application lifecycle).
 //
-// For reference: https://github.com/prometheus/client_golang/blob/v0.9.2/prometheus/summary.go#L485-L495
+// For reference: https://github.com/prometheus/client_golang/blob/v0.9.2/prometheus/histogram.go#L460-L470
+//
+// In contrast, the Vec behavior in this package is that member extraction before registration
+// returns a permanent noop object.
 
 // WithLabelValues returns the ObserverMetric for the given slice of label
 // values (same order as the VariableLabels in Desc). If that combination of
@@ -193,13 +205,13 @@ func (v *SummaryVec) Reset() {
 func (v *SummaryVec) WithContext(ctx context.Context) *SummaryVecWithContext {
 	return &SummaryVecWithContext{
 		ctx:        ctx,
-		SummaryVec: *v,
+		SummaryVec: v,
 	}
 }
 
 // SummaryVecWithContext is the wrapper of SummaryVec with context.
 type SummaryVecWithContext struct {
-	SummaryVec
+	*SummaryVec
 	ctx context.Context
 }
 

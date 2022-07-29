@@ -29,14 +29,16 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func newListWorkEstimator(countFn objectCountGetterFunc) WorkEstimatorFunc {
+func newListWorkEstimator(countFn objectCountGetterFunc, config *WorkEstimatorConfig) WorkEstimatorFunc {
 	estimator := &listWorkEstimator{
+		config:        config,
 		countGetterFn: countFn,
 	}
 	return estimator.estimate
 }
 
 type listWorkEstimator struct {
+	config        *WorkEstimatorConfig
 	countGetterFn objectCountGetterFunc
 }
 
@@ -45,7 +47,7 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 	if !ok {
 		// no RequestInfo should never happen, but to be on the safe side
 		// let's return maximumSeats
-		return WorkEstimate{InitialSeats: maximumSeats}
+		return WorkEstimate{InitialSeats: e.config.MaximumSeats}
 	}
 
 	query := r.URL.Query()
@@ -55,7 +57,7 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 
 		// This request is destined to fail in the validation layer,
 		// return maximumSeats for this request to be consistent.
-		return WorkEstimate{InitialSeats: maximumSeats}
+		return WorkEstimate{InitialSeats: e.config.MaximumSeats}
 	}
 	isListFromCache := !shouldListFromStorage(query, &listOptions)
 
@@ -66,20 +68,26 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		// be conservative here and allocate maximum seats to this list request.
 		// NOTE: if a CRD is removed, its count will go stale first and then the
 		// pruner will eventually remove the CRD from the cache.
-		return WorkEstimate{InitialSeats: maximumSeats}
+		return WorkEstimate{InitialSeats: e.config.MaximumSeats}
 	case err == ObjectCountNotFoundErr:
-		// there are two scenarios in which we can see this error:
+		// there are multiple scenarios in which we can see this error:
 		//  a. the type is truly unknown, a typo on the caller's part.
 		//  b. the count has gone stale for too long and the pruner
 		//     has removed the type from the cache.
-		// we don't have a way to distinguish between a and b. b seems to indicate
-		// to a more severe case of degradation, although b can naturally trigger
-		// when a CRD is removed. let's be conservative and allocate maximum seats.
-		return WorkEstimate{InitialSeats: maximumSeats}
+		//  c. the type is an aggregated resource that is served by a
+		//     different apiserver (thus its object count is not updated)
+		// we don't have a way to distinguish between those situations.
+		// However, in case c, the request is delegated to a different apiserver,
+		// and thus its cost for our server is minimal. To avoid the situation
+		// when aggregated API calls are overestimated, we allocate the minimum
+		// possible seats (see #109106 as an example when being more conservative
+		// led to problems).
+		return WorkEstimate{InitialSeats: e.config.MinimumSeats}
 	case err != nil:
 		// we should never be here since Get returns either ObjectCountStaleErr or
 		// ObjectCountNotFoundErr, return maximumSeats to be on the safe side.
-		return WorkEstimate{InitialSeats: maximumSeats}
+		klog.ErrorS(err, "Unexpected error from object count tracker")
+		return WorkEstimate{InitialSeats: e.config.MaximumSeats}
 	}
 
 	limit := numStored
@@ -105,14 +113,14 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 	// will be processed by the list request.
 	// we will come up with a different formula for the transformation function and/or
 	// fine tune this number in future iteratons.
-	seats := uint(math.Ceil(float64(estimatedObjectsToBeProcessed) / float64(100)))
+	seats := uint64(math.Ceil(float64(estimatedObjectsToBeProcessed) / e.config.ObjectsPerSeat))
 
 	// make sure we never return a seat of zero
-	if seats < minimumSeats {
-		seats = minimumSeats
+	if seats < e.config.MinimumSeats {
+		seats = e.config.MinimumSeats
 	}
-	if seats > maximumSeats {
-		seats = maximumSeats
+	if seats > e.config.MaximumSeats {
+		seats = e.config.MaximumSeats
 	}
 	return WorkEstimate{InitialSeats: seats}
 }
@@ -126,7 +134,8 @@ func key(requestInfo *apirequest.RequestInfo) string {
 }
 
 // NOTICE: Keep in sync with shouldDelegateList function in
-//  staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
+//
+//	staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go
 func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)

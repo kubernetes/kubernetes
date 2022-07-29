@@ -24,6 +24,7 @@ import (
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
 )
 
 const (
@@ -642,7 +643,7 @@ func TestCelCompilation(t *testing.T) {
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
-			compilationResults, err := Compile(&tt.input, false, PerCallLimit)
+			compilationResults, err := Compile(&tt.input, model.SchemaDeclType(&tt.input, false), PerCallLimit)
 			if err != nil {
 				t.Errorf("Expected no error, but got: %v", err)
 			}
@@ -1073,10 +1074,12 @@ func genMapWithCustomItemRule(item *schema.Structural, rule string) func(maxProp
 	}
 }
 
-func schemaChecker(schema *schema.Structural, expectedCost uint64, calcLimit uint64, t *testing.T) func(t *testing.T) {
+// schemaChecker checks the cost of the validation rule declared in the provided schema (it requires there be exactly one rule)
+// and checks that the resulting equals the expectedCost if expectedCost is non-zero, and that the resulting cost is >= expectedCostExceedsLimit
+// if expectedCostExceedsLimit is non-zero. Typically, only expectedCost or expectedCostExceedsLimit is non-zero, not both.
+func schemaChecker(schema *schema.Structural, expectedCost uint64, expectedCostExceedsLimit uint64, t *testing.T) func(t *testing.T) {
 	return func(t *testing.T) {
-		// TODO(DangerOnTheRanger): if perCallLimit in compilation.go changes, this needs to change as well
-		compilationResults, err := Compile(schema, false, uint64(math.MaxInt64))
+		compilationResults, err := Compile(schema, model.SchemaDeclType(schema, false), PerCallLimit)
 		if err != nil {
 			t.Errorf("Expected no error, got: %v", err)
 		}
@@ -1087,13 +1090,14 @@ func schemaChecker(schema *schema.Structural, expectedCost uint64, calcLimit uin
 		if result.Error != nil {
 			t.Errorf("Expected no compile-time error, got: %v", result.Error)
 		}
-		if calcLimit == 0 {
+		if expectedCost > 0 {
 			if result.MaxCost != expectedCost {
 				t.Errorf("Wrong cost (expected %d, got %d)", expectedCost, result.MaxCost)
 			}
-		} else {
-			if result.MaxCost < calcLimit {
-				t.Errorf("Cost did not exceed limit as expected (expected more than %d, got %d)", calcLimit, result.MaxCost)
+		}
+		if expectedCostExceedsLimit > 0 {
+			if result.MaxCost < expectedCostExceedsLimit {
+				t.Errorf("Cost did not exceed limit as expected (expected more than %d, got %d)", expectedCostExceedsLimit, result.MaxCost)
 			}
 		}
 	}
@@ -1101,12 +1105,17 @@ func schemaChecker(schema *schema.Structural, expectedCost uint64, calcLimit uin
 
 func TestCostEstimation(t *testing.T) {
 	cases := []struct {
-		name                       string
-		schemaGenerator            func(maxLength *int64) *schema.Structural
+		name            string
+		schemaGenerator func(maxLength *int64) *schema.Structural
+		setMaxElements  int64
+
+		// calc costs expectations are checked against the generated schema without any max element limits set
 		expectedCalcCost           uint64
-		setMaxElements             int64
-		expectedSetCost            uint64
 		expectCalcCostExceedsLimit uint64
+
+		// calc costs expectations are checked against the generated schema with max element limits set
+		expectedSetCost             uint64
+		expectedSetCostExceedsLimit uint64
 	}{
 		{
 			name:             "number array with all",
@@ -1233,7 +1242,6 @@ func TestCostEstimation(t *testing.T) {
 		{
 			name:                       "O(n^2) loop with numbers",
 			schemaGenerator:            genArrayWithRule("number", "self.all(x, self.all(y, true))"),
-			expectedCalcCost:           9895601504256,
 			expectCalcCostExceedsLimit: costLimit,
 			setMaxElements:             10,
 			expectedSetCost:            352,
@@ -1241,7 +1249,6 @@ func TestCostEstimation(t *testing.T) {
 		{
 			name:                       "O(n^3) loop with numbers",
 			schemaGenerator:            genArrayWithRule("number", "self.all(x, self.all(y, self.all(z, true)))"),
-			expectedCalcCost:           13499986500008999998,
 			expectCalcCostExceedsLimit: costLimit,
 			setMaxElements:             10,
 			expectedSetCost:            3552,
@@ -1512,6 +1519,80 @@ func TestCostEstimation(t *testing.T) {
 			setMaxElements:   490,
 			expectedSetCost:  0,
 		},
+		// Ensure library functions are integrated with size estimates by testing the interesting cases.
+		{
+			name:             "extended library regex find",
+			schemaGenerator:  genStringWithRule("self.find('[0-9]+') == ''"),
+			expectedCalcCost: 629147,
+			setMaxElements:   10,
+			expectedSetCost:  11,
+		},
+		{
+			name: "extended library join",
+			schemaGenerator: func(max *int64) *schema.Structural {
+				strType := withMaxLength(primitiveType("string", ""), max)
+				array := withMaxItems(arrayType("atomic", nil, &strType), max)
+				array = withRule(array, "self.join(' ') == 'aa bb'")
+				return &array
+			},
+			expectedCalcCost: 329853068905,
+			setMaxElements:   10,
+			expectedSetCost:  43,
+		},
+		{
+			name: "extended library isSorted",
+			schemaGenerator: func(max *int64) *schema.Structural {
+				strType := withMaxLength(primitiveType("string", ""), max)
+				array := withMaxItems(arrayType("atomic", nil, &strType), max)
+				array = withRule(array, "self.isSorted() == true")
+				return &array
+			},
+			expectedCalcCost: 329854432052,
+			setMaxElements:   10,
+			expectedSetCost:  52,
+		},
+		{
+			name: "extended library replace",
+			schemaGenerator: func(max *int64) *schema.Structural {
+				strType := withMaxLength(primitiveType("string", ""), max)
+				objType := objectType(map[string]schema.Structural{
+					"str":    strType,
+					"before": strType,
+					"after":  strType,
+				})
+				objType = withRule(objType, "self.str.replace(self.before, self.after) == 'does not matter'")
+				return &objType
+			},
+			expectedCalcCost: 629154,
+			setMaxElements:   10,
+			expectedSetCost:  16,
+		},
+		{
+			name: "extended library split",
+			schemaGenerator: func(max *int64) *schema.Structural {
+				strType := withMaxLength(primitiveType("string", ""), max)
+				objType := objectType(map[string]schema.Structural{
+					"str":       strType,
+					"separator": strType,
+				})
+				objType = withRule(objType, "self.str.split(self.separator) == []")
+				return &objType
+			},
+			expectedCalcCost: 629160,
+			setMaxElements:   10,
+			expectedSetCost:  22,
+		},
+		{
+			name: "extended library lowerAscii",
+			schemaGenerator: func(max *int64) *schema.Structural {
+				strType := withMaxLength(primitiveType("string", ""), max)
+				strType = withRule(strType, "self.lowerAscii() == 'lower!'")
+				return &strType
+			},
+			expectedCalcCost: 314575,
+			setMaxElements:   10,
+			expectedSetCost:  6,
+		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -1520,7 +1601,23 @@ func TestCostEstimation(t *testing.T) {
 			t.Run("calc maxLength", schemaChecker(schema, testCase.expectedCalcCost, testCase.expectCalcCostExceedsLimit, t))
 			// static maxLength case
 			setSchema := testCase.schemaGenerator(&testCase.setMaxElements)
-			t.Run("set maxLength", schemaChecker(setSchema, testCase.expectedSetCost, 0, t))
+			t.Run("set maxLength", schemaChecker(setSchema, testCase.expectedSetCost, testCase.expectedSetCostExceedsLimit, t))
 		})
+	}
+}
+
+func BenchmarkCompile(b *testing.B) {
+	_, err := getBaseEnv() // prime the baseEnv
+	if err != nil {
+		b.Fatal(err)
+	}
+	s := genArrayWithRule("number", "true")(nil)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := Compile(s, model.SchemaDeclType(s, false), uint64(math.MaxInt64))
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }

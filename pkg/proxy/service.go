@@ -52,8 +52,8 @@ type BaseServiceInfo struct {
 	externalIPs              []string
 	loadBalancerSourceRanges []string
 	healthCheckNodePort      int
-	nodeLocalExternal        bool
-	nodeLocalInternal        bool
+	externalPolicyLocal      bool
+	internalPolicyLocal      bool
 	internalTrafficPolicy    *v1.ServiceInternalTrafficPolicyType
 	hintsAnnotation          string
 }
@@ -119,14 +119,14 @@ func (info *BaseServiceInfo) LoadBalancerIPStrings() []string {
 	return ips
 }
 
-// NodeLocalExternal is part of ServicePort interface.
-func (info *BaseServiceInfo) NodeLocalExternal() bool {
-	return info.nodeLocalExternal
+// ExternalPolicyLocal is part of ServicePort interface.
+func (info *BaseServiceInfo) ExternalPolicyLocal() bool {
+	return info.externalPolicyLocal
 }
 
-// NodeLocalInternal is part of ServicePort interface
-func (info *BaseServiceInfo) NodeLocalInternal() bool {
-	return info.nodeLocalInternal
+// InternalPolicyLocal is part of ServicePort interface
+func (info *BaseServiceInfo) InternalPolicyLocal() bool {
+	return info.internalPolicyLocal
 }
 
 // InternalTrafficPolicy is part of ServicePort interface
@@ -139,14 +139,32 @@ func (info *BaseServiceInfo) HintsAnnotation() string {
 	return info.hintsAnnotation
 }
 
+// ExternallyAccessible is part of ServicePort interface.
+func (info *BaseServiceInfo) ExternallyAccessible() bool {
+	return info.nodePort != 0 || len(info.loadBalancerStatus.Ingress) != 0 || len(info.externalIPs) != 0
+}
+
+// UsesClusterEndpoints is part of ServicePort interface.
+func (info *BaseServiceInfo) UsesClusterEndpoints() bool {
+	// The service port uses Cluster endpoints if the internal traffic policy is "Cluster",
+	// or if it accepts external traffic at all. (Even if the external traffic policy is
+	// "Local", we need Cluster endpoints to implement short circuiting.)
+	return !info.internalPolicyLocal || info.ExternallyAccessible()
+}
+
+// UsesLocalEndpoints is part of ServicePort interface.
+func (info *BaseServiceInfo) UsesLocalEndpoints() bool {
+	return info.internalPolicyLocal || (info.externalPolicyLocal && info.ExternallyAccessible())
+}
+
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
-	nodeLocalExternal := false
-	if apiservice.RequestsOnlyLocalTraffic(service) {
-		nodeLocalExternal = true
+	externalPolicyLocal := false
+	if apiservice.ExternalPolicyLocal(service) {
+		externalPolicyLocal = true
 	}
-	nodeLocalInternal := false
+	internalPolicyLocal := false
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
-		nodeLocalInternal = apiservice.RequestsOnlyLocalTrafficForInternal(service)
+		internalPolicyLocal = apiservice.InternalPolicyLocal(service)
 	}
 	var stickyMaxAgeSeconds int
 	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
@@ -162,8 +180,8 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		nodePort:              int(port.NodePort),
 		sessionAffinityType:   service.Spec.SessionAffinity,
 		stickyMaxAgeSeconds:   stickyMaxAgeSeconds,
-		nodeLocalExternal:     nodeLocalExternal,
-		nodeLocalInternal:     nodeLocalInternal,
+		externalPolicyLocal:   externalPolicyLocal,
+		internalPolicyLocal:   internalPolicyLocal,
 		internalTrafficPolicy: service.Spec.InternalTrafficPolicy,
 		hintsAnnotation:       service.Annotations[v1.AnnotationTopologyAwareHints],
 	}
@@ -271,8 +289,10 @@ func NewServiceChangeTracker(makeServiceInfo makeServicePortFunc, ipFamily v1.IP
 // otherwise return false.  Update can be used to add/update/delete items of ServiceChangeMap.  For example,
 // Add item
 //   - pass <nil, service> as the <previous, current> pair.
+//
 // Update item
 //   - pass <oldService, service> as the <previous, current> pair.
+//
 // Delete item
 //   - pass <service, nil> as the <previous, current> pair.
 func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
@@ -397,17 +417,18 @@ func (sm *ServiceMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP set
 // tell if a service is deleted or updated.
 // The returned value is one of the arguments of ServiceMap.unmerge().
 // ServiceMap A Merge ServiceMap B will do following 2 things:
-//   * update ServiceMap A.
-//   * produce a string set which stores all other ServiceMap's ServicePortName.String().
+//   - update ServiceMap A.
+//   - produce a string set which stores all other ServiceMap's ServicePortName.String().
+//
 // For example,
 //   - A{}
 //   - B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//     - A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//     - produce string set {"ns/cluster-ip:http"}
+//   - A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
+//   - produce string set {"ns/cluster-ip:http"}
 //   - A{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 345, "UDP"}}
 //   - B{{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//     - A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
-//     - produce string set {"ns/cluster-ip:http"}
+//   - A updated to be {{"ns", "cluster-ip", "http"}: {"172.16.55.10", 1234, "TCP"}}
+//   - produce string set {"ns/cluster-ip:http"}
 func (sm *ServiceMap) merge(other ServiceMap) sets.String {
 	// existingPorts is going to store all identifiers of all services in `other` ServiceMap.
 	existingPorts := sets.NewString()

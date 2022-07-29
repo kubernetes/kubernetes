@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	batchv1informers "k8s.io/client-go/informers/batch/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -48,6 +49,8 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -371,6 +374,7 @@ func (jm *ControllerV2) enqueueControllerAfter(obj interface{}, t time.Duration)
 // updateCronJob re-queues the CronJob for next scheduled time if there is a
 // change in spec.schedule otherwise it re-queues it now
 func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
+	timeZoneEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CronJobTimeZone)
 	oldCJ, okOld := old.(*batchv1.CronJob)
 	newCJ, okNew := curr.(*batchv1.CronJob)
 
@@ -381,9 +385,9 @@ func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
 	// if the change in schedule results in next requeue having to be sooner than it already was,
 	// it will be handled here by the queue. If the next requeue is further than previous schedule,
 	// the sync loop will essentially be a no-op for the already queued key with old schedule.
-	if oldCJ.Spec.Schedule != newCJ.Spec.Schedule {
-		// schedule changed, change the requeue time
-		sched, err := cron.ParseStandard(newCJ.Spec.Schedule)
+	if oldCJ.Spec.Schedule != newCJ.Spec.Schedule || (timeZoneEnabled && !pointer.StringEqual(oldCJ.Spec.TimeZone, newCJ.Spec.TimeZone)) {
+		// schedule changed, change the requeue time, pass nil recorder so that syncCronJob will output any warnings
+		sched, err := cron.ParseStandard(formatSchedule(timeZoneEnabled, newCJ, nil))
 		if err != nil {
 			// this is likely a user error in defining the spec value
 			// we should log the error and not reconcile this cronjob until an update to spec
@@ -392,7 +396,7 @@ func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
 			return
 		}
 		now := jm.now()
-		t := nextScheduledTimeDuration(sched, now)
+		t := nextScheduledTimeDuration(*newCJ, sched, now)
 
 		jm.enqueueControllerAfter(curr, *t)
 		return
@@ -420,6 +424,7 @@ func (jm *ControllerV2) syncCronJob(
 	cronJob = cronJob.DeepCopy()
 	now := jm.now()
 	updateStatus := false
+	timeZoneEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CronJobTimeZone)
 
 	childrenJobs := make(map[types.UID]bool)
 	for _, j := range jobs {
@@ -487,22 +492,27 @@ func (jm *ControllerV2) syncCronJob(
 		return cronJob, nil, updateStatus, nil
 	}
 
+	if timeZoneEnabled && cronJob.Spec.TimeZone != nil {
+		if _, err := time.LoadLocation(*cronJob.Spec.TimeZone); err != nil {
+			timeZone := pointer.StringDeref(cronJob.Spec.TimeZone, "")
+			klog.V(4).InfoS("Not starting job because timeZone is invalid", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "timeZone", timeZone, "err", err)
+			jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "UnknownTimeZone", "invalid timeZone: %q: %s", timeZone, err)
+			return cronJob, nil, updateStatus, nil
+		}
+	}
+
 	if cronJob.Spec.Suspend != nil && *cronJob.Spec.Suspend {
 		klog.V(4).InfoS("Not starting job because the cron is suspended", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()))
 		return cronJob, nil, updateStatus, nil
 	}
 
-	sched, err := cron.ParseStandard(cronJob.Spec.Schedule)
+	sched, err := cron.ParseStandard(formatSchedule(timeZoneEnabled, cronJob, jm.recorder))
 	if err != nil {
 		// this is likely a user error in defining the spec value
 		// we should log the error and not reconcile this cronjob until an update to spec
 		klog.V(2).InfoS("Unparseable schedule", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "schedule", cronJob.Spec.Schedule, "err", err)
 		jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "UnparseableSchedule", "unparseable schedule: %q : %s", cronJob.Spec.Schedule, err)
 		return cronJob, nil, updateStatus, nil
-	}
-
-	if strings.Contains(cronJob.Spec.Schedule, "TZ") {
-		jm.recorder.Eventf(cronJob, corev1.EventTypeWarning, "UnsupportedSchedule", "CRON_TZ or TZ used in schedule %q is not officially supported, see https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/ for more details", cronJob.Spec.Schedule)
 	}
 
 	scheduledTime, err := getNextScheduleTime(*cronJob, now, sched, jm.recorder)
@@ -519,7 +529,7 @@ func (jm *ControllerV2) syncCronJob(
 		// Otherwise, the queue is always suppose to trigger sync function at the time of
 		// the scheduled time, that will give atleast 1 unmet time schedule
 		klog.V(4).InfoS("No unmet start times", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()))
-		t := nextScheduledTimeDuration(sched, now)
+		t := nextScheduledTimeDuration(*cronJob, sched, now)
 		return cronJob, t, updateStatus, nil
 	}
 
@@ -538,7 +548,7 @@ func (jm *ControllerV2) syncCronJob(
 		// Status.LastScheduleTime, Status.LastMissedTime), and then so we won't generate
 		// and event the next time we process it, and also so the user looking at the status
 		// can see easily that there was a missed execution.
-		t := nextScheduledTimeDuration(sched, now)
+		t := nextScheduledTimeDuration(*cronJob, sched, now)
 		return cronJob, t, updateStatus, nil
 	}
 	if isJobInActiveList(&batchv1.Job{
@@ -547,7 +557,7 @@ func (jm *ControllerV2) syncCronJob(
 			Namespace: cronJob.Namespace,
 		}}, cronJob.Status.Active) || cronJob.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
 		klog.V(4).InfoS("Not starting job because the scheduled time is already processed", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "schedule", scheduledTime)
-		t := nextScheduledTimeDuration(sched, now)
+		t := nextScheduledTimeDuration(*cronJob, sched, now)
 		return cronJob, t, updateStatus, nil
 	}
 	if cronJob.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent && len(cronJob.Status.Active) > 0 {
@@ -562,7 +572,7 @@ func (jm *ControllerV2) syncCronJob(
 		// But that would mean that you could not inspect prior successes or failures of Forbid jobs.
 		klog.V(4).InfoS("Not starting job because prior execution is still running and concurrency policy is Forbid", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()))
 		jm.recorder.Eventf(cronJob, corev1.EventTypeNormal, "JobAlreadyActive", "Not starting job because prior execution is running and concurrency policy is Forbid")
-		t := nextScheduledTimeDuration(sched, now)
+		t := nextScheduledTimeDuration(*cronJob, sched, now)
 		return cronJob, t, updateStatus, nil
 	}
 	if cronJob.Spec.ConcurrencyPolicy == batchv1.ReplaceConcurrent {
@@ -623,7 +633,7 @@ func (jm *ControllerV2) syncCronJob(
 	cronJob.Status.LastScheduleTime = &metav1.Time{Time: *scheduledTime}
 	updateStatus = true
 
-	t := nextScheduledTimeDuration(sched, now)
+	t := nextScheduledTimeDuration(*cronJob, sched, now)
 	return cronJob, t, updateStatus, nil
 }
 
@@ -632,12 +642,26 @@ func getJobName(cj *batchv1.CronJob, scheduledTime time.Time) string {
 }
 
 // nextScheduledTimeDuration returns the time duration to requeue based on
-// the schedule and current time. It adds a 100ms padding to the next requeue to account
+// the schedule and last schedule time. It adds a 100ms padding to the next requeue to account
 // for Network Time Protocol(NTP) time skews. If the time drifts are adjusted which in most
 // realistic cases would be around 100s, scheduled cron will still be executed without missing
 // the schedule.
-func nextScheduledTimeDuration(sched cron.Schedule, now time.Time) *time.Duration {
-	t := sched.Next(now).Add(nextScheduleDelta).Sub(now)
+func nextScheduledTimeDuration(cj batchv1.CronJob, sched cron.Schedule, now time.Time) *time.Duration {
+	earliestTime := cj.ObjectMeta.CreationTimestamp.Time
+	if cj.Status.LastScheduleTime != nil {
+		earliestTime = cj.Status.LastScheduleTime.Time
+	}
+	mostRecentTime, _, err := getMostRecentScheduleTime(earliestTime, now, sched)
+	if err != nil {
+		// we still have to requeue at some point, so aim for the next scheduling slot from now
+		mostRecentTime = &now
+	} else if mostRecentTime == nil {
+		// no missed schedules since earliestTime
+		mostRecentTime = &earliestTime
+	}
+
+	t := sched.Next(*mostRecentTime).Add(nextScheduleDelta).Sub(now)
+
 	return &t
 }
 
@@ -738,4 +762,24 @@ func deleteJob(cj *batchv1.CronJob, job *batchv1.Job, jc jobControlInterface, re
 
 func getRef(object runtime.Object) (*corev1.ObjectReference, error) {
 	return ref.GetReference(scheme.Scheme, object)
+}
+
+func formatSchedule(timeZoneEnabled bool, cj *batchv1.CronJob, recorder record.EventRecorder) string {
+	if strings.Contains(cj.Spec.Schedule, "TZ") {
+		if recorder != nil {
+			recorder.Eventf(cj, corev1.EventTypeWarning, "UnsupportedSchedule", "CRON_TZ or TZ used in schedule %q is not officially supported, see https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/ for more details", cj.Spec.Schedule)
+		}
+
+		return cj.Spec.Schedule
+	}
+
+	if timeZoneEnabled && cj.Spec.TimeZone != nil {
+		if _, err := time.LoadLocation(*cj.Spec.TimeZone); err != nil {
+			return cj.Spec.Schedule
+		}
+
+		return fmt.Sprintf("TZ=%s %s", *cj.Spec.TimeZone, cj.Spec.Schedule)
+	}
+
+	return cj.Spec.Schedule
 }

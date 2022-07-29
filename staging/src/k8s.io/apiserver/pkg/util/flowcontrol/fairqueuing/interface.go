@@ -32,10 +32,10 @@ import (
 // before committing to a concurrency allotment for the second.
 type QueueSetFactory interface {
 	// BeginConstruction does the first phase of creating a QueueSet.
-	// The RatioedChangeObserverPair observes number of requests,
+	// The RatioedGaugePair observes number of requests,
 	// execution covering just the regular phase.
-	// The RatioedChangeObserver observes number of seats occupied through all phases of execution.
-	BeginConstruction(QueuingConfig, metrics.RatioedChangeObserverPair, metrics.RatioedChangeObserver) (QueueSetCompleter, error)
+	// The RatioedGauge observes number of seats occupied through all phases of execution.
+	BeginConstruction(QueuingConfig, metrics.RatioedGaugePair, metrics.RatioedGauge) (QueueSetCompleter, error)
 }
 
 // QueueSetCompleter finishes the two-step process of creating or
@@ -85,10 +85,6 @@ type QueueSet interface {
 	// and the client must call the Finish method of the Request
 	// exactly once.
 	StartRequest(ctx context.Context, width *request.WorkEstimate, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn QueueNoteFn) (req Request, idle bool)
-
-	// UpdateObservations makes sure any time-based statistics have
-	// caught up with the current clock reading
-	UpdateObservations()
 
 	// Dump saves and returns the instant internal state of the queue-set.
 	// Note that dumping process will stop the queue-set from proceeding

@@ -34,13 +34,6 @@ import (
 var _ volume.NodeExpandableVolumePlugin = &csiPlugin{}
 
 func (c *csiPlugin) RequiresFSResize() bool {
-	// We could check plugin's node capability but we instead are going to rely on
-	// NodeExpand to do the right thing and return early if plugin does not have
-	// node expansion capability.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandCSIVolumes) {
-		klog.V(4).Infof("Resizing is not enabled for CSI volume")
-		return false
-	}
 	return true
 }
 
@@ -86,6 +79,17 @@ func (c *csiPlugin) nodeExpandWithClient(
 	if pv == nil {
 		return false, fmt.Errorf("Expander.NodeExpand failed to find associated PersistentVolume for plugin %s", c.GetPluginName())
 	}
+	nodeExpandSecrets := map[string]string{}
+	expandClient := c.host.GetKubeClient()
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeExpandSecret) {
+		if csiSource.NodeExpandSecretRef != nil {
+			nodeExpandSecrets, err = getCredentialsFromSecret(expandClient, csiSource.NodeExpandSecretRef)
+			if err != nil {
+				return false, fmt.Errorf("expander.NodeExpand failed to get NodeExpandSecretRef %s/%s: %v",
+					csiSource.NodeExpandSecretRef.Namespace, csiSource.NodeExpandSecretRef.Name, err)
+			}
+		}
+	}
 
 	opts := csiResizeOptions{
 		volumePath:        resizeOptions.DeviceMountPath,
@@ -95,6 +99,7 @@ func (c *csiPlugin) nodeExpandWithClient(
 		fsType:            csiSource.FSType,
 		accessMode:        api.ReadWriteOnce,
 		mountOptions:      pv.Spec.MountOptions,
+		secrets:           nodeExpandSecrets,
 	}
 
 	if !fsVolume {

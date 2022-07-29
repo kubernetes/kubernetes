@@ -25,8 +25,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/upgrades"
 	"k8s.io/kubernetes/test/e2e/upgrades/network"
 	"k8s.io/kubernetes/test/utils/junit"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var upgradeTests = []upgrades.Test{
@@ -45,6 +46,7 @@ func kubeProxyDaemonSetExtraEnvs(enableKubeProxyDaemonSet bool) []string {
 
 var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]", func() {
 	f := framework.NewDefaultFramework("kube-proxy-ds-migration")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	upgradeTestFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 	downgradeTestsFrameworks := upgrades.CreateUpgradeFrameworks(downgradeTests)
 

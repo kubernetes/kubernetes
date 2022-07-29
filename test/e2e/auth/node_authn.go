@@ -26,8 +26,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -36,6 +37,7 @@ import (
 var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 
 	f := framework.NewDefaultFramework("node-authn")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	var ns string
 	var nodeIPs []string
 	ginkgo.BeforeEach(func() {
@@ -51,13 +53,6 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 
 		nodeIPs := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
 		framework.ExpectNotEqual(len(nodeIPs), 0)
-
-		// make sure ServiceAccount admission controller is enabled, so secret generation on SA creation works
-		saName := "default"
-		sa, err := f.ClientSet.CoreV1().ServiceAccounts(ns).Get(context.TODO(), saName, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to retrieve service account (%s:%s)", ns, saName)
-		framework.ExpectNotEqual(len(sa.Secrets), 0)
-
 	})
 
 	ginkgo.It("The kubelet's main port 10250 should reject requests with no credentials", func() {

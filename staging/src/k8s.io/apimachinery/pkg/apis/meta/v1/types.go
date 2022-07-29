@@ -17,10 +17,11 @@ limitations under the License.
 // Package v1 contains API types that are common to all versions.
 //
 // The package contains two categories of types:
-// - external (serialized) types that lack their own version (e.g TypeMeta)
-// - internal (never-serialized) types that are needed by several different
-//   api groups, and so live here, to avoid duplication and/or import loops
-//   (e.g. LabelSelector).
+//   - external (serialized) types that lack their own version (e.g TypeMeta)
+//   - internal (never-serialized) types that are needed by several different
+//     api groups, and so live here, to avoid duplication and/or import loops
+//     (e.g. LabelSelector).
+//
 // In the future, we will probably move these categories of objects into
 // separate packages.
 package v1
@@ -125,10 +126,7 @@ type ObjectMeta struct {
 	// and may be truncated by the length of the suffix required to make the value
 	// unique on the server.
 	//
-	// If this field is specified and the generated name exists, the server will
-	// NOT return a 409 - instead, it will either return 201 Created or 500 with Reason
-	// ServerTimeout indicating a unique name could not be found in the time allotted, and the client
-	// should retry (optionally after the time indicated in the Retry-After header).
+	// If this field is specified and the generated name exists, the server will return a 409.
 	//
 	// Applied only if Name is not specified.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#idempotency
@@ -257,11 +255,9 @@ type ObjectMeta struct {
 	// +patchStrategy=merge
 	Finalizers []string `json:"finalizers,omitempty" patchStrategy:"merge" protobuf:"bytes,14,rep,name=finalizers"`
 
-	// The name of the cluster which the object belongs to.
-	// This is used to distinguish resources with same name and namespace in different clusters.
-	// This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
-	// +optional
-	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
+	// Tombstone: ClusterName was a legacy field that was always cleared by
+	// the system and never used.
+	// ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
 
 	// ManagedFields maps workflow-id and version to the set of fields
 	// that are managed by that workflow. This is mostly for internal
@@ -1453,17 +1449,18 @@ type PartialObjectMetadataList struct {
 // Condition contains details for one aspect of the current state of this API Resource.
 // ---
 // This struct is intended for direct use as an array at the field path .status.conditions.  For example,
-// type FooStatus struct{
-//     // Represents the observations of a foo's current state.
-//     // Known .status.conditions.type are: "Available", "Progressing", and "Degraded"
-//     // +patchMergeKey=type
-//     // +patchStrategy=merge
-//     // +listType=map
-//     // +listMapKey=type
-//     Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 //
-//     // other fields
-// }
+//	type FooStatus struct{
+//	    // Represents the observations of a foo's current state.
+//	    // Known .status.conditions.type are: "Available", "Progressing", and "Degraded"
+//	    // +patchMergeKey=type
+//	    // +patchStrategy=merge
+//	    // +listType=map
+//	    // +listMapKey=type
+//	    Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+//
+//	    // other fields
+//	}
 type Condition struct {
 	// type of condition in CamelCase or in foo.example.com/CamelCase.
 	// ---

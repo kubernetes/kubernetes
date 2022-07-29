@@ -20,12 +20,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -45,6 +46,7 @@ type KubeletManagedHostConfig struct {
 
 var _ = SIGDescribe("KubeletManagedEtcHosts", func() {
 	f := framework.NewDefaultFramework("e2e-kubelet-etc-hosts")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	config := &KubeletManagedHostConfig{
 		f: f,
 	}

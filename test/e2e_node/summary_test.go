@@ -29,9 +29,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	systemdutil "github.com/coreos/go-systemd/v22/util"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
@@ -39,9 +40,10 @@ import (
 
 var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("summary-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /stats/summary", func() {
 		ginkgo.AfterEach(func() {
-			if !ginkgo.CurrentGinkgoTestDescription().Failed {
+			if !ginkgo.CurrentSpecReport().Failed() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
@@ -228,8 +230,9 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				}),
 				"VolumeStats": gstruct.MatchAllElements(summaryObjectID, gstruct.Elements{
 					"test-empty-dir": gstruct.MatchAllFields(gstruct.Fields{
-						"Name":   gomega.Equal("test-empty-dir"),
-						"PVCRef": gomega.BeNil(),
+						"Name":              gomega.Equal("test-empty-dir"),
+						"PVCRef":            gomega.BeNil(),
+						"VolumeHealthStats": gomega.BeNil(),
 						"FsStats": gstruct.MatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
@@ -411,7 +414,7 @@ func recent(d time.Duration) types.GomegaMatcher {
 	}, gomega.And(
 		gomega.BeTemporally(">=", time.Now().Add(-d)),
 		// Now() is the test start time, not the match time, so permit a few extra minutes.
-		gomega.BeTemporally("<", time.Now().Add(2*time.Minute))))
+		gomega.BeTemporally("<", time.Now().Add(3*time.Minute))))
 }
 
 func recordSystemCgroupProcesses() {

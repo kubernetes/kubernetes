@@ -262,7 +262,7 @@ func (pl *InterPodAffinity) NormalizeScore(ctx context.Context, cycleState *fram
 	}
 
 	var minCount int64 = math.MaxInt64
-	var maxCount int64 = -math.MaxInt64
+	var maxCount int64 = math.MinInt64
 	for i := range scores {
 		score := scores[i].Score
 		if score > maxCount {

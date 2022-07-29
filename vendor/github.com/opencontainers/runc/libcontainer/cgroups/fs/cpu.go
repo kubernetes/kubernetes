@@ -1,5 +1,3 @@
-// +build linux
-
 package fs
 
 import (
@@ -21,24 +19,19 @@ func (s *CpuGroup) Name() string {
 	return "cpu"
 }
 
-func (s *CpuGroup) Apply(path string, d *cgroupData) error {
-	// This might happen if we have no cpu cgroup mounted.
-	// Just do nothing and don't fail.
-	if path == "" {
-		return nil
-	}
+func (s *CpuGroup) Apply(path string, r *configs.Resources, pid int) error {
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		return err
 	}
 	// We should set the real-Time group scheduling settings before moving
 	// in the process because if the process is already in SCHED_RR mode
 	// and no RT bandwidth is set, adding it will fail.
-	if err := s.SetRtSched(path, d.config.Resources); err != nil {
+	if err := s.SetRtSched(path, r); err != nil {
 		return err
 	}
-	// Since we are not using join(), we need to place the pid
-	// into the procs file unlike other subsystems.
-	return cgroups.WriteCgroupProc(path, d.pid)
+	// Since we are not using apply(), we need to place the pid
+	// into the procs file.
+	return cgroups.WriteCgroupProc(path, pid)
 }
 
 func (s *CpuGroup) SetRtSched(path string, r *configs.Resources) error {
@@ -105,7 +98,8 @@ func (s *CpuGroup) Set(path string, r *configs.Resources) error {
 }
 
 func (s *CpuGroup) GetStats(path string, stats *cgroups.Stats) error {
-	f, err := cgroups.OpenFile(path, "cpu.stat", os.O_RDONLY)
+	const file = "cpu.stat"
+	f, err := cgroups.OpenFile(path, file, os.O_RDONLY)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -118,7 +112,7 @@ func (s *CpuGroup) GetStats(path string, stats *cgroups.Stats) error {
 	for sc.Scan() {
 		t, v, err := fscommon.ParseKeyValue(sc.Text())
 		if err != nil {
-			return err
+			return &parseError{Path: path, File: file, Err: err}
 		}
 		switch t {
 		case "nr_periods":

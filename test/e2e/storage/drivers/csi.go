@@ -40,13 +40,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -60,7 +59,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -147,6 +145,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapBlock:               true,
 		storageframework.CapPVCDataSource:       true,
 		storageframework.CapControllerExpansion: true,
+		storageframework.CapOfflineExpansion:    true,
 		storageframework.CapOnlineExpansion:     true,
 		storageframework.CapSingleNodeVolume:    true,
 
@@ -245,14 +244,6 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 		NodeName:                 node.Name,
 	}
 
-	// Disable volume lifecycle checks due to issue #103651 for the one
-	// test that it breaks.
-	// TODO: enable this check once issue is resolved for csi-host-path driver
-	// (https://github.com/kubernetes/kubernetes/pull/104858).
-	if regexp.MustCompile("should unmount if pod is.*deleted while kubelet is down").MatchString(ginkgo.CurrentGinkgoTestDescription().FullTestText) {
-		o.DriverContainerArguments = append(o.DriverContainerArguments, "--check-volume-lifecycle=false")
-	}
-
 	cleanup, err := utils.CreateFromManifests(config.Framework, driverNamespace, func(item interface{}) error {
 		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
 			return err
@@ -317,7 +308,7 @@ type mockCSIDriver struct {
 	embeddedCSIDriver      *mockdriver.CSIDriver
 
 	// Additional values set during PrepareTest
-	clientSet       kubernetes.Interface
+	clientSet       clientset.Interface
 	driverNamespace *v1.Namespace
 }
 
@@ -810,6 +801,7 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapVolumeLimits:        false,
 				storageframework.CapTopology:            true,
 				storageframework.CapControllerExpansion: true,
+				storageframework.CapOfflineExpansion:    true,
 				storageframework.CapOnlineExpansion:     true,
 				storageframework.CapNodeExpansion:       true,
 				storageframework.CapSnapshotDataSource:  true,

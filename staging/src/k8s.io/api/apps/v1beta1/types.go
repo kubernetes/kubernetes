@@ -88,8 +88,9 @@ type Scale struct {
 // more information.
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
-//  - Network: A single stable DNS and hostname.
-//  - Storage: As many VolumeClaims as requested.
+//   - Network: A single stable DNS and hostname.
+//   - Storage: As many VolumeClaims as requested.
+//
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
 type StatefulSet struct {
@@ -153,9 +154,20 @@ const (
 
 // RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.
 type RollingUpdateStatefulSetStrategy struct {
-	// Partition indicates the ordinal at which the StatefulSet should be
-	// partitioned.
+	// Partition indicates the ordinal at which the StatefulSet should be partitioned
+	// for updates. During a rolling update, all pods from ordinal Replicas-1 to
+	// Partition are updated. All pods from ordinal Partition-1 to 0 remain untouched.
+	// This is helpful in being able to do a canary based deployment. The default value is 0.
 	Partition *int32 `json:"partition,omitempty" protobuf:"varint,1,opt,name=partition"`
+	// The maximum number of pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Defaults to 1. This field is alpha-level and is only honored by servers that enable the
+	// MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to
+	// Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
+	// will be counted towards MaxUnavailable.
+	// +optional
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"varint,2,opt,name=maxUnavailable"`
 }
 
 // PersistentVolumeClaimRetentionPolicyType is a string enumeration of the policies that will determine
@@ -256,7 +268,6 @@ type StatefulSetSpec struct {
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
-	// This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
 	// +optional
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,9,opt,name=minReadySeconds"`
 
@@ -309,7 +320,7 @@ type StatefulSetStatus struct {
 	Conditions []StatefulSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,10,rep,name=conditions"`
 
 	// Total number of available pods (ready for at least minReadySeconds) targeted by this StatefulSet.
-	// This is a beta field and enabled/disabled by StatefulSetMinReadySeconds feature gate.
+	// +optional
 	AvailableReplicas int32 `json:"availableReplicas" protobuf:"varint,11,opt,name=availableReplicas"`
 }
 

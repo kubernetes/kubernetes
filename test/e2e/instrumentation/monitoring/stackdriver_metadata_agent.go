@@ -31,8 +31,9 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"golang.org/x/oauth2/google"
 )
 
@@ -50,6 +51,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var kubeClient clientset.Interface
 
 	ginkgo.It("should run Stackdriver Metadata Agent [Feature:StackdriverMetadataAgent]", func() {

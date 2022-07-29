@@ -133,9 +133,11 @@ type cleanupStream struct {
 func (c *cleanupStream) isTransportResponseFrame() bool { return c.rst } // Results in a RST_STREAM
 
 type earlyAbortStream struct {
+	httpStatus     uint32
 	streamID       uint32
 	contentSubtype string
 	status         *status.Status
+	rst            bool
 }
 
 func (*earlyAbortStream) isTransportResponseFrame() bool { return false }
@@ -771,9 +773,12 @@ func (l *loopyWriter) earlyAbortStreamHandler(eas *earlyAbortStream) error {
 	if l.side == clientSide {
 		return errors.New("earlyAbortStream not handled on client")
 	}
-
+	// In case the caller forgets to set the http status, default to 200.
+	if eas.httpStatus == 0 {
+		eas.httpStatus = 200
+	}
 	headerFields := []hpack.HeaderField{
-		{Name: ":status", Value: "200"},
+		{Name: ":status", Value: strconv.Itoa(int(eas.httpStatus))},
 		{Name: "content-type", Value: grpcutil.ContentType(eas.contentSubtype)},
 		{Name: "grpc-status", Value: strconv.Itoa(int(eas.status.Code()))},
 		{Name: "grpc-message", Value: encodeGrpcMessage(eas.status.Message())},
@@ -781,6 +786,11 @@ func (l *loopyWriter) earlyAbortStreamHandler(eas *earlyAbortStream) error {
 
 	if err := l.writeHeader(eas.streamID, true, headerFields, nil); err != nil {
 		return err
+	}
+	if eas.rst {
+		if err := l.framer.fr.WriteRSTStream(eas.streamID, http2.ErrCodeNo); err != nil {
+			return err
+		}
 	}
 	return nil
 }

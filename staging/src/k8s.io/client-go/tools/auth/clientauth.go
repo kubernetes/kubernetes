@@ -45,20 +45,20 @@ client.Client from an authcfg.Info.
 
 Example:
 
-    import (
-        "pkg/client"
-        "pkg/client/auth"
-    )
+	import (
+	    "pkg/client"
+	    "pkg/client/auth"
+	)
 
-    info, err := auth.LoadFromFile(filename)
-    if err != nil {
-      // handle error
-    }
-    clientConfig = client.Config{}
-    clientConfig.Host = "example.com:4901"
-    clientConfig = info.MergeWithConfig()
-    client := client.New(clientConfig)
-    client.Pods(ns).List()
+	info, err := auth.LoadFromFile(filename)
+	if err != nil {
+	  // handle error
+	}
+	clientConfig = client.Config{}
+	clientConfig.Host = "example.com:4901"
+	clientConfig = info.MergeWithConfig()
+	client := client.New(clientConfig)
+	client.Pods(ns).List()
 */
 package auth
 

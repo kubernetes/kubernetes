@@ -107,14 +107,10 @@ func (pl *VolumeBinding) EventsToRegister() []framework.ClusterEvent {
 		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
 		// We rely on CSI node to translate in-tree PV to CSI.
 		{Resource: framework.CSINode, ActionType: framework.Add | framework.Update},
-	}
-	if pl.fts.EnableCSIStorageCapacity {
 		// When CSIStorageCapacity is enabled, pods may become schedulable
 		// on CSI driver & storage capacity changes.
-		events = append(events, []framework.ClusterEvent{
-			{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update},
-			{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update},
-		}...)
+		{Resource: framework.CSIDriver, ActionType: framework.Add | framework.Update},
+		{Resource: framework.CSIStorageCapacity, ActionType: framework.Add | framework.Update},
 	}
 	return events
 }
@@ -337,7 +333,7 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs *framework.CycleState, 
 		return framework.AsStatus(fmt.Errorf("no pod volumes found for node %q", nodeName))
 	}
 	klog.V(5).InfoS("Trying to bind volumes for pod", "pod", klog.KObj(pod))
-	err = pl.Binder.BindPodVolumes(pod, podVolumes)
+	err = pl.Binder.BindPodVolumes(ctx, pod, podVolumes)
 	if err != nil {
 		klog.V(1).InfoS("Failed to bind volumes for pod", "pod", klog.KObj(pod), "err", err)
 		return framework.AsStatus(err)
@@ -359,7 +355,6 @@ func (pl *VolumeBinding) Unreserve(ctx context.Context, cs *framework.CycleState
 		return
 	}
 	pl.Binder.RevertAssumedPodVolumes(podVolumes)
-	return
 }
 
 // New initializes a new plugin and returns it.
@@ -379,12 +374,9 @@ func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 	pvInformer := fh.SharedInformerFactory().Core().V1().PersistentVolumes()
 	storageClassInformer := fh.SharedInformerFactory().Storage().V1().StorageClasses()
 	csiNodeInformer := fh.SharedInformerFactory().Storage().V1().CSINodes()
-	var capacityCheck *CapacityCheck
-	if fts.EnableCSIStorageCapacity {
-		capacityCheck = &CapacityCheck{
-			CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
-			CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1beta1().CSIStorageCapacities(),
-		}
+	capacityCheck := CapacityCheck{
+		CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
+		CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1().CSIStorageCapacities(),
 	}
 	binder := NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
 

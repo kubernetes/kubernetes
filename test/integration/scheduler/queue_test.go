@@ -56,6 +56,7 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
 		testutils.InitTestAPIServer(t, "core-res-enqueue", nil),
+		0,
 		scheduler.WithPodInitialBackoffSeconds(0),
 		scheduler.WithPodMaxBackoffSeconds(0),
 	)
@@ -104,15 +105,11 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		if fitError == nil {
 			t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 		}
-		testCtx.Scheduler.Error(podInfo, fitError)
-
-		// Scheduling cycle is incremented by one after NextPod() is called, so
-		// pass a number larger than i to move Pod to unschedulableQ.
-		testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, int64(i+10))
+		testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, fitError, v1.PodReasonUnschedulable, nil)
 	}
 
 	// Trigger a NodeTaintChange event.
-	// We expect this event to trigger moving the test Pod from unschedulableQ to activeQ.
+	// We expect this event to trigger moving the test Pod from unschedulablePods to activeQ.
 	node.Spec.Taints = nil
 	if _, err := cs.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("Failed to remove taints off the node: %v", err)
@@ -240,6 +237,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	testCtx = testutils.InitTestSchedulerWithOptions(
 		t,
 		testCtx,
+		0,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry),
 		scheduler.WithPodInitialBackoffSeconds(0),
@@ -282,14 +280,14 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 	}
-	testCtx.Scheduler.Error(podInfo, fitError)
+	testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, fitError, v1.PodReasonUnschedulable, nil)
 
 	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
-	// pass a number larger than 1 to move Pod to unschedulableQ.
+	// pass a number larger than 1 to move Pod to unschedulablePods.
 	testCtx.Scheduler.SchedulingQueue.AddUnschedulableIfNotPresent(podInfo, 10)
 
 	// Trigger a Custom Resource event.
-	// We expect this event to trigger moving the test Pod from unschedulableQ to activeQ.
+	// We expect this event to trigger moving the test Pod from unschedulablePods to activeQ.
 	crdGVR := schema.GroupVersionResource{Group: fooCRD.Spec.Group, Version: fooCRD.Spec.Versions[0].Name, Resource: "foos"}
 	crClient := dynamicClient.Resource(crdGVR).Namespace(ns)
 	if _, err := crClient.Create(ctx, &unstructured.Unstructured{

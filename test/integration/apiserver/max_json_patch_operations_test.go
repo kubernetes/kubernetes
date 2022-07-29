@@ -32,13 +32,12 @@ import (
 
 // Tests that the apiserver limits the number of operations in a json patch.
 func TestMaxJSONPatchOperations(t *testing.T) {
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	clientSet, _ := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
+	clientSet, _, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 		},
 	})
+	defer tearDownFn()
 
 	p := `{"op":"add","path":"/x","value":"y"}`
 	// maxJSONPatchOperations = 10000

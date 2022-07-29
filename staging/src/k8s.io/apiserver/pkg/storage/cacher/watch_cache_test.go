@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/client-go/tools/cache"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -111,7 +110,7 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *testWatchCache {
 		}
 		return labels.Set(pod.Labels), fields.Set{"spec.nodeName": pod.Spec.NodeName}, nil
 	}
-	versioner := etcd3.APIObjectVersioner{}
+	versioner := storage.APIObjectVersioner{}
 	mockHandler := func(*watchCacheEvent) {}
 	wc := newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), reflect.TypeOf(&example.Pod{}))
 	// To preserve behavior of tests that assume a given capacity,
@@ -864,6 +863,132 @@ func TestCacheIncreaseDoesNotBreakWatch(t *testing.T) {
 	_, err := store.getAllEventsSince(15)
 	if err == nil || !strings.Contains(err.Error(), "too old resource version") {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestSuggestedWatchChannelSize(t *testing.T) {
+	testCases := []struct {
+		name        string
+		capacity    int
+		indexExists bool
+		triggerUsed bool
+		expected    int
+	}{
+		{
+			name:        "capacity=100, indexExists, triggerUsed",
+			capacity:    100,
+			indexExists: true,
+			triggerUsed: true,
+			expected:    10,
+		},
+		{
+			name:        "capacity=100, indexExists, !triggerUsed",
+			capacity:    100,
+			indexExists: true,
+			triggerUsed: false,
+			expected:    10,
+		},
+		{
+			name:        "capacity=100, !indexExists",
+			capacity:    100,
+			indexExists: false,
+			triggerUsed: false,
+			expected:    10,
+		},
+		{
+			name:        "capacity=750, indexExists, triggerUsed",
+			capacity:    750,
+			indexExists: true,
+			triggerUsed: true,
+			expected:    10,
+		},
+		{
+			name:        "capacity=750, indexExists, !triggerUsed",
+			capacity:    750,
+			indexExists: true,
+			triggerUsed: false,
+			expected:    10,
+		},
+		{
+			name:        "capacity=750, !indexExists",
+			capacity:    750,
+			indexExists: false,
+			triggerUsed: false,
+			expected:    10,
+		},
+		{
+			name:        "capacity=7500, indexExists, triggerUsed",
+			capacity:    7500,
+			indexExists: true,
+			triggerUsed: true,
+			expected:    10,
+		},
+		{
+			name:        "capacity=7500, indexExists, !triggerUsed",
+			capacity:    7500,
+			indexExists: true,
+			triggerUsed: false,
+			expected:    100,
+		},
+		{
+			name:        "capacity=7500, !indexExists",
+			capacity:    7500,
+			indexExists: false,
+			triggerUsed: false,
+			expected:    100,
+		},
+		{
+			name:        "capacity=75000, indexExists, triggerUsed",
+			capacity:    75000,
+			indexExists: true,
+			triggerUsed: true,
+			expected:    10,
+		},
+		{
+			name:        "capacity=75000, indexExists, !triggerUsed",
+			capacity:    75000,
+			indexExists: true,
+			triggerUsed: false,
+			expected:    1000,
+		},
+		{
+			name:        "capacity=75000, !indexExists",
+			capacity:    75000,
+			indexExists: false,
+			triggerUsed: false,
+			expected:    100,
+		},
+		{
+			name:        "capacity=750000, indexExists, triggerUsed",
+			capacity:    750000,
+			indexExists: true,
+			triggerUsed: true,
+			expected:    10,
+		},
+		{
+			name:        "capacity=750000, indexExists, !triggerUsed",
+			capacity:    750000,
+			indexExists: true,
+			triggerUsed: false,
+			expected:    1000,
+		},
+		{
+			name:        "capacity=750000, !indexExists",
+			capacity:    750000,
+			indexExists: false,
+			triggerUsed: false,
+			expected:    100,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			store := newTestWatchCache(test.capacity, &cache.Indexers{})
+			got := store.suggestedWatchChannelSize(test.indexExists, test.triggerUsed)
+			if got != test.expected {
+				t.Errorf("unexpected channel size got: %v, expected: %v", got, test.expected)
+			}
+		})
 	}
 }
 

@@ -1,0 +1,14 @@
+{
+  "kind": "DeleteOptions",
+  "apiVersion": "v1",
+  "gracePeriodSeconds": 1,
+  "preconditions": {
+    "uid": "uidValue",
+    "resourceVersion": "resourceVersionValue"
+  },
+  "orphanDependents": true,
+  "propagationPolicy": "propagationPolicyValue",
+  "dryRun": [
+    "dryRunValue"
+  ]
+}

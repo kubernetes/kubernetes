@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/storage/etcd3"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
@@ -119,11 +119,14 @@ func TestCrossGroupStorage(t *testing.T) {
 				}
 			}
 
-			versioner := etcd3.APIObjectVersioner{}
+			versioner := storage.APIObjectVersioner{}
 			for _, resource := range resources {
 				// clear out the things cleared in etcd
 				versioned := versionedData[resource.Mapping.Resource]
-				versioner.PrepareObjectForStorage(versioned)
+				if err := versioner.PrepareObjectForStorage(versioned); err != nil {
+					t.Error(err)
+					continue
+				}
 				versionedJSON, err := versioned.MarshalJSON()
 				if err != nil {
 					t.Error(err)

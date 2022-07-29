@@ -14,6 +14,9 @@ conntrack:
   min: 131072
   tcpCloseWaitTimeout: 1h0m0s
   tcpEstablishedTimeout: 24h0m0s
+detectLocal:
+  bridgeInterface: ""
+  interfaceNamePrefix: ""
 detectLocalMode: ""
 enableProfiling: false
 healthzBindAddress: 0.0.0.0:10256

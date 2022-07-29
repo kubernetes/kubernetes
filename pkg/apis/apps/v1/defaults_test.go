@@ -175,6 +175,15 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 	}
 }
 
+func getMaxUnavailable(maxUnavailable int) *intstr.IntOrString {
+	maxUnavailableIntOrStr := intstr.FromInt(maxUnavailable)
+	return &maxUnavailableIntOrStr
+}
+
+func getPartition(partition int32) *int32 {
+	return &partition
+}
+
 func TestSetDefaultStatefulSet(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}
 	var defaultPartition int32 = 0
@@ -196,10 +205,11 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                    string
-		original                *appsv1.StatefulSet
-		expected                *appsv1.StatefulSet
-		enablePVCDeletionPolicy bool
+		name                       string
+		original                   *appsv1.StatefulSet
+		expected                   *appsv1.StatefulSet
+		enablePVCDeletionPolicy    bool
+		enableMaxUnavailablePolicy bool
 	}{
 		{
 			name: "labels and default update strategy",
@@ -439,12 +449,165 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 			},
 			enablePVCDeletionPolicy: false,
 		},
+		{
+			name: "MaxUnavailable disabled, with maxUnavailable not specified",
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition: getPartition(0),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enableMaxUnavailablePolicy: false,
+		},
+		{
+			name: "MaxUnavailable disabled, with default maxUnavailable specified",
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition:      &defaultPartition,
+							MaxUnavailable: getMaxUnavailable(1),
+						},
+					},
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition:      getPartition(0),
+							MaxUnavailable: getMaxUnavailable(1),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enableMaxUnavailablePolicy: false,
+		},
+		{
+			name: "MaxUnavailable disabled, with non default maxUnavailable specified",
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition:      &notTheDefaultPartition,
+							MaxUnavailable: getMaxUnavailable(3),
+						},
+					},
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition:      getPartition(42),
+							MaxUnavailable: getMaxUnavailable(3),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enableMaxUnavailablePolicy: false,
+		},
+		{
+			name: "MaxUnavailable enabled, with no maxUnavailable specified",
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition:      getPartition(0),
+							MaxUnavailable: getMaxUnavailable(1),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enableMaxUnavailablePolicy: true,
+		},
+		{
+			name: "MaxUnavailable enabled, with non default maxUnavailable specified",
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition:      &notTheDefaultPartition,
+							MaxUnavailable: getMaxUnavailable(3),
+						},
+					},
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition:      getPartition(42),
+							MaxUnavailable: getMaxUnavailable(3),
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+			enableMaxUnavailablePolicy: true,
+		},
 	}
 
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StatefulSetAutoDeletePVC, test.enablePVCDeletionPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, test.enableMaxUnavailablePolicy)()
 
 			obj2 := roundTrip(t, runtime.Object(test.original))
 			got, ok := obj2.(*appsv1.StatefulSet)

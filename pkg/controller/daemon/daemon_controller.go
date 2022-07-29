@@ -84,10 +84,13 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("DaemonSet")
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
 // in the system with actual running pods.
 type DaemonSetsController struct {
-	kubeClient    clientset.Interface
-	eventRecorder record.EventRecorder
-	podControl    controller.PodControlInterface
-	crControl     controller.ControllerRevisionControlInterface
+	kubeClient clientset.Interface
+
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
+
+	podControl controller.PodControlInterface
+	crControl  controller.ControllerRevisionControlInterface
 
 	// An dsc is temporarily suspended after creating/deleting these many replicas.
 	// It resumes normal action after observing the watch events for them.
@@ -138,8 +141,6 @@ func NewDaemonSetsController(
 	failedPodsBackoff *flowcontrol.Backoff,
 ) (*DaemonSetsController, error) {
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartStructuredLogging(0)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("daemon_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -147,8 +148,9 @@ func NewDaemonSetsController(
 		}
 	}
 	dsc := &DaemonSetsController{
-		kubeClient:    kubeClient,
-		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
+		kubeClient:       kubeClient,
+		eventBroadcaster: eventBroadcaster,
+		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
@@ -279,6 +281,11 @@ func (dsc *DaemonSetsController) deleteDaemonset(obj interface{}) {
 // Run begins watching and syncing daemon sets.
 func (dsc *DaemonSetsController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
+
+	dsc.eventBroadcaster.StartStructuredLogging(0)
+	dsc.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dsc.kubeClient.CoreV1().Events("")})
+	defer dsc.eventBroadcaster.Shutdown()
+
 	defer dsc.queue.ShutDown()
 
 	klog.Infof("Starting daemon sets controller")
@@ -1256,10 +1263,10 @@ func (dsc *DaemonSetsController) syncDaemonSet(ctx context.Context, key string) 
 
 // NodeShouldRunDaemonPod checks a set of preconditions against a (node,daemonset) and returns a
 // summary. Returned booleans are:
-// * shouldRun:
+//   - shouldRun:
 //     Returns true when a daemonset should run on the node if a daemonset pod is not already
 //     running on that node.
-// * shouldContinueRunning:
+//   - shouldContinueRunning:
 //     Returns true when a daemonset should continue running on a node if a daemonset pod is already
 //     running on that node.
 func NodeShouldRunDaemonPod(node *v1.Node, ds *apps.DaemonSet) (bool, bool) {

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -44,6 +45,8 @@ import (
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	utilpointer "k8s.io/utils/pointer"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const region = "us-central"
@@ -61,7 +64,7 @@ func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Serv
 	}
 }
 
-//Wrap newService so that you don't have to call default arguments again and again.
+// Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
 	return newService("external-balancer", types.UID("123"), v1.ServiceTypeLoadBalancer)
 }
@@ -548,7 +551,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 			controller, cloud, _ := newController()
 			controller.nodeLister = newFakeNodeLister(nil, nodes...)
 
-			if servicesToRetry := controller.updateLoadBalancerHosts(ctx, item.services, item.workers); servicesToRetry != nil {
+			if servicesToRetry := controller.updateLoadBalancerHosts(ctx, item.services, item.workers); len(servicesToRetry) != 0 {
 				t.Errorf("for case %q, unexpected servicesToRetry: %v", item.desc, servicesToRetry)
 			}
 			compareUpdateCalls(t, item.expectedUpdateCalls, cloud.UpdateCalls)
@@ -569,6 +572,11 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 		newService("s4", "123", v1.ServiceTypeLoadBalancer),
 	}
 
+	serviceNames := sets.NewString()
+	for _, svc := range services {
+		serviceNames.Insert(fmt.Sprintf("%s/%s", svc.GetObjectMeta().GetNamespace(), svc.GetObjectMeta().GetName()))
+	}
+
 	controller, cloud, _ := newController()
 	for _, tc := range []struct {
 		desc                  string
@@ -576,7 +584,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 		expectedUpdateCalls   []fakecloud.UpdateBalancerCall
 		worker                int
 		nodeListerErr         error
-		expectedRetryServices []*v1.Service
+		expectedRetryServices sets.String
 	}{
 		{
 			desc:  "only 1 node",
@@ -589,7 +597,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			},
 			worker:                3,
 			nodeListerErr:         nil,
-			expectedRetryServices: []*v1.Service{},
+			expectedRetryServices: sets.NewString(),
 		},
 		{
 			desc:  "2 nodes",
@@ -602,7 +610,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			},
 			worker:                1,
 			nodeListerErr:         nil,
-			expectedRetryServices: []*v1.Service{},
+			expectedRetryServices: sets.NewString(),
 		},
 		{
 			desc:  "4 nodes",
@@ -615,7 +623,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			},
 			worker:                3,
 			nodeListerErr:         nil,
-			expectedRetryServices: []*v1.Service{},
+			expectedRetryServices: sets.NewString(),
 		},
 		{
 			desc:                  "error occur during sync",
@@ -623,7 +631,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
 			worker:                3,
 			nodeListerErr:         fmt.Errorf("random error"),
-			expectedRetryServices: services,
+			expectedRetryServices: serviceNames,
 		},
 		{
 			desc:                  "error occur during sync with 1 workers",
@@ -631,7 +639,7 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			expectedUpdateCalls:   []fakecloud.UpdateBalancerCall{},
 			worker:                1,
 			nodeListerErr:         fmt.Errorf("random error"),
-			expectedRetryServices: services,
+			expectedRetryServices: serviceNames,
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
@@ -639,34 +647,10 @@ func TestNodeChangesInExternalLoadBalancer(t *testing.T) {
 			defer cancel()
 			controller.nodeLister = newFakeNodeLister(tc.nodeListerErr, tc.nodes...)
 			servicesToRetry := controller.updateLoadBalancerHosts(ctx, services, tc.worker)
-			compareServiceList(t, tc.expectedRetryServices, servicesToRetry)
+			assert.Truef(t, tc.expectedRetryServices.Equal(servicesToRetry), "Services to retry are not expected")
 			compareUpdateCalls(t, tc.expectedUpdateCalls, cloud.UpdateCalls)
 			cloud.UpdateCalls = []fakecloud.UpdateBalancerCall{}
 		})
-	}
-}
-
-// compareServiceList compares if both left and right inputs contains the same service list despite the order.
-func compareServiceList(t *testing.T, left, right []*v1.Service) {
-	if len(left) != len(right) {
-		t.Errorf("expect len(left) == len(right), but got %v != %v", len(left), len(right))
-	}
-
-	mismatch := false
-	for _, l := range left {
-		found := false
-		for _, r := range right {
-			if reflect.DeepEqual(l, r) {
-				found = true
-			}
-		}
-		if !found {
-			mismatch = true
-			break
-		}
-	}
-	if mismatch {
-		t.Errorf("expected service list to match, expected %+v, got %+v", left, right)
 	}
 }
 
@@ -1012,14 +996,15 @@ func TestProcessServiceDeletion(t *testing.T) {
 
 // Test cases:
 // index    finalizer    timestamp    wantLB  |  clean-up
-//   0         0           0            0     |   false    (No finalizer, no clean up)
-//   1         0           0            1     |   false    (Ignored as same with case 0)
-//   2         0           1            0     |   false    (Ignored as same with case 0)
-//   3         0           1            1     |   false    (Ignored as same with case 0)
-//   4         1           0            0     |   true
-//   5         1           0            1     |   false
-//   6         1           1            0     |   true    (Service is deleted, needs clean up)
-//   7         1           1            1     |   true    (Ignored as same with case 6)
+//
+//	0         0           0            0     |   false    (No finalizer, no clean up)
+//	1         0           0            1     |   false    (Ignored as same with case 0)
+//	2         0           1            0     |   false    (Ignored as same with case 0)
+//	3         0           1            1     |   false    (Ignored as same with case 0)
+//	4         1           0            0     |   true
+//	5         1           0            1     |   false
+//	6         1           1            0     |   true    (Service is deleted, needs clean up)
+//	7         1           1            1     |   true    (Ignored as same with case 6)
 func TestNeedsCleanup(t *testing.T) {
 	testCases := []struct {
 		desc               string
@@ -1233,10 +1218,10 @@ func TestNeedsUpdate(t *testing.T) {
 	}
 }
 
-//All the test cases for ServiceCache uses a single cache, these below test cases should be run in order,
-//as tc1 (addCache would add elements to the cache)
-//and tc2 (delCache would remove element from the cache without it adding automatically)
-//Please keep this in mind while adding new test cases.
+// All the test cases for ServiceCache uses a single cache, these below test cases should be run in order,
+// as tc1 (addCache would add elements to the cache)
+// and tc2 (delCache would remove element from the cache without it adding automatically)
+// Please keep this in mind while adding new test cases.
 func TestServiceCache(t *testing.T) {
 
 	//ServiceCache a common service cache for all the test cases
@@ -1343,7 +1328,7 @@ func TestServiceCache(t *testing.T) {
 	}
 }
 
-//Test a utility functions as it's not easy to unit test nodeSyncInternal directly
+// Test a utility functions as it's not easy to unit test nodeSyncInternal directly
 func TestNodeSlicesEqualForLB(t *testing.T) {
 	numNodes := 10
 	nArray := make([]*v1.Node, numNodes)

@@ -19,6 +19,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"k8s.io/pod-security-admission/api"
 
 	v1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
@@ -32,12 +33,13 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
+	f.NamespacePodSecurityEnforceLevel = api.LevelBaseline
 
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func() {
 		labelFooName := "foo-" + string(uuid.NewUUID())

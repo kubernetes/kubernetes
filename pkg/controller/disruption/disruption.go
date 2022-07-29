@@ -297,14 +297,13 @@ func (dc *DisruptionController) getScaleController(ctx context.Context, controll
 		return nil, err
 	}
 	gr := mapping.Resource.GroupResource()
-
 	scale, err := dc.scaleNamespacer.Scales(namespace).Get(ctx, gr, controllerRef.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// The IsNotFound error can mean either that the resource does not exist,
 			// or it exist but doesn't implement the scale subresource. We check which
 			// situation we are facing so we can give an appropriate error message.
-			isScale, err := dc.implementsScale(gv, controllerRef.Kind)
+			isScale, err := dc.implementsScale(mapping.Resource)
 			if err != nil {
 				return nil, err
 			}
@@ -321,17 +320,24 @@ func (dc *DisruptionController) getScaleController(ctx context.Context, controll
 	return &controllerAndScale{scale.UID, scale.Spec.Replicas}, nil
 }
 
-func (dc *DisruptionController) implementsScale(gv schema.GroupVersion, kind string) (bool, error) {
-	resourceList, err := dc.discoveryClient.ServerResourcesForGroupVersion(gv.String())
+func (dc *DisruptionController) implementsScale(gvr schema.GroupVersionResource) (bool, error) {
+	resourceList, err := dc.discoveryClient.ServerResourcesForGroupVersion(gvr.GroupVersion().String())
 	if err != nil {
 		return false, err
 	}
+
+	scaleSubresourceName := fmt.Sprintf("%s/scale", gvr.Resource)
 	for _, resource := range resourceList.APIResources {
-		if resource.Kind != kind {
+		if resource.Name != scaleSubresourceName {
 			continue
 		}
-		if strings.HasSuffix(resource.Name, "/scale") {
-			return true, nil
+
+		for _, scaleGv := range scaleclient.NewScaleConverter().ScaleVersions() {
+			if resource.Group == scaleGv.Group &&
+				resource.Version == scaleGv.Version &&
+				resource.Kind == "Scale" {
+				return true, nil
+			}
 		}
 	}
 	return false, nil
@@ -358,7 +364,18 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 
 func (dc *DisruptionController) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
+
+	// Start events processing pipeline.
+	if dc.kubeClient != nil {
+		klog.Infof("Sending events to api server.")
+		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dc.kubeClient.CoreV1().Events("")})
+	} else {
+		klog.Infof("No api server defined - no events will be sent to API server.")
+	}
+	defer dc.broadcaster.Shutdown()
+
 	defer dc.queue.ShutDown()
+	defer dc.recheckQueue.ShutDown()
 
 	klog.Infof("Starting disruption controller")
 	defer klog.Infof("Shutting down disruption controller")
@@ -367,12 +384,6 @@ func (dc *DisruptionController) Run(ctx context.Context) {
 		return
 	}
 
-	if dc.kubeClient != nil {
-		klog.Infof("Sending events to api server.")
-		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dc.kubeClient.CoreV1().Events("")})
-	} else {
-		klog.Infof("No api server defined - no events will be sent to API server.")
-	}
 	go wait.UntilWithContext(ctx, dc.worker, time.Second)
 	go wait.Until(dc.recheckWorker, time.Second, ctx.Done())
 

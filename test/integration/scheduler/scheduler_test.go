@@ -218,13 +218,13 @@ func TestMultipleSchedulers(t *testing.T) {
 	}
 
 	defaultScheduler := "default-scheduler"
-	testPodFitsDefault, err := createPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{Name: "pod-fits-default", Namespace: testCtx.NS.Name, SchedulerName: defaultScheduler}))
+	testPodFitsDefault, err := createPausePod(testCtx.ClientSet, initPausePod(&testutils.PausePodConfig{Name: "pod-fits-default", Namespace: testCtx.NS.Name, SchedulerName: defaultScheduler}))
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
 
 	fooScheduler := "foo-scheduler"
-	testPodFitsFoo, err := createPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{Name: "pod-fits-foo", Namespace: testCtx.NS.Name, SchedulerName: fooScheduler}))
+	testPodFitsFoo, err := createPausePod(testCtx.ClientSet, initPausePod(&testutils.PausePodConfig{Name: "pod-fits-foo", Namespace: testCtx.NS.Name, SchedulerName: fooScheduler}))
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
 	}
@@ -267,7 +267,7 @@ func TestMultipleSchedulers(t *testing.T) {
 			}},
 		},
 	})
-	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, scheduler.WithProfiles(cfg.Profiles...))
+	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, 0, scheduler.WithProfiles(cfg.Profiles...))
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 
@@ -357,7 +357,7 @@ func TestMultipleSchedulingProfiles(t *testing.T) {
 	}
 	defer evs.Stop()
 
-	for _, pc := range []*pausePodConfig{
+	for _, pc := range []*testutils.PausePodConfig{
 		{Name: "foo", Namespace: testCtx.NS.Name},
 		{Name: "bar", Namespace: testCtx.NS.Name, SchedulerName: "unknown-scheduler"},
 		{Name: "baz", Namespace: testCtx.NS.Name, SchedulerName: "default-scheduler"},
@@ -503,7 +503,7 @@ func TestSchedulerInformers(t *testing.T) {
 			name:  "Pod cannot be scheduled when node is occupied by pods scheduled by other schedulers",
 			nodes: []*nodeConfig{{name: "node-1", res: defaultNodeRes}},
 			existingPods: []*v1.Pod{
-				initPausePod(&pausePodConfig{
+				initPausePod(&testutils.PausePodConfig{
 					Name:          "pod1",
 					Namespace:     testCtx.NS.Name,
 					Resources:     defaultPodRes,
@@ -511,7 +511,7 @@ func TestSchedulerInformers(t *testing.T) {
 					NodeName:      "node-1",
 					SchedulerName: "foo-scheduler",
 				}),
-				initPausePod(&pausePodConfig{
+				initPausePod(&testutils.PausePodConfig{
 					Name:          "pod2",
 					Namespace:     testCtx.NS.Name,
 					Resources:     defaultPodRes,
@@ -520,7 +520,7 @@ func TestSchedulerInformers(t *testing.T) {
 					SchedulerName: "bar-scheduler",
 				}),
 			},
-			pod: initPausePod(&pausePodConfig{
+			pod: initPausePod(&testutils.PausePodConfig{
 				Name:      "unschedulable-pod",
 				Namespace: testCtx.NS.Name,
 				Resources: defaultPodRes,
@@ -562,8 +562,105 @@ func TestSchedulerInformers(t *testing.T) {
 			// Cleanup
 			pods = append(pods, unschedulable)
 			testutils.CleanupPods(cs, t, pods)
-			cs.PolicyV1beta1().PodDisruptionBudgets(testCtx.NS.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+			cs.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 			cs.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 		})
 	}
+}
+
+func TestNodeEvents(t *testing.T) {
+	// The test verifies that unschedulable pods are re-queued
+	// on node update events. The scenario we are testing is the following:
+	// 1. Create pod1 and node1 that is small enough to only fit pod1; pod1 schedules on node1
+	// 2. Create pod2, it should be unschedulable due to insufficient cpu
+	// 3. Create node2 with a taint, pod2 should still not schedule
+	// 4. Remove the taint from node2; pod2 should now schedule on node2
+
+	testCtx := initTest(t, "node-events")
+	defer testutils.CleanupTest(t, testCtx)
+	defer testCtx.ClientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+
+	// 1.1 create pod1
+	pod1, err := createPausePodWithResource(testCtx.ClientSet, "pod1", testCtx.NS.Name, &v1.ResourceList{
+		v1.ResourceCPU: *resource.NewMilliQuantity(80, resource.DecimalSI),
+	})
+	if err != nil {
+		t.Fatalf("Failed to create pod: %v", err)
+	}
+
+	// 1.2 Create node1
+	node1, err := createNode(testCtx.ClientSet, st.MakeNode().
+		Name("node-events-test-node1").
+		Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:   "32",
+			v1.ResourceCPU:    "100m",
+			v1.ResourceMemory: "30",
+		}).Obj())
+	if err != nil {
+		t.Fatalf("Failed to create %s: %v", node1.Name, err)
+	}
+
+	// 1.3 verify pod1 is scheduled
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pod1, time.Second*5)
+	if err != nil {
+		t.Errorf("Pod %s didn't schedule: %v", pod1.Name, err)
+	}
+
+	// 2. create pod2
+	pod2, err := createPausePodWithResource(testCtx.ClientSet, "pod2", testCtx.NS.Name, &v1.ResourceList{
+		v1.ResourceCPU: *resource.NewMilliQuantity(40, resource.DecimalSI),
+	})
+	if err != nil {
+		t.Fatalf("Failed to create pod %v: %v", pod2.Name, err)
+	}
+
+	if err := waitForPodUnschedulable(testCtx.ClientSet, pod2); err != nil {
+		t.Errorf("Pod %v got scheduled: %v", pod2.Name, err)
+	}
+
+	// 3.1 Create node2 with a taint
+	node2 := st.MakeNode().
+		Name("node-events-test-node2").
+		Capacity(map[v1.ResourceName]string{
+			v1.ResourcePods:   "32",
+			v1.ResourceCPU:    "100m",
+			v1.ResourceMemory: "30",
+		}).
+		Label("affinity-key", "affinity-value").
+		Taints([]v1.Taint{{Key: "taint-key", Effect: v1.TaintEffectNoSchedule}}).Obj()
+	node2, err = createNode(testCtx.ClientSet, node2)
+	if err != nil {
+		t.Fatalf("Failed to create %s: %v", node2.Name, err)
+	}
+	// make sure the scheduler received the node add event by creating a pod that only fits node2
+	plugPod := st.MakePod().Name("plug-pod").Namespace(testCtx.NS.Name).Container("pause").
+		Req(map[v1.ResourceName]string{v1.ResourceCPU: "40m"}).
+		NodeAffinityIn("affinity-key", []string{"affinity-value"}).
+		Toleration("taint-key").Obj()
+	plugPod, err = testCtx.ClientSet.CoreV1().Pods(plugPod.Namespace).Create(context.TODO(), plugPod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create pod %v: %v", plugPod.Name, err)
+	}
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, plugPod, time.Second*5)
+	if err != nil {
+		t.Errorf("Pod %s didn't schedule: %v", plugPod.Name, err)
+	}
+
+	// 3.2 pod2 still unschedulable
+	if err := waitForPodUnschedulable(testCtx.ClientSet, pod2); err != nil {
+		t.Errorf("Pod %v got scheduled: %v", pod2.Name, err)
+	}
+
+	// 4. Remove node taint, pod2 should schedule
+	node2.Spec.Taints = nil
+	node2, err = updateNode(testCtx.ClientSet, node2)
+	if err != nil {
+		t.Fatalf("Failed to update %s: %v", node2.Name, err)
+	}
+
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.ClientSet, pod2, time.Second*5)
+	if err != nil {
+		t.Errorf("Pod %s didn't schedule: %v", pod2.Name, err)
+	}
+
 }

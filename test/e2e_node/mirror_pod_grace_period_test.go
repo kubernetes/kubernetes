@@ -22,7 +22,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,10 +31,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = SIGDescribe("MirrorPodWithGracePeriod", func() {
 	f := framework.NewDefaultFramework("mirror-pod-with-grace-period")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 	ginkgo.Context("when create a mirror pod ", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
 		ginkgo.BeforeEach(func() {

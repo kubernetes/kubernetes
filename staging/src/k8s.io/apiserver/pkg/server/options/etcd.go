@@ -137,13 +137,18 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.DefaultWatchCacheSize, "default-watch-cache-size", s.DefaultWatchCacheSize,
 		"Default watch cache size. If zero, watch cache will be disabled for resources that do not have a default watch size set.")
 
+	fs.MarkDeprecated("default-watch-cache-size",
+		"watch caches are sized automatically and this flag will be removed in a future version")
+
 	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
 		"Watch cache size settings for some resources (pods, nodes, etc.), comma separated. "+
 		"The individual setting format: resource[.group]#size, where resource is lowercase plural (no version), "+
 		"group is omitted for resources of apiVersion v1 (the legacy core API) and included for others, "+
-		"and size is a number. It takes effect when watch-cache is enabled. "+
-		"Some resources (replicationcontrollers, endpoints, nodes, pods, services, apiservices.apiregistration.k8s.io) "+
-		"have system defaults set by heuristics, others default to default-watch-cache-size")
+		"and size is a number. This option is only meaningful for resources built into the apiserver, "+
+		"not ones defined by CRDs or aggregated from external servers, and is only consulted if the "+
+		"watch-cache is enabled. The only meaningful size setting to supply here is zero, which means to "+
+		"disable watch caching for the associated resource; all non-zero values are equivalent and mean "+
+		"to not disable watch caching for that resource")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default).")
@@ -177,6 +182,9 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.DurationVar(&s.StorageConfig.HealthcheckTimeout, "etcd-healthcheck-timeout", s.StorageConfig.HealthcheckTimeout,
 		"The timeout to use when checking etcd health.")
+
+	fs.DurationVar(&s.StorageConfig.ReadycheckTimeout, "etcd-readycheck-timeout", s.StorageConfig.ReadycheckTimeout,
+		"The timeout to use when checking etcd readiness")
 
 	fs.Int64Var(&s.StorageConfig.LeaseManagerConfig.ReuseDurationSeconds, "lease-reuse-duration-seconds", s.StorageConfig.LeaseManagerConfig.ReuseDurationSeconds,
 		"The time in seconds that each lease is reused. A lower value could avoid large number of objects reusing the same lease. Notice that a too small value may cause performance problems at storage layer.")
@@ -221,12 +229,20 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 }
 
 func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
-	healthCheck, err := storagefactory.CreateHealthCheck(s.StorageConfig)
+	healthCheck, err := storagefactory.CreateHealthCheck(s.StorageConfig, c.DrainedNotify())
 	if err != nil {
 		return err
 	}
 	c.AddHealthChecks(healthz.NamedCheck("etcd", func(r *http.Request) error {
 		return healthCheck()
+	}))
+
+	readyCheck, err := storagefactory.CreateReadyCheck(s.StorageConfig, c.DrainedNotify())
+	if err != nil {
+		return err
+	}
+	c.AddReadyzChecks(healthz.NamedCheck("etcd-readiness", func(r *http.Request) error {
+		return readyCheck()
 	}))
 
 	if s.EncryptionProviderConfigFilepath != "" {
@@ -270,8 +286,10 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 			klog.Warningf("Dropping watch-cache-size for %v - watchCache size is now dynamic", resource)
 		}
 		if ok && size <= 0 {
+			klog.V(3).InfoS("Not using watch cache", "resource", resource)
 			ret.Decorator = generic.UndecoratedStorage
 		} else {
+			klog.V(3).InfoS("Using watch cache", "resource", resource)
 			ret.Decorator = genericregistry.StorageWithCacher()
 		}
 	}

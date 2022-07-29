@@ -39,8 +39,9 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -53,6 +54,7 @@ const (
 var _ = common.SIGDescribe("Firewall rule", func() {
 	var firewallTestName = "firewall-test"
 	f := framework.NewDefaultFramework(firewallTestName)
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	var cloudConfig framework.CloudConfig

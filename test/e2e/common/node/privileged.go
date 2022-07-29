@@ -19,11 +19,12 @@ package node
 import (
 	"fmt"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 // PrivilegedPodTestConfig is configuration struct for privileged pod test
@@ -39,8 +40,10 @@ type PrivilegedPodTestConfig struct {
 }
 
 var _ = SIGDescribe("PrivilegedPod [NodeConformance]", func() {
+	f := framework.NewDefaultFramework("e2e-privileged-pod")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	config := &PrivilegedPodTestConfig{
-		f:                      framework.NewDefaultFramework("e2e-privileged-pod"),
+		f:                      f,
 		privilegedPod:          "privileged-pod",
 		privilegedContainer:    "privileged-container",
 		notPrivilegedContainer: "not-privileged-container",

@@ -34,8 +34,9 @@ import (
 	cpumanagerstate "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -784,6 +785,7 @@ func isSMTAlignmentError(pod *v1.Pod) bool {
 // Serial because the test updates kubelet configuration.
 var _ = SIGDescribe("CPU Manager [Serial] [Feature:CPUManager]", func() {
 	f := framework.NewDefaultFramework("cpu-manager-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.Context("With kubeconfig updated with static CPU Manager policy run the CPU Manager tests", func() {
 		runCPUManagerTests(f)

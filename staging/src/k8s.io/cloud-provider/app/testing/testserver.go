@@ -33,6 +33,8 @@ import (
 	"k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
+
+	"k8s.io/klog/v2"
 )
 
 // TearDownFunc is to be called to tear down a test server.
@@ -58,14 +60,25 @@ type Logger interface {
 // and location of the tmpdir are returned.
 //
 // Note: we return a tear-down func instead of a stop channel because the later will leak temporary
-// 		 files that because Golang testing's call to os.Exit will not give a stop channel go routine
-// 		 enough time to remove temporary files.
+//
+//	files that because Golang testing's call to os.Exit will not give a stop channel go routine
+//	enough time to remove temporary files.
 func StartTestServer(t Logger, customFlags []string) (result TestServer, err error) {
 	stopCh := make(chan struct{})
+	var errCh chan error
 	configDoneCh := make(chan struct{})
 	var capturedConfig config.CompletedConfig
 	tearDown := func() {
 		close(stopCh)
+
+		// If cloud-controller-manager was started, let's wait for
+		// it to shutdown clearly.
+		if errCh != nil {
+			err, ok := <-errCh
+			if ok && err != nil {
+				klog.Errorf("Failed to shutdown test server clearly: %v", err)
+			}
+		}
 		if len(result.TmpDir) != 0 {
 			os.RemoveAll(result.TmpDir)
 		}
@@ -106,18 +119,12 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 
 	commandArgs := []string{}
 	listeners := []net.Listener{}
-	disableInsecure := false
 	disableSecure := false
 	for _, arg := range customFlags {
 		if strings.HasPrefix(arg, "--secure-port=") {
 			if arg == "--secure-port=0" {
 				commandArgs = append(commandArgs, arg)
 				disableSecure = true
-			}
-		} else if strings.HasPrefix(arg, "--port=") {
-			if arg == "--port=0" {
-				commandArgs = append(commandArgs, arg)
-				disableInsecure = true
 			}
 		} else if strings.HasPrefix(arg, "--cert-dir=") {
 			// skip it
@@ -137,27 +144,18 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 
 		t.Logf("cloud-controller-manager will listen securely on port %d...", bindPort)
 	}
-	if !disableInsecure {
-		listener, bindPort, err := createListenerOnFreePort()
-		if err != nil {
-			return result, fmt.Errorf("failed to create listener: %v", err)
-		}
-		listeners = append(listeners, listener)
-		commandArgs = append(commandArgs, fmt.Sprintf("--port=%d", bindPort))
-
-		t.Logf("cloud-controller-manager will listen securely on port %d...", bindPort)
-	}
 	for _, listener := range listeners {
 		listener.Close()
 	}
 
-	errCh := make(chan error)
+	errCh = make(chan error)
 	go func() {
+		defer close(errCh)
+
 		command.SetArgs(commandArgs)
 		if err := command.Execute(); err != nil {
 			errCh <- err
 		}
-		close(errCh)
 	}()
 
 	select {

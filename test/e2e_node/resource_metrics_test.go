@@ -25,10 +25,11 @@ import (
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/prometheus/common/model"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
@@ -42,6 +43,7 @@ const (
 
 var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 	f := framework.NewDefaultFramework("resource-metrics")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	ginkgo.Context("when querying /resource/metrics", func() {
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("Creating test pods to measure their resource usage")
@@ -113,7 +115,7 @@ var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 			var zero int64 = 0
 			f.PodClient().DeleteSync(pod0, metav1.DeleteOptions{GracePeriodSeconds: &zero}, 10*time.Minute)
 			f.PodClient().DeleteSync(pod1, metav1.DeleteOptions{GracePeriodSeconds: &zero}, 10*time.Minute)
-			if !ginkgo.CurrentGinkgoTestDescription().Failed {
+			if !ginkgo.CurrentSpecReport().Failed() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {

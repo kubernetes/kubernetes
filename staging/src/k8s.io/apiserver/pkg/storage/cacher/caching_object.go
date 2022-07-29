@@ -395,17 +395,6 @@ func (o *cachingObject) SetOwnerReferences(references []metav1.OwnerReference) {
 		func() { o.object.SetOwnerReferences(references) },
 	)
 }
-func (o *cachingObject) GetClusterName() string {
-	o.lock.RLock()
-	defer o.lock.RUnlock()
-	return o.object.GetClusterName()
-}
-func (o *cachingObject) SetClusterName(clusterName string) {
-	o.conditionalSet(
-		func() bool { return o.object.GetClusterName() == clusterName },
-		func() { o.object.SetClusterName(clusterName) },
-	)
-}
 func (o *cachingObject) GetManagedFields() []metav1.ManagedFieldsEntry {
 	o.lock.RLock()
 	defer o.lock.RUnlock()

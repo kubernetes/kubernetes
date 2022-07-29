@@ -17,7 +17,7 @@
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 
-TAG ?= 3.7
+TAG ?= 3.8
 REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
@@ -40,7 +40,7 @@ ALL_OS_ARCH.windows = $(foreach arch, $(ALL_ARCH.windows), $(foreach osversion, 
 ALL_OS_ARCH = $(foreach os, $(ALL_OS), ${ALL_OS_ARCH.${os}})
 
 CFLAGS = -Os -Wall -Werror -static -DVERSION=v$(TAG)-$(REV)
-KUBE_CROSS_IMAGE ?= k8s.gcr.io/build-image/kube-cross
+KUBE_CROSS_IMAGE ?= registry.k8s.io/build-image/kube-cross
 KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
 # NOTE(claudiub): The Windows pause image also requires the wincat binary we're compiling for the
@@ -68,7 +68,8 @@ TRIPLE.linux-ppc64le := powerpc64le-linux-gnu
 TRIPLE.linux-s390x := s390x-linux-gnu
 TRIPLE := ${TRIPLE.${OS}-${ARCH}}
 BASE.linux := scratch
-BASE.windows := mcr.microsoft.com/windows/nanoserver
+# Source for windows pause image base is located at https://github.com/microsoft/windows-pause-image-base
+BASE.windows := mcr.microsoft.com/oss/kubernetes/windows-pause-image-base:v0.2
 BASE := ${BASE.${OS}}
 
 # If you want to build AND push all containers, see the 'all-push' rule.
@@ -77,16 +78,21 @@ all: all-container-docker
 # NOTE(claudiub): A non-default builder instance is needed in order to build Windows images.
 all-push: all-container-registry push-manifest
 
+push-manifest: SHELL:=/bin/bash
 push-manifest:
 	docker manifest create --amend $(IMAGE):$(TAG) $(shell echo $(ALL_OS_ARCH) | sed -e "s~[^ ]*~$(IMAGE):$(TAG)\-&~g")
 	set -x; for arch in $(ALL_ARCH.linux); do docker manifest annotate --os linux --arch $${arch} ${IMAGE}:${TAG} ${IMAGE}:${TAG}-linux-$${arch}; done
 	# For Windows images, we also need to include the "os.version" in the manifest list, so the Windows node can pull the proper image it needs.
 	# we use awk to also trim the quotes around the OS version string.
 	set -x; \
+	# tagToKernelVersionMap maps the container images tags for different Windows Server releases (ex: ltsc2022 for Windows Server 2022)
+	# to the kernel version for that OS release (ex: 20348 for Windows Server 2022). This is needed to fetch the servicing revision from the
+	# pause base image manifest (which containers an entry for each Windows Server version) so we can add the approrite 'os.version'
+	# field to the pause image manifest.
+	declare -A tagToKernelVersionMap=( ['1809']='17763' ['20H2']='19042' ['ltsc2022']='20348' );\
 	for arch in $(ALL_ARCH.windows);  do \
 		for osversion in ${ALL_OSVERSIONS.windows}; do \
-			BASEIMAGE=${BASE.windows}:$${osversion}; \
-			full_version=`docker manifest inspect ${BASE.windows}:$${osversion} | grep "os.version" | head -n 1 | awk -F\" '{print $$4}'` || true; \
+			full_version=`docker manifest inspect ${BASE.windows} | grep "10.0.$${tagToKernelVersionMap[$$osversion]}" | head -n 1 | awk -F\" '{print $$4}'` || true; \
 			docker manifest annotate --os windows --arch $${arch} --os-version $${full_version} ${IMAGE}:${TAG} ${IMAGE}:${TAG}-windows-$${arch}-$${osversion}; \
 		done; \
 	done
@@ -122,7 +128,7 @@ container: .container-${OS}-$(ARCH)
 
 .container-windows-$(ARCH): $(foreach binary, ${BIN}, bin/${binary}-${OS}-${ARCH})
 	docker buildx build --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
-		-t $(IMAGE):$(TAG)-${OS}-$(ARCH)-${OSVERSION} --build-arg BASE=${BASE}:${OSVERSION} --build-arg ARCH=$(ARCH) -f Dockerfile_windows .
+		-t $(IMAGE):$(TAG)-${OS}-$(ARCH)-${OSVERSION} --build-arg BASE=${BASE}-windows-${OSVERSION}-${ARCH} --build-arg ARCH=$(ARCH) -f Dockerfile_windows .
 	touch $@
 
 # Useful for testing, not automatically included in container image

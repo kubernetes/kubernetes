@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	restful "github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful/v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
@@ -83,16 +83,7 @@ var (
 		&compbasemetrics.GaugeOpts{
 			Name:           "apiserver_longrunning_requests",
 			Help:           "Gauge of all active long-running apiserver requests broken out by verb, group, version, resource, scope and component. Not all requests are tracked this way.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
-	)
-	longRunningRequestGauge = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:              "apiserver_longrunning_gauge",
-			Help:              "Gauge of all active long-running apiserver requests broken out by verb, group, version, resource, scope and component. Not all requests are tracked this way.",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.23.0",
+			StabilityLevel: compbasemetrics.STABLE,
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
@@ -103,7 +94,7 @@ var (
 			// This metric is used for verifying api call latencies SLO,
 			// as well as tracking regressions in this aspects.
 			// Thus we customize buckets significantly, to empower both usecases.
-			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+			Buckets: []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
 				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
 			StabilityLevel: compbasemetrics.STABLE,
 		},
@@ -122,6 +113,19 @@ var (
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
+	fieldValidationRequestLatencies = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name: "field_validation_request_duration_seconds",
+			Help: "Response latency distribution in seconds for each field validation value and whether field validation is enabled or not",
+			// This metric is supplementary to the requestLatencies metric.
+			// It measures request durations for the various field validation
+			// values.
+			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"field_validation", "enabled"},
+	)
 	responseSizes = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Name: "apiserver_response_sizes",
@@ -132,15 +136,6 @@ var (
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
 	)
-	// DroppedRequests is a number of requests dropped with 'Try again later' response"
-	DroppedRequests = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_dropped_requests_total",
-			Help:           "Number of requests dropped with 'Try again later' response",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"request_kind"},
-	)
 	// TLSHandshakeErrors is a number of requests dropped with 'TLS handshake error from' error
 	TLSHandshakeErrors = compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
@@ -148,16 +143,6 @@ var (
 			Help:           "Number of requests dropped with 'TLS handshake error from' error",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-	)
-	// RegisteredWatchers is a number of currently registered watchers splitted by resource.
-	RegisteredWatchers = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Name:              "apiserver_registered_watchers",
-			Help:              "Number of currently registered watchers for a given resources",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.23.0",
-		},
-		[]string{"group", "version", "kind"},
 	)
 	WatchEvents = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
@@ -253,17 +238,27 @@ var (
 		[]string{"source", "status"},
 	)
 
+	requestTimestampComparisonDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "apiserver_request_timestamp_comparison_time",
+			Help:           "Time taken for comparison of old vs new objects in UPDATE or PATCH requests",
+			Buckets:        []float64{0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 5.0},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		// Path the code takes to reach a conclusion:
+		// i.e. unequalObjectsFast, unequalObjectsSlow, equalObjectsSlow
+		[]string{"code_path"},
+	)
+
 	metrics = []resettableCollector{
 		deprecatedRequestGauge,
 		requestCounter,
 		longRunningRequestsGauge,
-		longRunningRequestGauge,
 		requestLatencies,
 		requestSloLatencies,
+		fieldValidationRequestLatencies,
 		responseSizes,
-		DroppedRequests,
 		TLSHandshakeErrors,
-		RegisteredWatchers,
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,
@@ -273,6 +268,7 @@ var (
 		requestFilterDuration,
 		requestAbortsTotal,
 		requestPostTimeoutTotal,
+		requestTimestampComparisonDuration,
 	}
 
 	// these are the valid request methods which we report in our metrics. Any other request methods
@@ -383,6 +379,10 @@ func RecordFilterLatency(ctx context.Context, name string, elapsed time.Duration
 	requestFilterDuration.WithContext(ctx).WithLabelValues(name).Observe(elapsed.Seconds())
 }
 
+func RecordTimestampComparisonLatency(codePath string, elapsed time.Duration) {
+	requestTimestampComparisonDuration.WithLabelValues(codePath).Observe(elapsed.Seconds())
+}
+
 func RecordRequestPostTimeout(source string, status string) {
 	requestPostTimeoutTotal.WithLabelValues(source, status).Inc()
 }
@@ -401,6 +401,27 @@ func RecordRequestAbort(req *http.Request, requestInfo *request.RequestInfo) {
 	version := requestInfo.APIVersion
 
 	requestAbortsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope).Inc()
+}
+
+// RecordDroppedRequest records that the request was rejected via http.TooManyRequests.
+func RecordDroppedRequest(req *http.Request, requestInfo *request.RequestInfo, component string, isMutatingRequest bool) {
+	if requestInfo == nil {
+		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
+	}
+	scope := CleanScope(requestInfo)
+	dryRun := cleanDryRun(req.URL)
+
+	// We don't use verb from <requestInfo>, as this may be propagated from
+	// InstrumentRouteFunc which is registered in installer.go with predefined
+	// list of verbs (different than those translated to RequestInfo).
+	// However, we need to tweak it e.g. to differentiate GET from LIST.
+	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
+
+	if requestInfo.IsResourceRequest {
+		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests)).Inc()
+	} else {
+		requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, "", "", "", requestInfo.Subresource, scope, component, codeToString(http.StatusTooManyRequests)).Inc()
+	}
 }
 
 // RecordRequestTermination records that the request was terminated early as part of a resource
@@ -432,7 +453,7 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	if requestInfo == nil {
 		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
 	}
-	var g, e compbasemetrics.GaugeMetric
+	var g compbasemetrics.GaugeMetric
 	scope := CleanScope(requestInfo)
 
 	// We don't use verb from <requestInfo>, as this may be propagated from
@@ -442,18 +463,12 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	reportedVerb := cleanVerb(CanonicalVerb(strings.ToUpper(req.Method), scope), getVerbIfWatch(req), req)
 
 	if requestInfo.IsResourceRequest {
-		e = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
-		g = longRunningRequestGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
+		g = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
 	} else {
-		e = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
-		g = longRunningRequestGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
+		g = longRunningRequestsGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
 	}
-	e.Inc()
 	g.Inc()
-	defer func() {
-		e.Dec()
-		g.Dec()
-	}()
+	defer g.Dec()
 	fn()
 }
 
@@ -482,6 +497,10 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 		}
 	}
 	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
+	fieldValidation := cleanFieldValidation(req.URL)
+	fieldValidationEnabled := strconv.FormatBool(utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation))
+	fieldValidationRequestLatencies.WithContext(req.Context()).WithLabelValues(fieldValidation, fieldValidationEnabled)
+
 	if wd, ok := request.LatencyTrackersFrom(req.Context()); ok {
 		sloLatency := elapsedSeconds - (wd.MutatingWebhookTracker.GetLatency() + wd.ValidatingWebhookTracker.GetLatency()).Seconds()
 		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sloLatency)
@@ -531,7 +550,7 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 
 // CleanScope returns the scope of the request.
 func CleanScope(requestInfo *request.RequestInfo) string {
-	if requestInfo.Name != "" {
+	if requestInfo.Name != "" || requestInfo.Verb == "create" {
 		return "resource"
 	}
 	if requestInfo.Namespace != "" {
@@ -620,6 +639,21 @@ func cleanDryRun(u *url.URL) string {
 	// TODO: this is a fairly large allocation for what it does, consider
 	//   a sort and dedup in a single pass
 	return strings.Join(utilsets.NewString(dryRun...).List(), ",")
+}
+
+func cleanFieldValidation(u *url.URL) string {
+	// avoid allocating when we don't see dryRun in the query
+	if !strings.Contains(u.RawQuery, "fieldValidation") {
+		return ""
+	}
+	fieldValidation := u.Query()["fieldValidation"]
+	if len(fieldValidation) != 1 {
+		return "invalid"
+	}
+	if errs := validation.ValidateFieldValidation(nil, fieldValidation[0]); len(errs) > 0 {
+		return "invalid"
+	}
+	return fieldValidation[0]
 }
 
 var _ http.ResponseWriter = (*ResponseWriterDelegator)(nil)

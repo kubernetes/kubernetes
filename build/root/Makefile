@@ -70,6 +70,8 @@ define ALL_HELP_INFO
 #   WHAT: Directory names to build.  If any of these directories has a 'main'
 #     package, the build will produce executable files under $(OUT_DIR)/bin.
 #     If not specified, "everything" will be built.
+#     "vendor/<module>/<path>" is accepted as alias for "<module>/<path>".
+#     "ginkgo" is an alias for the ginkgo CLI.
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags passed to 'go' when building.
 #   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
@@ -106,7 +108,7 @@ ginkgo:
 	echo "$$GINKGO_HELP_INFO"
 else
 ginkgo:
-	hack/make-rules/build.sh vendor/github.com/onsi/ginkgo/ginkgo
+	hack/make-rules/build.sh github.com/onsi/ginkgo/v2/ginkgo
 endif
 
 define VERIFY_HELP_INFO
@@ -223,8 +225,6 @@ define TEST_E2E_NODE_HELP_INFO
 #  ARTIFACTS: Local directory to scp test artifacts into from the remote hosts
 #    for REMOTE=true. Local directory to write juntil xml results into for REMOTE=false.
 #    Defaults to "/tmp/_artifacts/$$(date +%y%m%dT%H%M%S)".
-#  LIST_IMAGES: For REMOTE=true only. If true, don't run tests. Just output the
-#    list of available images for testing.  Defaults to false.
 #  TIMEOUT: For REMOTE=true only. How long (in golang duration format) to wait
 #    for ginkgo tests to complete. Defaults to 45m.
 #  PARALLELISM: The number of ginkgo nodes to run.  Defaults to 8.
@@ -250,7 +250,7 @@ define TEST_E2E_NODE_HELP_INFO
 #  CLEANUP: For REMOTE=true only.  If false, do not stop processes or delete
 #    test files on remote hosts.  Defaults to true.
 #  IMAGE_PROJECT: For REMOTE=true only.  Project containing images provided to
-#    $$IMAGES.  Defaults to "kubernetes-node-e2e-images".
+#    $$IMAGES.  Defaults to "cos-cloud".
 #  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
 #    have the name "$${INSTANCE_PREFIX}-$${IMAGE_NAME}".  Defaults to "test".
 #  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
@@ -412,8 +412,8 @@ define RELEASE_SKIP_TESTS_HELP_INFO
 # Args:
 #   KUBE_RELEASE_RUN_TESTS: Whether to run tests. Set to 'y' to run tests anyways.
 #   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
-#   KUBE_DOCKER_REGISTRY: Registry of released images, default to k8s.gcr.io
-#   KUBE_BASE_IMAGE_REGISTRY: Registry of base images for controlplane binaries, default to k8s.gcr.io/build-image
+#   KUBE_DOCKER_REGISTRY: Registry of released images, default to registry.k8s.io
+#   KUBE_BASE_IMAGE_REGISTRY: Registry of base images for controlplane binaries, default to registry.k8s.io/build-image
 #
 # Example:
 #   make release-skip-tests
@@ -502,7 +502,7 @@ define CMD_HELP_INFO
 #   make kubectl kube-proxy
 endef
 #TODO: make EXCLUDE_TARGET auto-generated when there are other files in cmd/
-EXCLUDE_TARGET=BUILD OWNERS
+EXCLUDE_TARGET=OWNERS
 CMD_TARGET = $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/))))
 .PHONY: $(CMD_TARGET)
 ifeq ($(PRINT_HELP),y)

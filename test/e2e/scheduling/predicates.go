@@ -38,8 +38,9 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -77,6 +78,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	var RCName string
 	var ns string
 	f := framework.NewDefaultFramework("sched-pred")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.AfterEach(func() {
 		rc, err := cs.CoreV1().ReplicationControllers(ns).Get(context.TODO(), RCName, metav1.GetOptions{})
@@ -826,15 +828,17 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 			OwnerReferences: conf.OwnerReferences,
 		},
 		Spec: v1.PodSpec{
+			SecurityContext:           e2epod.GetRestrictedPodSecurityContext(),
 			NodeSelector:              conf.NodeSelector,
 			Affinity:                  conf.Affinity,
 			TopologySpreadConstraints: conf.TopologySpreadConstraints,
 			RuntimeClassName:          conf.RuntimeClassHandler,
 			Containers: []v1.Container{
 				{
-					Name:  conf.Name,
-					Image: imageutils.GetPauseImageName(),
-					Ports: conf.Ports,
+					Name:            conf.Name,
+					Image:           imageutils.GetPauseImageName(),
+					Ports:           conf.Ports,
+					SecurityContext: e2epod.GetRestrictedContainerSecurityContext(),
 				},
 			},
 			Tolerations:                   conf.Tolerations,

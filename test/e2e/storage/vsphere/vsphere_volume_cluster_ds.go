@@ -18,7 +18,7 @@ package vsphere
 
 import (
 	"context"
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -26,20 +26,22 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 /*
-	Tests to verify volume provisioning on a clustered datastore
-	1. Static provisioning
-	2. Dynamic provisioning
-	3. Dynamic provisioning with spbm policy
+Tests to verify volume provisioning on a clustered datastore
+1. Static provisioning
+2. Dynamic provisioning
+3. Dynamic provisioning with spbm policy
 
-	This test reads env
-	1. CLUSTER_DATASTORE which should be set to clustered datastore
-	2. VSPHERE_SPBM_POLICY_DS_CLUSTER which should be set to a tag based spbm policy tagged to a clustered datastore
+This test reads env
+1. CLUSTER_DATASTORE which should be set to clustered datastore
+2. VSPHERE_SPBM_POLICY_DS_CLUSTER which should be set to a tag based spbm policy tagged to a clustered datastore
 */
 var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-provision")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var (
 		client           clientset.Interface

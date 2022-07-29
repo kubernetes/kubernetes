@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,12 +38,14 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 	netutils "k8s.io/utils/net"
 )
 
 // Tests for ipv4-ipv6 dual-stack feature
 var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 	f := framework.NewDefaultFramework("dualstack")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	var cs clientset.Interface
 	var podClient *framework.PodClient
@@ -692,7 +694,7 @@ func validateNumOfServicePorts(svc *v1.Service, expectedNumOfPorts int) {
 	}
 }
 
-func validateServiceAndClusterIPFamily(svc *v1.Service, expectedIPFamilies []v1.IPFamily, expectedPolicy *v1.IPFamilyPolicyType) {
+func validateServiceAndClusterIPFamily(svc *v1.Service, expectedIPFamilies []v1.IPFamily, expectedPolicy *v1.IPFamilyPolicy) {
 	if len(svc.Spec.IPFamilies) != len(expectedIPFamilies) {
 		framework.Failf("service ip family nil for service %s/%s", svc.Namespace, svc.Name)
 	}
@@ -775,7 +777,7 @@ func checkNetworkConnectivity(ip, port string, timeout int) []string {
 }
 
 // createService returns a service spec with defined arguments
-func createService(name, ns string, labels map[string]string, ipFamilyPolicy *v1.IPFamilyPolicyType, ipFamilies []v1.IPFamily) *v1.Service {
+func createService(name, ns string, labels map[string]string, ipFamilyPolicy *v1.IPFamilyPolicy, ipFamilies []v1.IPFamily) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

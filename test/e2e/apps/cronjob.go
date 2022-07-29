@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -43,6 +43,7 @@ import (
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -52,6 +53,7 @@ const (
 
 var _ = SIGDescribe("CronJob", func() {
 	f := framework.NewDefaultFramework("cronjob")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	sleepCommand := []string{"sleep", "300"}
 

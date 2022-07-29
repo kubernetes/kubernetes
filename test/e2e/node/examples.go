@@ -34,8 +34,9 @@ import (
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -44,6 +45,7 @@ const (
 
 var _ = SIGDescribe("[Feature:Example]", func() {
 	f := framework.NewDefaultFramework("examples")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	var c clientset.Interface
 	var ns string

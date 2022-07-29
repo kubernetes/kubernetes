@@ -32,24 +32,23 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/traverse"
 )
 
 // NodeAuthorizer authorizes requests from kubelets, with the following logic:
-// 1. If a request is not from a node (NodeIdentity() returns isNode=false), reject
-// 2. If a specific node cannot be identified (NodeIdentity() returns nodeName=""), reject
-// 3. If a request is for a secret, configmap, persistent volume or persistent volume claim, reject unless the verb is get, and the requested object is related to the requesting node:
-//    node <- configmap
-//    node <- pod
-//    node <- pod <- secret
-//    node <- pod <- configmap
-//    node <- pod <- pvc
-//    node <- pod <- pvc <- pv
-//    node <- pod <- pvc <- pv <- secret
-// 4. For other resources, authorize all nodes uniformly using statically defined rules
+//  1. If a request is not from a node (NodeIdentity() returns isNode=false), reject
+//  2. If a specific node cannot be identified (NodeIdentity() returns nodeName=""), reject
+//  3. If a request is for a secret, configmap, persistent volume or persistent volume claim, reject unless the verb is get, and the requested object is related to the requesting node:
+//     node <- configmap
+//     node <- pod
+//     node <- pod <- secret
+//     node <- pod <- configmap
+//     node <- pod <- pvc
+//     node <- pod <- pvc <- pv
+//     node <- pod <- pvc <- pv <- secret
+//  4. For other resources, authorize all nodes uniformly using statically defined rules
 type NodeAuthorizer struct {
 	graph      *Graph
 	identifier nodeidentifier.NodeIdentifier
@@ -112,10 +111,8 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		case configMapResource:
 			return r.authorizeReadNamespacedObject(nodeName, configMapVertexType, attrs)
 		case pvcResource:
-			if r.features.Enabled(features.ExpandPersistentVolumes) {
-				if attrs.GetSubresource() == "status" {
-					return r.authorizeStatusUpdate(nodeName, pvcVertexType, attrs)
-				}
+			if attrs.GetSubresource() == "status" {
+				return r.authorizeStatusUpdate(nodeName, pvcVertexType, attrs)
 			}
 			return r.authorizeGet(nodeName, pvcVertexType, attrs)
 		case pvResource:

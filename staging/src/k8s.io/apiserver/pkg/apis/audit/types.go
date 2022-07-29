@@ -98,6 +98,12 @@ type Event struct {
 	// +optional
 	ImpersonatedUser *authnv1.UserInfo
 	// Source IPs, from where the request originated and intermediate proxies.
+	// The source IPs are listed from (in order):
+	// 1. X-Forwarded-For request header IPs
+	// 2. X-Real-Ip header, if not present in the X-Forwarded-For list
+	// 3. The remote address for the connection, if it doesn't match the last
+	//    IP in the list up to here (X-Forwarded-For or X-Real-Ip).
+	// Note: All but the last IP can be arbitrarily set by the client.
 	// +optional
 	SourceIPs []string
 	// UserAgent records the user agent string reported by the client.

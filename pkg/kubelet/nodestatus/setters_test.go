@@ -56,14 +56,21 @@ const (
 
 // TODO(mtaufen): below is ported from the old kubelet_node_status_test.go code, potentially add more test coverage for NodeAddress setter in future
 func TestNodeAddress(t *testing.T) {
+	type cloudProviderType int
+	const (
+		cloudProviderLegacy cloudProviderType = iota
+		cloudProviderExternal
+		cloudProviderNone
+	)
 	cases := []struct {
-		name                  string
-		hostnameOverride      bool
-		nodeIP                net.IP
-		externalCloudProvider bool
-		nodeAddresses         []v1.NodeAddress
-		expectedAddresses     []v1.NodeAddress
-		shouldError           bool
+		name                string
+		hostnameOverride    bool
+		nodeIP              net.IP
+		cloudProviderType   cloudProviderType
+		nodeAddresses       []v1.NodeAddress
+		expectedAddresses   []v1.NodeAddress
+		expectedAnnotations map[string]string
+		shouldError         bool
 	}{
 		{
 			name:   "A single InternalIP",
@@ -211,10 +218,10 @@ func TestNodeAddress(t *testing.T) {
 			shouldError:      false,
 		},
 		{
-			name:                  "cloud provider is external",
-			nodeIP:                netutils.ParseIPSloppy("10.0.0.1"),
-			nodeAddresses:         []v1.NodeAddress{},
-			externalCloudProvider: true,
+			name:              "cloud provider is external",
+			nodeIP:            netutils.ParseIPSloppy("10.0.0.1"),
+			nodeAddresses:     []v1.NodeAddress{},
+			cloudProviderType: cloudProviderExternal,
 			expectedAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
@@ -396,6 +403,55 @@ func TestNodeAddress(t *testing.T) {
 			},
 			shouldError: false,
 		},
+		{
+			name:              "Legacy cloud provider gets nodeIP annotation",
+			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
+			cloudProviderType: cloudProviderLegacy,
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1",
+			},
+			shouldError: false,
+		},
+		{
+			name:              "External cloud provider gets nodeIP annotation",
+			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
+			cloudProviderType: cloudProviderExternal,
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAnnotations: map[string]string{
+				"alpha.kubernetes.io/provided-node-ip": "10.1.1.1",
+			},
+			shouldError: false,
+		},
+		{
+			name:              "No cloud provider does not get nodeIP annotation",
+			nodeIP:            netutils.ParseIPSloppy("10.1.1.1"),
+			cloudProviderType: cloudProviderNone,
+			nodeAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			expectedAnnotations: map[string]string{},
+			shouldError:         false,
+		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -418,16 +474,13 @@ func TestNodeAddress(t *testing.T) {
 				return testCase.nodeAddresses, nil
 			}
 
-			// cloud provider is expected to be nil if external provider is set
+			// cloud provider is expected to be nil if external provider is set or there is no cloud provider
 			var cloud cloudprovider.Interface
-			if testCase.externalCloudProvider {
-				cloud = nil
-			} else {
+			if testCase.cloudProviderType == cloudProviderLegacy {
 				cloud = &fakecloud.Cloud{
 					Addresses: testCase.nodeAddresses,
 					Err:       nil,
 				}
-
 			}
 
 			// construct setter
@@ -435,7 +488,7 @@ func TestNodeAddress(t *testing.T) {
 				nodeIPValidator,
 				hostname,
 				testCase.hostnameOverride,
-				testCase.externalCloudProvider,
+				testCase.cloudProviderType == cloudProviderExternal,
 				cloud,
 				nodeAddressesFunc)
 
@@ -450,6 +503,10 @@ func TestNodeAddress(t *testing.T) {
 
 			assert.True(t, apiequality.Semantic.DeepEqual(testCase.expectedAddresses, existingNode.Status.Addresses),
 				"Diff: %s", diff.ObjectDiff(testCase.expectedAddresses, existingNode.Status.Addresses))
+			if testCase.expectedAnnotations != nil {
+				assert.True(t, apiequality.Semantic.DeepEqual(testCase.expectedAnnotations, existingNode.Annotations),
+					"Diff: %s", diff.ObjectDiff(testCase.expectedAnnotations, existingNode.Annotations))
+			}
 		})
 	}
 }
@@ -1811,7 +1868,7 @@ func makeExpectedImageList(imageList []kubecontainer.Image, maxImages, maxNames 
 func makeImageTags(num int32) []string {
 	tags := make([]string, num)
 	for i := range tags {
-		tags[i] = "k8s.gcr.io:v" + strconv.Itoa(i)
+		tags[i] = "registry.k8s.io:v" + strconv.Itoa(i)
 	}
 	return tags
 }

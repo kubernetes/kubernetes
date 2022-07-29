@@ -56,10 +56,10 @@ func (o *objectValidator) Validate(data interface{}) *Result {
 	numKeys := int64(len(val))
 
 	if o.MinProperties != nil && numKeys < *o.MinProperties {
-		return errorHelp.sErr(errors.TooFewProperties(o.Path, o.In, *o.MinProperties))
+		return errorHelp.sErr(errors.TooFewProperties(o.Path, o.In, *o.MinProperties, numKeys))
 	}
 	if o.MaxProperties != nil && numKeys > *o.MaxProperties {
-		return errorHelp.sErr(errors.TooManyProperties(o.Path, o.In, *o.MaxProperties))
+		return errorHelp.sErr(errors.TooManyProperties(o.Path, o.In, *o.MaxProperties, numKeys))
 	}
 
 	res := new(Result)

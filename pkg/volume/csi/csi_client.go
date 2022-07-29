@@ -28,6 +28,7 @@ import (
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -120,6 +121,7 @@ type csiResizeOptions struct {
 	accessMode        api.PersistentVolumeAccessMode
 	newSize           resource.Quantity
 	mountOptions      []string
+	secrets           map[string]string
 }
 
 var _ csiClient = &csiDriverClient{}
@@ -320,6 +322,7 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 				Mode: accessModeMapper(opts.accessMode),
 			},
 		},
+		Secrets: opts.secrets,
 	}
 
 	// not all CSI drivers support NodeStageUnstage and hence the StagingTargetPath
@@ -532,7 +535,7 @@ func newGrpcConn(addr csiAddr, metricsManager *MetricsManager) (*grpc.ClientConn
 
 	return grpc.Dial(
 		string(addr),
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),

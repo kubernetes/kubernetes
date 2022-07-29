@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -35,6 +35,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 func addMasterReplica(zone string) error {
@@ -161,6 +162,7 @@ func waitForMasters(masterPrefix string, c clientset.Interface, size int, timeou
 
 var _ = SIGDescribe("HA-master [Feature:HAMaster]", func() {
 	f := framework.NewDefaultFramework("ha-master")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var ns string
 	var additionalReplicaZones []string

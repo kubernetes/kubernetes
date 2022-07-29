@@ -20,10 +20,6 @@ We want to have a standard way to reproduce scheduling latency metrics result an
 
 Currently the test suite has the following:
 
-- density test (by adding a new Go test)
-  - schedule 30k pods on 1000 (fake) nodes and 3k pods on 100 (fake) nodes
-  - print out scheduling rate every second
-  - let you learn the rate changes vs number of scheduled pods
 - benchmark
   - make use of `go test -bench` and report nanosecond/op.
   - schedule b.N pods when the cluster has N nodes and P scheduled pods. Since it takes relatively long time to finish one round, b.N is small: 10 - 100.
@@ -31,13 +27,6 @@ Currently the test suite has the following:
 
 How To Run
 ------
-
-## Density tests
-
-```shell
-# In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" KUBE_TEST_ARGS="-alsologtostderr=true -logtostderr=true -run=." KUBE_TIMEOUT="--timeout=60m" SHORT="--short=false"
-```
 
 ## Benchmark tests
 

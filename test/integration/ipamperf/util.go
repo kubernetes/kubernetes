@@ -24,9 +24,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
 
@@ -54,27 +52,15 @@ var (
 	}
 )
 
-func deleteNodes(apiURL string, config *Config) {
+func deleteNodes(clientSet *clientset.Clientset) {
 	klog.Info("Deleting nodes")
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
-		Host:          apiURL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
-		QPS:           float32(config.CreateQPS),
-		Burst:         config.CreateQPS,
-	})
 	noGrace := int64(0)
 	if err := clientSet.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &noGrace}, metav1.ListOptions{}); err != nil {
 		klog.Errorf("Error deleting node: %v", err)
 	}
 }
 
-func createNodes(apiURL string, config *Config) error {
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
-		Host:          apiURL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
-		QPS:           float32(config.CreateQPS),
-		Burst:         config.CreateQPS,
-	})
+func createNodes(clientSet *clientset.Clientset, config *Config) error {
 	klog.Infof("Creating %d nodes", config.NumNodes)
 	for i := 0; i < config.NumNodes; i++ {
 		var err error

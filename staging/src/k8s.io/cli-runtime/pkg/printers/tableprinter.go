@@ -449,7 +449,7 @@ func formatEventType(eventType string) string {
 	if formatted, ok := formattedEventType[eventType]; ok {
 		return formatted
 	}
-	return string(eventType)
+	return eventType
 }
 
 // printRows writes the provided rows to output.
@@ -499,7 +499,7 @@ func formatLabelHeaders(columnLabels []string) []string {
 	formHead := make([]string, len(columnLabels))
 	for i, l := range columnLabels {
 		p := strings.Split(l, "/")
-		formHead[i] = strings.ToUpper((p[len(p)-1]))
+		formHead[i] = strings.ToUpper(p[len(p)-1])
 	}
 	return formHead
 }

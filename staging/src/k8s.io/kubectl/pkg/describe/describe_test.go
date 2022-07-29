@@ -37,6 +37,7 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -97,6 +98,30 @@ func TestDescribePod(t *testing.T) {
 		t.Errorf("unexpected out: %s", out)
 	}
 	if !strings.Contains(out, "Terminating (lasts 10y)") || !strings.Contains(out, "1234s") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePodServiceAccount(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			ServiceAccountName: "fooaccount",
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "Service Account:") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "fooaccount") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -206,6 +231,40 @@ func TestDescribePodTolerations(t *testing.T) {
 		!strings.Contains(out, "key3=value3:NoExecute for 300s\n") ||
 		!strings.Contains(out, "key4:NoExecute for 60s\n") ||
 		!strings.Contains(out, "Tolerations:") {
+		t.Errorf("unexpected out:\n%s", out)
+	}
+}
+
+func TestDescribeTopologySpreadConstraints(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+				{
+					MaxSkew:           3,
+					TopologyKey:       "topology.kubernetes.io/test1",
+					WhenUnsatisfiable: "DoNotSchedule",
+					LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"key1": "val1", "key2": "val2"}},
+				},
+				{
+					MaxSkew:           1,
+					TopologyKey:       "topology.kubernetes.io/test2",
+					WhenUnsatisfiable: "ScheduleAnyway",
+				},
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "topology.kubernetes.io/test1:DoNotSchedule when max skew 3 is exceeded for selector key1=val1,key2=val2\n") ||
+		!strings.Contains(out, "topology.kubernetes.io/test2:ScheduleAnyway when max skew 1 is exceeded\n") {
 		t.Errorf("unexpected out:\n%s", out)
 	}
 }
@@ -340,6 +399,154 @@ func TestDescribePodPriority(t *testing.T) {
 	}
 	if !strings.Contains(out, "high-priority") || !strings.Contains(out, "1000") {
 		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePodRuntimeClass(t *testing.T) {
+	runtimeClassNames := []string{"test1", ""}
+	testCases := []struct {
+		name     string
+		pod      *corev1.Pod
+		expect   []string
+		unexpect []string
+	}{
+		{
+			name: "test1",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					RuntimeClassName: &runtimeClassNames[0],
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+				"Runtime Class Name", "test1",
+			},
+			unexpect: []string{},
+		},
+		{
+			name: "test2",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					RuntimeClassName: &runtimeClassNames[1],
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+			},
+			unexpect: []string{
+				"Runtime Class Name",
+			},
+		},
+		{
+			name: "test3",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{},
+			},
+			expect: []string{
+				"Name", "bar",
+			},
+			unexpect: []string{
+				"Runtime Class Name",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.pod)
+			c := &describeClient{T: t, Interface: fake}
+			d := PodDescriber{c}
+			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+			for _, unexpected := range testCase.unexpect {
+				if strings.Contains(out, unexpected) {
+					t.Errorf("unexpected to find %q in output: %q", unexpected, out)
+				}
+			}
+		})
+	}
+}
+
+func TestDescribePriorityClass(t *testing.T) {
+	preemptLowerPriority := corev1.PreemptLowerPriority
+	preemptNever := corev1.PreemptNever
+
+	testCases := []struct {
+		name          string
+		priorityClass *schedulingv1.PriorityClass
+		expect        []string
+	}{
+		{
+			name: "test1",
+			priorityClass: &schedulingv1.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Value:            10,
+				GlobalDefault:    false,
+				PreemptionPolicy: &preemptLowerPriority,
+				Description:      "test1",
+			},
+			expect: []string{
+				"Name", "bar",
+				"Value", "10",
+				"GlobalDefault", "false",
+				"PreemptionPolicy", "PreemptLowerPriority",
+				"Description", "test1",
+				"Annotations", "",
+			},
+		},
+		{
+			name: "test2",
+			priorityClass: &schedulingv1.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Value:            100,
+				GlobalDefault:    true,
+				PreemptionPolicy: &preemptNever,
+				Description:      "test2",
+			},
+			expect: []string{
+				"Name", "bar",
+				"Value", "100",
+				"GlobalDefault", "true",
+				"PreemptionPolicy", "Never",
+				"Description", "test2",
+				"Annotations", "",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.priorityClass)
+			c := &describeClient{T: t, Interface: fake}
+			d := PriorityClassDescriber{c}
+			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+		})
 	}
 }
 
@@ -4865,6 +5072,7 @@ func TestDescribeNode(t *testing.T) {
 		&corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "bar",
+				UID:  "uid",
 			},
 			Spec: corev1.NodeSpec{
 				Unschedulable: true,
@@ -4917,6 +5125,42 @@ func TestDescribeNode(t *testing.T) {
 				Phase: corev1.PodRunning,
 			},
 		},
+		&corev1.EventList{
+			Items: []corev1.Event{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "event-1",
+						Namespace: "default",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind: "Node",
+						Name: "bar",
+						UID:  "bar",
+					},
+					Message:        "Node bar status is now: NodeHasNoDiskPressure",
+					FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					Count:          1,
+					Type:           corev1.EventTypeNormal,
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "event-2",
+						Namespace: "default",
+					},
+					InvolvedObject: corev1.ObjectReference{
+						Kind: "Node",
+						Name: "bar",
+						UID:  "0ceac5fb-a393-49d7-b04f-9ea5f18de5e9",
+					},
+					Message:        "Node bar status is now: NodeReady",
+					FirstTimestamp: metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					LastTimestamp:  metav1.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+					Count:          2,
+					Type:           corev1.EventTypeNormal,
+				},
+			},
+		},
 	)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := NodeDescriber{c}
@@ -4934,7 +5178,9 @@ func TestDescribeNode(t *testing.T) {
   memory             1Gi (8%)     2Gi (16%)
   ephemeral-storage  0 (0%)       0 (0%)
   hugepages-1Gi      0 (0%)       0 (0%)
-  hugepages-2Mi      512Mi (25%)  512Mi (25%)`}
+  hugepages-2Mi      512Mi (25%)  512Mi (25%)`,
+		`Node bar status is now: NodeHasNoDiskPressure`,
+		`Node bar status is now: NodeReady`}
 	for _, expected := range expectedOut {
 		if !strings.Contains(out, expected) {
 			t.Errorf("expected to find %q in output: %q", expected, out)

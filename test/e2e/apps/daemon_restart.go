@@ -41,8 +41,9 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // This test primarily checks 2 things:
@@ -204,6 +205,7 @@ func getContainerRestarts(c clientset.Interface, ns string, labelSelector labels
 var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("daemonrestart")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(uuid.NewUUID())
 	labelSelector := labels.Set(map[string]string{"name": rcName}).AsSelector()
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)

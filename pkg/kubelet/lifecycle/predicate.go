@@ -21,10 +21,13 @@ import (
 	"runtime"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 )
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
@@ -182,7 +185,8 @@ func rejectPodAdmissionBasedOnOSSelector(pod *v1.Pod, node *v1.Node) bool {
 
 // rejectPodAdmissionBasedOnOSField rejects pods if their OS field doesn't match runtime.GOOS.
 // TODO: Relax this restriction when we start supporting LCOW in kubernetes where podOS may not match
-// 		 node's OS.
+//
+//	node's OS.
 func rejectPodAdmissionBasedOnOSField(pod *v1.Pod) bool {
 	if pod.Spec.OS == nil {
 		return false
@@ -270,5 +274,17 @@ func generalFilter(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []Predica
 			reasons = append(reasons, &PredicateFailureError{r.Name, r.Reason})
 		}
 	}
+
+	// Check taint/toleration except for static pods
+	if !types.IsStaticPod(pod) {
+		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+			// Kubelet is only interested in the NoExecute taint.
+			return t.Effect == v1.TaintEffectNoExecute
+		})
+		if isUntolerated {
+			reasons = append(reasons, &PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch})
+		}
+	}
+
 	return reasons
 }

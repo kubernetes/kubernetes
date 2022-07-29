@@ -131,6 +131,10 @@ func (IntOrString) OpenAPISchemaType() []string { return []string{"string"} }
 // the OpenAPI spec of this type.
 func (IntOrString) OpenAPISchemaFormat() string { return "int-or-string" }
 
+// OpenAPIV3OneOfTypes is used by the kube-openapi generator when constructing
+// the OpenAPI v3 spec of this type.
+func (IntOrString) OpenAPIV3OneOfTypes() []string { return []string{"integer", "string"} }
+
 func ValueOrDefault(intOrPercent *IntOrString, defaultValue IntOrString) *IntOrString {
 	if intOrPercent == nil {
 		return &defaultValue
@@ -141,7 +145,7 @@ func ValueOrDefault(intOrPercent *IntOrString, defaultValue IntOrString) *IntOrS
 // GetScaledValueFromIntOrPercent is meant to replace GetValueFromIntOrPercent.
 // This method returns a scaled value from an IntOrString type. If the IntOrString
 // is a percentage string value it's treated as a percentage and scaled appropriately
-// in accordance to the total, if it's an int value it's treated as a a simple value and
+// in accordance to the total, if it's an int value it's treated as a simple value and
 // if it is a string value which is either non-numeric or numeric but lacking a trailing '%' it returns an error.
 func GetScaledValueFromIntOrPercent(intOrPercent *IntOrString, total int, roundUp bool) (int, error) {
 	if intOrPercent == nil {

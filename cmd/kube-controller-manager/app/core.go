@@ -17,7 +17,6 @@ limitations under the License.
 // Package app implements a server that runs a set of active
 // components.  This includes replication controllers, service endpoints and
 // nodes.
-//
 package app
 
 import (
@@ -65,7 +64,6 @@ import (
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
 	"k8s.io/kubernetes/pkg/controller/volume/pvprotection"
-	"k8s.io/kubernetes/pkg/features"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	netutils "k8s.io/utils/net"
@@ -213,7 +211,7 @@ func startCloudNodeLifecycleController(ctx context.Context, controllerContext Co
 		return nil, false, nil
 	}
 
-	go cloudNodeLifecycleController.Run(ctx)
+	go cloudNodeLifecycleController.Run(ctx, controllerContext.ControllerManagerMetrics)
 	return nil, true, nil
 }
 
@@ -336,36 +334,34 @@ func startAttachDetachController(ctx context.Context, controllerContext Controll
 }
 
 func startVolumeExpandController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
-		plugins, err := ProbeExpandableVolumePlugins(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
-		if err != nil {
-			return nil, true, fmt.Errorf("failed to probe volume plugins when starting volume expand controller: %v", err)
-		}
-		csiTranslator := csitrans.New()
-		filteredDialOptions, err := options.ParseVolumeHostFilters(
-			controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeHostCIDRDenylist,
-			controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeHostAllowLocalLoopback)
-		if err != nil {
-			return nil, true, err
-		}
-		expandController, expandControllerErr := expand.NewExpandController(
-			controllerContext.ClientBuilder.ClientOrDie("expand-controller"),
-			controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
-			controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
-			controllerContext.Cloud,
-			plugins,
-			csiTranslator,
-			csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
-			filteredDialOptions,
-		)
-
-		if expandControllerErr != nil {
-			return nil, true, fmt.Errorf("failed to start volume expand controller: %v", expandControllerErr)
-		}
-		go expandController.Run(ctx)
-		return nil, true, nil
+	plugins, err := ProbeExpandableVolumePlugins(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to probe volume plugins when starting volume expand controller: %v", err)
 	}
-	return nil, false, nil
+	csiTranslator := csitrans.New()
+	filteredDialOptions, err := options.ParseVolumeHostFilters(
+		controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeHostCIDRDenylist,
+		controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeHostAllowLocalLoopback)
+	if err != nil {
+		return nil, true, err
+	}
+	expandController, expandControllerErr := expand.NewExpandController(
+		controllerContext.ClientBuilder.ClientOrDie("expand-controller"),
+		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
+		controllerContext.Cloud,
+		plugins,
+		csiTranslator,
+		csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
+		filteredDialOptions,
+	)
+
+	if expandControllerErr != nil {
+		return nil, true, fmt.Errorf("failed to start volume expand controller: %v", expandControllerErr)
+	}
+	go expandController.Run(ctx)
+	return nil, true, nil
+
 }
 
 func startEphemeralVolumeController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
@@ -429,6 +425,7 @@ func startResourceQuotaController(ctx context.Context, controllerContext Control
 		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
 		InformersStarted:          controllerContext.InformersStarted,
 		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
+		UpdateFilter:              quotainstall.DefaultUpdateFilter(),
 	}
 	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {

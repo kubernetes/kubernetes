@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -70,7 +71,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/version"
 	"k8s.io/kubectl/pkg/cmd/wait"
-	"k8s.io/kubectl/pkg/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
@@ -173,13 +174,29 @@ func NewDefaultPluginHandler(validPrefixes []string) *DefaultPluginHandler {
 func (h *DefaultPluginHandler) Lookup(filename string) (string, bool) {
 	for _, prefix := range h.ValidPrefixes {
 		path, err := exec.LookPath(fmt.Sprintf("%s-%s", prefix, filename))
-		if err != nil || len(path) == 0 {
+		if shouldSkipOnLookPathErr(err) || len(path) == 0 {
 			continue
 		}
 		return path, true
 	}
-
 	return "", false
+}
+
+func Command(name string, arg ...string) *exec.Cmd {
+	cmd := &exec.Cmd{
+		Path: name,
+		Args: append([]string{name}, arg...),
+	}
+	if filepath.Base(name) == name {
+		lp, err := exec.LookPath(name)
+		if lp != "" && !shouldSkipOnLookPathErr(err) {
+			// Update cmd.Path even if err is non-nil.
+			// If err is ErrDot (especially on Windows), lp may include a resolved
+			// extension (like .exe or .bat) that should be preserved.
+			cmd.Path = lp
+		}
+	}
+	return cmd
 }
 
 // Execute implements PluginHandler
@@ -187,7 +204,7 @@ func (h *DefaultPluginHandler) Execute(executablePath string, cmdArgs, environme
 
 	// Windows does not support exec syscall.
 	if runtime.GOOS == "windows" {
-		cmd := exec.Command(executablePath, cmdArgs...)
+		cmd := Command(executablePath, cmdArgs...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
@@ -258,7 +275,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
       kubectl controls the Kubernetes cluster manager.
 
       Find more information at:
-            https://kubernetes.io/docs/reference/kubectl/overview/`),
+            https://kubernetes.io/docs/reference/kubectl/`),
 		Run: runHelp,
 		// Hook before and after Run initialize and write profiles to disk,
 		// respectively.
@@ -319,6 +336,11 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	proxyCmd.PreRun = func(cmd *cobra.Command, args []string) {
 		kubeConfigFlags.WrapConfigFn = nil
 	}
+
+	// Avoid import cycle by setting ValidArgsFunction here instead of in NewCmdGet()
+	getCmd := get.NewCmdGet("kubectl", f, o.IOStreams)
+	getCmd.ValidArgsFunction = utilcomp.ResourceTypeAndNameCompletionFunc(f)
+
 	groups := templates.CommandGroups{
 		{
 			Message: "Basic Commands (Beginner):",
@@ -333,7 +355,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
 				explain.NewCmdExplain("kubectl", f, o.IOStreams),
-				get.NewCmdGet("kubectl", f, o.IOStreams),
+				getCmd,
 				edit.NewCmdEdit(f, o.IOStreams),
 				delete.NewCmdDelete(f, o.IOStreams),
 			},
@@ -404,7 +426,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
-	util.SetFactoryForCompletion(f)
+	utilcomp.SetFactoryForCompletion(f)
 	registerCompletionFuncForGlobalFlags(cmds, f)
 
 	cmds.AddCommand(alpha)
@@ -422,16 +444,18 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 }
 
 // addCmdHeaderHooks performs updates on two hooks:
-//   1) Modifies the passed "cmds" persistent pre-run function to parse command headers.
-//      These headers will be subsequently added as X-headers to every
-//      REST call.
-//   2) Adds CommandHeaderRoundTripper as a wrapper around the standard
-//      RoundTripper. CommandHeaderRoundTripper adds X-Headers then delegates
-//      to standard RoundTripper.
+//  1. Modifies the passed "cmds" persistent pre-run function to parse command headers.
+//     These headers will be subsequently added as X-headers to every
+//     REST call.
+//  2. Adds CommandHeaderRoundTripper as a wrapper around the standard
+//     RoundTripper. CommandHeaderRoundTripper adds X-Headers then delegates
+//     to standard RoundTripper.
+//
 // For beta, these hooks are updated unless the KUBECTL_COMMAND_HEADERS environment variable
 // is set, and the value of the env var is false (or zero).
 // See SIG CLI KEP 859 for more information:
-//   https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers
+//
+//	https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers
 func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags) {
 	// If the feature gate env var is set to "false", then do no add kubectl command headers.
 	if value, exists := os.LookupEnv(kubectlCmdHeaders); exists {
@@ -474,21 +498,21 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"namespace",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return get.CompGetResource(f, cmd, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.CompGetResource(f, cmd, "namespace", toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"context",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return util.ListContextsInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.ListContextsInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return util.ListClustersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.ListClustersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 	cmdutil.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"user",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return util.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
+			return utilcomp.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 }

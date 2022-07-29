@@ -26,7 +26,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -50,6 +51,7 @@ var _ = SIGDescribe("NodeProblemDetector [NodeFeature:NodeProblemDetector] [Seri
 		pollTimeout    = 1 * time.Minute
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
 	var uid string
 	var ns, name, configName, eventNamespace string
@@ -423,7 +425,7 @@ current-context: local-context
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+			if ginkgo.CurrentSpecReport().Failed() && framework.TestContext.DumpLogsOnFailure {
 				ginkgo.By("Get node problem detector log")
 				log, err := e2epod.GetPodLogs(c, ns, name, name)
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())

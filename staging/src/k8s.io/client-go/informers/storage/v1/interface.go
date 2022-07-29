@@ -28,6 +28,8 @@ type Interface interface {
 	CSIDrivers() CSIDriverInformer
 	// CSINodes returns a CSINodeInformer.
 	CSINodes() CSINodeInformer
+	// CSIStorageCapacities returns a CSIStorageCapacityInformer.
+	CSIStorageCapacities() CSIStorageCapacityInformer
 	// StorageClasses returns a StorageClassInformer.
 	StorageClasses() StorageClassInformer
 	// VolumeAttachments returns a VolumeAttachmentInformer.
@@ -53,6 +55,11 @@ func (v *version) CSIDrivers() CSIDriverInformer {
 // CSINodes returns a CSINodeInformer.
 func (v *version) CSINodes() CSINodeInformer {
 	return &cSINodeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// CSIStorageCapacities returns a CSIStorageCapacityInformer.
+func (v *version) CSIStorageCapacities() CSIStorageCapacityInformer {
+	return &cSIStorageCapacityInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // StorageClasses returns a StorageClassInformer.

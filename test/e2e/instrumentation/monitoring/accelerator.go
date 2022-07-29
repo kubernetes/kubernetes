@@ -31,8 +31,9 @@ import (
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	"k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"golang.org/x/oauth2/google"
 	gcm "google.golang.org/api/monitoring/v3"
 	"google.golang.org/api/option"
@@ -52,6 +53,7 @@ var _ = instrumentation.SIGDescribe("Stackdriver Monitoring", func() {
 	})
 
 	f := framework.NewDefaultFramework("stackdriver-monitoring")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should have accelerator metrics [Feature:StackdriverAcceleratorMonitoring]", func() {
 		testStackdriverAcceleratorMonitoring(f)

@@ -1646,7 +1646,7 @@ And point to the file using the --config flag, as in
 
 * For advanced auditing, audit policy supports subresources wildcard matching, such as "resource/", "/subresource","*". ([#55306](https://github.com/kubernetes/kubernetes/pull/55306), [@hzxuzhonghu](https://github.com/hzxuzhonghu))
 
-* [Auditing](https://kubernetes.io/docs/tasks/debug-application-cluster/audit/) is now enabled behind a featureGate in kubeadm. A user can supply their own audit policy with configuration option as well as a place for the audit logs to live. If no policy is supplied a default policy will be provided. The default policy will log all Metadata level policy logs. It is the example provided in the documentation. ([#59067](https://github.com/kubernetes/kubernetes/pull/59067), [@chuckha](https://github.com/chuckha))
+* [Auditing](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/) is now enabled behind a featureGate in kubeadm. A user can supply their own audit policy with configuration option as well as a place for the audit logs to live. If no policy is supplied a default policy will be provided. The default policy will log all Metadata level policy logs. It is the example provided in the documentation. ([#59067](https://github.com/kubernetes/kubernetes/pull/59067), [@chuckha](https://github.com/chuckha))
 
 * Reduce Metrics Server memory requirement from 140Mi + 4Mi per node to 40Mi + 4Mi per node. ([#58391](https://github.com/kubernetes/kubernetes/pull/58391), [@kawych](https://github.com/kawych))
 

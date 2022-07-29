@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/core/service"
 	svcreg "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
@@ -86,18 +85,16 @@ func NewREST(
 	pods PodStorage,
 	proxyTransport http.RoundTripper) (*REST, *StatusREST, *svcreg.ProxyREST, error) {
 
-	strategy, _ := svcreg.StrategyForServiceCIDRs(ipAllocs[serviceIPFamily].CIDR(), len(ipAllocs) > 1)
-
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Service{} },
 		NewListFunc:              func() runtime.Object { return &api.ServiceList{} },
 		DefaultQualifiedResource: api.Resource("services"),
 		ReturnDeletedObject:      true,
 
-		CreateStrategy:      strategy,
-		UpdateStrategy:      strategy,
-		DeleteStrategy:      strategy,
-		ResetFieldsStrategy: strategy,
+		CreateStrategy:      svcreg.Strategy,
+		UpdateStrategy:      svcreg.Strategy,
+		DeleteStrategy:      svcreg.Strategy,
+		ResetFieldsStrategy: svcreg.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -107,9 +104,8 @@ func NewREST(
 	}
 
 	statusStore := *store
-	statusStrategy := service.NewServiceStatusStrategy(strategy)
-	statusStore.UpdateStrategy = statusStrategy
-	statusStore.ResetFieldsStrategy = statusStrategy
+	statusStore.UpdateStrategy = svcreg.StatusStrategy
+	statusStore.ResetFieldsStrategy = svcreg.StatusStrategy
 
 	var primaryIPFamily api.IPFamily = serviceIPFamily
 	var secondaryIPFamily api.IPFamily = "" // sentinel value
@@ -157,6 +153,12 @@ func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
+// Destroy cleans up everything on shutdown.
+func (r *REST) Destroy() {
+	r.Store.Destroy()
+	r.alloc.Destroy()
+}
+
 // StatusREST implements the REST endpoint for changing the status of a service.
 type StatusREST struct {
 	store *genericregistry.Store
@@ -164,6 +166,12 @@ type StatusREST struct {
 
 func (r *StatusREST) New() runtime.Object {
 	return &api.Service{}
+}
+
+// Destroy cleans up resources on shutdown.
+func (r *StatusREST) Destroy() {
+	// Given that underlying store is shared with REST,
+	// we don't destroy it here explicitly.
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
@@ -176,6 +184,10 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+func (r *StatusREST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
+	return r.store.ConvertToTable(ctx, object, tableOptions)
 }
 
 // GetResetFields implements rest.ResetFieldsStrategy

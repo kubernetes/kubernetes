@@ -587,7 +587,7 @@ func (a *relativeAttribute) Resolve(vars Activation) (interface{}, error) {
 	if types.IsUnknown(v) {
 		return v, nil
 	}
-	// Next, qualify it. Qualification handles unkonwns as well, so there's no need to recheck.
+	// Next, qualify it. Qualification handles unknowns as well, so there's no need to recheck.
 	var err error
 	var obj interface{} = v
 	for _, qual := range a.qualifiers {
@@ -637,6 +637,8 @@ func newQualifier(adapter ref.TypeAdapter, id int64, v interface{}) (Qualifier, 
 		qual = &uintQualifier{id: id, value: uint64(val), celValue: val, adapter: adapter}
 	case types.Bool:
 		qual = &boolQualifier{id: id, value: bool(val), celValue: val, adapter: adapter}
+	case types.Double:
+		qual = &doubleQualifier{id: id, value: float64(val), celValue: val, adapter: adapter}
 	default:
 		return nil, fmt.Errorf("invalid qualifier type: %T", v)
 	}

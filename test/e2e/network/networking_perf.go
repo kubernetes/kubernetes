@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
@@ -35,6 +35,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -123,20 +124,22 @@ func iperf2ClientDaemonSet(client clientset.Interface, namespace string) (*appsv
 }
 
 // Test summary:
-//   This test uses iperf2 to obtain bandwidth data between nodes in the cluster, providing a coarse measure
-//   of the health of the cluster network.  The test runs two sets of pods:
-//     1. an iperf2 server on a single node
-//     2. a daemonset of iperf2 clients
-//   The test then iterates through the clients, one by one, running iperf2 from each of them to transfer
-//   data to the server and back for ten seconds, after which the results are collected and parsed.
-//   Thus, if your cluster has 10 nodes, then 10 test runs are performed.
-//     Note: a more complete test could run this scenario with a daemonset of servers as well; however, this
-//     would require n^2 tests, n^2 time, and n^2 network resources which quickly become prohibitively large
-//     as the cluster size increases.
-//   Finally, after collecting all data, the results are analyzed and tabulated.
+//
+//	This test uses iperf2 to obtain bandwidth data between nodes in the cluster, providing a coarse measure
+//	of the health of the cluster network.  The test runs two sets of pods:
+//	  1. an iperf2 server on a single node
+//	  2. a daemonset of iperf2 clients
+//	The test then iterates through the clients, one by one, running iperf2 from each of them to transfer
+//	data to the server and back for ten seconds, after which the results are collected and parsed.
+//	Thus, if your cluster has 10 nodes, then 10 test runs are performed.
+//	  Note: a more complete test could run this scenario with a daemonset of servers as well; however, this
+//	  would require n^2 tests, n^2 time, and n^2 network resources which quickly become prohibitively large
+//	  as the cluster size increases.
+//	Finally, after collecting all data, the results are analyzed and tabulated.
 var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]", func() {
 	// this test runs iperf2: one pod as a server, and a daemonset of clients
 	f := framework.NewDefaultFramework("network-perf")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
 
 	ginkgo.It(fmt.Sprintf("should run iperf2"), func() {
 		readySchedulableNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)

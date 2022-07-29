@@ -33,6 +33,11 @@ type NetworkPolicy struct {
 	// Specification of the desired behavior for this NetworkPolicy.
 	// +optional
 	Spec NetworkPolicySpec
+
+	// Status is the current state of the NetworkPolicy.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Status NetworkPolicyStatus
 }
 
 // PolicyType describes the NetworkPolicy type
@@ -149,8 +154,6 @@ type NetworkPolicyPort struct {
 	// should be allowed by the policy. This field cannot be defined if the port field
 	// is not defined or if the port field is defined as a named (string) port.
 	// The endPort must be equal or greater than port.
-	// This feature is in Beta state and is enabled by default.
-	// It can be disabled using the Feature Gate "NetworkPolicyEndPort".
 	// +optional
 	EndPort *int32
 }
@@ -193,6 +196,42 @@ type NetworkPolicyPeer struct {
 	// neither of the other fields can be.
 	// +optional
 	IPBlock *IPBlock
+}
+
+// NetworkPolicyConditionType is the type for status conditions on
+// a NetworkPolicy. This type should be used with the
+// NetworkPolicyStatus.Conditions field.
+type NetworkPolicyConditionType string
+
+const (
+	// NetworkPolicyConditionStatusAccepted represents status of a Network Policy that could be properly parsed by
+	// the Network Policy provider and will be implemented in the cluster
+	NetworkPolicyConditionStatusAccepted NetworkPolicyConditionType = "Accepted"
+
+	// NetworkPolicyConditionStatusPartialFailure represents status of a Network Policy that could be partially
+	// parsed by the Network Policy provider and may not be completely implemented due to a lack of a feature or some
+	// other condition
+	NetworkPolicyConditionStatusPartialFailure NetworkPolicyConditionType = "PartialFailure"
+
+	// NetworkPolicyConditionStatusFailure represents status of a Network Policy that could not be parsed by the
+	// Network Policy provider and will not be implemented in the cluster
+	NetworkPolicyConditionStatusFailure NetworkPolicyConditionType = "Failure"
+)
+
+// NetworkPolicyConditionReason defines the set of reasons that explain why a
+// particular NetworkPolicy condition type has been raised.
+type NetworkPolicyConditionReason string
+
+const (
+	// NetworkPolicyConditionReasonFeatureNotSupported represents a reason where the Network Policy may not have been
+	// implemented in the cluster due to a lack of some feature not supported by the Network Policy provider
+	NetworkPolicyConditionReasonFeatureNotSupported NetworkPolicyConditionReason = "FeatureNotSupported"
+)
+
+// NetworkPolicyStatus describe the current state of the NetworkPolicy.
+type NetworkPolicyStatus struct {
+	// Conditions holds an array of metav1.Condition that describe the state of the NetworkPolicy.
+	Conditions []metav1.Condition
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -320,7 +359,7 @@ const (
 	// IngressClassParametersReferenceScopeNamespace indicates that the
 	// referenced Parameters resource is namespace-scoped.
 	IngressClassParametersReferenceScopeNamespace = "Namespace"
-	// IngressClassParametersReferenceScopeNamespace indicates that the
+	// IngressClassParametersReferenceScopeCluster indicates that the
 	// referenced Parameters resource is cluster-scoped.
 	IngressClassParametersReferenceScopeCluster = "Cluster"
 )

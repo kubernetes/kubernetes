@@ -17,7 +17,9 @@ limitations under the License.
 package storage
 
 import (
-	"github.com/onsi/ginkgo"
+	"os"
+
+	"github.com/onsi/ginkgo/v2"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -35,10 +37,9 @@ var testDrivers = []func() storageframework.TestDriver{
 	drivers.InitHostPathSymlinkDriver,
 	drivers.InitEmptydirDriver,
 	drivers.InitCinderDriver,
-	drivers.InitGcePdDriver,
-	drivers.InitWindowsGcePdDriver,
 	drivers.InitVSphereDriver,
 	drivers.InitAzureDiskDriver,
+	drivers.InitAzureFileDriver,
 	drivers.InitAwsDriver,
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectory),
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLink),
@@ -52,6 +53,10 @@ var testDrivers = []func() storageframework.TestDriver{
 
 // This executes testSuites for in-tree volumes.
 var _ = utils.SIGDescribe("In-tree Volumes", func() {
+	if enableGcePD := os.Getenv("ENABLE_STORAGE_GCE_PD_DRIVER"); enableGcePD == "yes" {
+		testDrivers = append(testDrivers, drivers.InitGcePdDriver)
+		testDrivers = append(testDrivers, drivers.InitWindowsGcePdDriver)
+	}
 	for _, initDriver := range testDrivers {
 		curDriver := initDriver()
 

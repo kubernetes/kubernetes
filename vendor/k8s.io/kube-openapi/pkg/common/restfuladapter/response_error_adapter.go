@@ -1,7 +1,7 @@
 package restfuladapter
 
 import (
-	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/v3"
 	"k8s.io/kube-openapi/pkg/common"
 )
 

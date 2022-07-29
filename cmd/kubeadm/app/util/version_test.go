@@ -17,12 +17,13 @@ limitations under the License.
 package util
 
 import (
-	"errors"
 	"fmt"
 	"path"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -382,6 +383,11 @@ func TestKubeadmVersion(t *testing.T) {
 			parsingError: true,
 		},
 		{
+			name:         "invalid version with label and stray dot",
+			input:        "v1.8.0-alpha.2.",
+			parsingError: true,
+		},
+		{
 			name:        "invalid version with label and metadata",
 			input:       "v1.8.0-alpha.2.1231+afabd012389d53a",
 			output:      "v1.8.0-alpha.3",
@@ -475,5 +481,5 @@ func TestValidateStableVersion(t *testing.T) {
 }
 
 func errorFetcher(url string, timeout time.Duration) (string, error) {
-	return "should not make internet calls", fmt.Errorf("should not make internet calls, tried to request url: %s", url)
+	return "should not make internet calls", errors.Errorf("should not make internet calls, tried to request url: %s", url)
 }

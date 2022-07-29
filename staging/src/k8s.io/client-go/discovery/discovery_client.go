@@ -39,6 +39,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -46,10 +47,14 @@ const (
 	// defaultRetries is the number of times a resource discovery is repeated if an api group disappears on the fly (e.g. CustomResourceDefinitions).
 	defaultRetries = 2
 	// protobuf mime type
-	mimePb = "application/com.github.proto-openapi.spec.v2@v1.0+protobuf"
+	openAPIV2mimePb = "application/com.github.proto-openapi.spec.v2@v1.0+protobuf"
+
 	// defaultTimeout is the maximum amount of time per request when no timeout has been set on a RESTClient.
 	// Defaults to 32s in order to have a distinguishable length of time, relative to other timeouts that exist.
 	defaultTimeout = 32 * time.Second
+
+	// defaultBurst is the default burst to be used with the discovery client's token bucket rate limiter
+	defaultBurst = 300
 )
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
@@ -60,6 +65,7 @@ type DiscoveryInterface interface {
 	ServerResourcesInterface
 	ServerVersionInterface
 	OpenAPISchemaInterface
+	OpenAPIV3SchemaInterface
 }
 
 // CachedDiscoveryInterface is a DiscoveryInterface with cache invalidation and freshness.
@@ -90,13 +96,6 @@ type ServerGroupsInterface interface {
 type ServerResourcesInterface interface {
 	// ServerResourcesForGroupVersion returns the supported resources for a group and version.
 	ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error)
-	// ServerResources returns the supported resources for all groups and versions.
-	//
-	// The returned resource list might be non-nil with partial results even in the case of
-	// non-nil error.
-	//
-	// Deprecated: use ServerGroupsAndResources instead.
-	ServerResources() ([]*metav1.APIResourceList, error)
 	// ServerGroupsAndResources returns the supported groups and resources for all groups and versions.
 	//
 	// The returned group and resource lists might be non-nil with partial results even in the
@@ -126,6 +125,10 @@ type ServerVersionInterface interface {
 type OpenAPISchemaInterface interface {
 	// OpenAPISchema retrieves and parses the swagger API schema the server supports.
 	OpenAPISchema() (*openapi_v2.Document, error)
+}
+
+type OpenAPIV3SchemaInterface interface {
+	OpenAPIV3() openapi.Client
 }
 
 // DiscoveryClient implements the functions that discover server-supported API groups,
@@ -210,13 +213,6 @@ func (d *DiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (r
 	return resources, nil
 }
 
-// ServerResources returns the supported resources for all groups and versions.
-// Deprecated: use ServerGroupsAndResources instead.
-func (d *DiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
-	_, rs, err := d.ServerGroupsAndResources()
-	return rs, err
-}
-
 // ServerGroupsAndResources returns the supported resources for all groups and versions.
 func (d *DiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
 	return withRetries(defaultRetries, func() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
@@ -245,13 +241,6 @@ func (e *ErrGroupDiscoveryFailed) Error() string {
 func IsGroupDiscoveryFailedError(err error) bool {
 	_, ok := err.(*ErrGroupDiscoveryFailed)
 	return err != nil && ok
-}
-
-// ServerResources uses the provided discovery interface to look up supported resources for all groups and versions.
-// Deprecated: use ServerGroupsAndResources instead.
-func ServerResources(d DiscoveryInterface) ([]*metav1.APIResourceList, error) {
-	_, rs, err := ServerGroupsAndResources(d)
-	return rs, err
 }
 
 func ServerGroupsAndResources(d DiscoveryInterface) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
@@ -420,9 +409,9 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 	return &info, nil
 }
 
-// OpenAPISchema fetches the open api schema using a rest client and parses the proto.
+// OpenAPISchema fetches the open api v2 schema using a rest client and parses the proto.
 func (d *DiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
-	data, err := d.restClient.Get().AbsPath("/openapi/v2").SetHeader("Accept", mimePb).Do(context.TODO()).Raw()
+	data, err := d.restClient.Get().AbsPath("/openapi/v2").SetHeader("Accept", openAPIV2mimePb).Do(context.TODO()).Raw()
 	if err != nil {
 		if errors.IsForbidden(err) || errors.IsNotFound(err) || errors.IsNotAcceptable(err) {
 			// single endpoint not found/registered in old server, try to fetch old endpoint
@@ -441,6 +430,10 @@ func (d *DiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
 		return nil, err
 	}
 	return document, nil
+}
+
+func (d *DiscoveryClient) OpenAPIV3() openapi.Client {
+	return openapi.NewClient(d.restClient)
 }
 
 // withRetries retries the given recovery function in case the groups supported by the server change after ServerGroup() returns.
@@ -466,12 +459,13 @@ func setDiscoveryDefaults(config *restclient.Config) error {
 	if config.Timeout == 0 {
 		config.Timeout = defaultTimeout
 	}
-	if config.Burst == 0 && config.QPS < 100 {
+	// if a burst limit is not already configured
+	if config.Burst == 0 {
 		// discovery is expected to be bursty, increase the default burst
 		// to accommodate looking up resource info for many API groups.
 		// matches burst set by ConfigFlags#ToDiscoveryClient().
 		// see https://issue.k8s.io/86149
-		config.Burst = 100
+		config.Burst = defaultBurst
 	}
 	codec := runtime.NoopEncoder{Decoder: scheme.Codecs.UniversalDecoder()}
 	config.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})

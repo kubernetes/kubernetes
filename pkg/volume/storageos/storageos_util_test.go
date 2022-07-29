@@ -212,7 +212,7 @@ func TestAttachVolume(t *testing.T) {
 	util := &storageosUtil{}
 	util.api = fakeAPI{}
 
-	mounter := &storageosMounter{
+	_ = &storageosMounter{
 		storageos: &storageos{
 			volName:      testVolName,
 			volNamespace: testNamespace,
@@ -221,11 +221,5 @@ func TestAttachVolume(t *testing.T) {
 			plugin:       plug.(*storageosPlugin),
 		},
 		deviceDir: tmpDir,
-	}
-	if err != nil {
-		t.Errorf("Failed to make a new Mounter: %v", err)
-	}
-	if mounter == nil {
-		t.Errorf("Got a nil Mounter")
 	}
 }

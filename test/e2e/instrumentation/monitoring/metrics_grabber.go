@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	clientset "k8s.io/client-go/kubernetes"
 
@@ -30,10 +30,12 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	f := framework.NewDefaultFramework("metrics-grabber")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var c, ec clientset.Interface
 	var grabber *e2emetrics.Grabber
 	ginkgo.BeforeEach(func() {

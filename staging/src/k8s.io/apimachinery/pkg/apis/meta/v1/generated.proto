@@ -162,17 +162,18 @@ message ApplyOptions {
 // Condition contains details for one aspect of the current state of this API Resource.
 // ---
 // This struct is intended for direct use as an array at the field path .status.conditions.  For example,
-// type FooStatus struct{
-//     // Represents the observations of a foo's current state.
-//     // Known .status.conditions.type are: "Available", "Progressing", and "Degraded"
-//     // +patchMergeKey=type
-//     // +patchStrategy=merge
-//     // +listType=map
-//     // +listMapKey=type
-//     Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 //
-//     // other fields
-// }
+// 	type FooStatus struct{
+// 	    // Represents the observations of a foo's current state.
+// 	    // Known .status.conditions.type are: "Available", "Progressing", and "Degraded"
+// 	    // +patchMergeKey=type
+// 	    // +patchStrategy=merge
+// 	    // +listType=map
+// 	    // +listMapKey=type
+// 	    Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+//
+// 	    // other fields
+// 	}
 message Condition {
   // type of condition in CamelCase or in foo.example.com/CamelCase.
   // ---
@@ -656,10 +657,7 @@ message ObjectMeta {
   // and may be truncated by the length of the suffix required to make the value
   // unique on the server.
   //
-  // If this field is specified and the generated name exists, the server will
-  // NOT return a 409 - instead, it will either return 201 Created or 500 with Reason
-  // ServerTimeout indicating a unique name could not be found in the time allotted, and the client
-  // should retry (optionally after the time indicated in the Retry-After header).
+  // If this field is specified and the generated name exists, the server will return a 409.
   //
   // Applied only if Name is not specified.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#idempotency
@@ -787,12 +785,6 @@ message ObjectMeta {
   // +optional
   // +patchStrategy=merge
   repeated string finalizers = 14;
-
-  // The name of the cluster which the object belongs to.
-  // This is used to distinguish resources with same name and namespace in different clusters.
-  // This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
-  // +optional
-  optional string clusterName = 15;
 
   // ManagedFields maps workflow-id and version to the set of fields
   // that are managed by that workflow. This is mostly for internal

@@ -29,8 +29,9 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var loggingSoak struct {
@@ -42,6 +43,7 @@ var _ = e2econfig.AddOptions(&loggingSoak, "instrumentation.logging.soak")
 var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("logging-soak")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	// Not a global constant (irrelevant outside this test), also not a parameter (if you want more logs, use --scale=).
 	kbRateInSeconds := 1 * time.Second

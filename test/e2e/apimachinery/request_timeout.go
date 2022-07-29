@@ -21,9 +21,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -32,6 +33,7 @@ const (
 
 var _ = SIGDescribe("Server request timeout", func() {
 	f := framework.NewDefaultFramework("request-timeout")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should return HTTP status code 400 if the user specifies an invalid timeout in the request URL", func() {
 		rt := getRoundTripper(f)

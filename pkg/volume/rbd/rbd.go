@@ -80,8 +80,7 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 }
 
 func (plugin *rbdPlugin) IsMigratedToCSI() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
+	return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationRBD)
 }
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {

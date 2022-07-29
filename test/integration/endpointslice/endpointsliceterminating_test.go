@@ -30,8 +30,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/endpointslice"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -152,12 +152,11 @@ func TestEndpointSliceTerminating(t *testing.T) {
 		t.Run(testcase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EndpointSliceTerminatingCondition, testcase.terminatingGate)()
 
-			controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-			_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-			defer closeFn()
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
+			defer server.TearDownFn()
 
-			config := restclient.Config{Host: server.URL}
-			client, err := clientset.NewForConfig(&config)
+			client, err := clientset.NewForConfig(server.ClientConfig)
 			if err != nil {
 				t.Fatalf("Error creating clientset: %v", err)
 			}
@@ -181,8 +180,8 @@ func TestEndpointSliceTerminating(t *testing.T) {
 			go epsController.Run(1, stopCh)
 
 			// Create namespace
-			ns := framework.CreateTestingNamespace("test-endpoints-terminating", server, t)
-			defer framework.DeleteTestingNamespace(ns, server, t)
+			ns := framework.CreateNamespaceOrDie(client, "test-endpoints-terminating", t)
+			defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{

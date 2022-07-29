@@ -27,8 +27,9 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 func preparePod(name string, node *v1.Node, propagation *v1.MountPropagationMode, hostDir string) *v1.Pod {
@@ -79,6 +80,7 @@ func preparePod(name string, node *v1.Node, propagation *v1.MountPropagationMode
 
 var _ = SIGDescribe("Mount propagation", func() {
 	f := framework.NewDefaultFramework("mount-propagation")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.It("should propagate mounts within defined scopes", func() {
 		// This test runs two pods: master and slave with respective mount

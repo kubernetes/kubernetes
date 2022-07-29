@@ -25,9 +25,7 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // GetTemplateGeneration gets the template generation associated with a v1.DaemonSet by extracting it from the
@@ -137,9 +135,7 @@ func SurgeCount(ds *apps.DaemonSet, numberToSchedule int) (int, error) {
 	if ds.Spec.UpdateStrategy.Type != apps.RollingUpdateDaemonSetStrategyType {
 		return 0, nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DaemonSetUpdateSurge) {
-		return 0, nil
-	}
+
 	r := ds.Spec.UpdateStrategy.RollingUpdate
 	if r == nil {
 		return 0, nil
@@ -169,7 +165,7 @@ func UnavailableCount(ds *apps.DaemonSet, numberToSchedule int) (int, error) {
 func IsPodUpdated(pod *v1.Pod, hash string, dsTemplateGeneration *int64) bool {
 	// Compare with hash to see if the pod is updated, need to maintain backward compatibility of templateGeneration
 	templateMatches := dsTemplateGeneration != nil &&
-		pod.Labels[extensions.DaemonSetTemplateGenerationKey] == fmt.Sprint(dsTemplateGeneration)
+		pod.Labels[extensions.DaemonSetTemplateGenerationKey] == fmt.Sprint(*dsTemplateGeneration)
 	hashMatches := len(hash) > 0 && pod.Labels[extensions.DefaultDaemonSetUniqueLabelKey] == hash
 	return hashMatches || templateMatches
 }

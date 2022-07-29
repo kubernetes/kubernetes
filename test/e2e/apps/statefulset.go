@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -51,6 +51,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2estatefulset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -88,6 +89,7 @@ var httpProbe = &v1.Probe{
 // GCE Api requirements: nodes and master need storage r/w permissions.
 var _ = SIGDescribe("StatefulSet", func() {
 	f := framework.NewDefaultFramework("statefulset")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 	var ns string
 	var c clientset.Interface
 
@@ -118,7 +120,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
@@ -1105,7 +1107,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)
@@ -1228,7 +1230,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentSpecReport().Failed() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			framework.Logf("Deleting all statefulset in ns %v", ns)

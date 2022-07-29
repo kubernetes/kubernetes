@@ -24,20 +24,26 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
+
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
 func TestValidationExpressions(t *testing.T) {
 	tests := []struct {
-		name       string
-		schema     *schema.Structural
-		obj        map[string]interface{}
-		valid      []string
-		errors     map[string]string // rule -> string that error message must contain
-		costBudget int64
+		name          string
+		schema        *schema.Structural
+		obj           interface{}
+		oldObj        interface{}
+		valid         []string
+		errors        map[string]string // rule -> string that error message must contain
+		costBudget    int64
+		isRoot        bool
+		expectSkipped bool
 	}{
 		// tests where val1 and val2 are equal but val3 is different
 		// equality, comparisons and type specific functions
@@ -195,6 +201,10 @@ func TestValidationExpressions(t *testing.T) {
 				"self.val1.substring(4, 10).trim() == 'takes'",
 				"self.val1.upperAscii() == 'ROOK TAKES 👑'",
 				"self.val1.lowerAscii() == 'rook takes 👑'",
+			},
+			errors: map[string]string{
+				// Invalid regex with a string constant regex pattern is compile time error
+				"self.val1.matches(')')": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
 			},
 		},
 		{name: "escaped strings",
@@ -622,6 +632,7 @@ func TestValidationExpressions(t *testing.T) {
 			},
 		},
 		{name: "typemeta and objectmeta access not specified",
+			isRoot: true,
 			obj: map[string]interface{}{
 				"apiVersion": "v1",
 				"kind":       "Pod",
@@ -1440,11 +1451,11 @@ func TestValidationExpressions(t *testing.T) {
 			}),
 			errors: map[string]string{
 				// data is validated before CEL evaluation, so these errors should not be surfaced to end users
-				"has(self.o)":             "invalid data, expected map[string]interface{} to match the provided schema with type=object",
-				"has(self.m)":             "invalid data, expected map[string]interface{} to match the provided schema with type=object",
-				"has(self.l)":             "invalid data, expected []interface{} to match the provided schema with type=array",
-				"has(self.s)":             "invalid data, expected []interface{} to match the provided schema with type=array",
-				"has(self.lm)":            "invalid data, expected []interface{} to match the provided schema with type=array",
+				"has(self.o)":             "invalid data, expected a map for the provided schema with type=object",
+				"has(self.m)":             "invalid data, expected a map for the provided schema with type=object",
+				"has(self.l)":             "invalid data, expected an array for the provided schema with type=array",
+				"has(self.s)":             "invalid data, expected an array for the provided schema with type=array",
+				"has(self.lm)":            "invalid data, expected an array for the provided schema with type=array",
 				"has(self.intorstring)":   "invalid data, expected XIntOrString value to be either a string or integer",
 				"self.nullable[0] == 'x'": "invalid data, got null for schema with nullable=false",
 				// TODO: also find a way to test the errors returned for: array with no items, object with no properties or additionalProperties, invalid listType and invalid type.
@@ -1596,8 +1607,7 @@ func TestValidationExpressions(t *testing.T) {
 				"dyn([1, 2]).sum() == 3",
 				"dyn([1.0, 2.0]).sum() == 3.0",
 
-				// TODO: enable once type system fix it made to CEL
-				//"[].sum() == 0", // An empty list returns an 0 int
+				"[].sum() == 0", // An empty list returns an 0 int
 			},
 			errors: map[string]string{
 				// return an error for min/max on empty list
@@ -1636,6 +1646,12 @@ func TestValidationExpressions(t *testing.T) {
 				"self.str.findAll('[0-9]+', -1) == ['123', '456']",
 				"self.str.findAll('xyz') == []",
 				"self.str.findAll('xyz', 1) == []",
+			},
+			errors: map[string]string{
+				// Invalid regex with a string constant regex pattern is compile time error
+				"self.str.find(')') == ''":       "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				"self.str.findAll(')') == []":    "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
+				"self.str.findAll(')', 1) == []": "compile error: program instantiation failed: error parsing regexp: unexpected ): `)`",
 			},
 		},
 		{name: "URL parsing",
@@ -1682,6 +1698,59 @@ func TestValidationExpressions(t *testing.T) {
 				"isURL('../relative-path') == false",
 			},
 		},
+		{name: "transition rules",
+			obj: map[string]interface{}{
+				"v": "new",
+			},
+			oldObj: map[string]interface{}{
+				"v": "old",
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"v": stringType,
+			}),
+			valid: []string{
+				"oldSelf.v != self.v",
+				"oldSelf.v == 'old' && self.v == 'new'",
+			},
+		},
+		{name: "skipped transition rule for nil old primitive",
+			expectSkipped: true,
+			obj:           "exists",
+			oldObj:        nil,
+			schema:        &stringType,
+			valid: []string{
+				"oldSelf == self",
+			},
+		},
+		{name: "skipped transition rule for nil old array",
+			expectSkipped: true,
+			obj:           []interface{}{},
+			oldObj:        nil,
+			schema:        listTypePtr(&stringType),
+			valid: []string{
+				"oldSelf == self",
+			},
+		},
+		{name: "skipped transition rule for nil old object",
+			expectSkipped: true,
+			obj:           map[string]interface{}{"f": "exists"},
+			oldObj:        nil,
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": stringType,
+			}),
+			valid: []string{
+				"oldSelf.f == self.f",
+			},
+		},
+		{name: "skipped transition rule for old with non-nil interface but nil value",
+			expectSkipped: true,
+			obj:           []interface{}{},
+			oldObj:        nilInterfaceOfStringSlice(),
+			schema:        listTypePtr(&stringType),
+			valid: []string{
+				"oldSelf == self",
+			},
+		},
 	}
 
 	for i := range tests {
@@ -1693,40 +1762,343 @@ func TestValidationExpressions(t *testing.T) {
 			ctx := context.TODO()
 			for j := range tt.valid {
 				validRule := tt.valid[j]
-				t.Run(validRule, func(t *testing.T) {
+				testName := validRule
+				if len(testName) > 127 {
+					testName = testName[:127]
+				}
+				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := NewValidator(&s, PerCallLimit)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.costBudget)
+					errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
 					for _, err := range errs {
 						t.Errorf("unexpected error: %v", err)
 					}
+					if tt.expectSkipped {
+						// Skipped validations should have no cost. The only possible false positive here would be the CEL expression 'true'.
+						if remainingBudget != tt.costBudget {
+							t.Errorf("expected no cost expended for skipped validation, but got %d remaining from %d budget", remainingBudget, tt.costBudget)
+						}
+						return
+					}
+				})
+			}
+			for rule, expectErrToContain := range tt.errors {
+				testName := rule
+				if len(testName) > 127 {
+					testName = testName[:127]
+				}
+				t.Run(testName, func(t *testing.T) {
+					s := withRule(*tt.schema, rule)
+					celValidator := NewValidator(&s, true, PerCallLimit)
+					if celValidator == nil {
+						t.Fatal("expected non nil validator")
+					}
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
+					if len(errs) == 0 {
+						t.Error("expected validation errors but got none")
+					}
+					for _, err := range errs {
+						if err.Type != field.ErrorTypeInvalid || !strings.Contains(err.Error(), expectErrToContain) {
+							t.Errorf("expected error to contain '%s', but got: %v", expectErrToContain, err)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+// TestValidationExpressionsInSchema tests CEL integration with custom resource values and OpenAPIv3 for cases
+// where the validation rules are defined at any level within the schema.
+func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    interface{}
+		oldObj interface{}
+		errors []string // strings that error message must contain
+	}{
+		{name: "invalid rule under array items",
+			obj: map[string]interface{}{
+				"f": []interface{}{1},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": listType(cloneWithRule(&integerType, "self == 'abc'")),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under array items, parent has rule",
+			obj: map[string]interface{}{
+				"f": []interface{}{1},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": withRule(listType(cloneWithRule(&integerType, "self == 'abc'")), "1 == 1"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under additionalProperties",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{"k": 1},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": mapType(cloneWithRule(&integerType, "self == 'abc'")),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under additionalProperties, parent has rule",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{"k": 1},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": withRule(mapType(cloneWithRule(&integerType, "self == 'abc'")), "1 == 1"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under unescaped field name",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under unescaped field name, parent has rule",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}), "1 == 1"),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		// check that escaped field names do not impact CEL rule validation
+		{name: "invalid rule under escaped field name",
+			obj: map[string]interface{}{
+				"f/2": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f/2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under escaped field name, parent has rule",
+			obj: map[string]interface{}{
+				"f/2": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f/2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}), "1 == 1"),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "failing rule under escaped field name",
+			obj: map[string]interface{}{
+				"f/2": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f/2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2"),
+			}),
+			errors: []string{"Invalid value: \"object\": failed rule: self.m == 2"},
+		},
+		// unescapable field names that are not accessed by the CEL rule are allowed and should not impact CEL rule validation
+		{name: "invalid rule under unescapable field name",
+			obj: map[string]interface{}{
+				"a@b": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"a@b": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under unescapable field name, parent has rule",
+			obj: map[string]interface{}{
+				"f@2": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f@2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}), "1 == 1"),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "failing rule under unescapable field name",
+			obj: map[string]interface{}{
+				"a@b": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"a@b": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2"),
+			}),
+			errors: []string{"Invalid value: \"object\": failed rule: self.m == 2"},
+		},
+		{name: "matchExpressions - 'values' must be specified when 'operator' is 'In' or 'NotIn'",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "tier",
+						"operator": "In",
+						"values":   []interface{}{},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, (rule.operator != "In" && rule.operator != "NotIn") || ((has(rule.values) && size(rule.values) > 0)))`),
+			errors: []string{"failed rule"},
+		},
+		{name: "matchExpressions - 'values' may not be specified when 'operator' is 'Exists' or 'DoesNotExist'",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "tier",
+						"operator": "Exists",
+						"values":   []interface{}{"somevalue"},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, (rule.operator != "Exists" && rule.operator != "DoesNotExist") || ((!has(rule.values) || size(rule.values) == 0)))`),
+			errors: []string{"failed rule"},
+		},
+		{name: "matchExpressions - invalid selector operator",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "tier",
+						"operator": "badop",
+						"values":   []interface{}{},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, rule.operator == "In" || rule.operator == "NotIn" || rule.operator == "DoesNotExist")`),
+			errors: []string{"failed rule"},
+		},
+		{name: "matchExpressions - invalid label value",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "badkey!",
+						"operator": "Exists",
+						"values":   []interface{}{},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, size(rule.key) <= 63 && rule.key.matches("^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$"))`),
+			errors: []string{"failed rule"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.TODO()
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), tt.schema, tt.obj, tt.oldObj, math.MaxInt)
+			unmatched := map[string]struct{}{}
+			for _, e := range tt.errors {
+				unmatched[e] = struct{}{}
+			}
+			for _, err := range errs {
+				if err.Type != field.ErrorTypeInvalid {
+					t.Errorf("expected only ErrorTypeInvalid errors, but got: %v", err)
+					continue
+				}
+				matched := false
+				for expected := range unmatched {
+					if strings.Contains(err.Error(), expected) {
+						delete(unmatched, expected)
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
+				}
+			}
+			if len(unmatched) > 0 {
+				t.Errorf("expected errors %v", unmatched)
+			}
+		})
+	}
+}
+
+func genMatchSelectorSchema(rule string) *schema.Structural {
+	s := withRule(objectType(map[string]schema.Structural{
+		"matchExpressions": listType(objectTypePtr(map[string]schema.Structural{
+			"key":      stringType,
+			"operator": stringType,
+			"values":   listType(&stringType),
+		})),
+	}), rule)
+	return &s
+}
+
+func TestCELValidationLimit(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    interface{}
+		valid  []string
+	}{
+		{
+			name:   "test limit",
+			obj:    objs(math.MaxInt64),
+			schema: schemas(integerType),
+			valid: []string{
+				"self.val1 > 0",
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			for j := range tt.valid {
+				validRule := tt.valid[j]
+				t.Run(validRule, func(t *testing.T) {
+					t.Parallel()
+					s := withRule(*tt.schema, validRule)
+					celValidator := validator(&s, false, model.SchemaDeclType(&s, false), PerCallLimit)
 
 					// test with cost budget exceeded
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, 0)
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, 0)
 					var found bool
 					for _, err := range errs {
 						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
 							found = true
+						} else {
+							t.Errorf("unexpected err: %v", err)
 						}
 					}
 					if !found {
 						t.Errorf("expect cost limit exceed err but did not find")
 					}
 					if len(errs) > 1 {
-						t.Errorf("expect to return cost budget exceed err once")
+						t.Errorf("expect to only return cost budget exceed err once but got: %v", len(errs))
 					}
 
 					// test with PerCallLimit exceeded
 					found = false
-					celValidator = NewValidator(&s, 0)
+					celValidator = NewValidator(&s, true, 0)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.costBudget)
+					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
 					for _, err := range errs {
 						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "no further validation rules will be run due to call cost exceeds limit for rule") {
 							found = true
@@ -1738,41 +2110,9 @@ func TestValidationExpressions(t *testing.T) {
 					}
 				})
 			}
-			for rule, expectErrToContain := range tt.errors {
-				t.Run(rule, func(t *testing.T) {
-					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s, PerCallLimit)
-					if celValidator == nil {
-						t.Fatal("expected non nil validator")
-					}
-					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.costBudget)
-					if len(errs) == 0 {
-						t.Error("expected validation errors but got none")
-					}
-					for _, err := range errs {
-						if err.Type != field.ErrorTypeInvalid || !strings.Contains(err.Error(), expectErrToContain) {
-							t.Errorf("expected error to contain '%s', but got: %v", expectErrToContain, err)
-						}
-					}
-
-					// test with cost budget exceeded
-					errs, _ = celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, 0)
-					var found bool
-					for _, err := range errs {
-						if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "validation failed due to running out of cost budget, no further validation rules will be run") {
-							found = true
-						}
-					}
-					if !found {
-						t.Errorf("expect cost limit exceed err but did not find")
-					}
-					if len(errs) > 1 {
-						t.Errorf("expect to return cost budget exceed err once")
-					}
-				})
-			}
 		})
 	}
+
 }
 
 func TestCELValidationContextCancellation(t *testing.T) {
@@ -1801,11 +2141,11 @@ func TestCELValidationContextCancellation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, PerCallLimit)
+			celValidator := NewValidator(&s, true, PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
-			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, RuntimeCELCostBudget)
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
 			for _, err := range errs {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1814,7 +2154,7 @@ func TestCELValidationContextCancellation(t *testing.T) {
 			found := false
 			evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 			cancel()
-			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, RuntimeCELCostBudget)
+			errs, _ = celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
 			for _, err := range errs {
 				if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
 					found = true
@@ -1823,6 +2163,88 @@ func TestCELValidationContextCancellation(t *testing.T) {
 			}
 			if !found {
 				t.Errorf("expect operation interrupted err but did not find")
+			}
+		})
+	}
+}
+
+// This is the most recursive operations we expect to be able to include in an expression.
+// This number could get larger with more improvements in the grammar or ANTLR stack, but should *never* decrease or previously valid expressions could be treated as invalid.
+const maxValidDepth = 243
+
+// TestCELMaxRecursionDepth tests CEL setting for maxRecursionDepth.
+func TestCELMaxRecursionDepth(t *testing.T) {
+	tests := []struct {
+		name          string
+		schema        *schema.Structural
+		obj           interface{}
+		oldObj        interface{}
+		valid         []string
+		errors        map[string]string // rule -> string that error message must contain
+		costBudget    int64
+		isRoot        bool
+		expectSkipped bool
+	}{
+		{name: "test CEL maxRecursionDepth",
+			obj:    objs(true),
+			schema: schemas(booleanType),
+			valid: []string{
+				strings.Repeat("self.val1"+" == ", maxValidDepth-1) + "self.val1",
+			},
+			errors: map[string]string{
+				strings.Repeat("self.val1"+" == ", maxValidDepth) + "self.val1": "max recursion depth exceeded",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.costBudget = RuntimeCELCostBudget
+			ctx := context.TODO()
+			for j := range tt.valid {
+				validRule := tt.valid[j]
+				testName := validRule
+				t.Run(testName, func(t *testing.T) {
+					t.Parallel()
+					s := withRule(*tt.schema, validRule)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
+					if celValidator == nil {
+						t.Fatal("expected non nil validator")
+					}
+					errs, remainingBudget := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
+					for _, err := range errs {
+						t.Errorf("unexpected error: %v", err)
+					}
+					if tt.expectSkipped {
+						// Skipped validations should have no cost. The only possible false positive here would be the CEL expression 'true'.
+						if remainingBudget != tt.costBudget {
+							t.Errorf("expected no cost expended for skipped validation, but got %d remaining from %d budget", remainingBudget, tt.costBudget)
+						}
+						return
+					}
+				})
+			}
+			for rule, expectErrToContain := range tt.errors {
+				testName := rule
+				if len(testName) > 127 {
+					testName = testName[:127]
+				}
+				t.Run(testName, func(t *testing.T) {
+					s := withRule(*tt.schema, rule)
+					celValidator := NewValidator(&s, true, PerCallLimit)
+					if celValidator == nil {
+						t.Fatal("expected non nil validator")
+					}
+					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, tt.oldObj, tt.costBudget)
+					if len(errs) == 0 {
+						t.Error("expected validation errors but got none")
+					}
+					for _, err := range errs {
+						if err.Type != field.ErrorTypeInvalid || !strings.Contains(err.Error(), expectErrToContain) {
+							t.Errorf("expected error to contain '%s', but got: %v", expectErrToContain, err)
+						}
+					}
+				})
 			}
 		})
 	}
@@ -1854,12 +2276,12 @@ func BenchmarkCELValidationWithContext(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, PerCallLimit)
+			celValidator := NewValidator(&s, true, PerCallLimit)
 			if celValidator == nil {
 				b.Fatal("expected non nil validator")
 			}
 			for i := 0; i < b.N; i++ {
-				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
 				for _, err := range errs {
 					b.Fatalf("validation failed: %v", err)
 				}
@@ -1894,14 +2316,14 @@ func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, PerCallLimit)
+			celValidator := NewValidator(&s, true, PerCallLimit)
 			if celValidator == nil {
 				b.Fatal("expected non nil validator")
 			}
 			for i := 0; i < b.N; i++ {
 				evalCtx, cancel := context.WithTimeout(ctx, time.Microsecond)
 				cancel()
-				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, RuntimeCELCostBudget)
+				errs, _ := celValidator.Validate(evalCtx, field.NewPath("root"), &s, tt.obj, nil, RuntimeCELCostBudget)
 				//found := false
 				//for _, err := range errs {
 				//	if err.Type == field.ErrorTypeInvalid && strings.Contains(err.Error(), "operation interrupted") {
@@ -1911,6 +2333,57 @@ func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
 				//}
 				if len(errs) == 0 {
 					b.Errorf("expect operation interrupted err but did not find")
+				}
+			}
+		})
+	}
+}
+
+// BenchmarkCELValidationWithAndWithoutOldSelfReference measures the additional cost of evaluating
+// validation rules that reference "oldSelf".
+func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
+	for _, rule := range []string{
+		"self.getMonth() >= 0",
+		"oldSelf.getMonth() >= 0",
+	} {
+		b.Run(rule, func(b *testing.B) {
+			obj := map[string]interface{}{
+				"datetime": time.Time{}.Format(strfmt.ISO8601LocalTime),
+			}
+			s := &schema.Structural{
+				Generic: schema.Generic{
+					Type: "object",
+				},
+				Properties: map[string]schema.Structural{
+					"datetime": {
+						Generic: schema.Generic{
+							Type: "string",
+						},
+						ValueValidation: &schema.ValueValidation{
+							Format: "date-time",
+						},
+						Extensions: schema.Extensions{
+							XValidations: []apiextensions.ValidationRule{
+								{Rule: rule},
+							},
+						},
+					},
+				},
+			}
+			validator := NewValidator(s, true, PerCallLimit)
+			if validator == nil {
+				b.Fatal("expected non nil validator")
+			}
+
+			ctx := context.TODO()
+			root := field.NewPath("root")
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				errs, _ := validator.Validate(ctx, root, s, obj, obj, RuntimeCELCostBudget)
+				for _, err := range errs {
+					b.Errorf("unexpected error: %v", err)
 				}
 			}
 		})
@@ -2051,6 +2524,36 @@ func withRule(s schema.Structural, rule string) schema.Structural {
 	return s
 }
 
+func withRulePtr(s *schema.Structural, rule string) *schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule: rule,
+		},
+	}
+	return s
+}
+
+func cloneWithRule(s *schema.Structural, rule string) *schema.Structural {
+	s = s.DeepCopy()
+	return withRulePtr(s, rule)
+}
+
+func withMaxLength(s schema.Structural, maxLength *int64) schema.Structural {
+	if s.ValueValidation == nil {
+		s.ValueValidation = &schema.ValueValidation{}
+	}
+	s.ValueValidation.MaxLength = maxLength
+	return s
+}
+
+func withMaxItems(s schema.Structural, maxItems *int64) schema.Structural {
+	if s.ValueValidation == nil {
+		s.ValueValidation = &schema.ValueValidation{}
+	}
+	s.ValueValidation.MaxItems = maxItems
+	return s
+}
+
 func withDefault(dflt interface{}, s schema.Structural) schema.Structural {
 	s.Generic.Default = schema.JSON{Object: dflt}
 	return s
@@ -2064,4 +2567,9 @@ func withNullable(nullable bool, s schema.Structural) schema.Structural {
 func withNullablePtr(nullable bool, s schema.Structural) *schema.Structural {
 	s.Generic.Nullable = nullable
 	return &s
+}
+
+func nilInterfaceOfStringSlice() []interface{} {
+	var slice []interface{} = nil
+	return slice
 }

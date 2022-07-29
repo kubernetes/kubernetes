@@ -689,3 +689,6 @@ func (ms *mockStore) NewList() runtime.Object {
 func (ms *mockStore) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error) {
 	return nil, nil
 }
+
+func (ms *mockStore) Destroy() {
+}

@@ -106,6 +106,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		}
 
 		patchBytes, err := limitedReadBody(req, scope.MaxRequestBodyBytes)
+		trace.Step("limitedReadBody done", utiltrace.Field{"len", len(patchBytes)}, utiltrace.Field{"err", err})
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -124,8 +125,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		}
 		options.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("PatchOptions"))
 
-		ae := audit.AuditEventFrom(ctx)
-		admit = admission.WithAudit(admit, ae)
+		admit = admission.WithAudit(admit)
 
 		audit.LogRequestPatch(req.Context(), patchBytes)
 		trace.Step("Recorded the audit event")
@@ -507,11 +507,11 @@ func (p *applyPatcher) createNewObject(requestContext context.Context) (runtime.
 	return p.applyPatchToCurrentObject(requestContext, obj)
 }
 
-// strategicPatchObject applies a strategic merge patch of <patchBytes> to
-// <originalObject> and stores the result in <objToUpdate>.
+// strategicPatchObject applies a strategic merge patch of `patchBytes` to
+// `originalObject` and stores the result in `objToUpdate`.
 // It additionally returns the map[string]interface{} representation of the
-// <originalObject> and <patchBytes>.
-// NOTE: Both <originalObject> and <objToUpdate> are supposed to be versioned.
+// `originalObject` and `patchBytes`.
+// NOTE: Both `originalObject` and `objToUpdate` are supposed to be versioned.
 func strategicPatchObject(
 	requestContext context.Context,
 	defaulter runtime.ObjectDefaulter,
@@ -659,8 +659,13 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		return obj, nil
 	}
 
+	transformers := []rest.TransformFunc{p.applyPatch, p.applyAdmission, dedupOwnerReferencesTransformer}
+	if scope.FieldManager != nil {
+		transformers = append(transformers, fieldmanager.IgnoreManagedFieldsTimestampsTransformer)
+	}
+
 	wasCreated := false
-	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission, dedupOwnerReferencesTransformer)
+	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, transformers...)
 	requestFunc := func() (runtime.Object, error) {
 		// Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options := patchToUpdateOptions(p.options)

@@ -122,6 +122,9 @@ oomScoreAdj: 17
 portRange: "2-7"
 udpIdleTimeout: 123ms
 detectLocalMode: "ClusterCIDR"
+detectLocal:
+  bridgeInterface: "cbr0"
+  interfaceNamePrefix: "veth"
 nodePortAddresses:
   - "10.20.30.40/16"
   - "fd00:1::0/64"
@@ -263,6 +266,10 @@ nodePortAddresses:
 			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
 			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 			DetectLocalMode:    kubeproxyconfig.LocalModeClusterCIDR,
+			DetectLocal: kubeproxyconfig.DetectLocalConfiguration{
+				BridgeInterface:     string("cbr0"),
+				InterfaceNamePrefix: string("veth"),
+			},
 		}
 
 		options := NewOptions()
@@ -450,7 +457,7 @@ mode: ""
 nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""
-detectLocalMode: "ClusterCIDR"
+detectLocalMode: "BridgeInterface"
 udpIdleTimeout: 250ms`)
 		if err != nil {
 			return nil, "", fmt.Errorf("unexpected error when writing content to temp kube-proxy config file: %v", err)

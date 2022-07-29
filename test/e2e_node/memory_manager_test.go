@@ -42,9 +42,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -64,7 +65,7 @@ type memoryManagerCtnAttributes struct {
 	hugepages2Mi string
 }
 
-//  makeMemoryManagerContainers returns slice of containers with provided attributes and indicator of hugepages mount needed for those.
+// makeMemoryManagerContainers returns slice of containers with provided attributes and indicator of hugepages mount needed for those.
 func makeMemoryManagerContainers(ctnCmd string, ctnAttributes []memoryManagerCtnAttributes) ([]v1.Container, bool) {
 	hugepagesMount := false
 	var containers []v1.Container
@@ -253,6 +254,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 	)
 
 	f := framework.NewDefaultFramework("memory-manager-test")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	memoryQuantity := resource.MustParse("1100Mi")
 	defaultKubeParams := &kubeletParams{

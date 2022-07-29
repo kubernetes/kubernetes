@@ -56,13 +56,14 @@ func (pl *TaintToleration) Name() string {
 // failed by this plugin schedulable.
 func (pl *TaintToleration) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
-		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint},
+		{Resource: framework.Node, ActionType: framework.Add | framework.Update},
 	}
 }
 
 // Filter invoked at the filter extension point.
 func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if nodeInfo == nil || nodeInfo.Node() == nil {
+	node := nodeInfo.Node()
+	if node == nil {
 		return framework.AsStatus(fmt.Errorf("invalid nodeInfo"))
 	}
 
@@ -71,13 +72,12 @@ func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleSta
 		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
 	}
 
-	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, filterPredicate)
+	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, filterPredicate)
 	if !isUntolerated {
 		return nil
 	}
 
-	errReason := fmt.Sprintf("node(s) had taint {%s: %s}, that the pod didn't tolerate",
-		taint.Key, taint.Value)
+	errReason := fmt.Sprintf("node(s) had untolerated taint {%s: %s}", taint.Key, taint.Value)
 	return framework.NewStatus(framework.UnschedulableAndUnresolvable, errReason)
 }
 
@@ -119,7 +119,7 @@ func (pl *TaintToleration) PreScore(ctx context.Context, cycleState *framework.C
 func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
 	c, err := cycleState.Read(preScoreStateKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %q from cycleState: %v", preScoreStateKey, err)
+		return nil, fmt.Errorf("failed to read %q from cycleState: %w", preScoreStateKey, err)
 	}
 
 	s, ok := c.(*preScoreState)

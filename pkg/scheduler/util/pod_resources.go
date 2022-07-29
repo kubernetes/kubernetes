@@ -25,7 +25,7 @@ import (
 // For each of these resources, a pod that doesn't request the resource explicitly
 // will be treated as having requested the amount indicated below, for the purpose
 // of computing priority only. This ensures that when scheduling zero-request pods, such
-// pods will not all be scheduled to the machine with the smallest in-use request,
+// pods will not all be scheduled to the node with the smallest in-use request,
 // and that when scheduling regular pods, such pods will not see zero-request pods as
 // consuming no resources whatsoever. We chose these values to be similar to the
 // resources that we give to cluster addon pods (#10653). But they are pretty arbitrary.
