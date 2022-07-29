@@ -195,14 +195,16 @@
   - 0.5
   - 1
   - 2.5
-- name: apiserver_current_inflight_requests
+- name: current_inflight_requests
+  subsystem: apiserver
   help: Maximal number of currently used inflight request limit of this apiserver
     per request kind in last second.
   type: Gauge
   stabilityLevel: STABLE
   labels:
   - request_kind
-- name: apiserver_longrunning_requests
+- name: longrunning_requests
+  subsystem: apiserver
   help: Gauge of all active long-running apiserver requests broken out by verb, group,
     version, resource, scope and component. Not all requests are tracked this way.
   type: Gauge
@@ -215,7 +217,8 @@
   - subresource
   - verb
   - version
-- name: apiserver_request_duration_seconds
+- name: request_duration_seconds
+  subsystem: apiserver
   help: Response latency distribution in seconds for each verb, dry run value, group,
     version, resource, subresource, scope and component.
   type: Histogram
@@ -253,7 +256,8 @@
   - 30
   - 45
   - 60
-- name: apiserver_request_total
+- name: request_total
+  subsystem: apiserver
   help: Counter of apiserver requests broken out for each verb, dry run value, group,
     version, resource, scope, component, and HTTP response code.
   type: Counter
@@ -268,7 +272,8 @@
   - subresource
   - verb
   - version
-- name: apiserver_requested_deprecated_apis
+- name: requested_deprecated_apis
+  subsystem: apiserver
   help: Gauge of deprecated APIs that have been requested, broken out by API group,
     version, resource, subresource, and removed_release.
   type: Gauge
@@ -279,7 +284,8 @@
   - resource
   - subresource
   - version
-- name: apiserver_response_sizes
+- name: response_sizes
+  subsystem: apiserver
   help: Response size distribution in bytes for each group, version, verb, resource,
     subresource, scope and component.
   type: Histogram
