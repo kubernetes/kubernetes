@@ -53,7 +53,7 @@ ssh_options=${SSH_OPTIONS:-}
 kubelet_config_file=${KUBELET_CONFIG_FILE:-"test/e2e_node/jenkins/default-kubelet-config.yaml"}
 
 # Parse the flags to pass to ginkgo
-ginkgoflags=""
+ginkgoflags="-timeout=24h"
 if [[ ${parallelism} -gt 1 ]]; then
   ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 fi
