@@ -19,8 +19,10 @@ package factory
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -82,11 +84,27 @@ func init() {
 	legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
 	dbMetricsMonitors = make(map[string]struct{})
 
-	l, err := logutil.CreateDefaultZapLogger(zapcore.InfoLevel)
+	l, err := logutil.CreateDefaultZapLogger(etcdClientDebugLevel())
 	if err != nil {
 		l = zap.NewNop()
 	}
 	etcd3ClientLogger = l.Named("etcd-client")
+}
+
+// etcdClientDebugLevel translates ETCD_CLIENT_DEBUG into zap log level.
+// NOTE(negz): This is a copy of a private etcd client function:
+// https://github.com/etcd-io/etcd/blob/v3.5.4/client/v3/logger.go#L47
+func etcdClientDebugLevel() zapcore.Level {
+	envLevel := os.Getenv("ETCD_CLIENT_DEBUG")
+	if envLevel == "" || envLevel == "true" {
+		return zapcore.InfoLevel
+	}
+	var l zapcore.Level
+	if err := l.Set(envLevel); err == nil {
+		log.Printf("Deprecated env ETCD_CLIENT_DEBUG value. Using default level: 'info'")
+		return zapcore.InfoLevel
+	}
+	return l
 }
 
 func newETCD3HealthCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
