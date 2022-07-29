@@ -575,6 +575,25 @@ message ListOptions {
   // This field is not supported when watch is true. Clients may start a watch from the last
   // resourceVersion value returned by the server and not miss any modifications.
   optional string continue = 8;
+
+  // sendInitialEvents when set together with Watch option,
+  // begins the watch stream with synthetic "Added" events of all resources.
+  // Followed by a synthetic "Bookmark" event containing a ResourceVersion
+  // after which the server continues streaming events.
+  // This option is meant to be used with the resourceVersion parameter with the following semantics:
+  //
+  // - sendInitialEvent and RV>0 - provides the initial events and when we reach the desired RV,
+  //   the synthetic bookmark event. Note that the desired RV must be <= the current revision the server knows about.
+  //   If the desired RV is newer than the current revision the server is aware of,
+  //   The TooLargeResourceVersionError is returned.
+  //   Essentially this mode provides NotOlderThan semantics.
+  // - sendInitialEvent and RV=0 - provides the initial events and the synthetic bookmark with the current RV.
+  // - sendInitialEvent and RV="" - matches data at the most recent ResourceVersion.
+  //   The returned data is consistent, that is, served from etcd via a quorum read.
+  //   It provides the initial events, any other updates and the synthetic bookmark
+  //   event with the most recent ResourceVersion.
+  // +optional
+  optional bool sendInitialEvents = 11;
 }
 
 // ManagedFieldsEntry is a workflow-id, a FieldSet and the group version of the resource

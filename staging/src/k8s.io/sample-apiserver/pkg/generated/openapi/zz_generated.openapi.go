@@ -1231,6 +1231,13 @@ func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.Op
 							Format:      "",
 						},
 					},
+					"sendInitialEvents": {
+						SchemaProps: spec.SchemaProps{
+							Description: "sendInitialEvents when set together with Watch option, begins the watch stream with synthetic \"Added\" events of all resources. Followed by a synthetic \"Bookmark\" event containing a ResourceVersion after which the server continues streaming events. This option is meant to be used with the resourceVersion parameter with the following semantics:\n\n- sendInitialEvent and RV>0 - provides the initial events and when we reach the desired RV,\n  the synthetic bookmark event. Note that the desired RV must be <= the current revision the server knows about.\n  If the desired RV is newer than the current revision the server is aware of,\n  The TooLargeResourceVersionError is returned.\n  Essentially this mode provides NotOlderThan semantics.\n- sendInitialEvent and RV=0 - provides the initial events and the synthetic bookmark with the current RV. - sendInitialEvent and RV=\"\" - matches data at the most recent ResourceVersion.\n  The returned data is consistent, that is, served from etcd via a quorum read.\n  It provides the initial events, any other updates and the synthetic bookmark\n  event with the most recent ResourceVersion.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
