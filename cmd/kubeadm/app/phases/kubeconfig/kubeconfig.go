@@ -281,10 +281,7 @@ func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmda
 		}
 		fmt.Printf("[kubeconfig] Writing %q kubeconfig file\n", filename)
 		err = kubeconfigutil.WriteToDisk(kubeConfigFilePath, config)
-		if err != nil {
-			return errors.Wrapf(err, "failed to save kubeconfig file %q on disk", kubeConfigFilePath)
-		}
-		return nil
+		return errors.Wrapf(err, "failed to save kubeconfig file %q on disk", kubeConfigFilePath)
 	}
 	// kubeadm doesn't validate the existing kubeconfig file more than this (kubeadm trusts the client certs to be valid)
 	// Basically, if we find a kubeconfig file with the same path; the same CA cert and the same server URL;
