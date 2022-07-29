@@ -1658,6 +1658,7 @@ k8s.io/apiserver/pkg/storage/value/encrypt/secretbox
 k8s.io/apiserver/pkg/storageversion
 k8s.io/apiserver/pkg/tracing
 k8s.io/apiserver/pkg/util/apihelpers
+k8s.io/apiserver/pkg/util/disablecompression
 k8s.io/apiserver/pkg/util/dryrun
 k8s.io/apiserver/pkg/util/feature
 k8s.io/apiserver/pkg/util/flowcontrol
