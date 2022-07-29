@@ -1,3 +1,19 @@
+/*
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package v1_test
 
 import (
@@ -6,7 +22,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	// "rand"
 	"strconv"
 	"strings"
 	"sync"
@@ -66,7 +81,6 @@ func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) metav1.Discov
 		},
 		Groups: apis,
 	}
-
 }
 
 func fetchPath(handler http.Handler, path string, etag string) (*http.Response, []byte, *metav1.DiscoveryAPIGroupList) {
@@ -191,7 +205,7 @@ func TestEtagConsistent(t *testing.T) {
 	assert.NotEmpty(t, res1_addedToOne.Header.Get("ETag"), "Etag should be populated")
 	assert.NotEmpty(t, res2_addedToOne.Header.Get("ETag"), "Etag should be populated")
 	assert.Equal(t, res1_removeFromBoth.Header.Get("ETag"), res2_removeFromBoth.Header.Get("ETag"), "ETags should be equal since content is equal")
-	assert.Equal(t, res1_initial.Header.Get("ETag"), res1_removeFromBoth.Header.Get("ETag"), "ETag should be equal to inital value since added content was removed")
+	assert.Equal(t, res1_initial.Header.Get("ETag"), res1_removeFromBoth.Header.Get("ETag"), "ETag should be equal to initial value since added content was removed")
 }
 
 // Test that if a request comes in with an If-None-Match header with an incorrect
