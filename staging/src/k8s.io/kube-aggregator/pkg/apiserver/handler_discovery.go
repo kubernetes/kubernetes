@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/v2"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -250,7 +251,7 @@ func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 			key := updateInfo.service
 			handler := updateInfo.handler
 			handler = handlerWithUser(handler, &user.DefaultInfo{Name: "system:kube-aggregator", Groups: []string{"system:masters"}})
-			handler = http.TimeoutHandler(handler, 5*time.Second, "request timed out")
+			// handler = http.TimeoutHandler(handler, 5*time.Second, "request timed out")
 
 			req, err := http.NewRequest("GET", "/discovery/v2", nil)
 			if err != nil {
@@ -406,20 +407,12 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}) error {
 		})
 	}()
 
-	// TODO: This should be in a constant
-	ticker := time.NewTicker(60 * time.Second)
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				dm.markAPIServicesDirty()
-				dm.kickWorker()
-			case <-stopCh:
-				ticker.Stop()
-				return
-			}
-		}
-	}()
+	// Refresh external Services every minute
+	wait.PollImmediateUntil(1*time.Minute, func() (done bool, err error) {
+		dm.markAPIServicesDirty()
+		dm.kickWorker()
+		return true, nil
+	}, stopCh)
 
 	return result
 }
@@ -473,7 +466,11 @@ func (dm *discoveryManager) AddAPIService(apiService *apiregistrationv1.APIServi
 			//
 			if ph, ok := handler.(*proxyHandler); ok {
 				proxyHandlerCopy := *ph
+				info := proxyHandlerCopy.handlingInfo.Load().(proxyHandlingInfo)
+				info.serviceAvailable = true
+				proxyHandlerCopy.handlingInfo.Store(info)
 				handler = &proxyHandlerCopy
+
 			}
 
 			// APIService is new to us, so start tracking it
