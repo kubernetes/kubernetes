@@ -587,7 +587,7 @@ func (dc *DeploymentController) syncDeployment(ctx context.Context, key string) 
 
 	deployment, err := dc.dLister.Deployments(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		klog.V(2).InfoS("Deployment has been deleted", "deployment", klog.KRef(namespace, name))
+		klog.InfoS("Deployment has been deleted", "deployment", klog.KRef(namespace, name))
 		return nil
 	}
 	if err != nil {

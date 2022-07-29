@@ -107,6 +107,7 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 		for i := 0; i < retries; i++ {
 			err = c.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})
 			if err == nil {
+				klog.InfoS("NoExecuteTaintManager has deleted pod", "pod", args.NamespacedName.String())
 				break
 			}
 			time.Sleep(10 * time.Millisecond)
