@@ -214,10 +214,7 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir stri
 	}
 
 	_, err = client.Register(context.Background(), reqt)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // GetDevicePluginOptions returns DevicePluginOptions settings for the device plugin.

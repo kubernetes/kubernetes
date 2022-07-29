@@ -240,11 +240,7 @@ func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.S
 	if err != nil {
 		return err
 	}
-	err = upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors)
-	if err != nil {
-		return err
-	}
-	return nil
+	return upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors)
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not
