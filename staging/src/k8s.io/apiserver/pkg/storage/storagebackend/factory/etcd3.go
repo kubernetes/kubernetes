@@ -86,7 +86,7 @@ func init() {
 	if err != nil {
 		l = zap.NewNop()
 	}
-	etcd3ClientLogger = l
+	etcd3ClientLogger = l.Named("etcd-client")
 }
 
 func newETCD3HealthCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
