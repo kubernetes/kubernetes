@@ -19,7 +19,7 @@ containerLogMaxFiles: 5
 containerLogMaxSize: 10Mi
 contentType: application/vnd.kubernetes.protobuf
 cpuCFSQuota: true
-cpuCFSQuotaPeriod: 100ms
+cpuCFSQuotaPeriod: 100µs
 cpuManagerPolicy: none
 cpuManagerReconcilePeriod: 10s
 enableControllerAttachDetach: true
