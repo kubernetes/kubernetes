@@ -824,10 +824,6 @@ func (asw *actualStateOfWorld) PodExistsInVolume(podName volumetypes.UniquePodNa
 				fullErr := newSELinuxMountMismatchError(volumeName)
 				if util.IsRWOP(volumeObj.spec) {
 					return false, volumeObj.devicePath, fullErr
-				} else {
-					// This is not an error yet, but it will be when support for RWO and RWX volumes is added
-					// TODO: bump some metric here
-					klog.V(4).ErrorS(fullErr, "Please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file")
 				}
 			}
 		}

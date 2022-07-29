@@ -221,7 +221,7 @@ func (rc *reconciler) mountOrAttachVolumes() {
 		volumeToMount.DevicePath = devicePath
 		if cache.IsSELinuxMountMismatchError(err) {
 			// TODO: check error message + lower frequency, this can be noisy
-			klog.ErrorS(err, volumeToMount.GenerateErrorDetailed("mount precondition failed", err).Error(), "pod", klog.KObj(volumeToMount.Pod))
+			klog.ErrorS(err, volumeToMount.GenerateErrorDetailed("mount precondition failed, please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file", err).Error(), "pod", klog.KObj(volumeToMount.Pod))
 			// TODO: report error better, this may be too noisy
 			rc.desiredStateOfWorld.AddErrorToPod(volumeToMount.PodName, err.Error())
 		} else if cache.IsVolumeNotAttachedError(err) {
