@@ -189,6 +189,9 @@ type TestContextType struct {
 	// RequireDevices makes mandatory on the environment on which tests are run 1+ devices exposed through device plugins.
 	// With this enabled The e2e tests requiring devices for their operation can assume that if devices aren't reported, the test can fail
 	RequireDevices bool
+
+	// Enable volume drivers which are disabled by default. See test/e2e/storage/in_tree_volumes.go for details.
+	EnabledVolumeDrivers []string
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
@@ -262,6 +265,27 @@ type CloudConfig struct {
 // TestContext should be used by all tests to access common context data.
 var TestContext TestContextType
 
+// StringArrayValue is used with flag.Var for a comma-separated list of strings placed into a string array.
+type stringArrayValue struct {
+	stringArray *[]string
+}
+
+func (v stringArrayValue) String() string {
+	if v.stringArray != nil {
+		return strings.Join(*v.stringArray, ",")
+	}
+	return ""
+}
+
+func (v stringArrayValue) Set(s string) error {
+	if len(s) == 0 {
+		*v.stringArray = []string{}
+	} else {
+		*v.stringArray = strings.Split(s, ",")
+	}
+	return nil
+}
+
 // ClusterIsIPv6 returns true if the cluster is IPv6
 func (tc TestContextType) ClusterIsIPv6() bool {
 	return tc.IPFamily == "ipv6"
@@ -319,6 +343,8 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.SnapshotControllerPodName, "snapshot-controller-pod-name", "", "The pod name to use for identifying the snapshot controller in the kube-system namespace.")
 	flags.IntVar(&TestContext.SnapshotControllerHTTPPort, "snapshot-controller-http-port", 0, "The port to use for snapshot controller HTTP communication.")
+
+	flags.Var(&stringArrayValue{&TestContext.EnabledVolumeDrivers}, "enabled-volume-drivers", "Comma-separated list of in-tree volume drivers to enable for testing. This is only needed for in-tree drivers disabled by default. An example is gcepd; see test/e2e/storage/in_tree_volumes.go for full details.")
 }
 
 func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
