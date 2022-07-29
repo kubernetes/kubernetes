@@ -333,43 +333,6 @@ message DiscoveryAPIGroupList {
   repeated DiscoveryAPIGroup groups = 1;
 }
 
-// APIResource specifies the name of a resource and whether it is namespaced.
-message DiscoveryAPIResource {
-  // name is the plural name of the resource.
-  optional string name = 1;
-
-  // singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely.
-  // The singularName is more correct for reporting status on a single item and both singular and plural are allowed
-  // from the kubectl CLI interface.
-  optional string singularName = 6;
-
-  // namespaced indicates if a resource is namespaced or not.
-  optional bool namespaced = 2;
-
-  // group is the preferred group of the resource.  Empty implies the group of the containing resource list.
-  // For subresources, this may have a different value, for example: Scale".
-  optional string group = 8;
-
-  // version is the preferred version of the resource.  Empty implies the version of the containing resource list
-  // For subresources, this may have a different value, for example: v1 (while inside a v1beta1 version of the core resource's group)".
-  optional string version = 9;
-
-  // kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
-  optional string kind = 3;
-
-  // verbs is a list of supported kube verbs (this includes get, list, watch, create,
-  // update, patch, delete, deletecollection, and proxy)
-  optional Verbs verbs = 4;
-
-  // shortNames is a list of suggested short names of the resource.
-  // +listType=atomic
-  repeated string shortNames = 5;
-
-  // categories is a list of the grouped resources this resource belongs to (e.g. 'all')
-  // +listType=atomic
-  repeated string categories = 7;
-}
-
 // GroupVersion contains the "group/version" and "version" string of a version.
 // It is made a struct to keep extensibility.
 message DiscoveryGroupVersion {
@@ -380,7 +343,7 @@ message DiscoveryGroupVersion {
   // resources contains the name of the resources and if they are namespaced.
   // +listType=map
   // +listMapKey=name
-  repeated DiscoveryAPIResource resources = 2;
+  repeated APIResource resources = 2;
 }
 
 // Duration is a wrapper around time.Duration which supports correct

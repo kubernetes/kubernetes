@@ -692,7 +692,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 				apiGroupInfo.PrioritizedVersions[0].Group,
 				metav1.DiscoveryGroupVersion{
 					Version:      groupVersion.Version,
-					APIResources: discoveryv1.APIResourcesToDiscoveryAPIResources(apiResources),
+					APIResources: apiResources,
 				},
 			)
 		}

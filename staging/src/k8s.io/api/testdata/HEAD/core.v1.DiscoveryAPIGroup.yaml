@@ -12,6 +12,7 @@ versions:
     shortNames:
     - shortNamesValue
     singularName: singularNameValue
+    storageVersionHash: storageVersionHashValue
     verbs:
     - verbsValue
     version: versionValue

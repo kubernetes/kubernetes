@@ -1151,42 +1151,13 @@ type DiscoveryGroupVersion struct {
 	// resources contains the name of the resources and if they are namespaced.
 	// +listType=map
 	// +listMapKey=name
-	APIResources []DiscoveryAPIResource `json:"resources" protobuf:"bytes,2,rep,name=resources"`
+	APIResources []APIResource `json:"resources" protobuf:"bytes,2,rep,name=resources"`
 
 	// LastContacted is the last time that the apiserver has successfully reached the
 	// corresponding group version's discovery document. This will be nil if the group-version
 	// has not been aggregated yet (APIResources will be empty). To maintain consistency across scenarios with multiple
 	// apiservers, this time will be quantized down to the nearest fifteen minutes.
 	// LastContacted *time.Time `json:"lastContacted" protobuf:"bytes,3,opt,name=lastContacted"`
-}
-
-// APIResource specifies the name of a resource and whether it is namespaced.
-type DiscoveryAPIResource struct {
-	// name is the plural name of the resource.
-	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
-	// singularName is the singular name of the resource.  This allows clients to handle plural and singular opaquely.
-	// The singularName is more correct for reporting status on a single item and both singular and plural are allowed
-	// from the kubectl CLI interface.
-	SingularName string `json:"singularName" protobuf:"bytes,6,opt,name=singularName"`
-	// namespaced indicates if a resource is namespaced or not.
-	Namespaced bool `json:"namespaced" protobuf:"varint,2,opt,name=namespaced"`
-	// group is the preferred group of the resource.  Empty implies the group of the containing resource list.
-	// For subresources, this may have a different value, for example: Scale".
-	Group string `json:"group,omitempty" protobuf:"bytes,8,opt,name=group"`
-	// version is the preferred version of the resource.  Empty implies the version of the containing resource list
-	// For subresources, this may have a different value, for example: v1 (while inside a v1beta1 version of the core resource's group)".
-	Version string `json:"version,omitempty" protobuf:"bytes,9,opt,name=version"`
-	// kind is the kind for the resource (e.g. 'Foo' is the kind for a resource 'foo')
-	Kind string `json:"kind" protobuf:"bytes,3,opt,name=kind"`
-	// verbs is a list of supported kube verbs (this includes get, list, watch, create,
-	// update, patch, delete, deletecollection, and proxy)
-	Verbs Verbs `json:"verbs" protobuf:"bytes,4,opt,name=verbs"`
-	// shortNames is a list of suggested short names of the resource.
-	// +listType=atomic
-	ShortNames []string `json:"shortNames,omitempty" protobuf:"bytes,5,rep,name=shortNames"`
-	// categories is a list of the grouped resources this resource belongs to (e.g. 'all')
-	// +listType=atomic
-	Categories []string `json:"categories,omitempty" protobuf:"bytes,7,rep,name=categories"`
 }
 
 // Verbs masks the value so protobuf can generate

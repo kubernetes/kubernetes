@@ -216,7 +216,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
 		c.resourceManager.AddGroupVersion(version.Group, metav1.DiscoveryGroupVersion{
 			Version:      version.Version,
-			APIResources: discoveryv1.APIResourcesToDiscoveryAPIResources(apiResourcesForDiscovery),
+			APIResources: apiResourcesForDiscovery,
 		})
 	}
 	return nil
