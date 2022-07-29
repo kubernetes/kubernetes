@@ -713,7 +713,7 @@ func shouldRetry(err error) (retry bool, retryAfter time.Duration) {
 	}
 
 	// these errors indicate a transient error that should be retried.
-	if apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
+	if apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
 		return true, 0
 	}
 
