@@ -157,6 +157,18 @@ func TestInsecureOverridesCA(t *testing.T) {
 	matchByteArg(nil, actualCfg.TLSClientConfig.CAData, t)
 }
 
+func TestCurrentContextOverrides(t *testing.T) {
+	config := createCAValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "not-present", &ConfigOverrides{
+		CurrentContext: "clean",
+	}, nil)
+
+	_, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+
 func TestCAOverridesCAData(t *testing.T) {
 	file, err := ioutil.TempFile("", "my.ca")
 	if err != nil {

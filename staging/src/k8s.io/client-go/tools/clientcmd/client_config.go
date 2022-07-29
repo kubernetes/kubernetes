@@ -401,6 +401,9 @@ func (config *DirectClientConfig) ConfirmUsable() error {
 	} else {
 		contextName = config.config.CurrentContext
 	}
+	if config.overrides != nil && len(config.overrides.CurrentContext) != 0 {
+		contextName = config.overrides.CurrentContext
+	}
 
 	if len(contextName) > 0 {
 		_, exists := config.config.Contexts[contextName]
