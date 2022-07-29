@@ -3305,6 +3305,7 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.runAsUser
 	// - spec.containers[*].securityContext.runAsGroup
 	// +optional
+	// This is a beta field and requires the IdentifyPodOS feature
 	OS *PodOS `json:"os,omitempty" protobuf:"bytes,36,opt,name=os"`
 }
 
