@@ -442,7 +442,7 @@ type KubeletConfiguration struct {
 	// cpuCFSQuotaPeriod is the CPU CFS quota period value, `cpu.cfs_period_us`.
 	// The value must be between 1 us and 1 second, inclusive.
 	// Requires the CustomCPUCFSQuotaPeriod feature gate to be enabled.
-	// Default: "100ms"
+	// Default: "100µs"
 	// +optional
 	CPUCFSQuotaPeriod *metav1.Duration `json:"cpuCFSQuotaPeriod,omitempty"`
 	// nodeStatusMaxImages caps the number of images reported in Node.status.images.
