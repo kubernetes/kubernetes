@@ -466,6 +466,20 @@ func makeStorageClass(scName string, mode *storagev1.VolumeBindingMode) *storage
 		ObjectMeta: metav1.ObjectMeta{
 			Name: scName,
 		},
+		Provisioner:       "kubernetes.io/no-provisioner",
+		VolumeBindingMode: mode,
+	}
+}
+
+func makeDefaultStorageClass(scName string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {
+	return &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: scName,
+			Annotations: map[string]string{
+				util.IsDefaultStorageClassAnnotation: "true",
+			},
+		},
+		Provisioner:       "kubernetes.io/no-provisioner",
 		VolumeBindingMode: mode,
 	}
 }
@@ -774,5 +788,123 @@ func TestModifyDeletionFinalizers(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+func TestRetroactiveStorageClassAssignment(t *testing.T) {
+	// Enable RetroactiveDefaultStorageClass feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RetroactiveDefaultStorageClass, true)()
+	tests := []struct {
+		storageClasses []*storagev1.StorageClass
+		tests          []controllerTest
+	}{
+		// [Unit test set 15] - retroactive storage class assignment tests
+		{
+			storageClasses: []*storagev1.StorageClass{},
+			tests: []controllerTest{
+				{
+					name:            "15-1 - pvc storage class is not assigned retroactively if there are no default storage classes",
+					initialVolumes:  novolumes,
+					expectedVolumes: novolumes,
+					initialClaims:   newClaimArray("claim15-1", "uid15-1", "1Gi", "", v1.ClaimPending, nil),
+					expectedClaims:  newClaimArray("claim15-1", "uid15-1", "1Gi", "", v1.ClaimPending, nil),
+					expectedEvents:  noevents,
+					errors:          noerrors,
+					test:            testSyncClaim,
+				},
+			},
+		},
+		{
+			storageClasses: []*storagev1.StorageClass{
+				makeDefaultStorageClass(classGold, &modeImmediate),
+				makeDefaultStorageClass(classSilver, &modeImmediate)},
+			tests: []controllerTest{
+				{
+					name:            "15-2 - pvc storage class is not assigned retroactively if there are multiple default storage classes",
+					initialVolumes:  novolumes,
+					expectedVolumes: novolumes,
+					initialClaims:   newClaimArray("claim15-2", "uid15-2", "1Gi", "", v1.ClaimPending, nil),
+					expectedClaims:  newClaimArray("claim15-2", "uid15-2", "1Gi", "", v1.ClaimPending, nil),
+					expectedEvents:  noevents,
+					errors:          noerrors,
+					test:            testSyncClaim,
+				},
+			},
+		},
+		{
+			storageClasses: []*storagev1.StorageClass{
+				makeDefaultStorageClass(classGold, &modeImmediate),
+				makeStorageClass(classSilver, &modeImmediate),
+			},
+			tests: []controllerTest{
+				{
+					name:            "15-3 - pvc storage class is not assigned retroactively if claim is already bound",
+					initialVolumes:  novolumes,
+					expectedVolumes: novolumes,
+					initialClaims:   newClaimArray("claim15-3", "uid15-3", "1Gi", "test", v1.ClaimBound, &classCopper, volume.AnnBoundByController, volume.AnnBindCompleted),
+					expectedClaims:  newClaimArray("claim15-3", "uid15-3", "1Gi", "test", v1.ClaimLost, &classCopper, volume.AnnBoundByController, volume.AnnBindCompleted),
+					expectedEvents:  noevents,
+					errors:          noerrors,
+					test:            testSyncClaim,
+				},
+			},
+		},
+		{
+			storageClasses: []*storagev1.StorageClass{
+				makeDefaultStorageClass(classGold, &modeImmediate),
+				makeStorageClass(classSilver, &modeImmediate),
+			},
+			tests: []controllerTest{
+				{
+					name:            "15-4 - pvc storage class is not assigned retroactively if claim is already bound but annotations are missing",
+					initialVolumes:  novolumes,
+					expectedVolumes: novolumes,
+					initialClaims:   newClaimArray("claim15-4", "uid15-4", "1Gi", "test", v1.ClaimBound, &classCopper),
+					expectedClaims:  newClaimArray("claim15-4", "uid15-4", "1Gi", "test", v1.ClaimPending, &classCopper),
+					expectedEvents:  noevents,
+					errors:          noerrors,
+					test:            testSyncClaim,
+				},
+			},
+		},
+		{
+			storageClasses: []*storagev1.StorageClass{
+				makeDefaultStorageClass(classGold, &modeImmediate),
+				makeStorageClass(classSilver, &modeImmediate),
+			},
+			tests: []controllerTest{
+				{
+					name:            "15-5 - pvc storage class is assigned retroactively if there is a default",
+					initialVolumes:  novolumes,
+					expectedVolumes: novolumes,
+					initialClaims:   newClaimArray("claim15-5", "uid15-5", "1Gi", "", v1.ClaimPending, nil),
+					expectedClaims:  newClaimArray("claim15-5", "uid15-5", "1Gi", "", v1.ClaimPending, &classGold),
+					expectedEvents:  noevents,
+					errors:          noerrors,
+					test:            testSyncClaim,
+				},
+			},
+		},
+		{
+			storageClasses: []*storagev1.StorageClass{
+				makeDefaultStorageClass(classGold, &modeImmediate),
+				makeStorageClass(classCopper, &modeImmediate),
+			},
+			tests: []controllerTest{
+				{
+					name:            "15-6 - pvc storage class is not changed if claim is not bound but already has a storage class",
+					initialVolumes:  novolumes,
+					expectedVolumes: novolumes,
+					initialClaims:   newClaimArray("claim15-6", "uid15-6", "1Gi", "", v1.ClaimPending, &classCopper),
+					expectedClaims:  newClaimArray("claim15-6", "uid15-6", "1Gi", "", v1.ClaimPending, &classCopper),
+					expectedEvents:  noevents,
+					errors:          noerrors,
+					test:            testSyncClaim,
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		runSyncTests(t, test.tests, test.storageClasses, nil)
 	}
 }
