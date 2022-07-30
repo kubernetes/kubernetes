@@ -18,8 +18,10 @@ package label
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -29,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/json"
+	sptest "k8s.io/apimachinery/pkg/util/strategicpatch/testing"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -582,6 +585,154 @@ func TestLabelResourceVersion(t *testing.T) {
 	}
 	if err := options.RunLabel(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunLabelMsg(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	fakeSchema := sptest.Fake{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")}
+	tf.FakeOpenAPIGetter = &fakeSchema
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Group: "testgroup", Version: "v1"},
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.Method {
+			case "GET":
+				switch req.URL.Path {
+				case "/namespaces/test/pods/foo":
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     cmdtesting.DefaultHeader(),
+						Body: ioutil.NopCloser(bytes.NewBufferString(
+							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","labels":{"existing":"abc"}}}`,
+						))}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			case "PATCH":
+				switch req.URL.Path {
+				case "/namespaces/test/pods/foo":
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     cmdtesting.DefaultHeader(),
+						Body: ioutil.NopCloser(bytes.NewBufferString(
+							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","labels":{"existing":"abc"}}}`,
+						))}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			default:
+				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	testCases := []struct {
+		name          string
+		args          []string
+		overwrite     bool
+		dryRun        string
+		expectedOut   string
+		expectedError error
+	}{
+		{
+			name:        "set new label",
+			args:        []string{"pods/foo", "foo=bar"},
+			expectedOut: "pod/foo labeled\n",
+		},
+		{
+			name:          "attempt to set existing label without using overwrite flag",
+			args:          []string{"pods/foo", "existing=bar"},
+			expectedError: fmt.Errorf("'existing' already has a value (abc), and --overwrite is false"),
+		},
+		{
+			name:        "set existing label",
+			args:        []string{"pods/foo", "existing=bar"},
+			overwrite:   true,
+			expectedOut: "pod/foo labeled\n",
+		},
+		{
+			name:        "unset existing label",
+			args:        []string{"pods/foo", "existing-"},
+			expectedOut: "pod/foo unlabeled\n",
+		},
+		{
+			name: "unset nonexisting label",
+			args: []string{"pods/foo", "foo-"},
+			expectedOut: `label "foo" not found.
+pod/foo not labeled
+`,
+		},
+		{
+			name:        "set new label with server dry run",
+			args:        []string{"pods/foo", "foo=bar"},
+			dryRun:      "server",
+			expectedOut: "pod/foo labeled (server dry run)\n",
+		},
+		{
+			name:        "set new label with client dry run",
+			args:        []string{"pods/foo", "foo=bar"},
+			dryRun:      "client",
+			expectedOut: "pod/foo labeled (dry run)\n",
+		},
+		{
+			name:        "unset existing label with server dry run",
+			args:        []string{"pods/foo", "existing-"},
+			dryRun:      "server",
+			expectedOut: "pod/foo unlabeled (server dry run)\n",
+		},
+		{
+			name:        "unset existing label with client dry run",
+			args:        []string{"pods/foo", "existing-"},
+			dryRun:      "client",
+			expectedOut: "pod/foo unlabeled (dry run)\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdLabel(tf, iostreams)
+			cmd.SetOut(bufOut)
+			cmd.SetErr(bufOut)
+			if tc.dryRun != "" {
+				cmd.Flags().Set("dry-run", tc.dryRun)
+			}
+			options := NewLabelOptions(iostreams)
+			if tc.overwrite {
+				options.overwrite = true
+			}
+			if err := options.Complete(tf, cmd, tc.args); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err := options.Validate(); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			err := options.RunLabel()
+			if tc.expectedError == nil {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Fatalf("expected, but did not get, error: %s", tc.expectedError.Error())
+				} else if err.Error() != tc.expectedError.Error() {
+					t.Fatalf("wrong error\ngot: %s\nexpected: %s\n", err.Error(), tc.expectedError.Error())
+				}
+			}
+
+			if bufOut.String() != tc.expectedOut {
+				t.Fatalf("wrong output\ngot:\n%s\nexpected:\n%s\n", bufOut.String(), tc.expectedOut)
+			}
+		})
 	}
 }
 
