@@ -19,22 +19,17 @@ package factory
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"net/url"
-	"os"
 	"path"
 	"strings"
 	"sync"
 	"time"
 
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
-	"go.etcd.io/etcd/client/pkg/v3/logutil"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,13 +40,11 @@ import (
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
-	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics/legacyregistry"
 	tracing "k8s.io/component-base/tracing"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -64,17 +57,7 @@ const (
 	// It is set to 20 seconds as times shorter than that will cause TLS connections to fail
 	// on heavily loaded arm64 CPUs (issue #64649)
 	dialTimeout = 20 * time.Second
-
-	dbMetricsMonitorJitter = 0.5
 )
-
-// TODO(negz): Stop using a package scoped logger. At the time of writing we're
-// creating an etcd client for each CRD. We need to pass each etcd client a
-// logger or each client will create its own, which comes with a significant
-// memory cost (around 20% of the API server's memory when hundreds of CRDs are
-// present). The correct fix here is to not create a client per CRD. See
-// https://github.com/kubernetes/kubernetes/issues/111476 for more.
-var etcd3ClientLogger *zap.Logger
 
 func init() {
 	// grpcprom auto-registers (via an init function) their client metrics, since we are opting out of
@@ -82,29 +65,102 @@ func init() {
 	// we need to explicitly register these metrics to our global registry here.
 	// For reference: https://github.com/kubernetes/kubernetes/pull/81387
 	legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
-	dbMetricsMonitors = make(map[string]struct{})
-
-	l, err := logutil.CreateDefaultZapLogger(etcdClientDebugLevel())
-	if err != nil {
-		l = zap.NewNop()
-	}
-	etcd3ClientLogger = l.Named("etcd-client")
 }
 
-// etcdClientDebugLevel translates ETCD_CLIENT_DEBUG into zap log level.
-// NOTE(negz): This is a copy of a private etcd client function:
-// https://github.com/etcd-io/etcd/blob/v3.5.4/client/v3/logger.go#L47
-func etcdClientDebugLevel() zapcore.Level {
-	envLevel := os.Getenv("ETCD_CLIENT_DEBUG")
-	if envLevel == "" || envLevel == "true" {
-		return zapcore.InfoLevel
+type activeETCD3Client struct {
+	client *clientv3.Client
+	refs   int
+
+	compactionCancel   func()
+	compactionInterval time.Duration
+	metricPollCancel   func()
+	metricPollInterval time.Duration
+}
+
+type etcd3ClientCache struct {
+	mx     sync.Mutex
+	active map[string]*activeETCD3Client
+}
+
+func newETCD3ClientCache() *etcd3ClientCache {
+	return &etcd3ClientCache{active: make(map[string]*activeETCD3Client)}
+}
+
+func etcd3ClientCacheKey(tc storagebackend.TransportConfig) string {
+	return fmt.Sprintf("%v", tc) // gives: {[server1 server2] keyFile certFile caFile}
+}
+
+// For returns a compacted etcd v3 client for the supplied transport config. One
+// client and compactor are started for each transport. Callers must call the
+// returned destroy function once they are done with the client.
+func (e *etcd3ClientCache) For(tc storagebackend.TransportConfig, compactionInterval, metricPollInterval time.Duration) (*clientv3.Client, error) {
+	e.mx.Lock()
+	defer e.mx.Unlock()
+
+	k := etcd3ClientCacheKey(tc)
+	if a, ok := e.active[k]; ok {
+		// We want to compact and poll at the shortest interval specified by any caller.
+		if a.compactionInterval > compactionInterval {
+			a.compactionCancel()
+			ctx, cancel := context.WithCancel(context.Background())
+			etcd3.StartCompactor(ctx, a.client, compactionInterval)
+			a.compactionInterval = compactionInterval
+			a.compactionCancel = cancel
+		}
+		if a.metricPollInterval > metricPollInterval {
+			a.metricPollCancel()
+			ctx, cancel := context.WithCancel(context.Background())
+			etcd3.StartDBSizeMonitor(ctx, a.client, metricPollInterval)
+			a.metricPollInterval = metricPollInterval
+			a.metricPollCancel = cancel
+		}
+		a.refs++
+		return a.client, nil
 	}
-	var l zapcore.Level
-	if err := l.Set(envLevel); err == nil {
-		log.Printf("Deprecated env ETCD_CLIENT_DEBUG value. Using default level: 'info'")
-		return zapcore.InfoLevel
+
+	c, err := newETCD3Client(tc)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create new etcd3 client: %w", err)
 	}
-	return l
+
+	// Decorate the KV instance so we can track etcd latency per request.
+	// TODO(negz): Does it hurt that this will track latency for compaction?
+	c.KV = etcd3.NewETCDLatencyTracker(c.KV)
+
+	cctx, ccancel := context.WithCancel(context.Background())
+	etcd3.StartCompactor(cctx, c, compactionInterval)
+
+	mctx, mcancel := context.WithCancel(context.Background())
+	etcd3.StartDBSizeMonitor(mctx, c, metricPollInterval)
+
+	e.active[k] = &activeETCD3Client{
+		client:             c,
+		refs:               1,
+		compactionCancel:   ccancel,
+		compactionInterval: compactionInterval,
+		metricPollCancel:   mcancel,
+		metricPollInterval: metricPollInterval,
+	}
+	return c, nil
+}
+
+func (e *etcd3ClientCache) Done(tc storagebackend.TransportConfig) {
+	e.mx.Lock()
+	defer e.mx.Unlock()
+
+	k := etcd3ClientCacheKey(tc)
+	if _, ok := e.active[k]; !ok {
+		return
+	}
+
+	e.active[k].refs--
+	if e.active[k].refs > 0 {
+		return
+	}
+	e.active[k].compactionCancel()
+	e.active[k].metricPollCancel()
+	e.active[k].client.Close()
+	delete(e.active, k)
 }
 
 func newETCD3HealthCheck(c storagebackend.Config, stopCh <-chan struct{}) (func() error, error) {
@@ -257,93 +313,13 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, e
 		DialOptions:          dialOptions,
 		Endpoints:            c.ServerList,
 		TLS:                  tlsConfig,
-		Logger:               etcd3ClientLogger,
 	}
 
 	return clientv3.New(cfg)
 }
 
-type runningCompactor struct {
-	interval time.Duration
-	cancel   context.CancelFunc
-	client   *clientv3.Client
-	refs     int
-}
-
-var (
-	// compactorsMu guards access to compactors map
-	compactorsMu sync.Mutex
-	compactors   = map[string]*runningCompactor{}
-	// dbMetricsMonitorsMu guards access to dbMetricsMonitors map
-	dbMetricsMonitorsMu sync.Mutex
-	dbMetricsMonitors   map[string]struct{}
-)
-
-// startCompactorOnce start one compactor per transport. If the interval get smaller on repeated calls, the
-// compactor is replaced. A destroy func is returned. If all destroy funcs with the same transport are called,
-// the compactor is stopped.
-func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration) (func(), error) {
-	compactorsMu.Lock()
-	defer compactorsMu.Unlock()
-
-	key := fmt.Sprintf("%v", c) // gives: {[server1 server2] keyFile certFile caFile}
-	if compactor, foundBefore := compactors[key]; !foundBefore || compactor.interval > interval {
-		compactorClient, err := newETCD3Client(c)
-		if err != nil {
-			return nil, err
-		}
-
-		if foundBefore {
-			// replace compactor
-			compactor.cancel()
-			compactor.client.Close()
-		} else {
-			// start new compactor
-			compactor = &runningCompactor{}
-			compactors[key] = compactor
-		}
-
-		ctx, cancel := context.WithCancel(context.Background())
-
-		compactor.interval = interval
-		compactor.cancel = cancel
-		compactor.client = compactorClient
-
-		etcd3.StartCompactor(ctx, compactorClient, interval)
-	}
-
-	compactors[key].refs++
-
-	return func() {
-		compactorsMu.Lock()
-		defer compactorsMu.Unlock()
-
-		compactor := compactors[key]
-		compactor.refs--
-		if compactor.refs == 0 {
-			compactor.cancel()
-			compactor.client.Close()
-			delete(compactors, key)
-		}
-	}, nil
-}
-
-func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.Object) (storage.Interface, DestroyFunc, error) {
-	stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	client, err := newETCD3Client(c.Transport)
-	if err != nil {
-		stopCompactor()
-		return nil, nil, err
-	}
-
-	// decorate the KV instance so we can track etcd latency per request.
-	client.KV = etcd3.NewETCDLatencyTracker(client.KV)
-
-	stopDBSizeMonitor, err := startDBSizeMonitorPerEndpoint(client, c.DBMetricPollInterval)
+func newETCD3Storage(client *etcd3ClientCache, tc storagebackend.ConfigForResource, newFunc func() runtime.Object) (storage.Interface, DestroyFunc, error) {
+	c, err := client.For(tc.Transport, tc.CompactionInterval, tc.DBMetricPollInterval)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -354,47 +330,12 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 		// Hence, we only destroy once.
 		// TODO: fix duplicated storage destroy calls higher level
 		once.Do(func() {
-			stopCompactor()
-			stopDBSizeMonitor()
-			client.Close()
+			client.Done(tc.Transport)
 		})
 	}
-	transformer := c.Transformer
+	transformer := tc.Transformer
 	if transformer == nil {
 		transformer = value.IdentityTransformer
 	}
-	return etcd3.New(client, c.Codec, newFunc, c.Prefix, c.GroupResource, transformer, c.Paging, c.LeaseManagerConfig), destroyFunc, nil
-}
-
-// startDBSizeMonitorPerEndpoint starts a loop to monitor etcd database size and update the
-// corresponding metric etcd_db_total_size_in_bytes for each etcd server endpoint.
-func startDBSizeMonitorPerEndpoint(client *clientv3.Client, interval time.Duration) (func(), error) {
-	if interval == 0 {
-		return func() {}, nil
-	}
-	dbMetricsMonitorsMu.Lock()
-	defer dbMetricsMonitorsMu.Unlock()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	for _, ep := range client.Endpoints() {
-		if _, found := dbMetricsMonitors[ep]; found {
-			continue
-		}
-		dbMetricsMonitors[ep] = struct{}{}
-		endpoint := ep
-		klog.V(4).Infof("Start monitoring storage db size metric for endpoint %s with polling interval %v", endpoint, interval)
-		go wait.JitterUntilWithContext(ctx, func(context.Context) {
-			epStatus, err := client.Maintenance.Status(ctx, endpoint)
-			if err != nil {
-				klog.V(4).Infof("Failed to get storage db size for ep %s: %v", endpoint, err)
-				metrics.UpdateEtcdDbSize(endpoint, -1)
-			} else {
-				metrics.UpdateEtcdDbSize(endpoint, epStatus.DbSize)
-			}
-		}, interval, dbMetricsMonitorJitter, true)
-	}
-
-	return func() {
-		cancel()
-	}, nil
+	return etcd3.New(c, tc.Codec, newFunc, tc.Prefix, tc.GroupResource, transformer, tc.Paging, tc.LeaseManagerConfig), destroyFunc, nil
 }

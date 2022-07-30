@@ -37,7 +37,7 @@ func NewETCDLatencyTracker(delegate clientv3.KV) clientv3.KV {
 // complete response back)
 //
 // If an API request involves N (N>=1) round trips to etcd, then we will sum
-// up the latenciy incurred in each roundtrip.
+// up the latency incurred in each roundtrip.
 
 // It uses the context associated with the request in flight, so there
 // are no states shared among the requests in flight, and so there is no
@@ -45,10 +45,6 @@ func NewETCDLatencyTracker(delegate clientv3.KV) clientv3.KV {
 // If the goroutine executing the request handler makes concurrent calls
 // to the underlying storage layer, that is protected since the latency
 // tracking function TrackStorageLatency is thread safe.
-//
-// NOTE: Compact is an asynchronous process and is not associated with
-//
-//	any request, so we will not be tracking its latency.
 type clientV3KVLatencyTracker struct {
 	clientv3.KV
 }
