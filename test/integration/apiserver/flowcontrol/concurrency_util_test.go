@@ -81,6 +81,16 @@ func setupWithAuthorizer(t testing.TB, maxReadonlyRequestsInFlight, maxMutatingR
 	return kubeConfig, tearDownFn
 }
 
+// This integration test checks the client-side expected concurrency and the server-side observed concurrency
+// to make sure that they are close within a small error bound and that the priority levels are isolated.
+// This test differs from TestPriorityLevelIsolation since TestPriorityLevelIsolation checks throughput instead
+// of concurrency. In order to mitigate the effects of system noise, authorization webhook is used to artificially
+// increase request execution time to make the system noise relatively insignificant.
+// This test calculates the server-side observed concurrency from average priority level seat utilization APF metric.
+// It also assumes that
+// (server-side request execution throughput) == (client-side request throughput) and derives a formula to
+// calculate the client-side expected concurrency. The two are compared and a small error bound is determined
+// from estimating the noise using 2*(standard deviation of requenst latency)/(avg request latency).
 func TestConcurrencyIsolation(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
 	// NOTE: disabling the feature should fail the test
