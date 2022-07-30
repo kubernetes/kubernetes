@@ -18,8 +18,8 @@ package testing
 
 import (
 	"encoding/json"
+	"io"
 	"io/fs"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -71,7 +71,7 @@ func NewFakeOpenAPIV3Server(specsPath string) (*FakeOpenAPIServer, error) {
 		}
 
 		defer file.Close()
-		vals, err := ioutil.ReadAll(file)
+		vals, err := io.ReadAll(file)
 		if err != nil {
 			panic(err)
 		}
