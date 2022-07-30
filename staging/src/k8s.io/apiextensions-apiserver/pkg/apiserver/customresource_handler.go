@@ -112,6 +112,7 @@ type crdHandler struct {
 
 	crdLister             listers.CustomResourceDefinitionLister
 	clusterAwareCRDLister kcp.ClusterAwareCRDLister
+	crdIndexer            cache.Indexer
 
 	delegate          http.Handler
 	restOptionsGetter generic.RESTOptionsGetter
@@ -180,6 +181,8 @@ type crdInfo struct {
 // crdStorageMap goes from customresourcedefinition to its storage
 type crdStorageMap map[types.UID]*crdInfo
 
+const byGroupResource = "byGroupResource"
+
 func NewCustomResourceDefinitionHandler(
 	versionDiscoveryHandler *versionDiscoveryHandler,
 	groupDiscoveryHandler *groupDiscoveryHandler,
@@ -201,6 +204,7 @@ func NewCustomResourceDefinitionHandler(
 		groupDiscoveryHandler:   groupDiscoveryHandler,
 		customStorage:           atomic.Value{},
 		crdLister:               crdInformer.Lister(),
+		crdIndexer:              crdInformer.Informer().GetIndexer(),
 		delegate:                delegate,
 		restOptionsGetter:       restOptionsGetter,
 		admission:               admission,
@@ -219,6 +223,28 @@ func NewCustomResourceDefinitionHandler(
 			ret.removeDeadStorage()
 		},
 	})
+
+	// kcp: needed to be able to accurately preserve/remove storage for wildcard partial metadata requests
+	if _, exists := crdInformer.Informer().GetIndexer().GetIndexers()[byGroupResource]; !exists {
+		if err := crdInformer.Informer().GetIndexer().AddIndexers(cache.Indexers{
+			byGroupResource: func(obj interface{}) ([]string, error) {
+				crd, ok := obj.(*apiextensionsv1.CustomResourceDefinition)
+				if !ok {
+					return nil, fmt.Errorf("unable to process obj in byName index: unexpected type %T", obj)
+				}
+
+				group := crd.Spec.Group
+				if group == "" {
+					group = "core"
+				}
+
+				return []string{crd.Spec.Names.Plural + "." + group}, nil
+			},
+		}); err != nil {
+			return nil, fmt.Errorf("error adding byName index to CRD lister: %v", err)
+		}
+	}
+
 	crConverterFactory, err := conversion.NewCRConverterFactory(serviceResolver, authResolverWrapper)
 	if err != nil {
 		return nil, err
@@ -641,6 +667,26 @@ func (r *crdHandler) removeDeadStorage() {
 			storageMap2[crd.UID] = storageMap[crd.UID]
 		}
 	}
+
+	// kcp: preserve partial metadata, one per GroupResource (randomly) that has at least one CRD
+	for uid, crdInfo := range storageMap {
+		if strings.HasSuffix(string(uid), ".wildcard.partial-metadata") {
+			groupResource := strings.TrimSuffix(string(uid), ".wildcard.partial-metadata")
+
+			crdsForGroupResource, err := r.crdIndexer.ByIndex(byGroupResource, groupResource)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("error retrieving CRDs for %q from index: %v", groupResource, err))
+			}
+
+			if len(crdsForGroupResource) > 0 {
+				storageMap2[uid] = crdInfo
+				klog.V(6).InfoS("Preserving wildcard partial metadata storage because at least 1 CRD for this group resource still exists", "crd", groupResource)
+			} else {
+				klog.V(4).InfoS("Removing wildcard partial metadata storage because no CRDs for this group resource still exist", "crd", groupResource)
+			}
+		}
+	}
+
 	r.customStorage.Store(storageMap2)
 
 	for uid, crdInfo := range storageMap {
