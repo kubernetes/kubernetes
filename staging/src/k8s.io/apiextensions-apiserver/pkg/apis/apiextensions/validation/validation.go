@@ -1605,7 +1605,7 @@ func validatePreserveUnknownFields(crd, oldCRD *apiextensions.CustomResourceDefi
 	var errs field.ErrorList
 	if crd != nil && crd.Spec.PreserveUnknownFields != nil && *crd.Spec.PreserveUnknownFields {
 		// disallow changing spec.preserveUnknownFields=false to spec.preserveUnknownFields=true
-		errs = append(errs, field.Invalid(field.NewPath("spec").Child("preserveUnknownFields"), crd.Spec.PreserveUnknownFields, "cannot set to true, set x-preserve-unknown-fields to true in spec.versions[*].schema instead"))
+		errs = append(errs, field.Invalid(field.NewPath("spec").Child("preserveUnknownFields"), crd.Spec.PreserveUnknownFields, "cannot set to true, set x-kubernetes-preserve-unknown-fields to true in spec.versions[*].schema instead"))
 	}
 	return errs
 }

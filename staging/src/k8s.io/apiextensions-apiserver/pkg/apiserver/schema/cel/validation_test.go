@@ -775,7 +775,7 @@ func TestValidationExpressions(t *testing.T) {
 			}),
 			valid: []string{
 				// 'kind', 'apiVersion', 'metadata.name' and 'metadata.generateName' are always accessible
-				// even if not specified in the schema, regardless of if x-preserve-unknown-fields is set.
+				// even if not specified in the schema, regardless of if x-kubernetes-preserve-unknown-fields is set.
 				"self.embedded.kind == 'Pod'",
 				"self.embedded.apiVersion == 'v1'",
 				"self.embedded.metadata.name == 'foo'",
@@ -785,7 +785,7 @@ func TestValidationExpressions(t *testing.T) {
 				"has(self.embedded)",
 			},
 			// only field declared in the schema can be field selected in CEL expressions, regardless of if
-			// x-preserve-unknown-fields is set.
+			// x-kubernetes-preserve-unknown-fields is set.
 			errors: map[string]string{
 				"has(self.embedded.spec)": "undefined field 'spec'",
 			},
