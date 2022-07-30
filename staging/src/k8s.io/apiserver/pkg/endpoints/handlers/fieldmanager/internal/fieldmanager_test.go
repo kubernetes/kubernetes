@@ -18,7 +18,7 @@ package internal_test
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -27,7 +27,7 @@ import (
 )
 
 var fakeTypeConverter = func() internal.TypeConverter {
-	data, err := ioutil.ReadFile(filepath.Join(
+	data, err := os.ReadFile(filepath.Join(
 		strings.Repeat(".."+string(filepath.Separator), 9),
 		"api", "openapi-spec", "swagger.json"))
 	if err != nil {
@@ -45,7 +45,7 @@ var fakeTypeConverter = func() internal.TypeConverter {
 }()
 
 var testTypeConverter = func() internal.TypeConverter {
-	data, err := ioutil.ReadFile(filepath.Join("testdata", "swagger.json"))
+	data, err := os.ReadFile(filepath.Join("testdata", "swagger.json"))
 	if err != nil {
 		panic(err)
 	}

@@ -19,7 +19,6 @@ package config
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"path"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,7 +46,7 @@ func LoadConfig(configFile io.Reader) (string, error) {
 	var kubeconfigFile string
 	if configFile != nil {
 		// we have a config so parse it.
-		data, err := ioutil.ReadAll(configFile)
+		data, err := io.ReadAll(configFile)
 		if err != nil {
 			return "", err
 		}

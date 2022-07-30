@@ -17,7 +17,7 @@ limitations under the License.
 package admission
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"reflect"
 	"testing"
@@ -33,7 +33,7 @@ import (
 
 func TestReadAdmissionConfiguration(t *testing.T) {
 	// create a place holder file to hold per test config
-	configFile, err := ioutil.TempFile("", "admission-plugin-config")
+	configFile, err := os.CreateTemp("", "admission-plugin-config")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 	require.NoError(t, apiserverapiv1.AddToScheme(scheme))
 
 	for testName, testCase := range testCases {
-		if err = ioutil.WriteFile(configFileName, []byte(testCase.ConfigBody), 0644); err != nil {
+		if err = os.WriteFile(configFileName, []byte(testCase.ConfigBody), 0644); err != nil {
 			t.Fatalf("unexpected err writing temp file: %v", err)
 		}
 		config, err := ReadAdmissionConfiguration(testCase.PluginNames, configFileName, scheme)
@@ -203,7 +203,7 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 
 func TestEmbeddedConfiguration(t *testing.T) {
 	// create a place holder file to hold per test config
-	configFile, err := ioutil.TempFile("", "admission-plugin-config")
+	configFile, err := os.CreateTemp("", "admission-plugin-config")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
@@ -297,7 +297,7 @@ func TestEmbeddedConfiguration(t *testing.T) {
 		require.NoError(t, apiserverapiv1alpha1.AddToScheme(scheme))
 		require.NoError(t, apiserverapiv1.AddToScheme(scheme))
 
-		if err = ioutil.WriteFile(configFileName, []byte(test.ConfigBody), 0644); err != nil {
+		if err = os.WriteFile(configFileName, []byte(test.ConfigBody), 0644); err != nil {
 			t.Errorf("[%s] unexpected err writing temp file: %v", desc, err)
 			continue
 		}
@@ -311,7 +311,7 @@ func TestEmbeddedConfiguration(t *testing.T) {
 			t.Errorf("[%s] Failed to get Foo config: %v", desc, err)
 			continue
 		}
-		bs, err := ioutil.ReadAll(r)
+		bs, err := io.ReadAll(r)
 		if err != nil {
 			t.Errorf("[%s] Failed to read Foo config data: %v", desc, err)
 			continue

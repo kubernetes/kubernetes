@@ -19,8 +19,8 @@ package options
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 
 	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -145,7 +145,7 @@ func ReadTracingConfiguration(configFilePath string) (*tracingapi.TracingConfigu
 	if configFilePath == "" {
 		return nil, fmt.Errorf("tracing config file was empty")
 	}
-	data, err := ioutil.ReadFile(configFilePath)
+	data, err := os.ReadFile(configFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read tracing configuration from %q: %v", configFilePath, err)
 	}
