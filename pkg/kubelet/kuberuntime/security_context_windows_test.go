@@ -51,6 +51,7 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 	anyUser := "anyone"
 	runAsNonRootTrue := true
 	runAsNonRootFalse := false
+	uid := int64(0)
 	for _, test := range []struct {
 		desc     string
 		sc       *v1.SecurityContext
@@ -140,7 +141,11 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 		{
 			desc: "Pass if container's user and image's user aren't set and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
-				RunAsNonRoot: &runAsNonRootTrue,
+				// verifyRunAsNonRoot should ignore the RunAsUser, SELinuxOptions, and RunAsGroup options.
+				RunAsUser:      &uid,
+				SELinuxOptions: &v1.SELinuxOptions{},
+				RunAsGroup:     &uid,
+				RunAsNonRoot:   &runAsNonRootTrue,
 			},
 			fail: false,
 		},
