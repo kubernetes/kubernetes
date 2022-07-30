@@ -21,7 +21,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -347,7 +347,7 @@ func TestProxyHandler(t *testing.T) {
 				t.Errorf("%s: expected %v, got %v", name, e, a)
 				return
 			}
-			bytes, err := ioutil.ReadAll(resp.Body)
+			bytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Errorf("%s: %v", name, err)
 				return
@@ -756,7 +756,7 @@ func TestGetContextForNewRequest(t *testing.T) {
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Error(err)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1038,7 +1038,7 @@ func TestFlowControlSignal(t *testing.T) {
 }
 
 func getCertAndKeyPaths(t *testing.T) (string, string, string) {
-	dir, err := ioutil.TempDir(os.TempDir(), "k8s-test-handler-proxy-cert")
+	dir, err := os.MkdirTemp(os.TempDir(), "k8s-test-handler-proxy-cert")
 	if err != nil {
 		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
 	}
@@ -1048,10 +1048,10 @@ func getCertAndKeyPaths(t *testing.T) (string, string, string) {
 }
 
 func writeCerts(certFile, keyFile string, certContent, keyContent []byte, t *testing.T) {
-	if err := ioutil.WriteFile(certFile, certContent, 0600); err != nil {
+	if err := os.WriteFile(certFile, certContent, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", certFile, err)
 	}
-	if err := ioutil.WriteFile(keyFile, keyContent, 0600); err != nil {
+	if err := os.WriteFile(keyFile, keyContent, 0600); err != nil {
 		t.Fatalf("Unable to create the file %q: %v", keyFile, err)
 	}
 }
@@ -1078,7 +1078,7 @@ func getSingleCounterValueFromRegistry(t *testing.T, r metrics.Gatherer, name st
 }
 
 func readTestFile(filename string) []byte {
-	data, err := ioutil.ReadFile("testdata/" + filename)
+	data, err := os.ReadFile("testdata/" + filename)
 	if err != nil {
 		panic(err)
 	}
