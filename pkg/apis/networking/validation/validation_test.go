@@ -1982,3 +1982,216 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 		}
 	}
 }
+
+func makeNodeSelector(key string, op api.NodeSelectorOperator, values []string) *api.NodeSelector {
+	return &api.NodeSelector{
+		NodeSelectorTerms: []api.NodeSelectorTerm{
+			{
+				MatchExpressions: []api.NodeSelectorRequirement{
+					{
+						Key:      key,
+						Operator: op,
+						Values:   values,
+					},
+				},
+			},
+		},
+	}
+}
+
+func makeClusterCIDR(perNodeHostBits int32, ipv4, ipv6 string, nodeSelector *api.NodeSelector) *networking.ClusterCIDR {
+	return &networking.ClusterCIDR{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "9",
+		},
+		Spec: networking.ClusterCIDRSpec{
+			PerNodeHostBits: perNodeHostBits,
+			IPv4:            ipv4,
+			IPv6:            ipv6,
+			NodeSelector:    nodeSelector,
+		},
+	}
+}
+
+func TestValidateClusterCIDR(t *testing.T) {
+	testCases := []struct {
+		name      string
+		ccc       *networking.ClusterCIDR
+		expectErr bool
+	}{
+		{
+			name:      "valid SingleStack IPv4 ClusterCIDR",
+			ccc:       makeClusterCIDR(8, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid SingleStack IPv4 ClusterCIDR, perNodeHostBits = maxPerNodeHostBits",
+			ccc:       makeClusterCIDR(16, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid SingleStack IPv4 ClusterCIDR, perNodeHostBits > minPerNodeHostBits",
+			ccc:       makeClusterCIDR(4, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid SingleStack IPv6 ClusterCIDR",
+			ccc:       makeClusterCIDR(8, "", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid SingleStack IPv6 ClusterCIDR, perNodeHostBits = maxPerNodeHostBit",
+			ccc:       makeClusterCIDR(64, "", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid SingleStack IPv6 ClusterCIDR, perNodeHostBits > minPerNodeHostBit",
+			ccc:       makeClusterCIDR(4, "", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid SingleStack IPv6 ClusterCIDR perNodeHostBits=100",
+			ccc:       makeClusterCIDR(100, "", "fd00:1:1::/16", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid DualStack ClusterCIDR",
+			ccc:       makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "valid DualStack ClusterCIDR, no NodeSelector",
+			ccc:       makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", nil),
+			expectErr: false,
+		},
+		// Failure cases.
+		{
+			name:      "invalid ClusterCIDR, no IPv4 or IPv6 CIDR",
+			ccc:       makeClusterCIDR(8, "", "", nil),
+			expectErr: true,
+		},
+		{
+			name:      "invalid ClusterCIDR, invalid nodeSelector",
+			ccc:       makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("NoUppercaseOrSpecialCharsLike=Equals", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		// IPv4 tests.
+		{
+			name:      "invalid SingleStack IPv4 ClusterCIDR, invalid spec.IPv4",
+			ccc:       makeClusterCIDR(8, "test", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid Singlestack IPv4 ClusterCIDR, perNodeHostBits > maxPerNodeHostBits",
+			ccc:       makeClusterCIDR(100, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid SingleStack IPv4 ClusterCIDR, perNodeHostBits < minPerNodeHostBits",
+			ccc:       makeClusterCIDR(2, "10.1.0.0/16", "", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		// IPv6 tests.
+		{
+			name:      "invalid SingleStack IPv6 ClusterCIDR, invalid spec.IPv6",
+			ccc:       makeClusterCIDR(8, "", "testv6", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid SingleStack IPv6 ClusterCIDR, valid IPv4 CIDR in spec.IPv6",
+			ccc:       makeClusterCIDR(8, "", "10.2.0.0/16", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid SingleStack IPv6 ClusterCIDR, invalid perNodeHostBits > maxPerNodeHostBits",
+			ccc:       makeClusterCIDR(12, "", "fd00::/120", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid SingleStack IPv6 ClusterCIDR, invalid perNodeHostBits < minPerNodeHostBits",
+			ccc:       makeClusterCIDR(3, "", "fd00::/120", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		// DualStack tests
+		{
+			name:      "invalid DualStack ClusterCIDR, valid spec.IPv4, invalid spec.IPv6",
+			ccc:       makeClusterCIDR(8, "10.1.0.0/16", "testv6", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid DualStack ClusterCIDR, valid spec.IPv6, invalid spec.IPv4",
+			ccc:       makeClusterCIDR(8, "testv4", "fd00::/120", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid DualStack ClusterCIDR, invalid perNodeHostBits > maxPerNodeHostBits",
+			ccc:       makeClusterCIDR(24, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "invalid DualStack ClusterCIDR, valid IPv6 CIDR in spec.IPv4",
+			ccc:       makeClusterCIDR(8, "fd00::/120", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := ValidateClusterCIDR(testCase.ccc)
+			if !testCase.expectErr && err != nil {
+				t.Errorf("ValidateClusterCIDR(%+v) must be successful for test '%s', got %v", testCase.ccc, testCase.name, err)
+			}
+			if testCase.expectErr && err == nil {
+				t.Errorf("ValidateClusterCIDR(%+v) must return an error for test: %s, but got nil", testCase.ccc, testCase.name)
+			}
+		})
+	}
+}
+
+func TestValidateClusterConfigUpdate(t *testing.T) {
+	oldCCC := makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"}))
+
+	testCases := []struct {
+		name      string
+		ccc       *networking.ClusterCIDR
+		expectErr bool
+	}{
+		{
+			name:      "Successful update, no changes to ClusterCIDR.Spec",
+			ccc:       makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: false,
+		},
+		{
+			name:      "Failed update, update spec.PerNodeHostBits",
+			ccc:       makeClusterCIDR(12, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "Failed update, update spec.IPv4",
+			ccc:       makeClusterCIDR(8, "10.2.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "Failed update, update spec.IPv6",
+			ccc:       makeClusterCIDR(8, "10.1.0.0/16", "fd00:2:/112", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar"})),
+			expectErr: true,
+		},
+		{
+			name:      "Failed update, update spec.NodeSelector",
+			ccc:       makeClusterCIDR(8, "10.1.0.0/16", "fd00:1:1::/64", makeNodeSelector("foo", api.NodeSelectorOpIn, []string{"bar2"})),
+			expectErr: true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := ValidateClusterCIDRUpdate(testCase.ccc, oldCCC)
+			if !testCase.expectErr && err != nil {
+				t.Errorf("ValidateClusterCIDRUpdate(%+v) must be successful for test '%s', got %v", testCase.ccc, testCase.name, err)
+			}
+			if testCase.expectErr && err == nil {
+				t.Errorf("ValidateClusterCIDRUpdate(%+v) must return error for test: %s, but got nil", testCase.ccc, testCase.name)
+			}
+		})
+	}
+}

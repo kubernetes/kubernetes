@@ -583,3 +583,77 @@ type ServiceBackendPort struct {
 	// +optional
 	Number int32
 }
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterCIDR is the Schema for the ClusterCIDR API.
+// This resource is consumed by the MultiCIDRRangeAllocator to allocate pod CIDRs
+// to nodes. When there are multiple ClusterCIDR resources in the cluster, the
+// list of all applicable ClusterCIDR resources is collected. A ClusterCIDR is
+// applicable if its NodeSelector matches the Node being allocated, and if it has
+// free CIDRs to allocate.
+// In case of multiple matching ClusterCIDR resources, MultiCIDRRangeAllocator
+// attempts to break ties sequentially using the following rules:
+// 1. Pick the ClusterCIDR whose NodeSelector matches the most labels/fields on the Node.
+// For example, Pick {'node.kubernetes.io/instance-type': 'medium', 'rack': 'rack1'}
+// before {'node.kubernetes.io/instance-type': 'medium'}
+// 2. Pick the ClusterCIDR with the fewest allocatable Pod CIDRs.
+// For example, {IPv4: "10.0.0.0/16", PerNodeHostBits: "16"} (1 possible Pod CIDR)
+// is picked before {IPv4: "192.168.0.0/20", PerNodeHostBits: "10"} (4 possible Pod CIDRs)
+// 3. Pick the ClusterCIDR whose PerNodeHostBits is the fewest IPs.
+// For example, {PerNodeHostBits: 5} (32 IPs) picked before {PerNodeHostBits: 7} (128 IPs).
+// 4. Pick the ClusterCIDR having label with lower alphanumeric value.
+// For example, Pick {'node.kubernetes.io/instance-type': 'low'}
+// before {'node.kubernetes.io/instance-type': 'medium'}
+// 5. Pick the ClusterCIDR having a smaller IP address value.
+// For example, Pick {IPv4: "10.0.0.0/16"} before {IPv4: "10.11.0.0/16"}
+type ClusterCIDR struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+
+	Spec ClusterCIDRSpec
+}
+
+// ClusterCIDRSpec defines the desired state of ClusterCIDR.
+type ClusterCIDRSpec struct {
+	// NodeSelector defines which nodes the config is applicable to.
+	// An empty or nil NodeSelector functions as a default that applies to all nodes.
+	// This field is immutable.
+	// +optional
+	NodeSelector *api.NodeSelector
+
+	// PerNodeHostBits defines the number of host bits to be configured per node.
+	// A subnet mask determines how much of the address is used for network bits
+	// and host bits. For example and IPv4 address of 192.168.0.0/24, splits the
+	// address into 24 bits for the network portion and 8 bits for the host portion.
+	// For a /24 mask for IPv4 or a /120 for IPv6, configure PerNodeHostBits=8
+	// Minimum value for PerNodeHostBits is 4.
+	// This field is immutable.
+	// +required
+	PerNodeHostBits int32
+
+	// IPv4 defines an IPv4 IP block in CIDR notation(e.g. "10.0.0.0/8").
+	// This field is immutable.
+	// +optional
+	IPv4 string
+
+	// IPv6 defines an IPv6 IP block in CIDR notation(e.g. "fd12:3456:789a:1::/64").
+	// This field is immutable.
+	// +optional
+	IPv6 string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ClusterCIDRList contains a list of ClusterCIDRs.
+type ClusterCIDRList struct {
+	metav1.TypeMeta
+
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of ClusterCIDRs.
+	Items []ClusterCIDR
+}

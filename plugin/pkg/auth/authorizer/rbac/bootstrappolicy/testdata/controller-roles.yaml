@@ -908,6 +908,13 @@ items:
     - delete
     - list
   - apiGroups:
+    - networking.k8s.io
+    resources:
+    - clustercidrs
+    verbs:
+    - get
+    - list
+  - apiGroups:
     - ""
     - events.k8s.io
     resources:

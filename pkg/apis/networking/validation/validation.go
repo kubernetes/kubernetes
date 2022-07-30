@@ -602,3 +602,90 @@ func allowInvalidWildcardHostRule(oldIngress *networking.Ingress) bool {
 	}
 	return false
 }
+
+// ValidateClusterCIDRName validates that the given name can be used as an
+// ClusterCIDR name.
+var ValidateClusterCIDRName = apimachineryvalidation.NameIsDNSLabel
+
+// ValidateClusterCIDR validates a ClusterCIDR.
+func ValidateClusterCIDR(ccc *networking.ClusterCIDR) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&ccc.ObjectMeta, false, ValidateClusterCIDRName, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateClusterCIDRSpec(&ccc.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateClusterCIDRSpec validates ClusterCIDR Spec.
+func ValidateClusterCIDRSpec(spec *networking.ClusterCIDRSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if spec.NodeSelector != nil {
+		allErrs = append(allErrs, apivalidation.ValidateNodeSelector(spec.NodeSelector, fldPath.Child("nodeSelector"))...)
+	}
+
+	// Validate if CIDR is configured for at least one IP Family(IPv4/IPv6).
+	if spec.IPv4 == "" && spec.IPv6 == "" {
+		allErrs = append(allErrs, field.Required(fldPath, "one or both of `ipv4` and `ipv6` must be configured"))
+		return allErrs
+	}
+
+	// Validate configured IPv4 CIDR and PerNodeHostBits.
+	if spec.IPv4 != "" {
+		if !netutils.IsIPv4CIDRString(spec.IPv4) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ipv4"), spec.IPv4, "must be a valid IPv4 CIDR"))
+		} else {
+			allErrs = append(allErrs, validatePerNodeHostBits(spec.IPv4, spec.PerNodeHostBits, 32, fldPath)...)
+		}
+
+	}
+
+	// Validate configured IPv6 CIDR and PerNodeHostBits.
+	if spec.IPv6 != "" {
+		if !netutils.IsIPv6CIDRString(spec.IPv6) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ipv6"), spec.IPv6, "must be a valid IPv6 CIDR"))
+		} else {
+			allErrs = append(allErrs, validatePerNodeHostBits(spec.IPv6, spec.PerNodeHostBits, 128, fldPath)...)
+		}
+	}
+
+	return allErrs
+}
+
+func validatePerNodeHostBits(configCIDR string, perNodeHostBits, maxMaskSize int32, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	minPerNodeHostBits := int32(4)
+
+	_, cidr, err := netutils.ParseCIDRSloppy(configCIDR)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("cidr"), cidr, fmt.Sprintf("must be a valid CIDR: %s", configCIDR)))
+		return allErrs
+	}
+	maskSize, _ := cidr.Mask.Size()
+
+	maxPerNodeHostBits := maxMaskSize - int32(maskSize)
+
+	if perNodeHostBits < minPerNodeHostBits {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("perNodeHostBits"), perNodeHostBits, fmt.Sprintf("must be greater than %d", minPerNodeHostBits)))
+	}
+	if perNodeHostBits > maxPerNodeHostBits {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("perNodeHostBits"), perNodeHostBits, fmt.Sprintf("must be less than or equal to %d", maxPerNodeHostBits)))
+	}
+	return allErrs
+}
+
+// ValidateClusterCIDRUpdate tests if an update to a ClusterCIDR is valid.
+func ValidateClusterCIDRUpdate(update, old *networking.ClusterCIDR) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, validateClusterCIDRUpdateSpec(&update.Spec, &old.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+func validateClusterCIDRUpdateSpec(update, old *networking.ClusterCIDRSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.NodeSelector, old.NodeSelector, fldPath.Child("nodeSelector"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.PerNodeHostBits, old.PerNodeHostBits, fldPath.Child("perNodeHostBits"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.IPv4, old.IPv4, fldPath.Child("ipv4"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.IPv6, old.IPv6, fldPath.Child("ipv6"))...)
+
+	return allErrs
+}
