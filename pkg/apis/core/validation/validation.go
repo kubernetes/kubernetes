@@ -6490,6 +6490,7 @@ func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstrai
 		if err := validateNodeInclusionPolicy(subFldPath.Child("nodeTaintsPolicy"), constraint.NodeTaintsPolicy); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		allErrs = append(allErrs, validateMatchLabelKeys(subFldPath.Child("matchLabelKeys"), constraint.MatchLabelKeys, constraint.LabelSelector)...)
 	}
 
 	return allErrs
@@ -6561,6 +6562,33 @@ func validateNodeInclusionPolicy(fldPath *field.Path, policy *core.NodeInclusion
 		return field.NotSupported(fldPath, policy, supportedPodTopologySpreadNodePolicies.List())
 	}
 	return nil
+}
+
+// validateMatchLabelKeys tests that the elements are a valid label name and are not already included in labelSelector.
+func validateMatchLabelKeys(fldPath *field.Path, matchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
+	if len(matchLabelKeys) == 0 {
+		return nil
+	}
+
+	labelSelectorKeys := sets.String{}
+	if labelSelector != nil {
+		for key := range labelSelector.MatchLabels {
+			labelSelectorKeys.Insert(key)
+		}
+		for _, matchExpression := range labelSelector.MatchExpressions {
+			labelSelectorKeys.Insert(matchExpression.Key)
+		}
+	}
+
+	allErrs := field.ErrorList{}
+	for i, key := range matchLabelKeys {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(key, fldPath.Index(i))...)
+		if labelSelectorKeys.Has(key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector"))
+		}
+	}
+
+	return allErrs
 }
 
 // ValidateServiceClusterIPsRelatedFields validates .spec.ClusterIPs,,
