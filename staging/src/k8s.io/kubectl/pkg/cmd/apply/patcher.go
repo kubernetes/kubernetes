@@ -104,6 +104,12 @@ func (p *Patcher) delete(namespace, name string) error {
 }
 
 func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
+	objMeta, err := meta.Accessor(obj)
+
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to read object metadata")
+	}
+
 	// Serialize the current configuration of the object from the server.
 	current, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
@@ -164,6 +170,25 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 	}
 
 	patchedObj, err := p.Helper.Patch(namespace, name, patchType, patch, nil)
+
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "patch request failed")
+	}
+
+	patchedMeta, err := meta.Accessor(patchedObj)
+
+	if err != nil {
+		// Ignore error? request did go through...
+		return patch, patchedObj, nil
+	}
+
+	// The server side may detect a no-op patch and do nothing with it.
+	// 	If the returned object has the same resource version then the server did
+	// 	not apply any new changes and effectively nothing has happened.
+	if patchedMeta.GetResourceVersion() == objMeta.GetResourceVersion() {
+		return []byte("{}"), obj, err
+	}
+
 	return patch, patchedObj, err
 }
 
