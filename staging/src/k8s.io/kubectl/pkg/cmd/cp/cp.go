@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -129,7 +128,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 					//    listing the entire content of the current directory which could
 					//    be too many choices for the user)
 					if len(comps) > 0 && len(toComplete) > 0 {
-						if files, err := ioutil.ReadDir("."); err == nil {
+						if files, err := os.ReadDir("."); err == nil {
 							for _, file := range files {
 								filename := file.Name()
 								if strings.HasPrefix(filename, toComplete) {
@@ -425,7 +424,7 @@ func recursiveTar(srcDir, srcFile localPath, destDir, destFile remotePath, tw *t
 			return err
 		}
 		if stat.IsDir() {
-			files, err := ioutil.ReadDir(fpath)
+			files, err := os.ReadDir(fpath)
 			if err != nil {
 				return err
 			}

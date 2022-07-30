@@ -18,7 +18,7 @@ package rollout
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -80,7 +80,7 @@ func TestRolloutHistory(t *testing.T) {
 				case p == "/namespaces/test/deployments/foo" && m == "GET":
 					responseDeployment := &appsv1.Deployment{}
 					responseDeployment.Name = "foo"
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -176,12 +176,12 @@ func TestMultipleResourceRolloutHistory(t *testing.T) {
 				case p == "/namespaces/test/deployments/foo" && m == "GET":
 					responseDeployment := &appsv1.Deployment{}
 					responseDeployment.Name = "foo"
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				case p == "/namespaces/test/deployments/bar" && m == "GET":
 					responseDeployment := &appsv1.Deployment{}
 					responseDeployment.Name = "bar"
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
@@ -259,7 +259,7 @@ func TestRolloutHistoryWithOutput(t *testing.T) {
 				case p == "/namespaces/test/deployments/foo" && m == "GET":
 					responseDeployment := &appsv1.Deployment{}
 					responseDeployment.Name = "foo"
-					body := ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
 					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)

@@ -18,7 +18,7 @@ package patch
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"strings"
 
@@ -219,7 +219,7 @@ func (o *PatchOptions) RunPatch() error {
 	var patchBytes []byte
 	if len(o.PatchFile) > 0 {
 		var err error
-		patchBytes, err = ioutil.ReadFile(o.PatchFile)
+		patchBytes, err = os.ReadFile(o.PatchFile)
 		if err != nil {
 			return fmt.Errorf("unable to read patch file: %v", err)
 		}

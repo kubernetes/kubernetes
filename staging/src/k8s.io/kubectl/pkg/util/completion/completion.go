@@ -19,7 +19,7 @@ package completion
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -169,7 +169,7 @@ func CompGetContainers(f cmdutil.Factory, cmd *cobra.Command, podName string, to
 // which begin with `toComplete`.
 func CompGetFromTemplate(template *string, f cmdutil.Factory, namespace string, cmd *cobra.Command, args []string, toComplete string) []string {
 	buf := new(bytes.Buffer)
-	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: ioutil.Discard}
+	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
 	o := get.NewGetOptions("kubectl", streams)
 
 	// Get the list of names of the specified resource
@@ -259,7 +259,7 @@ func ListUsersInConfig(toComplete string) []string {
 // compGetResourceList returns the list of api resources which begin with `toComplete`.
 func compGetResourceList(restClientGetter genericclioptions.RESTClientGetter, cmd *cobra.Command, toComplete string) []string {
 	buf := new(bytes.Buffer)
-	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: ioutil.Discard}
+	streams := genericclioptions.IOStreams{In: os.Stdin, Out: buf, ErrOut: io.Discard}
 	o := apiresources.NewAPIResourceOptions(streams)
 
 	o.Complete(restClientGetter, cmd, nil)

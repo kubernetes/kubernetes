@@ -18,7 +18,6 @@ package replace
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -331,7 +330,7 @@ func (o *ReplaceOptions) forceReplace() error {
 	stdinInUse := false
 	for i, filename := range o.DeleteOptions.FilenameOptions.Filenames {
 		if filename == "-" {
-			tempDir, err := ioutil.TempDir("", "kubectl_replace_")
+			tempDir, err := os.MkdirTemp("", "kubectl_replace_")
 			if err != nil {
 				return err
 			}

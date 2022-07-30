@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -147,7 +146,7 @@ func (o *setClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluster) 
 	if o.certificateAuthority.Provided() {
 		caPath := o.certificateAuthority.Value()
 		if o.embedCAData.Value() {
-			modifiedCluster.CertificateAuthorityData, _ = ioutil.ReadFile(caPath)
+			modifiedCluster.CertificateAuthorityData, _ = os.ReadFile(caPath)
 			modifiedCluster.InsecureSkipTLSVerify = false
 			modifiedCluster.CertificateAuthority = ""
 		} else {

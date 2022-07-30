@@ -19,7 +19,6 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -103,7 +102,7 @@ func TestRenameToAlreadyExistingContext(t *testing.T) {
 }
 
 func (test renameContextTest) run(t *testing.T) {
-	fakeKubeFile, _ := ioutil.TempFile(os.TempDir(), "")
+	fakeKubeFile, _ := os.CreateTemp(os.TempDir(), "")
 	defer os.Remove(fakeKubeFile.Name())
 	err := clientcmd.WriteToFile(test.initialConfig, fakeKubeFile.Name())
 	if err != nil {

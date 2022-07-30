@@ -19,7 +19,6 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -53,7 +52,7 @@ func TestDeleteCluster(t *testing.T) {
 }
 
 func (test deleteClusterTest) run(t *testing.T) {
-	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
+	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
