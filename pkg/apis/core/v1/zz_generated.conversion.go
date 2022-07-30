@@ -7999,6 +7999,7 @@ func autoConvert_v1_TopologySpreadConstraint_To_core_TopologySpreadConstraint(in
 	out.MinDomains = (*int32)(unsafe.Pointer(in.MinDomains))
 	out.NodeAffinityPolicy = (*core.NodeInclusionPolicy)(unsafe.Pointer(in.NodeAffinityPolicy))
 	out.NodeTaintsPolicy = (*core.NodeInclusionPolicy)(unsafe.Pointer(in.NodeTaintsPolicy))
+	out.MatchLabelKeys = *(*[]string)(unsafe.Pointer(&in.MatchLabelKeys))
 	return nil
 }
 
@@ -8015,6 +8016,7 @@ func autoConvert_core_TopologySpreadConstraint_To_v1_TopologySpreadConstraint(in
 	out.MinDomains = (*int32)(unsafe.Pointer(in.MinDomains))
 	out.NodeAffinityPolicy = (*v1.NodeInclusionPolicy)(unsafe.Pointer(in.NodeAffinityPolicy))
 	out.NodeTaintsPolicy = (*v1.NodeInclusionPolicy)(unsafe.Pointer(in.NodeTaintsPolicy))
+	out.MatchLabelKeys = *(*[]string)(unsafe.Pointer(&in.MatchLabelKeys))
 	return nil
 }
 

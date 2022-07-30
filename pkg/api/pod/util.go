@@ -545,6 +545,7 @@ func dropDisabledFields(
 
 	dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec)
 	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
+	dropDisabledMatchLabelKeysField(podSpec, oldPodSpec)
 }
 
 // dropDisabledTopologySpreadConstraintsFields removes disabled fields from PodSpec related
@@ -616,6 +617,31 @@ func dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec *api.PodSpec) {
 			}
 		}
 	}
+}
+
+// dropDisabledMatchLabelKeysField removes disabled fields from PodSpec related
+// to MatchLabelKeys only if it is not already used by the old spec.
+func dropDisabledMatchLabelKeysField(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread) && !matchLabelKeysInUse(oldPodSpec) {
+		for i := range podSpec.TopologySpreadConstraints {
+			podSpec.TopologySpreadConstraints[i].MatchLabelKeys = nil
+		}
+	}
+}
+
+// matchLabelKeysInUse returns true if the pod spec is non-nil
+// and has MatchLabelKeys field set in TopologySpreadConstraints.
+func matchLabelKeysInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	for _, c := range podSpec.TopologySpreadConstraints {
+		if len(c.MatchLabelKeys) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // nodeAffinityPolicyInUse returns true if the pod spec is non-nil and has NodeAffinityPolicy field set

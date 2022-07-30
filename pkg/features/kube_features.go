@@ -518,6 +518,13 @@ const (
 	// Enables scaling down replicas via logarithmic comparison of creation/ready timestamps
 	LogarithmicScaleDown featuregate.Feature = "LogarithmicScaleDown"
 
+	// owner: @denkensk
+	// kep: http://kep.k8s.io/3243
+	// alpha: v1.25
+	//
+	// Enable MatchLabelKeys in PodTopologySpread.
+	MatchLabelKeysInPodTopologySpread featuregate.Feature = "MatchLabelKeysInPodTopologySpread"
+
 	// owner: @krmayankk
 	// alpha: v1.24
 	//
@@ -950,6 +957,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: true, PreRelease: featuregate.Beta},
 
 	LogarithmicScaleDown: {Default: true, PreRelease: featuregate.Beta},
+
+	MatchLabelKeysInPodTopologySpread: {Default: false, PreRelease: featuregate.Alpha},
 
 	MaxUnavailableStatefulSet: {Default: false, PreRelease: featuregate.Alpha},
 
