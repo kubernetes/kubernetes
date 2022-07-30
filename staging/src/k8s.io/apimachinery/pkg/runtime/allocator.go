@@ -60,7 +60,7 @@ func (a *Allocator) Allocate(n uint64) []byte {
 	}
 	// grow the buffer
 	size := uint64(2*cap(a.buf)) + n
-	a.buf = make([]byte, size, size)
+	a.buf = make([]byte, size)
 	a.buf = a.buf[:n]
 	return a.buf
 }
@@ -72,5 +72,5 @@ type SimpleAllocator struct{}
 var _ MemoryAllocator = &SimpleAllocator{}
 
 func (sa *SimpleAllocator) Allocate(n uint64) []byte {
-	return make([]byte, n, n)
+	return make([]byte, n)
 }
