@@ -19,7 +19,6 @@ package genericclioptions
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 )
 
 // IOStreams provides the standard names for iostreams.  This is useful for embedding and for unit testing.
@@ -51,7 +50,7 @@ func NewTestIOStreamsDiscard() IOStreams {
 	in := &bytes.Buffer{}
 	return IOStreams{
 		In:     in,
-		Out:    ioutil.Discard,
-		ErrOut: ioutil.Discard,
+		Out:    io.Discard,
+		ErrOut: io.Discard,
 	}
 }
