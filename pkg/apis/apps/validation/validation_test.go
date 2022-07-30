@@ -2396,8 +2396,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 }
 
 func TestValidateDaemonSet(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
-
 	validSelector := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -2660,8 +2658,6 @@ func validDeployment() *apps.Deployment {
 }
 
 func TestValidateDeployment(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
-
 	successCases := []*apps.Deployment{
 		validDeployment(),
 	}

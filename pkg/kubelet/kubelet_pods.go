@@ -1221,7 +1221,7 @@ func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *v1.PodS
 	if !found {
 		cStatus, found = podutil.GetContainerStatus(podStatus.InitContainerStatuses, containerName)
 	}
-	if !found && utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if !found {
 		cStatus, found = podutil.GetContainerStatus(podStatus.EphemeralContainerStatuses, containerName)
 	}
 	if !found {
@@ -1602,22 +1602,20 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 		len(pod.Spec.InitContainers) > 0,
 		true,
 	)
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		var ecSpecs []v1.Container
-		for i := range pod.Spec.EphemeralContainers {
-			ecSpecs = append(ecSpecs, v1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
-		}
-
-		// #80875: By now we've iterated podStatus 3 times. We could refactor this to make a single
-		// pass through podStatus.ContainerStatuses
-		apiPodStatus.EphemeralContainerStatuses = kl.convertToAPIContainerStatuses(
-			pod, podStatus,
-			oldPodStatus.EphemeralContainerStatuses,
-			ecSpecs,
-			len(pod.Spec.InitContainers) > 0,
-			false,
-		)
+	var ecSpecs []v1.Container
+	for i := range pod.Spec.EphemeralContainers {
+		ecSpecs = append(ecSpecs, v1.Container(pod.Spec.EphemeralContainers[i].EphemeralContainerCommon))
 	}
+
+	// #80875: By now we've iterated podStatus 3 times. We could refactor this to make a single
+	// pass through podStatus.ContainerStatuses
+	apiPodStatus.EphemeralContainerStatuses = kl.convertToAPIContainerStatuses(
+		pod, podStatus,
+		oldPodStatus.EphemeralContainerStatuses,
+		ecSpecs,
+		len(pod.Spec.InitContainers) > 0,
+		false,
+	)
 
 	return &apiPodStatus
 }

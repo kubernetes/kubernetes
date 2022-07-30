@@ -12171,8 +12171,6 @@ func makeValidService() core.Service {
 }
 
 func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
-
 	makePod := func(ephemeralContainers []core.EphemeralContainer) *core.Pod {
 		return &core.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -20998,7 +20996,6 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, testCase.featureEnabled)()
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 
 			opts := PodValidationOptions{AllowWindowsHostProcessField: testCase.featureEnabled}
 

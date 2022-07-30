@@ -917,7 +917,7 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 			}
 		}
 	}
-	if !found && utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if !found {
 		for _, container := range pod.Spec.EphemeralContainers {
 			if container.Name == containerName {
 				found = true

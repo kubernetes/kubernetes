@@ -285,6 +285,7 @@ const (
 	// owner: @verb
 	// alpha: v1.16
 	// beta: v1.23
+	// GA: v1.25
 	//
 	// Allows running an ephemeral container in pod namespaces to troubleshoot a running pod.
 	EphemeralContainers featuregate.Feature = "EphemeralContainers"
@@ -884,7 +885,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	EndpointSliceTerminatingCondition: {Default: true, PreRelease: featuregate.Beta},
 
-	EphemeralContainers: {Default: true, PreRelease: featuregate.Beta},
+	EphemeralContainers: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
 	ExecProbeTimeout: {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
 
