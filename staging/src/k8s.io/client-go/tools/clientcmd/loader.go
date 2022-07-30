@@ -18,7 +18,6 @@ package clientcmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -283,12 +282,12 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 			return fmt.Errorf("cannot migrate %v to %v because it is a directory", source, destination)
 		}
 
-		data, err := ioutil.ReadFile(source)
+		data, err := os.ReadFile(source)
 		if err != nil {
 			return err
 		}
 		// destination is created with mode 0666 before umask
-		err = ioutil.WriteFile(destination, data, 0666)
+		err = os.WriteFile(destination, data, 0666)
 		if err != nil {
 			return err
 		}
@@ -363,7 +362,7 @@ func (rules *ClientConfigLoadingRules) IsDefaultConfig(config *restclient.Config
 
 // LoadFromFile takes a filename and deserializes the contents into Config object
 func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
-	kubeconfigBytes, err := ioutil.ReadFile(filename)
+	kubeconfigBytes, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -429,7 +428,7 @@ func WriteToFile(config clientcmdapi.Config, filename string) error {
 		}
 	}
 
-	if err := ioutil.WriteFile(filename, content, 0600); err != nil {
+	if err := os.WriteFile(filename, content, 0600); err != nil {
 		return err
 	}
 	return nil

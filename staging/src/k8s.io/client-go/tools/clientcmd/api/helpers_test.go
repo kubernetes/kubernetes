@@ -18,7 +18,6 @@ package api
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -27,13 +26,13 @@ import (
 )
 
 func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caContent string, t *testing.T) Config {
-	if err := ioutil.WriteFile(certFile, []byte(certContent), 0644); err != nil {
+	if err := os.WriteFile(certFile, []byte(certContent), 0644); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := ioutil.WriteFile(keyFile, []byte(keyContent), 0600); err != nil {
+	if err := os.WriteFile(keyFile, []byte(keyContent), 0600); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if err := ioutil.WriteFile(caFile, []byte(caContent), 0644); err != nil {
+	if err := os.WriteFile(caFile, []byte(caContent), 0644); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
@@ -52,11 +51,11 @@ func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caConte
 }
 
 func TestMinifySuccess(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
+	certFile, _ := os.CreateTemp("", "")
 	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
+	keyFile, _ := os.CreateTemp("", "")
 	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
+	caFile, _ := os.CreateTemp("", "")
 	defer os.Remove(caFile.Name())
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
@@ -88,11 +87,11 @@ func TestMinifySuccess(t *testing.T) {
 }
 
 func TestMinifyMissingContext(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
+	certFile, _ := os.CreateTemp("", "")
 	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
+	keyFile, _ := os.CreateTemp("", "")
 	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
+	caFile, _ := os.CreateTemp("", "")
 	defer os.Remove(caFile.Name())
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
@@ -106,11 +105,11 @@ func TestMinifyMissingContext(t *testing.T) {
 }
 
 func TestMinifyMissingCluster(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
+	certFile, _ := os.CreateTemp("", "")
 	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
+	keyFile, _ := os.CreateTemp("", "")
 	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
+	caFile, _ := os.CreateTemp("", "")
 	defer os.Remove(caFile.Name())
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
@@ -124,11 +123,11 @@ func TestMinifyMissingCluster(t *testing.T) {
 }
 
 func TestMinifyMissingAuthInfo(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
+	certFile, _ := os.CreateTemp("", "")
 	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
+	keyFile, _ := os.CreateTemp("", "")
 	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
+	caFile, _ := os.CreateTemp("", "")
 	defer os.Remove(caFile.Name())
 
 	mutatingConfig := newMergedConfig(certFile.Name(), "cert", keyFile.Name(), "key", caFile.Name(), "ca", t)
@@ -142,11 +141,11 @@ func TestMinifyMissingAuthInfo(t *testing.T) {
 }
 
 func TestFlattenSuccess(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
+	certFile, _ := os.CreateTemp("", "")
 	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
+	keyFile, _ := os.CreateTemp("", "")
 	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
+	caFile, _ := os.CreateTemp("", "")
 	defer os.Remove(caFile.Name())
 
 	certData := "cert"
@@ -207,11 +206,11 @@ func TestFlattenSuccess(t *testing.T) {
 }
 
 func Example_minifyAndShorten() {
-	certFile, _ := ioutil.TempFile("", "")
+	certFile, _ := os.CreateTemp("", "")
 	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
+	keyFile, _ := os.CreateTemp("", "")
 	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
+	caFile, _ := os.CreateTemp("", "")
 	defer os.Remove(caFile.Name())
 
 	certData := "cert"
@@ -247,11 +246,11 @@ func Example_minifyAndShorten() {
 }
 
 func TestShortenSuccess(t *testing.T) {
-	certFile, _ := ioutil.TempFile("", "")
+	certFile, _ := os.CreateTemp("", "")
 	defer os.Remove(certFile.Name())
-	keyFile, _ := ioutil.TempFile("", "")
+	keyFile, _ := os.CreateTemp("", "")
 	defer os.Remove(keyFile.Name())
-	caFile, _ := ioutil.TempFile("", "")
+	caFile, _ := os.CreateTemp("", "")
 	defer os.Remove(caFile.Name())
 
 	certData := "cert"

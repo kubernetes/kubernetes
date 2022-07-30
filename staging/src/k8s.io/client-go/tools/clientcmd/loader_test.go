@@ -19,7 +19,6 @@ package clientcmd
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -132,10 +131,10 @@ func TestToleratingMissingFiles(t *testing.T) {
 }
 
 func TestErrorReadingFile(t *testing.T) {
-	commandLineFile, _ := ioutil.TempFile("", "")
+	commandLineFile, _ := os.CreateTemp("", "")
 	defer os.Remove(commandLineFile.Name())
 
-	if err := ioutil.WriteFile(commandLineFile.Name(), []byte("bogus value"), 0644); err != nil {
+	if err := os.WriteFile(commandLineFile.Name(), []byte("bogus value"), 0644); err != nil {
 		t.Fatalf("Error creating tempfile: %v", err)
 	}
 
@@ -153,7 +152,7 @@ func TestErrorReadingFile(t *testing.T) {
 }
 
 func TestErrorReadingNonFile(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
+	tmpdir, err := os.MkdirTemp("", "")
 	if err != nil {
 		t.Fatalf("Couldn't create tmpdir")
 	}
@@ -173,9 +172,9 @@ func TestErrorReadingNonFile(t *testing.T) {
 }
 
 func TestConflictingCurrentContext(t *testing.T) {
-	commandLineFile, _ := ioutil.TempFile("", "")
+	commandLineFile, _ := os.CreateTemp("", "")
 	defer os.Remove(commandLineFile.Name())
-	envVarFile, _ := ioutil.TempFile("", "")
+	envVarFile, _ := os.CreateTemp("", "")
 	defer os.Remove(envVarFile.Name())
 
 	mockCommandLineConfig := clientcmdapi.Config{
@@ -254,7 +253,7 @@ users: null
 }
 
 func TestLoadingEmptyMaps(t *testing.T) {
-	configFile, _ := ioutil.TempFile("", "")
+	configFile, _ := os.CreateTemp("", "")
 	defer os.Remove(configFile.Name())
 
 	mockConfig := clientcmdapi.Config{
@@ -280,10 +279,10 @@ func TestLoadingEmptyMaps(t *testing.T) {
 }
 
 func TestDuplicateClusterName(t *testing.T) {
-	configFile, _ := ioutil.TempFile("", "")
+	configFile, _ := os.CreateTemp("", "")
 	defer os.Remove(configFile.Name())
 
-	err := ioutil.WriteFile(configFile.Name(), []byte(`
+	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
 apiVersion: v1
 clusters:
@@ -322,10 +321,10 @@ users:
 }
 
 func TestDuplicateContextName(t *testing.T) {
-	configFile, _ := ioutil.TempFile("", "")
+	configFile, _ := os.CreateTemp("", "")
 	defer os.Remove(configFile.Name())
 
-	err := ioutil.WriteFile(configFile.Name(), []byte(`
+	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
 apiVersion: v1
 clusters:
@@ -364,10 +363,10 @@ users:
 }
 
 func TestDuplicateUserName(t *testing.T) {
-	configFile, _ := ioutil.TempFile("", "")
+	configFile, _ := os.CreateTemp("", "")
 	defer os.Remove(configFile.Name())
 
-	err := ioutil.WriteFile(configFile.Name(), []byte(`
+	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
 apiVersion: v1
 clusters:
@@ -404,10 +403,10 @@ users:
 }
 
 func TestDuplicateExtensionName(t *testing.T) {
-	configFile, _ := ioutil.TempFile("", "")
+	configFile, _ := os.CreateTemp("", "")
 	defer os.Remove(configFile.Name())
 
-	err := ioutil.WriteFile(configFile.Name(), []byte(`
+	err := os.WriteFile(configFile.Name(), []byte(`
 kind: Config
 apiVersion: v1
 clusters:
@@ -472,14 +471,14 @@ func TestResolveRelativePaths(t *testing.T) {
 		},
 	}
 
-	configDir1, _ := ioutil.TempDir("", "")
+	configDir1, _ := os.MkdirTemp("", "")
 	defer os.RemoveAll(configDir1)
 	configFile1 := path.Join(configDir1, ".kubeconfig")
 	configDir1, _ = filepath.Abs(configDir1)
 
-	configDir2, _ := ioutil.TempDir("", "")
+	configDir2, _ := os.MkdirTemp("", "")
 	defer os.RemoveAll(configDir2)
-	configDir2, _ = ioutil.TempDir(configDir2, "")
+	configDir2, _ = os.MkdirTemp(configDir2, "")
 	configFile2 := path.Join(configDir2, ".kubeconfig")
 	configDir2, _ = filepath.Abs(configDir2)
 
@@ -560,9 +559,9 @@ func TestResolveRelativePaths(t *testing.T) {
 }
 
 func TestMigratingFile(t *testing.T) {
-	sourceFile, _ := ioutil.TempFile("", "")
+	sourceFile, _ := os.CreateTemp("", "")
 	defer os.Remove(sourceFile.Name())
-	destinationFile, _ := ioutil.TempFile("", "")
+	destinationFile, _ := os.CreateTemp("", "")
 	// delete the file so that we'll write to it
 	os.Remove(destinationFile.Name())
 
@@ -579,11 +578,11 @@ func TestMigratingFile(t *testing.T) {
 	// the load should have recreated this file
 	defer os.Remove(destinationFile.Name())
 
-	sourceContent, err := ioutil.ReadFile(sourceFile.Name())
+	sourceContent, err := os.ReadFile(sourceFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-	destinationContent, err := ioutil.ReadFile(destinationFile.Name())
+	destinationContent, err := os.ReadFile(destinationFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -594,9 +593,9 @@ func TestMigratingFile(t *testing.T) {
 }
 
 func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {
-	sourceFile, _ := ioutil.TempFile("", "")
+	sourceFile, _ := os.CreateTemp("", "")
 	defer os.Remove(sourceFile.Name())
-	destinationFile, _ := ioutil.TempFile("", "")
+	destinationFile, _ := os.CreateTemp("", "")
 	defer os.Remove(destinationFile.Name())
 
 	WriteToFile(testConfigAlfa, sourceFile.Name())
@@ -609,7 +608,7 @@ func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 
-	destinationContent, err := ioutil.ReadFile(destinationFile.Name())
+	destinationContent, err := os.ReadFile(destinationFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -621,7 +620,7 @@ func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {
 
 func TestMigratingFileSourceMissingSkip(t *testing.T) {
 	sourceFilename := "some-missing-file"
-	destinationFile, _ := ioutil.TempFile("", "")
+	destinationFile, _ := os.CreateTemp("", "")
 	// delete the file so that we'll write to it
 	os.Remove(destinationFile.Name())
 
@@ -639,7 +638,7 @@ func TestMigratingFileSourceMissingSkip(t *testing.T) {
 }
 
 func TestFileLocking(t *testing.T) {
-	f, _ := ioutil.TempFile("", "")
+	f, _ := os.CreateTemp("", "")
 	defer os.Remove(f.Name())
 
 	err := lockFile(f.Name())
@@ -655,9 +654,9 @@ func TestFileLocking(t *testing.T) {
 }
 
 func Example_noMergingOnExplicitPaths() {
-	commandLineFile, _ := ioutil.TempFile("", "")
+	commandLineFile, _ := os.CreateTemp("", "")
 	defer os.Remove(commandLineFile.Name())
-	envVarFile, _ := ioutil.TempFile("", "")
+	envVarFile, _ := os.CreateTemp("", "")
 	defer os.Remove(envVarFile.Name())
 
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
@@ -704,9 +703,9 @@ func Example_noMergingOnExplicitPaths() {
 }
 
 func Example_mergingSomeWithConflict() {
-	commandLineFile, _ := ioutil.TempFile("", "")
+	commandLineFile, _ := os.CreateTemp("", "")
 	defer os.Remove(commandLineFile.Name())
-	envVarFile, _ := ioutil.TempFile("", "")
+	envVarFile, _ := os.CreateTemp("", "")
 	defer os.Remove(envVarFile.Name())
 
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
@@ -759,13 +758,13 @@ func Example_mergingSomeWithConflict() {
 }
 
 func Example_mergingEverythingNoConflicts() {
-	commandLineFile, _ := ioutil.TempFile("", "")
+	commandLineFile, _ := os.CreateTemp("", "")
 	defer os.Remove(commandLineFile.Name())
-	envVarFile, _ := ioutil.TempFile("", "")
+	envVarFile, _ := os.CreateTemp("", "")
 	defer os.Remove(envVarFile.Name())
-	currentDirFile, _ := ioutil.TempFile("", "")
+	currentDirFile, _ := os.CreateTemp("", "")
 	defer os.Remove(currentDirFile.Name())
-	homeDirFile, _ := ioutil.TempFile("", "")
+	homeDirFile, _ := os.CreateTemp("", "")
 	defer os.Remove(homeDirFile.Name())
 
 	WriteToFile(testConfigAlfa, commandLineFile.Name())

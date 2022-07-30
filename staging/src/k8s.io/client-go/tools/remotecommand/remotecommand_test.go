@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +71,7 @@ func fakeMassiveDataAttacher(stdin io.Reader, stdout, stderr io.WriteCloser, tty
 	}
 
 	go func() {
-		io.Copy(ioutil.Discard, stdin)
+		io.Copy(io.Discard, stdin)
 		copyDone <- struct{}{}
 	}()
 

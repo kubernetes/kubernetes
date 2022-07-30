@@ -19,7 +19,7 @@ package disk
 import (
 	"bytes"
 	"crypto/sha256"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -43,7 +43,7 @@ func (rt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 }
 
 func BenchmarkDiskCache(b *testing.B) {
-	cacheDir, err := ioutil.TempDir("", "cache-rt")
+	cacheDir, err := os.MkdirTemp("", "cache-rt")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func BenchmarkDiskCache(b *testing.B) {
 	})
 
 	k := "localhost:8080/apis/batch/v1.json"
-	v, err := ioutil.ReadFile("../../testdata/apis/batch/v1.json")
+	v, err := os.ReadFile("../../testdata/apis/batch/v1.json")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func BenchmarkDiskCache(b *testing.B) {
 
 func TestCacheRoundTripper(t *testing.T) {
 	rt := &testRoundTripper{}
-	cacheDir, err := ioutil.TempDir("", "cache-rt")
+	cacheDir, err := os.MkdirTemp("", "cache-rt")
 	defer os.RemoveAll(cacheDir)
 	if err != nil {
 		t.Fatal(err)
@@ -87,14 +87,14 @@ func TestCacheRoundTripper(t *testing.T) {
 	}
 	rt.Response = &http.Response{
 		Header:     http.Header{"ETag": []string{`"123456"`}},
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("Content"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("Content"))),
 		StatusCode: http.StatusOK,
 	}
 	resp, err := cache.RoundTrip(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	content, err := ioutil.ReadAll(resp.Body)
+	content, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestCacheRoundTripper(t *testing.T) {
 	}
 	rt.Response = &http.Response{
 		StatusCode: http.StatusNotModified,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("Other Content"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("Other Content"))),
 	}
 
 	resp, err = cache.RoundTrip(req)
@@ -118,7 +118,7 @@ func TestCacheRoundTripper(t *testing.T) {
 	}
 
 	// Read body and make sure we have the initial content
-	content, err = ioutil.ReadAll(resp.Body)
+	content, err = io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -132,7 +132,7 @@ func TestCacheRoundTripperPathPerm(t *testing.T) {
 	assert := assert.New(t)
 
 	rt := &testRoundTripper{}
-	cacheDir, err := ioutil.TempDir("", "cache-rt")
+	cacheDir, err := os.MkdirTemp("", "cache-rt")
 	os.RemoveAll(cacheDir)
 	defer os.RemoveAll(cacheDir)
 
@@ -148,14 +148,14 @@ func TestCacheRoundTripperPathPerm(t *testing.T) {
 	}
 	rt.Response = &http.Response{
 		Header:     http.Header{"ETag": []string{`"123456"`}},
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("Content"))),
+		Body:       io.NopCloser(bytes.NewReader([]byte("Content"))),
 		StatusCode: http.StatusOK,
 	}
 	resp, err := cache.RoundTrip(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	content, err := ioutil.ReadAll(resp.Body)
+	content, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestSumDiskCache(t *testing.T) {
 
 	// Ensure that we'll return a cache miss if the backing file doesn't exist.
 	t.Run("NoSuchKey", func(t *testing.T) {
-		cacheDir, err := ioutil.TempDir("", "cache-test")
+		cacheDir, err := os.MkdirTemp("", "cache-test")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -199,7 +199,7 @@ func TestSumDiskCache(t *testing.T) {
 
 	// Ensure that we'll return a cache miss if the backing file is empty.
 	t.Run("EmptyFile", func(t *testing.T) {
-		cacheDir, err := ioutil.TempDir("", "cache-test")
+		cacheDir, err := os.MkdirTemp("", "cache-test")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -223,7 +223,7 @@ func TestSumDiskCache(t *testing.T) {
 	// Ensure that we'll return a cache miss if the backing has an invalid
 	// checksum.
 	t.Run("InvalidChecksum", func(t *testing.T) {
-		cacheDir, err := ioutil.TempDir("", "cache-test")
+		cacheDir, err := os.MkdirTemp("", "cache-test")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -258,7 +258,7 @@ func TestSumDiskCache(t *testing.T) {
 	// This should cause httpcache to fall back to its underlying transport and
 	// to subsequently cache the new value, overwriting the corrupt one.
 	t.Run("OverwriteExistingKey", func(t *testing.T) {
-		cacheDir, err := ioutil.TempDir("", "cache-test")
+		cacheDir, err := os.MkdirTemp("", "cache-test")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -290,7 +290,7 @@ func TestSumDiskCache(t *testing.T) {
 
 	// Ensure that deleting a key does in fact delete it.
 	t.Run("DeleteKey", func(t *testing.T) {
-		cacheDir, err := ioutil.TempDir("", "cache-test")
+		cacheDir, err := os.MkdirTemp("", "cache-test")
 		if err != nil {
 			t.Fatal(err)
 		}

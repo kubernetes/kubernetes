@@ -18,7 +18,7 @@ package disk
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -157,7 +157,7 @@ func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 	}
 
 	// the cache is present and its valid.  Try to read and use it.
-	cachedBytes, err := ioutil.ReadAll(file)
+	cachedBytes, err := io.ReadAll(file)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 		return err
 	}
 
-	f, err := ioutil.TempFile(filepath.Dir(filename), filepath.Base(filename)+".")
+	f, err := os.CreateTemp(filepath.Dir(filename), filepath.Base(filename)+".")
 	if err != nil {
 		return err
 	}

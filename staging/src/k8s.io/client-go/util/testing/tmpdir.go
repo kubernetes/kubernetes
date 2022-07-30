@@ -17,7 +17,6 @@ limitations under the License.
 package testing
 
 import (
-	"io/ioutil"
 	"os"
 )
 
@@ -26,7 +25,7 @@ import (
 // deleted with a call to "os.RemoveAll(...)".
 // In case of error, it'll return an empty string and the error.
 func MkTmpdir(prefix string) (string, error) {
-	tmpDir, err := ioutil.TempDir(os.TempDir(), prefix)
+	tmpDir, err := os.MkdirTemp(os.TempDir(), prefix)
 	if err != nil {
 		return "", err
 	}
