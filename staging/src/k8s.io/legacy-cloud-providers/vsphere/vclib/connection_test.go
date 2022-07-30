@@ -22,7 +22,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -40,7 +39,7 @@ func createTestServer(
 	serverKeyPath string,
 	handler http.HandlerFunc,
 ) (*httptest.Server, string) {
-	caCertPEM, err := ioutil.ReadFile(caCertPath)
+	caCertPEM, err := os.ReadFile(caCertPath)
 	if err != nil {
 		t.Fatalf("Could not read ca cert from file")
 	}
