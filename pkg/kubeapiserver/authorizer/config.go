@@ -23,6 +23,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/union"
@@ -143,6 +144,10 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			return nil, nil, fmt.Errorf("unknown authorization mode %s specified", authorizationMode)
 		}
 	}
+
+	// Add SystemPrivilegedGroup as an authorizing group
+	tokenAuthorizer := authorizerfactory.NewPrivilegedGroups(user.SystemPrivilegedGroup)
+	authorizers = append(authorizers, tokenAuthorizer)
 
 	return union.New(authorizers...), union.NewRuleResolvers(ruleResolvers...), nil
 }
