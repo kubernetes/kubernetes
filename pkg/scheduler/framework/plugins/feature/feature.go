@@ -24,4 +24,5 @@ type Features struct {
 	EnableVolumeCapacityPriority                 bool
 	EnableMinDomainsInPodTopologySpread          bool
 	EnableNodeInclusionPolicyInPodTopologySpread bool
+	EnableMatchLabelKeysInPodTopologySpread      bool
 }

@@ -449,13 +449,14 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 		nodes                      []*v1.Node
 		want                       []string // nodes expected to schedule onto
 		enableNodeInclustionPolicy bool
+		enableMatchLabelKeys       bool
 	}{
 		// note: naming starts at index 0
 		// the symbol ~X~ means that node is infeasible
 		{
 			name: "place pod on a ~0~/1/2/3 cluster with MaxSkew=1, node-1 is the preferred fit",
 			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil, nil).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p1").Node("node-1").Label("foo", "").Container(pause).Obj(),
@@ -472,8 +473,8 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 		{
 			name: "combined with hardSpread constraint on a ~4~/0/1/2 cluster",
 			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil).
-				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil, nil).
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil, nil).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p0a").Node("node-0").Label("foo", "").Container(pause).Obj(),
@@ -495,8 +496,8 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 			name: "soft constraint with two node inclusion Constraints, zone: honor/ignore, node: honor/ignore",
 			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
 				NodeSelector(map[string]string{"foo": ""}).
-				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil).
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil).
+				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil, nil).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil, nil).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p1a").Node("node-1").Label("foo", "").Container(pause).Obj(),
@@ -521,8 +522,8 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 			name: "soft constraint with two node inclusion Constraints, zone: ignore/ignore, node: honor/honor",
 			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
 				NodeSelector(map[string]string{"foo": ""}).
-				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, &ignorePolicy, nil).
-				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, &honorPolicy).
+				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, &ignorePolicy, nil, nil).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, &honorPolicy, nil).
 				Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("p1a").Node("node-1").Label("foo", "").Container(pause).Obj(),
@@ -540,10 +541,65 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 			want:                       []string{"node-3"},
 			enableNodeInclustionPolicy: true,
 		},
+		{
+			name: "matchLabelKeys ignored when feature gate disabled, node-1 is the preferred fit",
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").Container(pause).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil, []string{"bar"}).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p1").Node("node-1").Label("foo", "").Label("bar", "").Container(pause).Obj(),
+				st.MakePod().Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3a").Node("node-3").Label("foo", "").Label("bar", "").Container(pause).Obj(),
+				st.MakePod().Name("p3b").Node("node-3").Label("foo", "").Label("bar", "").Container(pause).Obj(),
+				st.MakePod().Name("p3c").Node("node-3").Label("foo", "").Container(pause).Obj(),
+			},
+			fits:                 true,
+			nodes:                defaultNodes,
+			want:                 []string{"node-1"},
+			enableMatchLabelKeys: false,
+		},
+		{
+			name: "matchLabelKeys ANDed with LabelSelector when LabelSelector isn't empty, node-2 is the preferred fit",
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").Container(pause).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj(), nil, nil, nil, []string{"bar"}).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p1").Node("node-1").Label("foo", "").Label("bar", "").Container(pause).Obj(),
+				st.MakePod().Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3a").Node("node-3").Label("foo", "").Label("bar", "").Container(pause).Obj(),
+				st.MakePod().Name("p3b").Node("node-3").Label("foo", "").Label("bar", "").Container(pause).Obj(),
+				st.MakePod().Name("p3c").Node("node-3").Label("foo", "").Container(pause).Obj(),
+			},
+			fits:                 true,
+			nodes:                defaultNodes,
+			want:                 []string{"node-2"},
+			enableMatchLabelKeys: true,
+		},
+		{
+			name: "matchLabelKeys ANDed with LabelSelector when LabelSelector is empty, node-1 is the preferred fit",
+			incomingPod: st.MakePod().Name("p").Label("foo", "").Container(pause).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Obj(), nil, nil, nil, []string{"foo"}).
+				Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p1").Node("node-1").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p2a").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p2b").Node("node-2").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3a").Node("node-3").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3b").Node("node-3").Label("foo", "").Container(pause).Obj(),
+				st.MakePod().Name("p3c").Node("node-3").Label("foo", "").Container(pause).Obj(),
+			},
+			fits:                 true,
+			nodes:                defaultNodes,
+			want:                 []string{"node-1"},
+			enableMatchLabelKeys: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclustionPolicy)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)()
 
 			testCtx := initTestSchedulerForPriorityTest(t, podtopologyspread.Name)
 			defer testutils.CleanupTest(t, testCtx)
