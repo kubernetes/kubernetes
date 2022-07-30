@@ -20,7 +20,6 @@ limitations under the License.
 package mount
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -28,12 +27,12 @@ import (
 )
 
 func writeFile(content string) (string, string, error) {
-	tempDir, err := ioutil.TempDir("", "mounter_shared_test")
+	tempDir, err := os.MkdirTemp("", "mounter_shared_test")
 	if err != nil {
 		return "", "", err
 	}
 	filename := filepath.Join(tempDir, "mountinfo")
-	err = ioutil.WriteFile(filename, []byte(content), 0600)
+	err = os.WriteFile(filename, []byte(content), 0600)
 	if err != nil {
 		os.RemoveAll(tempDir)
 		return "", "", err
