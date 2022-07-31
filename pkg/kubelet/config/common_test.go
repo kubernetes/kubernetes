@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -34,6 +35,8 @@ import (
 )
 
 func noDefault(*core.Pod) error { return nil }
+
+func errDefault(*core.Pod) error { return fmt.Errorf("mock error") }
 
 func TestDecodeSinglePod(t *testing.T) {
 	grace := int64(30)
@@ -85,6 +88,17 @@ func TestDecodeSinglePod(t *testing.T) {
 	}
 	if !reflect.DeepEqual(pod, podOut) {
 		t.Errorf("expected:\n%#v\ngot:\n%#v\n%s", pod, podOut, string(json))
+	}
+
+	parsed, podOut, err = tryDecodeSinglePod(json, errDefault)
+	if !parsed {
+		t.Errorf("expected to have parsed file: (%s)", string(json))
+	}
+	if err == nil {
+		t.Errorf("expect err: %v (%s)", err, string(json))
+	}
+	if podOut != nil {
+		t.Errorf("expect nil pod out, got %v\n", podOut)
 	}
 
 	for _, gv := range legacyscheme.Scheme.PrioritizedVersionsForGroup(v1.GroupName) {
@@ -239,5 +253,59 @@ func TestStaticPodNameGenerate(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestApplyDefault(t *testing.T) {
+	testCases := []struct {
+		uid    string
+		isFile bool
+		source string
+		desc   string
+	}{
+		{
+			"non-empty-uid",
+			true,
+			"file",
+			"file source with non-empty uid ",
+		},
+		{
+			"non-empty-uid",
+			false,
+			"http://www.example.com/source",
+			"url source with non-empty uid",
+		},
+		{
+			"",
+			true,
+			"file",
+			"file source with empty uid",
+		},
+		{
+			"",
+			false,
+			"http://www.example.com/source",
+			"url source with empty uid",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.desc, func(t *testing.T) {
+			pod := &core.Pod{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					UID:       types.UID(testCase.uid),
+					Namespace: "mynamespace",
+				},
+			}
+			if err := applyDefaults(pod, testCase.source, testCase.isFile, "node1"); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if len(pod.UID) == 0 {
+				t.Errorf("expect to generate new uid")
+			}
+		})
 	}
 }

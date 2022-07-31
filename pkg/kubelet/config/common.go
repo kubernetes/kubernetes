@@ -103,7 +103,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 type defaultFunc func(pod *api.Pod) error
 
 // tryDecodeSinglePod takes data and tries to extract valid Pod config information from it.
-func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v1.Pod, err error) {
+func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (bool, *v1.Pod, error) {
 	// JSON is valid YAML, so this should work for everything.
 	json, err := utilyaml.ToJSON(data)
 	if err != nil {
@@ -111,21 +111,21 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	}
 	obj, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), json)
 	if err != nil {
-		return false, pod, err
+		return false, nil, err
 	}
 
 	newPod, ok := obj.(*api.Pod)
 	// Check whether the object could be converted to single pod.
 	if !ok {
-		return false, pod, fmt.Errorf("invalid pod: %#v", obj)
+		return false, nil, fmt.Errorf("invalid pod: %#v", obj)
 	}
 
 	// Apply default values and validate the pod.
 	if err = defaultFn(newPod); err != nil {
-		return true, pod, err
+		return true, nil, err
 	}
 	if errs := validation.ValidatePodCreate(newPod, validation.PodValidationOptions{}); len(errs) > 0 {
-		return true, pod, fmt.Errorf("invalid pod: %v", errs)
+		return true, nil, fmt.Errorf("invalid pod: %v", errs)
 	}
 	v1Pod := &v1.Pod{}
 	if err := k8s_api_v1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
