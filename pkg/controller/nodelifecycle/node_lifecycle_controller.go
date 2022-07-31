@@ -632,21 +632,27 @@ func (nc *Controller) doNoScheduleTaintingPass(ctx context.Context, nodeName str
 	}
 	if node.Spec.Unschedulable {
 		// If unschedulable, append related taint.
-		taints = append(taints, v1.Taint{
-			Key:    v1.TaintNodeUnschedulable,
-			Effect: v1.TaintEffectNoSchedule,
-		})
+		taints = append(taints,
+			v1.Taint{
+				Key:    v1.TaintNodeUnschedulable,
+				Effect: v1.TaintEffectNoSchedule,
+			},
+			v1.Taint{
+				Key:    v1.TaintNodeUnschedulable,
+				Effect: v1.TaintEffectPreferNoSchedule,
+			},
+		)
 	}
 
 	// Get exist taints of node.
 	nodeTaints := taintutils.TaintSetFilter(node.Spec.Taints, func(t *v1.Taint) bool {
-		// only NoSchedule taints are candidates to be compared with "taints" later
-		if t.Effect != v1.TaintEffectNoSchedule {
-			return false
-		}
 		// Find unschedulable taint of node.
 		if t.Key == v1.TaintNodeUnschedulable {
 			return true
+		}
+		// only NoSchedule taints are candidates to be compared with "taints" later
+		if t.Effect != v1.TaintEffectNoSchedule {
+			return false
 		}
 		// Find node condition taints of node.
 		_, found := taintKeyToNodeConditionMap[t.Key]
