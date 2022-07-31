@@ -172,7 +172,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 	patchedObj, err := p.Helper.Patch(namespace, name, patchType, patch, nil)
 
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "patch request failed")
+		return nil, nil, err
 	}
 
 	patchedMeta, err := meta.Accessor(patchedObj)
@@ -186,7 +186,7 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, namespace, na
 	// 	If the returned object has the same resource version then the server did
 	// 	not apply any new changes and effectively nothing has happened.
 	if patchedMeta.GetResourceVersion() == objMeta.GetResourceVersion() {
-		return []byte("{}"), obj, err
+		return []byte("{}"), patchedObj, err
 	}
 
 	return patch, patchedObj, err
