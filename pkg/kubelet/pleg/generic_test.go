@@ -60,11 +60,12 @@ func newTestGenericPLEGWithChannelSize(eventChannelCap int) *TestGenericPLEG {
 	// The channel capacity should be large enough to hold all events in a
 	// single test.
 	pleg := &GenericPLEG{
-		relistPeriod: time.Hour,
-		runtime:      fakeRuntime,
-		eventChannel: make(chan *PodLifecycleEvent, eventChannelCap),
-		podRecords:   make(podRecords),
-		clock:        clock,
+		relistPeriod:    time.Hour,
+		relistThreshold: 3 * time.Minute,
+		runtime:         fakeRuntime,
+		eventChannel:    make(chan *PodLifecycleEvent, eventChannelCap),
+		podRecords:      make(podRecords),
+		clock:           clock,
 	}
 	return &TestGenericPLEG{pleg: pleg, runtime: fakeRuntime, clock: clock}
 }
@@ -314,12 +315,13 @@ func testReportMissingPods(t *testing.T, numRelists int) {
 
 func newTestGenericPLEGWithRuntimeMock(runtimeMock kubecontainer.Runtime) *GenericPLEG {
 	pleg := &GenericPLEG{
-		relistPeriod: time.Hour,
-		runtime:      runtimeMock,
-		eventChannel: make(chan *PodLifecycleEvent, 100),
-		podRecords:   make(podRecords),
-		cache:        kubecontainer.NewCache(),
-		clock:        clock.RealClock{},
+		relistPeriod:    time.Hour,
+		relistThreshold: 2 * time.Hour,
+		runtime:         runtimeMock,
+		eventChannel:    make(chan *PodLifecycleEvent, 1000),
+		podRecords:      make(podRecords),
+		cache:           kubecontainer.NewCache(),
+		clock:           clock.RealClock{},
 	}
 	return pleg
 }
@@ -447,7 +449,7 @@ func TestHealthy(t *testing.T) {
 
 	// Advance by relistThreshold without any relisting. pleg should be unhealthy
 	// because it has been longer than relistThreshold since a relist occurred.
-	clock.Step(relistThreshold)
+	clock.Step(pleg.relistThreshold)
 	ok, _ = pleg.Healthy()
 	assert.False(t, ok, "pleg should be unhealthy")
 }

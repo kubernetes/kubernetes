@@ -64,6 +64,10 @@ type GenericPLEG struct {
 	// Pods that failed to have their status retrieved during a relist. These pods will be
 	// retried during the next relisting.
 	podsToReinspect map[types.UID]*kubecontainer.Pod
+	// The relisting threshold needs to be greater than the relisting period +
+	// the relisting time, which can vary significantly. Set a conservative
+	// threshold to avoid flipping between healthy and unhealthy.
+	relistThreshold time.Duration
 }
 
 // plegContainerState has a one-to-one mapping to the
@@ -76,11 +80,6 @@ const (
 	plegContainerExited      plegContainerState = "exited"
 	plegContainerUnknown     plegContainerState = "unknown"
 	plegContainerNonExistent plegContainerState = "non-existent"
-
-	// The threshold needs to be greater than the relisting period + the
-	// relisting time, which can vary significantly. Set a conservative
-	// threshold to avoid flipping between healthy and unhealthy.
-	relistThreshold = 3 * time.Minute
 )
 
 func convertState(state kubecontainer.State) plegContainerState {
@@ -107,15 +106,17 @@ type podRecord struct {
 type podRecords map[types.UID]*podRecord
 
 // NewGenericPLEG instantiates a new GenericPLEG object and return it.
-func NewGenericPLEG(runtime kubecontainer.Runtime, channelCapacity int,
-	relistPeriod time.Duration, cache kubecontainer.Cache, clock clock.Clock) PodLifecycleEventGenerator {
+func NewGenericPLEG(runtime kubecontainer.Runtime, eventChannel chan *PodLifecycleEvent,
+	relistPeriod time.Duration, relistThreshold time.Duration, cache kubecontainer.Cache,
+	clock clock.Clock) PodLifecycleEventGenerator {
 	return &GenericPLEG{
-		relistPeriod: relistPeriod,
-		runtime:      runtime,
-		eventChannel: make(chan *PodLifecycleEvent, channelCapacity),
-		podRecords:   make(podRecords),
-		cache:        cache,
-		clock:        clock,
+		relistPeriod:    relistPeriod,
+		relistThreshold: relistThreshold,
+		runtime:         runtime,
+		eventChannel:    eventChannel,
+		podRecords:      make(podRecords),
+		cache:           cache,
+		clock:           clock,
 	}
 }
 
@@ -141,8 +142,8 @@ func (g *GenericPLEG) Healthy() (bool, error) {
 	// Expose as metric so you can alert on `time()-pleg_last_seen_seconds > nn`
 	metrics.PLEGLastSeen.Set(float64(relistTime.Unix()))
 	elapsed := g.clock.Since(relistTime)
-	if elapsed > relistThreshold {
-		return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, relistThreshold)
+	if elapsed > g.relistThreshold {
+		return false, fmt.Errorf("pleg was last seen active %v ago; threshold is %v", elapsed, g.relistThreshold)
 	}
 	return true, nil
 }

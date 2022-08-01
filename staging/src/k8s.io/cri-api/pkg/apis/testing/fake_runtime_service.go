@@ -708,3 +708,7 @@ func (r *FakeRuntimeService) CheckpointContainer(options *runtimeapi.CheckpointC
 
 	return nil
 }
+
+func (f *FakeRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {
+	return nil
+}
