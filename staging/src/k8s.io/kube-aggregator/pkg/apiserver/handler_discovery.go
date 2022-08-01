@@ -99,7 +99,7 @@ type serviceKey struct {
 	LocalName string
 }
 
-// Human-readable String representation used for loggs
+// Human-readable String representation used for logs
 func (s serviceKey) String() string {
 	if s.LocalName == "" {
 		return fmt.Sprintf("%v/%v:%v", s.Namespace, s.Name, s.Port)
@@ -262,7 +262,7 @@ func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 			}
 			req.Header.Add("Accept", "application/json")
 
-			if updateInfo.etag != "" {
+			if len(updateInfo.etag) != 0 {
 				req.Header.Add("If-None-Match", updateInfo.etag)
 			}
 
