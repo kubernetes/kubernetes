@@ -206,6 +206,15 @@ func TestWarnings(t *testing.T) {
 			expected: []string{`spec.volumes[0].quobyte: deprecated in v1.22, support removal is planned in v1.26`},
 		},
 		{
+			name: "glusterfs",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].glusterfs: deprecated in v1.25, this feature will be removed soon after in a subsequent release`},
+		},
+		{
 			name: "duplicate hostAlias",
 			template: &api.PodTemplateSpec{Spec: api.PodSpec{
 				HostAliases: []api.HostAlias{

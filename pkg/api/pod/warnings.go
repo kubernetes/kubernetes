@@ -182,6 +182,9 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		if v.Quobyte != nil {
 			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, support removal is planned in v1.26", fieldPath.Child("spec", "volumes").Index(i).Child("quobyte")))
 		}
+		if v.Glusterfs != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.25, this feature will be removed soon after in a subsequent release", fieldPath.Child("spec", "volumes").Index(i).Child("glusterfs")))
+		}
 	}
 
 	// duplicate hostAliases (#91670, #58477)

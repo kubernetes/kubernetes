@@ -70,6 +70,7 @@ var (
 		"kubernetes.io/storageos": "The StorageOS volume provider is deprecated and will be removed in a future release",
 		"kubernetes.io/quobyte":   "The Quobyte volume provider is deprecated and will be removed in a future release",
 		"kubernetes.io/flocker":   "The Flocker volume provider is deprecated and will be removed in a future release",
+		"kubernetes.io/glusterfs": "The GlusterFS volume provider is deprecated and will be removed soon after in a subsequent release",
 	}
 )
 
