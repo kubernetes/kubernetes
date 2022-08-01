@@ -1221,13 +1221,15 @@
     its label selector.
   release: v1.20
   file: test/e2e/instrumentation/core_events.go
-- testname: Event resource lifecycle
-  codename: '[sig-instrumentation] Events should ensure that an event can be fetched,
-    patched, deleted, and listed [Conformance]'
-  description: Create an event, the event MUST exist. The event is patched with a
-    new message, the check MUST have the update message. The event is deleted and
-    MUST NOT show up when listing all events.
-  release: v1.20
+- testname: Event, manage lifecycle of an Event
+  codename: '[sig-instrumentation] Events should manage the lifecycle of an event
+    [Conformance]'
+  description: Attempt to create an event which MUST succeed. Attempt to list all
+    namespaces with a label selector which MUST succeed. One list MUST be found. The
+    event is patched with a new message, the check MUST have the update message. The
+    event is updated with a new series of events, the check MUST confirm this update.
+    The event is deleted and MUST NOT show up when listing all events.
+  release: v1.25
   file: test/e2e/instrumentation/core_events.go
 - testname: DNS, cluster
   codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [Conformance]'
