@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	discoveryv1 "k8s.io/apiserver/pkg/endpoints/discovery/v1"
+	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/v2"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
@@ -51,8 +51,8 @@ func init() {
 
 // Test that the discovery manager starts and aggregates from two local API services
 func TestBasic(t *testing.T) {
-	service1 := discoveryv1.NewResourceManager(negotiatedSerializer)
-	service2 := discoveryv1.NewResourceManager(negotiatedSerializer)
+	service1 := discoveryendpoint.NewResourceManager(negotiatedSerializer)
+	service2 := discoveryendpoint.NewResourceManager(negotiatedSerializer)
 	apiGroup1 := fuzzAPIGroups(2, 5, 25)
 	apiGroup2 := fuzzAPIGroups(2, 5, 50)
 	service1.SetGroups(apiGroup1.Groups)
@@ -67,7 +67,7 @@ func TestBasic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error while starting ResourceDiscoveryManager: %e", err)
 	}
-	response, _, parsed := fetchPath(container, "/discovery/v1", "")
+	response, _, parsed := fetchPath(container, "/discovery/v2", "")
 	if response.StatusCode != 200 {
 		t.Fatalf("unexpected status code %d", response.StatusCode)
 	}
@@ -97,7 +97,7 @@ func checkAPIGroups(t *testing.T, api metav1.DiscoveryAPIGroupList, response *me
 // APIService has been marked as dirty
 func TestDirty(t *testing.T) {
 	pinged := false
-	service := discoveryv1.NewResourceManager(negotiatedSerializer)
+	service := discoveryendpoint.NewResourceManager(negotiatedSerializer)
 	aggregatedManager := NewDiscoveryManager(codecs, negotiatedSerializer)
 	aggregatedManager.AddLocalAPIService("service", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pinged = true
@@ -119,7 +119,7 @@ func TestDirty(t *testing.T) {
 // Show that an APIService can be removed and that its group no longer remains
 // if there are no versions
 func TestRemoveAPIService(t *testing.T) {
-	service := discoveryv1.NewResourceManager(negotiatedSerializer)
+	service := discoveryendpoint.NewResourceManager(negotiatedSerializer)
 	apiGroup := fuzzAPIGroups(2, 3, 10)
 	service.SetGroups(apiGroup.Groups)
 	aggregatedManager := NewDiscoveryManager(codecs, negotiatedSerializer)
@@ -146,7 +146,7 @@ func TestRemoveAPIService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error while starting ResourceDiscoveryManager: %e", err)
 	}
-	response, _, parsed := fetchPath(container, "/discovery/v1", "")
+	response, _, parsed := fetchPath(container, "/discovery/v2", "")
 	if response.StatusCode != 200 {
 		t.Fatalf("unexpected status code %d", response.StatusCode)
 	}
@@ -155,7 +155,7 @@ func TestRemoveAPIService(t *testing.T) {
 	}
 }
 
-// copied from staging/src/k8s.io/apiserver/pkg/endpoints/discovery/v1/handler_test.go
+// copied from staging/src/k8s.io/apiserver/pkg/endpoints/discovery/v2/handler_test.go
 func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) metav1.DiscoveryAPIGroupList {
 	fuzzer := fuzz.NewWithSeed(seed)
 	fuzzer.NumElements(atLeastNumGroups, maxNumGroups)
@@ -188,11 +188,11 @@ func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) metav1.Discov
 
 }
 
-// copied from staging/src/k8s.io/apiserver/pkg/endpoints/discovery/v1/handler_test.go
+// copied from staging/src/k8s.io/apiserver/pkg/endpoints/discovery/v2/handler_test.go
 func fetchPath(handler http.Handler, path string, etag string) (*http.Response, []byte, *metav1.DiscoveryAPIGroupList) {
 	// Expect json-formatted apis group list
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/discovery/v1", nil)
+	req := httptest.NewRequest("GET", "/discovery/v2", nil)
 
 	// Ask for JSON response
 	req.Header.Set("Accept", "application/json")
