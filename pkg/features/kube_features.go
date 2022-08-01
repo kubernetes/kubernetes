@@ -245,6 +245,7 @@ const (
 	// owner: @RenaudWasTaken @dashpole
 	// alpha: v1.19
 	// beta: v1.20
+	// ga: v1.25
 	//
 	// Disables Accelerator Metrics Collected by Kubelet
 	DisableAcceleratorUsageMetrics featuregate.Feature = "DisableAcceleratorUsageMetrics"
@@ -881,7 +882,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DevicePlugins: {Default: true, PreRelease: featuregate.Beta},
 
-	DisableAcceleratorUsageMetrics: {Default: true, PreRelease: featuregate.Beta},
+	DisableAcceleratorUsageMetrics: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	DisableCloudProviders: {Default: false, PreRelease: featuregate.Alpha},
 
