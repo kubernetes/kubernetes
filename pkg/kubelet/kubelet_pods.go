@@ -1478,16 +1478,6 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		}
 	}
 
-	// pods are not allowed to transition out of terminal phases
-	if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
-		// API server shows terminal phase; transitions are not allowed
-		if s.Phase != pod.Status.Phase {
-			klog.ErrorS(nil, "Pod attempted illegal phase transition", "pod", klog.KObj(pod), "originalStatusPhase", pod.Status.Phase, "apiStatusPhase", s.Phase, "apiStatus", s)
-			// Force back to phase from the API server
-			s.Phase = pod.Status.Phase
-		}
-	}
-
 	// ensure the probe managers have up to date status for containers
 	kl.probeManager.UpdatePodStatus(pod.UID, s)
 
