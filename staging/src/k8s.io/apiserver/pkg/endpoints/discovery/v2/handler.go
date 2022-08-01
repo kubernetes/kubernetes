@@ -58,6 +58,23 @@ type ResourceManager interface {
 	http.Handler
 }
 
+type noopResourceManager struct{}
+
+func (noopResourceManager) AddGroupVersion(groupName string, value metav1.DiscoveryGroupVersion) {}
+func (noopResourceManager) RemoveGroup(groupName string)                                         {}
+func (noopResourceManager) RemoveGroupVersion(gv metav1.GroupVersion)                            {}
+func (noopResourceManager) SetGroups([]metav1.DiscoveryAPIGroup)                                 {}
+func (noopResourceManager) WebService() *restful.WebService                                      { return nil }
+func (noopResourceManager) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
+	resp.WriteHeader(http.StatusNotImplemented)
+}
+
+var _ ResourceManager = noopResourceManager{}
+
+func NewNoopResourceManager() ResourceManager {
+	return noopResourceManager{}
+}
+
 type resourceDiscoveryManager struct {
 	// Protects writes to all fields in struct
 	lock sync.RWMutex
@@ -117,6 +134,7 @@ func (rdm *resourceDiscoveryManager) AddGroupVersion(groupName string, value met
 }
 
 func (rdm *resourceDiscoveryManager) addGroupVersionLocked(groupName string, value metav1.DiscoveryGroupVersion) {
+	klog.Infof("Adding GroupVersion %s %s to ResourceManager", groupName, value.Version)
 
 	if rdm.apiGroups == nil {
 		rdm.apiGroups = make(map[string]*metav1.DiscoveryAPIGroup)

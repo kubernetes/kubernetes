@@ -686,16 +686,13 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 		}
 		resourceInfos = append(resourceInfos, r...)
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
-			klog.Infof("Adding GroupVersion %s %s to DiscoveryManager", groupVersion.Group, groupVersion.Version)
-			s.DiscoveryResourceManager.AddGroupVersion(
-				apiGroupInfo.PrioritizedVersions[0].Group,
-				metav1.DiscoveryGroupVersion{
-					Version:      groupVersion.Version,
-					APIResources: apiResources,
-				},
-			)
-		}
+		s.DiscoveryResourceManager.AddGroupVersion(
+			apiGroupInfo.PrioritizedVersions[0].Group,
+			metav1.DiscoveryGroupVersion{
+				Version:      groupVersion.Version,
+				APIResources: apiResources,
+			},
+		)
 	}
 
 	s.RegisterDestroyFunc(apiGroupInfo.destroyStorage)

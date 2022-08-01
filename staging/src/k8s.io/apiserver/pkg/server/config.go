@@ -672,6 +672,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		s.DiscoveryResourceManager = discoveryendpoint.NewResourceManager(c.Serializer)
+	} else {
+		s.DiscoveryResourceManager = discoveryendpoint.NewNoopResourceManager()
 	}
 
 	for {

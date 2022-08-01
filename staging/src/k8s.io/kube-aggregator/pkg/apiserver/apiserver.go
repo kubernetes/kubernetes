@@ -463,7 +463,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 			s.openAPIV3AggregationController.UpdateAPIService(proxyHandler, apiService)
 		}
 		// Forward calls to discovery manager to update discovery document
-		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+		if s.discoveryAggregationController != nil {
 			s.discoveryAggregationController.AddAPIService(apiService, proxyHandler)
 		}
 		return nil
@@ -490,15 +490,13 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	if s.openAPIV3AggregationController != nil {
 		s.openAPIV3AggregationController.AddAPIService(proxyHandler, apiService)
 	}
+	if s.discoveryAggregationController != nil {
+		s.discoveryAggregationController.AddAPIService(apiService, proxyHandler)
+	}
+
 	s.proxyHandlers[apiService.Name] = proxyHandler
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandler)
-
-	// Forward calls to discovery manager to update discovery document
-	// This must be called after the proxyHandler for the apiservices are set up
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
-		s.discoveryAggregationController.AddAPIService(apiService, proxyHandler)
-	}
 
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {
@@ -529,7 +527,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 // It's a slow moving API, so it's ok to run the controller on a single thread.
 func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	// Forward calls to discovery manager to update discovery document
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+	if s.discoveryAggregationController != nil {
 		s.discoveryAggregationController.RemoveAPIService(apiServiceName)
 	}
 
