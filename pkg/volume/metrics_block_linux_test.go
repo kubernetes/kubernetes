@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
 Copyright 2021 The Kubernetes Authors.
 
@@ -24,6 +27,7 @@ import (
 )
 
 func TestGetMetricsBlockInvalid(t *testing.T) {
+	// TODO: Enable this on Windows once support VolumeMode=Block is added.
 	metrics := NewMetricsBlock("")
 	actual, err := metrics.GetMetrics()
 	expected := &Metrics{}
