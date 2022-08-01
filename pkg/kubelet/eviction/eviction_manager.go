@@ -388,7 +388,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		if !isHardEvictionThreshold(thresholdToReclaim) {
 			gracePeriodOverride = m.config.MaxPodGracePeriodSeconds
 		}
-		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc)
+		message, annotations := evictionMessage(resourceToReclaim, pod, statsFunc, thresholds, observations)
 		var condition *v1.PodCondition
 		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
 			condition = &v1.PodCondition{

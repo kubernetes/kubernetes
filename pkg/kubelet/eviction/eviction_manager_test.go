@@ -195,7 +195,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 			wantPodStatus: v1.PodStatus{
 				Phase:   v1.PodFailed,
 				Reason:  "Evicted",
-				Message: "The node was low on resource: memory. ",
+				Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
 			},
 		},
 	}
@@ -272,7 +272,7 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 						Type:    "DisruptionTarget",
 						Status:  "True",
 						Reason:  "TerminationByKubelet",
-						Message: "The node was low on resource: memory. ",
+						Message: "The node was low on resource: memory. Threshold quantity: 2Gi, available: 1500Mi. ",
 					})
 				}
 
@@ -296,7 +296,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 			wantPodStatus: v1.PodStatus{
 				Phase:   v1.PodFailed,
 				Reason:  "Evicted",
-				Message: "The node was low on resource: ephemeral-storage. ",
+				Message: "The node was low on resource: ephemeral-storage. Threshold quantity: 2Gi, available: 1536Mi. ",
 			},
 		},
 	}
@@ -373,7 +373,7 @@ func TestDiskPressureNodeFs_VerifyPodStatus(t *testing.T) {
 						Type:    "DisruptionTarget",
 						Status:  "True",
 						Reason:  "TerminationByKubelet",
-						Message: "The node was low on resource: ephemeral-storage. ",
+						Message: "The node was low on resource: ephemeral-storage. Threshold quantity: 2Gi, available: 1536Mi. ",
 					})
 				}
 
