@@ -596,6 +596,22 @@
     and minor versions MUST only be an integer.
   release: v1.19
   file: test/e2e/apimachinery/server_version.go
+- testname: ControllerRevision, resource lifecycle
+  codename: '[sig-apps] ControllerRevision [Serial] should manage the lifecycle of
+    a ControllerRevision [Conformance]'
+  description: Creating a DaemonSet MUST succeed. Listing all ControllerRevisions
+    with a label selector MUST find only one. After patching the ControllerRevision
+    with a new label, the label MUST be found. Creating a new ControllerRevision for
+    the DaemonSet MUST succeed. Listing the ControllerRevisions by label selector
+    MUST find only two. Deleting a ControllerRevision MUST succeed. Listing the ControllerRevisions
+    by label selector MUST find only one. After updating the ControllerRevision with
+    a new label, the label MUST be found. Patching the DaemonSet MUST succeed. Listing
+    the ControllerRevisions by label selector MUST find only two. Deleting a collection
+    of ControllerRevision via a label selector MUST succeed. Listing the ControllerRevisions
+    by label selector MUST find only one. The current ControllerRevision revision
+    MUST be 3.
+  release: v1.25
+  file: test/e2e/apps/controller_revision.go
 - testname: CronJob Suspend
   codename: '[sig-apps] CronJob should not schedule jobs when suspended [Slow] [Conformance]'
   description: CronJob MUST support suspension, which suppresses creation of new jobs.
