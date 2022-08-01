@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,7 +25,7 @@ import (
 const GroupName = "kubelet.config.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1beta1"}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
 
 var (
 	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
@@ -37,8 +37,6 @@ var (
 // addKnownTypes registers known types to the given scheme
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&KubeletConfiguration{},
-		&SerializedNodeConfigSource{},
 		&CredentialProviderConfig{},
 	)
 	return nil
