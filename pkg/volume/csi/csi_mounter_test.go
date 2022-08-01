@@ -22,9 +22,9 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -903,19 +903,25 @@ func TestUnmounterTeardown(t *testing.T) {
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file prior to unmount
-	dir := filepath.Join(getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host), "/mount")
+	targetDir := getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host)
+	dir := filepath.Join(targetDir, "mount")
 	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
 		t.Errorf("failed to create dir [%s]: %v", dir, err)
 	}
 
 	// do a fake local mount
 	diskMounter := util.NewSafeFormatAndMountFromHost(plug.GetPluginName(), plug.host)
-	if err := diskMounter.FormatAndMount("/fake/device", dir, "testfs", nil); err != nil {
+	device := "/fake/device"
+	if goruntime.GOOS == "windows" {
+		// We need disk numbers on Windows.
+		device = "1"
+	}
+	if err := diskMounter.FormatAndMount(device, dir, "testfs", nil); err != nil {
 		t.Errorf("failed to mount dir [%s]: %v", dir, err)
 	}
 
 	if err := saveVolumeData(
-		path.Dir(dir),
+		targetDir,
 		volDataFileName,
 		map[string]string{
 			volDataKey.specVolID:  pv.ObjectMeta.Name,

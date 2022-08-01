@@ -18,6 +18,7 @@ package flexvolume
 
 import (
 	"encoding/json"
+	goruntime "runtime"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
@@ -41,7 +42,11 @@ func testPlugin(h *harness.Harness) (*flexVolumeAttachablePlugin, string) {
 
 func assertDriverCall(t *harness.Harness, output exectesting.FakeAction, expectedCommand string, expectedArgs ...string) exectesting.FakeCommandAction {
 	return func(cmd string, args ...string) exec.Cmd {
-		if cmd != "/plugin/test" {
+		executable := "/plugin/test"
+		if goruntime.GOOS == "windows" {
+			executable = "c:\\plugin\\test"
+		}
+		if cmd != executable {
 			t.Errorf("Wrong executable called: got %v, expected %v", cmd, "/plugin/test")
 		}
 		if args[0] != expectedCommand {
