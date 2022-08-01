@@ -438,6 +438,13 @@ const (
 	// Allows Job controller to manage Pod completions per completion index.
 	IndexedJob featuregate.Feature = "IndexedJob"
 
+	// owner: @danwinship
+	// kep: http://kep.k8s.io/3178
+	// alpha: v1.25
+	//
+	// Causes kubelet to no longer create legacy IPTables rules
+	IPTablesOwnershipCleanup featuregate.Feature = "IPTablesOwnershipCleanup"
+
 	// owner: @ahg
 	// beta: v1.23
 	//
@@ -937,6 +944,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginvSphereUnregister: {Default: false, PreRelease: featuregate.Alpha},
 
 	IndexedJob: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
+
+	IPTablesOwnershipCleanup: {Default: false, PreRelease: featuregate.Alpha},
 
 	JobMutableNodeSchedulingDirectives: {Default: true, PreRelease: featuregate.Beta},
 
