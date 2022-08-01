@@ -151,6 +151,8 @@ if [[ "${GINKGO_NO_COLOR}" == "y" ]]; then
   ginkgo_args+=("--noColor")
 fi
 
+ginkgo_args+=("--keep-separate-reports")
+
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.
