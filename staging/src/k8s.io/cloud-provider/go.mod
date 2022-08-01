@@ -17,7 +17,7 @@ require (
 	k8s.io/component-helpers v0.0.0
 	k8s.io/controller-manager v0.0.0
 	k8s.io/klog/v2 v2.70.1
-	k8s.io/utils v0.0.0-20220725171434-9bab9ef40391
+	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
 )
 
 require (
