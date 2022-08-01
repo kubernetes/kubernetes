@@ -147,7 +147,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				conf.CPUCFSQuotaPeriod = metav1.Duration{Duration: 200 * time.Microsecond}
 				return conf
 			},
-			errMsg: "invalid configuration: cpuCFSQuotaPeriod (--cpu-cfs-quota-period) {200us} requires feature gate CustomCPUCFSQuotaPeriod",
+			errMsg: "invalid configuration: cpuCFSQuotaPeriod (--cpu-cfs-quota-period) {200µs} requires feature gate CustomCPUCFSQuotaPeriod",
 		},
 		{
 			name: "invalid CPUCFSQuotaPeriod",
