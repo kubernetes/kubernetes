@@ -629,6 +629,13 @@ const (
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
+	// owner: @ddebroy
+	// alpha: v1.25
+	//
+	// Enables reporting of PodHasNetwork condition in pod status after pod
+	// sandbox creation and network configuration completes successfully
+	PodHasNetworkCondition featuregate.Feature = "PodHasNetworkCondition"
+
 	// owner: @egernst
 	// alpha: v1.16
 	// beta: v1.18
@@ -997,6 +1004,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodAndContainerStatsFromCRI: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodDeletionCost: {Default: true, PreRelease: featuregate.Beta},
+
+	PodHasNetworkCondition: {Default: false, PreRelease: featuregate.Alpha},
 
 	PodOverhead: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
