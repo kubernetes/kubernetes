@@ -370,91 +370,6 @@ func TestGetSeccompProfilePath(t *testing.T) {
 			expectedProfile: "",
 		},
 		{
-			description: "annotations: pod runtime/default seccomp profile should return runtime/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
-			},
-			expectedProfile: "runtime/default",
-		},
-		{
-			description: "annotations: pod docker/default seccomp profile should return docker/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
-			},
-			expectedProfile: "docker/default",
-		},
-		{
-			description: "annotations: pod runtime/default seccomp profile with containerName should return runtime/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
-			},
-			containerName:   "container1",
-			expectedProfile: "runtime/default",
-		},
-		{
-			description: "annotations: pod docker/default seccomp profile with containerName should return docker/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
-			},
-			containerName:   "container1",
-			expectedProfile: "docker/default",
-		},
-		{
-			description: "annotations: pod unconfined seccomp profile should return unconfined",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileNameUnconfined,
-			},
-			expectedProfile: "unconfined",
-		},
-		{
-			description: "annotations: pod unconfined seccomp profile with containerName should return unconfined",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileNameUnconfined,
-			},
-			containerName:   "container1",
-			expectedProfile: "unconfined",
-		},
-		{
-			description: "annotations: pod localhost seccomp profile should return local profile path",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "localhost/chmod.json",
-			},
-			expectedProfile: seccompLocalhostPath("chmod.json"),
-		},
-		{
-			description: "annotations: pod localhost seccomp profile with containerName should return local profile path",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "localhost/chmod.json",
-			},
-			containerName:   "container1",
-			expectedProfile: seccompLocalhostPath("chmod.json"),
-		},
-		{
-			description: "annotations: container localhost seccomp profile with containerName should return local profile path",
-			annotation: map[string]string{
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
-			},
-			containerName:   "container1",
-			expectedProfile: seccompLocalhostPath("chmod.json"),
-		},
-		{
-			description: "annotations: container localhost seccomp profile should override pod profile",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey:                            v1.SeccompProfileNameUnconfined,
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
-			},
-			containerName:   "container1",
-			expectedProfile: seccompLocalhostPath("chmod.json"),
-		},
-		{
-			description: "annotations: container localhost seccomp profile with unmatched containerName should return empty",
-			annotation: map[string]string{
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
-			},
-			containerName:   "container2",
-			expectedProfile: "",
-		},
-		{
 			description:     "pod seccomp profile set to unconfined returns unconfined",
 			podSc:           &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}},
 			expectedProfile: "unconfined",
@@ -500,36 +415,6 @@ func TestGetSeccompProfilePath(t *testing.T) {
 			containerSc:     &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}},
 			expectedProfile: "runtime/default",
 		},
-		{
-			description: "prioritise container field over container annotation, pod field and pod annotation",
-			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
-			containerSc: &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-cont-profile.json")}},
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey:                            "localhost/annota-pod-profile.json",
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/annota-cont-profile.json",
-			},
-			containerName:   "container1",
-			expectedProfile: seccompLocalhostPath("field-cont-profile.json"),
-		},
-		{
-			description: "prioritise container annotation over pod field",
-			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey:                            "localhost/annota-pod-profile.json",
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/annota-cont-profile.json",
-			},
-			containerName:   "container1",
-			expectedProfile: seccompLocalhostPath("annota-cont-profile.json"),
-		},
-		{
-			description: "prioritise pod field over pod annotation",
-			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "localhost/annota-pod-profile.json",
-			},
-			containerName:   "container1",
-			expectedProfile: seccompLocalhostPath("field-pod-profile.json"),
-		},
 	}
 
 	for i, test := range tests {
@@ -557,91 +442,6 @@ func TestGetSeccompProfilePathDefaultSeccomp(t *testing.T) {
 		{
 			description:     "annotations: no seccomp with containerName should return runtime/default",
 			containerName:   "container1",
-			expectedProfile: v1.SeccompProfileRuntimeDefault,
-		},
-		{
-			description: "annotations: pod runtime/default seccomp profile should return runtime/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
-			},
-			expectedProfile: v1.SeccompProfileRuntimeDefault,
-		},
-		{
-			description: "annotations: pod docker/default seccomp profile should return docker/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
-			},
-			expectedProfile: "docker/default",
-		},
-		{
-			description: "annotations: pod runtime/default seccomp profile with containerName should return runtime/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
-			},
-			containerName:   "container1",
-			expectedProfile: v1.SeccompProfileRuntimeDefault,
-		},
-		{
-			description: "annotations: pod docker/default seccomp profile with containerName should return docker/default",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.DeprecatedSeccompProfileDockerDefault,
-			},
-			containerName:   "container1",
-			expectedProfile: "docker/default",
-		},
-		{
-			description: "annotations: pod unconfined seccomp profile should return unconfined",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileNameUnconfined,
-			},
-			expectedProfile: "unconfined",
-		},
-		{
-			description: "annotations: pod unconfined seccomp profile with containerName should return unconfined",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: v1.SeccompProfileNameUnconfined,
-			},
-			containerName:   "container1",
-			expectedProfile: "unconfined",
-		},
-		{
-			description: "annotations: pod localhost seccomp profile should return local profile path",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "localhost/chmod.json",
-			},
-			expectedProfile: seccompLocalhostPath("chmod.json"),
-		},
-		{
-			description: "annotations: pod localhost seccomp profile with containerName should return local profile path",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "localhost/chmod.json",
-			},
-			containerName:   "container1",
-			expectedProfile: seccompLocalhostPath("chmod.json"),
-		},
-		{
-			description: "annotations: container localhost seccomp profile with containerName should return local profile path",
-			annotation: map[string]string{
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
-			},
-			containerName:   "container1",
-			expectedProfile: seccompLocalhostPath("chmod.json"),
-		},
-		{
-			description: "annotations: container localhost seccomp profile should override pod profile",
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey:                            v1.SeccompProfileNameUnconfined,
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
-			},
-			containerName:   "container1",
-			expectedProfile: seccompLocalhostPath("chmod.json"),
-		},
-		{
-			description: "annotations: container localhost seccomp profile with unmatched containerName should return runtime/default",
-			annotation: map[string]string{
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/chmod.json",
-			},
-			containerName:   "container2",
 			expectedProfile: v1.SeccompProfileRuntimeDefault,
 		},
 		{
@@ -689,36 +489,6 @@ func TestGetSeccompProfilePathDefaultSeccomp(t *testing.T) {
 			podSc:           &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeUnconfined}},
 			containerSc:     &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeRuntimeDefault}},
 			expectedProfile: "runtime/default",
-		},
-		{
-			description: "prioritise container field over container annotation, pod field and pod annotation",
-			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
-			containerSc: &v1.SecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-cont-profile.json")}},
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey:                            "localhost/annota-pod-profile.json",
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/annota-cont-profile.json",
-			},
-			containerName:   "container1",
-			expectedProfile: seccompLocalhostPath("field-cont-profile.json"),
-		},
-		{
-			description: "prioritise container annotation over pod field",
-			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey:                            "localhost/annota-pod-profile.json",
-				v1.SeccompContainerAnnotationKeyPrefix + "container1": "localhost/annota-cont-profile.json",
-			},
-			containerName:   "container1",
-			expectedProfile: seccompLocalhostPath("annota-cont-profile.json"),
-		},
-		{
-			description: "prioritise pod field over pod annotation",
-			podSc:       &v1.PodSecurityContext{SeccompProfile: &v1.SeccompProfile{Type: v1.SeccompProfileTypeLocalhost, LocalhostProfile: getLocal("field-pod-profile.json")}},
-			annotation: map[string]string{
-				v1.SeccompPodAnnotationKey: "localhost/annota-pod-profile.json",
-			},
-			containerName:   "container1",
-			expectedProfile: seccompLocalhostPath("field-pod-profile.json"),
 		},
 	}
 

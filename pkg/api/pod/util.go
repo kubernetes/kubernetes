@@ -777,36 +777,6 @@ func SeccompAnnotationForField(field *api.SeccompProfile) string {
 	return ""
 }
 
-// SeccompFieldForAnnotation takes a pod annotation and returns the converted
-// seccomp profile field.
-func SeccompFieldForAnnotation(annotation string) *api.SeccompProfile {
-	// If only seccomp annotations are specified, copy the values into the
-	// corresponding fields. This ensures that existing applications continue
-	// to enforce seccomp, and prevents the kubelet from needing to resolve
-	// annotations & fields.
-	if annotation == v1.SeccompProfileNameUnconfined {
-		return &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined}
-	}
-
-	if annotation == api.SeccompProfileRuntimeDefault || annotation == api.DeprecatedSeccompProfileDockerDefault {
-		return &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault}
-	}
-
-	if strings.HasPrefix(annotation, v1.SeccompLocalhostProfileNamePrefix) {
-		localhostProfile := strings.TrimPrefix(annotation, v1.SeccompLocalhostProfileNamePrefix)
-		if localhostProfile != "" {
-			return &api.SeccompProfile{
-				Type:             api.SeccompProfileTypeLocalhost,
-				LocalhostProfile: &localhostProfile,
-			}
-		}
-	}
-
-	// we can only reach this code path if the localhostProfile name has a zero
-	// length or if the annotation has an unrecognized value
-	return nil
-}
-
 // setsWindowsHostProcess returns true if WindowsOptions.HostProcess is set (true or false)
 // anywhere in the pod spec.
 func setsWindowsHostProcess(podSpec *api.PodSpec) bool {

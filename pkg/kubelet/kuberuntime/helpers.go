@@ -234,15 +234,6 @@ func fieldProfile(scmp *v1.SeccompProfile, profileRootPath string, fallbackToRun
 	return ""
 }
 
-func annotationProfile(profile, profileRootPath string) string {
-	if strings.HasPrefix(profile, v1.SeccompLocalhostProfileNamePrefix) {
-		name := strings.TrimPrefix(profile, v1.SeccompLocalhostProfileNamePrefix)
-		fname := filepath.Join(profileRootPath, filepath.FromSlash(name))
-		return v1.SeccompLocalhostProfileNamePrefix + fname
-	}
-	return profile
-}
-
 func (m *kubeGenericRuntimeManager) getSeccompProfilePath(annotations map[string]string, containerName string,
 	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext, fallbackToRuntimeDefault bool) string {
 	// container fields are applied first
@@ -250,21 +241,9 @@ func (m *kubeGenericRuntimeManager) getSeccompProfilePath(annotations map[string
 		return fieldProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
 	}
 
-	// if container field does not exist, try container annotation (deprecated)
-	if containerName != "" {
-		if profile, ok := annotations[v1.SeccompContainerAnnotationKeyPrefix+containerName]; ok {
-			return annotationProfile(profile, m.seccompProfileRoot)
-		}
-	}
-
 	// when container seccomp is not defined, try to apply from pod field
 	if podSecContext != nil && podSecContext.SeccompProfile != nil {
 		return fieldProfile(podSecContext.SeccompProfile, m.seccompProfileRoot, fallbackToRuntimeDefault)
-	}
-
-	// as last resort, try to apply pod annotation (deprecated)
-	if profile, ok := annotations[v1.SeccompPodAnnotationKey]; ok {
-		return annotationProfile(profile, m.seccompProfileRoot)
 	}
 
 	if fallbackToRuntimeDefault {
