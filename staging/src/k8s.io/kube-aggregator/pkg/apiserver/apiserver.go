@@ -387,7 +387,6 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
 		s.discoveryAggregationController = NewDiscoveryManager(
-			aggregatorscheme.Codecs,
 			s.GenericAPIServer.Serializer,
 		)
 

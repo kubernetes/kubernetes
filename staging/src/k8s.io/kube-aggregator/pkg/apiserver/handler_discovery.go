@@ -26,8 +26,6 @@ import (
 	"github.com/emicklei/go-restful/v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -35,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // Given a list of APIServices and proxyHandlers for contacting them,
@@ -155,7 +154,6 @@ type apiServiceInfo struct {
 var _ DiscoveryAggregationController = &discoveryManager{}
 
 func NewDiscoveryManager(
-	codecs serializer.CodecFactory,
 	serializer runtime.NegotiatedSerializer,
 ) DiscoveryAggregationController {
 	return &discoveryManager{
@@ -260,7 +258,7 @@ func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 				klog.Errorf("failed to create http.Request for /discovery/v2: %v", err)
 				continue
 			}
-			req.Header.Add("Accept", "application/json")
+			req.Header.Add("Accept", runtime.ContentTypeProtobuf)
 
 			if len(updateInfo.etag) != 0 {
 				req.Header.Add("If-None-Match", updateInfo.etag)
@@ -281,7 +279,7 @@ func (dm *discoveryManager) refreshDocument(localOnly bool) error {
 				}
 			case http.StatusOK:
 				parsed := &metav1.DiscoveryAPIGroupList{}
-				if err := utiljson.Unmarshal(writer.data, parsed); err != nil {
+				if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), writer.data, parsed); err != nil {
 					results <- resultItem{
 						service: key,
 						error:   err,

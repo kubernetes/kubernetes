@@ -28,36 +28,20 @@ import (
 	fuzz "github.com/google/gofuzz"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/v2"
-	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
-
-var scheme = runtime.NewScheme()
-var codecs = runtimeserializer.NewCodecFactory(scheme)
-var negotiatedSerializer runtime.NegotiatedSerializer
-
-func init() {
-	// Add all builtin types to scheme
-	k8sscheme.AddToScheme(scheme)
-	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	if !ok {
-		panic("failed to create serializer info")
-	}
-
-	negotiatedSerializer = runtime.NewSimpleNegotiatedSerializer(info)
-}
 
 // Test that the discovery manager starts and aggregates from two local API services
 func TestBasic(t *testing.T) {
-	service1 := discoveryendpoint.NewResourceManager(negotiatedSerializer)
-	service2 := discoveryendpoint.NewResourceManager(negotiatedSerializer)
+	service1 := discoveryendpoint.NewResourceManager(legacyscheme.Codecs)
+	service2 := discoveryendpoint.NewResourceManager(legacyscheme.Codecs)
 	apiGroup1 := fuzzAPIGroups(2, 5, 25)
 	apiGroup2 := fuzzAPIGroups(2, 5, 50)
 	service1.SetGroups(apiGroup1.Groups)
 	service2.SetGroups(apiGroup2.Groups)
-	aggregatedManager := NewDiscoveryManager(codecs, negotiatedSerializer)
+	aggregatedManager := NewDiscoveryManager(legacyscheme.Codecs)
 	aggregatedManager.AddLocalAPIService("service1", service1)
 	aggregatedManager.AddLocalAPIService("service2", service2)
 	container := restful.NewContainer()
@@ -97,8 +81,8 @@ func checkAPIGroups(t *testing.T, api metav1.DiscoveryAPIGroupList, response *me
 // APIService has been marked as dirty
 func TestDirty(t *testing.T) {
 	pinged := false
-	service := discoveryendpoint.NewResourceManager(negotiatedSerializer)
-	aggregatedManager := NewDiscoveryManager(codecs, negotiatedSerializer)
+	service := discoveryendpoint.NewResourceManager(legacyscheme.Codecs)
+	aggregatedManager := NewDiscoveryManager(legacyscheme.Codecs)
 	aggregatedManager.AddLocalAPIService("service", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pinged = true
 		service.ServeHTTP(w, r)
@@ -119,10 +103,10 @@ func TestDirty(t *testing.T) {
 // Show that an APIService can be removed and that its group no longer remains
 // if there are no versions
 func TestRemoveAPIService(t *testing.T) {
-	service := discoveryendpoint.NewResourceManager(negotiatedSerializer)
+	service := discoveryendpoint.NewResourceManager(legacyscheme.Codecs)
 	apiGroup := fuzzAPIGroups(2, 3, 10)
 	service.SetGroups(apiGroup.Groups)
-	aggregatedManager := NewDiscoveryManager(codecs, negotiatedSerializer)
+	aggregatedManager := NewDiscoveryManager(legacyscheme.Codecs)
 	aggregatedManager.AddAPIService(&apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "serviceName",
@@ -195,7 +179,7 @@ func fetchPath(handler http.Handler, path string, etag string) (*http.Response, 
 	req := httptest.NewRequest("GET", "/discovery/v2", nil)
 
 	// Ask for JSON response
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", runtime.ContentTypeProtobuf)
 
 	if etag != "" {
 		// Quote provided etag if unquoted
@@ -212,7 +196,7 @@ func fetchPath(handler http.Handler, path string, etag string) (*http.Response, 
 	var decoded *metav1.DiscoveryAPIGroupList
 	if len(bytes) > 0 {
 		decoded = &metav1.DiscoveryAPIGroupList{}
-		runtime.DecodeInto(codecs.UniversalDecoder(), bytes, decoded)
+		runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), bytes, decoded)
 	}
 
 	return w.Result(), bytes, decoded
