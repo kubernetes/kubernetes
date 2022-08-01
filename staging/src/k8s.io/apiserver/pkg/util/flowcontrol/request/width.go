@@ -26,6 +26,11 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	// minimumSeats is the minimum number of seats a request must occupy.
+	minimumSeats = 1
+)
+
 // WorkEstimate carries three of the four parameters that determine the work in a request.
 // The fourth parameter is the duration of the initial phase of execution.
 type WorkEstimate struct {

@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-	"k8s.io/apiserver/pkg/apis/apiserver"
+	"k8s.io/apiserver/pkg/server"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/utils/path"
 )
@@ -51,16 +51,21 @@ func (o *PriorityAndFairnessOptions) AddFlags(fs *pflag.FlagSet) {
 
 // ApplyTo overrides default values initialised in PriorityAndFairnessConfiguration
 // with values specified by a user in the PriorityAndFairnessOptions config file.
-func (o *PriorityAndFairnessOptions) ApplyTo(c *apiserver.PriorityAndFairnessConfiguration) error {
+func (o *PriorityAndFairnessOptions) ApplyTo(c *server.Config) error {
 	if o == nil {
 		return nil
 	}
 
-	err := utilflowcontrol.ReadConfigFromFile(o.ConfigFile, c)
+	cfg, err := utilflowcontrol.ApplyConfigFromFileToDefaultConfiguration(o.ConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read flow control config: %v", err)
 	}
 
+	if errs := utilflowcontrol.ValidatePriorityAndFairnessConfiguration(cfg); len(errs) > 0 {
+		return fmt.Errorf("failed to validate priority and fairness configuration: %v", errs.ToAggregate())
+	}
+
+	c.PriorityAndFairnessConfig = *cfg
 	return nil
 }
 

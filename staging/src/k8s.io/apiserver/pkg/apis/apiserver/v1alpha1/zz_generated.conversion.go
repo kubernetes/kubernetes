@@ -24,6 +24,7 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	apiserver "k8s.io/apiserver/pkg/apis/apiserver"
@@ -171,6 +172,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((**uint64)(nil), (*uint64)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_Pointer_uint64_To_uint64(a.(**uint64), b.(*uint64), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*uint64)(nil), (**uint64)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_uint64_To_Pointer_uint64(a.(*uint64), b.(**uint64), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*EgressSelection)(nil), (*apiserver.EgressSelection)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_EgressSelection_To_apiserver_EgressSelection(a.(*EgressSelection), b.(*apiserver.EgressSelection), scope)
 	}); err != nil {
@@ -307,7 +318,9 @@ func Convert_apiserver_EgressSelectorConfiguration_To_v1alpha1_EgressSelectorCon
 }
 
 func autoConvert_v1alpha1_ListWorkEstimatorConfiguration_To_apiserver_ListWorkEstimatorConfiguration(in *ListWorkEstimatorConfiguration, out *apiserver.ListWorkEstimatorConfiguration, s conversion.Scope) error {
-	out.ObjectsPerSeat = in.ObjectsPerSeat
+	if err := v1.Convert_Pointer_float64_To_float64(&in.ObjectsPerSeat, &out.ObjectsPerSeat, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -317,7 +330,9 @@ func Convert_v1alpha1_ListWorkEstimatorConfiguration_To_apiserver_ListWorkEstima
 }
 
 func autoConvert_apiserver_ListWorkEstimatorConfiguration_To_v1alpha1_ListWorkEstimatorConfiguration(in *apiserver.ListWorkEstimatorConfiguration, out *ListWorkEstimatorConfiguration, s conversion.Scope) error {
-	out.ObjectsPerSeat = in.ObjectsPerSeat
+	if err := v1.Convert_float64_To_Pointer_float64(&in.ObjectsPerSeat, &out.ObjectsPerSeat, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -327,8 +342,12 @@ func Convert_apiserver_ListWorkEstimatorConfiguration_To_v1alpha1_ListWorkEstima
 }
 
 func autoConvert_v1alpha1_MutatingWorkEstimatorConfiguration_To_apiserver_MutatingWorkEstimatorConfiguration(in *MutatingWorkEstimatorConfiguration, out *apiserver.MutatingWorkEstimatorConfiguration, s conversion.Scope) error {
-	out.EventAdditionalDuration = in.EventAdditionalDuration
-	out.WatchesPerSeat = in.WatchesPerSeat
+	if err := v1.Convert_Pointer_v1_Duration_To_v1_Duration(&in.EventAdditionalDuration, &out.EventAdditionalDuration, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_Pointer_float64_To_float64(&in.WatchesPerSeat, &out.WatchesPerSeat, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -338,8 +357,12 @@ func Convert_v1alpha1_MutatingWorkEstimatorConfiguration_To_apiserver_MutatingWo
 }
 
 func autoConvert_apiserver_MutatingWorkEstimatorConfiguration_To_v1alpha1_MutatingWorkEstimatorConfiguration(in *apiserver.MutatingWorkEstimatorConfiguration, out *MutatingWorkEstimatorConfiguration, s conversion.Scope) error {
-	out.EventAdditionalDuration = in.EventAdditionalDuration
-	out.WatchesPerSeat = in.WatchesPerSeat
+	if err := v1.Convert_v1_Duration_To_Pointer_v1_Duration(&in.EventAdditionalDuration, &out.EventAdditionalDuration, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_float64_To_Pointer_float64(&in.WatchesPerSeat, &out.WatchesPerSeat, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -349,7 +372,9 @@ func Convert_apiserver_MutatingWorkEstimatorConfiguration_To_v1alpha1_MutatingWo
 }
 
 func autoConvert_v1alpha1_PriorityAndFairnessConfiguration_To_apiserver_PriorityAndFairnessConfiguration(in *PriorityAndFairnessConfiguration, out *apiserver.PriorityAndFairnessConfiguration, s conversion.Scope) error {
-	out.WorkEstimator = (*apiserver.WorkEstimatorConfiguration)(unsafe.Pointer(in.WorkEstimator))
+	if err := Convert_v1alpha1_WorkEstimatorConfiguration_To_apiserver_WorkEstimatorConfiguration(&in.WorkEstimator, &out.WorkEstimator, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -359,7 +384,9 @@ func Convert_v1alpha1_PriorityAndFairnessConfiguration_To_apiserver_PriorityAndF
 }
 
 func autoConvert_apiserver_PriorityAndFairnessConfiguration_To_v1alpha1_PriorityAndFairnessConfiguration(in *apiserver.PriorityAndFairnessConfiguration, out *PriorityAndFairnessConfiguration, s conversion.Scope) error {
-	out.WorkEstimator = (*WorkEstimatorConfiguration)(unsafe.Pointer(in.WorkEstimator))
+	if err := Convert_apiserver_WorkEstimatorConfiguration_To_v1alpha1_WorkEstimatorConfiguration(&in.WorkEstimator, &out.WorkEstimator, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -479,9 +506,15 @@ func Convert_apiserver_UDSTransport_To_v1alpha1_UDSTransport(in *apiserver.UDSTr
 }
 
 func autoConvert_v1alpha1_WorkEstimatorConfiguration_To_apiserver_WorkEstimatorConfiguration(in *WorkEstimatorConfiguration, out *apiserver.WorkEstimatorConfiguration, s conversion.Scope) error {
-	out.ListWorkEstimator = (*apiserver.ListWorkEstimatorConfiguration)(unsafe.Pointer(in.ListWorkEstimator))
-	out.MutatingWorkEstimator = (*apiserver.MutatingWorkEstimatorConfiguration)(unsafe.Pointer(in.MutatingWorkEstimator))
-	out.MaximumSeats = in.MaximumSeats
+	if err := Convert_v1alpha1_ListWorkEstimatorConfiguration_To_apiserver_ListWorkEstimatorConfiguration(&in.ListWorkEstimator, &out.ListWorkEstimator, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_MutatingWorkEstimatorConfiguration_To_apiserver_MutatingWorkEstimatorConfiguration(&in.MutatingWorkEstimator, &out.MutatingWorkEstimator, s); err != nil {
+		return err
+	}
+	if err := Convert_Pointer_uint64_To_uint64(&in.MaximumSeats, &out.MaximumSeats, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -491,9 +524,15 @@ func Convert_v1alpha1_WorkEstimatorConfiguration_To_apiserver_WorkEstimatorConfi
 }
 
 func autoConvert_apiserver_WorkEstimatorConfiguration_To_v1alpha1_WorkEstimatorConfiguration(in *apiserver.WorkEstimatorConfiguration, out *WorkEstimatorConfiguration, s conversion.Scope) error {
-	out.ListWorkEstimator = (*ListWorkEstimatorConfiguration)(unsafe.Pointer(in.ListWorkEstimator))
-	out.MutatingWorkEstimator = (*MutatingWorkEstimatorConfiguration)(unsafe.Pointer(in.MutatingWorkEstimator))
-	out.MaximumSeats = in.MaximumSeats
+	if err := Convert_apiserver_ListWorkEstimatorConfiguration_To_v1alpha1_ListWorkEstimatorConfiguration(&in.ListWorkEstimator, &out.ListWorkEstimator, s); err != nil {
+		return err
+	}
+	if err := Convert_apiserver_MutatingWorkEstimatorConfiguration_To_v1alpha1_MutatingWorkEstimatorConfiguration(&in.MutatingWorkEstimator, &out.MutatingWorkEstimator, s); err != nil {
+		return err
+	}
+	if err := Convert_uint64_To_Pointer_uint64(&in.MaximumSeats, &out.MaximumSeats, s); err != nil {
+		return err
+	}
 	return nil
 }
 

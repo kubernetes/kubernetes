@@ -29,5 +29,14 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&PriorityAndFairnessConfiguration{}, func(obj interface{}) {
+		SetObjectDefaults_PriorityAndFairnessConfiguration(obj.(*PriorityAndFairnessConfiguration))
+	})
 	return nil
+}
+
+func SetObjectDefaults_PriorityAndFairnessConfiguration(in *PriorityAndFairnessConfiguration) {
+	SetDefaults_WorkEstimatorConfiguration(&in.WorkEstimator)
+	SetDefaults_ListWorkEstimatorConfiguration(&in.WorkEstimator.ListWorkEstimator)
+	SetDefaults_MutatingWorkEstimatorConfiguration(&in.WorkEstimator.MutatingWorkEstimator)
 }

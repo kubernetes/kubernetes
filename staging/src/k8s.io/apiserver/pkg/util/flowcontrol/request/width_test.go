@@ -22,11 +22,23 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func TestWorkEstimator(t *testing.T) {
-	defaultCfg := DefaultWorkEstimatorConfiguration()
+	defaultCfg := apiserver.WorkEstimatorConfiguration{
+		MaximumSeats: 10,
+
+		ListWorkEstimator: apiserver.ListWorkEstimatorConfiguration{
+			ObjectsPerSeat: 100.0,
+		},
+		MutatingWorkEstimator: apiserver.MutatingWorkEstimatorConfiguration{
+			EventAdditionalDuration: metav1.Duration{Duration: 5 * time.Millisecond},
+			WatchesPerSeat:          10.0,
+		},
+	}
 
 	tests := []struct {
 		name                      string
@@ -395,7 +407,7 @@ func TestWorkEstimator(t *testing.T) {
 				return test.watchCount
 			}
 
-			estimator := NewWorkEstimator(countsFn, watchCountsFn, defaultCfg)
+			estimator := NewWorkEstimator(countsFn, watchCountsFn, &defaultCfg)
 
 			req, err := http.NewRequest("GET", test.requestURI, nil)
 			if err != nil {

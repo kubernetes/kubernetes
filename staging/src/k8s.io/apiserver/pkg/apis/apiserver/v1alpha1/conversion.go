@@ -30,3 +30,18 @@ func Convert_v1alpha1_EgressSelection_To_apiserver_EgressSelection(in *EgressSel
 	}
 	return nil
 }
+
+func Convert_Pointer_uint64_To_uint64(in **uint64, out *uint64, s conversion.Scope) error {
+	if *in == nil {
+		*out = 0
+		return nil
+	}
+	*out = uint64(**in)
+	return nil
+}
+
+func Convert_uint64_To_Pointer_uint64(in *uint64, out **uint64, s conversion.Scope) error {
+	temp := uint64(*in)
+	*out = &temp
+	return nil
+}

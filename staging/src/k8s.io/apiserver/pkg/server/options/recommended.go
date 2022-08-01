@@ -133,7 +133,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
 		return err
 	}
-	if err := o.PriorityAndFairnessOptions.ApplyTo(&config.PriorityAndFairnessConfig); err != nil {
+	if err := o.PriorityAndFairnessOptions.ApplyTo(&config.Config); err != nil {
 		return err
 	}
 	if initializers, err := o.ExtraAdmissionInitializers(config); err != nil {
@@ -171,6 +171,7 @@ func (o *RecommendedOptions) Validate() []error {
 	errors = append(errors, o.Admission.Validate()...)
 	errors = append(errors, o.EgressSelector.Validate()...)
 	errors = append(errors, o.Traces.Validate()...)
+	errors = append(errors, o.PriorityAndFairnessOptions.Validate()...)
 
 	return errors
 }

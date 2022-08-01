@@ -21,10 +21,10 @@ import (
 	"io/ioutil"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/apis/apiserver/install"
 	"k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
-	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"sigs.k8s.io/yaml"
 )
 
@@ -34,43 +34,68 @@ func init() {
 	install.Install(cfgScheme)
 }
 
-// DefaultConfig creates a new PriorityAndFairnessConfiguration with default values.
-func DefaultConfig() apiserver.PriorityAndFairnessConfiguration {
-	return apiserver.PriorityAndFairnessConfiguration{
-		WorkEstimator: fcrequest.DefaultWorkEstimatorConfiguration(),
-	}
+// DefaultConfiguration return default Priority and Fairness configuration.
+func DefaultConfiguration() apiserver.PriorityAndFairnessConfiguration {
+	cfg, _ := ApplyConfigFromFileToDefaultConfiguration("")
+	return *cfg
 }
 
-// ReadConfigFromFile parses configuration stored under configFilePath
-// and overrides PriorityAndFairnessConfiguration cfg object with defined values,
-// leaving undefined ones unchanged.
-func ReadConfigFromFile(configFilePath string, cfg *apiserver.PriorityAndFairnessConfiguration) error {
-	if configFilePath == "" {
-		return nil
+// ApplyConfigFromFileToDefaultConfiguration parses configuration stored under configFilePath and
+// overrides PriorityAndFairnessConfiguration cfg object with defined values, leaving undefined ones
+// unchanged.
+func ApplyConfigFromFileToDefaultConfiguration(cfgFilePath string) (*apiserver.PriorityAndFairnessConfiguration, error) {
+	decodedConfig := &v1alpha1.PriorityAndFairnessConfiguration{}
+	cfgScheme.Default(decodedConfig)
+
+	if cfgFilePath != "" {
+		data, err := ioutil.ReadFile(cfgFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read P&F configuration from %q [%v]", cfgFilePath, err)
+		}
+
+		if err = yaml.Unmarshal(data, &decodedConfig); err != nil {
+			return nil, err
+		}
+
+		if decodedConfig.Kind != "PriorityAndFairnessConfiguration" {
+			return nil, fmt.Errorf("invalid service configuration object %q", decodedConfig.Kind)
+		}
 	}
 
-	data, err := ioutil.ReadFile(configFilePath)
-	if err != nil {
-		return fmt.Errorf("unable to read P&F configuration from %q [%v]", configFilePath, err)
+	internalConfig := &apiserver.PriorityAndFairnessConfiguration{}
+	if err := cfgScheme.Convert(decodedConfig, internalConfig, nil); err != nil {
+		return nil, err
 	}
 
-	decodedConfig := v1alpha1.PriorityAndFairnessConfiguration{}
-	if err := cfgScheme.Convert(cfg, &decodedConfig, nil); err != nil {
-		return err
+	return internalConfig, nil
+}
+
+// ValidatePriorityAndFairnessConfiguration checks the v1alpha1.PriorityAndFairnessConfiguration for
+// common configuration errors. It will return error if either objectsPerSeat or watchesPerSeat
+// have value lower or equal to 0.
+func ValidatePriorityAndFairnessConfiguration(cfg *apiserver.PriorityAndFairnessConfiguration) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if cfg == nil {
+		return allErrs // Treating a nil configuration as valid
 	}
 
-	err = yaml.Unmarshal(data, &decodedConfig)
-	if err != nil {
-		return err
+	objectsPerSeat := cfg.WorkEstimator.ListWorkEstimator.ObjectsPerSeat
+	if objectsPerSeat <= 0 {
+		fldPath := field.NewPath("workEstimator", "listRequests")
+		allErrs = append(allErrs, field.Invalid(
+			fldPath.Child("objectsPerSeat"),
+			objectsPerSeat,
+			"objectsPerSeat can't be less than 0"))
 	}
 
-	if decodedConfig.Kind != "PriorityAndFairnessConfiguration" {
-		return fmt.Errorf("invalid service configuration object %q", decodedConfig.Kind)
+	watchesPerSeat := cfg.WorkEstimator.MutatingWorkEstimator.WatchesPerSeat
+	if watchesPerSeat <= 0 {
+		fldPath := field.NewPath("workEstimator", "mutatingRequests")
+		allErrs = append(allErrs, field.Invalid(
+			fldPath.Child("watchesPerSeat"),
+			watchesPerSeat,
+			"watchesPerSeat can't be less than 0"))
 	}
 
-	if err := cfgScheme.Convert(&decodedConfig, cfg, nil); err != nil {
-		return err
-	}
-
-	return nil
+	return allErrs
 }

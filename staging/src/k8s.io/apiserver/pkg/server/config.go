@@ -371,7 +371,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		LongRunningFunc:           genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
 		lifecycleSignals:          lifecycleSignals,
 		StorageObjectCountTracker: flowcontrolrequest.NewStorageObjectCountTracker(),
-		PriorityAndFairnessConfig: utilflowcontrol.DefaultConfig(),
+		PriorityAndFairnessConfig: utilflowcontrol.DefaultConfiguration(),
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
@@ -814,7 +814,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 	if c.PriorityAndFairness != nil {
 		requestWorkEstimator := flowcontrolrequest.NewWorkEstimator(
-			c.StorageObjectCountTracker.Get, c.PriorityAndFairness.GetInterestedWatchCount, c.PriorityAndFairnessConfig.WorkEstimator)
+			c.StorageObjectCountTracker.Get, c.PriorityAndFairness.GetInterestedWatchCount, &c.PriorityAndFairnessConfig.WorkEstimator)
 		handler = filterlatency.TrackCompleted(handler)
 		handler = genericfilters.WithPriorityAndFairness(handler, c.LongRunningFunc, c.PriorityAndFairness, requestWorkEstimator)
 		handler = filterlatency.TrackStarted(handler, "priorityandfairness")
