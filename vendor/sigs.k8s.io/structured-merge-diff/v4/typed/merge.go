@@ -80,7 +80,12 @@ func (w *mergingWalker) merge(prefixFn func() string) (errs ValidationErrors) {
 
 	alhs := deduceAtom(a, w.lhs)
 	arhs := deduceAtom(a, w.rhs)
-	if alhs.Equals(&arhs) {
+
+	// deduceAtom does not fix the type for nil values
+	// nil is a wildcard and will accept whatever form the other operand takes
+	if w.rhs == nil {
+		errs = append(errs, handleAtom(alhs, w.typeRef, w)...)
+	} else if w.lhs == nil || alhs.Equals(&arhs) {
 		errs = append(errs, handleAtom(arhs, w.typeRef, w)...)
 	} else {
 		w2 := *w
