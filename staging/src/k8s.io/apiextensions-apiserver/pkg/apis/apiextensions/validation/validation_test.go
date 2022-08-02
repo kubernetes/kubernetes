@@ -7598,6 +7598,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "forbid transition rule on element of list of type atomic",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7624,6 +7625,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "forbid transition rule on element of list defaulting to type atomic",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7649,6 +7651,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "allow transition rule on list of type atomic",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7695,6 +7698,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "forbid transition rule on element of list of type set",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7722,6 +7726,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "allow transition rule on list of type set",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7746,6 +7751,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "allow transition rule on element of list of type map",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7773,6 +7779,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "allow transition rule on list of type map",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7801,6 +7808,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "allow transition rule on element of map of type granular",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7824,6 +7832,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "forbid transition rule on element of map of unrecognized type",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7851,6 +7860,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "allow transition rule on element of map defaulting to type granular",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7873,6 +7883,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "allow transition rule on map of type granular",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7890,6 +7901,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "allow transition rule on map defaulting to type granular",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7906,6 +7918,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "allow transition rule on element of map of type atomic",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7928,6 +7941,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "allow transition rule on map of type atomic",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7945,6 +7959,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "forbid double-nested rule with no limit set",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -7982,6 +7997,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "forbid double-nested rule with one limit set",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8019,6 +8035,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "allow double-nested rule with three limits set",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8052,6 +8069,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "allow double-nested rule with one limit set on outermost array",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8084,6 +8102,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "check for cardinality of 1 under root object",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8101,6 +8120,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "forbid validation rules where cost total exceeds total limit",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8152,7 +8172,141 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 		},
 		{
+			name: "skip CEL expression validation when OpenAPIv3 schema is an invalid structural schema",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					// illegal to have both Properties and AdditionalProperties
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"field": {
+							Type: "integer",
+						},
+					},
+					AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "string",
+						},
+					},
+					XValidations: apiextensions.ValidationRules{
+						{Rule: "self.invalidFieldName > 50"}, // invalid CEL rule
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				forbidden("spec.validation.openAPIV3Schema.additionalProperties"), // illegal to have both properties and additional properties
+				forbidden("spec.validation.openAPIV3Schema.additionalProperties"), // structural schema rule: illegal to have additional properties at root
+				// Error for invalid CEL rule is NOT expected here because CEL rules are not checked when the schema is invalid
+			},
+		},
+		{
+			name: "skip CEL expression validation when OpenAPIv3 schema is an invalid structural schema at level below",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"field": {
+							Type: "object",
+							// illegal to have both Properties and AdditionalProperties
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field": {
+									Type: "integer",
+								},
+							},
+							AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+					},
+					XValidations: apiextensions.ValidationRules{
+						{Rule: "self.invalidFieldName > 50"},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				forbidden("spec.validation.openAPIV3Schema.properties[field].additionalProperties"),
+			},
+		},
+		{
+			// So long at the schema information accessible to the CEL expression is valid, the expression should be validated.
+			name: "do not skip when OpenAPIv3 schema is an invalid structural schema in a separate part of the schema tree",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"a": {
+							Type: "object",
+							// illegal to have both Properties and AdditionalProperties
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field": {
+									Type: "integer",
+								},
+							},
+							AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+						"b": {
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"field": {
+									Type: "integer",
+								},
+							},
+							XValidations: apiextensions.ValidationRules{
+								{Rule: "self.invalidFieldName > 50"},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				forbidden("spec.validation.openAPIV3Schema.properties[a].additionalProperties"),
+				invalid("spec.validation.openAPIV3Schema.properties[b].x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
+			// So long at the schema information accessible to the CEL expression is valid, the expression should be validated.
+			name: "do not skip CEL expression validation when OpenAPIv3 schema is an invalid structural schema at level above",
+			opts: validationOptions{requireStructuralSchema: true},
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"a": {
+							Type: "object",
+							// illegal to have both Properties and AdditionalProperties
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"b": {
+									Type: "integer",
+									XValidations: apiextensions.ValidationRules{
+										{Rule: "self == 'abc'"},
+									},
+								},
+							},
+							AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErrors: []validationMatch{
+				forbidden("spec.validation.openAPIV3Schema.properties[a].additionalProperties"),
+				invalid("spec.validation.openAPIV3Schema.properties[a].properties[b].x-kubernetes-validations[0].rule"),
+			},
+		},
+		{
 			name: "x-kubernetes-validations rule validated for escaped property name",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8172,6 +8326,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "x-kubernetes-validations rule validated under array items",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8196,6 +8351,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "x-kubernetes-validations rule validated under array items, parent has rule",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8222,6 +8378,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "x-kubernetes-validations rule validated under additionalProperties",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8246,6 +8403,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "x-kubernetes-validations rule validated under additionalProperties, parent has rule",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8273,6 +8431,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "x-kubernetes-validations rule validated under unescaped property name",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8292,6 +8451,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "x-kubernetes-validations rule validated under unescaped property name, parent has rule",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8314,6 +8474,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "x-kubernetes-validations rule validated under escaped property name",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8333,6 +8494,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "x-kubernetes-validations rule validated under escaped property name, parent has rule",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8355,6 +8517,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "x-kubernetes-validations rule validated under unescapable property name",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8374,6 +8537,7 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 		},
 		{
 			name: "x-kubernetes-validations rule validated under unescapable property name, parent has rule",
+			opts: validationOptions{requireStructuralSchema: true},
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type: "object",
@@ -8814,7 +8978,7 @@ func TestCelContext(t *testing.T) {
 				disallowDefaultsReason:   opts.disallowDefaultsReason,
 				requireValidPropertyType: opts.requireValidPropertyType,
 			}
-			errors := ValidateCustomResourceDefinitionOpenAPISchema(tt.schema, field.NewPath("openAPIV3Schema"), openAPIV3Schema, true, &opts, celContext)
+			errors := ValidateCustomResourceDefinitionOpenAPISchema(tt.schema, field.NewPath("openAPIV3Schema"), openAPIV3Schema, true, &opts, celContext).AllErrors()
 			if len(errors) != 0 {
 				t.Errorf("Expected no validate errors but got %v", errors)
 			}

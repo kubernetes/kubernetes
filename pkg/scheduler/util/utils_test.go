@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,27 +63,59 @@ func newPriorityPodWithStartTime(name string, priority int32, startTime time.Tim
 }
 
 func TestGetEarliestPodStartTime(t *testing.T) {
+	var priority int32 = 1
 	currentTime := time.Now()
-	pod1 := newPriorityPodWithStartTime("pod1", 1, currentTime.Add(time.Second))
-	pod2 := newPriorityPodWithStartTime("pod2", 2, currentTime.Add(time.Second))
-	pod3 := newPriorityPodWithStartTime("pod3", 2, currentTime)
-	victims := &extenderv1.Victims{
-		Pods: []*v1.Pod{pod1, pod2, pod3},
+	tests := []struct {
+		name              string
+		pods              []*v1.Pod
+		expectedStartTime *metav1.Time
+	}{
+		{
+			name:              "Pods length is 0",
+			pods:              []*v1.Pod{},
+			expectedStartTime: nil,
+		},
+		{
+			name: "generate new startTime",
+			pods: []*v1.Pod{
+				newPriorityPodWithStartTime("pod1", 1, currentTime.Add(-time.Second)),
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod2",
+					},
+					Spec: v1.PodSpec{
+						Priority: &priority,
+					},
+				},
+			},
+			expectedStartTime: &metav1.Time{Time: currentTime.Add(-time.Second)},
+		},
+		{
+			name: "Pod with earliest start time last in the list",
+			pods: []*v1.Pod{
+				newPriorityPodWithStartTime("pod1", 1, currentTime.Add(time.Second)),
+				newPriorityPodWithStartTime("pod2", 2, currentTime.Add(time.Second)),
+				newPriorityPodWithStartTime("pod3", 2, currentTime),
+			},
+			expectedStartTime: &metav1.Time{Time: currentTime},
+		},
+		{
+			name: "Pod with earliest start time first in the list",
+			pods: []*v1.Pod{
+				newPriorityPodWithStartTime("pod1", 2, currentTime),
+				newPriorityPodWithStartTime("pod2", 2, currentTime.Add(time.Second)),
+				newPriorityPodWithStartTime("pod3", 2, currentTime.Add(2*time.Second)),
+			},
+			expectedStartTime: &metav1.Time{Time: currentTime},
+		},
 	}
-	startTime := GetEarliestPodStartTime(victims)
-	if !startTime.Equal(pod3.Status.StartTime) {
-		t.Errorf("Got wrong earliest pod start time")
-	}
-
-	pod1 = newPriorityPodWithStartTime("pod1", 2, currentTime)
-	pod2 = newPriorityPodWithStartTime("pod2", 2, currentTime.Add(time.Second))
-	pod3 = newPriorityPodWithStartTime("pod3", 2, currentTime.Add(2*time.Second))
-	victims = &extenderv1.Victims{
-		Pods: []*v1.Pod{pod1, pod2, pod3},
-	}
-	startTime = GetEarliestPodStartTime(victims)
-	if !startTime.Equal(pod1.Status.StartTime) {
-		t.Errorf("Got wrong earliest pod start time, got %v, expected %v", startTime, pod1.Status.StartTime)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			startTime := GetEarliestPodStartTime(&extenderv1.Victims{Pods: test.pods})
+			if !startTime.Equal(test.expectedStartTime) {
+				t.Errorf("startTime is not the expected result,got %v, expected %v", startTime, test.expectedStartTime)
+			}
+		})
 	}
 }
 

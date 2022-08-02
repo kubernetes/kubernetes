@@ -372,12 +372,6 @@ func (s *Server) InstallDefaultHandlers() {
 		cadvisormetrics.OOMMetrics:          struct{}{},
 	}
 
-	// Only add the Accelerator metrics if the feature is inactive
-	// Note: Accelerator metrics will be removed in the future, hence the feature gate.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAcceleratorUsageMetrics) {
-		includedMetrics[cadvisormetrics.AcceleratorUsageMetrics] = struct{}{}
-	}
-
 	cadvisorOpts := cadvisorv2.RequestOptions{
 		IdType:    cadvisorv2.TypeName,
 		Count:     1,
@@ -402,6 +396,7 @@ func (s *Server) InstallDefaultHandlers() {
 	p := compbasemetrics.NewKubeRegistry()
 	_ = compbasemetrics.RegisterProcessStartTime(p.Register)
 	p.MustRegister(prober.ProberResults)
+	p.MustRegister(prober.ProberDuration)
 	s.restfulCont.Handle(proberMetricsPath,
 		compbasemetrics.HandlerFor(p, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
@@ -916,7 +911,7 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 			}
 		}
 	}
-	if !found && utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+	if !found {
 		for _, container := range pod.Spec.EphemeralContainers {
 			if container.Name == containerName {
 				found = true

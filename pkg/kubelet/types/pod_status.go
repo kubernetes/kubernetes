@@ -18,6 +18,8 @@ package types
 
 import (
 	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // PodConditionsByKubelet is the list of pod conditions owned by kubelet
@@ -32,6 +34,11 @@ var PodConditionsByKubelet = []v1.PodConditionType{
 func PodConditionByKubelet(conditionType v1.PodConditionType) bool {
 	for _, c := range PodConditionsByKubelet {
 		if c == conditionType {
+			return true
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodHasNetworkCondition) {
+		if conditionType == PodHasNetwork {
 			return true
 		}
 	}

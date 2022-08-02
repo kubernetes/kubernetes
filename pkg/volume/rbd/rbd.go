@@ -44,6 +44,7 @@ import (
 
 var (
 	supportedFeatures = sets.NewString("layering")
+	pathSeparator     = string(os.PathSeparator)
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -846,6 +847,7 @@ func (b *rbdMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	if err != nil {
 		klog.Errorf("rbd: failed to setup at %s %v", dir, err)
+		return err
 	}
 	klog.V(3).Infof("rbd: successfully setup at %s", dir)
 	return err
@@ -948,7 +950,7 @@ type rbdDiskUnmapper struct {
 
 func getPoolAndImageFromMapPath(mapPath string) (string, string, error) {
 
-	pathParts := dstrings.Split(mapPath, "/")
+	pathParts := dstrings.Split(mapPath, pathSeparator)
 	if len(pathParts) < 2 {
 		return "", "", fmt.Errorf("corrupted mapPath")
 	}

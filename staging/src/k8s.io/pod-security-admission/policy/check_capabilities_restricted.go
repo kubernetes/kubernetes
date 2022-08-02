@@ -66,6 +66,12 @@ func CheckCapabilitiesRestricted() Check {
 				CheckPod:         capabilitiesRestricted_1_22,
 				OverrideCheckIDs: []CheckID{checkCapabilitiesBaselineID},
 			},
+			// Starting 1.25, windows pods would be exempted from this check using pod.spec.os field when set to windows.
+			{
+				MinimumVersion:   api.MajorMinorVersion(1, 25),
+				CheckPod:         capabilitiesRestricted_1_25,
+				OverrideCheckIDs: []CheckID{checkCapabilitiesBaselineID},
+			},
 		},
 	}
 }
@@ -127,4 +133,13 @@ func capabilitiesRestricted_1_22(podMetadata *metav1.ObjectMeta, podSpec *corev1
 		}
 	}
 	return CheckResult{Allowed: true}
+}
+
+func capabilitiesRestricted_1_25(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	// Pod API validation would have failed if podOS == Windows and if capabilities have been set.
+	// We can admit the Windows pod even if capabilities has not been set.
+	if podSpec.OS != nil && podSpec.OS.Name == corev1.Windows {
+		return CheckResult{Allowed: true}
+	}
+	return capabilitiesRestricted_1_22(podMetadata, podSpec)
 }

@@ -111,6 +111,7 @@ const (
 	// owner: @leakingtapan
 	// alpha: v1.14
 	// beta: v1.17
+	// GA: v1.25
 	//
 	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
 	CSIMigrationAWS featuregate.Feature = "CSIMigrationAWS"
@@ -245,6 +246,7 @@ const (
 	// owner: @RenaudWasTaken @dashpole
 	// alpha: v1.19
 	// beta: v1.20
+	// ga: v1.25
 	//
 	// Disables Accelerator Metrics Collected by Kubelet
 	DisableAcceleratorUsageMetrics featuregate.Feature = "DisableAcceleratorUsageMetrics"
@@ -285,6 +287,7 @@ const (
 	// owner: @verb
 	// alpha: v1.16
 	// beta: v1.23
+	// GA: v1.25
 	//
 	// Allows running an ephemeral container in pod namespaces to troubleshoot a running pod.
 	EphemeralContainers featuregate.Feature = "EphemeralContainers"
@@ -436,6 +439,13 @@ const (
 	// Allows Job controller to manage Pod completions per completion index.
 	IndexedJob featuregate.Feature = "IndexedJob"
 
+	// owner: @danwinship
+	// kep: http://kep.k8s.io/3178
+	// alpha: v1.25
+	//
+	// Causes kubelet to no longer create legacy IPTables rules
+	IPTablesOwnershipCleanup featuregate.Feature = "IPTablesOwnershipCleanup"
+
 	// owner: @ahg
 	// beta: v1.23
 	//
@@ -504,6 +514,7 @@ const (
 
 	// owner: @RobertKrawitz
 	// alpha: v1.15
+	// beta: v1.25
 	//
 	// Allow use of filesystems for ephemeral storage monitoring.
 	// Only applies if LocalStorageCapacityIsolation is set.
@@ -515,6 +526,13 @@ const (
 	//
 	// Enables scaling down replicas via logarithmic comparison of creation/ready timestamps
 	LogarithmicScaleDown featuregate.Feature = "LogarithmicScaleDown"
+
+	// owner: @denkensk
+	// kep: http://kep.k8s.io/3243
+	// alpha: v1.25
+	//
+	// Enable MatchLabelKeys in PodTopologySpread.
+	MatchLabelKeysInPodTopologySpread featuregate.Feature = "MatchLabelKeysInPodTopologySpread"
 
 	// owner: @krmayankk
 	// alpha: v1.24
@@ -611,6 +629,13 @@ const (
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
+	// owner: @ddebroy
+	// alpha: v1.25
+	//
+	// Enables reporting of PodHasNetwork condition in pod status after pod
+	// sandbox creation and network configuration completes successfully
+	PodHasNetworkCondition featuregate.Feature = "PodHasNetworkCondition"
+
 	// owner: @egernst
 	// alpha: v1.16
 	// beta: v1.18
@@ -641,6 +666,7 @@ const (
 
 	// owner: @ehashman
 	// alpha: v1.21
+	// beta: v1.22
 	//
 	// Allows user to override pod-level terminationGracePeriod for probes
 	ProbeTerminationGracePeriod featuregate.Feature = "ProbeTerminationGracePeriod"
@@ -842,7 +868,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	CSIMigration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
-	CSIMigrationAWS: {Default: true, PreRelease: featuregate.Beta},
+	CSIMigrationAWS: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	CSIMigrationAzureDisk: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // On by default in 1.23 (requires Azure Disk CSI driver)
 
@@ -880,7 +906,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	DevicePlugins: {Default: true, PreRelease: featuregate.Beta},
 
-	DisableAcceleratorUsageMetrics: {Default: true, PreRelease: featuregate.Beta},
+	DisableAcceleratorUsageMetrics: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	DisableCloudProviders: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -892,7 +918,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	EndpointSliceTerminatingCondition: {Default: true, PreRelease: featuregate.Beta},
 
-	EphemeralContainers: {Default: true, PreRelease: featuregate.Beta},
+	EphemeralContainers: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
 	ExecProbeTimeout: {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
 
@@ -936,6 +962,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	IndexedJob: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
+	IPTablesOwnershipCleanup: {Default: false, PreRelease: featuregate.Alpha},
+
 	JobMutableNodeSchedulingDirectives: {Default: true, PreRelease: featuregate.Beta},
 
 	JobReadyPods: {Default: true, PreRelease: featuregate.Beta},
@@ -954,9 +982,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	LocalStorageCapacityIsolation: {Default: true, PreRelease: featuregate.Beta},
 
-	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
+	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: true, PreRelease: featuregate.Beta},
 
 	LogarithmicScaleDown: {Default: true, PreRelease: featuregate.Beta},
+
+	MatchLabelKeysInPodTopologySpread: {Default: false, PreRelease: featuregate.Alpha},
 
 	MaxUnavailableStatefulSet: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -984,13 +1014,15 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	PodDeletionCost: {Default: true, PreRelease: featuregate.Beta},
 
+	PodHasNetworkCondition: {Default: false, PreRelease: featuregate.Alpha},
+
 	PodOverhead: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
 	PodSecurity: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 
 	PreferNominatedNode: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
-	ProbeTerminationGracePeriod: {Default: false, PreRelease: featuregate.Beta}, // Default to false in beta 1.22, set to true in 1.24
+	ProbeTerminationGracePeriod: {Default: true, PreRelease: featuregate.Beta}, // Default to true in beta 1.25
 
 	ProcMountType: {Default: false, PreRelease: featuregate.Alpha},
 
@@ -1047,7 +1079,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	genericfeatures.AdvancedAuditing: {Default: true, PreRelease: featuregate.GA},
 
-	genericfeatures.CustomResourceValidationExpressions: {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
 	genericfeatures.DryRun: {Default: true, PreRelease: featuregate.GA},
 

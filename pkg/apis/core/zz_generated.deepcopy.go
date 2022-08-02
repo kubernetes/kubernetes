@@ -5649,6 +5649,11 @@ func (in *TopologySpreadConstraint) DeepCopyInto(out *TopologySpreadConstraint) 
 		*out = new(NodeInclusionPolicy)
 		**out = **in
 	}
+	if in.MatchLabelKeys != nil {
+		in, out := &in.MatchLabelKeys, &out.MatchLabelKeys
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

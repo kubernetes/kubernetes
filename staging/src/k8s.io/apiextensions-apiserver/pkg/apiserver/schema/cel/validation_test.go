@@ -775,7 +775,7 @@ func TestValidationExpressions(t *testing.T) {
 			}),
 			valid: []string{
 				// 'kind', 'apiVersion', 'metadata.name' and 'metadata.generateName' are always accessible
-				// even if not specified in the schema, regardless of if x-preserve-unknown-fields is set.
+				// even if not specified in the schema, regardless of if x-kubernetes-preserve-unknown-fields is set.
 				"self.embedded.kind == 'Pod'",
 				"self.embedded.apiVersion == 'v1'",
 				"self.embedded.metadata.name == 'foo'",
@@ -785,7 +785,7 @@ func TestValidationExpressions(t *testing.T) {
 				"has(self.embedded)",
 			},
 			// only field declared in the schema can be field selected in CEL expressions, regardless of if
-			// x-preserve-unknown-fields is set.
+			// x-kubernetes-preserve-unknown-fields is set.
 			errors: map[string]string{
 				"has(self.embedded.spec)": "undefined field 'spec'",
 			},
@@ -1948,6 +1948,58 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 			}),
 			errors: []string{"Invalid value: \"object\": failed rule: self.m == 2"},
 		},
+		{name: "matchExpressions - 'values' must be specified when 'operator' is 'In' or 'NotIn'",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "tier",
+						"operator": "In",
+						"values":   []interface{}{},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, (rule.operator != "In" && rule.operator != "NotIn") || ((has(rule.values) && size(rule.values) > 0)))`),
+			errors: []string{"failed rule"},
+		},
+		{name: "matchExpressions - 'values' may not be specified when 'operator' is 'Exists' or 'DoesNotExist'",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "tier",
+						"operator": "Exists",
+						"values":   []interface{}{"somevalue"},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, (rule.operator != "Exists" && rule.operator != "DoesNotExist") || ((!has(rule.values) || size(rule.values) == 0)))`),
+			errors: []string{"failed rule"},
+		},
+		{name: "matchExpressions - invalid selector operator",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "tier",
+						"operator": "badop",
+						"values":   []interface{}{},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, rule.operator == "In" || rule.operator == "NotIn" || rule.operator == "DoesNotExist")`),
+			errors: []string{"failed rule"},
+		},
+		{name: "matchExpressions - invalid label value",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "badkey!",
+						"operator": "Exists",
+						"values":   []interface{}{},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, size(rule.key) <= 63 && rule.key.matches("^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$"))`),
+			errors: []string{"failed rule"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1985,6 +2037,17 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 			}
 		})
 	}
+}
+
+func genMatchSelectorSchema(rule string) *schema.Structural {
+	s := withRule(objectType(map[string]schema.Structural{
+		"matchExpressions": listType(objectTypePtr(map[string]schema.Structural{
+			"key":      stringType,
+			"operator": stringType,
+			"values":   listType(&stringType),
+		})),
+	}), rule)
+	return &s
 }
 
 func TestCELValidationLimit(t *testing.T) {

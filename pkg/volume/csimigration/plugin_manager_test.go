@@ -101,27 +101,6 @@ func TestIsMigratable(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:                 "AWS EBS PV with CSIMigration and CSIMigrationAWS disabled",
-			pluginFeature:        features.CSIMigrationAWS,
-			pluginFeatureEnabled: false,
-			isMigratable:         false,
-			csiMigrationEnabled:  false,
-			spec: &volume.Spec{
-				PersistentVolume: &v1.PersistentVolume{
-					Spec: v1.PersistentVolumeSpec{
-						PersistentVolumeSource: v1.PersistentVolumeSource{
-							AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-								VolumeID:  "vol01",
-								FSType:    "ext3",
-								Partition: 1,
-								ReadOnly:  true,
-							},
-						},
-					},
-				},
-			},
-		},
 	}
 	csiTranslator := csitrans.New()
 	for _, test := range testCases {
@@ -250,28 +229,6 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 			inTreePluginUnregisterEnabled: true,
 			csiMigrationResult:            true,
 			csiMigrationCompleteResult:    true,
-		},
-		{
-			name:                          "aws-ebs migration flag disabled and migration-complete flag disabled with CSI migration flag disabled",
-			pluginName:                    "kubernetes.io/aws-ebs",
-			pluginFeature:                 features.CSIMigrationAWS,
-			pluginFeatureEnabled:          false,
-			csiMigrationEnabled:           false,
-			inTreePluginUnregister:        features.InTreePluginAWSUnregister,
-			inTreePluginUnregisterEnabled: false,
-			csiMigrationResult:            false,
-			csiMigrationCompleteResult:    false,
-		},
-		{
-			name:                          "aws-ebs migration flag disabled and migration-complete flag disabled with CSI migration flag enabled",
-			pluginName:                    "kubernetes.io/aws-ebs",
-			pluginFeature:                 features.CSIMigrationAWS,
-			pluginFeatureEnabled:          false,
-			csiMigrationEnabled:           true,
-			inTreePluginUnregister:        features.InTreePluginAWSUnregister,
-			inTreePluginUnregisterEnabled: false,
-			csiMigrationResult:            false,
-			csiMigrationCompleteResult:    false,
 		},
 		{
 			name:                          "aws-ebs migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",

@@ -37,8 +37,8 @@ func TestWorkEstimator(t *testing.T) {
 		counts                    map[string]int64
 		countErr                  error
 		watchCount                int
-		initialSeatsExpected      uint
-		finalSeatsExpected        uint
+		initialSeatsExpected      uint64
+		finalSeatsExpected        uint64
 		additionalLatencyExpected time.Duration
 	}{
 		{

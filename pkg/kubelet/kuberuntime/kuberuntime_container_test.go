@@ -17,7 +17,6 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -32,10 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -405,21 +401,10 @@ func TestStartSpec(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 			if got, err := tc.spec.getTargetID(podStatus); err != nil {
 				t.Fatalf("%v: getTargetID got unexpected error: %v", t.Name(), err)
 			} else if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Errorf("%v: getTargetID got unexpected result. diff:\n%v", t.Name(), diff)
-			}
-		})
-
-		// Test with feature disabled in self-contained section which can be removed when feature flag is removed.
-		t.Run(fmt.Sprintf("%s (disabled)", tc.name), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, false)()
-			if got, err := tc.spec.getTargetID(podStatus); err != nil {
-				t.Fatalf("%v: getTargetID got unexpected error: %v", t.Name(), err)
-			} else if got != nil {
-				t.Errorf("%v: getTargetID got: %v, wanted nil", t.Name(), got)
 			}
 		})
 	}
@@ -464,5 +449,169 @@ func TestRestartCountByLogDir(t *testing.T) {
 		}
 		count, _ := calcRestartCountByLogDir(tempDirPath)
 		assert.Equal(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
+	}
+}
+
+func TestKillContainerGracePeriod(t *testing.T) {
+
+	shortGracePeriod := int64(10)
+	mediumGracePeriod := int64(30)
+	longGracePeriod := int64(60)
+
+	tests := []struct {
+		name                string
+		pod                 *v1.Pod
+		reason              containerKillReason
+		expectedGracePeriod int64
+	}{
+		{
+			name: "default termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{{Name: "foo"}}},
+			},
+			reason:              reasonUnknown,
+			expectedGracePeriod: int64(2),
+		},
+		{
+			name: "use pod termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers:                    []v1.Container{{Name: "foo"}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonUnknown,
+			expectedGracePeriod: longGracePeriod,
+		},
+		{
+			name: "liveness probe overrides pod termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "foo", LivenessProbe: &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonLivenessProbe,
+			expectedGracePeriod: shortGracePeriod,
+		},
+		{
+			name: "startup probe overrides pod termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "foo", StartupProbe: &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonStartupProbe,
+			expectedGracePeriod: shortGracePeriod,
+		},
+		{
+			name: "startup probe overrides pod termination grace period, probe period > pod period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "foo", StartupProbe: &v1.Probe{TerminationGracePeriodSeconds: &longGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &shortGracePeriod,
+				},
+			},
+			reason:              reasonStartupProbe,
+			expectedGracePeriod: longGracePeriod,
+		},
+		{
+			name: "liveness probe overrides pod termination grace period, probe period > pod period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "foo", LivenessProbe: &v1.Probe{TerminationGracePeriodSeconds: &longGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &shortGracePeriod,
+				},
+			},
+			reason:              reasonLivenessProbe,
+			expectedGracePeriod: longGracePeriod,
+		},
+		{
+			name: "non-liveness probe failure, use pod termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "foo", LivenessProbe: &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonUnknown,
+			expectedGracePeriod: longGracePeriod,
+		},
+		{
+			name: "non-startup probe failure, use pod termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "foo", StartupProbe: &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonUnknown,
+			expectedGracePeriod: longGracePeriod,
+		},
+		{
+			name: "all three grace periods set, use pod termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:          "foo",
+						StartupProbe:  &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+						LivenessProbe: &v1.Probe{TerminationGracePeriodSeconds: &mediumGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonUnknown,
+			expectedGracePeriod: longGracePeriod,
+		},
+		{
+			name: "all three grace periods set, use startup termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:          "foo",
+						StartupProbe:  &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+						LivenessProbe: &v1.Probe{TerminationGracePeriodSeconds: &mediumGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonStartupProbe,
+			expectedGracePeriod: shortGracePeriod,
+		},
+		{
+			name: "all three grace periods set, use liveness termination grace period",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:          "foo",
+						StartupProbe:  &v1.Probe{TerminationGracePeriodSeconds: &shortGracePeriod},
+						LivenessProbe: &v1.Probe{TerminationGracePeriodSeconds: &mediumGracePeriod},
+					}},
+					TerminationGracePeriodSeconds: &longGracePeriod,
+				},
+			},
+			reason:              reasonLivenessProbe,
+			expectedGracePeriod: mediumGracePeriod,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualGracePeriod := setTerminationGracePeriod(test.pod, &test.pod.Spec.Containers[0], "", kubecontainer.ContainerID{}, test.reason)
+			require.Equal(t, test.expectedGracePeriod, actualGracePeriod)
+		})
 	}
 }

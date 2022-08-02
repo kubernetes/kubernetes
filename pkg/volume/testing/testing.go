@@ -1146,7 +1146,7 @@ func (fc *FakeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []
 			return nil, fmt.Errorf("expected error")
 		}
 	}
-	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
+	fullpath := fmt.Sprintf("/%s/hostpath_pv/%s", os.TempDir(), uuid.NewUUID())
 
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{

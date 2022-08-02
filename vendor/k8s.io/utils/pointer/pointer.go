@@ -52,6 +52,8 @@ func Int(i int) *int {
 	return &i
 }
 
+// IntPtr is a function variable referring to Int.
+// Deprecated: Use Int instead.
 var IntPtr = Int // for back-compat
 
 // IntDeref dereferences the int ptr and returns it if not nil, or else
@@ -63,6 +65,8 @@ func IntDeref(ptr *int, def int) int {
 	return def
 }
 
+// IntPtrDerefOr is a function variable referring to IntDeref.
+// Deprecated: Use IntDeref instead.
 var IntPtrDerefOr = IntDeref // for back-compat
 
 // Int32 returns a pointer to an int32.
@@ -70,6 +74,8 @@ func Int32(i int32) *int32 {
 	return &i
 }
 
+// Int32Ptr is a function variable referring to Int32.
+// Deprecated: Use Int32 instead.
 var Int32Ptr = Int32 // for back-compat
 
 // Int32Deref dereferences the int32 ptr and returns it if not nil, or else
@@ -81,6 +87,8 @@ func Int32Deref(ptr *int32, def int32) int32 {
 	return def
 }
 
+// Int32PtrDerefOr is a function variable referring to Int32Deref.
+// Deprecated: Use Int32Deref instead.
 var Int32PtrDerefOr = Int32Deref // for back-compat
 
 // Int32Equal returns true if both arguments are nil or both arguments
@@ -100,6 +108,8 @@ func Int64(i int64) *int64 {
 	return &i
 }
 
+// Int64Ptr is a function variable referring to Int64.
+// Deprecated: Use Int64 instead.
 var Int64Ptr = Int64 // for back-compat
 
 // Int64Deref dereferences the int64 ptr and returns it if not nil, or else
@@ -111,6 +121,8 @@ func Int64Deref(ptr *int64, def int64) int64 {
 	return def
 }
 
+// Int64PtrDerefOr is a function variable referring to Int64Deref.
+// Deprecated: Use Int64Deref instead.
 var Int64PtrDerefOr = Int64Deref // for back-compat
 
 // Int64Equal returns true if both arguments are nil or both arguments
@@ -130,6 +142,8 @@ func Bool(b bool) *bool {
 	return &b
 }
 
+// BoolPtr is a function variable referring to Bool.
+// Deprecated: Use Bool instead.
 var BoolPtr = Bool // for back-compat
 
 // BoolDeref dereferences the bool ptr and returns it if not nil, or else
@@ -141,6 +155,8 @@ func BoolDeref(ptr *bool, def bool) bool {
 	return def
 }
 
+// BoolPtrDerefOr is a function variable referring to BoolDeref.
+// Deprecated: Use BoolDeref instead.
 var BoolPtrDerefOr = BoolDeref // for back-compat
 
 // BoolEqual returns true if both arguments are nil or both arguments
@@ -160,6 +176,8 @@ func String(s string) *string {
 	return &s
 }
 
+// StringPtr is a function variable referring to String.
+// Deprecated: Use String instead.
 var StringPtr = String // for back-compat
 
 // StringDeref dereferences the string ptr and returns it if not nil, or else
@@ -171,6 +189,8 @@ func StringDeref(ptr *string, def string) string {
 	return def
 }
 
+// StringPtrDerefOr is a function variable referring to StringDeref.
+// Deprecated: Use StringDeref instead.
 var StringPtrDerefOr = StringDeref // for back-compat
 
 // StringEqual returns true if both arguments are nil or both arguments
@@ -190,6 +210,8 @@ func Float32(i float32) *float32 {
 	return &i
 }
 
+// Float32Ptr is a function variable referring to Float32.
+// Deprecated: Use Float32 instead.
 var Float32Ptr = Float32
 
 // Float32Deref dereferences the float32 ptr and returns it if not nil, or else
@@ -201,6 +223,8 @@ func Float32Deref(ptr *float32, def float32) float32 {
 	return def
 }
 
+// Float32PtrDerefOr is a function variable referring to Float32Deref.
+// Deprecated: Use Float32Deref instead.
 var Float32PtrDerefOr = Float32Deref // for back-compat
 
 // Float32Equal returns true if both arguments are nil or both arguments
@@ -220,6 +244,8 @@ func Float64(i float64) *float64 {
 	return &i
 }
 
+// Float64Ptr is a function variable referring to Float64.
+// Deprecated: Use Float64 instead.
 var Float64Ptr = Float64
 
 // Float64Deref dereferences the float64 ptr and returns it if not nil, or else
@@ -231,6 +257,8 @@ func Float64Deref(ptr *float64, def float64) float64 {
 	return def
 }
 
+// Float64PtrDerefOr is a function variable referring to Float64Deref.
+// Deprecated: Use Float64Deref instead.
 var Float64PtrDerefOr = Float64Deref // for back-compat
 
 // Float64Equal returns true if both arguments are nil or both arguments

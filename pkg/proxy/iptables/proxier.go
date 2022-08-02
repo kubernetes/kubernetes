@@ -70,11 +70,11 @@ const (
 	// kubeMarkMasqChain is the mark-for-masquerade chain
 	kubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
 
-	// kubeMarkDropChain is the mark-for-drop chain
-	kubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
-
 	// the kubernetes forward chain
 	kubeForwardChain utiliptables.Chain = "KUBE-FORWARD"
+
+	// kubeProxyFirewallChain is the kube-proxy firewall chain
+	kubeProxyFirewallChain utiliptables.Chain = "KUBE-PROXY-FIREWALL"
 
 	// kube proxy canary chain is used for monitoring rule reload
 	kubeProxyCanaryChain utiliptables.Chain = "KUBE-PROXY-CANARY"
@@ -386,16 +386,12 @@ var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainForward, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeForwardChain, utiliptables.ChainForward, "kubernetes forwarding rules", nil},
+	{utiliptables.TableFilter, kubeProxyFirewallChain, utiliptables.ChainInput, "kubernetes load balancer firewall", []string{"-m", "conntrack", "--ctstate", "NEW"}},
+	{utiliptables.TableFilter, kubeProxyFirewallChain, utiliptables.ChainOutput, "kubernetes load balancer firewall", []string{"-m", "conntrack", "--ctstate", "NEW"}},
+	{utiliptables.TableFilter, kubeProxyFirewallChain, utiliptables.ChainForward, "kubernetes load balancer firewall", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainPrerouting, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubePostroutingChain, utiliptables.ChainPostrouting, "kubernetes postrouting rules", nil},
-}
-
-var iptablesEnsureChains = []struct {
-	table utiliptables.Table
-	chain utiliptables.Chain
-}{
-	{utiliptables.TableNAT, kubeMarkDropChain},
 }
 
 var iptablesCleanupOnlyChains = []iptablesJumpChain{
@@ -877,14 +873,6 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	// ensure KUBE-MARK-DROP chain exist but do not change any rules
-	for _, ch := range iptablesEnsureChains {
-		if _, err := proxier.iptables.EnsureChain(ch.table, ch.chain); err != nil {
-			klog.ErrorS(err, "Failed to ensure chain exists", "table", ch.table, "chain", ch.chain)
-			return
-		}
-	}
-
 	//
 	// Below this point we will not return until we try to write the iptables rules.
 	//
@@ -896,9 +884,8 @@ func (proxier *Proxier) syncProxyRules() {
 	proxier.natChains.Reset()
 	proxier.natRules.Reset()
 
-	// Make sure we keep stats for the top-level chains, if they existed
-	// (which most should have because we created them above).
-	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
+	// Write chain lines for all the "top-level" chains we'll be filling in
+	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain, kubeProxyFirewallChain} {
 		proxier.filterChains.Write(utiliptables.MakeChainLine(chainName))
 	}
 	for _, chainName := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, kubeMarkMasqChain} {
@@ -1158,6 +1145,15 @@ func (proxier *Proxier) syncProxyRules() {
 					"-j", string(loadBalancerTrafficChain))
 
 			}
+			if usesFWChain {
+				proxier.filterRules.Write(
+					"-A", string(kubeProxyFirewallChain),
+					"-m", "comment", "--comment", fmt.Sprintf(`"%s traffic not accepted by %s"`, svcPortNameString, svcInfo.firewallChainName),
+					"-m", protocol, "-p", protocol,
+					"-d", lbip,
+					"--dport", strconv.Itoa(svcInfo.Port()),
+					"-j", "DROP")
+			}
 		}
 		if !hasExternalEndpoints {
 			// Either no endpoints at all (REJECT) or no endpoints for
@@ -1339,9 +1335,8 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 			}
 			// If the packet was able to reach the end of firewall chain,
-			// then it did not get DNATed.  It means the packet cannot go
-			// thru the firewall, then mark it for DROP.
-			proxier.natRules.Write(args, "-j", string(kubeMarkDropChain))
+			// then it did not get DNATed and will be dropped later by the
+			// corresponding KUBE-PROXY-FIREWALL rule.
 		}
 
 		// If Cluster policy is in use, create the chain and create rules jumping

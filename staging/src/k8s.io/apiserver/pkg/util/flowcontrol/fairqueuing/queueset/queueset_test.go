@@ -120,9 +120,9 @@ type uniformClient struct {
 	// period
 	split bool
 	// initialSeats is the number of seats this request occupies in the first phase of execution
-	initialSeats uint
+	initialSeats uint64
 	// finalSeats is the number occupied during the second phase of execution
-	finalSeats uint
+	finalSeats uint64
 }
 
 func newUniformClient(hash uint64, nThreads, nCalls int, execDuration, thinkDuration time.Duration) uniformClient {
@@ -142,13 +142,13 @@ func (uc uniformClient) setSplit() uniformClient {
 	return uc
 }
 
-func (uc uniformClient) setInitWidth(seats uint) uniformClient {
+func (uc uniformClient) setInitWidth(seats uint64) uniformClient {
 	uc.initialSeats = seats
 	return uc
 }
 
 func (uc uniformClient) pad(finalSeats int, duration time.Duration) uniformClient {
-	uc.finalSeats = uint(finalSeats)
+	uc.finalSeats = uint64(finalSeats)
 	uc.padDuration = duration
 	return uc
 }

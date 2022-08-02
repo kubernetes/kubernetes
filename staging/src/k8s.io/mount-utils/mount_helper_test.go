@@ -55,12 +55,16 @@ func TestDoCleanupMountPoint(t *testing.T) {
 				}
 				return MountPoint{Device: "/dev/sdb", Path: path}, nil, nil
 			},
+			corruptedMnt: false,
+			expectErr:    false,
 		},
 		"path-not-exist": {
 			prepareMnt: func(base string) (MountPoint, error, error) {
 				path := filepath.Join(base, testMount)
 				return MountPoint{Device: "/dev/sdb", Path: path}, nil, nil
 			},
+			corruptedMnt: false,
+			expectErr:    false,
 		},
 		"mount-corrupted": {
 			prepareMnt: func(base string) (MountPoint, error, error) {
@@ -71,6 +75,7 @@ func TestDoCleanupMountPoint(t *testing.T) {
 				return MountPoint{Device: "/dev/sdb", Path: path}, os.NewSyscallError("fake", syscall.ESTALE), nil
 			},
 			corruptedMnt: true,
+			expectErr:    false,
 		},
 		"mount-err-not-corrupted": {
 			prepareMnt: func(base string) (MountPoint, error, error) {
@@ -80,7 +85,8 @@ func TestDoCleanupMountPoint(t *testing.T) {
 				}
 				return MountPoint{Device: "/dev/sdb", Path: path}, os.NewSyscallError("fake", syscall.ETIMEDOUT), nil
 			},
-			expectErr: true,
+			corruptedMnt: false,
+			expectErr:    true,
 		},
 		"skip-mount-point-check": {
 			prepareMnt: func(base string) (MountPoint, error, error) {

@@ -110,7 +110,7 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 	if len(host) == 0 {
 		status, err := hr.containerManager.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
-			klog.ErrorS(err, "Unable to get pod info, event handlers may be invalid.")
+			klog.ErrorS(err, "Unable to get pod info, event handlers may be invalid.", "pod", klog.KObj(pod))
 			return "", err
 		}
 		if len(status.IPs) == 0 {

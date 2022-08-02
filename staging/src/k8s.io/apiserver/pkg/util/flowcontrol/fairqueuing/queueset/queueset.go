@@ -811,8 +811,8 @@ func (qs *queueSet) findDispatchQueueLocked() (*queue, *request) {
 	// If the requested final seats exceed capacity of that queue,
 	// we reduce them to current capacity and adjust additional latency
 	// to preserve the total amount of work.
-	if oldestReqFromMinQueue.workEstimate.FinalSeats > uint(qs.dCfg.ConcurrencyLimit) {
-		finalSeats := uint(qs.dCfg.ConcurrencyLimit)
+	if oldestReqFromMinQueue.workEstimate.FinalSeats > uint64(qs.dCfg.ConcurrencyLimit) {
+		finalSeats := uint64(qs.dCfg.ConcurrencyLimit)
 		additionalLatency := oldestReqFromMinQueue.workEstimate.finalWork.DurationPerSeat(float64(finalSeats))
 		oldestReqFromMinQueue.workEstimate.FinalSeats = finalSeats
 		oldestReqFromMinQueue.workEstimate.AdditionalLatency = additionalLatency

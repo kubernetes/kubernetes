@@ -33,12 +33,10 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -330,10 +328,6 @@ var _ = rest.Patcher(&EphemeralContainersREST{})
 
 // Get retrieves the object from the storage. It is required to support Patch.
 func (r *EphemeralContainersREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		return nil, errors.NewBadRequest("feature EphemeralContainers disabled")
-	}
-
 	return r.store.Get(ctx, name, options)
 }
 
@@ -350,10 +344,6 @@ func (r *EphemeralContainersREST) Destroy() {
 
 // Update alters the EphemeralContainers field in PodSpec
 func (r *EphemeralContainersREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		return nil, false, errors.NewBadRequest("feature EphemeralContainers disabled")
-	}
-
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)

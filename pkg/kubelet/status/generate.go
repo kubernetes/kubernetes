@@ -22,6 +22,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -192,6 +195,24 @@ func GeneratePodInitializedCondition(spec *v1.PodSpec, containerStatuses []v1.Co
 	return v1.PodCondition{
 		Type:   v1.PodInitialized,
 		Status: v1.ConditionTrue,
+	}
+}
+
+func GeneratePodHasNetworkCondition(pod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodCondition {
+	newSandboxNeeded, _, _ := runtimeutil.PodSandboxChanged(pod, podStatus)
+	// if a new sandbox does not need to be created for a pod, it indicates that
+	// a sandbox for the pod with networking configured already exists.
+	// Otherwise, the kubelet needs to invoke the container runtime to create a
+	// fresh sandbox and configure networking for the sandbox.
+	if !newSandboxNeeded {
+		return v1.PodCondition{
+			Type:   kubetypes.PodHasNetwork,
+			Status: v1.ConditionTrue,
+		}
+	}
+	return v1.PodCondition{
+		Type:   kubetypes.PodHasNetwork,
+		Status: v1.ConditionFalse,
 	}
 }
 

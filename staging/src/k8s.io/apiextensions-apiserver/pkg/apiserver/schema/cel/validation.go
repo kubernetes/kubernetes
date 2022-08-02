@@ -62,11 +62,13 @@ type Validator struct {
 // NewValidator returns compiles all the CEL programs defined in x-kubernetes-validations extensions
 // of the Structural schema and returns a custom resource validator that contains nested
 // validators for all items, properties and additionalProperties that transitively contain validator rules.
-// Returns nil only if there no validator rules in the Structural schema. May return a validator containing
-// only errors.
+// Returns nil if there are no validator rules in the Structural schema. May return a validator containing only errors.
 // Adding perCallLimit as input arg for testing purpose only. Callers should always use const PerCallLimit as input
 func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *Validator {
-	return validator(s, true, model.SchemaDeclType(s, isResourceRoot), perCallLimit)
+	if !hasXValidations(s) {
+		return nil
+	}
+	return validator(s, isResourceRoot, model.SchemaDeclType(s, isResourceRoot), perCallLimit)
 }
 
 // validator creates a Validator for all x-kubernetes-validations at the level of the provided schema and lower and
@@ -377,4 +379,27 @@ func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, sts 
 func MapIsCorrelatable(mapType *string) bool {
 	// if a third map type is introduced, assume it's not correlatable. granular is the default if unspecified.
 	return mapType == nil || *mapType == "granular" || *mapType == "atomic"
+}
+
+func hasXValidations(s *schema.Structural) bool {
+	if s == nil {
+		return false
+	}
+	if len(s.XValidations) > 0 {
+		return true
+	}
+	if hasXValidations(s.Items) {
+		return true
+	}
+	if s.AdditionalProperties != nil && hasXValidations(s.AdditionalProperties.Structural) {
+		return true
+	}
+	if s.Properties != nil {
+		for _, prop := range s.Properties {
+			if hasXValidations(&prop) {
+				return true
+			}
+		}
+	}
+	return false
 }

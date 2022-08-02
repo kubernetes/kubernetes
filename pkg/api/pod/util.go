@@ -46,11 +46,7 @@ const AllContainers ContainerType = (InitContainers | Containers | EphemeralCont
 // AllFeatureEnabledContainers returns a ContainerType mask which includes all container
 // types except for the ones guarded by feature gate.
 func AllFeatureEnabledContainers() ContainerType {
-	containerType := AllContainers
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		containerType &= ^EphemeralContainers
-	}
-	return containerType
+	return AllContainers
 }
 
 // ContainerVisitor is called with each container spec, and returns true
@@ -529,10 +525,6 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) && !ephemeralContainersInUse(oldPodSpec) {
-		podSpec.EphemeralContainers = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ProbeTerminationGracePeriod) && !probeGracePeriodInUse(oldPodSpec) {
 		// Set pod-level terminationGracePeriodSeconds to nil if the feature is disabled and it is not used
 		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
@@ -553,6 +545,7 @@ func dropDisabledFields(
 
 	dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec)
 	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
+	dropDisabledMatchLabelKeysField(podSpec, oldPodSpec)
 }
 
 // dropDisabledTopologySpreadConstraintsFields removes disabled fields from PodSpec related
@@ -626,6 +619,31 @@ func dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec *api.PodSpec) {
 	}
 }
 
+// dropDisabledMatchLabelKeysField removes disabled fields from PodSpec related
+// to MatchLabelKeys only if it is not already used by the old spec.
+func dropDisabledMatchLabelKeysField(podSpec, oldPodSpec *api.PodSpec) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread) && !matchLabelKeysInUse(oldPodSpec) {
+		for i := range podSpec.TopologySpreadConstraints {
+			podSpec.TopologySpreadConstraints[i].MatchLabelKeys = nil
+		}
+	}
+}
+
+// matchLabelKeysInUse returns true if the pod spec is non-nil
+// and has MatchLabelKeys field set in TopologySpreadConstraints.
+func matchLabelKeysInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	for _, c := range podSpec.TopologySpreadConstraints {
+		if len(c.MatchLabelKeys) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // nodeAffinityPolicyInUse returns true if the pod spec is non-nil and has NodeAffinityPolicy field set
 // in TopologySpreadConstraints
 func nodeAffinityPolicyInUse(podSpec *api.PodSpec) bool {
@@ -652,13 +670,6 @@ func nodeTaintsPolicyInUse(podSpec *api.PodSpec) bool {
 		}
 	}
 	return false
-}
-
-func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	return len(podSpec.EphemeralContainers) > 0
 }
 
 // procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value
@@ -764,36 +775,6 @@ func SeccompAnnotationForField(field *api.SeccompProfile) string {
 	// provided field type is SeccompProfileTypeLocalhost or if an unrecognized
 	// type is specified
 	return ""
-}
-
-// SeccompFieldForAnnotation takes a pod annotation and returns the converted
-// seccomp profile field.
-func SeccompFieldForAnnotation(annotation string) *api.SeccompProfile {
-	// If only seccomp annotations are specified, copy the values into the
-	// corresponding fields. This ensures that existing applications continue
-	// to enforce seccomp, and prevents the kubelet from needing to resolve
-	// annotations & fields.
-	if annotation == v1.SeccompProfileNameUnconfined {
-		return &api.SeccompProfile{Type: api.SeccompProfileTypeUnconfined}
-	}
-
-	if annotation == api.SeccompProfileRuntimeDefault || annotation == api.DeprecatedSeccompProfileDockerDefault {
-		return &api.SeccompProfile{Type: api.SeccompProfileTypeRuntimeDefault}
-	}
-
-	if strings.HasPrefix(annotation, v1.SeccompLocalhostProfileNamePrefix) {
-		localhostProfile := strings.TrimPrefix(annotation, v1.SeccompLocalhostProfileNamePrefix)
-		if localhostProfile != "" {
-			return &api.SeccompProfile{
-				Type:             api.SeccompProfileTypeLocalhost,
-				LocalhostProfile: &localhostProfile,
-			}
-		}
-	}
-
-	// we can only reach this code path if the localhostProfile name has a zero
-	// length or if the annotation has an unrecognized value
-	return nil
 }
 
 // setsWindowsHostProcess returns true if WindowsOptions.HostProcess is set (true or false)

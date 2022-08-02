@@ -50,7 +50,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -58,7 +57,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/component-base/featuregate"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
@@ -776,8 +774,6 @@ func (f *Framework) testContainerOutputMatcher(scenarioName string,
 type ContainerType int
 
 const (
-	// FeatureEphemeralContainers allows running an ephemeral container in pod namespaces to troubleshoot a running pod
-	FeatureEphemeralContainers featuregate.Feature = "EphemeralContainers"
 	// Containers is for normal containers
 	Containers ContainerType = 1 << iota
 	// InitContainers is for init containers
@@ -790,11 +786,7 @@ const (
 // types except for the ones guarded by feature gate.
 // Copied from pkg/api/v1/pod to avoid pulling extra dependencies
 func allFeatureEnabledContainers() ContainerType {
-	containerType := AllContainers
-	if !utilfeature.DefaultFeatureGate.Enabled(FeatureEphemeralContainers) {
-		containerType &= ^EphemeralContainers
-	}
-	return containerType
+	return AllContainers
 }
 
 // ContainerVisitor is called with each container spec, and returns true

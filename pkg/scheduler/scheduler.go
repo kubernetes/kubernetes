@@ -33,7 +33,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-scheduler/config/v1beta3"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -131,7 +131,7 @@ type ScheduleResult struct {
 // WithComponentConfigVersion sets the component config version to the
 // KubeSchedulerConfiguration version used. The string should be the full
 // scheme group/version of the external type we converted from (for example
-// "kubescheduler.config.k8s.io/v1beta2")
+// "kubescheduler.config.k8s.io/v1")
 func WithComponentConfigVersion(apiVersion string) Option {
 	return func(o *schedulerOptions) {
 		o.componentConfigVersion = apiVersion
@@ -246,7 +246,7 @@ func New(client clientset.Interface,
 	}
 
 	if options.applyDefaultProfile {
-		var versionedCfg v1beta3.KubeSchedulerConfiguration
+		var versionedCfg configv1.KubeSchedulerConfiguration
 		scheme.Scheme.Default(&versionedCfg)
 		cfg := schedulerapi.KubeSchedulerConfiguration{}
 		if err := scheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {

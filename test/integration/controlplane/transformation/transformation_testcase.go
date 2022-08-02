@@ -51,11 +51,11 @@ const (
 	testSecret               = "test-secret"
 	metricsPrefix            = "apiserver_storage_"
 
-	// precomputed key and secret for use with AES GCM
-	// this looks exactly the same as the AES CBC secret but with a different value
-	futureAESGCMKey = "e0/+tts8FS254BZimFZWtUsOCOUDSkvzB72PyimMlkY="
-	futureSecret    = "azhzAAoMCgJ2MRIGU2VjcmV0En4KXwoLdGVzdC1zZWNyZXQSABoWc2VjcmV0LWVuY3J5cHRpb24tdGVzdCIAKiQ3MmRmZTVjNC0xNDU2LTQyMzktYjFlZC1hZGZmYTJmMWY3YmEyADgAQggI5Jy/7wUQAHoAEhMKB2FwaV9rZXkSCPCfpJfwn5C8GgZPcGFxdWUaACIA"
-	futureSecretVal = "\xf0\x9f\xa4\x97\xf0\x9f\x90\xbc"
+	// precomputed key and secret for use with AES CBC
+	// this looks exactly the same as the AES GCM secret but with a different value
+	oldAESCBCKey = "e0/+tts8FS254BZimFZWtUsOCOUDSkvzB72PyimMlkY="
+	oldSecret    = "azhzAAoMCgJ2MRIGU2VjcmV0En4KXwoLdGVzdC1zZWNyZXQSABoWc2VjcmV0LWVuY3J5cHRpb24tdGVzdCIAKiQ3MmRmZTVjNC0xNDU2LTQyMzktYjFlZC1hZGZmYTJmMWY3YmEyADgAQggI5Jy/7wUQAHoAEhMKB2FwaV9rZXkSCPCfpJfwn5C8GgZPcGFxdWUaACIA"
+	oldSecretVal = "\xf0\x9f\xa4\x97\xf0\x9f\x90\xbc"
 )
 
 type unSealSecret func(ctx context.Context, cipherText []byte, dataCtx value.Context, config apiserverconfigv1.ProviderConfiguration) ([]byte, error)

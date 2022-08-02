@@ -487,6 +487,79 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 	}
 }
 
+func TestRetryInternalError(t *testing.T) {
+	testCases := []struct {
+		name                string
+		maxInternalDuration time.Duration
+		rewindTime          int
+		wantRetries         int
+	}{
+		{
+			name:                "retries off",
+			maxInternalDuration: time.Duration(0),
+			wantRetries:         0,
+		},
+		{
+			name:                "retries on, all calls fail",
+			maxInternalDuration: time.Second * 30,
+			wantRetries:         31,
+		},
+		{
+			name:                "retries on, one call successful",
+			maxInternalDuration: time.Second * 30,
+			rewindTime:          10,
+			wantRetries:         40,
+		},
+	}
+
+	for _, tc := range testCases {
+		err := apierrors.NewInternalError(fmt.Errorf("etcdserver: no leader"))
+		fakeClock := testingclock.NewFakeClock(time.Now())
+		bm := &fakeBackoff{clock: fakeClock}
+
+		counter := 0
+
+		lw := &testLW{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				counter = counter + 1
+				t.Logf("Counter: %v", counter)
+				if counter == tc.rewindTime {
+					t.Logf("Rewinding")
+					fakeClock.Step(time.Minute)
+				}
+
+				fakeClock.Step(time.Second)
+				w := watch.NewFakeWithChanSize(1, false)
+				status := err.Status()
+				w.Error(&status)
+				return w, nil
+			},
+		}
+
+		r := &Reflector{
+			name:                   "test-reflector",
+			listerWatcher:          lw,
+			store:                  NewFIFO(MetaNamespaceKeyFunc),
+			initConnBackoffManager: bm,
+			clock:                  fakeClock,
+			watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
+		}
+
+		r.MaxInternalErrorRetryDuration = tc.maxInternalDuration
+
+		stopCh := make(chan struct{})
+		r.ListAndWatch(stopCh)
+		close(stopCh)
+
+		if counter-1 != tc.wantRetries {
+			t.Errorf("%v unexpected number of retries: %d", tc, counter-1)
+		}
+	}
+}
+
 func TestReflectorResync(t *testing.T) {
 	iteration := 0
 	stopCh := make(chan struct{})

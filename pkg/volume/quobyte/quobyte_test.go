@@ -19,6 +19,7 @@ package quobyte
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/mount-utils"
@@ -99,7 +100,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 
 	volumePath := mounter.GetPath()
-	if volumePath != fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir) {
+	if volumePath != filepath.Join(tmpDir, "plugins/kubernetes.io~quobyte/root#root@vol") {
 		t.Errorf("Got unexpected path: %s expected: %s", volumePath, fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir))
 	}
 	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
