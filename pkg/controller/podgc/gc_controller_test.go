@@ -44,10 +44,12 @@ import (
 func alwaysReady() bool { return true }
 
 func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (*PodGCController, coreinformers.PodInformer, coreinformers.NodeInformer) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	nodeInformer := informerFactory.Core().V1().Nodes()
-	controller := NewPodGC(context.TODO(), kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
+	controller := NewPodGC(ctx, kubeClient, podInformer, nodeInformer, terminatedPodThreshold)
 	controller.podListerSynced = alwaysReady
 	return controller, podInformer, nodeInformer
 }
@@ -130,6 +132,8 @@ func TestGCTerminated(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			creationTime := time.Unix(0, 0)
 			nodes := []*v1.Node{testutil.NewNode("node")}
@@ -149,7 +153,7 @@ func TestGCTerminated(t *testing.T) {
 				podInformer.Informer().GetStore().Add(pod)
 			}
 
-			gcc.gc(context.TODO())
+			gcc.gc(ctx)
 
 			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
@@ -324,6 +328,8 @@ func TestGCOrphaned(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			nodes := make([]*v1.Node, 0, len(test.initialClientNodes))
 			for _, node := range test.initialClientNodes {
@@ -347,7 +353,7 @@ func TestGCOrphaned(t *testing.T) {
 			gcc.nodeQueue = workqueue.NewDelayingQueueWithCustomClock(fakeClock, "podgc_test_queue")
 
 			// First GC of orphaned pods
-			gcc.gc(context.TODO())
+			gcc.gc(ctx)
 			deletedPodNames := getDeletedPodNames(client)
 
 			if len(deletedPodNames) > 0 {
@@ -367,10 +373,10 @@ func TestGCOrphaned(t *testing.T) {
 
 			// Execute planned nodes changes
 			for _, node := range test.addedClientNodes {
-				client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
+				client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
 			}
 			for _, node := range test.deletedClientNodes {
-				client.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{})
+				client.CoreV1().Nodes().Delete(ctx, node.Name, metav1.DeleteOptions{})
 			}
 			for _, node := range test.addedInformerNodes {
 				nodeInformer.Informer().GetStore().Add(node)
@@ -380,7 +386,7 @@ func TestGCOrphaned(t *testing.T) {
 			}
 
 			// Actual pod deletion
-			gcc.gc(context.TODO())
+			gcc.gc(ctx)
 			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
@@ -434,6 +440,8 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			creationTime := time.Unix(0, 0)
 
@@ -460,7 +468,7 @@ func TestGCUnscheduledTerminating(t *testing.T) {
 				t.Errorf("Error while listing all Pods: %v", err)
 				return
 			}
-			gcc.gcUnscheduledTerminating(context.TODO(), pods)
+			gcc.gcUnscheduledTerminating(ctx, pods)
 			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
@@ -586,6 +594,8 @@ func TestGCTerminating(t *testing.T) {
 	}
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 
 			creationTime := time.Unix(0, 0)
@@ -626,8 +636,7 @@ func TestGCTerminating(t *testing.T) {
 			for _, node := range nodes {
 				nodeInformer.Informer().GetStore().Add(node)
 			}
-
-			gcc.gc(context.TODO())
+			gcc.gc(ctx)
 			verifyDeletedAndPatchedPods(t, client, test.deletedPodNames, test.patchedPodNames)
 		})
 	}
