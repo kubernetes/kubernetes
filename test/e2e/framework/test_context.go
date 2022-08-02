@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path"
 	"sort"
 	"strings"
 	"time"
@@ -330,14 +329,6 @@ func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
 	suiteConfig.RandomizeAllSpecs = true
 	// Turn on verbose by default to get spec names
 	reporterConfig.Verbose = true
-	// Enable JUnit output to the result directory, but only if not already specified
-	// via -junit-report.
-	if reporterConfig.JUnitReport == "" && TestContext.ReportDir != "" {
-		// With Ginkgo v1, we used to write one file per parallel node. Now Ginkgo v2 automatically
-		// merges all results into a single file for us. The 01 suffix is kept in case that users
-		// expect files to be called "junit_<prefix><number>.xml".
-		reporterConfig.JUnitReport = path.Join(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
-	}
 	// Disable skipped tests unless they are explicitly requested.
 	if len(suiteConfig.FocusStrings) == 0 && len(suiteConfig.SkipStrings) == 0 {
 		suiteConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
