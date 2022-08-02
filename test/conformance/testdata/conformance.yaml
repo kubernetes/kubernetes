@@ -384,6 +384,15 @@
     MUST cause pods created by that RC to be orphaned.
   release: v1.9
   file: test/e2e/apimachinery/garbage_collector.go
+- testname: Namespace, apply changes to a namespace status
+  codename: '[sig-api-machinery] Namespaces [Serial] should apply changes to a namespace
+    status [Conformance]'
+  description: Getting the current namespace status MUST succeed. The reported status
+    phase MUST be active. Given the patching of the namespace status, the fields MUST
+    equal the new values. Given the updating of the namespace status, the fields MUST
+    equal the new values.
+  release: v1.25
+  file: test/e2e/apimachinery/namespace.go
 - testname: namespace-deletion-removes-pods
   codename: '[sig-api-machinery] Namespaces [Serial] should ensure that all pods are
     removed when a namespace is deleted [Conformance]'

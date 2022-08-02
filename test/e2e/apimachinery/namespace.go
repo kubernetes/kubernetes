@@ -287,7 +287,15 @@ var _ = SIGDescribe("Namespaces [Serial]", func() {
 		framework.ExpectEqual(namespace.ObjectMeta.Labels["testLabel"], "testValue", "namespace not patched")
 	})
 
-	ginkgo.It("should apply changes to a namespace status", func() {
+	/*
+		Release: v1.25
+		Testname: Namespace, apply changes to a namespace status
+		Description: Getting the current namespace status MUST succeed. The reported status
+		phase MUST be active. Given the patching of the namespace status, the fields MUST
+		equal the new values. Given the updating of the namespace status, the fields MUST
+		equal the new values.
+	*/
+	framework.ConformanceIt("should apply changes to a namespace status", func() {
 		ns := f.Namespace.Name
 		dc := f.DynamicClient
 		nsResource := v1.SchemeGroupVersion.WithResource("namespaces")
