@@ -39,8 +39,8 @@ func TestIsMigratable(t *testing.T) {
 		spec                 *volume.Spec
 	}{
 		{
-			name:                 "GCE PD PV source with CSIMigrationGCE enabled",
-			pluginFeature:        features.CSIMigrationGCE,
+			name:                 "RBD PV source with CSIMigrationGCE enabled",
+			pluginFeature:        features.CSIMigrationRBD,
 			pluginFeatureEnabled: true,
 			isMigratable:         true,
 			csiMigrationEnabled:  true,
@@ -48,11 +48,8 @@ func TestIsMigratable(t *testing.T) {
 				PersistentVolume: &v1.PersistentVolume{
 					Spec: v1.PersistentVolumeSpec{
 						PersistentVolumeSource: v1.PersistentVolumeSource{
-							GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-								PDName:    "test-disk",
-								FSType:    "ext4",
-								Partition: 0,
-								ReadOnly:  false,
+							RBD: &v1.RBDPersistentVolumeSource{
+								RBDImage: "test-disk",
 							},
 						},
 					},
@@ -60,8 +57,8 @@ func TestIsMigratable(t *testing.T) {
 			},
 		},
 		{
-			name:                 "GCE PD PV Source with CSIMigrationGCE disabled",
-			pluginFeature:        features.CSIMigrationGCE,
+			name:                 "RBD PD PV Source with CSIMigrationGCE disabled",
+			pluginFeature:        features.CSIMigrationRBD,
 			pluginFeatureEnabled: false,
 			isMigratable:         false,
 			csiMigrationEnabled:  true,
@@ -69,11 +66,8 @@ func TestIsMigratable(t *testing.T) {
 				PersistentVolume: &v1.PersistentVolume{
 					Spec: v1.PersistentVolumeSpec{
 						PersistentVolumeSource: v1.PersistentVolumeSource{
-							GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-								PDName:    "test-disk",
-								FSType:    "ext4",
-								Partition: 0,
-								ReadOnly:  false,
+							RBD: &v1.RBDPersistentVolumeSource{
+								RBDImage: "test-disk",
 							},
 						},
 					},
@@ -187,28 +181,6 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 		csiMigrationCompleteResult    bool
 	}{
 		{
-			name:                          "gce-pd migration flag disabled and migration-complete flag disabled with CSI migration flag disabled",
-			pluginName:                    "kubernetes.io/gce-pd",
-			pluginFeature:                 features.CSIMigrationGCE,
-			pluginFeatureEnabled:          false,
-			csiMigrationEnabled:           false,
-			inTreePluginUnregister:        features.InTreePluginGCEUnregister,
-			inTreePluginUnregisterEnabled: false,
-			csiMigrationResult:            false,
-			csiMigrationCompleteResult:    false,
-		},
-		{
-			name:                          "gce-pd migration flag disabled and migration-complete flag disabled with CSI migration flag enabled",
-			pluginName:                    "kubernetes.io/gce-pd",
-			pluginFeature:                 features.CSIMigrationGCE,
-			pluginFeatureEnabled:          false,
-			csiMigrationEnabled:           true,
-			inTreePluginUnregister:        features.InTreePluginGCEUnregister,
-			inTreePluginUnregisterEnabled: false,
-			csiMigrationResult:            false,
-			csiMigrationCompleteResult:    false,
-		},
-		{
 			name:                          "gce-pd migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
 			pluginName:                    "kubernetes.io/gce-pd",
 			pluginFeature:                 features.CSIMigrationGCE,
@@ -257,7 +229,12 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 	for _, test := range testCases {
 		pm := NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
+			// CSIMigrationGCE is locked to on, so it cannot be enabled or disabled. There are a couple
+			// of test cases that check correct behavior when CSIMigrationGCE is enabled, but there are
+			// no longer any tests cases for CSIMigrationGCE being disabled as that is not possible.
+			if test.pluginFeature != features.CSIMigrationGCE {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
+			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.inTreePluginUnregister, test.inTreePluginUnregisterEnabled)()
 
 			csiMigrationResult := pm.IsMigrationEnabledForPlugin(test.pluginName)
