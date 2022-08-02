@@ -19,6 +19,7 @@ package responsewriters
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -231,7 +233,7 @@ func TestSerializeObject(t *testing.T) {
 		},
 
 		{
-			name:               "compress on gzip",
+			name:               "compress on gzip, request's context has no decision",
 			compressionEnabled: true,
 			out:                largePayload,
 			mediaType:          "application/json",
@@ -248,6 +250,40 @@ func TestSerializeObject(t *testing.T) {
 				"Vary":             []string{"Accept-Encoding"},
 			},
 			wantBody: gzipContent(largePayload, defaultGzipContentEncodingLevel),
+		},
+		{
+			name:               "compress on gzip, request's context allows compression",
+			compressionEnabled: true,
+			out:                largePayload,
+			mediaType:          "application/json",
+			req: (&http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			}).WithContext(request.WithCompressionDisabled(context.Background(), false)),
+			wantCode: http.StatusOK,
+			wantHeaders: http.Header{
+				"Content-Type":     []string{"application/json"},
+				"Content-Encoding": []string{"gzip"},
+				"Vary":             []string{"Accept-Encoding"},
+			},
+			wantBody: gzipContent(largePayload, defaultGzipContentEncodingLevel),
+		},
+		{
+			name:               "compress on gzip, request's context disables compression",
+			compressionEnabled: true,
+			out:                largePayload,
+			mediaType:          "application/json",
+			req: (&http.Request{
+				Header: http.Header{
+					"Accept-Encoding": []string{"gzip"},
+				},
+				URL: &url.URL{Path: "/path"},
+			}).WithContext(request.WithCompressionDisabled(context.Background(), true)),
+			wantCode:    http.StatusOK,
+			wantHeaders: http.Header{"Content-Type": []string{"application/json"}},
+			wantBody:    largePayload,
 		},
 
 		{
