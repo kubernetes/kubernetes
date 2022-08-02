@@ -28,11 +28,14 @@ import (
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -340,9 +343,26 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 		// Otherwise we should delete the victim.
 		if waitingPod := fh.GetWaitingPod(victim.UID); waitingPod != nil {
 			waitingPod.Reject(pluginName, "preempted")
-		} else if err := util.DeletePod(ctx, cs, victim); err != nil {
-			klog.ErrorS(err, "Preempting pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
-			return framework.AsStatus(err)
+		} else {
+			if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+				condition := &v1.PodCondition{
+					Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status:  v1.ConditionTrue,
+					Reason:  "PreemptionByKubeScheduler",
+					Message: "Kube-scheduler: preempting",
+				}
+				newStatus := pod.Status.DeepCopy()
+				if apipod.UpdatePodCondition(newStatus, condition) {
+					if err := util.PatchPodStatus(ctx, cs, victim, newStatus); err != nil {
+						klog.ErrorS(err, "Preparing pod preemption", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
+						return framework.AsStatus(err)
+					}
+				}
+			}
+			if err := util.DeletePod(ctx, cs, victim); err != nil {
+				klog.ErrorS(err, "Preempting pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
+				return framework.AsStatus(err)
+			}
 		}
 		fh.EventRecorder().Eventf(victim, pod, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v",
 			pod.Namespace, pod.Name, c.Name())
