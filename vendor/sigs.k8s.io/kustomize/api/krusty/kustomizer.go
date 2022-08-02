@@ -5,7 +5,6 @@ package krusty
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"sigs.k8s.io/kustomize/api/internal/builtins"
 	pLdr "sigs.k8s.io/kustomize/api/internal/plugins/loader"
@@ -76,7 +75,7 @@ func (b *Kustomizer) Run(
 	}
 	var bytes []byte
 	if openApiPath, exists := kt.Kustomization().OpenAPI["path"]; exists {
-		bytes, err = ldr.Load(filepath.Join(ldr.Root(), openApiPath))
+		bytes, err = ldr.Load(openApiPath)
 		if err != nil {
 			return nil, err
 		}

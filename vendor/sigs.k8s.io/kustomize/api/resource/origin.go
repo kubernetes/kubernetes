@@ -50,7 +50,7 @@ func (origin *Origin) Copy() Origin {
 // Append returns a copy of origin with a path appended to it
 func (origin *Origin) Append(path string) *Origin {
 	originCopy := origin.Copy()
-	repoSpec, err := git.NewRepoSpecFromUrl(path)
+	repoSpec, err := git.NewRepoSpecFromURL(path)
 	if err == nil {
 		originCopy.Repo = repoSpec.Host + repoSpec.OrgRepo
 		absPath := repoSpec.AbsPath()
