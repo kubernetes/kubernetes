@@ -37,8 +37,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
+	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	utilpod "k8s.io/kubernetes/pkg/util/pod"
 	"k8s.io/kubernetes/pkg/util/taints"
 )
 
@@ -171,13 +173,13 @@ func (gcc *PodGCController) gcTerminating(ctx context.Context, pods []*v1.Pod) {
 	var wait sync.WaitGroup
 	for i := 0; i < deleteCount; i++ {
 		wait.Add(1)
-		go func(namespace string, name string) {
+		go func(pod *v1.Pod) {
 			defer wait.Done()
-			if err := gcc.deletePod(ctx, namespace, name); err != nil {
+			if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
 				// ignore not founds
 				utilruntime.HandleError(err)
 			}
-		}(terminatingPods[i].Namespace, terminatingPods[i].Name)
+		}(terminatingPods[i])
 	}
 	wait.Wait()
 }
@@ -203,13 +205,13 @@ func (gcc *PodGCController) gcTerminated(ctx context.Context, pods []*v1.Pod) {
 	var wait sync.WaitGroup
 	for i := 0; i < deleteCount; i++ {
 		wait.Add(1)
-		go func(namespace string, name string) {
+		go func(pod *v1.Pod) {
 			defer wait.Done()
-			if err := gcc.deletePod(ctx, namespace, name); err != nil {
+			if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
 				// ignore not founds
 				defer utilruntime.HandleError(err)
 			}
-		}(terminatedPods[i].Namespace, terminatedPods[i].Name)
+		}(terminatedPods[i])
 	}
 	wait.Wait()
 }
@@ -238,7 +240,13 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 			continue
 		}
 		klog.V(2).InfoS("Found orphaned Pod assigned to the Node, deleting.", "pod", klog.KObj(pod), "node", pod.Spec.NodeName)
-		if err := gcc.deletePod(ctx, pod.Namespace, pod.Name); err != nil {
+		condition := &v1.PodCondition{
+			Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+			Status:  v1.ConditionTrue,
+			Reason:  "DeletionByPodGC",
+			Message: "PodGC: node no longer exists",
+		}
+		if err := gcc.markFailedAndDeletePodWithCondition(ctx, pod, condition); err != nil {
 			utilruntime.HandleError(err)
 		} else {
 			klog.V(0).InfoS("Forced deletion of orphaned Pod succeeded", "pod", klog.KObj(pod))
@@ -287,7 +295,7 @@ func (gcc *PodGCController) gcUnscheduledTerminating(ctx context.Context, pods [
 		}
 
 		klog.V(2).InfoS("Found unscheduled terminating Pod not assigned to any Node, deleting.", "pod", klog.KObj(pod))
-		if err := gcc.deletePod(ctx, pod.Namespace, pod.Name); err != nil {
+		if err := gcc.markFailedAndDeletePod(ctx, pod); err != nil {
 			utilruntime.HandleError(err)
 		} else {
 			klog.V(0).InfoS("Forced deletion of unscheduled terminating Pod succeeded", "pod", klog.KObj(pod))
@@ -308,7 +316,30 @@ func (o byCreationTimestamp) Less(i, j int) bool {
 	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }
 
-func (gcc *PodGCController) deletePod(ctx context.Context, namespace, name string) error {
-	klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(namespace, name))
-	return gcc.kubeClient.CoreV1().Pods(namespace).Delete(ctx, name, *metav1.NewDeleteOptions(0))
+func (gcc *PodGCController) markFailedAndDeletePod(ctx context.Context, pod *v1.Pod) error {
+	return gcc.markFailedAndDeletePodWithCondition(ctx, pod, nil)
+}
+
+func (gcc *PodGCController) markFailedAndDeletePodWithCondition(ctx context.Context, pod *v1.Pod, condition *v1.PodCondition) error {
+	klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(pod.Namespace, pod.Name))
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		newStatus := pod.Status.DeepCopy()
+		updated := false
+		if condition != nil {
+			updated = apipod.UpdatePodCondition(newStatus, condition)
+		}
+		// Mark the pod as failed - this is especially important in case the pod
+		// is orphaned, in which case the pod would remain in the Running phase
+		// forever as there is no kubelet running to change the phase.
+		if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
+			newStatus.Phase = v1.PodFailed
+			updated = true
+		}
+		if updated {
+			if _, _, _, err := utilpod.PatchPodStatus(ctx, gcc.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
+				return err
+			}
+		}
+	}
+	return gcc.kubeClient.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, *metav1.NewDeleteOptions(0))
 }
