@@ -22,6 +22,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -200,12 +201,11 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 
 				// Add entries to the map for both the current and persistent portals
 				// pointing to the SCSI host for those connections
-				portal := strings.TrimSpace(string(addr)) + ":" +
-					strings.TrimSpace(string(port))
+				// JoinHostPort will add `[]` around IPv6 addresses.
+				portal := net.JoinHostPort(strings.TrimSpace(string(addr)), strings.TrimSpace(string(port)))
 				portalHostMap[portal] = hostNumber
 
-				persistentPortal := strings.TrimSpace(string(persistentAddr)) + ":" +
-					strings.TrimSpace(string(persistentPort))
+				persistentPortal := net.JoinHostPort(strings.TrimSpace(string(persistentAddr)), strings.TrimSpace(string(persistentPort)))
 				portalHostMap[persistentPortal] = hostNumber
 			}
 		}
