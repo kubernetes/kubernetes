@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
 	cloudprovider "k8s.io/cloud-provider"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	nodeutil "k8s.io/component-helpers/node/util"
 )
@@ -94,7 +95,7 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	return rc
 }
 
-func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration) {
+func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
 	defer utilruntime.HandleCrash()
 
 	// Start event processing pipeline.
@@ -106,6 +107,8 @@ func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration) {
 
 	klog.Info("Starting route controller")
 	defer klog.Info("Shutting down route controller")
+	controllerManagerMetrics.ControllerStarted("route")
+	defer controllerManagerMetrics.ControllerStopped("route")
 
 	if !cache.WaitForNamedCacheSync("route", ctx.Done(), rc.nodeListerSynced) {
 		return

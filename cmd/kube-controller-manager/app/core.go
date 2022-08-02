@@ -90,7 +90,7 @@ func startServiceController(ctx context.Context, controllerContext ControllerCon
 		klog.Errorf("Failed to start service controller: %v", err)
 		return nil, false, nil
 	}
-	go serviceController.Run(ctx, int(controllerContext.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
+	go serviceController.Run(ctx, int(controllerContext.ComponentConfig.ServiceController.ConcurrentServiceSyncs), controllerContext.ControllerManagerMetrics)
 	return nil, true, nil
 }
 
@@ -251,7 +251,7 @@ func startRouteController(ctx context.Context, controllerContext ControllerConte
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		controllerContext.ComponentConfig.KubeCloudShared.ClusterName,
 		clusterCIDRs)
-	go routeController.Run(ctx, controllerContext.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
+	go routeController.Run(ctx, controllerContext.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration, controllerContext.ControllerManagerMetrics)
 	return nil, true, nil
 }
 

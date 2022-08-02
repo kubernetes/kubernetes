@@ -40,6 +40,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/component-base/featuregate"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 )
@@ -224,7 +225,7 @@ func (c *Controller) enqueueService(obj interface{}) {
 //
 // It's an error to call Run() more than once for a given ServiceController
 // object.
-func (c *Controller) Run(ctx context.Context, workers int) {
+func (c *Controller) Run(ctx context.Context, workers int, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
 	defer runtime.HandleCrash()
 	defer c.queue.ShutDown()
 
@@ -235,6 +236,8 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 
 	klog.Info("Starting service controller")
 	defer klog.Info("Shutting down service controller")
+	controllerManagerMetrics.ControllerStarted("service")
+	defer controllerManagerMetrics.ControllerStopped("service")
 
 	if !cache.WaitForNamedCacheSync("service", ctx.Done(), c.serviceListerSynced, c.nodeListerSynced) {
 		return
