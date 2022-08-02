@@ -26,14 +26,14 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	informers "k8s.io/client-go/informers/core/v1"
 	networkinginformers "k8s.io/client-go/informers/networking/v1alpha1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -48,6 +48,7 @@ import (
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/controller"
 	cidrset "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/multicidrset"
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/util/slice"
@@ -66,6 +67,9 @@ const (
 	maxRetries                   = 15
 )
 
+// used for testing
+var testCIDRMap map[string][]*cidrset.ClusterCIDR
+
 // CIDRs are reserved, then node resource is patched with them.
 // multiCIDRNodeReservedCIDRs holds the reservation info for a node.
 type multiCIDRNodeReservedCIDRs struct {
@@ -83,18 +87,17 @@ type multiCIDRRangeAllocator struct {
 	clusterCIDRLister networkinglisters.ClusterCIDRLister
 	// clusterCIDRSynced returns true if the clustercidr shared informer has been synced at least once.
 	clusterCIDRSynced cache.InformerSynced
-	// Channel that is used to pass updating Nodes and their reserved CIDRs to the background.
-	// This increases a throughput of CIDR assignment by not blocking on long operations.
-	nodeCIDRUpdateChannel chan multiCIDRNodeReservedCIDRs
-	recorder              record.EventRecorder
-	// queue is where incoming work is placed to de-dup and to allow "easy"
+	recorder          record.EventRecorder
+	// workerLoopPeriod is the time between worker runs. The workers
+	// process the queue of nodes and clustercidrs changes
+	workerLoopPeriod time.Duration
+	// queues are where incoming work is placed to de-dup and to allow "easy"
 	// rate limited requeues on errors
-	queue workqueue.RateLimitingInterface
+	cccQueue  workqueue.RateLimitingInterface
+	nodeQueue workqueue.RateLimitingInterface
 
 	// lock guards nodesInProcessing and cidrMap to avoid races in CIDR allocation.
 	lock *sync.Mutex
-	// nodesInProcessing is a set of nodes that are currently being processed.
-	nodesInProcessing sets.String
 	// cidrMap maps ClusterCIDR labels to internal ClusterCIDR objects.
 	cidrMap map[string][]*cidrset.ClusterCIDR
 }
@@ -103,13 +106,12 @@ type multiCIDRRangeAllocator struct {
 // Caller must always pass in a list of existing nodes to the new allocator.
 // NodeList is only nil in testing.
 func NewMultiCIDRRangeAllocator(
-		client clientset.Interface,
-		nodeInformer informers.NodeInformer,
-		clusterCIDRInformer networkinginformers.ClusterCIDRInformer,
-		allocatorParams CIDRAllocatorParams,
-		nodeList *v1.NodeList,
-		cccList *networkingv1alpha1.ClusterCIDRList,
-		testCIDRMap map[string][]*cidrset.ClusterCIDR,
+	client clientset.Interface,
+	nodeInformer informers.NodeInformer,
+	clusterCIDRInformer networkinginformers.ClusterCIDRInformer,
+	allocatorParams CIDRAllocatorParams,
+	nodeList *v1.NodeList,
+	cccList *networkingv1alpha1.ClusterCIDRList,
 ) (CIDRAllocator, error) {
 	if client == nil {
 		klog.Fatalf("client is nil")
@@ -133,23 +135,23 @@ func NewMultiCIDRRangeAllocator(
 	}
 
 	ra := &multiCIDRRangeAllocator{
-		client:                client,
-		nodeLister:            nodeInformer.Lister(),
-		nodesSynced:           nodeInformer.Informer().HasSynced,
-		clusterCIDRLister:     clusterCIDRInformer.Lister(),
-		clusterCIDRSynced:     clusterCIDRInformer.Informer().HasSynced,
-		nodeCIDRUpdateChannel: make(chan multiCIDRNodeReservedCIDRs, cidrUpdateQueueSize),
-		recorder:              recorder,
-		queue:                 workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multi_cidr_range_allocator"),
-		lock:                  &sync.Mutex{},
-		nodesInProcessing:     sets.NewString(),
-		cidrMap:               make(map[string][]*cidrset.ClusterCIDR, 0),
+		client:            client,
+		nodeLister:        nodeInformer.Lister(),
+		nodesSynced:       nodeInformer.Informer().HasSynced,
+		clusterCIDRLister: clusterCIDRInformer.Lister(),
+		clusterCIDRSynced: clusterCIDRInformer.Informer().HasSynced,
+		recorder:          recorder,
+		workerLoopPeriod:  time.Second,
+		cccQueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multi_cidr_range_allocator_clustercidrs"),
+		nodeQueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "multi_cidr_range_allocator_nodes"),
+		lock:              &sync.Mutex{},
+		cidrMap:           make(map[string][]*cidrset.ClusterCIDR, 0),
 	}
 
 	// testCIDRMap is only set for testing purposes.
 	if len(testCIDRMap) > 0 {
 		ra.cidrMap = testCIDRMap
-		klog.Warningf("testCIDRMap should only be set for testing purposes, if this is seen in production logs, it might be a misconfiguration or a bug.")
+		klog.Fatalf("testCIDRMap should only be set for testing purposes, if this is seen in production logs, it might be a misconfiguration or a bug.")
 	}
 
 	if cccList == nil {
@@ -168,8 +170,9 @@ func NewMultiCIDRRangeAllocator(
 	}
 
 	clusterCIDRInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    createClusterCIDRHandler(ra.reconcileCreate),
-		DeleteFunc: createClusterCIDRHandler(ra.reconcileDelete),
+		AddFunc:    ra.addClusterCIDR,
+		UpdateFunc: ra.updateClusterCIDR,
+		DeleteFunc: ra.deleteClusterCIDR,
 	})
 
 	if allocatorParams.ServiceCIDR != nil {
@@ -184,52 +187,10 @@ func NewMultiCIDRRangeAllocator(
 		klog.V(0).Info("No Secondary Service CIDR provided. Skipping filtering out secondary service addresses.")
 	}
 
-	if nodeList != nil {
-		for _, node := range nodeList.Items {
-			if len(node.Spec.PodCIDRs) == 0 {
-				klog.V(4).Infof("Node %v has no CIDR, ignoring", node.Name)
-				continue
-			}
-			klog.V(0).Infof("Node %v has CIDR %s, occupying it in CIDR map", node.Name, node.Spec.PodCIDRs)
-			if err := ra.occupyCIDRs(&node); err != nil {
-				// This will happen if:
-				// 1. We find garbage in the podCIDRs field. Retrying is useless.
-				// 2. CIDR out of range: This means ClusterCIDR is not yet created
-				// This error will keep crashing controller-manager until the
-				// appropriate ClusterCIDR has been created
-				return nil, err
-			}
-		}
-	}
-
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controllerutil.CreateAddNodeHandler(ra.AllocateOrOccupyCIDR),
-		UpdateFunc: controllerutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
-			// If the PodCIDRs list is not empty we either:
-			// - already processed a Node that already had CIDRs after NC restarted
-			//   (cidr is marked as used),
-			// - already processed a Node successfully and allocated CIDRs for it
-			//   (cidr is marked as used),
-			// - already processed a Node but we saw a "timeout" response and
-			//   request eventually got through in this case we haven't released
-			//   the allocated CIDRs (cidr is still marked as used).
-			// There's a possible error here:
-			// - NC sees a new Node and assigns CIDRs X,Y.. to it,
-			// - Update Node call fails with a timeout,
-			// - Node is updated by some other component, NC sees an update and
-			//   assigns CIDRs A,B.. to the Node,
-			// - Both CIDR X,Y.. and CIDR A,B.. are marked as used in the local cache,
-			//   even though Node sees only CIDR A,B..
-			// The problem here is that in in-memory cache we see CIDR X,Y.. as marked,
-			// which prevents it from being assigned to any new node. The cluster
-			// state is correct.
-			// Restart of NC fixes the issue.
-			if len(newNode.Spec.PodCIDRs) == 0 {
-				return ra.AllocateOrOccupyCIDR(newNode)
-			}
-			return nil
-		}),
-		DeleteFunc: controllerutil.CreateDeleteNodeHandler(ra.ReleaseCIDR),
+		AddFunc:    ra.addNode,
+		UpdateFunc: ra.updateNode,
+		DeleteFunc: ra.deleteNode,
 	})
 
 	return ra, nil
@@ -245,99 +206,106 @@ func (r *multiCIDRRangeAllocator) Run(stopCh <-chan struct{}) {
 		return
 	}
 
-	// raWaitGroup is used to wait for the RangeAllocator to finish the goroutines.
-	var raWaitGroup sync.WaitGroup
-
 	for i := 0; i < cidrUpdateWorkers; i++ {
-		raWaitGroup.Add(2)
-		go func() {
-			r.worker(stopCh)
-			raWaitGroup.Done()
-		}()
-
-		go func() {
-			r.cccWorker()
-			raWaitGroup.Done()
-		}()
-
+		go wait.Until(r.nodeWorker, r.workerLoopPeriod, stopCh)
+		go wait.Until(r.cccWorker, r.workerLoopPeriod, stopCh)
 	}
-
-	raWaitGroup.Wait()
 
 	<-stopCh
 }
 
-func (r *multiCIDRRangeAllocator) worker(stopChan <-chan struct{}) {
-	for {
-		select {
-		case workItem, ok := <-r.nodeCIDRUpdateChannel:
-			r.lock.Lock()
-			if !ok {
-				klog.Error("Channel nodeCIDRUpdateChannel was unexpectedly closed")
-				return
-			}
-			if err := r.updateCIDRsAllocation(workItem); err != nil {
-				// Requeue the failed node for update again.
-				r.nodeCIDRUpdateChannel <- workItem
-			}
-			r.lock.Unlock()
-		case <-stopChan:
-			klog.Infof("MultiCIDRRangeAllocator worker is stopping.")
-			return
-		}
-	}
-}
-
-func (r *multiCIDRRangeAllocator) cccWorker() {
-	for r.processNextWorkItem() {
+func (r *multiCIDRRangeAllocator) nodeWorker() {
+	for r.processNextNodeItem() {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (r *multiCIDRRangeAllocator) processNextWorkItem() bool {
-	cKey, quit := r.queue.Get()
+func (r *multiCIDRRangeAllocator) processNextNodeItem() bool {
+	cKey, quit := r.nodeQueue.Get()
 	if quit {
 		return false
 	}
-	defer r.queue.Done(cKey)
+	defer r.nodeQueue.Done(cKey)
 
-	err := r.syncClusterCIDR(cKey.(string))
-	r.handleErr(err, cKey)
+	err := r.syncNode(cKey.(string))
+	r.handleNodeErr(err, cKey)
 
 	return true
 }
 
-func (r *multiCIDRRangeAllocator) handleErr(err error, key interface{}) {
+func (r *multiCIDRRangeAllocator) syncNode(key string) error {
+	startTime := time.Now()
+	defer func() {
+		klog.V(4).Infof("Finished syncing node %q. (%v)", key, time.Since(startTime))
+	}()
+
+	node, err := r.nodeLister.Get(key)
+	if apierrors.IsNotFound(err) {
+		// delete the assigned CIDR to that node
+		// TODO, we may have to use a cache if we don't have this info already
+	}
+	if err != nil {
+		return err
+	}
+	if !node.DeletionTimestamp.IsZero() {
+		// node is being deleted
+		return r.ReleaseCIDR(node)
+	}
+
+	return r.AllocateOrOccupyCIDR(node)
+}
+
+func (r *multiCIDRRangeAllocator) handleNodeErr(err error, key interface{}) {
 	if err == nil {
-		r.queue.Forget(key)
+		r.nodeQueue.Forget(key)
 		return
 	}
 
-	if r.queue.NumRequeues(key) < maxRetries {
-		klog.Warningf("Error syncing clusterCIDR %q, retries(%d). Error: %v", key, r.queue.NumRequeues(key), err)
-		r.queue.AddRateLimited(key)
+	if r.cccQueue.NumRequeues(key) < maxRetries {
+		klog.Warningf("Error syncing clusterCIDR %q, retries(%d). Error: %v", key, r.nodeQueue.NumRequeues(key), err)
+		r.nodeQueue.AddRateLimited(key)
 		return
 	}
 
 	klog.Warningf("Error syncing ClusterCIDR %q, not retrying as retry budget (%d retries) has been exceeded: %v", key, maxRetries, err)
-	r.queue.Forget(key)
+	r.nodeQueue.Forget(key)
 	utilruntime.HandleError(err)
 }
 
-// createClusterCIDRHandler creates clusterCIDR handler.
-func createClusterCIDRHandler(f func(ccc *networkingv1alpha1.ClusterCIDR) error) func(obj interface{}) {
-	return func(originalObj interface{}) {
-		ccc := originalObj.(*networkingv1alpha1.ClusterCIDR)
-		if err := f(ccc); err != nil {
-			utilruntime.HandleError(fmt.Errorf("error while processing ClusterCIDR Add/Delete: %w", err))
-		}
+func (r *multiCIDRRangeAllocator) cccWorker() {
+	for r.processNextCCCItem() {
 	}
 }
 
-// needToAddFinalizer checks if a finalizer should be added to the object.
-func needToAddFinalizer(obj metav1.Object, finalizer string) bool {
-	return obj.GetDeletionTimestamp() == nil && !slice.ContainsString(obj.GetFinalizers(),
-		finalizer, nil)
+// processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
+func (r *multiCIDRRangeAllocator) processNextCCCItem() bool {
+	cKey, quit := r.cccQueue.Get()
+	if quit {
+		return false
+	}
+	defer r.cccQueue.Done(cKey)
+
+	err := r.syncClusterCIDR(cKey.(string))
+	r.handleCCCErr(err, cKey)
+
+	return true
+}
+
+func (r *multiCIDRRangeAllocator) handleCCCErr(err error, key interface{}) {
+	if err == nil {
+		r.cccQueue.Forget(key)
+		return
+	}
+
+	if r.cccQueue.NumRequeues(key) < maxRetries {
+		klog.Warningf("Error syncing clusterCIDR %q, retries(%d). Error: %v", key, r.cccQueue.NumRequeues(key), err)
+		r.cccQueue.AddRateLimited(key)
+		return
+	}
+
+	klog.Warningf("Error syncing ClusterCIDR %q, not retrying as retry budget (%d retries) has been exceeded: %v", key, maxRetries, err)
+	r.cccQueue.Forget(key)
+	utilruntime.HandleError(err)
 }
 
 func (r *multiCIDRRangeAllocator) syncClusterCIDR(key string) error {
@@ -347,38 +315,24 @@ func (r *multiCIDRRangeAllocator) syncClusterCIDR(key string) error {
 	}()
 
 	clusterCIDR, err := r.clusterCIDRLister.Get(key)
-	if apierrors.IsNotFound(err) {
-		klog.V(3).Infof("clusterCIDR has been deleted: %v", key)
-		return nil
+	if apierrors.IsNotFound(err) || !clusterCIDR.DeletionTimestamp.IsZero() {
+		klog.V(3).Infof("clusterCIDR %v deleted", key)
+		return r.reconcileDelete(clusterCIDR)
 	}
-
 	if err != nil {
 		return err
-	}
-
-	// Check the DeletionTimestamp to determine if object is under deletion.
-	if !clusterCIDR.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(clusterCIDR)
 	}
 	return r.reconcileCreate(clusterCIDR)
 }
 
-func (r *multiCIDRRangeAllocator) insertNodeToProcessing(nodeName string) bool {
-	if r.nodesInProcessing.Has(nodeName) {
-		return false
-	}
-	r.nodesInProcessing.Insert(nodeName)
-	return true
-}
-
-func (r *multiCIDRRangeAllocator) removeNodeFromProcessing(nodeName string) {
-	klog.Infof("Removing Node: %s from processing", nodeName)
-	r.nodesInProcessing.Delete(nodeName)
+// needToAddFinalizer checks if a finalizer should be added to the object.
+func needToAddFinalizer(obj metav1.Object, finalizer string) bool {
+	return obj.GetDeletionTimestamp() == nil && !slice.ContainsString(obj.GetFinalizers(),
+		finalizer, nil)
 }
 
 // occupyCIDRs marks node.PodCIDRs[...] as used in allocator's tracked cidrSet.
 func (r *multiCIDRRangeAllocator) occupyCIDRs(node *v1.Node) error {
-
 	err := func(node *v1.Node) error {
 
 		if len(node.Spec.PodCIDRs) == 0 {
@@ -419,7 +373,6 @@ func (r *multiCIDRRangeAllocator) occupyCIDRs(node *v1.Node) error {
 		return fmt.Errorf("could not occupy cidrs: %v, No matching ClusterCIDRs found", node.Spec.PodCIDRs)
 	}(node)
 
-	r.removeNodeFromProcessing(node.Name)
 	return err
 }
 
@@ -478,25 +431,17 @@ func (r *multiCIDRRangeAllocator) AllocateOrOccupyCIDR(node *v1.Node) error {
 	if node == nil {
 		return nil
 	}
-
-	if !r.insertNodeToProcessing(node.Name) {
-		klog.Infof("Node %v is already in a process of CIDR assignment.", node.Name)
-		return nil
-	}
-
 	if len(node.Spec.PodCIDRs) > 0 {
 		return r.occupyCIDRs(node)
 	}
 
 	cidrs, clusterCIDR, err := r.prioritizedCIDRs(node)
 	if err != nil {
-		r.removeNodeFromProcessing(node.Name)
 		controllerutil.RecordNodeStatusChange(r.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("failed to get cidrs for node %s", node.Name)
 	}
 
 	if len(cidrs) == 0 {
-		r.removeNodeFromProcessing(node.Name)
 		controllerutil.RecordNodeStatusChange(r.recorder, node, "CIDRNotAvailable")
 		return fmt.Errorf("no cidrSets with matching labels found for node %s", node.Name)
 	}
@@ -646,7 +591,6 @@ func (r *multiCIDRRangeAllocator) updateCIDRsAllocation(data multiCIDRNodeReserv
 		return err
 	}(data)
 
-	r.removeNodeFromProcessing(data.nodeName)
 	return err
 }
 
@@ -882,7 +826,7 @@ func (r *multiCIDRRangeAllocator) matchCIDRLabels(node *v1.Node, label []byte) (
 // been configured. It converts the --cluster-cidr and --per-node-mask-size* flags
 // to appropriate ClusterCIDR fields.
 func createDefaultClusterCIDR(existingConfigList *networkingv1alpha1.ClusterCIDRList,
-		allocatorParams CIDRAllocatorParams) {
+	allocatorParams CIDRAllocatorParams) {
 	// Create default ClusterCIDR only if --cluster-cidr has been configured
 	if len(allocatorParams.ClusterCIDRs) == 0 {
 		return
@@ -1087,7 +1031,7 @@ func (r *multiCIDRRangeAllocator) reconcileDelete(clusterCIDR *networkingv1alpha
 	defer r.lock.Unlock()
 
 	if slice.ContainsString(clusterCIDR.GetFinalizers(), clusterCIDRFinalizer, nil) {
-		if err := r.deleteClusterCIDR(clusterCIDR); err != nil {
+		if err := r.removeClusterCIDR(clusterCIDR); err != nil {
 			return err
 		}
 		// Remove the finalizer as delete is successful.
@@ -1103,7 +1047,7 @@ func (r *multiCIDRRangeAllocator) reconcileDelete(clusterCIDR *networkingv1alpha
 }
 
 // deleteClusterCIDR Deletes and unmaps the ClusterCIDRs from the cidrMap.
-func (r *multiCIDRRangeAllocator) deleteClusterCIDR(clusterCIDR *networkingv1alpha1.ClusterCIDR) error {
+func (r *multiCIDRRangeAllocator) removeClusterCIDR(clusterCIDR *networkingv1alpha1.ClusterCIDR) error {
 
 	labelSelector, err := r.nodeSelectorKey(clusterCIDR)
 	if err != nil {
@@ -1159,4 +1103,68 @@ func (r *multiCIDRRangeAllocator) nodeSelectorKey(clusterCIDR *networkingv1alpha
 	}
 
 	return string(nodeSelector), nil
+}
+
+//
+
+func (r *multiCIDRRangeAllocator) addNode(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+	r.nodeQueue.Add(key)
+}
+
+func (r *multiCIDRRangeAllocator) updateNode(old, cur interface{}) {
+	// TODO: Check if node has been already assigned a PodCIDR by this controller
+	// if not, queueu to sync current status
+	// node := cur.(*v1.Node)
+	key, err := controller.KeyFunc(cur)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", cur, err))
+		return
+	}
+	r.nodeQueue.Add(key)
+
+}
+
+func (r *multiCIDRRangeAllocator) deleteNode(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+	r.nodeQueue.Add(key)
+}
+
+func (r *multiCIDRRangeAllocator) addClusterCIDR(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+	r.cccQueue.Add(key)
+}
+
+func (r *multiCIDRRangeAllocator) updateClusterCIDR(old, cur interface{}) {
+	// TODO: Check if node has been already assigned a PodCIDR by this controller
+	// if not, queueu to sync current status
+	// node := cur.(*v1.Node)
+	key, err := controller.KeyFunc(cur)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", cur, err))
+		return
+	}
+	r.cccQueue.Add(key)
+
+}
+
+func (r *multiCIDRRangeAllocator) deleteClusterCIDR(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+	r.cccQueue.Add(key)
 }

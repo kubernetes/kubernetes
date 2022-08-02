@@ -173,6 +173,12 @@ func TestIPAMMultiCIDRRangeAllocatorType(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if list, err := clientSet.NetworkingV1alpha1().ClusterCIDRs().List(context.TODO(), metav1.ListOptions{}); err != nil {
+		t.Fatal(err)
+	} else {
+		fmt.Println("ClusterCIDRs: ", list)
+	}
+
 	// assert nodes get the correct PodCIDRs
 	cidrs = getNodesPodCIDRs(t, clientSet)
 	fmt.Println("CIDRs: ", cidrs)

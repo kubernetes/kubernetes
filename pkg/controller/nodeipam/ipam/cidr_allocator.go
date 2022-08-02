@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -132,7 +132,7 @@ func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInfo
 		if err != nil {
 			return nil, err
 		}
-		return NewMultiCIDRRangeAllocator(kubeClient, nodeInformer, clusterCIDRInformer, allocatorParams, nodeList, cccList, nil)
+		return NewMultiCIDRRangeAllocator(kubeClient, nodeInformer, clusterCIDRInformer, allocatorParams, nodeList, cccList)
 	case CloudAllocatorType:
 		return NewCloudCIDRAllocator(kubeClient, cloud, nodeInformer)
 	default:
