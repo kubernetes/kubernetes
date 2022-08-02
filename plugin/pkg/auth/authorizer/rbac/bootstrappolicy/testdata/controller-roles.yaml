@@ -912,8 +912,10 @@ items:
     resources:
     - clustercidrs
     verbs:
+    - create
     - get
     - list
+    - update
   - apiGroups:
     - ""
     - events.k8s.io

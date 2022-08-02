@@ -20,9 +20,10 @@ import (
 	"net"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	networkinginformers "k8s.io/client-go/informers/networking/v1alpha1"
+	networkinglisters "k8s.io/client-go/listers/networking/v1alpha1"
+	"k8s.io/klog/v2"
 
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -64,6 +65,9 @@ type Controller struct {
 	nodeLister         corelisters.NodeLister
 	nodeInformerSynced cache.InformerSynced
 
+	clusterCIDRLister networkinglisters.ClusterCIDRLister
+	clusterCIDRSynced cache.InformerSynced
+
 	cidrAllocator ipam.CIDRAllocator
 }
 
@@ -74,6 +78,7 @@ type Controller struct {
 // currently, this should be handled as a fatal error.
 func NewNodeIpamController(
 	nodeInformer coreinformers.NodeInformer,
+	clusterCIDRInformer networkinginformers.ClusterCIDRInformer,
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
 	clusterCIDRs []*net.IPNet,
@@ -136,10 +141,15 @@ func NewNodeIpamController(
 			NodeCIDRMaskSizes:    nodeCIDRMaskSizes,
 		}
 
-		ic.cidrAllocator, err = ipam.New(kubeClient, cloud, nodeInformer, ic.allocatorType, allocatorParams)
+		ic.cidrAllocator, err = ipam.New(kubeClient, cloud, nodeInformer, clusterCIDRInformer, ic.allocatorType, allocatorParams)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if ic.allocatorType == ipam.MultiCIDRRangeAllocatorType {
+		ic.clusterCIDRLister = clusterCIDRInformer.Lister()
+		ic.clusterCIDRSynced = clusterCIDRInformer.Informer().HasSynced
 	}
 
 	ic.nodeLister = nodeInformer.Lister()

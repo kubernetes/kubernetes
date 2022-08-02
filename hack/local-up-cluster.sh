@@ -37,6 +37,10 @@ FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
 # Name of the dns addon, eg: "kube-dns" or "coredns"
 DNS_ADDON=${DNS_ADDON:-"coredns"}
 CLUSTER_CIDR=${CLUSTER_CIDR:-10.1.0.0/16}
+ALLOCATE_NODE_CIDRS=${ALLOCATE_NODE_CIDRS:-false}
+RANGE_ALLOCATOR=${RANGE_ALLOCATOR:-"RangeAllocator"}
+DUALSTACK_ENABLED=${DUALSTACK_ENABLED:-"false"}
+
 SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 # if enabled, must set CGROUP_ROOT
@@ -631,6 +635,12 @@ function start_controller_manager {
       cloud_config_arg+=("--cloud-config=${CLOUD_CONFIG}")
     fi
 
+    node_ipam_arg=("--allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}" "--cluster-cidr=${CLUSTER_CIDR}")
+    node_ipam_arg+=("--cidr-allocator-type=${RANGE_ALLOCATOR}")
+    if [ "${DUALSTACK_ENABLED}" == "true" ]; then
+      node_ipam_arg+=("--node-cidr-mask-size-ipv4=24" "--node-cidr-mask-size-ipv6=120")
+    fi
+
     CTLRMGR_LOG=${LOG_DIR}/kube-controller-manager.log
     ${CONTROLPLANE_SUDO} "${GO_OUT}/kube-controller-manager" \
       --v="${LOG_LEVEL}" \
@@ -644,6 +654,7 @@ function start_controller_manager {
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --feature-gates="${FEATURE_GATES}" \
       "${cloud_config_arg[@]}" \
+      "${node_ipam_arg[@]}" \
       --authentication-kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --authorization-kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --kubeconfig "${CERT_DIR}"/controller.kubeconfig \

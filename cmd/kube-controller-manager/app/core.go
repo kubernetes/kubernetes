@@ -155,6 +155,7 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
 		controllerContext.InformerFactory.Core().V1().Nodes(),
+		controllerContext.InformerFactory.Networking().V1alpha1().ClusterCIDRs(),
 		controllerContext.Cloud,
 		controllerContext.ClientBuilder.ClientOrDie("node-controller"),
 		clusterCIDRs,
