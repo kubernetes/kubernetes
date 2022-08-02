@@ -24,6 +24,9 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -251,6 +254,186 @@ func TestGetPodTopologyHints(t *testing.T) {
 		if !reflect.DeepEqual(tc.expectedHints, podHints) {
 			t.Errorf("Expected in result to be %v , got %v", tc.expectedHints, podHints)
 		}
+	}
+}
+
+func TestGetPodTopologyHintsWithPolicyOptions(t *testing.T) {
+	testPod1 := makePod("fakePod", "fakeContainer", "2", "2")
+	testContainer1 := &testPod1.Spec.Containers[0]
+
+	testPod2 := makePod("fakePod", "fakeContainer", "41", "41")
+	testContainer2 := &testPod1.Spec.Containers[0]
+
+	cpu_set_across_socket, _ := cpuset.Parse("0-28,40-57")
+
+	m0001, _ := bitmask.NewBitMask(0)
+	m0011, _ := bitmask.NewBitMask(0, 1)
+	m0101, _ := bitmask.NewBitMask(0, 2)
+	m1001, _ := bitmask.NewBitMask(0, 3)
+	m0111, _ := bitmask.NewBitMask(0, 1, 2)
+	m1011, _ := bitmask.NewBitMask(0, 1, 3)
+	m1101, _ := bitmask.NewBitMask(0, 2, 3)
+	m1111, _ := bitmask.NewBitMask(0, 1, 2, 3)
+
+	testCases := []struct {
+		description   string
+		pod           v1.Pod
+		container     v1.Container
+		assignments   state.ContainerCPUAssignments
+		defaultCPUSet cpuset.CPUSet
+		policyOptions map[string]string
+		topology      *topology.CPUTopology
+		expectedHints []topologymanager.TopologyHint
+	}{
+		{
+			// CPU available on numa node[0 ,1]. CPU on numa node 0 can satisfy request of 2 CPU's
+			description:   "AlignBySocket:false, Preferred hints does not contains socket aligned hints",
+			pod:           *testPod1,
+			container:     *testContainer1,
+			defaultCPUSet: cpuset.NewCPUSet(2, 3, 11),
+			topology:      topoDualSocketMultiNumaPerSocketHT,
+			policyOptions: map[string]string{AlignBySocketOption: "false"},
+			expectedHints: []topologymanager.TopologyHint{
+				{
+					NUMANodeAffinity: m0001,
+					Preferred:        true,
+				},
+				{
+					NUMANodeAffinity: m0011,
+					Preferred:        false,
+				},
+				{
+					NUMANodeAffinity: m0101,
+					Preferred:        false,
+				},
+				{
+					NUMANodeAffinity: m1001,
+					Preferred:        false,
+				},
+				{
+					NUMANodeAffinity: m0111,
+					Preferred:        false,
+				},
+				{
+					NUMANodeAffinity: m1011,
+					Preferred:        false,
+				},
+				{
+					NUMANodeAffinity: m1101,
+					Preferred:        false,
+				},
+				{
+					NUMANodeAffinity: m1111,
+					Preferred:        false,
+				},
+			},
+		},
+		{
+			// CPU available on numa node[0 ,1]. CPU on numa node 0 can satisfy request of 2 CPU's
+			description:   "AlignBySocket:true Preferred hints contains socket aligned hints",
+			pod:           *testPod1,
+			container:     *testContainer1,
+			defaultCPUSet: cpuset.NewCPUSet(2, 3, 11),
+			topology:      topoDualSocketMultiNumaPerSocketHT,
+			policyOptions: map[string]string{AlignBySocketOption: "true"},
+			expectedHints: []topologymanager.TopologyHint{
+				{
+					NUMANodeAffinity: m0001,
+					Preferred:        true,
+				},
+				{
+					NUMANodeAffinity: m0011,
+					Preferred:        true,
+				},
+				{
+					NUMANodeAffinity: m0101,
+					Preferred:        false,
+				},
+				{
+					NUMANodeAffinity: m1001,
+					Preferred:        false,
+				},
+				{
+					NUMANodeAffinity: m0111,
+					Preferred:        false,
+				},
+				{
+					NUMANodeAffinity: m1011,
+					Preferred:        false,
+				},
+				{
+					NUMANodeAffinity: m1101,
+					Preferred:        false,
+				},
+				{
+					NUMANodeAffinity: m1111,
+					Preferred:        false,
+				},
+			},
+		},
+		{
+			// CPU available on numa node[0 ,1]. CPU on numa nodes across sockets can satisfy request of 2 CPU's
+			description:   "AlignBySocket:true Preferred hints are spread across socket since 2 sockets are required",
+			pod:           *testPod2,
+			container:     *testContainer2,
+			defaultCPUSet: cpu_set_across_socket,
+			topology:      topoDualSocketMultiNumaPerSocketHT,
+			policyOptions: map[string]string{AlignBySocketOption: "true"},
+			expectedHints: []topologymanager.TopologyHint{
+				{
+					NUMANodeAffinity: m0111,
+					Preferred:        true,
+				},
+				{
+					NUMANodeAffinity: m1111,
+					Preferred:        true,
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)()
+
+			var activePods []*v1.Pod
+			for p := range testCase.assignments {
+				pod := v1.Pod{}
+				pod.UID = types.UID(p)
+				for c := range testCase.assignments[p] {
+					container := v1.Container{}
+					container.Name = c
+					pod.Spec.Containers = append(pod.Spec.Containers, container)
+				}
+				activePods = append(activePods, &pod)
+			}
+			policyOpt, _ := NewStaticPolicyOptions(testCase.policyOptions)
+			m := manager{
+				policy: &staticPolicy{
+					topology: testCase.topology,
+					options:  policyOpt,
+				},
+				state: &mockState{
+					assignments:   testCase.assignments,
+					defaultCPUSet: testCase.defaultCPUSet,
+				},
+				topology:          testCase.topology,
+				activePods:        func() []*v1.Pod { return activePods },
+				podStatusProvider: mockPodStatusProvider{},
+				sourcesReady:      &sourcesReadyStub{},
+			}
+
+			podHints := m.GetPodTopologyHints(&testCase.pod)[string(v1.ResourceCPU)]
+			sort.SliceStable(podHints, func(i, j int) bool {
+				return podHints[i].LessThan(podHints[j])
+			})
+			sort.SliceStable(testCase.expectedHints, func(i, j int) bool {
+				return testCase.expectedHints[i].LessThan(testCase.expectedHints[j])
+			})
+			if !reflect.DeepEqual(testCase.expectedHints, podHints) {
+				t.Errorf("Expected in result to be %v , got %v", testCase.expectedHints, podHints)
+			}
+		})
 	}
 }
 

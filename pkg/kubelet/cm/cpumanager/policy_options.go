@@ -23,16 +23,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
 const (
 	FullPCPUsOnlyOption            string = "full-pcpus-only"
 	DistributeCPUsAcrossNUMAOption string = "distribute-cpus-across-numa"
+	AlignBySocketOption            string = "align-by-socket"
 )
 
 var (
 	alphaOptions = sets.NewString(
 		DistributeCPUsAcrossNUMAOption,
+		AlignBySocketOption,
 	)
 	betaOptions = sets.NewString(
 		FullPCPUsOnlyOption,
@@ -69,6 +73,9 @@ type StaticPolicyOptions struct {
 	// Flag to evenly distribute CPUs across NUMA nodes in cases where more
 	// than one NUMA node is required to satisfy the allocation.
 	DistributeCPUsAcrossNUMA bool
+	// Flag to ensure CPUs are considered aligned at socket boundary rather than
+	// NUMA boundary
+	AlignBySocket bool
 }
 
 func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOptions, error) {
@@ -91,6 +98,12 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
 			}
 			opts.DistributeCPUsAcrossNUMA = optValue
+		case AlignBySocketOption:
+			optValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.AlignBySocket = optValue
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.
@@ -98,4 +111,18 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 		}
 	}
 	return opts, nil
+}
+
+func ValidateStaticPolicyOptions(opts StaticPolicyOptions, topology *topology.CPUTopology, topologyManager topologymanager.Store) error {
+	if opts.AlignBySocket {
+		// Not compatible with topology manager single-numa-node policy option.
+		if topologyManager.GetPolicy().Name() == topologymanager.PolicySingleNumaNode {
+			return fmt.Errorf("Topolgy manager %s policy is incompatible with CPUManager %s policy option", topologymanager.PolicySingleNumaNode, AlignBySocketOption)
+		}
+		// Not compatible with topology when number of sockets are more than number of NUMA nodes.
+		if topology.NumSockets > topology.NumNUMANodes {
+			return fmt.Errorf("Align by socket is not compatible with hardware where number of sockets are more than number of NUMA")
+		}
+	}
+	return nil
 }
