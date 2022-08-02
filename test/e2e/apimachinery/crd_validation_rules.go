@@ -35,7 +35,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin]", func() {
+var _ = SIGDescribe("CustomResourceValidationRules [Privileged:ClusterAdmin][Feature:CustomResourceValidationExpressions]", func() {
 	f := framework.NewDefaultFramework("crd-validation-expressions")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
