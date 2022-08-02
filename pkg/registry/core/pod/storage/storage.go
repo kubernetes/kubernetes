@@ -105,7 +105,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		Pod:                 &REST{store, proxyTransport},
 		Binding:             &BindingREST{store: store},
 		LegacyBinding:       &LegacyBindingREST{bindingREST},
-		Eviction:            newEvictionStorage(store, podDisruptionBudgetClient),
+		Eviction:            newEvictionStorage(&statusStore, podDisruptionBudgetClient),
 		Status:              &StatusREST{store: &statusStore},
 		EphemeralContainers: &EphemeralContainersREST{store: &ephemeralContainersStore},
 		Log:                 &podrest.LogREST{Store: store, KubeletConn: k},

@@ -241,17 +241,23 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("get", "list", "delete", "deletecollection").Groups("*").Resources("*").RuleOrDie(),
 		},
 	})
-	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "node-controller"},
-		Rules: []rbacv1.PolicyRule{
-			rbacv1helpers.NewRule("get", "list", "update", "delete", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-			rbacv1helpers.NewRule("patch", "update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
-			// used for pod eviction
-			rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
-			rbacv1helpers.NewRule("list", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			eventsRule(),
-		},
-	})
+	addControllerRole(&controllerRoles, &controllerRoleBindings, func() rbacv1.ClusterRole {
+		role := rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "node-controller"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("get", "list", "update", "delete", "patch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+				rbacv1helpers.NewRule("patch", "update").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
+				// used for pod deletion
+				rbacv1helpers.NewRule("update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
+				rbacv1helpers.NewRule("list", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				eventsRule(),
+			},
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+			role.Rules = append(role.Rules, rbacv1helpers.NewRule("patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie())
+		}
+		return role
+	}())
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "persistent-volume-binder"},
 		Rules: []rbacv1.PolicyRule{
@@ -275,13 +281,19 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
-	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pod-garbage-collector"},
-		Rules: []rbacv1.PolicyRule{
-			rbacv1helpers.NewRule("list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
-			rbacv1helpers.NewRule("get", "list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-		},
-	})
+	addControllerRole(&controllerRoles, &controllerRoleBindings, func() rbacv1.ClusterRole {
+		role := rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pod-garbage-collector"},
+			Rules: []rbacv1.PolicyRule{
+				rbacv1helpers.NewRule("list", "watch", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+			},
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+			role.Rules = append(role.Rules, rbacv1helpers.NewRule("patch").Groups(legacyGroup).Resources("pods/status").RuleOrDie())
+		}
+		return role
+	}())
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "replicaset-controller"},
 		Rules: []rbacv1.PolicyRule{

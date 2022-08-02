@@ -30,14 +30,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
+	utilpod "k8s.io/kubernetes/pkg/util/pod"
 
 	"k8s.io/klog/v2"
 )
@@ -105,7 +109,7 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 		}
 		var err error
 		for i := 0; i < retries; i++ {
-			err = c.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})
+			err = addConditionAndDeletePod(ctx, c, name, ns)
 			if err == nil {
 				break
 			}
@@ -113,6 +117,27 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 		}
 		return err
 	}
+}
+
+func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, ns string) (err error) {
+	if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+		pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		newStatus := pod.Status.DeepCopy()
+		if apipod.UpdatePodCondition(newStatus, &v1.PodCondition{
+			Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+			Status:  v1.ConditionTrue,
+			Reason:  "DeletionByTaintManager",
+			Message: "Taint manager: deleting due to NoExecute taint",
+		}) {
+			if _, _, _, err = utilpod.PatchPodStatus(ctx, c, pod.Namespace, pod.Name, pod.UID, pod.Status, *newStatus); err != nil {
+				return err
+			}
+		}
+	}
+	return c.CoreV1().Pods(ns).Delete(ctx, name, metav1.DeleteOptions{})
 }
 
 func getNoExecuteTaints(taints []v1.Taint) []v1.Taint {
