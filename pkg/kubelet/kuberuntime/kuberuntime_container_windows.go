@@ -44,7 +44,7 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 }
 
 // generateWindowsContainerConfig generates windows container config for kubelet runtime v1.
-// Refer https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/cri-windows.md.
+// Refer https://git.k8s.io/design-proposals-archive/node/cri-windows.md.
 func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string) (*runtimeapi.WindowsContainerConfig, error) {
 	wc := &runtimeapi.WindowsContainerConfig{
 		Resources:       &runtimeapi.WindowsContainerResources{},
