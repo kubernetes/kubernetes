@@ -332,3 +332,7 @@ func (f *RemoteRuntime) CheckpointContainer(ctx context.Context, req *kubeapi.Ch
 
 	return &kubeapi.CheckpointContainerResponse{}, nil
 }
+
+func (f *RemoteRuntime) GetContainerEvents(req *kubeapi.GetEventsRequest, ces kubeapi.RuntimeService_GetContainerEventsServer) error {
+	return nil
+}
