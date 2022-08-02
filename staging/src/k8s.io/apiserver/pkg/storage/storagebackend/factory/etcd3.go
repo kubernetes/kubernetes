@@ -50,7 +50,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"k8s.io/component-base/traces"
+	tracing "k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
 )
 
@@ -226,12 +226,10 @@ var newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, e
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		tracingOpts := []otelgrpc.Option{
-			otelgrpc.WithPropagators(traces.Propagators()),
+			otelgrpc.WithPropagators(tracing.Propagators()),
+			otelgrpc.WithTracerProvider(c.TracerProvider),
 		}
-		if c.TracerProvider != nil {
-			tracingOpts = append(tracingOpts, otelgrpc.WithTracerProvider(*c.TracerProvider))
-		}
-		// Even if there is no TracerProvider, the otelgrpc still handles context propagation.
+		// Even with Noop  TracerProvider, the otelgrpc still handles context propagation.
 		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
 		dialOptions = append(dialOptions,
 			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),

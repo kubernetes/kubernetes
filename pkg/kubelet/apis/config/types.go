@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -441,10 +442,14 @@ type KubeletConfiguration struct {
 	// is true and upon the initial registration of the node.
 	// +optional
 	RegisterWithTaints []v1.Taint
-
 	// registerNode enables automatic registration with the apiserver.
 	// +optional
 	RegisterNode bool
+	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
+	// See http://kep.k8s.io/2832 for more details.
+	// +featureGate=KubeletTracing
+	// +optional
+	Tracing *tracingapi.TracingConfiguration
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

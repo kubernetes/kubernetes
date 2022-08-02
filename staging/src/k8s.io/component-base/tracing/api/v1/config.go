@@ -14,63 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tracing
+package v1
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/apis/apiserver"
-	"k8s.io/apiserver/pkg/apis/apiserver/install"
-)
-
-const (
-	maxSamplingRatePerMillion = 1000000
+	"k8s.io/component-base/featuregate"
 )
 
 var (
-	cfgScheme = runtime.NewScheme()
-	codecs    = serializer.NewCodecFactory(cfgScheme)
+	maxSamplingRatePerMillion = int32(1000000)
 )
 
-func init() {
-	install.Install(cfgScheme)
-}
-
-// ReadTracingConfiguration reads the tracing configuration from a file
-func ReadTracingConfiguration(configFilePath string) (*apiserver.TracingConfiguration, error) {
-	if configFilePath == "" {
-		return nil, fmt.Errorf("tracing config file was empty")
-	}
-	data, err := ioutil.ReadFile(configFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read tracing configuration from %q: %v", configFilePath, err)
-	}
-	internalConfig := &apiserver.TracingConfiguration{}
-	// this handles json/yaml/whatever, and decodes all registered version to the internal version
-	if err := runtime.DecodeInto(codecs.UniversalDecoder(), data, internalConfig); err != nil {
-		return nil, fmt.Errorf("unable to decode tracing configuration data: %v", err)
-	}
-	return internalConfig, nil
-}
-
 // ValidateTracingConfiguration validates the tracing configuration
-func ValidateTracingConfiguration(config *apiserver.TracingConfiguration) field.ErrorList {
+func ValidateTracingConfiguration(traceConfig *TracingConfiguration, featureGate featuregate.FeatureGate, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if config == nil {
-		// Tracing is disabled
+	if traceConfig == nil {
 		return allErrs
 	}
-	if config.SamplingRatePerMillion != nil {
-		allErrs = append(allErrs, validateSamplingRate(*config.SamplingRatePerMillion, field.NewPath("samplingRatePerMillion"))...)
+	if traceConfig.SamplingRatePerMillion != nil {
+		allErrs = append(allErrs, validateSamplingRate(*traceConfig.SamplingRatePerMillion, fldPath.Child("samplingRatePerMillion"))...)
 	}
-	if config.Endpoint != nil {
-		allErrs = append(allErrs, validateEndpoint(*config.Endpoint, field.NewPath("endpoint"))...)
+	if traceConfig.Endpoint != nil {
+		allErrs = append(allErrs, validateEndpoint(*traceConfig.Endpoint, fldPath.Child("endpoint"))...)
 	}
 	return allErrs
 }

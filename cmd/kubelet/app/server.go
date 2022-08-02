@@ -39,6 +39,10 @@ import (
 	"k8s.io/mount-utils"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
+	otelsdkresource "go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/semconv"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,6 +72,7 @@ import (
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	tracing "k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -373,6 +378,13 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 	if err != nil {
 		return nil, err
 	}
+	tp := oteltrace.NewNoopTracerProvider()
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+		tp, err = newTracerProvider(s)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &kubelet.Dependencies{
 		Auth:                nil, // default does not enforce auth[nz]
 		CAdvisorInterface:   nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
@@ -381,6 +393,7 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 		KubeClient:          nil,
 		HeartbeatClient:     nil,
 		EventClient:         nil,
+		TracerProvider:      tp,
 		HostUtil:            hu,
 		Mounter:             mounter,
 		Subpather:           subpather,
@@ -563,7 +576,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		klog.InfoS("Standalone mode, no API client")
 
 	case kubeDeps.KubeClient == nil, kubeDeps.EventClient == nil, kubeDeps.HeartbeatClient == nil:
-		clientConfig, onHeartbeatFailure, err := buildKubeletClientConfig(ctx, s, nodeName)
+		clientConfig, onHeartbeatFailure, err := buildKubeletClientConfig(ctx, s, kubeDeps.TracerProvider, nodeName)
 		if err != nil {
 			return err
 		}
@@ -790,7 +803,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 // buildKubeletClientConfig constructs the appropriate client config for the kubelet depending on whether
 // bootstrapping is enabled or client certificate rotation is enabled.
-func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nodeName types.NodeName) (*restclient.Config, func(), error) {
+func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, tp oteltrace.TracerProvider, nodeName types.NodeName) (*restclient.Config, func(), error) {
 	if s.RotateCertificates {
 		// Rules for client rotation and the handling of kube config files:
 		//
@@ -904,6 +917,9 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 		onHeartbeatFailure = func() {
 			utilnet.CloseIdleConnectionsFor(clientConfig.Transport)
 		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletTracing) {
+		clientConfig.Wrap(tracing.WrapperFor(tp))
 	}
 	return clientConfig, onHeartbeatFailure, nil
 }
@@ -1167,7 +1183,7 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 
 	// start the kubelet server
 	if enableServer {
-		go k.ListenAndServe(kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth)
+		go k.ListenAndServe(kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
 		go k.ListenAndServeReadOnly(netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort))
@@ -1249,4 +1265,25 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		}
 	}
 	return rl, nil
+}
+
+func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, error) {
+	if s.KubeletConfiguration.Tracing == nil {
+		return oteltrace.NewNoopTracerProvider(), nil
+	}
+	hostname, err := nodeutil.GetHostname(s.HostnameOverride)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine hostname for tracer provider: %v", err)
+	}
+	resourceOpts := []otelsdkresource.Option{
+		otelsdkresource.WithAttributes(
+			semconv.ServiceNameKey.String(componentKubelet),
+			semconv.HostNameKey.String(hostname),
+		),
+	}
+	tp, err := tracing.NewProvider(context.Background(), s.KubeletConfiguration.Tracing, []otlpgrpc.Option{}, resourceOpts)
+	if err != nil {
+		return nil, fmt.Errorf("could not configure tracer provider: %v", err)
+	}
+	return tp, nil
 }
