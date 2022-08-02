@@ -118,7 +118,7 @@ func (u *UnexpectedObjectError) Error() string {
 }
 
 // FromObject generates an StatusError from an metav1.Status, if that is the type of obj; otherwise,
-// returns an UnexpecteObjectError.
+// returns an UnexpectedObjectError.
 func FromObject(obj runtime.Object) error {
 	switch t := obj.(type) {
 	case *metav1.Status:
