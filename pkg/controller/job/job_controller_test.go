@@ -1613,6 +1613,32 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				},
 			},
 		},
+		"pod flips from failed to succeeded": {
+			job: batch.Job{
+				Spec: batch.JobSpec{
+					Completions: pointer.Int32(2),
+					Parallelism: pointer.Int32(2),
+				},
+				Status: batch.JobStatus{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
+						Failed: []types.UID{"a", "b"},
+					},
+				},
+			},
+			pods: []*v1.Pod{
+				buildPod().uid("a").phase(v1.PodFailed).trackingFinalizer().Pod,
+				buildPod().uid("b").phase(v1.PodSucceeded).trackingFinalizer().Pod,
+			},
+			finishedCond:     failedCond,
+			wantRmFinalizers: 2,
+			wantStatusUpdates: []batch.JobStatus{
+				{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+					Failed:                  2,
+					Conditions:              []batch.JobCondition{*failedCond},
+				},
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
