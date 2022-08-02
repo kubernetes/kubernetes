@@ -34,6 +34,7 @@ var ParameterCodec = runtime.NewParameterCodec(Scheme)
 
 func init() {
 	v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
+	v1.AddMetaToScheme(Scheme)
 	Install(Scheme)
 }
 

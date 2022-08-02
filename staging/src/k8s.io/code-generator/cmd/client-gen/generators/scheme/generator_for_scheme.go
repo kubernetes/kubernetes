@@ -99,6 +99,7 @@ func (g *GenScheme) GenerateType(c *generator.Context, t *types.Type, w io.Write
 		"runtimeUtilMust":           c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/util/runtime", Name: "Must"}),
 		"schemaGroupVersion":        c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
 		"metav1AddToGroupVersion":   c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "AddToGroupVersion"}),
+		"metav1AddMetaToScheme":     c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "AddMetaToScheme"}),
 	}
 	globals := map[string]string{
 		"Scheme":         "Scheme",
@@ -140,6 +141,7 @@ var registryRegistration = `
 
 func init() {
 	$.metav1AddToGroupVersion|raw$($.Scheme$, $.schemaGroupVersion|raw${Version: "v1"})
+	$.metav1AddMetaToScheme|raw$($.Scheme$)
 	Install($.Scheme$)
 }
 
@@ -182,6 +184,7 @@ var AddToScheme = localSchemeBuilder.AddToScheme
 
 func init() {
 	$.metav1AddToGroupVersion|raw$($.Scheme$, $.schemaGroupVersion|raw${Version: "v1"})
+	$.metav1AddMetaToScheme|raw$($.Scheme$)
 	$.runtimeUtilMust|raw$(AddToScheme($.Scheme$))
 }
 `
