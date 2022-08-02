@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"k8s.io/apiserver/pkg/authentication/user"
 	"net/http"
 	"net/url"
 	"strings"
@@ -379,6 +380,76 @@ func TestRecordDroppedRequests(t *testing.T) {
 				t.Fatal(err)
 			}
 
+		})
+	}
+}
+
+func TestDeprecatedMetricsFiltersOutKCM(t *testing.T) {
+	testedMetrics := []string{
+		"apiserver_requested_deprecated_apis",
+	}
+
+	testCases := []struct {
+		desc           string
+		request        *http.Request
+		userInfo       user.Info
+		want           string
+		group          string
+		version        string
+		resource       string
+		subresource    string
+		removedRelease string
+	}{
+		{
+			desc: "should record a deprecated metric if it is a random (non-KCM) request",
+			request: &http.Request{
+				Method: "GET",
+				URL: &url.URL{
+					RawPath: "/apis/extensions/v1beta1/ingresses",
+				},
+			},
+			userInfo: &user.DefaultInfo{
+				Name: "random",
+			},
+			version:        "extensions/v1beta1",
+			resource:       "ingresses",
+			removedRelease: "1.22",
+			want: `
+			            # HELP apiserver_requested_deprecated_apis [STABLE] Gauge of deprecated APIs that have been requested, broken out by API group, version, resource, subresource, and removed_release.
+        				# TYPE apiserver_requested_deprecated_apis gauge
+        				apiserver_requested_deprecated_apis{group="",removed_release="1.22",resource="ingresses",subresource="",version="extensions/v1beta1"} 1
+				`,
+		},
+		{
+			desc: "should NOT record a deprecated metric if it is a KCM request",
+			request: &http.Request{
+				Method: "GET",
+				URL: &url.URL{
+					RawPath: "/apis/extensions/v1beta1/ingresses",
+				},
+			},
+			userInfo: &user.DefaultInfo{
+				Name: user.KubeControllerManager,
+			},
+			version:        "extensions/v1beta1",
+			resource:       "ingresses",
+			removedRelease: "1.22",
+		},
+	}
+
+	// Since prometheus' gatherer is global, other tests may have updated metrics already, so
+	// we need to reset them prior running this test.
+	// This also implies that we can't run this test in parallel with other tests.
+	Register()
+	deprecatedRequestGauge.Reset()
+
+	for _, test := range testCases {
+		t.Run(test.desc, func(t *testing.T) {
+			defer deprecatedRequestGauge.Reset()
+			recordDeprecatedRequest(test.request, test.userInfo, test.group, test.version, test.resource, test.subresource, test.removedRelease)
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(test.want), testedMetrics...); err != nil {
+				t.Fatal(err)
+			}
 		})
 	}
 }

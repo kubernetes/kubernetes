@@ -490,7 +490,8 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 		apiSelfRequestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, resource, subresource).Inc()
 	}
 	if deprecated {
-		deprecatedRequestGauge.WithContext(req.Context()).WithLabelValues(group, version, resource, subresource, removedRelease).Set(1)
+		// We should ignore requests from the KCM since it actually hits all apis from the discovery doc.
+		recordDeprecatedRequest(req, info, group, version, resource, subresource, removedRelease)
 		audit.AddAuditAnnotation(req.Context(), deprecatedAnnotationKey, "true")
 		if len(removedRelease) > 0 {
 			audit.AddAuditAnnotation(req.Context(), removedReleaseAnnotationKey, removedRelease)
@@ -508,6 +509,12 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
 		responseSizes.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))
+	}
+}
+
+func recordDeprecatedRequest(req *http.Request, info user.Info, group string, version string, resource string, subresource string, removedRelease string) {
+	if info.GetName() != user.KubeControllerManager {
+		deprecatedRequestGauge.WithContext(req.Context()).WithLabelValues(group, version, resource, subresource, removedRelease).Set(1)
 	}
 }
 
