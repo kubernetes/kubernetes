@@ -34,9 +34,12 @@ e2e_test=$(kube::util::find-binary "e2e.test")
 GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
 CLOUD_CONFIG=${CLOUD_CONFIG:-""}
 
-# If 'y', Ginkgo's reporter will not print out in color when tests are run
-# in parallel
-GINKGO_NO_COLOR=${GINKGO_NO_COLOR:-n}
+# If 'y', Ginkgo's reporter will not use escape sequence to color output.
+#
+# Since Kubernetes 1.25, the default is to use colors only when connected to
+# a terminal. That is the right choice for all Prow jobs (Spyglass doesn't
+# render them properly).
+GINKGO_NO_COLOR=${GINKGO_NO_COLOR:-$(if [ -t 2 ]; then echo n; else echo y; fi)}
 
 # If 'y', will rerun failed tests once to give them a second chance.
 GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
@@ -148,7 +151,7 @@ if [[ "${GINKGO_TOLERATE_FLAKES}" == "y" ]]; then
 fi
 
 if [[ "${GINKGO_NO_COLOR}" == "y" ]]; then
-  ginkgo_args+=("--noColor")
+  ginkgo_args+=("--no-color")
 fi
 
 # The --host setting is used only when providing --auth_config
