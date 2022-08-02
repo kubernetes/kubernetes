@@ -17,6 +17,10 @@ limitations under the License.
 package validation
 
 import (
+	"archive/zip"
+	"io"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -33,15 +37,14 @@ import (
 )
 
 var (
-	timeZoneEmpty         = ""
-	timeZoneLocal         = "LOCAL"
-	timeZoneUTC           = "UTC"
-	timeZoneCorrectCasing = "America/New_York"
-	timeZoneBadCasing     = "AMERICA/new_york"
-	timeZoneBadPrefix     = " America/New_York"
-	timeZoneBadSuffix     = "America/New_York "
-	timeZoneBadName       = "America/New York"
-	timeZoneEmptySpace    = " "
+	timeZoneEmpty      = ""
+	timeZoneLocal      = "LOCAL"
+	timeZoneUTC        = "UTC"
+	timeZoneCorrect    = "Continent/Zone"
+	timeZoneBadPrefix  = " Continent/Zone"
+	timeZoneBadSuffix  = "Continent/Zone "
+	timeZoneBadName    = "Continent/InvalidZone"
+	timeZoneEmptySpace = " "
 )
 
 var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
@@ -882,6 +885,12 @@ func TestValidateCronJob(t *testing.T) {
 	validPodTemplateSpec := getValidPodTemplateSpecForGenerated(getValidGeneratedSelector())
 	validPodTemplateSpec.Labels = map[string]string{}
 
+	zoneDir := t.TempDir()
+	if err := setupFakeTimeZoneDatabase(zoneDir); err != nil {
+		t.Fatalf("Unexpected error setting up fake timezone database: %v", err)
+	}
+	t.Setenv("ZONEINFO", zoneDir)
+
 	successCases := map[string]batch.CronJob{
 		"basic scheduled job": {
 			ObjectMeta: metav1.ObjectMeta{
@@ -915,7 +924,7 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
-		"correct timeZone value casing": {
+		"correct timeZone value": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: metav1.NamespaceDefault,
@@ -923,7 +932,7 @@ func TestValidateCronJob(t *testing.T) {
 			},
 			Spec: batch.CronJobSpec{
 				Schedule:          "0 * * * *",
-				TimeZone:          &timeZoneCorrectCasing,
+				TimeZone:          &timeZoneCorrect,
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
@@ -934,17 +943,19 @@ func TestValidateCronJob(t *testing.T) {
 		},
 	}
 	for k, v := range successCases {
-		if errs := ValidateCronJobCreate(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
-			t.Errorf("expected success for %s: %v", k, errs)
-		}
+		t.Run(k, func(t *testing.T) {
+			if errs := ValidateCronJobCreate(&v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+				t.Errorf("expected success for %s: %v", k, errs)
+			}
 
-		// Update validation should pass same success cases
-		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
-		v = *v.DeepCopy()
-		v.ResourceVersion = "1"
-		if errs := ValidateCronJobUpdate(&v, &v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
-			t.Errorf("expected success for %s: %v", k, errs)
-		}
+			// Update validation should pass same success cases
+			// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
+			v = *v.DeepCopy()
+			v.ResourceVersion = "1"
+			if errs := ValidateCronJobUpdate(&v, &v, corevalidation.PodValidationOptions{}); len(errs) != 0 {
+				t.Errorf("expected success for %s: %v", k, errs)
+			}
+		})
 	}
 
 	negative := int32(-1)
@@ -1034,7 +1045,7 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
-		"spec.timeZone: Invalid value: \" America/New_York\": unknown time zone  America/New_York": {
+		"spec.timeZone: Invalid value: \" Continent/Zone\": unknown time zone  Continent/Zone": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: metav1.NamespaceDefault,
@@ -1051,7 +1062,7 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
-		"spec.timeZone: Invalid value: \"America/New_York \": unknown time zone America/New_York ": {
+		"spec.timeZone: Invalid value: \"Continent/Zone \": unknown time zone Continent/Zone ": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: metav1.NamespaceDefault,
@@ -1068,7 +1079,7 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
-		"spec.timeZone: Invalid value: \"America/New York\": unknown time zone  America/New York": {
+		"spec.timeZone: Invalid value: \"Continent/InvalidZone\": unknown time zone  Continent/InvalidZone": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: metav1.NamespaceDefault,
@@ -1314,80 +1325,98 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
-	}
-	errorCases["spec.jobTemplate.spec.ttlSecondsAfterFinished:must be greater than or equal to 0"] = batch.CronJob{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mycronjob",
-			Namespace: metav1.NamespaceDefault,
-			UID:       types.UID("1a2b3c"),
-		},
-		Spec: batch.CronJobSpec{
-			Schedule:          "* * * * ?",
-			ConcurrencyPolicy: batch.AllowConcurrent,
-			JobTemplate: batch.JobTemplateSpec{
-				Spec: batch.JobSpec{
-					TTLSecondsAfterFinished: &negative,
-					Template:                validPodTemplateSpec,
-				},
-			},
-		},
-	}
-	if runtime.GOOS != "darwin" {
-		// Skip this error case on darwin, see https://github.com/golang/go/issues/21512
-		errorCases["spec.timeZone: Invalid value: \"AMERICA/new_york\": unknown time zone AMERICA/new_york"] = batch.CronJob{
+		"spec.jobTemplate.spec.ttlSecondsAfterFinished:must be greater than or equal to 0": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
 				Namespace: metav1.NamespaceDefault,
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.CronJobSpec{
-				Schedule:          "0 * * * *",
-				TimeZone:          &timeZoneBadCasing,
+				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
-						Template: validPodTemplateSpec,
+						TTLSecondsAfterFinished: &negative,
+						Template:                validPodTemplateSpec,
 					},
 				},
 			},
-		}
+		},
 	}
 
 	for k, v := range errorCases {
-		errs := ValidateCronJobCreate(&v, corevalidation.PodValidationOptions{})
-		if len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
-		} else {
-			s := strings.Split(k, ":")
-			err := errs[0]
-			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
-				t.Errorf("unexpected error: %v, expected: %s", err, k)
+		t.Run(k, func(t *testing.T) {
+			errs := ValidateCronJobCreate(&v, corevalidation.PodValidationOptions{})
+			if len(errs) == 0 {
+				t.Errorf("expected failure for %s", k)
+			} else {
+				s := strings.Split(k, ":")
+				err := errs[0]
+				if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+					t.Errorf("unexpected error: %v, expected: %s", err, k)
+				}
 			}
-		}
 
-		// Update validation should fail all failure cases other than the 52 character name limit
-		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
-		oldSpec := *v.DeepCopy()
-		oldSpec.ResourceVersion = "1"
-		oldSpec.Spec.TimeZone = nil
+			// Update validation should fail all failure cases other than the 52 character name limit
+			// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
+			oldSpec := *v.DeepCopy()
+			oldSpec.ResourceVersion = "1"
+			oldSpec.Spec.TimeZone = nil
 
-		newSpec := *v.DeepCopy()
-		newSpec.ResourceVersion = "2"
+			newSpec := *v.DeepCopy()
+			newSpec.ResourceVersion = "2"
 
-		errs = ValidateCronJobUpdate(&newSpec, &oldSpec, corevalidation.PodValidationOptions{})
-		if len(errs) == 0 {
-			if k == "metadata.name: must be no more than 52 characters" {
-				continue
+			errs = ValidateCronJobUpdate(&newSpec, &oldSpec, corevalidation.PodValidationOptions{})
+			if len(errs) == 0 {
+				if k == "metadata.name: must be no more than 52 characters" {
+					return
+				}
+				t.Errorf("expected failure for %s", k)
+			} else {
+				s := strings.Split(k, ":")
+				err := errs[0]
+				if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+					t.Errorf("unexpected error: %v, expected: %s", err, k)
+				}
 			}
-			t.Errorf("expected failure for %s", k)
-		} else {
-			s := strings.Split(k, ":")
-			err := errs[0]
-			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
-				t.Errorf("unexpected error: %v, expected: %s", err, k)
-			}
-		}
+		})
 	}
+}
+
+// Sets up fake timezone database in a zoneDir directory with a single valid
+// time zone called "Continent/Zone" by copying UTC metadata from golang's
+// built-in databse. Returns an error in case of problems.
+func setupFakeTimeZoneDatabase(zoneDir string) error {
+	reader, err := zip.OpenReader(runtime.GOROOT() + "/lib/time/zoneinfo.zip")
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+
+	if err := os.Mkdir(filepath.Join(zoneDir, "Continent"), os.ModePerm); err != nil {
+		return err
+	}
+	zoneFile, err := os.OpenFile(filepath.Join(zoneDir, "Continent", "Zone"), os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+	defer zoneFile.Close()
+
+	for _, file := range reader.File {
+		if file.Name != "UTC" {
+			continue
+		}
+		rc, err := file.Open()
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(zoneFile, rc); err != nil {
+			return err
+		}
+		rc.Close()
+		break
+	}
+	return nil
 }
 
 func TestValidateCronJobSpec(t *testing.T) {

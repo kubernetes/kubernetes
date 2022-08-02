@@ -207,9 +207,10 @@ const (
 	// Enables Leader Migration for kube-controller-manager and cloud-controller-manager
 	ControllerManagerLeaderMigration featuregate.Feature = "ControllerManagerLeaderMigration"
 
-	// owner: @deejross
+	// owner: @deejross, @soltysh
 	// kep: http://kep.k8s.io/3140
 	// alpha: v1.24
+	// beta: v1.25
 	//
 	// Enables support for time zones in CronJobs.
 	CronJobTimeZone featuregate.Feature = "CronJobTimeZone"
@@ -910,7 +911,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	ControllerManagerLeaderMigration: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.26
 
-	CronJobTimeZone: {Default: false, PreRelease: featuregate.Alpha},
+	CronJobTimeZone: {Default: true, PreRelease: featuregate.Beta},
 
 	DaemonSetUpdateSurge: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
