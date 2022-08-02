@@ -17,7 +17,9 @@ limitations under the License.
 package kubelet
 
 import (
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -96,6 +98,86 @@ func TestBuildKubeletArgMap(t *testing.T) {
 					test.expected,
 					actual,
 				)
+			}
+		})
+	}
+}
+
+func TestGetNodeNameAndHostname(t *testing.T) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	testCases := []struct {
+		name             string
+		opts             kubeletFlagsOpts
+		expectedNodeName string
+		expectedHostName string
+	}{
+		{
+			name: "overridden hostname",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					KubeletExtraArgs: map[string]string{"hostname-override": "override-name"},
+				},
+			},
+			expectedNodeName: "override-name",
+			expectedHostName: strings.ToLower(hostname),
+		},
+		{
+			name: "overridden hostname uppercase",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					KubeletExtraArgs: map[string]string{"hostname-override": "OVERRIDE-NAME"},
+				},
+			},
+			expectedNodeName: "OVERRIDE-NAME",
+			expectedHostName: strings.ToLower(hostname),
+		},
+		{
+			name: "hostname contains only spaces",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					KubeletExtraArgs: map[string]string{"hostname-override": " "},
+				},
+			},
+			expectedNodeName: " ",
+			expectedHostName: strings.ToLower(hostname),
+		},
+		{
+			name: "empty parameter",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					KubeletExtraArgs: map[string]string{"hostname-override": ""},
+				},
+			},
+			expectedNodeName: "",
+			expectedHostName: strings.ToLower(hostname),
+		},
+		{
+			name: "nil parameter",
+			opts: kubeletFlagsOpts{
+				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
+					KubeletExtraArgs: nil,
+				},
+			},
+			expectedNodeName: strings.ToLower(hostname),
+			expectedHostName: strings.ToLower(hostname),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			nodeName, hostname, err := GetNodeNameAndHostname(tc.opts.nodeRegOpts)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if nodeName != tc.expectedNodeName {
+				t.Errorf("expected nodeName: %v, got %v", tc.expectedNodeName, nodeName)
+			}
+			if hostname != tc.expectedHostName {
+				t.Errorf("expected hostname: %v, got %v", tc.expectedHostName, hostname)
 			}
 		})
 	}
