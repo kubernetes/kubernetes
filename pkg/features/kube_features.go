@@ -821,6 +821,13 @@ const (
 	// Enable resource managers to make NUMA aligned decisions
 	TopologyManager featuregate.Feature = "TopologyManager"
 
+	// owner: @rata, @giuseppe
+	// kep: http://kep.k8s.io/127
+	// alpha: v1.25
+	//
+	// Enables user namespace support for stateless pods.
+	UserNamespacesStatelessPodsSupport featuregate.Feature = "UserNamespacesStatelessPodsSupport"
+
 	// owner: @cofyc
 	// alpha: v1.21
 	VolumeCapacityPriority featuregate.Feature = "VolumeCapacityPriority"
@@ -1080,6 +1087,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TopologyManager: {Default: true, PreRelease: featuregate.Beta},
 
 	VolumeCapacityPriority: {Default: false, PreRelease: featuregate.Alpha},
+
+	UserNamespacesStatelessPodsSupport: {Default: false, PreRelease: featuregate.Alpha},
 
 	WinDSR: {Default: false, PreRelease: featuregate.Alpha},
 

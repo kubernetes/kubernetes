@@ -1630,7 +1630,8 @@
         "setHostnameAsFQDN": true,
         "os": {
           "name": "nameValue"
-        }
+        },
+        "hostUsers": true
       }
     },
     "ttlSecondsAfterFinished": 8,

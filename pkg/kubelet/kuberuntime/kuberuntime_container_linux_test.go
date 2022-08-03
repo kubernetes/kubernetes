@@ -47,6 +47,8 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 	restartCountUint32 := uint32(restartCount)
 	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
 
+	l, _ := m.generateLinuxContainerConfig(container, pod, new(int64), "", nil, enforceMemoryQoS)
+
 	expectedConfig := &runtimeapi.ContainerConfig{
 		Metadata: &runtimeapi.ContainerMetadata{
 			Name:    container.Name,
@@ -64,7 +66,7 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 		Stdin:       container.Stdin,
 		StdinOnce:   container.StdinOnce,
 		Tty:         container.TTY,
-		Linux:       m.generateLinuxContainerConfig(container, pod, new(int64), "", nil, enforceMemoryQoS),
+		Linux:       l,
 		Envs:        envs,
 	}
 	return expectedConfig
@@ -215,7 +217,8 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 			},
 		}
 
-		linuxConfig := m.generateLinuxContainerConfig(&pod.Spec.Containers[0], pod, new(int64), "", nil, false)
+		linuxConfig, err := m.generateLinuxContainerConfig(&pod.Spec.Containers[0], pod, new(int64), "", nil, false)
+		assert.NoError(t, err)
 		assert.Equal(t, test.expected.CpuPeriod, linuxConfig.GetResources().CpuPeriod, test.name)
 		assert.Equal(t, test.expected.CpuQuota, linuxConfig.GetResources().CpuQuota, test.name)
 		assert.Equal(t, test.expected.CpuShares, linuxConfig.GetResources().CpuShares, test.name)
@@ -329,6 +332,8 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		memoryLow       int64
 		memoryHigh      int64
 	}
+	l1, _ := m.generateLinuxContainerConfig(&pod1.Spec.Containers[0], pod1, new(int64), "", nil, true)
+	l2, _ := m.generateLinuxContainerConfig(&pod2.Spec.Containers[0], pod2, new(int64), "", nil, true)
 	tests := []struct {
 		name     string
 		pod      *v1.Pod
@@ -338,7 +343,7 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 			name: "Request128MBLimit256MB",
 			pod:  pod1,
 			expected: &expectedResult{
-				m.generateLinuxContainerConfig(&pod1.Spec.Containers[0], pod1, new(int64), "", nil, true),
+				l1,
 				128 * 1024 * 1024,
 				int64(float64(256*1024*1024) * m.memoryThrottlingFactor),
 			},
@@ -347,7 +352,7 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 			name: "Request128MBWithoutLimit",
 			pod:  pod2,
 			expected: &expectedResult{
-				m.generateLinuxContainerConfig(&pod2.Spec.Containers[0], pod2, new(int64), "", nil, true),
+				l2,
 				128 * 1024 * 1024,
 				int64(pod2MemoryHigh),
 			},
@@ -355,7 +360,8 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		linuxConfig := m.generateLinuxContainerConfig(&test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
+		linuxConfig, err := m.generateLinuxContainerConfig(&test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
+		assert.NoError(t, err)
 		assert.Equal(t, test.expected.containerConfig, linuxConfig, test.name)
 		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.min"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
 		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.high"], strconv.FormatInt(test.expected.memoryHigh, 10), test.name)
@@ -577,7 +583,8 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target, false)
+			got, err := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target, false)
+			assert.NoError(t, err)
 			if diff := cmp.Diff(tc.want, got.SecurityContext.NamespaceOptions); diff != "" {
 				t.Errorf("%v: diff (-want +got):\n%v", t.Name(), diff)
 			}
@@ -668,7 +675,8 @@ func TestGenerateLinuxContainerConfigSwap(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m.memorySwapBehavior = tc.swapSetting
-			actual := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", nil, false)
+			actual, err := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", nil, false)
+			assert.NoError(t, err)
 			assert.Equal(t, tc.expected, actual.Resources.MemorySwapLimitInBytes, "memory swap config for %s", tc.name)
 		})
 	}

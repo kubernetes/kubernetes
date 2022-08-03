@@ -18399,6 +18399,7 @@ func TestValidateOSFields(t *testing.T) {
 		"SecurityContext.HostIPC",
 		"SecurityContext.HostNetwork",
 		"SecurityContext.HostPID",
+		"SecurityContext.HostUsers",
 		"SecurityContext.RunAsGroup",
 		"SecurityContext.RunAsUser",
 		"SecurityContext.SELinuxOptions",
@@ -20689,6 +20690,172 @@ func TestValidateNonSpecialIP(t *testing.T) {
 			errs := ValidateNonSpecialIP(tc.ip, fp)
 			if len(errs) == 0 {
 				t.Errorf("ValidateNonSpecialIP(%q, ...) = nil; want non-nil (errors)", tc.ip)
+			}
+		})
+	}
+}
+
+func TestValidateHostUsers(t *testing.T) {
+	falseVar := false
+	trueVar := true
+
+	cases := []struct {
+		name    string
+		success bool
+		spec    *core.PodSpec
+	}{
+		{
+			name:    "empty",
+			success: true,
+			spec:    &core.PodSpec{},
+		},
+		{
+			name:    "hostUsers unset",
+			success: true,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{},
+			},
+		},
+		{
+			name:    "hostUsers=false",
+			success: true,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostUsers: &falseVar,
+				},
+			},
+		},
+		{
+			name:    "hostUsers=true",
+			success: true,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostUsers: &trueVar,
+				},
+			},
+		},
+		{
+			name:    "hostUsers=false & volumes",
+			success: true,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostUsers: &falseVar,
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "configmap",
+						VolumeSource: core.VolumeSource{
+							ConfigMap: &core.ConfigMapVolumeSource{
+								LocalObjectReference: core.LocalObjectReference{Name: "configmap"},
+							},
+						},
+					},
+					{
+						Name: "secret",
+						VolumeSource: core.VolumeSource{
+							Secret: &core.SecretVolumeSource{
+								SecretName: "secret",
+							},
+						},
+					},
+					{
+						Name: "downward-api",
+						VolumeSource: core.VolumeSource{
+							DownwardAPI: &core.DownwardAPIVolumeSource{},
+						},
+					},
+					{
+						Name: "proj",
+						VolumeSource: core.VolumeSource{
+							Projected: &core.ProjectedVolumeSource{},
+						},
+					},
+					{
+						Name: "empty-dir",
+						VolumeSource: core.VolumeSource{
+							EmptyDir: &core.EmptyDirVolumeSource{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "hostUsers=false - unsupported volume",
+			success: false,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostUsers: &falseVar,
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "host-path",
+						VolumeSource: core.VolumeSource{
+							HostPath: &core.HostPathVolumeSource{},
+						},
+					},
+				},
+			},
+		},
+		{
+			// It should ignore unsupported volumes with hostUsers=true.
+			name:    "hostUsers=true - unsupported volume",
+			success: true,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostUsers: &trueVar,
+				},
+				Volumes: []core.Volume{
+					{
+						Name: "host-path",
+						VolumeSource: core.VolumeSource{
+							HostPath: &core.HostPathVolumeSource{},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    "hostUsers=false & HostNetwork",
+			success: false,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostUsers:   &falseVar,
+					HostNetwork: true,
+				},
+			},
+		},
+		{
+			name:    "hostUsers=false & HostPID",
+			success: false,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostUsers: &falseVar,
+					HostPID:   true,
+				},
+			},
+		},
+		{
+			name:    "hostUsers=false & HostIPC",
+			success: false,
+			spec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostUsers: &falseVar,
+					HostIPC:   true,
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fPath := field.NewPath("spec")
+
+			allErrs := validateHostUsers(tc.spec, fPath)
+			if !tc.success && len(allErrs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if tc.success && len(allErrs) != 0 {
+				t.Errorf("Unexpected error(s): %v", allErrs)
 			}
 		})
 	}

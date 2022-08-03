@@ -539,6 +539,15 @@ func dropDisabledFields(
 		})
 	}
 
+	// If the feature is disabled and not in use, drop the hostUsers field.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) && !hostUsersInUse(oldPodSpec) {
+		// Drop the field in podSpec only if SecurityContext is not nil.
+		// If it is nil, there is no need to set hostUsers=nil (it will be nil too).
+		if podSpec.SecurityContext != nil {
+			podSpec.SecurityContext.HostUsers = nil
+		}
+	}
+
 	dropDisabledProcMountField(podSpec, oldPodSpec)
 
 	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
@@ -669,6 +678,15 @@ func nodeTaintsPolicyInUse(podSpec *api.PodSpec) bool {
 			return true
 		}
 	}
+	return false
+}
+
+// hostUsersInUse returns true if the pod spec has spec.hostUsers field set.
+func hostUsersInUse(podSpec *api.PodSpec) bool {
+	if podSpec != nil && podSpec.SecurityContext != nil && podSpec.SecurityContext.HostUsers != nil {
+		return true
+	}
+
 	return false
 }
 

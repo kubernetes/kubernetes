@@ -5762,6 +5762,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: hostPID
       type:
         scalar: boolean
+    - name: hostUsers
+      type:
+        scalar: boolean
     - name: hostname
       type:
         scalar: string

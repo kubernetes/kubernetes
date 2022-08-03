@@ -195,7 +195,11 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 		if sc.RunAsGroup != nil && runtime.GOOS != "windows" {
 			lc.SecurityContext.RunAsGroup = &runtimeapi.Int64Value{Value: int64(*sc.RunAsGroup)}
 		}
-		lc.SecurityContext.NamespaceOptions = runtimeutil.NamespacesForPod(pod)
+		namespaceOptions, err := runtimeutil.NamespacesForPod(pod, m.runtimeHelper)
+		if err != nil {
+			return nil, err
+		}
+		lc.SecurityContext.NamespaceOptions = namespaceOptions
 
 		if sc.FSGroup != nil && runtime.GOOS != "windows" {
 			lc.SecurityContext.SupplementalGroups = append(lc.SecurityContext.SupplementalGroups, int64(*sc.FSGroup))

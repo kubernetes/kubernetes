@@ -669,10 +669,23 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			resizeOptions.DeviceStagePath = deviceMountPath
 		}
 
+		kvh, ok := og.GetVolumePluginMgr().Host.(volume.KubeletVolumeHost)
+		if !ok {
+			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume type assertion error", fmt.Errorf("volume host does not implement KubeletVolumeHost interface"))
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		}
+		uid := util.FsUserFrom(volumeToMount.Pod)
+		hostUID, hostGID, err := kvh.GetHostIDsForPod(volumeToMount.Pod, uid, fsGroup)
+		if err != nil {
+			msg := fmt.Sprintf("MountVolume.GetHostIDsForPod failed to find host ID in user namespace (UID: %v GID: %v)", uid, fsGroup)
+			eventErr, detailedErr := volumeToMount.GenerateError(msg, err)
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		}
+
 		// Execute mount
 		mountErr := volumeMounter.SetUp(volume.MounterArgs{
-			FsUser:              util.FsUserFrom(volumeToMount.Pod),
-			FsGroup:             fsGroup,
+			FsUser:              hostUID,
+			FsGroup:             hostGID,
 			DesiredSize:         volumeToMount.DesiredSizeLimit,
 			FSGroupChangePolicy: fsGroupChangePolicy,
 		})

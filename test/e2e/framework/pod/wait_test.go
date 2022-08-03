@@ -183,6 +183,7 @@ INFO: Unexpected error: wait for pod pending-pod running:
                     TopologySpreadConstraints: nil,
                     SetHostnameAsFQDN: nil,
                     OS: nil,
+                    HostUsers: nil,
                 },
                 Status: {
                     Phase: "",

@@ -394,6 +394,10 @@ func (expc *expandController) GetPodsDir() string {
 	return ""
 }
 
+func (expc *expandController) GetHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int64) (hostUID, hostGID *int64, err error) {
+	return nil, nil, nil
+}
+
 func (expc *expandController) GetPodVolumeDir(podUID types.UID, pluginName string, volumeName string) string {
 	return ""
 }
