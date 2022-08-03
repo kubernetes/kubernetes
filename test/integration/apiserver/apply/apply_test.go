@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -3586,5 +3587,268 @@ func TestSubresourceField(t *testing.T) {
 		managedFields[1].Subresource != "scale" ||
 		string(managedFields[1].FieldsV1.Raw) != `{"f:spec":{"f:replicas":{}}}` {
 		t.Fatalf(`Unexpected entry, got: %v`, managedFields[1])
+	}
+}
+
+// K8s has a bug introduced in vX.XX.X which changed the treatment of
+// ObjectReferences from granular to atomic. This means that only one manager
+// may own all fields of the ObjectReference. This resulted in a regression
+// for the common use case of user-specified GVK, and machine-populated UID fields.
+//
+// This is a test to show that clusters  affected by this bug before it was fixed
+// do not experience any friction when updating to a version of k8s which marks
+// the fields' management again as granular.
+func TestApplyFormerlyAtomicFields(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	// Start server with our populated ObjectReference. Since it is atomic its
+	// ownership changed when XX popualted the UID after the user specified the
+	// GVKN.
+
+	// 1. Create PersistentVolume with its claimRef owned by
+	//		kube-controller-manager as in v1.22 - 1.24
+	// 2. Attempt to re-apply the original PersistentVolume which does not
+	//		include uid.
+	// 3. Check that:
+	//		a.) The operaiton was successfu;
+	//		b.) The uid is unchanged
+
+	client, closeFn := setup(t)
+	defer closeFn()
+
+	// old PersistentVolume from last version of k8s with its claimRef owned
+	// atomically
+	oldPersistentVolume := []byte(`
+	{
+		"apiVersion": "v1",
+		"kind": "PersistentVolume",
+		"metadata": {
+			"creationTimestamp": "2022-06-08T23:46:32Z",
+			"finalizers": [
+				"kubernetes.io/pv-protection"
+			],
+			"labels": {
+				"type": "local"
+			},
+			"name": "pv-storage",
+			"uid": "112b18f7-fde6-4e48-aa61-f5168bd576b8"
+		},
+		"spec": {
+			"accessModes": [
+				"ReadWriteOnce"
+			],
+			"capacity": {
+				"storage": "16Mi"
+			},
+			"claimRef": {
+				"apiVersion": "v1",
+				"kind": "PersistentVolumeClaim",
+				"name": "pvc-storage",
+				"namespace": "default",
+				"resourceVersion": "15499",
+				"uid": "2018e302-7b12-406c-9fa2-e52535d29e48"
+			},
+			"hostPath": {
+				"path": "“/tmp/mydata",
+				"type": ""
+			},
+			"persistentVolumeReclaimPolicy": "Retain",
+			"volumeMode": "Filesystem"
+		},
+		"status": {
+			"phase": "Bound"
+		}
+	}`)
+
+	managedFieldsUpdate := []byte(`{
+		"apiVersion": "v1",
+		"kind": "PersistentVolume",
+		"metadata": {
+			"name": "pv-storage",
+			"managedFields": [
+				{
+					"apiVersion": "v1",
+					"fieldsType": "FieldsV1",
+					"fieldsV1": {
+						"f:metadata": {
+							"f:labels": {
+								"f:type": {}
+							}
+						},
+						"f:spec": {
+							"f:accessModes": {},
+							"f:capacity": {
+								"f:storage": {}
+							},
+							"f:hostPath": {
+								"f:path": {}
+							},
+							"f:storageClassName": {}
+						}
+					},
+					"manager": "apply_test",
+					"operation": "Apply",
+					"time": "2022-06-08T23:46:32Z"
+				},
+				{
+					"apiVersion": "v1",
+					"fieldsType": "FieldsV1",
+					"fieldsV1": {
+						"f:status": {
+							"f:phase": {}
+						}
+					},
+					"manager": "kube-controller-manager",
+					"operation": "Update",
+					"subresource": "status",
+					"time": "2022-06-08T23:46:32Z"
+				},
+				{
+					"apiVersion": "v1",
+					"fieldsType": "FieldsV1",
+					"fieldsV1": {
+						"f:spec": {
+							"f:claimRef": {}
+						}
+					},
+					"manager": "kube-controller-manager",
+					"operation": "Update",
+					"time": "2022-06-08T23:46:37Z"
+				}
+			]
+		}
+	}`)
+
+	// Re-applies name and namespace
+	originalPV := []byte(`{
+		"kind": "PersistentVolume",
+		"apiVersion": "v1",
+		"metadata": {
+			"labels": {
+				"type": "local"
+			},
+			"name": "pv-storage",
+		},
+		"spec": {
+			"storageClassName": "",
+			"capacity": {
+				"storage": "16Mi"
+			},
+			"accessModes": [
+				"ReadWriteOnce"
+			],
+			"hostPath": {
+				"path": "“/tmp/mydata"
+			},
+			"claimRef": {
+				"name": "pvc-storage",
+				"namespace": "default"
+			}
+		}
+	}`)
+
+	// Create PV
+	originalObj, err := client.CoreV1().RESTClient().
+		Post().
+		Param("fieldManager", "apply_test").
+		Resource("persistentvolumes").
+		Body(oldPersistentVolume).
+		Do(context.TODO()).
+		Get()
+
+	if err != nil {
+		t.Fatalf("Failed to apply object: %v", err)
+	} else if _, ok := originalObj.(*v1.PersistentVolume); !ok {
+		t.Fatalf("returned object is incorrect type: %t", originalObj)
+	}
+
+	// Directly set managed fields to object
+	newObj, err := client.CoreV1().RESTClient().
+		Patch(types.StrategicMergePatchType).
+		Name("pv-storage").
+		Param("fieldManager", "apply_test").
+		Resource("persistentvolumes").
+		Body(managedFieldsUpdate).
+		Do(context.TODO()).
+		Get()
+
+	if err != nil {
+		t.Fatalf("Failed to apply object: %v", err)
+	} else if _, ok := newObj.(*v1.PersistentVolume); !ok {
+		t.Fatalf("returned object is incorrect type: %t", newObj)
+	}
+
+	// Is initialized, attempt to write to fields underneath
+	//	claimRef ObjectReference.
+	newObj, err = client.CoreV1().RESTClient().
+		Patch(types.ApplyPatchType).
+		Name("pv-storage").
+		Param("fieldManager", "apply_test").
+		Resource("persistentvolumes").
+		Body(originalPV).
+		Do(context.TODO()).
+		Get()
+
+	if err != nil {
+		t.Fatalf("Failed to apply object: %v", err)
+	} else if _, ok := newObj.(*v1.PersistentVolume); !ok {
+		t.Fatalf("returned object is incorrect type: %t", newObj)
+	}
+
+	// Test that bug is fixed by showing no error and that uid is not cleared.
+	if !reflect.DeepEqual(originalObj.(*v1.PersistentVolume).Spec.ClaimRef, newObj.(*v1.PersistentVolume).Spec.ClaimRef) {
+		t.Fatalf("claimRef changed unexpectedly")
+	}
+
+	// Expect that we know own name/namespace fields
+	// All other fields unowned
+	// Make sure apply_test now owns claimRef.UID and that kube-controller-manager owns
+	// claimRef (but its ownership is not respected due to new granular structType)
+	managedFields := newObj.(*v1.PersistentVolume).ManagedFields
+	var expectedManagedFields []metav1.ManagedFieldsEntry
+	expectedManagedFieldsString := []byte(`[
+		{
+			"apiVersion": "v1",
+			"fieldsType": "FieldsV1",
+			"fieldsV1": {"f:metadata":{"f:labels":{"f:type":{}}},"f:spec":{"f:accessModes":{},"f:capacity":{"f:storage":{}},"f:claimRef":{"f:name":{},"f:namespace":{}},"f:hostPath":{"f:path":{}},"f:storageClassName":{}}},
+			"manager": "apply_test",
+			"operation": "Apply",
+			"time": "2022-06-08T23:46:32Z"
+		},
+		{
+			"apiVersion": "v1",
+			"fieldsType": "FieldsV1",
+			"fieldsV1": {"f:status":{"f:phase":{}}},
+			"manager": "kube-controller-manager",
+			"operation": "Update",
+			"subresource": "status",
+			"time": "2022-06-08T23:46:32Z"
+		},
+		{
+			"apiVersion": "v1",
+			"fieldsType": "FieldsV1",
+			"fieldsV1": {"f:spec":{"f:claimRef":{}}},
+			"manager": "kube-controller-manager",
+			"operation": "Update",
+			"time": "2022-06-08T23:46:37Z"
+		}
+	]`)
+
+	err = json.Unmarshal(expectedManagedFieldsString, &expectedManagedFields)
+	if err != nil {
+		t.Fatalf("unexpectly failed to decode expected managed fields")
+	}
+
+	// Wipe timestamps before comparison
+	for i := range expectedManagedFields {
+		expectedManagedFields[i].Time = nil
+	}
+
+	for i := range managedFields {
+		managedFields[i].Time = nil
+	}
+
+	if !reflect.DeepEqual(expectedManagedFields, managedFields) {
+		t.Fatalf("unexpected managed fields: %v", cmp.Diff(expectedManagedFields, managedFields))
 	}
 }
