@@ -4,6 +4,15 @@ resources:
   - resources:
       - secrets
     providers:
+      - kms:
+          apiVersion: v2
+          name: testproviderv2
+          endpoint: unix:///tmp/testprovider.sock
+          cachesize: 10
+      - kms:
+          name: testprovider
+          endpoint: unix:///tmp/testprovider.sock
+          cachesize: 10
       - secretbox:
           keys:
             - name: key1
@@ -14,15 +23,6 @@ resources:
               secret: c2VjcmV0IGlzIHNlY3VyZQ==
             - name: key2
               secret: dGhpcyBpcyBwYXNzd29yZA==
-      - kms:
-          name: testprovider
-          endpoint: unix:///tmp/testprovider.sock
-          cachesize: 10
-      - kms:
-          apiVersion: v2
-          name: testproviderv2
-          endpoint: unix:///tmp/testprovider.sock
-          cachesize: 10
       - identity: {}
       - aesgcm:
           keys:

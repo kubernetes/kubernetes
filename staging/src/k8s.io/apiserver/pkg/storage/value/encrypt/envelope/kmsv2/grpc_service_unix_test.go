@@ -1,8 +1,5 @@
-//go:build !windows
-// +build !windows
-
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,17 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package envelope transforms values for storage at rest using a Envelope provider
-package envelope
+// Package kmsv2 transforms values for storage at rest using a Envelope v2 provider
+package kmsv2
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 
-	mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v1beta1"
+	mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing/v2alpha1"
 
 	"k8s.io/apimachinery/pkg/util/uuid"
 )
@@ -73,13 +71,13 @@ func TestKMSPluginLateStart(t *testing.T) {
 	defer f.CleanUp()
 
 	data := []byte("test data")
-	_, err = service.Encrypt(data)
+	uid := string(uuid.NewUUID())
+	_, err = service.Encrypt(context.Background(), uid, data)
 	if err != nil {
 		t.Fatalf("failed when execute encrypt, error: %v", err)
 	}
 }
 
-// TestTimeout tests behaviour of the kube-apiserver based on the supplied timeout and delayed start of kms-plugin.
 func TestTimeouts(t *testing.T) {
 	t.Parallel()
 	var testCases = []struct {
@@ -123,6 +121,7 @@ func TestTimeouts(t *testing.T) {
 				service         Service
 				err             error
 				data            = []byte("test data")
+				uid             = string(uuid.NewUUID())
 				kubeAPIServerWG sync.WaitGroup
 				kmsPluginWG     sync.WaitGroup
 				testCompletedWG sync.WaitGroup
@@ -166,7 +165,7 @@ func TestTimeouts(t *testing.T) {
 			}()
 
 			kubeAPIServerWG.Wait()
-			_, err = service.Encrypt(data)
+			_, err = service.Encrypt(context.Background(), uid, data)
 
 			if err == nil && tt.wantErr != "" {
 				t.Fatalf("got nil, want %s", tt.wantErr)
@@ -191,6 +190,7 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 		timeout    = 30 * time.Second
 		blackOut   = 1 * time.Second
 		data       = []byte("test data")
+		uid        = string(uuid.NewUUID())
 		endpoint   = newEndpoint()
 		encryptErr error
 	)
@@ -210,7 +210,8 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 	}
 	defer destroyService(service)
 
-	_, err = service.Encrypt(data)
+	ctx := context.Background()
+	_, err = service.Encrypt(ctx, uid, data)
 	if err != nil {
 		t.Fatalf("failed when execute encrypt, error: %v", err)
 	}
@@ -228,7 +229,7 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 		// Call service to encrypt data.
 		t.Log("Sending encrypt request")
 		wg1.Done()
-		_, err := service.Encrypt(data)
+		_, err := service.Encrypt(ctx, uid, data)
 		if err != nil {
 			encryptErr = fmt.Errorf("failed when executing encrypt, error: %v", err)
 		}
@@ -254,50 +255,6 @@ func TestIntermittentConnectionLoss(t *testing.T) {
 	}
 }
 
-func TestUnsupportedVersion(t *testing.T) {
-	t.Parallel()
-	ver := "invalid"
-	data := []byte("test data")
-	wantErr := fmt.Errorf(versionErrorf, ver, kmsapiVersion)
-	endpoint := newEndpoint()
-
-	f, err := mock.NewBase64Plugin(endpoint.path)
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %ver", err)
-	}
-	f.SetVersion(ver)
-	if err := f.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer f.CleanUp()
-
-	s, err := NewGRPCService(endpoint.endpoint, 1*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer destroyService(s)
-
-	// Encrypt
-	_, err = s.Encrypt(data)
-	if err == nil || err.Error() != wantErr.Error() {
-		t.Errorf("got err: %ver, want: %ver", err, wantErr)
-	}
-
-	destroyService(s)
-
-	s, err = NewGRPCService(endpoint.endpoint, 1*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer destroyService(s)
-
-	// Decrypt
-	_, err = s.Decrypt(data)
-	if err == nil || err.Error() != wantErr.Error() {
-		t.Errorf("got err: %ver, want: %ver", err, wantErr)
-	}
-}
-
 // Normal encryption and decryption operation.
 func TestGRPCService(t *testing.T) {
 	t.Parallel()
@@ -319,15 +276,18 @@ func TestGRPCService(t *testing.T) {
 	}
 	defer destroyService(service)
 
+	ctx := context.Background()
 	// Call service to encrypt data.
 	data := []byte("test data")
-	cipher, err := service.Encrypt(data)
+	uid := string(uuid.NewUUID())
+	resp, err := service.Encrypt(ctx, uid, data)
 	if err != nil {
 		t.Fatalf("failed when execute encrypt, error: %v", err)
 	}
 
+	keyID := "1"
 	// Call service to decrypt data.
-	result, err := service.Decrypt(cipher)
+	result, err := service.Decrypt(ctx, uid, &DecryptRequest{Ciphertext: resp.Ciphertext, KeyID: keyID})
 	if err != nil {
 		t.Fatalf("failed when execute decrypt, error: %v", err)
 	}
@@ -358,6 +318,7 @@ func TestGRPCServiceConcurrentAccess(t *testing.T) {
 	}
 	defer destroyService(service)
 
+	ctx := context.Background()
 	var wg sync.WaitGroup
 	n := 100
 	wg.Add(n)
@@ -366,13 +327,15 @@ func TestGRPCServiceConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 			// Call service to encrypt data.
 			data := []byte("test data")
-			cipher, err := service.Encrypt(data)
+			uid := string(uuid.NewUUID())
+			resp, err := service.Encrypt(ctx, uid, data)
 			if err != nil {
 				t.Errorf("failed when execute encrypt, error: %v", err)
 			}
 
+			keyID := "1"
 			// Call service to decrypt data.
-			result, err := service.Decrypt(cipher)
+			result, err := service.Decrypt(ctx, uid, &DecryptRequest{Ciphertext: resp.Ciphertext, KeyID: keyID})
 			if err != nil {
 				t.Errorf("failed when execute decrypt, error: %v", err)
 			}

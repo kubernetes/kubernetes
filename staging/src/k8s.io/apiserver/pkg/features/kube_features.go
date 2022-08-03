@@ -107,6 +107,13 @@ const (
 	// Allows for updating watchcache resource version with progress notify events.
 	EfficientWatchResumption featuregate.Feature = "EfficientWatchResumption"
 
+	// owner: @aramase
+	// kep: http://kep.k8s.io/3299
+	// alpha: v1.25
+	//
+	// Enables KMS v2 API for encryption at rest.
+	KMSv2 featuregate.Feature = "KMSv2"
+
 	// owner: @jiahuif
 	// kep: http://kep.k8s.io/2887
 	// alpha: v1.23
@@ -204,6 +211,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DryRun: {Default: true, PreRelease: featuregate.GA},
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+
+	KMSv2: {Default: false, PreRelease: featuregate.Alpha},
 
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 

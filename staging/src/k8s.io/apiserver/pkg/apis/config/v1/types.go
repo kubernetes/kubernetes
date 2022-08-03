@@ -86,6 +86,9 @@ type IdentityConfiguration struct{}
 
 // KMSConfiguration contains the name, cache size and path to configuration file for a KMS based envelope transformer.
 type KMSConfiguration struct {
+	// apiVersion of KeyManagementService
+	// +optional
+	APIVersion string `json:"apiVersion"`
 	// name is the name of the KMS plugin to be used.
 	Name string `json:"name"`
 	// cachesize is the maximum number of secrets which are cached in memory. The default value is 1000.
