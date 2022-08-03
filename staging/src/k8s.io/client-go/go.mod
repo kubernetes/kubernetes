@@ -24,7 +24,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
 	github.com/imdario/mergo v0.3.5
-	github.com/kcp-dev/logicalcluster/v2 v2.0.0-alpha.0
+	github.com/kcp-dev/logicalcluster/v2 v2.0.0-alpha.1
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/spf13/pflag v1.0.5

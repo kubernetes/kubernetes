@@ -78,12 +78,15 @@ func (n Name) String() string {
 // Object is a local interface representation of the Kubernetes metav1.Object, to avoid dependencies on
 // k8s.io/apimachinery.
 type Object interface {
-	GetZZZ_DeprecatedClusterName() string
+	GetAnnotations() map[string]string
 }
+
+// AnnotationKey is the name of the annotation key used to denote an object's logical cluster.
+const AnnotationKey = "kcp.dev/cluster"
 
 // From returns the logical cluster name for obj.
 func From(obj Object) Name {
-	return Name{obj.GetZZZ_DeprecatedClusterName()}
+	return Name{obj.GetAnnotations()[AnnotationKey]}
 }
 
 // Parent returns the parent logical cluster name of the given logical cluster name.
