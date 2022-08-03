@@ -36,7 +36,7 @@ const (
 
 var stringToBuiltinPluginTypeMap map[string]BuiltinPluginType
 
-func init() {
+func init() { //nolint:gochecknoinits
 	stringToBuiltinPluginTypeMap = makeStringToBuiltinPluginTypeMap()
 }
 

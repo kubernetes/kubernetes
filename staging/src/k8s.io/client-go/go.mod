@@ -15,7 +15,7 @@ require (
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
-	github.com/imdario/mergo v0.3.5
+	github.com/imdario/mergo v0.3.6
 	github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0

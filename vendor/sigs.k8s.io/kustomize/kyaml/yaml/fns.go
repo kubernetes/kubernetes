@@ -541,6 +541,9 @@ func (l PathGetter) getFilter(part, nextPart string, fieldPath *[]string) (Filte
 	case part == "-":
 		// part is a hyphen
 		return GetElementByIndex(-1), nil
+	case part == "*":
+		// PathGetter is not support for wildcard matching
+		return nil, errors.Errorf("wildcard is not supported in PathGetter")
 	case IsListIndex(part):
 		// part is surrounded by brackets
 		return l.elemFilter(part)
@@ -552,7 +555,6 @@ func (l PathGetter) getFilter(part, nextPart string, fieldPath *[]string) (Filte
 }
 
 func (l PathGetter) elemFilter(part string) (Filter, error) {
-	var match *RNode
 	name, value, err := SplitIndexNameValue(part)
 	if err != nil {
 		return nil, errors.Wrap(err)
@@ -567,10 +569,9 @@ func (l PathGetter) elemFilter(part string) (Filter, error) {
 		// append a ScalarNode
 		elem = NewScalarRNode(value)
 		elem.YNode().Style = l.Style
-		match = elem
 	} else {
 		// append a MappingNode
-		match = NewRNode(&yaml.Node{Kind: yaml.ScalarNode, Value: value, Style: l.Style})
+		match := NewRNode(&yaml.Node{Kind: yaml.ScalarNode, Value: value, Style: l.Style})
 		elem = NewRNode(&yaml.Node{
 			Kind:    yaml.MappingNode,
 			Content: []*yaml.Node{{Kind: yaml.ScalarNode, Value: name}, match.YNode()},

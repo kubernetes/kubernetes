@@ -41,10 +41,11 @@ The utility will yield Unicode-friendly trees. The output is predictable and the
 
 ## Use cases
 
-When you want to render a complex data structure:
+### When you want to render a complex data structure:
 
 ```go
 func main() {
+    // to add a custom root name use `treeprint.NewWithRoot()` instead
     tree := treeprint.New()
 
     // create a new branch in the root
@@ -86,10 +87,11 @@ Will give you:
 └── outernode
 ```
 
-Another case, when you have to make a tree where any leaf may have some meta-data (as `tree` is capable of it):
+### Another case, when you have to make a tree where any leaf may have some meta-data (as `tree` is capable of it):
 
 ```go
 func main {
+    // to add a custom root name use `treeprint.NewWithRoot()` instead
     tree := treeprint.New()
 
     tree.AddNode("Dockerfile")
@@ -122,6 +124,30 @@ Output:
 └── [122K]  testtool.a
 ```
 
+### Iterating over the tree nodes
+
+```go
+tree := New()
+
+one := tree.AddBranch("one")
+one.AddNode("one-subnode1").AddNode("one-subnode2")
+one.AddBranch("two").AddNode("two-subnode1").AddNode("two-subnode2").
+    AddBranch("three").AddNode("three-subnode1").AddNode("three-subnode2")
+tree.AddNode("outernode")
+
+// if you need to iterate over the whole tree
+// call `VisitAll` from your top root node.
+tree.VisitAll(func(item *node) {
+    if len(item.Nodes) > 0 {
+        // branch nodes
+        fmt.Println(item.Value) // will output one, two, three
+    } else {
+        // leaf nodes
+        fmt.Println(item.Value) // will output one-*, two-*, three-* and outernode
+    }
+})
+
+```
 Yay! So it works.
 
 ## License

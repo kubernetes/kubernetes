@@ -34,7 +34,7 @@ func (c *Filter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 }
 
 func (c *Filter) Run(reader io.Reader, writer io.Writer) error {
-	cmd := exec.Command(c.Path, c.Args...)
+	cmd := exec.Command(c.Path, c.Args...) // nolint:gosec
 	cmd.Stdin = reader
 	cmd.Stdout = writer
 	cmd.Stderr = os.Stderr

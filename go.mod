@@ -189,7 +189,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6 // indirect
-	github.com/imdario/mergo v0.3.5 // indirect
+	github.com/imdario/mergo v0.3.6 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
@@ -230,7 +230,7 @@ require (
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
-	github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca // indirect
+	github.com/xlab/treeprint v1.1.0 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.etcd.io/etcd/client/v2 v2.305.4 // indirect
 	go.etcd.io/etcd/pkg/v3 v3.5.4 // indirect
@@ -256,9 +256,9 @@ require (
 	gopkg.in/warnings.v0 v0.1.1 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.32 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
-	sigs.k8s.io/kustomize/api v0.11.4 // indirect
-	sigs.k8s.io/kustomize/kustomize/v4 v4.5.4 // indirect
-	sigs.k8s.io/kustomize/kyaml v0.13.6 // indirect
+	sigs.k8s.io/kustomize/api v0.12.1 // indirect
+	sigs.k8s.io/kustomize/kustomize/v4 v4.5.7 // indirect
+	sigs.k8s.io/kustomize/kyaml v0.13.9 // indirect
 )
 
 replace (
@@ -409,7 +409,7 @@ replace (
 	github.com/heketi/heketi => github.com/heketi/heketi v10.3.0+incompatible
 	github.com/heketi/tests => github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6
 	github.com/ianlancetaylor/demangle => github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639
-	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
+	github.com/imdario/mergo => github.com/imdario/mergo v0.3.6
 	github.com/inconshreveable/mousetrap => github.com/inconshreveable/mousetrap v1.0.0
 	github.com/ishidawataru/sctp => github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
 	github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.4.0
@@ -499,7 +499,7 @@ replace (
 	github.com/vishvananda/netns => github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.20.3
 	github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
-	github.com/xlab/treeprint => github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca
+	github.com/xlab/treeprint => github.com/xlab/treeprint v1.1.0
 	github.com/yuin/goldmark => github.com/yuin/goldmark v1.4.1
 	go.etcd.io/bbolt => go.etcd.io/bbolt v1.3.6
 	go.etcd.io/etcd/api/v3 => go.etcd.io/etcd/api/v3 v3.5.4
@@ -605,10 +605,10 @@ replace (
 	rsc.io/pdf => rsc.io/pdf v0.1.1
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.32
 	sigs.k8s.io/json => sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2
-	sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.11.4
-	sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.10.6
-	sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.5.4
-	sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.13.6
+	sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.12.1
+	sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.10.9
+	sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.5.7
+	sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.13.9
 	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )
