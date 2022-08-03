@@ -70,6 +70,7 @@ var (
 		"kubernetes.io/storageos": "The StorageOS volume provider is deprecated and will be removed in a future release",
 		"kubernetes.io/quobyte":   "The Quobyte volume provider is deprecated and will be removed in a future release",
 		"kubernetes.io/flocker":   "The Flocker volume provider is deprecated and will be removed in a future release",
+		"kubernetes.io/glusterfs": "The GlusterFS volume provider is deprecated and will be removed soon after in a subsequent release",
 	}
 )
 
@@ -1043,11 +1044,11 @@ func (pm *VolumePluginMgr) Run(stopCh <-chan struct{}) {
 // plugin implementations.  The following attributes can be overridden per
 // plugin via configuration:
 //
-// 1.  pod.Spec.Volumes[0].VolumeSource must be overridden.  Recycler
+//  1. pod.Spec.Volumes[0].VolumeSource must be overridden.  Recycler
 //     implementations without a valid VolumeSource will fail.
-// 2.  pod.GenerateName helps distinguish recycler pods by name.  Recommended.
+//  2. pod.GenerateName helps distinguish recycler pods by name.  Recommended.
 //     Default is "pv-recycler-".
-// 3.  pod.Spec.ActiveDeadlineSeconds gives the recycler pod a maximum timeout
+//  3. pod.Spec.ActiveDeadlineSeconds gives the recycler pod a maximum timeout
 //     before failing.  Recommended.  Default is 60 seconds.
 //
 // See HostPath and NFS for working recycler examples

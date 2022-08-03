@@ -590,10 +590,6 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				func() *framework.QueuedPodInfo {
 					return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(item.sendPod)}
 				},
-				func(p *framework.QueuedPodInfo, err error) {
-					gotPod = p.Pod
-					gotError = err
-				},
 				nil,
 				internalqueue.NewTestQueue(ctx, nil),
 				profile.Map{
@@ -604,6 +600,13 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				0)
 			s.SchedulePod = func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 				return item.mockResult.result, item.mockResult.err
+			}
+			s.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo) {
+				gotPod = p.Pod
+				gotError = err
+
+				msg := truncateMessage(err.Error())
+				fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 			}
 			called := make(chan struct{})
 			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
@@ -1756,7 +1759,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						Operator: metav1.LabelSelectorOpExists,
 					},
 				},
-			}, nil, nil, nil).Obj(),
+			}, nil, nil, nil, nil).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("pod1").UID("pod1").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
 			},
@@ -1783,7 +1786,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						Operator: metav1.LabelSelectorOpExists,
 					},
 				},
-			}, nil, nil, nil).Obj(),
+			}, nil, nil, nil, nil).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("pod1a").UID("pod1a").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
 				st.MakePod().Name("pod1b").UID("pod1b").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
@@ -2026,7 +2029,6 @@ func TestSchedulerSchedulePod(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				snapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			informerFactory.Start(ctx.Done())
@@ -2202,10 +2204,10 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 }
 
 // The point of this test is to show that you:
-// - get the same priority for a zero-request pod as for a pod with the defaults requests,
-//   both when the zero-request pod is already on the node and when the zero-request pod
-//   is the one being scheduled.
-// - don't get the same score no matter what we schedule.
+//   - get the same priority for a zero-request pod as for a pod with the defaults requests,
+//     both when the zero-request pod is already on the node and when the zero-request pod
+//     is the one being scheduled.
+//   - don't get the same score no matter what we schedule.
 func TestZeroRequest(t *testing.T) {
 	// A pod with no resources. We expect spreading to count it as having the default resources.
 	noResources := v1.PodSpec{
@@ -2321,7 +2323,6 @@ func TestZeroRequest(t *testing.T) {
 			}
 
 			scheduler := newScheduler(
-				nil,
 				nil,
 				nil,
 				nil,
@@ -2512,7 +2513,6 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				snapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 
@@ -2568,7 +2568,6 @@ func makeScheduler(nodes []*v1.Node) *Scheduler {
 
 	s := newScheduler(
 		cache,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -2671,9 +2670,6 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 		func() *framework.QueuedPodInfo {
 			return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(clientcache.Pop(queuedPodStore).(*v1.Pod))}
 		},
-		func(p *framework.QueuedPodInfo, err error) {
-			errChan <- err
-		},
 		nil,
 		schedulingQueue,
 		profile.Map{
@@ -2682,6 +2678,12 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 		client,
 		internalcache.NewEmptySnapshot(),
 		schedulerapi.DefaultPercentageOfNodesToScore)
+	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo) {
+		errChan <- err
+
+		msg := truncateMessage(err.Error())
+		fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+	}
 	return sched, bindingChan, errChan
 }
 

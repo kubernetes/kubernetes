@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -1201,7 +1201,7 @@ func MultiplePVMountSingleNodeCheck(client clientset.Interface, timeouts *framew
 
 	pv2, pvc2, err := e2epv.CreatePVCPV(client, timeouts, pv2Config, pvc2Config, claim.Namespace, true)
 	framework.ExpectNoError(err, "PVC, PV creation failed")
-	framework.Logf("Created PVC %s/%s and PV %s in namespace %s", pvc2.Namespace, pvc2.Name, pv2.Name)
+	framework.Logf("Created PVC %s/%s and PV %s", pvc2.Namespace, pvc2.Name, pv2.Name)
 
 	pod2Config := e2epod.Config{
 		NS:            pvc2.Namespace,

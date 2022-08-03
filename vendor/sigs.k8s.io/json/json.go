@@ -84,6 +84,8 @@ const (
 // and a list of the strict failures (if any) are returned. If no `strictOptions` are selected,
 // all supported strict checks are performed.
 //
+// Strict errors returned will implement the FieldError interface for the specific erroneous fields.
+//
 // Currently supported strict checks are:
 // - DisallowDuplicateFields: ensure the data contains no duplicate fields
 // - DisallowUnknownFields: ensure the data contains no unknown fields (when decoding into typed structs)
@@ -136,4 +138,13 @@ func SyntaxErrorOffset(err error) (isSyntaxError bool, offset int64) {
 	default:
 		return false, 0
 	}
+}
+
+// FieldError is an error that provides access to the path of the erroneous field
+type FieldError interface {
+	error
+	// FieldPath provides the full path of the erroneous field within the json object.
+	FieldPath() string
+	// SetFieldPath updates the path of the erroneous field output in the error message.
+	SetFieldPath(path string)
 }

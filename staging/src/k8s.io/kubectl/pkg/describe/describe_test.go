@@ -102,6 +102,30 @@ func TestDescribePod(t *testing.T) {
 	}
 }
 
+func TestDescribePodServiceAccount(t *testing.T) {
+	fake := fake.NewSimpleClientset(&corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: corev1.PodSpec{
+			ServiceAccountName: "fooaccount",
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("foo", "bar", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "Service Account:") {
+		t.Errorf("unexpected out: %s", out)
+	}
+	if !strings.Contains(out, "fooaccount") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribePodEphemeralContainers(t *testing.T) {
 	fake := fake.NewSimpleClientset(&corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -375,6 +399,86 @@ func TestDescribePodPriority(t *testing.T) {
 	}
 	if !strings.Contains(out, "high-priority") || !strings.Contains(out, "1000") {
 		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePodRuntimeClass(t *testing.T) {
+	runtimeClassNames := []string{"test1", ""}
+	testCases := []struct {
+		name     string
+		pod      *corev1.Pod
+		expect   []string
+		unexpect []string
+	}{
+		{
+			name: "test1",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					RuntimeClassName: &runtimeClassNames[0],
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+				"Runtime Class Name", "test1",
+			},
+			unexpect: []string{},
+		},
+		{
+			name: "test2",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{
+					RuntimeClassName: &runtimeClassNames[1],
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+			},
+			unexpect: []string{
+				"Runtime Class Name",
+			},
+		},
+		{
+			name: "test3",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bar",
+				},
+				Spec: corev1.PodSpec{},
+			},
+			expect: []string{
+				"Name", "bar",
+			},
+			unexpect: []string{
+				"Runtime Class Name",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			fake := fake.NewSimpleClientset(testCase.pod)
+			c := &describeClient{T: t, Interface: fake}
+			d := PodDescriber{c}
+			out, err := d.Describe("", "bar", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			for _, expected := range testCase.expect {
+				if !strings.Contains(out, expected) {
+					t.Errorf("expected to find %q in output: %q", expected, out)
+				}
+			}
+			for _, unexpected := range testCase.unexpect {
+				if strings.Contains(out, unexpected) {
+					t.Errorf("unexpected to find %q in output: %q", unexpected, out)
+				}
+			}
+		})
 	}
 }
 

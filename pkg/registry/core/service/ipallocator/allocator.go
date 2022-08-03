@@ -65,18 +65,18 @@ func (e *ErrNotInRange) Error() string {
 //
 // The internal structure of the range is:
 //
-//   For CIDR 10.0.0.0/24
-//   254 addresses usable out of 256 total (minus base and broadcast IPs)
-//     The number of usable addresses is r.max
+//	For CIDR 10.0.0.0/24
+//	254 addresses usable out of 256 total (minus base and broadcast IPs)
+//	  The number of usable addresses is r.max
 //
-//   CIDR base IP          CIDR broadcast IP
-//   10.0.0.0                     10.0.0.255
-//   |                                     |
-//   0 1 2 3 4 5 ...         ... 253 254 255
-//     |                              |
-//   r.base                     r.base + r.max
-//     |                              |
-//   offset #0 of r.allocated   last offset of r.allocated
+//	CIDR base IP          CIDR broadcast IP
+//	10.0.0.0                     10.0.0.255
+//	|                                     |
+//	0 1 2 3 4 5 ...         ... 253 254 255
+//	  |                              |
+//	r.base                     r.base + r.max
+//	  |                              |
+//	offset #0 of r.allocated   last offset of r.allocated
 type Range struct {
 	net *net.IPNet
 	// base is a cached version of the start IP in the CIDR range as a *big.Int

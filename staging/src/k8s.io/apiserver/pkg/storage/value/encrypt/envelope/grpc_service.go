@@ -29,6 +29,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 )
@@ -64,7 +65,7 @@ func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error)
 	s := &gRPCService{callTimeout: callTimeout}
 	s.connection, err = grpc.Dial(
 		addr,
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithUnaryInterceptor(s.interceptor),
 		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
 		grpc.WithContextDialer(

@@ -96,14 +96,18 @@ func (p *ParserATNSimulator) AdaptivePredict(input TokenStream, decision int, ou
 	// Now we are certain to have a specific decision's DFA
 	// But, do we still need an initial state?
 	var s0 *DFAState
+	p.atn.stateMu.RLock()
 	if dfa.getPrecedenceDfa() {
+		p.atn.edgeMu.RLock()
 		// the start state for a precedence DFA depends on the current
 		// parser precedence, and is provided by a DFA method.
 		s0 = dfa.getPrecedenceStartState(p.parser.GetPrecedence())
+		p.atn.edgeMu.RUnlock()
 	} else {
 		// the start state for a "regular" DFA is just s0
 		s0 = dfa.getS0()
 	}
+	p.atn.stateMu.RUnlock()
 
 	if s0 == nil {
 		if outerContext == nil {
@@ -114,21 +118,10 @@ func (p *ParserATNSimulator) AdaptivePredict(input TokenStream, decision int, ou
 				" exec LA(1)==" + p.getLookaheadName(input) +
 				", outerContext=" + outerContext.String(p.parser.GetRuleNames(), nil))
 		}
-		// If p is not a precedence DFA, we check the ATN start state
-		// to determine if p ATN start state is the decision for the
-		// closure block that determines whether a precedence rule
-		// should continue or complete.
-
-		t2 := dfa.atnStartState
-		t, ok := t2.(*StarLoopEntryState)
-		if !dfa.getPrecedenceDfa() && ok {
-			if t.precedenceRuleDecision {
-				dfa.setPrecedenceDfa(true)
-			}
-		}
 		fullCtx := false
 		s0Closure := p.computeStartState(dfa.atnStartState, RuleContextEmpty, fullCtx)
 
+		p.atn.stateMu.Lock()
 		if dfa.getPrecedenceDfa() {
 			// If p is a precedence DFA, we use applyPrecedenceFilter
 			// to convert the computed start state to a precedence start
@@ -139,12 +132,16 @@ func (p *ParserATNSimulator) AdaptivePredict(input TokenStream, decision int, ou
 			dfa.s0.configs = s0Closure
 			s0Closure = p.applyPrecedenceFilter(s0Closure)
 			s0 = p.addDFAState(dfa, NewDFAState(-1, s0Closure))
+			p.atn.edgeMu.Lock()
 			dfa.setPrecedenceStartState(p.parser.GetPrecedence(), s0)
+			p.atn.edgeMu.Unlock()
 		} else {
 			s0 = p.addDFAState(dfa, NewDFAState(-1, s0Closure))
 			dfa.setS0(s0)
 		}
+		p.atn.stateMu.Unlock()
 	}
+
 	alt := p.execATN(dfa, s0, input, index, outerContext)
 	if ParserATNSimulatorDebug {
 		fmt.Println("DFA after predictATN: " + dfa.String(p.parser.GetLiteralNames(), nil))
@@ -295,11 +292,16 @@ func (p *ParserATNSimulator) execATN(dfa *DFA, s0 *DFAState, input TokenStream, 
 // already cached
 
 func (p *ParserATNSimulator) getExistingTargetState(previousD *DFAState, t int) *DFAState {
-	edges := previousD.getEdges()
-	if edges == nil || t+1 < 0 || t+1 >= len(edges) {
+	if t+1 < 0 {
 		return nil
 	}
 
+	p.atn.edgeMu.RLock()
+	defer p.atn.edgeMu.RUnlock()
+	edges := previousD.getEdges()
+	if edges == nil || t+1 >= len(edges) {
+		return nil
+	}
 	return previousD.getIthEdge(t + 1)
 }
 
@@ -568,7 +570,7 @@ func (p *ParserATNSimulator) computeReachSet(closure ATNConfigSet, t int, fullCt
 	//
 	if reach == nil {
 		reach = NewBaseATNConfigSet(fullCtx)
-		closureBusy := NewArray2DHashSet(nil, nil)
+		closureBusy := newArray2DHashSet(nil, nil)
 		treatEOFAsEpsilon := t == TokenEOF
 		amount := len(intermediate.configs)
 		for k := 0; k < amount; k++ {
@@ -663,7 +665,7 @@ func (p *ParserATNSimulator) computeStartState(a ATNState, ctx RuleContext, full
 	for i := 0; i < len(a.GetTransitions()); i++ {
 		target := a.GetTransitions()[i].getTarget()
 		c := NewBaseATNConfig6(target, i+1, initialContext)
-		closureBusy := NewArray2DHashSet(nil, nil)
+		closureBusy := newArray2DHashSet(nil, nil)
 		p.closure(c, configs, closureBusy, true, fullCtx, false)
 	}
 	return configs
@@ -1446,14 +1448,18 @@ func (p *ParserATNSimulator) addDFAEdge(dfa *DFA, from *DFAState, t int, to *DFA
 	if to == nil {
 		return nil
 	}
+	p.atn.stateMu.Lock()
 	to = p.addDFAState(dfa, to) // used existing if possible not incoming
+	p.atn.stateMu.Unlock()
 	if from == nil || t < -1 || t > p.atn.maxTokenType {
 		return to
 	}
+	p.atn.edgeMu.Lock()
 	if from.getEdges() == nil {
 		from.setEdges(make([]*DFAState, p.atn.maxTokenType+1+1))
 	}
 	from.setIthEdge(t+1, to) // connect
+	p.atn.edgeMu.Unlock()
 
 	if ParserATNSimulatorDebug {
 		var names []string

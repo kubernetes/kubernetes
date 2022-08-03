@@ -19,6 +19,8 @@ package customresource
 import (
 	"context"
 
+	"k8s.io/kube-openapi/pkg/validation/validate"
+
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel"
@@ -37,7 +39,6 @@ import (
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
@@ -60,7 +61,7 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 	celValidators := map[string]*cel.Validator{}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CustomResourceValidationExpressions) {
 		for name, s := range structuralSchemas {
-			v := cel.NewValidator(s, cel.PerCallLimit) // CEL programs are compiled and cached here
+			v := cel.NewValidator(s, true, cel.PerCallLimit) // CEL programs are compiled and cached here
 			if v != nil {
 				celValidators[name] = v
 			}

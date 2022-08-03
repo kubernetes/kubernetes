@@ -24,7 +24,7 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-//  Storage version of a specific resource.
+// Storage version of a specific resource.
 type StorageVersion struct {
 	metav1.TypeMeta `json:",inline"`
 	// The name is <group>.<resource>.

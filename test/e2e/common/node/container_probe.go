@@ -40,7 +40,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -615,7 +615,7 @@ done
 				return false, err
 			}
 			// verify the pod ready status has reported not ready
-			return podutil.IsPodReady(pod) == false, nil
+			return !podutil.IsPodReady(pod), nil
 		})
 		framework.ExpectNoError(err)
 	})
@@ -698,7 +698,7 @@ done
 				return false, err
 			}
 			// verify the pod ready status has reported not ready
-			return podutil.IsPodReady(pod) == false, nil
+			return !podutil.IsPodReady(pod), nil
 		})
 		framework.ExpectNoError(err)
 

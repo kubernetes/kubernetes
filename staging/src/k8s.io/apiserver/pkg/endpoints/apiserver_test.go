@@ -37,9 +37,9 @@ import (
 	"testing"
 	"time"
 
-	restful "github.com/emicklei/go-restful/v3"
+	"github.com/emicklei/go-restful/v3"
 
-	fuzzer "k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -2839,7 +2839,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if res.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %s %#v", request.URL, res)
+		t.Errorf("unexpected response: %s %#v", request.URL, res)
 		s, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)

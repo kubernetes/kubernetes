@@ -28,15 +28,18 @@ limitations under the License.
 // Generation is governed by comment tags in the source.  Any package may
 // request DeepCopy generation by including a comment in the file-comments of
 // one file, of the form:
-//   // +k8s:deepcopy-gen=package
+//
+//	// +k8s:deepcopy-gen=package
 //
 // DeepCopy functions can be generated for individual types, rather than the
 // entire package by specifying a comment on the type definion of the form:
-//   // +k8s:deepcopy-gen=true
+//
+//	// +k8s:deepcopy-gen=true
 //
 // When generating for a whole package, individual types may opt out of
 // DeepCopy generation by specifying a comment on the of the form:
-//   // +k8s:deepcopy-gen=false
+//
+//	// +k8s:deepcopy-gen=false
 //
 // Note that registration is a whole-package option, and is not available for
 // individual types.

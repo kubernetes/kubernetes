@@ -94,7 +94,7 @@ var (
 			// This metric is used for verifying api call latencies SLO,
 			// as well as tracking regressions in this aspects.
 			// Thus we customize buckets significantly, to empower both usecases.
-			Buckets: []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
+			Buckets: []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3,
 				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
 			StabilityLevel: compbasemetrics.STABLE,
 		},
@@ -238,6 +238,18 @@ var (
 		[]string{"source", "status"},
 	)
 
+	requestTimestampComparisonDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "apiserver_request_timestamp_comparison_time",
+			Help:           "Time taken for comparison of old vs new objects in UPDATE or PATCH requests",
+			Buckets:        []float64{0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 5.0},
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		// Path the code takes to reach a conclusion:
+		// i.e. unequalObjectsFast, unequalObjectsSlow, equalObjectsSlow
+		[]string{"code_path"},
+	)
+
 	metrics = []resettableCollector{
 		deprecatedRequestGauge,
 		requestCounter,
@@ -256,6 +268,7 @@ var (
 		requestFilterDuration,
 		requestAbortsTotal,
 		requestPostTimeoutTotal,
+		requestTimestampComparisonDuration,
 	}
 
 	// these are the valid request methods which we report in our metrics. Any other request methods
@@ -364,6 +377,10 @@ func UpdateInflightRequestMetrics(phase string, nonmutating, mutating int) {
 
 func RecordFilterLatency(ctx context.Context, name string, elapsed time.Duration) {
 	requestFilterDuration.WithContext(ctx).WithLabelValues(name).Observe(elapsed.Seconds())
+}
+
+func RecordTimestampComparisonLatency(codePath string, elapsed time.Duration) {
+	requestTimestampComparisonDuration.WithLabelValues(codePath).Observe(elapsed.Seconds())
 }
 
 func RecordRequestPostTimeout(source string, status string) {

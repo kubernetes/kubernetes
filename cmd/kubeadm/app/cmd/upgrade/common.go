@@ -232,9 +232,14 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 	if dupURLScheme {
 		socket := strings.ReplaceAll(cfg.NodeRegistration.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://", "")
 		cfg.NodeRegistration.CRISocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + socket
-		hostname, err := os.Hostname()
-		if err != nil {
-			return nil, nil, nil, errors.Wrapf(err, "failed to get hostname")
+		var hostname string
+		if len(cfg.NodeRegistration.Name) > 0 {
+			hostname = cfg.NodeRegistration.Name
+		} else {
+			hostname, err = os.Hostname()
+			if err != nil {
+				return nil, nil, nil, errors.Wrapf(err, "failed to get hostname")
+			}
 		}
 		klog.V(2).Infof("ensuring that Node %q has a CRI socket annotation with correct URL scheme %q", hostname, cfg.NodeRegistration.CRISocket)
 		if err := patchnodephase.AnnotateCRISocket(client, hostname, cfg.NodeRegistration.CRISocket); err != nil {

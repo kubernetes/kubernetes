@@ -47,11 +47,11 @@ func (si *SliceInfo) getTotalReadyEndpoints() int {
 // getAllocatedHintsByZone sums up the allocated hints we currently have in
 // unchanged slices and marks slices for update as necessary. A slice needs to
 // be updated if any of the following are true:
-// - It has an endpoint without zone hints
-// - It has an endpoint hint for a zone that no longer needs any
-// - It has endpoint hints that would make the minimum allocations necessary
-//   impossible with changes to slices that are already being updated or
-//   created.
+//   - It has an endpoint without zone hints
+//   - It has an endpoint hint for a zone that no longer needs any
+//   - It has endpoint hints that would make the minimum allocations necessary
+//     impossible with changes to slices that are already being updated or
+//     created.
 func (si *SliceInfo) getAllocatedHintsByZone(allocations map[string]Allocation) EndpointZoneInfo {
 	allocatedHintsByZone := EndpointZoneInfo{}
 

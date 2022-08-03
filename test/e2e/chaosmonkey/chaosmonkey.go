@@ -16,7 +16,11 @@ limitations under the License.
 
 package chaosmonkey
 
-import "github.com/onsi/ginkgo"
+import (
+	"fmt"
+
+	"github.com/onsi/ginkgo/v2"
+)
 
 // Disruption is the type to construct a Chaosmonkey with; see Do for more information.
 type Disruption func()
@@ -91,7 +95,7 @@ func (cm *Chaosmonkey) Do() {
 		}()
 	}
 
-	ginkgo.By("Waiting for all async tests to be ready")
+	fmt.Println("Waiting for all async tests to be ready")
 	for _, sem := range sems {
 		// Wait for test to be ready.  We have to wait for ready *or done* because a test
 		// may panic before signaling that its ready, and we shouldn't block.  Since we
@@ -101,15 +105,15 @@ func (cm *Chaosmonkey) Do() {
 
 	defer func() {
 		close(stopCh)
-		ginkgo.By("Waiting for async validations to complete")
+		fmt.Println("Waiting for async validations to complete")
 		for _, sem := range sems {
 			sem.waitForDone()
 		}
 	}()
 
-	ginkgo.By("Starting disruption")
+	fmt.Println("Starting disruption")
 	cm.disruption()
-	ginkgo.By("Disruption complete; stopping async validations")
+	fmt.Println("Disruption complete; stopping async validations")
 }
 
 // Semaphore is taken by a Test and provides: Ready(), for the Test to call when it's ready for the

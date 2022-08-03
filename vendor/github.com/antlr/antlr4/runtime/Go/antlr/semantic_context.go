@@ -193,7 +193,7 @@ type AND struct {
 
 func NewAND(a, b SemanticContext) *AND {
 
-	operands := NewArray2DHashSet(nil, nil)
+	operands := newArray2DHashSet(nil, nil)
 	if aa, ok := a.(*AND); ok {
 		for _, o := range aa.opnds {
 			operands.Add(o)
@@ -345,7 +345,7 @@ type OR struct {
 
 func NewOR(a, b SemanticContext) *OR {
 
-	operands := NewArray2DHashSet(nil, nil)
+	operands := newArray2DHashSet(nil, nil)
 	if aa, ok := a.(*OR); ok {
 		for _, o := range aa.opnds {
 			operands.Add(o)

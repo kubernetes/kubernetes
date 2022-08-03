@@ -430,10 +430,9 @@ func cachedStatsFunc(podStats []statsapi.PodStats) statsFunc {
 
 // Cmp compares p1 and p2 and returns:
 //
-//   -1 if p1 <  p2
-//    0 if p1 == p2
-//   +1 if p1 >  p2
-//
+//	-1 if p1 <  p2
+//	 0 if p1 == p2
+//	+1 if p1 >  p2
 type cmpFunc func(p1, p2 *v1.Pod) int
 
 // multiSorter implements the Sort interface, sorting changes within.

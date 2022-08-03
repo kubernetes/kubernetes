@@ -575,8 +575,8 @@ func TestPrune(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			pruned := PruneWithOptions(in, tt.schema, tt.isResourceRoot, PruneOptions{
-				ReturnPruned: true,
+			pruned := PruneWithOptions(in, tt.schema, tt.isResourceRoot, structuralschema.UnknownFieldPathOptions{
+				TrackUnknownFieldPaths: true,
 			})
 			if !reflect.DeepEqual(in, expectedObject) {
 				var buf bytes.Buffer
@@ -592,8 +592,8 @@ func TestPrune(t *testing.T) {
 				t.Errorf("expected pruned:\n\t%v\ngot:\n\t%v\n", strings.Join(tt.expectedPruned, "\n\t"), strings.Join(pruned, "\n\t"))
 			}
 
-			// now check that pruned is empty when ReturnPruned is false
-			emptyPruned := PruneWithOptions(in, tt.schema, tt.isResourceRoot, PruneOptions{})
+			// now check that pruned is empty when TrackUnknownFieldPaths is false
+			emptyPruned := PruneWithOptions(in, tt.schema, tt.isResourceRoot, structuralschema.UnknownFieldPathOptions{})
 			if !reflect.DeepEqual(in, expectedObject) {
 				var buf bytes.Buffer
 				enc := json.NewEncoder(&buf)

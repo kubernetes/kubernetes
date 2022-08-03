@@ -198,12 +198,38 @@ func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc
 	}
 }
 
+func (ect *EndpointChangeTracker) PendingCount() int {
+	trackerSvcMap := ect.endpointSliceCache.trackerByServiceMap
+	count := 0
+	for _, trackerSvc := range trackerSvcMap {
+		svcMap := trackerSvc.pending
+		for _, svc := range svcMap {
+			count += len(svc.Endpoints)
+		}
+	}
+	return count
+}
+
+func (ect *EndpointChangeTracker) AppliedCount() int {
+	trackerSvcMap := ect.endpointSliceCache.trackerByServiceMap
+	count := 0
+	for _, trackerSvc := range trackerSvcMap {
+		svcMap := trackerSvc.applied
+		for _, svc := range svcMap {
+			count += len(svc.Endpoints)
+		}
+	}
+	return count
+}
+
 // Update updates given service's endpoints change map based on the <previous, current> endpoints pair.  It returns true
 // if items changed, otherwise return false.  Update can be used to add/update/delete items of EndpointsChangeMap.  For example,
 // Add item
 //   - pass <nil, endpoints> as the <previous, current> pair.
+//
 // Update item
 //   - pass <oldEndpoints, endpoints> as the <previous, current> pair.
+//
 // Delete item
 //   - pass <endpoints, nil> as the <previous, current> pair.
 func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
@@ -399,30 +425,6 @@ func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndp
 	}
 
 	return result
-}
-
-func (ect *EndpointChangeTracker) PendingCount() int {
-	trackerSvcMap := ect.endpointSliceCache.trackerByServiceMap
-	count := 0
-	for _, trackerSvc := range trackerSvcMap {
-		svcMap := trackerSvc.pending
-		for _, svc := range svcMap {
-			count += len(svc.Endpoints)
-		}
-	}
-	return count
-}
-
-func (ect *EndpointChangeTracker) AppliedCount() int {
-	trackerSvcMap := ect.endpointSliceCache.trackerByServiceMap
-	count := 0
-	for _, trackerSvc := range trackerSvcMap {
-		svcMap := trackerSvc.applied
-		for _, svc := range svcMap {
-			count += len(svc.Endpoints)
-		}
-	}
-	return count
 }
 
 // EndpointsMap maps a service name to a list of all its Endpoints.

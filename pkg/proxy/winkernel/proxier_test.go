@@ -23,13 +23,13 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/Microsoft/hcsshim/hcn"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/stretchr/testify/mock"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,12 +44,9 @@ import (
 )
 
 const (
-	testHostName      = "test-hostname"
-	macAddress        = "00-11-22-33-44-55"
-	clusterCIDR       = "192.168.1.0/24"
-	destinationPrefix = "192.168.2.0/24"
-	providerAddress   = "10.0.0.3"
-	guid              = "123ABC"
+	testHostName = "test-hostname"
+	macAddress   = "00-11-22-33-44-55"
+	clusterCIDR  = "192.168.1.0/24"
 )
 
 type fakeHNS struct{}
@@ -165,6 +162,42 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clust
 	proxier.serviceChanges = serviceChanges
 
 	return proxier
+}
+
+// NewProxierWithMockHCN creates a new proxy object with hcn functions mocked.
+func NewProxierWithMockHCN(clusterCIDR string, hostname string, nodeIP net.IP, networkType string, idCount int) (*Proxier, *hns) {
+	sourceVip := "192.168.1.2"
+	hns := &hns{
+		hcnUtils: newMockHCN(idCount),
+	}
+	hnsNetworkInfo := &hnsNetworkInfo{
+		id:          "TestOverlay",
+		name:        "TestOverlay",
+		networkType: networkType,
+	}
+	createTestNetwork(*hns)
+	proxier := &Proxier{
+		serviceMap:          make(proxy.ServiceMap),
+		endpointsMap:        make(proxy.EndpointsMap),
+		clusterCIDR:         clusterCIDR,
+		hostname:            testHostName,
+		nodeIP:              nodeIP,
+		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
+		network:             *hnsNetworkInfo,
+		sourceVip:           sourceVip,
+		hostMac:             macAddress,
+		isDSR:               false,
+		hns:                 hns,
+		endPointsRefCount:   make(endPointsReferenceCountMap),
+		rootHnsEndpointName: mocks.HnsEndPointName,
+	}
+
+	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, v1.IPv4Protocol, nil, proxier.serviceMapChange)
+	endpointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, v1.IPv4Protocol, nil, proxier.endpointsMapChange)
+	proxier.endpointsChanges = endpointChangeTracker
+	proxier.serviceChanges = serviceChanges
+
+	return proxier, hns
 }
 
 func TestCreateServiceVip(t *testing.T) {
@@ -726,6 +759,9 @@ func TestCreateLoadBalancer(t *testing.T) {
 }
 
 func TestCreateDsrLoadBalancer(t *testing.T) {
+	mockhcn := mocks.HcnMock{}
+	hcnDSRSupported = mockhcn.DSRSupported
+	mockhcn.On("DSRSupported").Return(nil)
 	syncPeriod := 30 * time.Second
 	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
 	if proxier == nil {
@@ -741,6 +777,7 @@ func TestCreateDsrLoadBalancer(t *testing.T) {
 		Protocol:       v1.ProtocolTCP,
 	}
 	lbIP := "11.21.31.41"
+	proxier.forwardHealthCheckVip = true
 
 	makeServiceMap(proxier,
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
@@ -963,6 +1000,7 @@ func makeTestEndpointSlice(namespace, name string, sliceNum int, epsFunc func(*d
 	return eps
 }
 
+// TestGetHnsNetworkInfo refers to unit tests which tests GetHnsNetworkInfo functionality
 func TestGetHnsNetworkInfo(t *testing.T) {
 	mockhscshim := mocks.HcsshimMock{}
 	hcsshimGetHNSNetworkByName = mockhscshim.GetHNSNetworkByName
@@ -982,27 +1020,7 @@ func TestGetHnsNetworkInfo(t *testing.T) {
 	assert.Equal(t, err, errors.New("{NetworkNotFoundError:nw-name-234}"), "Negative test for getHnsNetworkInfo : Returns error.")
 }
 
-func TestNewHostNetworkServiceV1(t *testing.T) {
-	mockhcn := mocks.HcnMock{}
-	hcnGetSupportedFeatures = mockhcn.GetSupportedFeatures
-	mockSupFeatures := mocks.MockNewSupportedFeatures()
-	mockhcn.On("GetSupportedFeatures").Return(mockSupFeatures)
-	actualHns, _ := newHostNetworkService()
-	expectedHns := hnsV1{}
-	assert.Equal(t, expectedHns, actualHns)
-}
-
-func TestNewHostNetworkServiceV2(t *testing.T) {
-	mockhcn := mocks.HcnMock{}
-	hcnGetSupportedFeatures = mockhcn.GetSupportedFeatures
-	mockSupFeatures := mocks.MockNewSupportedFeatures()
-	mockSupFeatures.Api.V2 = true
-	mockhcn.On("GetSupportedFeatures").Return(mockSupFeatures)
-	actualHns2, _ := newHostNetworkService()
-	expectedHns2 := hnsV2{}
-	assert.Equal(t, expectedHns2, actualHns2)
-}
-
+// TestGetNetworkInfo is the testcase which tests getNetworkInfo util function
 func TestGetNetworkInfo(t *testing.T) {
 	mockHns := HnsMock{}
 	mockHnsNwInfo := mockNewHNSNetworkInfo("nw-id-123", "nw-name-123")
@@ -1011,77 +1029,35 @@ func TestGetNetworkInfo(t *testing.T) {
 	assert.Equal(t, mockHnsNwInfo, actualNwInfo)
 }
 
+// TestDualStackCompatible testcase which tests DualStackCompatible function
 func TestDualStackCompatible(t *testing.T) {
+	mockHcn()
 	mockHns := HnsMock{}
 	mockHnsNwInfo := mockNewHNSNetworkInfo("nw-id-123", "nw-name-123")
 	mockHns.On("getNetworkByName", "nw-name-123").Return(mockHnsNwInfo, nil)
-	hns = mockHns
-
+	hnsV2 = mockHns
 	mockhcn := mocks.HcnMock{}
 	hcnIPv6DualStackSupported = mockhcn.IPv6DualStackSupported
 	mockhcn.On("IPv6DualStackSupported").Return(nil)
-
 	dualStackCompTester := DualStackCompatTester{}
 	comp := dualStackCompTester.DualStackCompatible("nw-name-123")
 	assert.True(t, comp)
 }
 
-func setupMockHns(proxier *Proxier) HnsMock {
-
-	mockHns := HnsMock{}
-	mockHnsNwInfo := mockNewHNSNetworkInfo(strings.ToUpper(guid), mocks.TestNwName)
-	mockHns.On("getNetworkByName", mocks.TestNwName).Return(mockHnsNwInfo, nil)
-
-	mockEndpointInfo := mockNewEndpointInfo(mockHns, epIpAddress, epMacAddress, mocks.HnsID, true)
-	mockHns.On("getEndpointByName", proxier.rootHnsEndpointName).Return(mockEndpointInfo, nil)
-
-	endPointsInfoMap := mockNewHNSNetworkInfoMap(mockHns)
-	mockHns.On("getAllEndpointsByNetwork", mocks.TestNwName).Return(endPointsInfoMap, nil)
-
-	allLBs := mockNewAllLoadBalancers()
-	mockHns.On("getAllLoadBalancers").Return(allLBs, nil)
-
-	mockEndpointInfo2 := mockNewEndpointInfo(nil, mocks.SvcIP, epMacAddress, mocks.EmptyID, false)
-
-	mockEndpointInfo3 := mockNewEndpointInfo(nil, sourceVip, epMacAddress, mocks.EmptyID, true)
-	mockEndpointInfo3.terminating = false
-	mockHns.On("createEndpoint", mockEndpointInfo2, mocks.TestNwName).Return(mockEndpointInfo2, nil)
-	mockHns.On("createEndpoint", mockEndpointInfo3, mocks.TestNwName).Return(mockEndpointInfo3, nil)
-
-	mockHns.On("deleteLoadBalancer", mocks.EmptyID).Return(nil)
-
-	endPointsInfoList := mockNewHNSNetworkInfoList(nil, []string{epIpAddressRemote}, []string{epMacAddress}, mocks.ProviderAddress, 2)
-	lbInfo := &loadBalancerInfo{
-		hnsID: mocks.HnsID,
-	}
-	mockHns.On("getLoadBalancer", endPointsInfoList, mock.Anything, mocks.ProviderAddress, mock.Anything, uint16(protocol), uint16(internalPort), mock.Anything, allLBs).Return(lbInfo, nil)
-
-	proxier.hns = mockHns
-
-	return mockHns
-}
-
-// testSvcInfo is unit testcase to test the service map
+// TestSvcInfo is unit testcase to test the service map
 func TestSvcInfo(t *testing.T) {
-
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	proxier, _ := NewProxierWithMockHCN(clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, 5)
 	if proxier == nil {
 		t.Error()
 		return
 	}
-
-	setupMockHns(proxier)
-
 	// test to check if forwardHealthCheckVip is set to true.
 	proxier.forwardHealthCheckVip = true
-
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
 		Protocol:       v1.ProtocolTCP,
 	}
-
 	makeServiceMap(proxier,
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
 			svc.Spec.Type = "NodePort"
@@ -1094,7 +1070,6 @@ func TestSvcInfo(t *testing.T) {
 			}}
 		}),
 	)
-
 	tcpProtocol := v1.ProtocolTCP
 	populateEndpointSlices(proxier,
 		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
@@ -1109,29 +1084,23 @@ func TestSvcInfo(t *testing.T) {
 			}}
 		}),
 	)
-
 	proxier.setInitialized(true)
 	proxier.syncProxyRules()
-
 	// Assert service map
 	svc := proxier.serviceMap[svcPortName]
 	svcInfo, ok := svc.(*serviceInfo)
 	assert.True(t, ok, "Cast serviceInfo successful")
-	assert.Equal(t, svcInfo.hnsID, mocks.HnsID, "HNS ID match")
-	assert.Equal(t, svcInfo.nodePorthnsID, mocks.HnsID, "Node port HNS ID match")
+	assert.Equal(t, svcInfo.hnsID, "MOCK-LB-ID-0", "Service HNS ID not matching with expected HNS ID")
+	assert.Equal(t, svcInfo.nodePorthnsID, "MOCK-LB-ID-1", "Node port HNS ID not matching with expected HNS ID")
 }
 
 // TestHealthCheckNodePort tests that health check node ports are enabled when expected
 func TestHealthCheckNodePort(t *testing.T) {
-	// Arrange
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	proxier, _ := NewProxierWithMockHCN(clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, 5)
 	if proxier == nil {
 		t.Error()
 		return
 	}
-
-	setupMockHns(proxier)
 
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
@@ -1169,26 +1138,11 @@ func TestHealthCheckNodePort(t *testing.T) {
 // EndpointSlices
 func TestEndpointSliceE2E(t *testing.T) {
 	// Arrange
-	syncPeriod := 30 * time.Second
-	proxier := NewFakeProxier(syncPeriod, syncPeriod, clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
+	proxier, _ := NewProxierWithMockHCN(clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, 5)
 	if proxier == nil {
 		t.Error()
 		return
 	}
-
-	mockHns := setupMockHns(proxier)
-
-	mockCreateEndpoint(&mockHns, "192.168.2.4", "02-11-c0-a8-02-04", mocks.ProviderAddress, mocks.EmptyID, false)
-	mockCreateEndpoint(&mockHns, "192.168.2.5", "02-11-c0-a8-02-05", "", mocks.EmptyID, false)
-	// mockCreateEndpoint(&mockHns, "192.168.2.6", "02-11-c0-a8-02-06", "", mocks.EmptyID, false)
-
-	lbInfo := &loadBalancerInfo{
-		hnsID: mocks.HnsID,
-	}
-	allLBs := mockNewAllLoadBalancers()
-	mockHns.On("getLoadBalancer", mock.Anything, mock.Anything, mocks.ProviderAddress, mock.Anything, uint16(protocol), uint16(internalPort), mock.Anything, allLBs).Return(lbInfo, nil)
-
-	proxier.hns = mockHns
 
 	proxier.servicesSynced = true
 	proxier.endpointSlicesSynced = true
@@ -1256,39 +1210,106 @@ func TestEndpointSliceE2E(t *testing.T) {
 	// Assert
 	svc := proxier.serviceMap[svcPortName]
 	svcInfo, ok := svc.(*serviceInfo)
-	if !ok {
-		t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+	assert.True(t, ok, fmt.Sprintf("Failed to cast serviceInfo %s", svcPortName.String()))
+	assert.Equal(t, svcInfo.hnsID, "MOCK-LB-ID-0", fmt.Sprintf("The Hns Loadbalancer Id %v does not match %v. ServicePortName %s", svcInfo.hnsID, guid, svcPortName.String()))
 
-	} else {
-		if svcInfo.hnsID != guid {
-			t.Errorf("The Hns Loadbalancer Id %v does not match %v. ServicePortName %q", svcInfo.hnsID, guid, svcPortName.String())
-		}
+	ep := proxier.endpointsMap[svcPortName][0]
+	epInfo, ok := ep.(*endpointsInfo)
+	assert.True(t, ok, fmt.Sprintf("Failed to cast endpointsInfo %s", svcPortName.String()))
+	assert.Equal(t, epInfo.hnsID, "MOCK-EP-ID-1", fmt.Sprintf("Hns EndpointId %v does not match %v. ServicePortName %s", epInfo.hnsID, guid, svcPortName.String()))
+
+	proxier.setInitialized(false)
+	proxier.OnEndpointSliceDelete(endpointSlice)
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	svc = proxier.serviceMap[svcPortName]
+	svcInfo, ok = svc.(*serviceInfo)
+	assert.True(t, ok, fmt.Sprintf("Failed to cast serviceInfo %s", svcPortName.String()))
+	assert.False(t, svcInfo.policyApplied, "Service ns1/svc1:p80 has no endpoint information available, but policies are applied. Unexpected behaviour!")
+}
+
+// TestLoadBalancer tests that LoadBalancers that are created function as expected
+func TestLoadBalancer(t *testing.T) {
+	proxier, mockHns := NewProxierWithMockHCN(clusterCIDR, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY, 3)
+
+	if proxier == nil {
+		t.Error()
+		return
 	}
 
-	// ep := proxier.endpointsMap[svcPortName][0]
-	// epInfo, ok := ep.(*endpointsInfo)
-	// if !ok {
-	// 	t.Errorf("Failed to cast endpointsInfo %q", svcPortName.String())
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
 
-	// } else {
-	// 	if epInfo.hnsID != guid {
-	// 		t.Errorf("Hns EndpointId %v does not match %v. ServicePortName %q", epInfo.hnsID, guid, svcPortName.String())
-	// 	}
-	// }
+	expectedPortMapping := &hcn.LoadBalancerPortMapping{
+		Protocol:     mocks.LbTCPProtocol,
+		InternalPort: mocks.LbInternalPort,
+		ExternalPort: mocks.LbExternalPort,
+		Flags:        hcn.LoadBalancerPortMappingFlagsNone,
+	}
 
-	// proxier.setInitialized(false)
-	// proxier.OnEndpointSliceDelete(endpointSlice)
-	// proxier.setInitialized(true)
-	// proxier.syncProxyRules()
+	expectedPortMappings := []hcn.LoadBalancerPortMapping{*expectedPortMapping}
 
-	// svc = proxier.serviceMap[svcPortName]
-	// svcInfo, ok = svc.(*serviceInfo)
-	// if !ok {
-	// 	t.Errorf("Failed to cast serviceInfo %q", svcPortName.String())
+	// 3 Loadbalancer will be created, mapping to the 3rd loadbalancer (index 0)
+	lbID := lbIDPrefix + strconv.Itoa(2)
+	expectedLoadBalancer := &hcn.HostComputeLoadBalancer{
+		Id:                   lbID,
+		HostComputeEndpoints: []string{"MOCK-EP-ID-2"},
+		SourceVIP:            mocks.ProviderAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		FrontendVIPs: []string{mocks.SvcLBIP},
+		Flags:        hcn.LoadBalancerFlagsNone,
+		PortMappings: expectedPortMappings,
+	}
+	// Act
+	makeServiceMap(proxier,
+		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "LoadBalancer"
+			svc.Spec.ClusterIP = mocks.ClusterIP
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName.Port,
+				Port:     int32(mocks.SvcPort),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(mocks.SvcNodePort),
+			}}
+			svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{
+				IP: mocks.SvcLBIP,
+			}}
+			svc.Spec.LoadBalancerSourceRanges = []string{" 203.0.113.0/25"}
+		}),
+	)
 
-	// } else { //policy should not be applied here
-	// 	if svcInfo.policyApplied {
-	// 		t.Error("Service ns1/svc1:p80 has no endpoint information available, but policies are applied. Unexpected behaviour!")
-	// 	}
-	// }
+	tcpProtocol := v1.ProtocolTCP
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName.Namespace, svcPortName.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{epIpAddressRemote},
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(svcPortName.Port),
+				Port:     utilpointer.Int32(int32(mocks.SvcPort)),
+				Protocol: &tcpProtocol,
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	// Assert
+	svc := proxier.serviceMap[svcPortName]
+	svcInfo, ok := svc.(*serviceInfo)
+	actualLB, _ := mockHns.hcnUtils.getLoadBalancerByID(lbID)
+	assert.True(t, ok, fmt.Sprintf("Failed to cast serviceInfo %s", svcPortName.String()))
+	assert.Equal(t, svcInfo.hnsID, "MOCK-LB-ID-0", "Service HNS ID not matching with expected HNS ID")
+	assert.Equal(t, svcInfo.nodePorthnsID, "MOCK-LB-ID-1", "Node port HNS ID not matching with expected HNS ID")
+	assert.Equal(t, svcInfo.loadBalancerIngressIPs[0].hnsID, "MOCK-LB-ID-0", "LB Ingress IP HNS ID not matching with expected HNS ID")
+	assert.Equal(t, actualLB, expectedLoadBalancer, "Loadbalancers are not equal")
 }

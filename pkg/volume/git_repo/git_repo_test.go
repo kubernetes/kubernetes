@@ -36,7 +36,7 @@ import (
 )
 
 func newTestHost(t *testing.T) (string, volume.VolumeHost) {
-	tempDir, err := ioutil.TempDir("/tmp", "git_repo_test.")
+	tempDir, err := ioutil.TempDir("", "git_repo_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
@@ -314,7 +314,7 @@ func doTestPlugin(scenario struct {
 	}
 
 	path := mounter.GetPath()
-	suffix := fmt.Sprintf("pods/poduid/volumes/kubernetes.io~git-repo/%v", scenario.vol.Name)
+	suffix := filepath.Join("pods/poduid/volumes/kubernetes.io~git-repo", scenario.vol.Name)
 	if !strings.HasSuffix(path, suffix) {
 		allErrs = append(allErrs,
 			fmt.Errorf("got unexpected path: %s", path))
@@ -439,7 +439,7 @@ func doTestSetUp(scenario struct {
 
 	var expectedPaths []string
 	for _, expected := range expecteds {
-		expectedPaths = append(expectedPaths, g.GetPath()+expected.dir)
+		expectedPaths = append(expectedPaths, filepath.Join(g.GetPath(), expected.dir))
 	}
 	if len(fcmd.Dirs) != len(expectedPaths) || !reflect.DeepEqual(expectedPaths, fcmd.Dirs) {
 		allErrs = append(allErrs,

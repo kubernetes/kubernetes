@@ -41,7 +41,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -919,7 +919,18 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		}
 	})
 
-	ginkgo.It("should manage the lifecycle of a ResourceQuota", func() {
+	/*
+		Release: v1.25
+		Testname: ResourceQuota, manage lifecycle of a ResourceQuota
+		Description: Attempt to create a ResourceQuota for CPU and Memory
+		quota limits. Creation MUST be successful. Attempt to list all
+		namespaces with a label selector which MUST succeed. One list
+		MUST be found. The ResourceQuota when patched MUST succeed.
+		Given the patching of the ResourceQuota, the fields MUST equal
+		the new values. It MUST succeed at deleting a collection of
+		ResourceQuota via a label selector.
+	*/
+	framework.ConformanceIt("should manage the lifecycle of a ResourceQuota", func() {
 		client := f.ClientSet
 		ns := f.Namespace.Name
 

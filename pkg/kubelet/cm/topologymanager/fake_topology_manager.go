@@ -24,10 +24,11 @@ import (
 )
 
 type fakeManager struct {
-	hint *TopologyHint
+	hint   *TopologyHint
+	policy Policy
 }
 
-//NewFakeManager returns an instance of FakeManager
+// NewFakeManager returns an instance of FakeManager
 func NewFakeManager() Manager {
 	klog.InfoS("NewFakeManager")
 	return &fakeManager{}
@@ -37,7 +38,16 @@ func NewFakeManager() Manager {
 func NewFakeManagerWithHint(hint *TopologyHint) Manager {
 	klog.InfoS("NewFakeManagerWithHint")
 	return &fakeManager{
-		hint: hint,
+		hint:   hint,
+		policy: NewNonePolicy(),
+	}
+}
+
+// NewFakeManagerWithPolicy returns an instance of fake topology manager with specified policy
+func NewFakeManagerWithPolicy(policy Policy) Manager {
+	klog.InfoS("NewFakeManagerWithPolicy")
+	return &fakeManager{
+		policy: policy,
 	}
 }
 
@@ -48,6 +58,10 @@ func (m *fakeManager) GetAffinity(podUID string, containerName string) TopologyH
 	}
 
 	return *m.hint
+}
+
+func (m *fakeManager) GetPolicy() Policy {
+	return m.policy
 }
 
 func (m *fakeManager) AddHintProvider(h HintProvider) {

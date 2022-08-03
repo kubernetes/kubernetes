@@ -31,6 +31,8 @@ import (
 	"strings"
 	"time"
 
+	oteltrace "go.opentelemetry.io/otel/trace"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,7 +60,7 @@ import (
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -298,7 +300,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 	// connection timeout for CRI service connection
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout)
+	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, oteltrace.NewNoopTracerProvider())
 	if err != nil {
 		return nil, nil, err
 	}

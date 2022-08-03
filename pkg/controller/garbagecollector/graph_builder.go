@@ -25,6 +25,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	eventv1 "k8s.io/api/events/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
+
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
@@ -318,7 +320,8 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 }
 
 var ignoredResources = map[schema.GroupResource]struct{}{
-	{Group: "", Resource: "events"}: {},
+	{Group: "", Resource: "events"}:                {},
+	{Group: eventv1.GroupName, Resource: "events"}: {},
 }
 
 // DefaultIgnoredResources returns the default set of resources that the garbage collector controller

@@ -100,10 +100,10 @@ func findDiskByLun(lun int, iohandler ioHandler, exec utilexec.Interface) (strin
 	return "", nil
 }
 
-func formatIfNotFormatted(disk string, fstype string, exec utilexec.Interface) {
+func formatIfNotFormatted(disk string, fstype string, exec utilexec.Interface) error {
 	if err := mount.ValidateDiskNumber(disk); err != nil {
 		klog.Errorf("azureDisk Mount: formatIfNotFormatted failed, err: %v\n", err)
-		return
+		return err
 	}
 
 	if len(fstype) == 0 {
@@ -115,7 +115,8 @@ func formatIfNotFormatted(disk string, fstype string, exec utilexec.Interface) {
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
 		klog.Errorf("azureDisk Mount: Get-Disk failed, error: %v, output: %q", err, string(output))
-	} else {
-		klog.Infof("azureDisk Mount: Disk successfully formatted, disk: %q, fstype: %q\n", disk, fstype)
+		return err
 	}
+	klog.Infof("azureDisk Mount: Disk successfully formatted, disk: %q, fstype: %q\n", disk, fstype)
+	return nil
 }

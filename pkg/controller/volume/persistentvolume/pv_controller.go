@@ -166,6 +166,7 @@ type PersistentVolumeController struct {
 	NodeListerSynced   cache.InformerSynced
 
 	kubeClient                clientset.Interface
+	eventBroadcaster          record.EventBroadcaster
 	eventRecorder             record.EventRecorder
 	cloud                     cloudprovider.Interface
 	volumePluginMgr           vol.VolumePluginMgr
@@ -349,6 +350,14 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(ctx context.Context, cl
 			klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: no volume found", claimToClaimKey(claim))
 			// No PV could be found
 			// OBSERVATION: pvc is "Pending", will retry
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.RetroactiveDefaultStorageClass) {
+				klog.V(4).Infof("FeatureGate[%s] is enabled, attempting to assign storage class to unbound PersistentVolumeClaim[%s]", features.RetroactiveDefaultStorageClass, claimToClaimKey(claim))
+				if claim, err = ctrl.assignDefaultStorageClass(claim); err != nil {
+					return fmt.Errorf("can't update PersistentVolumeClaim[%q]: %w", claimToClaimKey(claim), err)
+				}
+			}
+
 			switch {
 			case delayBinding && !storagehelpers.IsDelayBindingProvisioning(claim):
 				if err = ctrl.emitEventForUnboundDelayBindingClaim(claim); err != nil {
@@ -755,9 +764,10 @@ func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *
 
 // updateClaimStatus saves new claim.Status to API server.
 // Parameters:
-//  claim - claim to update
-//  phase - phase to set
-//  volume - volume which Capacity is set into claim.Status.Capacity
+//
+//	claim - claim to update
+//	phase - phase to set
+//	volume - volume which Capacity is set into claim.Status.Capacity
 func (ctrl *PersistentVolumeController) updateClaimStatus(claim *v1.PersistentVolumeClaim, phase v1.PersistentVolumeClaimPhase, volume *v1.PersistentVolume) (*v1.PersistentVolumeClaim, error) {
 	klog.V(4).Infof("updating PersistentVolumeClaim[%s] status: set phase %s", claimToClaimKey(claim), phase)
 
@@ -839,10 +849,11 @@ func (ctrl *PersistentVolumeController) updateClaimStatus(claim *v1.PersistentVo
 // given event on the claim. It saves the status and emits the event only when
 // the status has actually changed from the version saved in API server.
 // Parameters:
-//   claim - claim to update
-//   phase - phase to set
-//   volume - volume which Capacity is set into claim.Status.Capacity
-//   eventtype, reason, message - event to send, see EventRecorder.Event()
+//
+//	claim - claim to update
+//	phase - phase to set
+//	volume - volume which Capacity is set into claim.Status.Capacity
+//	eventtype, reason, message - event to send, see EventRecorder.Event()
 func (ctrl *PersistentVolumeController) updateClaimStatusWithEvent(claim *v1.PersistentVolumeClaim, phase v1.PersistentVolumeClaimPhase, volume *v1.PersistentVolume, eventtype, reason, message string) (*v1.PersistentVolumeClaim, error) {
 	klog.V(4).Infof("updating updateClaimStatusWithEvent[%s]: set phase %s", claimToClaimKey(claim), phase)
 	if claim.Status.Phase == phase {
@@ -913,6 +924,35 @@ func (ctrl *PersistentVolumeController) updateVolumePhaseWithEvent(volume *v1.Pe
 	ctrl.eventRecorder.Event(newVol, eventtype, reason, message)
 
 	return newVol, nil
+}
+
+// assignDefaultStorageClass updates the claim storage class if there is any, the claim is updated to the API server.
+// Ignores claims that already have a storage class.
+// TODO: if resync is ever changed to a larger period, we might need to change how we set the default class on existing unbound claims
+func (ctrl *PersistentVolumeController) assignDefaultStorageClass(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	if claim.Spec.StorageClassName != nil {
+		return claim, nil
+	}
+
+	class, err := util.GetDefaultClass(ctrl.classLister)
+	if err != nil {
+		// It is safe to ignore errors here because it means we either could not list SCs or there is more than one default.
+		// TODO: do not ignore errors after this PR is merged: https://github.com/kubernetes/kubernetes/pull/110559
+		klog.V(4).Infof("failed to get default storage class: %v", err)
+		return claim, nil
+	} else if class == nil {
+		klog.V(4).Infof("can not assign storage class to PersistentVolumeClaim[%s]: default storage class not found", claimToClaimKey(claim))
+		return claim, nil
+	}
+
+	klog.V(4).Infof("assigning StorageClass[%s] to PersistentVolumeClaim[%s]", class.Name, claimToClaimKey(claim))
+	claim.Spec.StorageClassName = &class.Name
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.GetNamespace()).Update(context.TODO(), claim, metav1.UpdateOptions{})
+	if err != nil {
+		return claim, err
+	}
+
+	return newClaim, nil
 }
 
 // bindVolumeToClaim modifies given volume to be bound to a claim and saves it to

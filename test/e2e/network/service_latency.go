@@ -38,7 +38,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 type durations []time.Duration
@@ -227,8 +227,8 @@ func newQuerier() *endpointQueries {
 
 // join merges the incoming streams of requests and added endpoints. It has
 // nice properties like:
-//  * remembering an endpoint if it happens to arrive before it is requested.
-//  * closing all outstanding requests (returning nil) if it is stopped.
+//   - remembering an endpoint if it happens to arrive before it is requested.
+//   - closing all outstanding requests (returning nil) if it is stopped.
 func (eq *endpointQueries) join() {
 	defer func() {
 		// Terminate all pending requests, so that no goroutine will

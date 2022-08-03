@@ -65,24 +65,24 @@ func (e SMTAlignmentError) Type() string {
 //
 // The static policy maintains the following sets of logical CPUs:
 //
-// - SHARED: Burstable, BestEffort, and non-integral Guaranteed containers
-//   run here. Initially this contains all CPU IDs on the system. As
-//   exclusive allocations are created and destroyed, this CPU set shrinks
-//   and grows, accordingly. This is stored in the state as the default
-//   CPU set.
+//   - SHARED: Burstable, BestEffort, and non-integral Guaranteed containers
+//     run here. Initially this contains all CPU IDs on the system. As
+//     exclusive allocations are created and destroyed, this CPU set shrinks
+//     and grows, accordingly. This is stored in the state as the default
+//     CPU set.
 //
-// - RESERVED: A subset of the shared pool which is not exclusively
-//   allocatable. The membership of this pool is static for the lifetime of
-//   the Kubelet. The size of the reserved pool is
-//   ceil(systemreserved.cpu + kubereserved.cpu).
-//   Reserved CPUs are taken topologically starting with lowest-indexed
-//   physical core, as reported by cAdvisor.
+//   - RESERVED: A subset of the shared pool which is not exclusively
+//     allocatable. The membership of this pool is static for the lifetime of
+//     the Kubelet. The size of the reserved pool is
+//     ceil(systemreserved.cpu + kubereserved.cpu).
+//     Reserved CPUs are taken topologically starting with lowest-indexed
+//     physical core, as reported by cAdvisor.
 //
-// - ASSIGNABLE: Equal to SHARED - RESERVED. Exclusive CPUs are allocated
-//   from this pool.
+//   - ASSIGNABLE: Equal to SHARED - RESERVED. Exclusive CPUs are allocated
+//     from this pool.
 //
-// - EXCLUSIVE ALLOCATIONS: CPU sets assigned exclusively to one container.
-//   These are stored as explicit assignments in the state.
+//   - EXCLUSIVE ALLOCATIONS: CPU sets assigned exclusively to one container.
+//     These are stored as explicit assignments in the state.
 //
 // When an exclusive allocation is made, the static policy also updates the
 // default cpuset in the state abstraction. The CPU manager's periodic
@@ -112,6 +112,10 @@ var _ Policy = &staticPolicy{}
 // container process starts.
 func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store, cpuPolicyOptions map[string]string) (Policy, error) {
 	opts, err := NewStaticPolicyOptions(cpuPolicyOptions)
+	if err != nil {
+		return nil, err
+	}
+	err = ValidateStaticPolicyOptions(opts, topology, affinity)
 	if err != nil {
 		return nil, err
 	}
@@ -325,10 +329,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 	// If there are aligned CPUs in numaAffinity, attempt to take those first.
 	result := cpuset.NewCPUSet()
 	if numaAffinity != nil {
-		alignedCPUs := cpuset.NewCPUSet()
-		for _, numaNodeID := range numaAffinity.GetBits() {
-			alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)))
-		}
+		alignedCPUs := p.getAlignedCPUs(numaAffinity, allocatableCPUs)
 
 		numAlignedToAlloc := alignedCPUs.Size()
 		if numCPUs < numAlignedToAlloc {
@@ -571,10 +572,50 @@ func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, reu
 	// to the minAffinitySize. Only those with an equal number of bits set (and
 	// with a minimal set of numa nodes) will be considered preferred.
 	for i := range hints {
+		if p.options.AlignBySocket && p.isHintSocketAligned(hints[i], minAffinitySize) {
+			hints[i].Preferred = true
+			continue
+		}
 		if hints[i].NUMANodeAffinity.Count() == minAffinitySize {
 			hints[i].Preferred = true
 		}
 	}
 
 	return hints
+}
+
+// isHintSocketAligned function return true if numa nodes in hint are socket aligned.
+func (p *staticPolicy) isHintSocketAligned(hint topologymanager.TopologyHint, minAffinitySize int) bool {
+	numaNodesBitMask := hint.NUMANodeAffinity.GetBits()
+	numaNodesPerSocket := p.topology.NumNUMANodes / p.topology.NumSockets
+	if numaNodesPerSocket == 0 {
+		return false
+	}
+	// minSockets refers to minimum number of socket required to satify allocation.
+	// A hint is considered socket aligned if sockets across which numa nodes span is equal to minSockets
+	minSockets := (minAffinitySize + numaNodesPerSocket - 1) / numaNodesPerSocket
+	return p.topology.CPUDetails.SocketsInNUMANodes(numaNodesBitMask...).Size() == minSockets
+}
+
+// getAlignedCPUs return set of aligned CPUs based on numa affinity mask and configured policy options.
+func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableCPUs cpuset.CPUSet) cpuset.CPUSet {
+	alignedCPUs := cpuset.NewCPUSet()
+	numaBits := numaAffinity.GetBits()
+
+	// If align-by-socket policy option is enabled, NUMA based hint is expanded to
+	// socket aligned hint. It will ensure that first socket aligned available CPUs are
+	// allocated before we try to find CPUs across socket to satisfy allocation request.
+	if p.options.AlignBySocket {
+		socketBits := p.topology.CPUDetails.SocketsInNUMANodes(numaBits...).ToSliceNoSort()
+		for _, socketID := range socketBits {
+			alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInSockets(socketID)))
+		}
+		return alignedCPUs
+	}
+
+	for _, numaNodeID := range numaBits {
+		alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)))
+	}
+
+	return alignedCPUs
 }

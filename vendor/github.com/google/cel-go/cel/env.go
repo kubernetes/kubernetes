@@ -61,11 +61,23 @@ func (ast *Ast) SourceInfo() *exprpb.SourceInfo {
 
 // ResultType returns the output type of the expression if the Ast has been type-checked, else
 // returns decls.Dyn as the parse step cannot infer the type.
+//
+// Deprecated: use OutputType
 func (ast *Ast) ResultType() *exprpb.Type {
 	if !ast.IsChecked() {
 		return decls.Dyn
 	}
-	return ast.typeMap[ast.expr.Id]
+	return ast.typeMap[ast.expr.GetId()]
+}
+
+// OutputType returns the output type of the expression if the Ast has been type-checked, else
+// returns cel.DynType as the parse step cannot infer types.
+func (ast *Ast) OutputType() *Type {
+	t, err := ExprTypeToType(ast.ResultType())
+	if err != nil {
+		return DynType
+	}
+	return t
 }
 
 // Source returns a view of the input used to create the Ast. This source may be complete or
@@ -82,12 +94,14 @@ func FormatType(t *exprpb.Type) string {
 // Env encapsulates the context necessary to perform parsing, type checking, or generation of
 // evaluable programs for different expressions.
 type Env struct {
-	Container    *containers.Container
-	declarations []*exprpb.Decl
-	macros       []parser.Macro
-	adapter      ref.TypeAdapter
-	provider     ref.TypeProvider
-	features     map[int]bool
+	Container       *containers.Container
+	functions       map[string]*functionDecl
+	declarations    []*exprpb.Decl
+	macros          []parser.Macro
+	adapter         ref.TypeAdapter
+	provider        ref.TypeProvider
+	features        map[int]bool
+	appliedFeatures map[int]bool
 
 	// Internal parser representation
 	prsr *parser.Parser
@@ -137,13 +151,15 @@ func NewCustomEnv(opts ...EnvOption) (*Env, error) {
 		return nil, err
 	}
 	return (&Env{
-		declarations: []*exprpb.Decl{},
-		macros:       []parser.Macro{},
-		Container:    containers.DefaultContainer,
-		adapter:      registry,
-		provider:     registry,
-		features:     map[int]bool{},
-		progOpts:     []ProgramOption{},
+		declarations:    []*exprpb.Decl{},
+		functions:       map[string]*functionDecl{},
+		macros:          []parser.Macro{},
+		Container:       containers.DefaultContainer,
+		adapter:         registry,
+		provider:        registry,
+		features:        map[int]bool{},
+		appliedFeatures: map[int]bool{},
+		progOpts:        []ProgramOption{},
 	}).configure(opts)
 }
 
@@ -280,16 +296,27 @@ func (e *Env) Extend(opts ...EnvOption) (*Env, error) {
 	for k, v := range e.features {
 		featuresCopy[k] = v
 	}
+	appliedFeaturesCopy := make(map[int]bool, len(e.appliedFeatures))
+	for k, v := range e.appliedFeatures {
+		appliedFeaturesCopy[k] = v
+	}
+	funcsCopy := make(map[string]*functionDecl, len(e.functions))
+	for k, v := range e.functions {
+		funcsCopy[k] = v
+	}
 
+	// TODO: functions copy needs to happen here.
 	ext := &Env{
-		Container:    e.Container,
-		declarations: decsCopy,
-		macros:       macsCopy,
-		progOpts:     progOptsCopy,
-		adapter:      adapter,
-		features:     featuresCopy,
-		provider:     provider,
-		chkOpts:      chkOptsCopy,
+		Container:       e.Container,
+		declarations:    decsCopy,
+		functions:       funcsCopy,
+		macros:          macsCopy,
+		progOpts:        progOptsCopy,
+		adapter:         adapter,
+		features:        featuresCopy,
+		appliedFeatures: appliedFeaturesCopy,
+		provider:        provider,
+		chkOpts:         chkOptsCopy,
 	}
 	return ext.configure(opts)
 }
@@ -436,6 +463,28 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 		}
 	}
 
+	// If the default UTC timezone fix has been enabled, make sure the library is configured
+	if e.HasFeature(featureDefaultUTCTimeZone) {
+		if _, found := e.appliedFeatures[featureDefaultUTCTimeZone]; !found {
+			e, err = Lib(timeUTCLibrary{})(e)
+			if err != nil {
+				return nil, err
+			}
+			// record that the feature has been applied since it will generate declarations
+			// and functions which will be propagated on Extend() calls and which should only
+			// be registered once.
+			e.appliedFeatures[featureDefaultUTCTimeZone] = true
+		}
+	}
+
+	// Initialize all of the functions configured within the environment.
+	for _, fn := range e.functions {
+		err = fn.init()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Configure the parser.
 	prsrOpts := []parser.Option{parser.Macros(e.macros...)}
 	if e.HasFeature(featureEnableMacroCallTracking) {
@@ -446,8 +495,7 @@ func (e *Env) configure(opts []EnvOption) (*Env, error) {
 		return nil, err
 	}
 
-	// The simplest way to eagerly validate declarations on environment creation is to compile
-	// a dummy program and check for the presence of e.chkErr being non-nil.
+	// Ensure that the checker init happens eagerly rather than lazily.
 	if e.HasFeature(featureEagerlyValidateDeclarations) {
 		err := e.initChecker()
 		if err != nil {
@@ -473,11 +521,26 @@ func (e *Env) initChecker() error {
 			e.chkErr = err
 			return
 		}
+		// Add the statically configured declarations.
 		err = ce.Add(e.declarations...)
 		if err != nil {
 			e.chkErr = err
 			return
 		}
+		// Add the function declarations which are derived from the FunctionDecl instances.
+		for _, fn := range e.functions {
+			fnDecl, err := functionDeclToExprDecl(fn)
+			if err != nil {
+				e.chkErr = err
+				return
+			}
+			err = ce.Add(fnDecl)
+			if err != nil {
+				e.chkErr = err
+				return
+			}
+		}
+		// Add function declarations here separately.
 		e.chk = ce
 	})
 	return e.chkErr

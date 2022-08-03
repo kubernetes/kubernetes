@@ -66,9 +66,6 @@ type Interface interface {
 		execFn func(),
 	)
 
-	// MaintainObservations is a helper for maintaining statistics.
-	MaintainObservations(stopCh <-chan struct{})
-
 	// Run monitors config objects from the main apiservers and causes
 	// any needed changes to local behavior.  This method ceases
 	// activity and returns after the given channel is closed.

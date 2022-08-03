@@ -36,7 +36,7 @@ import (
 )
 
 // TODO(knverey): remove this hardcoding once kubectl being built with module support makes BuildInfo available.
-const kustomizeVersion = "v4.5.4"
+const kustomizeVersion = "v4.5.7"
 
 // Version is a struct for version information
 type Version struct {

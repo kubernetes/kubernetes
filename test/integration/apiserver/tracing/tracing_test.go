@@ -34,7 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	client "k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/component-base/traces"
+	"k8s.io/component-base/tracing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -84,7 +84,7 @@ endpoint: %s`, listener.Addr().String())), os.FileMode(0755)); err != nil {
 
 	// Create a client that creates sampled traces.
 	tp := trace.TracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.AlwaysSample())))
-	clientConfig.Wrap(traces.WrapperFor(&tp))
+	clientConfig.Wrap(tracing.WrapperFor(tp))
 	clientSet, err := client.NewForConfig(clientConfig)
 	if err != nil {
 		t.Fatal(err)

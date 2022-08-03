@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	fakecloud "k8s.io/cloud-provider/fake"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	utilpointer "k8s.io/utils/pointer"
@@ -252,7 +253,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	informer.Start(ctx.Done())
-	go controller.Run(ctx, 1)
+	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -298,7 +299,7 @@ func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	informer.Start(ctx.Done())
-	go controller.Run(ctx, 1)
+	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -349,7 +350,7 @@ func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	informer.Start(ctx.Done())
-	go controller.Run(ctx, 1)
+	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{

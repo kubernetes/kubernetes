@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
-	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
@@ -61,9 +60,17 @@ func DefaultWatchCacheSizes() map[schema.GroupResource]int {
 func NewStorageFactoryConfig() *StorageFactoryConfig {
 
 	resources := []schema.GroupVersionResource{
-		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in
-		// 1.25.
-		apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
+		// If a resource has to be stored in a version that is not the
+		// latest, then it can be listed here. Usually this is the case
+		// when a new version for a resource gets introduced and a
+		// downgrade to an older apiserver that doesn't know the new
+		// version still needs to be supported for one release.
+		//
+		// Example from Kubernetes 1.24 where csistoragecapacities had just
+		// graduated to GA:
+		//
+		// TODO (https://github.com/kubernetes/kubernetes/issues/108451): remove the override in 1.25.
+		// apisstorage.Resource("csistoragecapacities").WithVersion("v1beta1"),
 	}
 
 	return &StorageFactoryConfig{

@@ -23,15 +23,11 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -190,8 +186,6 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 }
 
 func TestPodCreateEphemeralContainers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
-
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -261,8 +255,6 @@ func setUpEphemeralContainers(podsClient typedv1.PodInterface, pod *v1.Pod, cont
 }
 
 func TestPodPatchEphemeralContainers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
-
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -494,8 +486,6 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 }
 
 func TestPodUpdateEphemeralContainers(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
-
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -682,63 +672,5 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 		}
 
 		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
-	}
-}
-
-// TestPodEphemeralContainersDisabled tests that the API server returns a 404 when the feature is disabled (because the subresource won't exist).
-// This validates that the feature gate is working, but kubectl also uses the 404 to guess that the feature is disabled on the server.
-func TestPodEphemeralContainersDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, false)()
-
-	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount"}, framework.SharedEtcd())
-	defer server.TearDownFn()
-
-	client := clientset.NewForConfigOrDie(server.ClientConfig)
-
-	ns := framework.CreateNamespaceOrDie(client, "pod-ephemeral-containers-disabled", t)
-	defer framework.DeleteNamespaceOrDie(client, ns, t)
-
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "ephemeral-container-pod",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "fake-name",
-					Image: "fakeimage",
-				},
-			},
-		},
-	}
-	pod, err := setUpEphemeralContainers(client.CoreV1().Pods(ns.Name), pod, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
-
-	pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers, v1.EphemeralContainer{
-		EphemeralContainerCommon: v1.EphemeralContainerCommon{
-			Name:                     "debugger",
-			Image:                    "debugimage",
-			ImagePullPolicy:          "Always",
-			TerminationMessagePolicy: "File",
-		},
-	})
-
-	if _, err = client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(context.TODO(), pod.Name, pod, metav1.UpdateOptions{}); err == nil {
-		t.Fatalf("got nil error when updating ephemeral containers with feature disabled, wanted %q", metav1.StatusReasonNotFound)
-	}
-
-	se, ok := err.(*errors.StatusError)
-	if !ok {
-		t.Fatalf("got error %#v, expected StatusError", err)
-	}
-	if se.ErrStatus.Reason != metav1.StatusReasonNotFound {
-		t.Errorf("got error reason %q when updating ephemeral containers with feature disabled, want %q: %#v", se.ErrStatus.Reason, metav1.StatusReasonNotFound, se)
-	}
-	if se.ErrStatus.Details.Name != "" {
-		t.Errorf("got error details with name %q, want %q: %#v", se.ErrStatus.Details.Name, "", se)
 	}
 }

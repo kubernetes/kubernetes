@@ -25,6 +25,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"sync"
 	"testing"
 	"time"
@@ -1113,6 +1114,7 @@ func TestAttacherMountDevice(t *testing.T) {
 		delegateFSGroupFeatureGate     bool
 		driverSupportsVolumeMountGroup bool
 		shouldFail                     bool
+		skipOnWindows                  bool
 		createAttachment               bool
 		populateDeviceMountPath        bool
 		exitError                      error
@@ -1216,7 +1218,12 @@ func TestAttacherMountDevice(t *testing.T) {
 			createAttachment:        true,
 			populateDeviceMountPath: true,
 			shouldFail:              true,
-			spec:                    volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), true),
+			// NOTE: We're skipping this test on Windows because os.Chmod is not working as intended, which means that
+			// this test won't fail on Windows due to permission denied errors.
+			// TODO: Remove the skip once Windows file permissions support is added.
+			// https://github.com/kubernetes/kubernetes/pull/110921
+			skipOnWindows: true,
+			spec:          volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), true),
 		},
 		{
 			testName:                       "fsgroup provided, DelegateFSGroupToCSIDriver feature enabled, driver supports volume mount group; expect fsgroup to be passed to NodeStageVolume",
@@ -1281,6 +1288,9 @@ func TestAttacherMountDevice(t *testing.T) {
 			}
 		}
 		t.Run(tc.testName, func(t *testing.T) {
+			if tc.skipOnWindows && goruntime.GOOS == "windows" {
+				t.Skipf("Skipping test case on Windows: %s", tc.testName)
+			}
 			t.Logf("Running test case: %s", tc.testName)
 
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DelegateFSGroupToCSIDriver, tc.delegateFSGroupFeatureGate)()
@@ -1348,7 +1358,7 @@ func TestAttacherMountDevice(t *testing.T) {
 				if tc.populateDeviceMountPath {
 					// We're expecting saveVolumeData to fail, which is responsible
 					// for creating this file. It shouldn't exist.
-					_, err := os.Stat(parent + "/" + volDataFileName)
+					_, err := os.Stat(filepath.Join(parent, volDataFileName))
 					if !os.IsNotExist(err) {
 						t.Errorf("vol_data.json should not exist: %v", err)
 					}

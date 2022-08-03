@@ -104,7 +104,7 @@ func (b *BaseATNConfigSet) Alts() *BitSet {
 func NewBaseATNConfigSet(fullCtx bool) *BaseATNConfigSet {
 	return &BaseATNConfigSet{
 		cachedHash:   -1,
-		configLookup: NewArray2DHashSetWithCap(hashATNConfig, equalATNConfigs, 16, 2),
+		configLookup: newArray2DHashSetWithCap(hashATNConfig, equalATNConfigs, 16, 2),
 		fullCtx:      fullCtx,
 	}
 }
@@ -155,7 +155,7 @@ func (b *BaseATNConfigSet) Add(config ATNConfig, mergeCache *DoubleDict) bool {
 }
 
 func (b *BaseATNConfigSet) GetStates() Set {
-	states := NewArray2DHashSet(nil, nil)
+	states := newArray2DHashSet(nil, nil)
 
 	for i := 0; i < len(b.configs); i++ {
 		states.Add(b.configs[i].GetState())
@@ -283,7 +283,7 @@ func (b *BaseATNConfigSet) Clear() {
 
 	b.configs = make([]ATNConfig, 0)
 	b.cachedHash = -1
-	b.configLookup = NewArray2DHashSet(nil, equalATNConfigs)
+	b.configLookup = newArray2DHashSet(nil, equalATNConfigs)
 }
 
 func (b *BaseATNConfigSet) FullContext() bool {
@@ -365,7 +365,7 @@ type OrderedATNConfigSet struct {
 func NewOrderedATNConfigSet() *OrderedATNConfigSet {
 	b := NewBaseATNConfigSet(false)
 
-	b.configLookup = NewArray2DHashSet(nil, nil)
+	b.configLookup = newArray2DHashSet(nil, nil)
 
 	return &OrderedATNConfigSet{BaseATNConfigSet: b}
 }

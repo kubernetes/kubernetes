@@ -45,8 +45,14 @@ func TestSetEntry(t *testing.T) {
 	}
 
 	// add two entries
-	fake.AddEntry("192.168.1.1,tcp:8080", set, true)
-	fake.AddEntry("192.168.1.2,tcp:8081", set, true)
+	err = fake.AddEntry("192.168.1.1,tcp:8080", set, true)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	err = fake.AddEntry("192.168.1.2,tcp:8081", set, true)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 	entries, err := fake.ListEntries(set.Name)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)

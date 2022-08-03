@@ -244,11 +244,10 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
 		// We have feature gating in APIServer to strip the spec
 		// so don't need to re-check feature gate, just check length of Constraints.
-		constraints, err = filterTopologySpreadConstraints(
+		constraints, err = pl.filterTopologySpreadConstraints(
 			pod.Spec.TopologySpreadConstraints,
+			pod.Labels,
 			v1.DoNotSchedule,
-			pl.enableMinDomainsInPodTopologySpread,
-			pl.enableNodeInclusionPolicyInPodTopologySpread,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("obtaining pod's hard topology spread constraints: %w", err)

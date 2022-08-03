@@ -64,6 +64,7 @@ type PodTopologySpread struct {
 	statefulSets                                 appslisters.StatefulSetLister
 	enableMinDomainsInPodTopologySpread          bool
 	enableNodeInclusionPolicyInPodTopologySpread bool
+	enableMatchLabelKeysInPodTopologySpread      bool
 }
 
 var _ framework.PreFilterPlugin = &PodTopologySpread{}
@@ -98,6 +99,7 @@ func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (frame
 		defaultConstraints:                  args.DefaultConstraints,
 		enableMinDomainsInPodTopologySpread: fts.EnableMinDomainsInPodTopologySpread,
 		enableNodeInclusionPolicyInPodTopologySpread: fts.EnableNodeInclusionPolicyInPodTopologySpread,
+		enableMatchLabelKeysInPodTopologySpread:      fts.EnableMatchLabelKeysInPodTopologySpread,
 	}
 	if args.DefaultingType == config.SystemDefaulting {
 		pl.defaultConstraints = systemDefaultConstraints

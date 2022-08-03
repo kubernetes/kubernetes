@@ -95,7 +95,7 @@ func newResetOptions() *resetOptions {
 func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out io.Writer) (*resetData, error) {
 	var cfg *kubeadmapi.InitConfiguration
 
-	client, err := getClientset(options.kubeconfigPath, false)
+	client, err := cmdutil.GetClientset(options.kubeconfigPath, false)
 	if err == nil {
 		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", options.kubeconfigPath)
 		cfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "reset", false, false)

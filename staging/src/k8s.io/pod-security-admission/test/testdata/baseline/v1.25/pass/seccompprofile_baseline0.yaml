@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: seccompprofile_baseline0
+spec:
+  containers:
+  - image: k8s.gcr.io/pause
+    name: container1
+    securityContext:
+      seccompProfile:
+        type: RuntimeDefault
+  initContainers:
+  - image: k8s.gcr.io/pause
+    name: initcontainer1
+    securityContext: {}
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault

@@ -26,6 +26,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	logsapi "k8s.io/component-base/logs/api/v1"
@@ -45,9 +46,10 @@ const defaultRootDir = "/var/lib/kubelet"
 
 // KubeletFlags contains configuration flags for the Kubelet.
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
-// - its value will never, or cannot safely be changed during the lifetime of a node, or
-// - its value cannot be safely shared between nodes at the same time (e.g. a hostname);
-//   KubeletConfiguration is intended to be shared between nodes.
+//   - its value will never, or cannot safely be changed during the lifetime of a node, or
+//   - its value cannot be safely shared between nodes at the same time (e.g. a hostname);
+//     KubeletConfiguration is intended to be shared between nodes.
+//
 // In general, please try to avoid adding flags or configuration fields,
 // we already have a confusingly large amount of them.
 type KubeletFlags struct {
@@ -159,13 +161,28 @@ func NewKubeletFlags() *KubeletFlags {
 // ValidateKubeletFlags validates Kubelet's configuration flags and returns an error if they are invalid.
 func ValidateKubeletFlags(f *KubeletFlags) error {
 	unknownLabels := sets.NewString()
-	for k := range f.NodeLabels {
+	invalidLabelErrs := make(map[string][]string)
+	for k, v := range f.NodeLabels {
 		if isKubernetesLabel(k) && !kubeletapis.IsKubeletLabel(k) {
 			unknownLabels.Insert(k)
+		}
+
+		if errs := validation.IsQualifiedName(k); len(errs) > 0 {
+			invalidLabelErrs[k] = append(invalidLabelErrs[k], errs...)
+		}
+		if errs := validation.IsValidLabelValue(v); len(errs) > 0 {
+			invalidLabelErrs[v] = append(invalidLabelErrs[v], errs...)
 		}
 	}
 	if len(unknownLabels) > 0 {
 		return fmt.Errorf("unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: %v\n--node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", unknownLabels.List(), strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", "))
+	}
+	if len(invalidLabelErrs) > 0 {
+		labelErrs := []string{}
+		for k, v := range invalidLabelErrs {
+			labelErrs = append(labelErrs, fmt.Sprintf("'%s' - %s", k, strings.Join(v, ", ")))
+		}
+		return fmt.Errorf("invalid node labels: %s", strings.Join(labelErrs, "; "))
 	}
 
 	if f.SeccompDefault && !utilfeature.DefaultFeatureGate.Enabled(features.SeccompDefault) {
@@ -307,7 +324,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.Var(&bindableNodeLabels, "node-labels", fmt.Sprintf("<Warning: Alpha feature> Labels to add when registering the node in the cluster.  Labels must be key=value pairs separated by ','. Labels in the 'kubernetes.io' namespace must begin with an allowed prefix (%s) or be in the specifically allowed set (%s)", strings.Join(kubeletapis.KubeletLabelNamespaces(), ", "), strings.Join(kubeletapis.KubeletLabels(), ", ")))
 	fs.StringVar(&f.LockFilePath, "lock-file", f.LockFilePath, "<Warning: Alpha feature> The path to file for kubelet to use as a lock file.")
 	fs.BoolVar(&f.ExitOnLockContention, "exit-on-lock-contention", f.ExitOnLockContention, "Whether kubelet should exit upon lock-file contention.")
-	fs.BoolVar(&f.SeccompDefault, "seccomp-default", f.SeccompDefault, "<Warning: Alpha feature> Enable the use of `RuntimeDefault` as the default seccomp profile for all workloads. The SeccompDefault feature gate must be enabled to allow this flag, which is disabled per default.")
+	fs.BoolVar(&f.SeccompDefault, "seccomp-default", f.SeccompDefault, "<Warning: Beta feature> Enable the use of `RuntimeDefault` as the default seccomp profile for all workloads. The SeccompDefault feature gate must be enabled to allow this flag, which is disabled per default.")
 
 	// DEPRECATED FLAGS
 	fs.DurationVar(&f.MinimumGCAge.Duration, "minimum-container-ttl-duration", f.MinimumGCAge.Duration, "Minimum age for a finished container before it is garbage collected.  Examples: '300ms', '10s' or '2h45m'")

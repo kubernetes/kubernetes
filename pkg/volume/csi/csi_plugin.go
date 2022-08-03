@@ -548,7 +548,7 @@ func (p *csiPlugin) constructVolSourceSpec(volSpecName, driverName string) *volu
 	return volume.NewSpecFromVolume(vol)
 }
 
-//constructPVSourceSpec constructs volume.Spec with CSIPersistentVolumeSource
+// constructPVSourceSpec constructs volume.Spec with CSIPersistentVolumeSource
 func (p *csiPlugin) constructPVSourceSpec(volSpecName, driverName, volumeHandle string) *volume.Spec {
 	fsMode := api.PersistentVolumeFilesystem
 	pv := &api.PersistentVolume{

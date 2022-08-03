@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/winkernel/mocks"
 )
 
-// Mock struct created for HostNetworkService
+// HnsMock struct created for HostNetworkService
 type HnsMock struct {
 	mock.Mock
 }
@@ -67,8 +67,15 @@ func (m HnsMock) getEndpointByName(id string) (*endpointsInfo, error) {
 // createEndpoint refers to the function used for mocking hns.createEndpoint function
 // in unit testing
 func (m HnsMock) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
-	args := m.Called(ep, networkName)
-	return args.Get(0).(*endpointsInfo), args.Error(1)
+	var epMock endpointsInfo = *ep
+	epMock.hns = nil
+	args := m.Called(&epMock, networkName)
+	newEpInfo := args.Get(0).(*endpointsInfo)
+	if newEpInfo == nil {
+		return args.Get(0).(*endpointsInfo), args.Error(1)
+	}
+	newEpInfo.hns = ep.hns
+	return newEpInfo, args.Error(1)
 }
 
 // deleteEndpoint refers to the function used for mocking hns.deleteEndpoint function
@@ -81,7 +88,14 @@ func (m HnsMock) deleteEndpoint(hnsID string) error {
 // getLoadBalancer refers to the function used for mocking hns.getLoadBalancer function
 // in unit testing
 func (m HnsMock) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16, previousLoadBalancers map[loadBalancerIdentifier]*loadBalancerInfo) (*loadBalancerInfo, error) {
-	args := m.Called(endpoints, flags, sourceVip, vip, protocol, internalPort, externalPort, previousLoadBalancers)
+	var epsMock []endpointsInfo
+	for _, ep := range endpoints {
+		epMock := ep
+		epMock.refCount = nil
+		epMock.hns = nil
+		epsMock = append(epsMock, epMock)
+	}
+	args := m.Called(epsMock, flags, sourceVip, vip, protocol, internalPort, externalPort, previousLoadBalancers)
 	return args.Get(0).(*loadBalancerInfo), args.Error(1)
 }
 
@@ -97,6 +111,14 @@ func (m HnsMock) getAllLoadBalancers() (map[loadBalancerIdentifier]*loadBalancer
 func (m HnsMock) deleteLoadBalancer(hnsID string) error {
 	args := m.Called(hnsID)
 	return args.Error(0)
+}
+
+// This will mock the hcn util functions
+func mockHcn() {
+	mockhcn := mocks.HcnMock{}
+	mockSupFeatures := mocks.MockNewSupportedFeatures()
+	mockhcn.On("GetSupportedFeatures").Return(mockSupFeatures)
+	hcnGetSupportedFeatures = mockhcn.GetSupportedFeatures
 }
 
 // mockNewHNSNetworkInfo mocks hnsNetworkInfo object
@@ -126,28 +148,25 @@ func mockNewEndpointInfo(hns HostNetworkService, epIp, epMac, hnsID string, flag
 
 func mockNewHNSNetworkInfoMap(hns HostNetworkService) (eps map[string]*endpointsInfo) {
 	eps = make(map[string]*endpointsInfo)
-	epInfo := mockNewEndpointInfo(hns, epIpAddress, epMacAddress, mocks.HnsID, true)
+	epInfo := mockNewEndpointInfo(hns, mocks.EpIpAddress, mocks.EpMacAddress, mocks.HnsID, true)
 	eps[epInfo.ip] = epInfo
 	eps[epInfo.hnsID] = epInfo
 	return eps
 }
 
-func mockNewHNSNetworkInfoList(hns HostNetworkService, ipList []string, macList []string, providerAddress string, refCount uint16) (eps []endpointsInfo) {
+func mockNewHNSNetworkInfoList(hns HostNetworkService, hnsID string, ipList []string, macList []string, providerAddress string, refCount uint16) (eps []endpointsInfo) {
 	for i := range ipList {
-		var refCountPtr *uint16
-		if i == 0 {
-			refCountPtr = &refCount
-		}
 		epInfo := endpointsInfo{
 			ip:              ipList[i],
 			macAddress:      macList[i],
 			providerAddress: providerAddress,
-			hns:             hns,
+			hns:             nil,
 			isLocal:         false,
 			ready:           false,
 			serving:         false,
 			terminating:     false,
-			refCount:        refCountPtr,
+			refCount:        nil,
+			hnsID:           hnsID,
 		}
 		eps = append(eps, epInfo)
 	}
@@ -155,7 +174,7 @@ func mockNewHNSNetworkInfoList(hns HostNetworkService, ipList []string, macList 
 }
 
 func mockNewLoadBalancerIdentifier() loadBalancerIdentifier {
-	return loadBalancerIdentifier{protocol: uint16(protocol), internalPort: uint16(internalPort), externalPort: uint16(externalPort)}
+	return loadBalancerIdentifier{protocol: uint16(mocks.Protocol), internalPort: uint16(mocks.InternalPort), externalPort: uint16(mocks.ExternalPort)}
 }
 
 func mockNewAllLoadBalancers() (lbs map[loadBalancerIdentifier]*loadBalancerInfo) {
@@ -171,5 +190,11 @@ func mockCreateEndpoint(mockHns *HnsMock, epIp, epMac, providerIpAddress, hnsID 
 	mockEndpointInfo := mockNewEndpointInfo(nil, epIp, epMac, hnsID, flags)
 	mockEndpointInfo.providerAddress = providerIpAddress
 	mockHns.On("createEndpoint", mockEndpointInfo, mocks.TestNwName).Return(mockEndpointInfo, nil)
+	return mockHns
+}
+
+func mockGetLoadbalancer(mockHns *HnsMock, refCount int, hnsID, ipAddress, macAddress, providerAddress, sourceVip string, allLBs map[loadBalancerIdentifier]*loadBalancerInfo, returnLBInfo *loadBalancerInfo) *HnsMock {
+	endPointsInfoList := mockNewHNSNetworkInfoList(nil, hnsID, []string{ipAddress}, []string{macAddress}, providerAddress, uint16(refCount))
+	mockHns.On("getLoadBalancer", endPointsInfoList, mock.Anything, sourceVip, mock.Anything, uint16(mocks.Protocol), uint16(mocks.InternalPort), mock.Anything, allLBs).Return(returnLBInfo, nil)
 	return mockHns
 }

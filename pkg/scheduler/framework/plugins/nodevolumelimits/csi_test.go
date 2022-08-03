@@ -29,11 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csitrans "k8s.io/csi-translation-lib"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -324,29 +321,9 @@ func TestCSILimits(t *testing.T) {
 			filterName:       "csi",
 			maxVols:          2,
 			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
-			migrationEnabled: false,
-			limitSource:      "csinode",
-			test:             "should not count in-tree volume if migration is disabled",
-		},
-		{
-			newPod:           inTreeOneVolPod,
-			existingPods:     []*v1.Pod{inTreeTwoVolPod},
-			filterName:       "csi",
-			maxVols:          2,
-			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
 			migrationEnabled: true,
 			limitSource:      "csinode-with-no-limit",
 			test:             "should not limit pod if volume used does not report limits",
-		},
-		{
-			newPod:           inTreeOneVolPod,
-			existingPods:     []*v1.Pod{inTreeTwoVolPod},
-			filterName:       "csi",
-			maxVols:          2,
-			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
-			migrationEnabled: false,
-			limitSource:      "csinode-with-no-limit",
-			test:             "should not limit in-tree pod if migration is disabled",
 		},
 		{
 			newPod:           inTreeNonMigratableOneVolPod,
@@ -412,36 +389,6 @@ func TestCSILimits(t *testing.T) {
 			limitSource:      "csinode",
 			test:             "should count in-tree and csi volumes if migration is enabled (when scheduling csi volumes)",
 			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
-		},
-		{
-			newPod:           csiEBSOneVolPod,
-			existingPods:     []*v1.Pod{csiEBSTwoVolPod, inTreeTwoVolPod},
-			filterName:       "csi",
-			maxVols:          3,
-			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
-			migrationEnabled: false,
-			limitSource:      "csinode",
-			test:             "should not count in-tree and count csi volumes if migration is disabled (when scheduling csi volumes)",
-		},
-		{
-			newPod:           csiEBSOneVolPod,
-			existingPods:     []*v1.Pod{csiEBSTwoVolPod, inTreeTwoVolPod, inTreeInlineVolPod},
-			filterName:       "csi",
-			maxVols:          3,
-			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
-			migrationEnabled: false,
-			limitSource:      "csinode",
-			test:             "should not count in-tree, inline; should count csi volumes if migration is disabled (when scheduling csi volumes)",
-		},
-		{
-			newPod:           inTreeOneVolPod,
-			existingPods:     []*v1.Pod{csiEBSTwoVolPod},
-			filterName:       "csi",
-			maxVols:          2,
-			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
-			migrationEnabled: false,
-			limitSource:      "csinode",
-			test:             "should not count in-tree and count csi volumes if migration is disabled (when scheduling in-tree volumes)",
 		},
 		// ephemeral volumes
 		{
@@ -533,11 +480,8 @@ func TestCSILimits(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits(test.limitSource, test.existingPods, int64(test.maxVols), test.driverNames...)
-			if test.migrationEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, true)()
+			if csiNode != nil {
 				enableMigrationOnNode(csiNode, csilibplugins.AWSEBSInTreePluginName)
-			} else {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, false)()
 			}
 			csiTranslator := csitrans.New()
 			p := &CSILimits{

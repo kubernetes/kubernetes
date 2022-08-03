@@ -299,7 +299,7 @@ func timeZone(tz ref.Val, visitor timestampVisitor) timestampVisitor {
 		if err != nil {
 			return wrapErr(err)
 		}
-		min, err := strconv.Atoi(string(val[ind+1]))
+		min, err := strconv.Atoi(string(val[ind+1:]))
 		if err != nil {
 			return wrapErr(err)
 		}

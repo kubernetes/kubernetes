@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
@@ -80,7 +79,7 @@ func getParentName(pod *v1.Pod) string {
 	return parent
 }
 
-//  getOrdinal gets pod's ordinal. If pod has no ordinal, -1 is returned.
+// getOrdinal gets pod's ordinal. If pod has no ordinal, -1 is returned.
 func getOrdinal(pod *v1.Pod) int {
 	_, ordinal := getParentNameAndOrdinal(pod)
 	return ordinal
@@ -592,7 +591,7 @@ func (ao ascendingOrdinal) Less(i, j int) bool {
 // Note that API validation has already guaranteed the maxUnavailable field to be >1 if it is an integer
 // or 0% < value <= 100% if it is a percentage, so we don't have to consider other cases.
 func getStatefulSetMaxUnavailable(maxUnavailable *intstr.IntOrString, replicaCount int) (int, error) {
-	maxUnavailableNum, err := intstrutil.GetScaledValueFromIntOrPercent(intstrutil.ValueOrDefault(maxUnavailable, intstrutil.FromInt(1)), replicaCount, false)
+	maxUnavailableNum, err := intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(maxUnavailable, intstr.FromInt(1)), replicaCount, false)
 	if err != nil {
 		return 0, err
 	}

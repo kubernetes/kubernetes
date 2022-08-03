@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
 	goruntime "runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,6 +46,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2/ktesting"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -1581,6 +1584,119 @@ func TestFilterOutInactivePods(t *testing.T) {
 	kubelet.podManager.SetPods(pods)
 	actual := kubelet.filterOutInactivePods(pods)
 	assert.Equal(t, expected, actual)
+}
+
+func TestCheckpointContainer(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	fakeRuntime := testKubelet.fakeRuntime
+	containerID := kubecontainer.ContainerID{
+		Type: "test",
+		ID:   "abc1234",
+	}
+
+	fakePod := &containertest.FakePod{
+		Pod: &kubecontainer.Pod{
+			ID:        "12345678",
+			Name:      "podFoo",
+			Namespace: "nsFoo",
+			Containers: []*kubecontainer.Container{
+				{
+					Name: "containerFoo",
+					ID:   containerID,
+				},
+			},
+		},
+	}
+
+	fakeRuntime.PodList = []*containertest.FakePod{fakePod}
+	wrongContainerName := "wrongContainerName"
+
+	tests := []struct {
+		name               string
+		containerName      string
+		checkpointLocation string
+		expectedStatus     error
+		expectedLocation   string
+	}{
+		{
+			name:               "Checkpoint with wrong container name",
+			containerName:      wrongContainerName,
+			checkpointLocation: "",
+			expectedStatus:     fmt.Errorf("container %s not found", wrongContainerName),
+			expectedLocation:   "",
+		},
+		{
+			name:               "Checkpoint with default checkpoint location",
+			containerName:      fakePod.Pod.Containers[0].Name,
+			checkpointLocation: "",
+			expectedStatus:     nil,
+			expectedLocation: filepath.Join(
+				kubelet.getCheckpointsDir(),
+				fmt.Sprintf(
+					"checkpoint-%s_%s-%s",
+					fakePod.Pod.Name,
+					fakePod.Pod.Namespace,
+					fakePod.Pod.Containers[0].Name,
+				),
+			),
+		},
+		{
+			name:               "Checkpoint with ignored location",
+			containerName:      fakePod.Pod.Containers[0].Name,
+			checkpointLocation: "somethingThatWillBeIgnored",
+			expectedStatus:     nil,
+			expectedLocation: filepath.Join(
+				kubelet.getCheckpointsDir(),
+				fmt.Sprintf(
+					"checkpoint-%s_%s-%s",
+					fakePod.Pod.Name,
+					fakePod.Pod.Namespace,
+					fakePod.Pod.Containers[0].Name,
+				),
+			),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			options := &runtimeapi.CheckpointContainerRequest{}
+			if test.checkpointLocation != "" {
+				options.Location = test.checkpointLocation
+			}
+			status := kubelet.CheckpointContainer(
+				fakePod.Pod.ID,
+				fmt.Sprintf(
+					"%s_%s",
+					fakePod.Pod.Name,
+					fakePod.Pod.Namespace,
+				),
+				test.containerName,
+				options,
+			)
+			require.Equal(t, status, test.expectedStatus)
+
+			if status != nil {
+				return
+			}
+
+			require.True(
+				t,
+				strings.HasPrefix(
+					options.Location,
+					test.expectedLocation,
+				),
+			)
+			require.Equal(
+				t,
+				options.ContainerId,
+				containerID.ID,
+			)
+
+		})
+	}
 }
 
 func TestSyncPodsSetStatusToFailedForPodsThatRunTooLong(t *testing.T) {

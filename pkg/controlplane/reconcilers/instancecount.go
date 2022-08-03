@@ -53,12 +53,12 @@ func NewMasterCountEndpointReconciler(masterCount int, epAdapter EndpointsAdapte
 // understand the requirements and the body of this function.
 //
 // Requirements:
-//  * All apiservers MUST use the same ports for their {rw, ro} services.
-//  * All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
-//      endpoints for their {rw, ro} services.
-//  * All apiservers MUST know and agree on the number of apiservers expected
-//      to be running (c.masterCount).
-//  * ReconcileEndpoints is called periodically from all apiservers.
+//   - All apiservers MUST use the same ports for their {rw, ro} services.
+//   - All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
+//     endpoints for their {rw, ro} services.
+//   - All apiservers MUST know and agree on the number of apiservers expected
+//     to be running (c.masterCount).
+//   - ReconcileEndpoints is called periodically from all apiservers.
 func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []corev1.EndpointPort, reconcilePorts bool) error {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
@@ -187,10 +187,10 @@ func (r *masterCountEndpointReconciler) Destroy() {
 // Determine if the endpoint is in the format ReconcileEndpoints expects.
 //
 // Return values:
-// * formatCorrect is true if exactly one subset is found.
-// * ipCorrect is true when current master's IP is found and the number
+//   - formatCorrect is true if exactly one subset is found.
+//   - ipCorrect is true when current master's IP is found and the number
 //     of addresses is less than or equal to the master count.
-// * portsCorrect is true when endpoint ports exactly match provided ports.
+//   - portsCorrect is true when endpoint ports exactly match provided ports.
 //     portsCorrect is only evaluated when reconcilePorts is set to true.
 func checkEndpointSubsetFormat(e *corev1.Endpoints, ip string, ports []corev1.EndpointPort, count int, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
 	if len(e.Subsets) != 1 {

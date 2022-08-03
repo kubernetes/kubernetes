@@ -151,7 +151,7 @@ func DefaultOffAdmissionPlugins() sets.String {
 		validatingwebhook.PluginName,            // ValidatingAdmissionWebhook
 		resourcequota.PluginName,                // ResourceQuota
 		storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
-		podpriority.PluginName,                  // PodPriority
+		podpriority.PluginName,                  // Priority
 		nodetaint.PluginName,                    // TaintNodesByCondition
 		runtimeclass.PluginName,                 // RuntimeClass
 		certapproval.PluginName,                 // CertificateApproval
