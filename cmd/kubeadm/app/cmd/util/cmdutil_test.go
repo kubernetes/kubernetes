@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"k8s.io/client-go/tools/clientcmd"
 	"testing"
 )
 
@@ -66,6 +67,32 @@ func TestValidateExactArgNumber(t *testing.T) {
 					rt.expectedErr,
 					(actual != nil),
 				)
+			}
+		})
+	}
+}
+
+func TestGetKubeConfigPath(t *testing.T) {
+	var tests = []struct {
+		name     string
+		file     string
+		expected string
+	}{
+		{
+			name:     "provide an empty value",
+			file:     "",
+			expected: clientcmd.NewDefaultClientConfigLoadingRules().GetDefaultFilename(),
+		},
+		{
+			name:     "provide a non-empty value",
+			file:     "kubelet.kubeconfig",
+			expected: "kubelet.kubeconfig",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if GetKubeConfigPath(tt.file) != tt.expected {
+				t.Error("unexpected result")
 			}
 		})
 	}
