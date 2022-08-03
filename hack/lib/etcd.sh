@@ -161,19 +161,21 @@ kube::etcd::install() {
     fi
 
     if [[ ${os} == "darwin" ]]; then
-      download_file="etcd-v${ETCD_VERSION}-darwin-amd64.zip"
+      download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.zip"
       url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
       kube::util::download_file "${url}" "${download_file}"
       unzip -o "${download_file}"
-      ln -fns "etcd-v${ETCD_VERSION}-darwin-amd64" etcd
+      ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
       rm "${download_file}"
-    else
-      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-${arch}.tar.gz"
-      download_file="etcd-v${ETCD_VERSION}-linux-${arch}.tar.gz"
+    elif [[ ${os} == "linux" ]]; then
+      url="https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
+      download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
       kube::util::download_file "${url}" "${download_file}"
       tar xzf "${download_file}"
-      ln -fns "etcd-v${ETCD_VERSION}-linux-${arch}" etcd
+      ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
       rm "${download_file}"
+    else
+      kube::log::info "${os} is NOT supported."
     fi
     kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
     kube::log::info "export PATH=\"$(pwd)/etcd:\${PATH}\""
