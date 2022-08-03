@@ -72,16 +72,27 @@ func adjustClusterNameIfWildcard(cluster *genericapirequest.Cluster, crdRequest 
 // name in the objects in storage. Instead, it is derived from the storage key, and then applied after retrieving
 // the object from storage.
 func setClusterNameOnDecodedObject(obj interface{}, clusterName logicalcluster.Name) {
+	var s clusterNameSetter
+
 	switch t := obj.(type) {
 	case metav1.ObjectMetaAccessor:
-		t.GetObjectMeta().SetZZZ_DeprecatedClusterName(clusterName.String())
+		s = t.GetObjectMeta()
 	case clusterNameSetter:
-		t.SetZZZ_DeprecatedClusterName(clusterName.String())
+		s = t
 	default:
 		klog.Warningf("Could not set ClusterName %s on object: %T", clusterName, obj)
+		return
 	}
+
+	annotations := s.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[logicalcluster.AnnotationKey] = clusterName.String()
+	s.SetAnnotations(annotations)
 }
 
 type clusterNameSetter interface {
-	SetZZZ_DeprecatedClusterName(clusterName string)
+	GetAnnotations() map[string]string
+	SetAnnotations(a map[string]string)
 }
