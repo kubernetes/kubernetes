@@ -362,6 +362,13 @@ function kube::release::create_docker_images_for_server() {
       local binary_file_path="${binary_dir}/${binary_name}"
       local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
 
+      if [[ "${binary_name}" =~ apiserver ]]; then
+          echo "${binary_name} include apiserver"
+      else
+          echo "${binary_name}, skip"
+          continue
+      fi
+
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
       (
         rm -rf "${docker_build_path}"
@@ -385,7 +392,7 @@ EOF
         if [[ "${KUBE_BUILD_PULL_LATEST_IMAGES}" =~ [yY] ]]; then
             docker_build_opts+=("--pull")
         fi
-        "${DOCKER[@]}" build "${docker_build_opts[@]}" -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
+        "${DOCKER[@]}" build -t "${docker_image_tag}" "${docker_build_path}"
         # If we are building an official/alpha/beta release we want to keep
         # docker images and tag them appropriately.
         local -r release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
