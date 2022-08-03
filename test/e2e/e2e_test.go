@@ -21,14 +21,11 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/ginkgo/v2/reporters"
-	"github.com/onsi/ginkgo/v2/types"
 	"gopkg.in/yaml.v2"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
@@ -146,9 +143,10 @@ var _ = ginkgo.ReportAfterEach(func(report ginkgo.SpecReport) {
 	progressReporter.ProcessSpecReport(report)
 })
 
-// writeSpecSummaryOutput will output details about every test (name, files, lines, etc) which helps
-// when documenting our tests.
-func writeSpecSummaryOutput(report ginkgo.Report) {
+var _ = ginkgo.ReportAfterSuite("Kubernetes e2e suite report", func(report ginkgo.Report) {
+	var err error
+	// The DetailsRepoerter will output details about every test (name, files, lines, etc) which helps
+	// when documenting our tests.
 	if len(framework.TestContext.SpecSummaryOutput) <= 0 {
 		return
 	}
@@ -171,58 +169,16 @@ func writeSpecSummaryOutput(report ginkgo.Report) {
 			klog.Errorf("Error in detail reporter: %v", err)
 			return
 		}
-		if _, err = f.Write(b); err != nil {
+		_, err = f.Write(b)
+		if err != nil {
 			klog.Errorf("Error saving test details in detail reporter: %v", err)
 			return
 		}
 		// Printing newline between records for easier viewing in various tools.
-		if _, err = fmt.Fprintln(f, ""); err != nil {
+		_, err = fmt.Fprintln(f, "")
+		if err != nil {
 			klog.Errorf("Error saving test details in detail reporter: %v", err)
 			return
 		}
 	}
-}
-
-// writeJUnitReport generates a JUnit file in the e2e report directory that is
-// shorter than the one normally written by `ginkgo --junit-report`. This is
-// needed because the full report can become too large for tools like Spyglass
-// (https://github.com/kubernetes/kubernetes/issues/111510).
-//
-// Users who want the full report can use `--junit-report`.
-func writeJUnitReport(report ginkgo.Report) {
-	if framework.TestContext.ReportDir == "" {
-		return
-	}
-
-	trimmedReport := report
-	trimmedReport.SpecReports = nil
-	for _, specReport := range report.SpecReports {
-		// Remove details for any spec that hasn't failed. In Prow,
-		// the test output captured in build-log.txt has all of this
-		// information, so we don't need it in the XML.
-		if specReport.State != types.SpecStateFailed {
-			// strip the "system-error" if the testcase is not failed.
-			specReport.CapturedGinkgoWriterOutput = ""
-			// strip the "system-out" if the testcase is not failed.
-			specReport.CapturedStdOutErr = ""
-			// strip some details for tracing each steps executed by Ginkgo, this is used to build the "system-out"
-			// while "system-out" is not shown by Spyglass if the testcase is not failed.
-			specReport.ReportEntries = nil
-
-		}
-
-		trimmedReport.SpecReports = append(trimmedReport.SpecReports, specReport)
-	}
-
-	// With Ginkgo v1, we used to write one file per parallel node. Now
-	// Ginkgo v2 automatically merges all results into a report for us. The
-	// 01 suffix is kept in case that users expect files to be called
-	// "junit_<prefix><number>.xml".
-	junitReport := path.Join(framework.TestContext.ReportDir, "junit_"+framework.TestContext.ReportPrefix+"01.xml")
-	reporters.GenerateJUnitReport(trimmedReport, junitReport)
-}
-
-var _ = ginkgo.ReportAfterSuite("Kubernetes e2e suite report", func(report ginkgo.Report) {
-	writeSpecSummaryOutput(report)
-	writeJUnitReport(report)
 })
