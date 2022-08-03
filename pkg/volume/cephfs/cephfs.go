@@ -340,7 +340,9 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 		klog.V(4).Info("cephfs mount begin using fuse.")
 
 		keyringPath := cephfsVolume.GetKeyringPath()
-		os.MkdirAll(keyringPath, 0750)
+		if err := os.MkdirAll(keyringPath, 0750); err != nil {
+			return err
+		}
 
 		payload := make(map[string]util.FileProjection, 1)
 		var fileProjection util.FileProjection

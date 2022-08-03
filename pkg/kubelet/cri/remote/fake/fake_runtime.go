@@ -305,7 +305,7 @@ func (f *RemoteRuntime) Status(ctx context.Context, req *kubeapi.StatusRequest) 
 
 // UpdateContainerResources updates ContainerConfig of the container.
 func (f *RemoteRuntime) UpdateContainerResources(ctx context.Context, req *kubeapi.UpdateContainerResourcesRequest) (*kubeapi.UpdateContainerResourcesResponse, error) {
-	err := f.RuntimeService.UpdateContainerResources(req.ContainerId, req.Linux)
+	err := f.RuntimeService.UpdateContainerResources(req.ContainerId, &kubeapi.ContainerResources{Linux: req.Linux})
 	if err != nil {
 		return nil, err
 	}
@@ -321,4 +321,18 @@ func (f *RemoteRuntime) ReopenContainerLog(ctx context.Context, req *kubeapi.Reo
 	}
 
 	return &kubeapi.ReopenContainerLogResponse{}, nil
+}
+
+// CheckpointContainer checkpoints the given container.
+func (f *RemoteRuntime) CheckpointContainer(ctx context.Context, req *kubeapi.CheckpointContainerRequest) (*kubeapi.CheckpointContainerResponse, error) {
+	err := f.RuntimeService.CheckpointContainer(&kubeapi.CheckpointContainerRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.CheckpointContainerResponse{}, nil
+}
+
+func (f *RemoteRuntime) GetContainerEvents(req *kubeapi.GetEventsRequest, ces kubeapi.RuntimeService_GetContainerEventsServer) error {
+	return nil
 }

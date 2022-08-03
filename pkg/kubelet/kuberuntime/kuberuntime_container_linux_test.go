@@ -520,7 +520,6 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 }
 
 func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 	_, _, m, err := createTestRuntimeManager()
 	if err != nil {
 		t.Fatalf("error creating test RuntimeManager: %v", err)

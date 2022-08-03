@@ -40,14 +40,27 @@ func TestIsKubeletServingCSR(t *testing.T) {
 		return csr
 	}
 	tests := map[string]struct {
-		req    *x509.CertificateRequest
-		usages []capi.KeyUsage
-		exp    bool
+		req                               *x509.CertificateRequest
+		usages                            []capi.KeyUsage
+		allowOmittingUsageKeyEncipherment bool
+		exp                               bool
 	}{
 		"defaults for kubelet-serving": {
 			req:    newCSR(kubeletServerPEMOptions),
 			usages: kubeletServerUsages,
 			exp:    true,
+		},
+		"defaults without key encipherment for kubelet-serving if allow omitting key encipherment": {
+			req:                               newCSR(kubeletServerPEMOptions),
+			usages:                            kubeletServerUsagesNoRSA,
+			allowOmittingUsageKeyEncipherment: true,
+			exp:                               true,
+		},
+		"defaults for kubelet-serving if allow omitting key encipherment": {
+			req:                               newCSR(kubeletServerPEMOptions),
+			usages:                            kubeletServerUsages,
+			allowOmittingUsageKeyEncipherment: true,
+			exp:                               true,
 		},
 		"does not default to kube-apiserver-client-kubelet if org is not 'system:nodes'": {
 			req:    newCSR(kubeletServerPEMOptions, pemOptions{org: "not-system:nodes"}),
@@ -69,6 +82,17 @@ func TestIsKubeletServingCSR(t *testing.T) {
 			usages: kubeletServerUsages[1:],
 			exp:    false,
 		},
+		"does not default to kubelet-serving if it is missing an expected usage if allow omitting key encipherment": {
+			req:                               newCSR(kubeletServerPEMOptions),
+			usages:                            kubeletServerUsagesNoRSA[1:],
+			allowOmittingUsageKeyEncipherment: true,
+			exp:                               false,
+		},
+		"does not default to kubelet-serving if it is missing an expected usage withou key encipherment": {
+			req:    newCSR(kubeletServerPEMOptions),
+			usages: kubeletServerUsagesNoRSA,
+			exp:    false,
+		},
 		"does not default to kubelet-serving if it does not specify any dnsNames or ipAddresses": {
 			req:    newCSR(kubeletServerPEMOptions, pemOptions{ipAddresses: []net.IP{}, dnsNames: []string{}}),
 			usages: kubeletServerUsages[1:],
@@ -87,7 +111,7 @@ func TestIsKubeletServingCSR(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := IsKubeletServingCSR(test.req, test.usages)
+			got := IsKubeletServingCSR(test.req, test.usages, test.allowOmittingUsageKeyEncipherment)
 			if test.exp != got {
 				t.Errorf("unexpected IsKubeletClientCSR output: exp=%v, got=%v", test.exp, got)
 			}
@@ -105,9 +129,10 @@ func TestIsKubeletClientCSR(t *testing.T) {
 		return csr
 	}
 	tests := map[string]struct {
-		req    *x509.CertificateRequest
-		usages []capi.KeyUsage
-		exp    bool
+		req                               *x509.CertificateRequest
+		usages                            []capi.KeyUsage
+		allowOmittingUsageKeyEncipherment bool
+		exp                               bool
 	}{
 		"defaults for kube-apiserver-client-kubelet": {
 			req:    newCSR(kubeletClientPEMOptions),
@@ -154,10 +179,28 @@ func TestIsKubeletClientCSR(t *testing.T) {
 			usages: kubeletClientUsages[1:],
 			exp:    false,
 		},
+		"does not default to kube-apiserver-client-kubelet if it is missing an expected usage without key encipherment": {
+			req:                               newCSR(kubeletClientPEMOptions),
+			usages:                            kubeletClientUsagesNoRSA[1:],
+			allowOmittingUsageKeyEncipherment: true,
+			exp:                               false,
+		},
+		"default to kube-apiserver-client-kubelet with key encipherment": {
+			req:                               newCSR(kubeletClientPEMOptions),
+			usages:                            kubeletClientUsages,
+			allowOmittingUsageKeyEncipherment: true,
+			exp:                               true,
+		},
+		"default to kube-apiserver-client-kubelet without key encipherment": {
+			req:                               newCSR(kubeletClientPEMOptions),
+			usages:                            kubeletClientUsagesNoRSA,
+			allowOmittingUsageKeyEncipherment: true,
+			exp:                               true,
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := IsKubeletClientCSR(test.req, test.usages)
+			got := IsKubeletClientCSR(test.req, test.usages, test.allowOmittingUsageKeyEncipherment)
 			if test.exp != got {
 				t.Errorf("unexpected IsKubeletClientCSR output: exp=%v, got=%v", test.exp, got)
 			}
@@ -171,6 +214,10 @@ var (
 		capi.UsageKeyEncipherment,
 		capi.UsageClientAuth,
 	}
+	kubeletClientUsagesNoRSA = []capi.KeyUsage{
+		capi.UsageDigitalSignature,
+		capi.UsageClientAuth,
+	}
 	kubeletClientPEMOptions = pemOptions{
 		cn:  "system:node:nodename",
 		org: "system:nodes",
@@ -179,6 +226,10 @@ var (
 	kubeletServerUsages = []capi.KeyUsage{
 		capi.UsageDigitalSignature,
 		capi.UsageKeyEncipherment,
+		capi.UsageServerAuth,
+	}
+	kubeletServerUsagesNoRSA = []capi.KeyUsage{
+		capi.UsageDigitalSignature,
 		capi.UsageServerAuth,
 	}
 	kubeletServerPEMOptions = pemOptions{

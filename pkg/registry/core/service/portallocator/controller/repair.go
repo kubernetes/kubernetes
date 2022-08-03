@@ -213,8 +213,8 @@ func (c *Repair) doRunOnce() error {
 
 // collectServiceNodePorts returns nodePorts specified in the Service.
 // Please note that:
-//   1. same nodePort with *same* protocol will be duplicated as it is
-//   2. same nodePort with *different* protocol will be deduplicated
+//  1. same nodePort with *same* protocol will be duplicated as it is
+//  2. same nodePort with *different* protocol will be deduplicated
 func collectServiceNodePorts(service *corev1.Service) []int {
 	var servicePorts []int
 	// map from nodePort to set of protocols

@@ -509,7 +509,7 @@ func (r *FakeRuntimeService) ContainerStatus(containerID string, verbose bool) (
 }
 
 // UpdateContainerResources returns the container resource in the FakeRuntimeService.
-func (r *FakeRuntimeService) UpdateContainerResources(string, *runtimeapi.LinuxContainerResources) error {
+func (r *FakeRuntimeService) UpdateContainerResources(string, *runtimeapi.ContainerResources) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -692,5 +692,23 @@ func (r *FakeRuntimeService) ReopenContainerLog(containerID string) error {
 		return err
 	}
 
+	return nil
+}
+
+// CheckpointContainer emulates call to checkpoint a container in the FakeRuntimeService.
+func (r *FakeRuntimeService) CheckpointContainer(options *runtimeapi.CheckpointContainerRequest) error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "CheckpointContainer")
+
+	if err := r.popError("CheckpointContainer"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (f *FakeRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {
 	return nil
 }

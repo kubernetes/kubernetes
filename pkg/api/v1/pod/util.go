@@ -23,8 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // FindPort locates the container port for the given pod and portName.  If the
@@ -68,11 +66,7 @@ const AllContainers ContainerType = (InitContainers | Containers | EphemeralCont
 // AllFeatureEnabledContainers returns a ContainerType mask which includes all container
 // types except for the ones guarded by feature gate.
 func AllFeatureEnabledContainers() ContainerType {
-	containerType := AllContainers
-	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		containerType &= ^EphemeralContainers
-	}
-	return containerType
+	return AllContainers
 }
 
 // ContainerVisitor is called with each container spec, and returns true

@@ -537,12 +537,7 @@ func (jm *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 
 	utilruntime.HandleError(fmt.Errorf("syncing job: %w", err))
-	if !apierrors.IsConflict(err) {
-		// If this was a conflict error, we expect a Job or Pod update event, which
-		// will add the job back to the queue. Avoiding the rate limited requeue
-		// saves an unnecessary sync.
-		jm.queue.AddRateLimited(key)
-	}
+	jm.queue.AddRateLimited(key)
 
 	return true
 }
@@ -986,11 +981,12 @@ func (jm *Controller) removeTrackingFinalizersFromAllPods(ctx context.Context, p
 }
 
 // trackJobStatusAndRemoveFinalizers does:
-// 1. Add finished Pods to .status.uncountedTerminatedPods
-// 2. Remove the finalizers from the Pods if they completed or were removed
-//    or the job was removed.
-// 3. Increment job counters for pods that no longer have a finalizer.
-// 4. Add Complete condition if satisfied with current counters.
+//  1. Add finished Pods to .status.uncountedTerminatedPods
+//  2. Remove the finalizers from the Pods if they completed or were removed
+//     or the job was removed.
+//  3. Increment job counters for pods that no longer have a finalizer.
+//  4. Add Complete condition if satisfied with current counters.
+//
 // It does this up to a limited number of Pods so that the size of .status
 // doesn't grow too much and this sync doesn't starve other Jobs.
 func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job *batch.Job, pods []*v1.Pod, succeededIndexes orderedIntervals, uncounted uncountedTerminatedPods, expectedRmFinalizers sets.String, finishedCond *batch.JobCondition, needsFlush bool) error {
@@ -1027,7 +1023,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 		if podFinished || podTerminating || job.DeletionTimestamp != nil {
 			podsToRemoveFinalizer = append(podsToRemoveFinalizer, pod)
 		}
-		if pod.Status.Phase == v1.PodSucceeded {
+		if pod.Status.Phase == v1.PodSucceeded && !uncounted.failed.Has(string(pod.UID)) {
 			if isIndexed {
 				// The completion index is enough to avoid recounting succeeded pods.
 				// No need to track UIDs.
@@ -1081,12 +1077,13 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job
 }
 
 // flushUncountedAndRemoveFinalizers does:
-// 1. flush the Job status that might include new uncounted Pod UIDs.
-// 2. perform the removal of finalizers from Pods which are in the uncounted
-//    lists.
-// 3. update the counters based on the Pods for which it successfully removed
-//    the finalizers.
-// 4. (if not all removals succeeded) flush Job status again.
+//  1. flush the Job status that might include new uncounted Pod UIDs.
+//  2. perform the removal of finalizers from Pods which are in the uncounted
+//     lists.
+//  3. update the counters based on the Pods for which it successfully removed
+//     the finalizers.
+//  4. (if not all removals succeeded) flush Job status again.
+//
 // Returns whether there are pending changes in the Job status that need to be
 // flushed in subsequent calls.
 func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, job *batch.Job, podsToRemoveFinalizer []*v1.Pod, uidsWithFinalizer sets.String, oldCounters *batch.JobStatus, needsFlush bool) (*batch.Job, bool, error) {

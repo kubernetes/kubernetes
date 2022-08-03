@@ -133,7 +133,7 @@ func (set *IPSet) validateEntry(entry *utilipset.Entry) bool {
 }
 
 func (set *IPSet) isEmpty() bool {
-	return len(set.activeEntries.UnsortedList()) == 0
+	return set.activeEntries.Len() == 0
 }
 
 func (set *IPSet) getComment() string {

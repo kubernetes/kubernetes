@@ -21,7 +21,6 @@ package mount
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -66,6 +65,18 @@ type Interface interface {
 	// care about such situations, this is a faster alternative to calling List()
 	// and scanning that output.
 	IsLikelyNotMountPoint(file string) (bool, error)
+	// canSafelySkipMountPointCheck indicates whether this mounter returns errors on
+	// operations for targets that are not mount points. If this returns true, no such
+	// errors will be returned.
+	canSafelySkipMountPointCheck() bool
+	// IsMountPoint determines if a directory is a mountpoint.
+	// It should return ErrNotExist when the directory does not exist.
+	// IsMountPoint is more expensive than IsLikelyNotMountPoint.
+	// IsMountPoint detects bind mounts in linux.
+	// IsMountPoint may enumerate all the mountpoints using List() and
+	// the list of mountpoints may be large, then it uses
+	// isMountPointMatch to evaluate whether the directory is a mountpoint.
+	IsMountPoint(file string) (bool, error)
 	// GetMountRefs finds all mount references to pathname, returning a slice of
 	// paths. Pathname can be a mountpoint path or a normal	directory
 	// (for bind mount). On Linux, pathname is excluded from the slice.
@@ -187,6 +198,24 @@ func getMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
 	return refs, nil
 }
 
+// IsNotMountPoint determines if a directory is a mountpoint.
+// It should return ErrNotExist when the directory does not exist.
+// IsNotMountPoint is more expensive than IsLikelyNotMountPoint
+// and depends on IsMountPoint.
+//
+// If an error occurs, it returns true (assuming it is not a mountpoint)
+// when ErrNotExist is returned for callers similar to IsLikelyNotMountPoint.
+//
+// Deprecated: This function is kept to keep changes backward compatible with
+// previous library version. Callers should prefer mounter.IsMountPoint.
+func IsNotMountPoint(mounter Interface, file string) (bool, error) {
+	isMnt, err := mounter.IsMountPoint(file)
+	if err != nil {
+		return true, err
+	}
+	return !isMnt, nil
+}
+
 // GetDeviceNameFromMount given a mnt point, find the device from /proc/mounts
 // returns the device name, reference count, and error code.
 func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, error) {
@@ -220,56 +249,11 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 	return device, refCount, nil
 }
 
-// IsNotMountPoint determines if a directory is a mountpoint.
-// It should return ErrNotExist when the directory does not exist.
-// IsNotMountPoint is more expensive than IsLikelyNotMountPoint.
-// IsNotMountPoint detects bind mounts in linux.
-// IsNotMountPoint enumerates all the mountpoints using List() and
-// the list of mountpoints may be large, then it uses
-// isMountPointMatch to evaluate whether the directory is a mountpoint.
-func IsNotMountPoint(mounter Interface, file string) (bool, error) {
-	// IsLikelyNotMountPoint provides a quick check
-	// to determine whether file IS A mountpoint.
-	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)
-	if notMntErr != nil && os.IsPermission(notMntErr) {
-		// We were not allowed to do the simple stat() check, e.g. on NFS with
-		// root_squash. Fall back to /proc/mounts check below.
-		notMnt = true
-		notMntErr = nil
-	}
-	if notMntErr != nil {
-		return notMnt, notMntErr
-	}
-	// identified as mountpoint, so return this fact.
-	if notMnt == false {
-		return notMnt, nil
-	}
-
-	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts.
-	resolvedFile, err := filepath.EvalSymlinks(file)
-	if err != nil {
-		return true, err
-	}
-
-	// check all mountpoints since IsLikelyNotMountPoint
-	// is not reliable for some mountpoint types.
-	mountPoints, mountPointsErr := mounter.List()
-	if mountPointsErr != nil {
-		return notMnt, mountPointsErr
-	}
-	for _, mp := range mountPoints {
-		if isMountPointMatch(mp, resolvedFile) {
-			notMnt = false
-			break
-		}
-	}
-	return notMnt, nil
-}
-
 // MakeBindOpts detects whether a bind mount is being requested and makes the remount options to
 // use in case of bind mount, due to the fact that bind mount doesn't respect mount options.
 // The list equals:
-//   options - 'bind' + 'remount' (no duplicate)
+//
+//	options - 'bind' + 'remount' (no duplicate)
 func MakeBindOpts(options []string) (bool, []string, []string) {
 	bind, bindOpts, bindRemountOpts, _ := MakeBindOptsSensitive(options, nil /* sensitiveOptions */)
 	return bind, bindOpts, bindRemountOpts

@@ -22,30 +22,31 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/reporters"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-func TestGinkgoOutput(t *testing.T, runTests func(t *testing.T, reporter ginkgo.Reporter), expected SuiteResults) {
-	// Run the Ginkgo suite with output collected by a custom
-	// reporter in adddition to the default one. To see what the full
-	// Ginkgo report looks like, run this test with "go test -v".
-	config.DefaultReporterConfig.FullTrace = true
+func TestGinkgoOutput(t *testing.T, expected SuiteResults) {
+	// Run the Ginkgo suite with spec results collected via ReportAfterEach
+	// in adddition to the default one. To see what the full
+	// Ginkgo output looks like, run this test with "go test -v".
 	gomega.RegisterFailHandler(framework.Fail)
+	var report []ginkgo.SpecReport
+	ginkgo.ReportAfterEach(func(spec ginkgo.SpecReport) {
+		report = append(report, spec)
+	})
 	fakeT := &testing.T{}
-	reporter := reporters.NewFakeReporter()
-	runTests(fakeT, reporter)
+	ginkgo.RunSpecs(fakeT, "Logging Suite")
 
 	// Now check the output.
-	actual := normalizeReport(*reporter)
+	actual := normalizeReport(report)
 
 	if assert.Equal(t, len(expected), len(actual), "Should have %d test results, got: %v", actual) {
 		for i := 0; i < len(expected); i++ {
+			assert.Equal(t, expected[i].Name, actual[i].Name, "name from test #%d", i)
 			output := actual[i].Output
 			if expected[i].NormalizeOutput != nil {
 				output = expected[i].NormalizeOutput(output)
@@ -80,12 +81,12 @@ type TestResult struct {
 
 type SuiteResults []TestResult
 
-func normalizeReport(report reporters.FakeReporter) SuiteResults {
+func normalizeReport(report []ginkgo.SpecReport) SuiteResults {
 	var results SuiteResults
-	for _, spec := range report.SpecSummaries {
+	for _, spec := range report {
 		results = append(results, TestResult{
-			Name:    strings.Join(spec.ComponentTexts, " "),
-			Output:  normalizeLocation(stripAddresses(stripTimes(spec.CapturedOutput))),
+			Name:    strings.Join(spec.ContainerHierarchyTexts, " ") + " " + spec.LeafNodeText,
+			Output:  normalizeLocation(stripAddresses(stripTimes(spec.CapturedGinkgoWriterOutput))),
 			Failure: stripAddresses(stripTimes(spec.Failure.Message)),
 			Stack:   normalizeLocation(spec.Failure.Location.FullStackTrace),
 		})
@@ -125,10 +126,15 @@ var functionArgs = regexp.MustCompile(`([[:alpha:]]+)\(.*\)`)
 // testFailureOutput matches TestFailureOutput() and its source followed by additional stack entries:
 //
 // k8s.io/kubernetes/test/e2e/framework/pod/pod_test.TestFailureOutput(0xc000558800)
+//
 //	/nvme/gopath/src/k8s.io/kubernetes/test/e2e/framework/pod/wait_test.go:73 +0x1c9
+//
 // testing.tRunner(0xc000558800, 0x1af2848)
-// 	/nvme/gopath/go/src/testing/testing.go:865 +0xc0
+//
+//	/nvme/gopath/go/src/testing/testing.go:865 +0xc0
+//
 // created by testing.(*T).Run
+//
 //	/nvme/gopath/go/src/testing/testing.go:916 +0x35a
 var testFailureOutput = regexp.MustCompile(`(?m)^k8s.io/kubernetes/test/e2e/framework/internal/output\.TestGinkgoOutput\(.*\n\t.*(\n.*\n\t.*)*`)
 

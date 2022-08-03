@@ -27,8 +27,8 @@ import (
 
 // GetDriverNameWithFeatureTags returns driver name with feature tags
 // For example)
-//  - [Driver: nfs]
-//  - [Driver: rbd][Feature:Volumes]
+//   - [Driver: nfs]
+//   - [Driver: rbd][Feature:Volumes]
 func GetDriverNameWithFeatureTags(driver TestDriver) string {
 	dInfo := driver.GetDriverInfo()
 

@@ -18,7 +18,6 @@ package request
 
 import (
 	"context"
-	"net/http"
 
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -45,12 +44,12 @@ func AuditIDFrom(ctx context.Context) (types.UID, bool) {
 	return auditID, ok
 }
 
-// GetAuditIDTruncated returns the audit ID (truncated) associated with a request.
+// GetAuditIDTruncated returns the audit ID (truncated) from the request context.
 // If the length of the Audit-ID value exceeds the limit, we truncate it to keep
 // the first N (maxAuditIDLength) characters.
 // This is intended to be used in logging only.
-func GetAuditIDTruncated(req *http.Request) string {
-	auditID, ok := AuditIDFrom(req.Context())
+func GetAuditIDTruncated(ctx context.Context) string {
+	auditID, ok := AuditIDFrom(ctx)
 	if !ok {
 		return ""
 	}

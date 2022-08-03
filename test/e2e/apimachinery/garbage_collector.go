@@ -45,7 +45,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -737,7 +737,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rc1Name := "simpletest-rc-to-be-deleted"
-		replicas := int32(estimateMaximumPods(clientSet, 10, 100))
+		replicas := estimateMaximumPods(clientSet, 10, 100)
 		halfReplicas := int(replicas / 2)
 		uniqLabelsDeleted := getUniqLabel("gctest_d", "valid_and_pending_owners_d")
 		rc1 := newOwnerRC(f, rc1Name, replicas, uniqLabelsDeleted)

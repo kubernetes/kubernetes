@@ -61,7 +61,7 @@ func (m *HcnMock) RemoteSubnetSupported() error {
 func MockNewSupportedFeatures() hcn.SupportedFeatures {
 	return hcn.SupportedFeatures{
 		Acl:          hcn.AclFeatures{},
-		Api:          hcn.ApiSupport{},
+		Api:          hcn.ApiSupport{V2: true},
 		RemoteSubnet: true,
 		HostRoute:    true,
 		DSR:          true,

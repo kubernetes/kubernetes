@@ -608,7 +608,7 @@ func TestCelCostStability(t *testing.T) {
 			}),
 			expectCost: map[string]int64{
 				// 'kind', 'apiVersion', 'metadata.name' and 'metadata.generateName' are always accessible
-				// even if not specified in the schema, regardless of if x-preserve-unknown-fields is set.
+				// even if not specified in the schema, regardless of if x-kubernetes-preserve-unknown-fields is set.
 				"self.embedded.kind == 'Pod'":                          4,
 				"self.embedded.apiVersion == 'v1'":                     4,
 				"self.embedded.metadata.name == 'foo'":                 5,
@@ -1094,7 +1094,7 @@ func TestCelCostStability(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := NewValidator(&s, PerCallLimit)
+					celValidator := NewValidator(&s, true, PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}

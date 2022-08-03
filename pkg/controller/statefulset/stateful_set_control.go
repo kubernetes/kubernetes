@@ -298,14 +298,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		if isRunningAndReady(pods[i]) {
 			status.ReadyReplicas++
 			// count the number of running and available replicas
-			if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
-				if isRunningAndAvailable(pods[i], set.Spec.MinReadySeconds) {
-					status.AvailableReplicas++
-				}
-			} else {
-				// If the featuregate is not enabled, all the ready replicas should be considered as available replicas
-				status.AvailableReplicas = status.ReadyReplicas
+			if isRunningAndAvailable(pods[i], set.Spec.MinReadySeconds) {
+				status.AvailableReplicas++
 			}
+
 		}
 
 		// count the number of current and update replicas
@@ -462,9 +458,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// If we have a Pod that has been created but is not available we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Available.
-		// TODO: Since available is superset of Ready, once we have this featuregate enabled by default, we can remove the
-		// isRunningAndReady block as only Available pods should be brought down.
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) && !isRunningAndAvailable(replicas[i], set.Spec.MinReadySeconds) && monotonic {
+		if !isRunningAndAvailable(replicas[i], set.Spec.MinReadySeconds) && monotonic {
 			klog.V(4).InfoS("StatefulSet is waiting for Pod to be Available",
 				"statefulSet", klog.KObj(set), "pod", klog.KObj(replicas[i]))
 			return &status, nil
@@ -525,9 +519,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			return &status, nil
 		}
 		// if we are in monotonic mode and the condemned target is not the first unhealthy Pod, block.
-		// TODO: Since available is superset of Ready, once we have this featuregate enabled by default, we can remove the
-		// isRunningAndReady block as only Available pods should be brought down.
-		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) && !isRunningAndAvailable(condemned[target], set.Spec.MinReadySeconds) && monotonic && condemned[target] != firstUnhealthyPod {
+		if !isRunningAndAvailable(condemned[target], set.Spec.MinReadySeconds) && monotonic && condemned[target] != firstUnhealthyPod {
 			klog.V(4).InfoS("StatefulSet is waiting for Pod to be Available prior to scale down",
 				"statefulSet", klog.KObj(set), "pod", klog.KObj(firstUnhealthyPod))
 			return &status, nil

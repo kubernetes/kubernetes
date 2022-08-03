@@ -78,6 +78,7 @@ func fakeGCECloud(vals TestClusterValues) (*Cloud, error) {
 	mockGCE.MockRegionBackendServices.UpdateHook = mock.UpdateRegionBackendServiceHook
 	mockGCE.MockHealthChecks.UpdateHook = mock.UpdateHealthCheckHook
 	mockGCE.MockFirewalls.UpdateHook = mock.UpdateFirewallHook
+	mockGCE.MockFirewalls.PatchHook = mock.UpdateFirewallHook
 
 	keyGA := meta.GlobalKey("key-ga")
 	mockGCE.MockZones.Objects[*keyGA] = &cloud.MockZonesObj{
@@ -372,7 +373,7 @@ func removeFinalizer(service *v1.Service, kubeClient v1core.CoreV1Interface, key
 	return err
 }
 
-//hasFinalizer returns if the given service has the specified key in its list of finalizers.
+// hasFinalizer returns if the given service has the specified key in its list of finalizers.
 func hasFinalizer(service *v1.Service, key string) bool {
 	for _, finalizer := range service.ObjectMeta.Finalizers {
 		if finalizer == key {

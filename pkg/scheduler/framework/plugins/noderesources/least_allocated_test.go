@@ -283,7 +283,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[0].weight",
+					Field: "scoringStrategy.resources[0].weight",
 				},
 			},
 		},
@@ -306,7 +306,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[1].weight",
+					Field: "scoringStrategy.resources[1].weight",
 				},
 			},
 		},
@@ -327,7 +327,7 @@ func TestLeastAllocatedScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
-					Field: "resources[1].weight",
+					Field: "scoringStrategy.resources[1].weight",
 				},
 			},
 		},

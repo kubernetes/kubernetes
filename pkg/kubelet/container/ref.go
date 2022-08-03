@@ -20,10 +20,8 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // ImplicitContainerPrefix is a container name prefix that will indicate that container was started implicitly (like the pod infra container).
@@ -67,15 +65,13 @@ func fieldPath(pod *v1.Pod, container *v1.Container) (string, error) {
 			return fmt.Sprintf("spec.initContainers{%s}", here.Name), nil
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		for i := range pod.Spec.EphemeralContainers {
-			here := &pod.Spec.EphemeralContainers[i]
-			if here.Name == container.Name {
-				if here.Name == "" {
-					return fmt.Sprintf("spec.ephemeralContainers[%d]", i), nil
-				}
-				return fmt.Sprintf("spec.ephemeralContainers{%s}", here.Name), nil
+	for i := range pod.Spec.EphemeralContainers {
+		here := &pod.Spec.EphemeralContainers[i]
+		if here.Name == container.Name {
+			if here.Name == "" {
+				return fmt.Sprintf("spec.ephemeralContainers[%d]", i), nil
 			}
+			return fmt.Sprintf("spec.ephemeralContainers{%s}", here.Name), nil
 		}
 	}
 	return "", fmt.Errorf("container %q not found in pod %s/%s", container.Name, pod.Namespace, pod.Name)

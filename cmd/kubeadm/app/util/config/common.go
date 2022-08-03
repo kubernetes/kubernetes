@@ -94,7 +94,7 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	isCIVersion := kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion)
 
 	// Requested version is automatic CI build, thus use KubernetesCI Image Repository for core images
-	if isCIVersion {
+	if isCIVersion && cfg.ImageRepository == kubeadmapiv1.DefaultImageRepository {
 		cfg.CIImageRepository = constants.DefaultCIImageRepository
 	}
 
@@ -106,7 +106,7 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 
 	// Requested version is automatic CI build, thus mark CIKubernetesVersion as `ci/<resolved-version>`
 	if isCIVersion {
-		cfg.CIKubernetesVersion = fmt.Sprintf("ci/%s", ver)
+		cfg.CIKubernetesVersion = fmt.Sprintf("%s%s", constants.CIKubernetesVersionPrefix, ver)
 	}
 
 	cfg.KubernetesVersion = ver
@@ -125,8 +125,8 @@ func NormalizeKubernetesVersion(cfg *kubeadmapi.ClusterConfiguration) error {
 	mcpVersion := constants.MinimumControlPlaneVersion
 	versionInfo := componentversion.Get()
 	if isKubeadmPrereleaseVersion(&versionInfo, k8sVersion, mcpVersion) {
-		klog.V(1).Infof("WARNING: tolerating control plane version %s, assuming that k8s version %s is not released yet",
-			cfg.KubernetesVersion, mcpVersion)
+		klog.V(1).Infof("WARNING: tolerating control plane version %s as a pre-release version", cfg.KubernetesVersion)
+
 		return nil
 	}
 	// If not a pre-release version, handle the validation normally.

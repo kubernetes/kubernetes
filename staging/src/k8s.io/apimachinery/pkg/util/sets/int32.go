@@ -28,7 +28,7 @@ type Int32 map[int32]Empty
 
 // NewInt32 creates a Int32 from a list of values.
 func NewInt32(items ...int32) Int32 {
-	ss := Int32{}
+	ss := make(Int32, len(items))
 	ss.Insert(items...)
 	return ss
 }
@@ -87,6 +87,15 @@ func (s Int32) HasAny(items ...int32) bool {
 	return false
 }
 
+// Clone returns a new set which is a copy of the current set.
+func (s Int32) Clone() Int32 {
+	result := make(Int32, len(s))
+	for key := range s {
+		result.Insert(key)
+	}
+	return result
+}
+
 // Difference returns a set of objects that are not in s2
 // For example:
 // s1 = {a1, a2, a3}
@@ -110,10 +119,7 @@ func (s Int32) Difference(s2 Int32) Int32 {
 // s1.Union(s2) = {a1, a2, a3, a4}
 // s2.Union(s1) = {a1, a2, a3, a4}
 func (s1 Int32) Union(s2 Int32) Int32 {
-	result := NewInt32()
-	for key := range s1 {
-		result.Insert(key)
-	}
+	result := s1.Clone()
 	for key := range s2 {
 		result.Insert(key)
 	}

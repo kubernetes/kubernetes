@@ -33,7 +33,7 @@ import (
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"golang.org/x/oauth2/google"
 )
 

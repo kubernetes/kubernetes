@@ -43,4 +43,10 @@ const (
 	LbTCPProtocol          = 0x6
 	HnsEndPointName        = "TestHnsEndpointName"
 	EmptyID                = ""
+	EpMacAddress           = "00-11-22-33-44-55"
+	EpIpAddress            = "192.168.1.3"
+	Protocol               = 6
+	InternalPort           = 80
+	ExternalPort           = 32440
+	ClusterIP              = "10.20.30.41"
 )

@@ -46,6 +46,7 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/configz"
+	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
@@ -363,28 +364,28 @@ type ControllerInitContext struct {
 // StartCloudNodeControllerWrapper is used to take cloud config as input and start cloud node controller
 func StartCloudNodeControllerWrapper(initContext ControllerInitContext, completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) InitFunc {
 	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
-		return startCloudNodeController(ctx, initContext, completedConfig, cloud)
+		return startCloudNodeController(ctx, initContext, controllerContext, completedConfig, cloud)
 	}
 }
 
 // StartCloudNodeLifecycleControllerWrapper is used to take cloud config as input and start cloud node lifecycle controller
 func StartCloudNodeLifecycleControllerWrapper(initContext ControllerInitContext, completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) InitFunc {
 	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
-		return startCloudNodeLifecycleController(ctx, initContext, completedConfig, cloud)
+		return startCloudNodeLifecycleController(ctx, initContext, controllerContext, completedConfig, cloud)
 	}
 }
 
 // StartServiceControllerWrapper is used to take cloud config as input and start service controller
 func StartServiceControllerWrapper(initContext ControllerInitContext, completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) InitFunc {
 	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
-		return startServiceController(ctx, initContext, completedConfig, cloud)
+		return startServiceController(ctx, initContext, controllerContext, completedConfig, cloud)
 	}
 }
 
 // StartRouteControllerWrapper is used to take cloud config as input and start route controller
 func StartRouteControllerWrapper(initContext ControllerInitContext, completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) InitFunc {
 	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
-		return startRouteController(ctx, initContext, completedConfig, cloud)
+		return startRouteController(ctx, initContext, controllerContext, completedConfig, cloud)
 	}
 }
 
@@ -457,6 +458,7 @@ func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBui
 		Stop:                            stop,
 		InformersStarted:                make(chan struct{}),
 		ResyncPeriod:                    ResyncPeriod(s),
+		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics("cloud-controller-manager"),
 	}
 	return ctx, nil
 }

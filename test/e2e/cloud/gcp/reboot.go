@@ -37,7 +37,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -66,7 +66,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			// Most of the reboot tests just make sure that addon/system pods are running, so dump
 			// events for the kube-system namespace on failures
 			namespaceName := metav1.NamespaceSystem
@@ -229,12 +229,12 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 }
 
 // rebootNode takes node name on provider through the following steps using c:
-//  - ensures the node is ready
-//  - ensures all pods on the node are running and ready
-//  - reboots the node (by executing rebootCmd over ssh)
-//  - ensures the node reaches some non-ready state
-//  - ensures the node becomes ready again
-//  - ensures all pods on the node become running and ready again
+//   - ensures the node is ready
+//   - ensures all pods on the node are running and ready
+//   - reboots the node (by executing rebootCmd over ssh)
+//   - ensures the node reaches some non-ready state
+//   - ensures the node becomes ready again
+//   - ensures all pods on the node become running and ready again
 //
 // It returns true through result only if all of the steps pass; at the first
 // failed step, it will return false through result and not run the rest.

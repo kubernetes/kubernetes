@@ -341,12 +341,6 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"and key set are served to relying parties from a URL other than the "+
 			"API server's external (as auto-detected or overridden with external-hostname). ")
 
-		// Deprecated in 1.13
-		fs.StringSliceVar(&o.APIAudiences, "service-account-api-audiences", o.APIAudiences, ""+
-			"Identifiers of the API. The service account token authenticator will validate that "+
-			"tokens used against the API are bound to at least one of these audiences.")
-		fs.MarkDeprecated("service-account-api-audiences", "Use --api-audiences")
-
 		fs.DurationVar(&o.ServiceAccounts.MaxExpiration, "service-account-max-token-expiration", o.ServiceAccounts.MaxExpiration, ""+
 			"The maximum validity duration of a token created by the service account token issuer. If an otherwise valid "+
 			"TokenRequest with a validity duration larger than this value is requested, a token will be issued with a validity duration of this value.")

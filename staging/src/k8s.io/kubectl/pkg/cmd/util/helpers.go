@@ -477,6 +477,9 @@ func AddLabelSelectorFlagVar(cmd *cobra.Command, p *string) {
 
 func AddSubresourceFlags(cmd *cobra.Command, subresource *string, usage string, allowedSubresources ...string) {
 	cmd.Flags().StringVar(subresource, "subresource", "", fmt.Sprintf("%s Must be one of %v. This flag is alpha and may change in the future.", usage, allowedSubresources))
+	CheckErr(cmd.RegisterFlagCompletionFunc("subresource", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+		return allowedSubresources, cobra.ShellCompDirectiveNoFileComp
+	}))
 }
 
 type ValidateOptions struct {
@@ -745,7 +748,8 @@ func IsSiblingCommandExists(cmd *cobra.Command, targetCmdName string) bool {
 // arguments (sub-commands) are provided, or a usage error otherwise.
 func DefaultSubCommandRun(out io.Writer) func(c *cobra.Command, args []string) {
 	return func(c *cobra.Command, args []string) {
-		c.SetOutput(out)
+		c.SetOut(out)
+		c.SetErr(out)
 		RequireNoArguments(c, args)
 		c.Help()
 		CheckErr(ErrExit)

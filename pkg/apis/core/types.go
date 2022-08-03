@@ -2430,6 +2430,10 @@ const (
 	PodReasonUnschedulable = "Unschedulable"
 	// ContainersReady indicates whether all containers in the pod are ready.
 	ContainersReady PodConditionType = "ContainersReady"
+	// AlphaNoCompatGuaranteeDisruptionTarget indicates the pod is about to be deleted due to a
+	// disruption (such as preemption, eviction API or garbage-collection).
+	// The constant is to be renamed once the name is accepted within the KEP-3329.
+	AlphaNoCompatGuaranteeDisruptionTarget PodConditionType = "DisruptionTarget"
 )
 
 // PodCondition represents pod's condition
@@ -2829,7 +2833,6 @@ type PodSpec struct {
 	// pod to perform user-initiated actions such as debugging. This list cannot be specified when
 	// creating a pod, and it cannot be modified by updating the pod spec. In order to add an
 	// ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.
-	// This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.
 	// +optional
 	EphemeralContainers []EphemeralContainer
 	// +optional
@@ -2992,7 +2995,6 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.runAsUser
 	// - spec.containers[*].securityContext.runAsGroup
 	// +optional
-	// This is a beta field and requires the IdentifyPodOS feature
 	OS *PodOS
 }
 
@@ -3222,8 +3224,9 @@ type PodDNSConfigOption struct {
 
 // PodIP represents the IP address of a pod.
 // IP address information. Each entry includes:
-//    IP: An IP address allocated to the pod. Routable at least within
-//        the cluster.
+//
+//	IP: An IP address allocated to the pod. Routable at least within
+//	    the cluster.
 type PodIP struct {
 	IP string
 }
@@ -3326,8 +3329,6 @@ var _ = Container(EphemeralContainerCommon{})
 //
 // To add an ephemeral container, use the ephemeralcontainers subresource of an existing
 // Pod. Ephemeral containers may not be removed or restarted.
-//
-// This is a beta feature available on clusters that haven't disabled the EphemeralContainers feature gate.
 type EphemeralContainer struct {
 	// Ephemeral containers have all of the fields of Container, plus additional fields
 	// specific to ephemeral containers. Fields in common with Container are in the
@@ -3390,7 +3391,6 @@ type PodStatus struct {
 	ContainerStatuses []ContainerStatus
 
 	// Status for any ephemeral containers that have run in this pod.
-	// This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.
 	// +optional
 	EphemeralContainerStatuses []ContainerStatus
 }
@@ -4036,17 +4036,18 @@ type ServiceAccountList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Endpoints is a collection of endpoints that implement the actual service.  Example:
-//   Name: "mysvc",
-//   Subsets: [
-//     {
-//       Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
-//       Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
-//     },
-//     {
-//       Addresses: [{"ip": "10.10.3.3"}],
-//       Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
-//     },
-//  ]
+//
+//	 Name: "mysvc",
+//	 Subsets: [
+//	   {
+//	     Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//	     Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//	   },
+//	   {
+//	     Addresses: [{"ip": "10.10.3.3"}],
+//	     Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
+//	   },
+//	]
 type Endpoints struct {
 	metav1.TypeMeta
 	// +optional
@@ -4059,13 +4060,16 @@ type Endpoints struct {
 // EndpointSubset is a group of addresses with a common set of ports.  The
 // expanded set of endpoints is the Cartesian product of Addresses x Ports.
 // For example, given:
-//   {
-//     Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
-//     Ports:     [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
-//   }
+//
+//	{
+//	  Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//	  Ports:     [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//	}
+//
 // The resulting set of endpoints can be viewed as:
-//     a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
-//     b: [ 10.10.1.1:309, 10.10.2.2:309 ]
+//
+//	a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
+//	b: [ 10.10.1.1:309, 10.10.2.2:309 ]
 type EndpointSubset struct {
 	Addresses         []EndpointAddress
 	NotReadyAddresses []EndpointAddress
@@ -5711,7 +5715,7 @@ type TopologySpreadConstraint struct {
 	// because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
 	// it will violate MaxSkew.
 	//
-	// This is an alpha field and requires enabling MinDomainsInPodTopologySpread feature gate.
+	// This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
 	// +optional
 	MinDomains *int32
 	// NodeAffinityPolicy indicates how we will treat Pod's nodeAffinity/nodeSelector
@@ -5733,6 +5737,15 @@ type TopologySpreadConstraint struct {
 	// This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
 	// +optional
 	NodeTaintsPolicy *NodeInclusionPolicy
+	// MatchLabelKeys is a set of pod label keys to select the pods over which
+	// spreading will be calculated. The keys are used to lookup values from the
+	// incoming pod labels, those key-value labels are ANDed with labelSelector
+	// to select the group of existing pods over which spreading will be calculated
+	// for the incoming pod. Keys that don't exist in the incoming pod labels will
+	// be ignored. A null or empty list means only match against labelSelector.
+	// +listType=atomic
+	// +optional
+	MatchLabelKeys []string
 }
 
 // These are the built-in errors for PortStatus.

@@ -168,6 +168,13 @@ func TestValidateKubeletFlags(t *testing.T) {
 			error:  false,
 			labels: map[string]string{},
 		},
+		{
+			name:  "Invalid label",
+			error: true,
+			labels: map[string]string{
+				"cloud.google.com/repository": "kubernetes/kubernetes",
+			},
+		},
 	}
 
 	for _, tt := range tests {

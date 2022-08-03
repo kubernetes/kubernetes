@@ -147,7 +147,7 @@ func TestConvertCPUValue(t *testing.T) {
 	for _, tc := range testCases {
 		p := perfCounterNodeStatsClient{}
 		newValue := p.convertCPUValue(cpuCores, tc.cpuValue)
-		assert.Equal(t, newValue, tc.expected)
+		assert.Equal(t, tc.expected, newValue)
 	}
 }
 
@@ -169,7 +169,7 @@ func TestGetCPUUsageNanoCores(t *testing.T) {
 			previousValue: tc.previousValue,
 		}
 		cpuUsageNanoCores := p.getCPUUsageNanoCores()
-		assert.Equal(t, cpuUsageNanoCores, tc.expected)
+		assert.Equal(t, tc.expected, cpuUsageNanoCores)
 	}
 }
 

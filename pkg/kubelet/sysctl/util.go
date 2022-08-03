@@ -26,8 +26,9 @@ import (
 // The '/' separator is also accepted in place of a '.'.
 // Convert the sysctl variables to dots separator format for validation.
 // More info:
-//   https://man7.org/linux/man-pages/man8/sysctl.8.html
-//   https://man7.org/linux/man-pages/man5/sysctl.d.5.html
+//
+//	https://man7.org/linux/man-pages/man8/sysctl.8.html
+//	https://man7.org/linux/man-pages/man5/sysctl.d.5.html
 func convertSysctlVariableToDotsSeparator(val string) string {
 	if val == "" {
 		return val

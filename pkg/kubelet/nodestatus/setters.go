@@ -94,14 +94,28 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 			klog.V(4).InfoS("Using secondary node IP", "IP", secondaryNodeIP.String())
 		}
 
-		if externalCloudProvider {
+		if externalCloudProvider || cloud != nil {
+			// Annotate the Node object with nodeIP for external cloud provider.
+			//
+			// We do this even when external CCM is not configured to cover a situation
+			// during migration from legacy to external CCM: when CCM is running the
+			// node controller in the cluster but kubelet is still running the in-tree
+			// provider. Adding this annotation in all cases ensures that while
+			// Addresses flap between the competing controllers, they at least flap
+			// consistently.
+			//
+			// We do not add the annotation in the case where there is no cloud
+			// controller at all, as we don't expect to migrate these clusters to use an
+			// external CCM.
 			if nodeIPSpecified {
 				if node.ObjectMeta.Annotations == nil {
 					node.ObjectMeta.Annotations = make(map[string]string)
 				}
 				node.ObjectMeta.Annotations[cloudproviderapi.AnnotationAlphaProvidedIPAddr] = nodeIP.String()
 			}
+		}
 
+		if externalCloudProvider {
 			// If --cloud-provider=external and node address is already set,
 			// then we return early because provider set addresses should take precedence.
 			// Otherwise, we try to look up the node IP and let the cloud provider override it later

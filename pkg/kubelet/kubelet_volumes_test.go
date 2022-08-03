@@ -25,10 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -103,8 +100,6 @@ func TestPodVolumesExist(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
-
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -131,8 +126,8 @@ func TestPodVolumesExist(t *testing.T) {
 					{
 						Name: "vol1",
 						VolumeSource: v1.VolumeSource{
-							GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-								PDName: "fake-device1",
+							RBD: &v1.RBDVolumeSource{
+								RBDImage: "fake1",
 							},
 						},
 					},
@@ -160,8 +155,8 @@ func TestPodVolumesExist(t *testing.T) {
 					{
 						Name: "vol2",
 						VolumeSource: v1.VolumeSource{
-							GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-								PDName: "fake-device2",
+							RBD: &v1.RBDVolumeSource{
+								RBDImage: "fake2",
 							},
 						},
 					},
@@ -189,8 +184,8 @@ func TestPodVolumesExist(t *testing.T) {
 					{
 						Name: "vol3",
 						VolumeSource: v1.VolumeSource{
-							GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-								PDName: "fake-device3",
+							RBD: &v1.RBDVolumeSource{
+								RBDImage: "fake3",
 							},
 						},
 					},
@@ -219,8 +214,6 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
-
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -241,8 +234,8 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 			{
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
-					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-						PDName: "fake-device",
+					RBD: &v1.RBDVolumeSource{
+						RBDImage: "fake",
 					},
 				},
 			},
@@ -280,8 +273,6 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
-
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -302,8 +293,8 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 			{
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
-					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-						PDName: "fake-device",
+					RBD: &v1.RBDVolumeSource{
+						RBDImage: "fake-device",
 					},
 				},
 			},
@@ -371,8 +362,6 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
-
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -410,8 +399,8 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 			{
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
-					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-						PDName: "fake-device",
+					RBD: &v1.RBDVolumeSource{
+						RBDImage: "fake-device",
 					},
 				},
 			},
@@ -457,8 +446,6 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, false)()
-
 	testKubelet := newTestKubelet(t, true /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -496,8 +483,8 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 			{
 				Name: "vol1",
 				VolumeSource: v1.VolumeSource{
-					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-						PDName: "fake-device",
+					RBD: &v1.RBDVolumeSource{
+						RBDImage: "fake-device",
 					},
 				},
 			},

@@ -33,7 +33,7 @@ var k8sBinDir = flag.String("k8s-bin-dir", "", "Directory containing k8s kubelet
 var buildTargets = []string{
 	"cmd/kubelet",
 	"test/e2e_node/e2e_node.test",
-	"github.com/onsi/ginkgo/ginkgo",
+	"github.com/onsi/ginkgo/v2/ginkgo",
 	"cluster/gce/gci/mounter",
 	"test/e2e_node/plugins/gcp-credential-provider",
 }

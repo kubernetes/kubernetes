@@ -46,7 +46,7 @@ func NewParser(opts ...Option) (*Parser, error) {
 		}
 	}
 	if p.maxRecursionDepth == 0 {
-		p.maxRecursionDepth = 200
+		p.maxRecursionDepth = 250
 	}
 	if p.maxRecursionDepth == -1 {
 		p.maxRecursionDepth = int((^uint(0)) >> 1)
@@ -270,6 +270,7 @@ type parser struct {
 	errors                           *parseErrors
 	helper                           *parserHelper
 	macros                           map[string]Macro
+	recursionDepth                   int
 	maxRecursionDepth                int
 	errorRecoveryLimit               int
 	errorRecoveryLookaheadTokenLimit int
@@ -352,6 +353,13 @@ func (p *parser) parse(expr runes.Buffer, desc string) *exprpb.Expr {
 
 // Visitor implementations.
 func (p *parser) Visit(tree antlr.ParseTree) interface{} {
+	p.recursionDepth++
+	if p.recursionDepth > p.maxRecursionDepth {
+		panic(&recursionError{message: "max recursion depth exceeded"})
+	}
+	defer func() {
+		p.recursionDepth--
+	}()
 	switch tree.(type) {
 	case *gen.StartContext:
 		return p.VisitStart(tree.(*gen.StartContext))

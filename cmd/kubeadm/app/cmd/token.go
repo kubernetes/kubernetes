@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -49,9 +48,7 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
@@ -130,7 +127,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 			klog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := getClientset(kubeConfigFile, dryRun)
+			client, err := cmdutil.GetClientset(kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
@@ -162,7 +159,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		`),
 		RunE: func(tokenCmd *cobra.Command, args []string) error {
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := getClientset(kubeConfigFile, dryRun)
+			client, err := cmdutil.GetClientset(kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
@@ -196,7 +193,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 				return errors.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern)
 			}
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := getClientset(kubeConfigFile, dryRun)
+			client, err := cmdutil.GetClientset(kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
@@ -432,15 +429,4 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 		fmt.Fprintf(out, "bootstrap token %q deleted\n", tokenID)
 	}
 	return nil
-}
-
-func getClientset(file string, dryRun bool) (clientset.Interface, error) {
-	if dryRun {
-		dryRunGetter, err := apiclient.NewClientBackedDryRunGetterFromKubeconfig(file)
-		if err != nil {
-			return nil, err
-		}
-		return apiclient.NewDryRunClient(dryRunGetter, os.Stdout), nil
-	}
-	return kubeconfigutil.ClientSetFromFile(file)
 }

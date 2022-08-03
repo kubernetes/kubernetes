@@ -14,6 +14,7 @@
       "github.com/influxdata/influxdb1-client": "",
       "github.com/json-iterator/go": "refer to #105030",
       "github.com/miekg/dns": "no dns client/server should be required",
+      "github.com/onsi/ginkgo": "Ginkgo has been migrated to V2, refer to #109111",
       "github.com/spf13/viper": "refer to #102598",
       "go.mongodb.org/mongo-driver": "",
       "k8s.io/klog": "we have switched to klog v2, so avoid klog v1",

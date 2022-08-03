@@ -106,10 +106,10 @@ func (dc *DeploymentController) checkPausedConditions(ctx context.Context, d *ap
 //
 // rsList should come from getReplicaSetsForDeployment(d).
 //
-// 1. Get all old RSes this deployment targets, and calculate the max revision number among them (maxOldV).
-// 2. Get new RS this deployment targets (whose pod template matches deployment's), and update new RS's revision number to (maxOldV + 1),
-//    only if its revision number is smaller than (maxOldV + 1). If this step failed, we'll update it in the next deployment sync loop.
-// 3. Copy new RS's revision number to deployment (update deployment's revision). If this step failed, we'll update it in the next deployment sync loop.
+//  1. Get all old RSes this deployment targets, and calculate the max revision number among them (maxOldV).
+//  2. Get new RS this deployment targets (whose pod template matches deployment's), and update new RS's revision number to (maxOldV + 1),
+//     only if its revision number is smaller than (maxOldV + 1). If this step failed, we'll update it in the next deployment sync loop.
+//  3. Copy new RS's revision number to deployment (update deployment's revision). If this step failed, we'll update it in the next deployment sync loop.
 //
 // Note that currently the deployment controller is using caches to avoid querying the server for reads.
 // This may lead to stale reads of replica sets, thus incorrect deployment status.

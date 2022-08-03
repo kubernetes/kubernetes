@@ -53,7 +53,7 @@ ssh_options=${SSH_OPTIONS:-}
 kubelet_config_file=${KUBELET_CONFIG_FILE:-"test/e2e_node/jenkins/default-kubelet-config.yaml"}
 
 # Parse the flags to pass to ginkgo
-ginkgoflags=""
+ginkgoflags="-timeout=24h"
 if [[ ${parallelism} -gt 1 ]]; then
   ginkgoflags="${ginkgoflags} -nodes=${parallelism} "
 fi
@@ -111,9 +111,9 @@ if [ "${remote}" = true ] && [ "${remote_mode}" = gce ] ; then
   fi
 
   # Get the compute zone
-  zone=${ZONE:-"$(gcloud info --format='value(config.properties.compute.zone)')"}
+  zone=${ZONE:-"$(gcloud info --format='value(config.properties.compute.zone.value)')"}
   if [[ ${zone} == "" ]]; then
-    echo "Could not find gcloud compute/zone when running: \`gcloud info --format='value(config.properties.compute.zone)'\`"
+    echo "Could not find gcloud compute/zone when running: \`gcloud info --format='value(config.properties.compute.zone.value)'\`"
     exit 1
   fi
 

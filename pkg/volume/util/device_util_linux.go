@@ -22,6 +22,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -89,10 +90,11 @@ func (handler *deviceHandler) FindSlaveDevicesOnMultipath(dm string) []string {
 
 // GetISCSIPortalHostMapForTarget given a target iqn, find all the scsi hosts logged into
 // that target. Returns a map of iSCSI portals (string) to SCSI host numbers (integers).
-// For example: {
-//    "192.168.30.7:3260": 2,
-//    "192.168.30.8:3260": 3,
-// }
+//
+//	For example: {
+//	   "192.168.30.7:3260": 2,
+//	   "192.168.30.8:3260": 3,
+//	}
 func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (map[string]int, error) {
 	portalHostMap := make(map[string]int)
 	io := handler.getIo
@@ -199,12 +201,11 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 
 				// Add entries to the map for both the current and persistent portals
 				// pointing to the SCSI host for those connections
-				portal := strings.TrimSpace(string(addr)) + ":" +
-					strings.TrimSpace(string(port))
+				// JoinHostPort will add `[]` around IPv6 addresses.
+				portal := net.JoinHostPort(strings.TrimSpace(string(addr)), strings.TrimSpace(string(port)))
 				portalHostMap[portal] = hostNumber
 
-				persistentPortal := strings.TrimSpace(string(persistentAddr)) + ":" +
-					strings.TrimSpace(string(persistentPort))
+				persistentPortal := net.JoinHostPort(strings.TrimSpace(string(persistentAddr)), strings.TrimSpace(string(persistentPort)))
 				portalHostMap[persistentPortal] = hostNumber
 			}
 		}

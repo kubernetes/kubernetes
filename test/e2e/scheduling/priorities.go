@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"

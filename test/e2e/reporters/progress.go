@@ -25,19 +25,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/types"
 	"k8s.io/klog/v2"
-
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/types"
 )
 
 // ProgressReporter is a ginkgo reporter which tracks the total number of tests to be run/passed/failed/skipped.
 // As new tests are completed it updates the values and prints them to stdout and optionally, sends the updates
 // to the configured URL.
+// TODO: Number of test specs is not available now, we can add it back when this is fixed in the Ginkgo V2.
+// pls see: https://github.com/kubernetes/kubernetes/issues/109744
 type ProgressReporter struct {
 	LastMsg string `json:"msg"`
 
-	TestsTotal     int `json:"total"`
 	TestsCompleted int `json:"completed"`
 	TestsSkipped   int `json:"skipped"`
 	TestsFailed    int `json:"failed"`
@@ -62,47 +62,8 @@ func NewProgressReporter(progressReportURL string) *ProgressReporter {
 	return rep
 }
 
-// SpecSuiteWillBegin is invoked by ginkgo when the suite is about to start and is the first point in which we can
-// antipate the number of tests which will be run.
-func (reporter *ProgressReporter) SpecSuiteWillBegin(cfg config.GinkgoConfigType, summary *types.SuiteSummary) {
-	reporter.TestsTotal = summary.NumberOfSpecsThatWillBeRun
-	reporter.LastMsg = "Test Suite starting"
-	reporter.sendUpdates()
-}
-
-// SpecSuiteDidEnd is the last method invoked by Ginkgo after all the specs are run.
-func (reporter *ProgressReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
-	reporter.LastMsg = "Test Suite completed"
-	reporter.sendUpdates()
-}
-
-// SpecDidComplete is invoked by Ginkgo each time a spec is completed (including skipped specs).
-func (reporter *ProgressReporter) SpecDidComplete(specSummary *types.SpecSummary) {
-	testname := strings.Join(specSummary.ComponentTexts[1:], " ")
-	switch specSummary.State {
-	case types.SpecStateFailed:
-		if len(specSummary.ComponentTexts) > 0 {
-			reporter.Failures = append(reporter.Failures, testname)
-		} else {
-			reporter.Failures = append(reporter.Failures, "Unknown test name")
-		}
-		reporter.TestsFailed++
-		reporter.LastMsg = fmt.Sprintf("FAILED %v", testname)
-	case types.SpecStatePassed:
-		reporter.TestsCompleted++
-		reporter.LastMsg = fmt.Sprintf("PASSED %v", testname)
-	case types.SpecStateSkipped:
-		reporter.TestsSkipped++
-		return
-	default:
-		return
-	}
-
-	reporter.sendUpdates()
-}
-
-// sendUpdates serializes the current progress and prints it to stdout and also posts it to the configured endpoint if set.
-func (reporter *ProgressReporter) sendUpdates() {
+// SendUpdates serializes the current progress and prints it to stdout and also posts it to the configured endpoint if set.
+func (reporter *ProgressReporter) SendUpdates() {
 	b := reporter.serialize()
 	fmt.Println(string(b))
 	go reporter.postProgressToURL(b)
@@ -143,11 +104,40 @@ func (reporter *ProgressReporter) serialize() []byte {
 	return b
 }
 
-// SpecWillRun is implemented as a noop to satisfy the reporter interface for ginkgo.
-func (reporter *ProgressReporter) SpecWillRun(specSummary *types.SpecSummary) {}
+func (reporter *ProgressReporter) SetStartMsg() {
+	reporter.LastMsg = "Test Suite starting"
+	reporter.SendUpdates()
+}
 
-// BeforeSuiteDidRun is implemented as a noop to satisfy the reporter interface for ginkgo.
-func (reporter *ProgressReporter) BeforeSuiteDidRun(setupSummary *types.SetupSummary) {}
+// ProcessSpecReport summarizes the report state and sends the state to the configured endpoint if set.
+func (reporter *ProgressReporter) ProcessSpecReport(report ginkgo.SpecReport) {
+	testName := strings.Join(report.ContainerHierarchyTexts, " ")
+	if len(report.LeafNodeText) > 0 {
+		testName = testName + " " + report.LeafNodeText
+	}
+	switch report.State {
+	case types.SpecStateFailed:
+		if len(testName) > 0 {
+			reporter.Failures = append(reporter.Failures, testName)
+		} else {
+			reporter.Failures = append(reporter.Failures, "Unknown test name")
+		}
+		reporter.TestsFailed++
+		reporter.LastMsg = fmt.Sprintf("FAILED %v", testName)
+	case types.SpecStatePassed:
+		reporter.TestsCompleted++
+		reporter.LastMsg = fmt.Sprintf("PASSED %v", testName)
+	case types.SpecStateSkipped:
+		reporter.TestsSkipped++
+		return
+	default:
+		return
+	}
 
-// AfterSuiteDidRun is implemented as a noop to satisfy the reporter interface for ginkgo.
-func (reporter *ProgressReporter) AfterSuiteDidRun(setupSummary *types.SetupSummary) {}
+	reporter.SendUpdates()
+}
+
+func (reporter *ProgressReporter) SetEndMsg() {
+	reporter.LastMsg = "Test Suite completed"
+	reporter.SendUpdates()
+}

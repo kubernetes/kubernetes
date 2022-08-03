@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -45,12 +46,15 @@ import (
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/apis/core"
 	serviceaccountgetter "k8s.io/kubernetes/pkg/controller/serviceaccount"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -87,49 +91,66 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 
 	gcs := &clientset.Clientset{}
 
-	// Start the server
-	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
-	controlPlaneConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
-	controlPlaneConfig.GenericConfig.Authentication.APIAudiences = aud
-	controlPlaneConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(
-		serviceaccount.JWTTokenAuthenticator(
-			[]string{iss},
-			[]interface{}{&pk},
-			aud,
-			serviceaccount.NewValidator(serviceaccountgetter.NewGetterFromClient(
-				gcs,
-				v1listers.NewSecretLister(newIndexer(func(namespace, name string) (interface{}, error) {
-					return gcs.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-				})),
-				v1listers.NewServiceAccountLister(newIndexer(func(namespace, name string) (interface{}, error) {
-					return gcs.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-				})),
-				v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
-					return gcs.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-				})),
-			)),
-		),
-	)
-
 	tokenGenerator, err := serviceaccount.JWTTokenGenerator(iss, sk)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	controlPlaneConfig.ExtraConfig.ServiceAccountIssuer = tokenGenerator
-	controlPlaneConfig.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
-	controlPlaneConfig.GenericConfig.Authentication.APIAudiences = aud
-	controlPlaneConfig.ExtraConfig.ExtendExpiration = true
 
-	controlPlaneConfig.ExtraConfig.ServiceAccountIssuerURL = iss
-	controlPlaneConfig.ExtraConfig.ServiceAccountJWKSURI = ""
-	controlPlaneConfig.ExtraConfig.ServiceAccountPublicKeys = []interface{}{&pk}
+	// Start the server
+	var serverAddress string
+	kubeClient, kubeConfig, tearDownFn := framework.StartTestServer(t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+			opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
+		},
+		ModifyServerConfig: func(config *controlplane.Config) {
+			config.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+			config.GenericConfig.Authentication.APIAudiences = aud
+			config.GenericConfig.Authentication.Authenticator = bearertoken.New(
+				serviceaccount.JWTTokenAuthenticator(
+					[]string{iss},
+					[]interface{}{&pk},
+					aud,
+					serviceaccount.NewValidator(serviceaccountgetter.NewGetterFromClient(
+						gcs,
+						v1listers.NewSecretLister(newIndexer(func(namespace, name string) (interface{}, error) {
+							return gcs.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+						})),
+						v1listers.NewServiceAccountLister(newIndexer(func(namespace, name string) (interface{}, error) {
+							return gcs.CoreV1().ServiceAccounts(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+						})),
+						v1listers.NewPodLister(newIndexer(func(namespace, name string) (interface{}, error) {
+							return gcs.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+						})),
+					)),
+				),
+			)
 
-	instanceConfig, _, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
-	defer closeFn()
+			config.ExtraConfig.ServiceAccountIssuer = tokenGenerator
+			config.ExtraConfig.ServiceAccountMaxExpiration = maxExpirationDuration
+			config.ExtraConfig.ExtendExpiration = true
+
+			config.ExtraConfig.ServiceAccountIssuerURL = iss
+			config.ExtraConfig.ServiceAccountJWKSURI = ""
+			config.ExtraConfig.ServiceAccountPublicKeys = []interface{}{&pk}
+
+			// Compute the serverAddress.
+			serverAddress = config.GenericConfig.ExternalAddress
+			_, port, err := config.GenericConfig.SecureServing.HostPort()
+			if err != nil {
+				t.Fatalf("Couldn't get server port: %v", err)
+			}
+			serverAddress = net.JoinHostPort(serverAddress, strconv.Itoa(port))
+		},
+	})
+	defer tearDownFn()
+
+	ns := framework.CreateNamespaceOrDie(kubeClient, "myns", t)
+	defer framework.DeleteNamespaceOrDie(kubeClient, ns, t)
 
 	warningHandler := &recordingWarningHandler{}
 
-	configWithWarningHandler := rest.CopyConfig(instanceConfig.GenericAPIServer.LoopbackClientConfig)
+	configWithWarningHandler := rest.CopyConfig(kubeConfig)
 	configWithWarningHandler.WarningHandler = warningHandler
 	cs, err := clientset.NewForConfig(configWithWarningHandler)
 	if err != nil {
@@ -137,7 +158,8 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	}
 	*gcs = *cs
 
-	rc, err := rest.UnversionedRESTClientFor(instanceConfig.GenericAPIServer.LoopbackClientConfig)
+	kubeConfig.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	rc, err := rest.UnversionedRESTClientFor(kubeConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +168,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 		sa = &v1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "test-svcacct",
-				Namespace: "myns",
+				Namespace: ns.Name,
 			},
 		}
 		pod = &v1.Pod{
@@ -431,7 +453,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			ObjectMeta: sa.ObjectMeta,
 		}
 		_, pc := serviceaccount.Claims(coresa, nil, nil, 0, 0, nil)
-		tok, err := controlPlaneConfig.ExtraConfig.ServiceAccountIssuer.GenerateToken(sc, pc)
+		tok, err := tokenGenerator.GenerateToken(sc, pc)
 		if err != nil {
 			t.Fatalf("err signing expired token: %v", err)
 		}
@@ -830,14 +852,9 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			t.Fatalf("invalid issuer in discovery doc: got %s, want %s",
 				discoveryDoc.Issuer, iss)
 		}
-		// Parse the JWKSURI see if the path is what we expect. Since the
-		// integration test framework hardcodes 192.168.10.4 as the PublicAddress,
-		// which results in the same for ExternalAddress, we expect the JWKS URI
-		// to be 192.168.10.4:443, even if that's not necessarily the external
-		// IP of the test machine.
 		expectJWKSURI := (&url.URL{
 			Scheme: "https",
-			Host:   "192.168.10.4:443",
+			Host:   serverAddress,
 			Path:   serviceaccount.JWKSPath,
 		}).String()
 		if discoveryDoc.JWKS != expectJWKSURI {

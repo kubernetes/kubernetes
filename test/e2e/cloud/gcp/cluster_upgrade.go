@@ -28,12 +28,13 @@ import (
 	"k8s.io/kubernetes/test/utils/junit"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 // TODO: Those tests should be splitted by SIG and moved to SIG-owned directories,
-//   however that involves also splitting the actual upgrade jobs too.
-//   Figure out the eventual solution for it.
+//
+//	however that involves also splitting the actual upgrade jobs too.
+//	Figure out the eventual solution for it.
 var upgradeTests = []upgrades.Test{
 	&apps.DaemonSetUpgradeTest{},
 	&apps.DeploymentUpgradeTest{},

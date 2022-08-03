@@ -40,7 +40,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
@@ -828,15 +828,17 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 			OwnerReferences: conf.OwnerReferences,
 		},
 		Spec: v1.PodSpec{
+			SecurityContext:           e2epod.GetRestrictedPodSecurityContext(),
 			NodeSelector:              conf.NodeSelector,
 			Affinity:                  conf.Affinity,
 			TopologySpreadConstraints: conf.TopologySpreadConstraints,
 			RuntimeClassName:          conf.RuntimeClassHandler,
 			Containers: []v1.Container{
 				{
-					Name:  conf.Name,
-					Image: imageutils.GetPauseImageName(),
-					Ports: conf.Ports,
+					Name:            conf.Name,
+					Image:           imageutils.GetPauseImageName(),
+					Ports:           conf.Ports,
+					SecurityContext: e2epod.GetRestrictedContainerSecurityContext(),
 				},
 			},
 			Tolerations:                   conf.Tolerations,

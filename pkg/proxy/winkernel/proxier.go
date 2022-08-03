@@ -64,7 +64,9 @@ var (
 	hcnDSRSupported           = hcn.DSRSupported
 	hcnRemoteSubnetSupported  = hcn.RemoteSubnetSupported
 
-	hns, supportedFeatures = newHostNetworkService()
+	hnsV2 HostNetworkService = hns{
+		hcnUtils: &hcnUtils{},
+	}
 )
 
 // KernelCompatTester tests whether the required kernel capabilities are
@@ -160,14 +162,15 @@ type remoteSubnetInfo struct {
 const NETWORK_TYPE_OVERLAY = "overlay"
 
 func newHostNetworkService() (HostNetworkService, hcn.SupportedFeatures) {
-	var hns HostNetworkService
-	hns = hnsV1{}
+	var h HostNetworkService
 	supportedFeatures := hcnGetSupportedFeatures()
 	if supportedFeatures.Api.V2 {
-		hns = hnsV2{}
+		h = hnsV2
+	} else {
+		panic("Windows HNS Api V2 required. This version of windows does not support API V2")
 	}
 
-	return hns, supportedFeatures
+	return h, supportedFeatures
 }
 
 func getNetworkName(hnsNetworkName string) (string, error) {
@@ -217,6 +220,7 @@ func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 	}
 
 	// check if network is using overlay
+	hns, _ := newHostNetworkService()
 	networkName, err := getNetworkName(networkName)
 	if err != nil {
 		klog.ErrorS(err, "Unable to determine dual-stack status, falling back to single-stack")
@@ -309,10 +313,10 @@ func (info *endpointsInfo) GetZone() string {
 	return ""
 }
 
-//Uses mac prefix and IPv4 address to return a mac address
-//This ensures mac addresses are unique for proper load balancing
-//There is a possibility of MAC collisions but this Mac address is used for remote endpoints only
-//and not sent on the wire.
+// Uses mac prefix and IPv4 address to return a mac address
+// This ensures mac addresses are unique for proper load balancing
+// There is a possibility of MAC collisions but this Mac address is used for remote endpoints only
+// and not sent on the wire.
 func conjureMac(macPrefix string, ip net.IP) string {
 	if ip4 := ip.To4(); ip4 != nil {
 		a, b, c, d := ip4[0], ip4[1], ip4[2], ip4[3]
@@ -430,6 +434,7 @@ func newSourceVIP(hns HostNetworkService, network string, ip string, mac string,
 		isLocal:         true,
 		macAddress:      mac,
 		providerAddress: providerAddress,
+		hns:             hns,
 
 		ready:       true,
 		serving:     true,
@@ -1103,6 +1108,7 @@ func (proxier *Proxier) syncProxyRules() {
 					isLocal:         false,
 					macAddress:      proxier.hostMac,
 					providerAddress: proxier.nodeIP.String(),
+					hns:             proxier.hns,
 				}
 
 				newHnsEndpoint, err := hns.createEndpoint(hnsEndpoint, hnsNetworkName)
@@ -1375,7 +1381,7 @@ func (proxier *Proxier) syncProxyRules() {
 					klog.ErrorS(err, "Policy creation failed")
 					continue
 				}
-				lbIngressIP.hnsID = hnsLoadBalancer.hnsID
+				lbIngressIP.hnsID = hnsLoadBalancer.hnsID // Prince Pereira: Check with Sravanth
 				klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 			} else {
 				klog.V(3).InfoS("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)

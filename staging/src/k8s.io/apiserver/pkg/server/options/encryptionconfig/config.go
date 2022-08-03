@@ -369,8 +369,10 @@ func secretboxPrefixTransformer(config *apiserverconfig.SecretboxConfiguration) 
 func envelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
 	baseTransformerFunc := func(block cipher.Block) value.Transformer {
 		// v1.24: write using AES-CBC only but support reads via AES-CBC and AES-GCM (so we can move to AES-GCM)
-		// TODO(aramase): swap this ordering in v1.25
-		return unionTransformers{aestransformer.NewCBCTransformer(block), aestransformer.NewGCMTransformer(block)}
+		// v1.25: write using AES-GCM only but support reads via AES-GCM and fallback to AES-CBC for backwards compatibility
+		// TODO(aramase): Post v1.25: We cannot drop CBC read support until we automate storage migration.
+		// We could have a release note that hard requires users to perform storage migration.
+		return unionTransformers{aestransformer.NewGCMTransformer(block), aestransformer.NewCBCTransformer(block)}
 	}
 
 	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, int(*config.CacheSize), baseTransformerFunc)

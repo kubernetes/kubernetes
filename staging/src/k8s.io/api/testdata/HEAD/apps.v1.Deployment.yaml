@@ -854,6 +854,8 @@ spec:
             - valuesValue
           matchLabels:
             matchLabelsKey: matchLabelsValue
+        matchLabelKeys:
+        - matchLabelKeysValue
         maxSkew: 1
         minDomains: 5
         nodeAffinityPolicy: nodeAffinityPolicyValue

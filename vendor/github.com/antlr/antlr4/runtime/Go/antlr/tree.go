@@ -64,7 +64,7 @@ type BaseParseTreeVisitor struct{}
 
 var _ ParseTreeVisitor = &BaseParseTreeVisitor{}
 
-func (v *BaseParseTreeVisitor) Visit(tree ParseTree) interface{}            { return nil }
+func (v *BaseParseTreeVisitor) Visit(tree ParseTree) interface{}            { return tree.Accept(v) }
 func (v *BaseParseTreeVisitor) VisitChildren(node RuleNode) interface{}     { return nil }
 func (v *BaseParseTreeVisitor) VisitTerminal(node TerminalNode) interface{} { return nil }
 func (v *BaseParseTreeVisitor) VisitErrorNode(node ErrorNode) interface{}   { return nil }

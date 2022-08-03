@@ -29,7 +29,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {

@@ -301,7 +301,6 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				emptySnapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			podIgnored := &v1.Pod{}

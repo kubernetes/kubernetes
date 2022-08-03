@@ -271,8 +271,10 @@ func isInternalLoadBalancer(lb *network.LoadBalancer) bool {
 // SingleStack -v4 (pre v1.16) => BackendPool name == clusterName
 // SingleStack -v6 => BackendPool name == <clusterName>-IPv6 (all cluster bootstrap uses this name)
 // DualStack
-//	=> IPv4 BackendPool name == clusterName
-//  => IPv6 BackendPool name == <clusterName>-IPv6
+//
+//		=> IPv4 BackendPool name == clusterName
+//	 => IPv6 BackendPool name == <clusterName>-IPv6
+//
 // This means:
 // clusters moving from IPv4 to dualstack will require no changes
 // clusters moving from IPv6 to dualstack will require no changes as the IPv4 backend pool will created with <clusterName>
@@ -425,7 +427,7 @@ outer:
 
 var polyTable = crc32.MakeTable(crc32.Koopman)
 
-//MakeCRC32 : convert string to CRC32 format
+// MakeCRC32 : convert string to CRC32 format
 func MakeCRC32(str string) string {
 	crc := crc32.New(polyTable)
 	crc.Write([]byte(str))

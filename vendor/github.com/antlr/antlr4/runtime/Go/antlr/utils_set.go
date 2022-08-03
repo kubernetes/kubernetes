@@ -8,7 +8,7 @@ const (
 	_loadFactor           = 0.75
 )
 
-var _ Set = (*Array2DHashSet)(nil)
+var _ Set = (*array2DHashSet)(nil)
 
 type Set interface {
 	Add(value interface{}) (added interface{})
@@ -19,7 +19,7 @@ type Set interface {
 	Each(f func(interface{}) bool)
 }
 
-type Array2DHashSet struct {
+type array2DHashSet struct {
 	buckets          [][]interface{}
 	hashcodeFunction func(interface{}) int
 	equalsFunction   func(interface{}, interface{}) bool
@@ -31,7 +31,7 @@ type Array2DHashSet struct {
 	initialBucketCapacity int
 }
 
-func (as *Array2DHashSet) Each(f func(interface{}) bool) {
+func (as *array2DHashSet) Each(f func(interface{}) bool) {
 	if as.Len() < 1 {
 		return
 	}
@@ -48,7 +48,7 @@ func (as *Array2DHashSet) Each(f func(interface{}) bool) {
 	}
 }
 
-func (as *Array2DHashSet) Values() []interface{} {
+func (as *array2DHashSet) Values() []interface{} {
 	if as.Len() < 1 {
 		return nil
 	}
@@ -61,18 +61,18 @@ func (as *Array2DHashSet) Values() []interface{} {
 	return values
 }
 
-func (as *Array2DHashSet) Contains(value interface{}) bool {
+func (as *array2DHashSet) Contains(value interface{}) bool {
 	return as.Get(value) != nil
 }
 
-func (as *Array2DHashSet) Add(value interface{}) interface{} {
+func (as *array2DHashSet) Add(value interface{}) interface{} {
 	if as.n > as.threshold {
 		as.expand()
 	}
 	return as.innerAdd(value)
 }
 
-func (as *Array2DHashSet) expand() {
+func (as *array2DHashSet) expand() {
 	old := as.buckets
 
 	as.currentPrime += 4
@@ -120,11 +120,11 @@ func (as *Array2DHashSet) expand() {
 	}
 }
 
-func (as *Array2DHashSet) Len() int {
+func (as *array2DHashSet) Len() int {
 	return as.n
 }
 
-func (as *Array2DHashSet) Get(o interface{}) interface{} {
+func (as *array2DHashSet) Get(o interface{}) interface{} {
 	if o == nil {
 		return nil
 	}
@@ -147,7 +147,7 @@ func (as *Array2DHashSet) Get(o interface{}) interface{} {
 	return nil
 }
 
-func (as *Array2DHashSet) innerAdd(o interface{}) interface{} {
+func (as *array2DHashSet) innerAdd(o interface{}) interface{} {
 	b := as.getBuckets(o)
 
 	bucket := as.buckets[b]
@@ -187,25 +187,25 @@ func (as *Array2DHashSet) innerAdd(o interface{}) interface{} {
 	return o
 }
 
-func (as *Array2DHashSet) getBuckets(value interface{}) int {
+func (as *array2DHashSet) getBuckets(value interface{}) int {
 	hash := as.hashcodeFunction(value)
 	return hash & (len(as.buckets) - 1)
 }
 
-func (as *Array2DHashSet) createBuckets(cap int) [][]interface{} {
+func (as *array2DHashSet) createBuckets(cap int) [][]interface{} {
 	return make([][]interface{}, cap)
 }
 
-func (as *Array2DHashSet) createBucket(cap int) []interface{} {
+func (as *array2DHashSet) createBucket(cap int) []interface{} {
 	return make([]interface{}, cap)
 }
 
-func NewArray2DHashSetWithCap(
+func newArray2DHashSetWithCap(
 	hashcodeFunction func(interface{}) int,
 	equalsFunction func(interface{}, interface{}) bool,
 	initCap int,
 	initBucketCap int,
-) *Array2DHashSet {
+) *array2DHashSet {
 	if hashcodeFunction == nil {
 		hashcodeFunction = standardHashFunction
 	}
@@ -214,7 +214,7 @@ func NewArray2DHashSetWithCap(
 		equalsFunction = standardEqualsFunction
 	}
 
-	ret := &Array2DHashSet{
+	ret := &array2DHashSet{
 		hashcodeFunction: hashcodeFunction,
 		equalsFunction:   equalsFunction,
 
@@ -229,9 +229,9 @@ func NewArray2DHashSetWithCap(
 	return ret
 }
 
-func NewArray2DHashSet(
+func newArray2DHashSet(
 	hashcodeFunction func(interface{}) int,
 	equalsFunction func(interface{}, interface{}) bool,
-) *Array2DHashSet {
-	return NewArray2DHashSetWithCap(hashcodeFunction, equalsFunction, _initalCapacity, _initalBucketCapacity)
+) *array2DHashSet {
+	return newArray2DHashSetWithCap(hashcodeFunction, equalsFunction, _initalCapacity, _initalBucketCapacity)
 }

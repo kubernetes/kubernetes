@@ -524,12 +524,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"invalid allowed unsafe sysctl pattern": {
 			psp:         invalidAllowedUnsafeSysctlPattern,
 			errorType:   field.ErrorTypeInvalid,
-			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlContainSlashPatternFmt),
 		},
 		"invalid forbidden sysctl pattern": {
 			psp:         invalidForbiddenSysctlPattern,
 			errorType:   field.ErrorTypeInvalid,
-			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlContainSlashPatternFmt),
 		},
 		"invalid overlapping sysctl pattern": {
 			psp:         invalidOverlappingSysctls,
@@ -805,6 +805,12 @@ func TestIsValidSysctlPattern(t *testing.T) {
 		"abc*",
 		"a.abc*",
 		"a.b.*",
+		"a/b/c/d",
+		"a/*",
+		"a/b/*",
+		"a.b/c*",
+		"a.b/c.d",
+		"a/b.c/d",
 	}
 	invalid := []string{
 		"",
@@ -823,6 +829,10 @@ func TestIsValidSysctlPattern(t *testing.T) {
 		"a*b",
 		"*a",
 		"Abc",
+		"/",
+		"a/",
+		"/a",
+		"a*/b",
 		func(n int) string {
 			x := make([]byte, n)
 			for i := range x {
@@ -832,12 +842,12 @@ func TestIsValidSysctlPattern(t *testing.T) {
 		}(256),
 	}
 	for _, s := range valid {
-		if !IsValidSysctlPattern(s, false) {
+		if !IsValidSysctlPattern(s) {
 			t.Errorf("%q expected to be a valid sysctl pattern", s)
 		}
 	}
 	for _, s := range invalid {
-		if IsValidSysctlPattern(s, false) {
+		if IsValidSysctlPattern(s) {
 			t.Errorf("%q expected to be an invalid sysctl pattern", s)
 		}
 	}
