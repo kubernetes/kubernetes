@@ -472,7 +472,7 @@ func GetAvailableResources(clientBuilder clientbuilder.ControllerClientBuilder) 
 	discoveryClient := client.Discovery()
 	_, resourceMap, err := discoveryClient.ServerGroupsAndResources()
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
+		return nil, fmt.Errorf("unable to get all supported resources from server: %v", err)
 	}
 	if len(resourceMap) == 0 {
 		return nil, fmt.Errorf("unable to get any supported resources from server")
