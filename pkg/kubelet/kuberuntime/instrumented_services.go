@@ -131,7 +131,7 @@ func (in instrumentedRuntimeService) ContainerStatus(containerID string, verbose
 	return out, err
 }
 
-func (in instrumentedRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+func (in instrumentedRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.ContainerResources) error {
 	const operation = "update_container"
 	defer recordOperation(operation, time.Now())
 

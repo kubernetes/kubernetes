@@ -641,7 +641,7 @@ func (r *remoteRuntimeService) containerStatusV1(ctx context.Context, containerI
 }
 
 // UpdateContainerResources updates a containers resource config
-func (r *remoteRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) (err error) {
+func (r *remoteRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.ContainerResources) (err error) {
 	klog.V(10).InfoS("[RemoteRuntimeService] UpdateContainerResources", "containerID", containerID, "timeout", r.timeout)
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
@@ -649,12 +649,14 @@ func (r *remoteRuntimeService) UpdateContainerResources(containerID string, reso
 	if r.useV1API() {
 		_, err = r.runtimeClient.UpdateContainerResources(ctx, &runtimeapi.UpdateContainerResourcesRequest{
 			ContainerId: containerID,
-			Linux:       resources,
+			Linux:       resources.GetLinux(),
+			Windows:     resources.GetWindows(),
 		})
 	} else {
 		_, err = r.runtimeClientV1alpha2.UpdateContainerResources(ctx, &runtimeapiV1alpha2.UpdateContainerResourcesRequest{
 			ContainerId: containerID,
-			Linux:       v1alpha2LinuxContainerResources(resources),
+			Linux:       v1alpha2LinuxContainerResources(resources.GetLinux()),
+			Windows:     v1alpha2WindowsContainerResources(resources.GetWindows()),
 		})
 	}
 	if err != nil {
