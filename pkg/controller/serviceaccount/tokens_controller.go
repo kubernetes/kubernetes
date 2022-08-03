@@ -259,7 +259,7 @@ func (e *TokensController) syncServiceAccount() {
 	case sa == nil:
 		// service account no longer exists, so delete related tokens
 		klog.V(4).Infof("syncServiceAccount(%s|%s/%s), service account deleted, removing tokens", saInfo.clusterName, saInfo.namespace, saInfo.name)
-		sa = &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{ZZZ_DeprecatedClusterName: saInfo.clusterName.String(), Namespace: saInfo.namespace, Name: saInfo.name, UID: saInfo.uid}}
+		sa = &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{logicalcluster.AnnotationKey: saInfo.clusterName.String()}, Namespace: saInfo.namespace, Name: saInfo.name, UID: saInfo.uid}}
 		retry, err = e.deleteTokens(sa)
 		if err != nil {
 			klog.Errorf("error deleting serviceaccount tokens for %s|%s/%s: %v", saInfo.clusterName, saInfo.namespace, saInfo.name, err)
@@ -378,7 +378,8 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 		return false, nil
 	}
 
-	ctx := genericapirequest.WithCluster(context.TODO(), genericapirequest.Cluster{Name: logicalcluster.From(serviceAccount)})
+	clusterName := logicalcluster.From(serviceAccount)
+	ctx := genericapirequest.WithCluster(context.TODO(), genericapirequest.Cluster{Name: clusterName})
 
 	// We don't want to update the cache's copy of the service account
 	// so add the secret to a freshly retrieved copy of the service account
@@ -473,7 +474,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 
 	if !addedReference {
 		// we weren't able to use the token, try to clean it up.
-		klog.V(2).Infof("deleting secret %s|%s/%s because reference couldn't be added (%v)", secret.ZZZ_DeprecatedClusterName, secret.Namespace, secret.Name, err)
+		klog.V(2).Infof("deleting secret %s|%s/%s because reference couldn't be added (%v)", clusterName, secret.Namespace, secret.Name, err)
 		deleteOpts := metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &createdToken.UID}}
 		if err := e.client.CoreV1().Secrets(createdToken.Namespace).Delete(ctx, createdToken.Name, deleteOpts); err != nil {
 			klog.Error(err) // if we fail, just log it
@@ -531,7 +532,8 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 		return false, nil
 	}
 
-	ctx := genericapirequest.WithCluster(context.TODO(), genericapirequest.Cluster{Name: logicalcluster.From(serviceAccount)})
+	clusterName := logicalcluster.From(serviceAccount)
+	ctx := genericapirequest.WithCluster(context.TODO(), genericapirequest.Cluster{Name: clusterName})
 
 	// We don't want to update the cache's copy of the secret
 	// so add the token to a freshly retrieved copy of the secret
@@ -544,7 +546,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 	if liveSecret.ResourceVersion != cachedSecret.ResourceVersion {
 		// our view of the secret is not up to date
 		// we'll get notified of an update event later and get to try again
-		klog.V(2).Infof("secret %s|%s/%s is not up to date, skipping token population", liveSecret.ZZZ_DeprecatedClusterName, liveSecret.Namespace, liveSecret.Name)
+		klog.V(2).Infof("secret %s|%s/%s is not up to date, skipping token population", clusterName, liveSecret.Namespace, liveSecret.Name)
 		return false, nil
 	}
 
