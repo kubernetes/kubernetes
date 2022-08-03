@@ -5433,6 +5433,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: claimRef
       type:
         namedType: io.k8s.api.core.v1.ObjectReference
+        elementRelationship: separable
     - name: csi
       type:
         namedType: io.k8s.api.core.v1.CSIPersistentVolumeSource
