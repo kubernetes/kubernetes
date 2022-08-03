@@ -1932,7 +1932,7 @@ func (ReplicationControllerSpec) SwaggerDoc() map[string]string {
 
 var map_ReplicationControllerStatus = map[string]string{
 	"":                     "ReplicationControllerStatus represents the current status of a replication controller.",
-	"replicas":             "Replicas is the most recently oberved number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller",
+	"replicas":             "Replicas is the most recently observed number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller",
 	"fullyLabeledReplicas": "The number of pods that have labels matching the labels of the pod template of the replication controller.",
 	"readyReplicas":        "The number of ready replicas for this replication controller.",
 	"availableReplicas":    "The number of available replicas (ready for at least minReadySeconds) for this replication controller.",
