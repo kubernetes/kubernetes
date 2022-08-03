@@ -56,9 +56,9 @@ func DefaultSignerNameFromSpec(obj *certificatesv1beta1.CertificateSigningReques
 		// Set the signerName to 'legacy-unknown' as the CSR could not be
 		// recognised.
 		return certificatesv1beta1.LegacyUnknownSignerName
-	case IsKubeletClientCSR(csr, obj.Usages, false):
+	case IsKubeletClientCSR(csr, obj.Usages, true):
 		return certificatesv1beta1.KubeAPIServerClientKubeletSignerName
-	case IsKubeletServingCSR(csr, obj.Usages, false):
+	case IsKubeletServingCSR(csr, obj.Usages, true):
 		return certificatesv1beta1.KubeletServingSignerName
 	default:
 		return certificatesv1beta1.LegacyUnknownSignerName
