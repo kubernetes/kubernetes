@@ -28,10 +28,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-func NewServiceRegistry() *ServiceRegistry {
-	return &ServiceRegistry{}
-}
-
 type ServiceRegistry struct {
 	mu      sync.Mutex
 	List    api.ServiceList

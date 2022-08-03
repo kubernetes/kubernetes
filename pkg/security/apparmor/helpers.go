@@ -42,21 +42,3 @@ func GetProfileName(pod *v1.Pod, containerName string) string {
 func GetProfileNameFromPodAnnotations(annotations map[string]string, containerName string) string {
 	return annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+containerName]
 }
-
-// SetProfileName sets the name of the profile to use with the container.
-func SetProfileName(pod *v1.Pod, containerName, profileName string) error {
-	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
-	}
-	pod.Annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+containerName] = profileName
-	return nil
-}
-
-// SetProfileNameFromPodAnnotations sets the name of the profile to use with the container.
-func SetProfileNameFromPodAnnotations(annotations map[string]string, containerName, profileName string) error {
-	if annotations == nil {
-		return nil
-	}
-	annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+containerName] = profileName
-	return nil
-}

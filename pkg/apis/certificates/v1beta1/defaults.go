@@ -23,7 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	certificates "k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -67,9 +67,6 @@ func DefaultSignerNameFromSpec(obj *certificatesv1beta1.CertificateSigningReques
 
 func IsKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage, allowOmittingUsageKeyEncipherment bool) bool {
 	return certificates.IsKubeletServingCSR(req, usagesToSet(usages), allowOmittingUsageKeyEncipherment)
-}
-func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage, allowOmittingUsageKeyEncipherment bool) error {
-	return certificates.ValidateKubeletServingCSR(req, usagesToSet(usages), allowOmittingUsageKeyEncipherment)
 }
 
 func IsKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage, allowOmittingUsageKeyEncipherment bool) bool {

@@ -354,11 +354,6 @@ func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfigurati
 	return allErrs
 }
 
-// ValidatePriorityLevelConfigurationUpdate validates the update of priority-level-configuration.
-func ValidatePriorityLevelConfigurationUpdate(old, pl *flowcontrol.PriorityLevelConfiguration) field.ErrorList {
-	return ValidatePriorityLevelConfiguration(pl)
-}
-
 // ValidatePriorityLevelConfigurationSpec validates priority-level-configuration's spec.
 func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, name string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList

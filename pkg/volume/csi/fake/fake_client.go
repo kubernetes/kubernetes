@@ -43,11 +43,6 @@ type IdentityClient struct {
 	nextErr error
 }
 
-// NewIdentityClient returns a new IdentityClient
-func NewIdentityClient() *IdentityClient {
-	return &IdentityClient{}
-}
-
 // SetNextError injects expected error
 func (f *IdentityClient) SetNextError(err error) {
 	f.nextErr = err
@@ -442,9 +437,6 @@ type ControllerClient struct {
 }
 
 // NewControllerClient returns a ControllerClient
-func NewControllerClient() *ControllerClient {
-	return &ControllerClient{}
-}
 
 // SetNextError injects next expected error
 func (f *ControllerClient) SetNextError(err error) {

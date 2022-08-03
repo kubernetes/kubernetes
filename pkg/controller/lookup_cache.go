@@ -52,13 +52,6 @@ type MatchingCache struct {
 	cache *lru.Cache
 }
 
-// NewMatchingCache return a NewMatchingCache, which save label and selector matching relationship.
-func NewMatchingCache(maxCacheEntries int) *MatchingCache {
-	return &MatchingCache{
-		cache: lru.New(maxCacheEntries),
-	}
-}
-
 // Add will add matching information to the cache.
 func (c *MatchingCache) Add(labelObj objectWithMeta, selectorObj objectWithMeta) {
 	key := keyFunc(labelObj)

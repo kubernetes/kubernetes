@@ -26,20 +26,6 @@ const IsDefaultStorageClassAnnotation = "storageclass.kubernetes.io/is-default-c
 // TODO: remove Beta when no longer used
 const BetaIsDefaultStorageClassAnnotation = "storageclass.beta.kubernetes.io/is-default-class"
 
-// IsDefaultAnnotationText returns a pretty Yes/No String if
-// the annotation is set
-// TODO: remove Beta when no longer needed
-func IsDefaultAnnotationText(obj metav1.ObjectMeta) string {
-	if obj.Annotations[IsDefaultStorageClassAnnotation] == "true" {
-		return "Yes"
-	}
-	if obj.Annotations[BetaIsDefaultStorageClassAnnotation] == "true" {
-		return "Yes"
-	}
-
-	return "No"
-}
-
 // IsDefaultAnnotation returns a boolean if
 // the annotation is set
 // TODO: remove Beta when no longer needed

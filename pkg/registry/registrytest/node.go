@@ -48,12 +48,6 @@ func MakeNodeList(nodes []string, nodeResources api.NodeResources) *api.NodeList
 	return &list
 }
 
-func NewNodeRegistry(nodes []string, nodeResources api.NodeResources) *NodeRegistry {
-	return &NodeRegistry{
-		Nodes: *MakeNodeList(nodes, nodeResources),
-	}
-}
-
 func (r *NodeRegistry) SetError(err error) {
 	r.Lock()
 	defer r.Unlock()
