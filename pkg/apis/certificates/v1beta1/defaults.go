@@ -56,27 +56,27 @@ func DefaultSignerNameFromSpec(obj *certificatesv1beta1.CertificateSigningReques
 		// Set the signerName to 'legacy-unknown' as the CSR could not be
 		// recognised.
 		return certificatesv1beta1.LegacyUnknownSignerName
-	case IsKubeletClientCSR(csr, obj.Usages):
+	case IsKubeletClientCSR(csr, obj.Usages, false):
 		return certificatesv1beta1.KubeAPIServerClientKubeletSignerName
-	case IsKubeletServingCSR(csr, obj.Usages):
+	case IsKubeletServingCSR(csr, obj.Usages, false):
 		return certificatesv1beta1.KubeletServingSignerName
 	default:
 		return certificatesv1beta1.LegacyUnknownSignerName
 	}
 }
 
-func IsKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) bool {
-	return certificates.IsKubeletServingCSR(req, usagesToSet(usages))
+func IsKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage, allowOmittingUsageKeyEncipherment bool) bool {
+	return certificates.IsKubeletServingCSR(req, usagesToSet(usages), allowOmittingUsageKeyEncipherment)
 }
-func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) error {
-	return certificates.ValidateKubeletServingCSR(req, usagesToSet(usages))
+func ValidateKubeletServingCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage, allowOmittingUsageKeyEncipherment bool) error {
+	return certificates.ValidateKubeletServingCSR(req, usagesToSet(usages), allowOmittingUsageKeyEncipherment)
 }
 
-func IsKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) bool {
-	return certificates.IsKubeletClientCSR(req, usagesToSet(usages))
+func IsKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage, allowOmittingUsageKeyEncipherment bool) bool {
+	return certificates.IsKubeletClientCSR(req, usagesToSet(usages), allowOmittingUsageKeyEncipherment)
 }
-func ValidateKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage) error {
-	return certificates.ValidateKubeletClientCSR(req, usagesToSet(usages))
+func ValidateKubeletClientCSR(req *x509.CertificateRequest, usages []certificatesv1beta1.KeyUsage, allowOmittingUsageKeyEncipherment bool) error {
+	return certificates.ValidateKubeletClientCSR(req, usagesToSet(usages), allowOmittingUsageKeyEncipherment)
 }
 
 func usagesToSet(usages []certificatesv1beta1.KeyUsage) sets.String {
