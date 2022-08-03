@@ -339,6 +339,5 @@ func (f *Fit) Score(ctx context.Context, state *framework.CycleState, pod *v1.Po
 		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
-	logger := klog.FromContext(ctx)
-	return f.score(logger, pod, nodeInfo)
+	return f.score(klog.FromContext(ctx), pod, nodeInfo)
 }

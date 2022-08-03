@@ -345,10 +345,10 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs *framework.CycleState, 
 	logger.V(5).Info("Trying to bind volumes for pod")
 	err = pl.Binder.BindPodVolumes(logger, pod, podVolumes)
 	if err != nil {
-		logger.V(1).Info("Failed to bind volumes for pod", "err", err)
+		logger.V(1).Info("Failed to bind volumes for pod", "err", "pod", klog.KObj(pod), err)
 		return framework.AsStatus(err)
 	}
-	logger.V(5).Info("Success binding volumes for pod")
+	logger.V(5).Info("Success binding volumes for pod", "pod", klog.KObj(pod))
 	return nil
 }
 

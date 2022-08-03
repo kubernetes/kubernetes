@@ -254,8 +254,7 @@ func (pl *InterPodAffinity) PreFilter(ctx context.Context, cycleState *framework
 			return nil, framework.AsStatus(err)
 		}
 	}
-	logger := klog.FromContext(ctx)
-	s.namespaceLabels = GetNamespaceLabelsSnapshot(logger, pod.Namespace, pl.nsLister)
+	s.namespaceLabels = GetNamespaceLabelsSnapshot(klog.FromContext(ctx), pod.Namespace, pl.nsLister)
 
 	s.existingAntiAffinityCounts = pl.getExistingAntiAffinityCounts(ctx, pod, s.namespaceLabels, nodesWithRequiredAntiAffinityPods)
 	s.affinityCounts, s.antiAffinityCounts = pl.getIncomingAffinityAntiAffinityCounts(ctx, s.podInfo, allNodes)

@@ -1557,7 +1557,7 @@ func TestBindAPIUpdate(t *testing.T) {
 		testEnv.assumeVolumes(t, "node1", pod, scenario.bindings, scenario.provisionedPVCs)
 
 		// Execute
-		err := testEnv.internalBinder.bindAPIUpdate(logger, pod.Name, scenario.bindings, scenario.provisionedPVCs)
+		err := testEnv.internalBinder.bindAPIUpdate(logger, pod, scenario.bindings, scenario.provisionedPVCs)
 
 		// Validate
 		if !scenario.shouldFail && err != nil {

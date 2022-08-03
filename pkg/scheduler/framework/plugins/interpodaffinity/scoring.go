@@ -187,8 +187,7 @@ func (pl *InterPodAffinity) PreScore(
 			return framework.AsStatus(fmt.Errorf("updating PreferredAntiAffinityTerms: %w", err))
 		}
 	}
-	logger := klog.FromContext(pCtx)
-	state.namespaceLabels = GetNamespaceLabelsSnapshot(logger, pod.Namespace, pl.nsLister)
+	state.namespaceLabels = GetNamespaceLabelsSnapshot(klog.FromContext(pCtx), pod.Namespace, pl.nsLister)
 
 	topoScores := make([]scoreMap, len(allNodes))
 	index := int32(-1)

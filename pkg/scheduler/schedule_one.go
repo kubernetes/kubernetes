@@ -192,7 +192,7 @@ func (sched *Scheduler) schedulingCycle(
 		// trigger un-reserve to clean up state associated with the reserved Pod
 		fwk.RunReservePluginsUnreserve(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 		if forgetErr := sched.Cache.ForgetPod(logger, assumedPod); forgetErr != nil {
-			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
+			logger.Error(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 
 		return ScheduleResult{nominatingInfo: clearNominatedNode},
@@ -206,7 +206,7 @@ func (sched *Scheduler) schedulingCycle(
 		// trigger un-reserve to clean up state associated with the reserved Pod
 		fwk.RunReservePluginsUnreserve(ctx, state, assumedPod, scheduleResult.SuggestedHost)
 		if forgetErr := sched.Cache.ForgetPod(logger, assumedPod); forgetErr != nil {
-			klog.ErrorS(forgetErr, "Scheduler cache ForgetPod failed")
+			logger.Error(forgetErr, "Scheduler cache ForgetPod failed")
 		}
 
 		return ScheduleResult{nominatingInfo: clearNominatedNode},
@@ -340,9 +340,7 @@ func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Frame
 func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
-	logger := klog.FromContext(ctx)
-
-	if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
+	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
 		return result, err
 	}
 	trace.Step("Snapshotting scheduler cache and node infos done")
