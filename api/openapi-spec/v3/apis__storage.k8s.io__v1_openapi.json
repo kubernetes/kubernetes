@@ -693,7 +693,8 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ObjectReference"
               }
             ],
-            "description": "claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding"
+            "description": "claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding",
+            "x-kubernetes-map-type": "granular"
           },
           "csi": {
             "allOf": [
