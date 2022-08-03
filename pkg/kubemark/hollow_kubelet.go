@@ -206,6 +206,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	c.ProtectKernelDefaults = false
 	c.RegisterWithTaints = opt.RegisterWithTaints
 	c.RegisterNode = true
+	c.LocalStorageCapacityIsolation = true
 
 	return f, c
 }

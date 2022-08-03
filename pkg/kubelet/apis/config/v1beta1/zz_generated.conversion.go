@@ -508,6 +508,9 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 		return err
 	}
 	out.Tracing = (*apiv1.TracingConfiguration)(unsafe.Pointer(in.Tracing))
+	if err := v1.Convert_Pointer_bool_To_bool(&in.LocalStorageCapacityIsolation, &out.LocalStorageCapacityIsolation, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -683,6 +686,9 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 		return err
 	}
 	out.Tracing = (*apiv1.TracingConfiguration)(unsafe.Pointer(in.Tracing))
+	if err := v1.Convert_bool_To_Pointer_bool(&in.LocalStorageCapacityIsolation, &out.LocalStorageCapacityIsolation, s); err != nil {
+		return err
+	}
 	return nil
 }
 

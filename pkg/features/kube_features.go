@@ -517,8 +517,9 @@ const (
 
 	// owner: @jinxu
 	// beta: v1.10
+	// stable: v1.25
 	//
-	// New local storage types to support local storage capacity isolation
+	// Support local ephemeral storage types for local storage capacity isolation feature.
 	LocalStorageCapacityIsolation featuregate.Feature = "LocalStorageCapacityIsolation"
 
 	// owner: @RobertKrawitz
@@ -1004,7 +1005,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	LegacyServiceAccountTokenNoAutoGeneration: {Default: true, PreRelease: featuregate.Beta},
 
-	LocalStorageCapacityIsolation: {Default: true, PreRelease: featuregate.Beta},
+	LocalStorageCapacityIsolation: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: true, PreRelease: featuregate.Beta},
 
