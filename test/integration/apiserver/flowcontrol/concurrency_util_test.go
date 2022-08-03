@@ -124,7 +124,10 @@ func (clm *clientLatencyMeasurement) getStats() clientLatencyStats {
 	defer clm.Mu.Unlock()
 	mean := clm.Sum / float64(clm.Count)
 	ss := clm.SumSq - mean*clm.Sum // reduced from ss := sumsq - 2*mean*sum + float64(count)*mean*mean
-
+	// Set ss to 0 if negative value is resulted from floating point calculations
+	if ss < 0 {
+		ss = 0
+	}
 	stdDev := math.Sqrt(ss / float64(clm.Count))
 	cv := stdDev / mean
 	return clientLatencyStats{mean: mean, stdDev: stdDev, cv: cv}
@@ -141,7 +144,7 @@ type plMetricAvg struct {
 	seatUtil     float64 // average seat utilization
 }
 
-func intervalMetricAvg(snapshot0 metricSnapshot, snapshot1 metricSnapshot, plLabel string) plMetricAvg {
+func intervalMetricAvg(snapshot0, snapshot1 metricSnapshot, plLabel string) plMetricAvg {
 	plmT0 := snapshot0[plLabel]
 	plmT1 := snapshot1[plLabel]
 	return plMetricAvg{
@@ -156,6 +159,17 @@ func intervalMetricAvg(snapshot0 metricSnapshot, snapshot1 metricSnapshot, plLab
 // allows to execute at once, while sending fewer than allowed to the other priority level.
 // The primary check is that the low flow gets all the seats it wants, but is modulated by
 // recognizing that there are uncontrolled overheads in the system.
+//
+// This test differs from TestPriorityLevelIsolation since TestPriorityLevelIsolation checks throughput instead
+// of concurrency. In order to mitigate the effects of system noise, authorization webhook is used to artificially
+// increase request execution time to make the system noise relatively insignificant.
+//
+// Secondarily, this test also checks the observed seat utilizations against values derived from expecting that
+// the throughput observed by the client equals the execution throughput observed by the server.
+//
+// This test recognizes that there is noise in the measurements coming from uncontrolled overheads
+// and unsynchronized reading of related quantities.  This test takes as a relative error margin 2 times
+// the smaller (of the two traffic classes) coefficient of variation of the client-observed latency.
 func TestConcurrencyIsolation(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
 	// NOTE: disabling the feature should fail the test
