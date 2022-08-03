@@ -73,7 +73,6 @@ func (d *testDecodable) DeepCopyInto(out *testDecodable) {
 	out.Value = d.Value
 	out.Spec = d.Spec
 	out.Interface = d.Interface
-	return
 }
 
 type testDecodeCoercion struct {
@@ -106,7 +105,6 @@ func (d *testDecodeCoercion) DeepCopyObject() runtime.Object {
 }
 func (d *testDecodeCoercion) DeepCopyInto(out *testDecodeCoercion) {
 	*out = *d
-	return
 }
 
 func TestDecode(t *testing.T) {
