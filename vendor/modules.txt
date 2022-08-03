@@ -200,13 +200,6 @@ github.com/containerd/cgroups/stats/v1
 # github.com/containerd/console v1.0.3 => github.com/containerd/console v1.0.3
 ## explicit; go 1.13
 github.com/containerd/console
-# github.com/containerd/containerd v1.4.12 => github.com/containerd/containerd v1.4.12
-## explicit
-github.com/containerd/containerd/api/services/containers/v1
-github.com/containerd/containerd/api/services/tasks/v1
-github.com/containerd/containerd/api/services/version/v1
-github.com/containerd/containerd/api/types
-github.com/containerd/containerd/api/types/task
 # github.com/containerd/ttrpc v1.0.2 => github.com/containerd/ttrpc v1.0.2
 ## explicit; go 1.13
 github.com/containerd/ttrpc
@@ -366,7 +359,7 @@ github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.1 => github.com/google/btree v1.0.1
 ## explicit; go 1.12
 github.com/google/btree
-# github.com/google/cadvisor v0.44.1 => github.com/google/cadvisor v0.44.1
+# github.com/google/cadvisor v0.45.0 => github.com/google/cadvisor v0.45.0
 ## explicit; go 1.16
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
@@ -401,6 +394,11 @@ github.com/google/cadvisor/resctrl
 github.com/google/cadvisor/stats
 github.com/google/cadvisor/storage
 github.com/google/cadvisor/summary
+github.com/google/cadvisor/third_party/containerd/api/services/containers/v1
+github.com/google/cadvisor/third_party/containerd/api/services/tasks/v1
+github.com/google/cadvisor/third_party/containerd/api/services/version/v1
+github.com/google/cadvisor/third_party/containerd/api/types
+github.com/google/cadvisor/third_party/containerd/api/types/task
 github.com/google/cadvisor/utils
 github.com/google/cadvisor/utils/cloudinfo
 github.com/google/cadvisor/utils/cloudinfo/aws
@@ -498,6 +496,8 @@ github.com/gophercloud/gophercloud/openstack/networking/v2/networks
 github.com/gophercloud/gophercloud/openstack/networking/v2/ports
 github.com/gophercloud/gophercloud/openstack/utils
 github.com/gophercloud/gophercloud/pagination
+# github.com/gorilla/mux v1.8.0 => github.com/gorilla/mux v1.8.0
+## explicit; go 1.12
 # github.com/gorilla/websocket v1.4.2 => github.com/gorilla/websocket v1.4.2
 ## explicit; go 1.12
 github.com/gorilla/websocket
@@ -2610,7 +2610,7 @@ sigs.k8s.io/yaml
 # github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.6.0
 # github.com/containerd/cgroups => github.com/containerd/cgroups v1.0.1
 # github.com/containerd/console => github.com/containerd/console v1.0.3
-# github.com/containerd/containerd => github.com/containerd/containerd v1.4.12
+# github.com/containerd/containerd => github.com/containerd/containerd v1.4.9
 # github.com/containerd/continuity => github.com/containerd/continuity v0.1.0
 # github.com/containerd/fifo => github.com/containerd/fifo v1.0.0
 # github.com/containerd/go-runc => github.com/containerd/go-runc v1.0.0
@@ -2628,7 +2628,7 @@ sigs.k8s.io/yaml
 # github.com/daviddengcn/go-colortext => github.com/daviddengcn/go-colortext v1.0.0
 # github.com/dnaeon/go-vcr => github.com/dnaeon/go-vcr v1.0.1
 # github.com/docker/distribution => github.com/docker/distribution v2.8.1+incompatible
-# github.com/docker/docker => github.com/docker/docker v20.10.12+incompatible
+# github.com/docker/docker => github.com/docker/docker v20.10.17+incompatible
 # github.com/docker/go-connections => github.com/docker/go-connections v0.4.0
 # github.com/docker/go-units => github.com/docker/go-units v0.4.0
 # github.com/docopt/docopt-go => github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
@@ -2666,6 +2666,7 @@ sigs.k8s.io/yaml
 # github.com/go-task/slim-sprig => github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0
 # github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.6
 # github.com/gofrs/uuid => github.com/gofrs/uuid v4.0.0+incompatible
+# github.com/gogo/googleapis => github.com/gogo/googleapis v1.4.1
 # github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
 # github.com/golang-jwt/jwt/v4 => github.com/golang-jwt/jwt/v4 v4.2.0
 # github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
@@ -2678,7 +2679,7 @@ sigs.k8s.io/yaml
 # github.com/golangplus/fmt => github.com/golangplus/fmt v1.0.0
 # github.com/golangplus/testing => github.com/golangplus/testing v1.0.0
 # github.com/google/btree => github.com/google/btree v1.0.1
-# github.com/google/cadvisor => github.com/google/cadvisor v0.44.1
+# github.com/google/cadvisor => github.com/google/cadvisor v0.45.0
 # github.com/google/cel-go => github.com/google/cel-go v0.12.4
 # github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
 # github.com/google/go-cmp => github.com/google/go-cmp v0.5.6

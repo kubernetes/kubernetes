@@ -40,7 +40,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/cadvisor v0.44.1
+	github.com/google/cadvisor v0.45.0
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.6
 	github.com/google/gofuzz v1.1.0
@@ -155,7 +155,6 @@ require (
 	github.com/cilium/ebpf v0.7.0 // indirect
 	github.com/containerd/cgroups v1.0.1 // indirect
 	github.com/containerd/console v1.0.3 // indirect
-	github.com/containerd/containerd v1.4.12 // indirect
 	github.com/containerd/ttrpc v1.0.2 // indirect
 	github.com/coredns/caddy v1.1.0 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
@@ -183,6 +182,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/gophercloud/gophercloud v0.1.0 // indirect
+	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
@@ -319,7 +319,7 @@ replace (
 	github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.6.0
 	github.com/containerd/cgroups => github.com/containerd/cgroups v1.0.1
 	github.com/containerd/console => github.com/containerd/console v1.0.3
-	github.com/containerd/containerd => github.com/containerd/containerd v1.4.12
+	github.com/containerd/containerd => github.com/containerd/containerd v1.4.9
 	github.com/containerd/continuity => github.com/containerd/continuity v0.1.0
 	github.com/containerd/fifo => github.com/containerd/fifo v1.0.0
 	github.com/containerd/go-runc => github.com/containerd/go-runc v1.0.0
@@ -337,7 +337,7 @@ replace (
 	github.com/daviddengcn/go-colortext => github.com/daviddengcn/go-colortext v1.0.0
 	github.com/dnaeon/go-vcr => github.com/dnaeon/go-vcr v1.0.1
 	github.com/docker/distribution => github.com/docker/distribution v2.8.1+incompatible
-	github.com/docker/docker => github.com/docker/docker v20.10.12+incompatible
+	github.com/docker/docker => github.com/docker/docker v20.10.17+incompatible
 	github.com/docker/go-connections => github.com/docker/go-connections v0.4.0
 	github.com/docker/go-units => github.com/docker/go-units v0.4.0
 	github.com/docopt/docopt-go => github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
@@ -375,6 +375,7 @@ replace (
 	github.com/go-task/slim-sprig => github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0
 	github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.6
 	github.com/gofrs/uuid => github.com/gofrs/uuid v4.0.0+incompatible
+	github.com/gogo/googleapis => github.com/gogo/googleapis v1.4.1
 	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
 	github.com/golang-jwt/jwt/v4 => github.com/golang-jwt/jwt/v4 v4.2.0
 	github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
@@ -387,7 +388,7 @@ replace (
 	github.com/golangplus/fmt => github.com/golangplus/fmt v1.0.0
 	github.com/golangplus/testing => github.com/golangplus/testing v1.0.0
 	github.com/google/btree => github.com/google/btree v1.0.1
-	github.com/google/cadvisor => github.com/google/cadvisor v0.44.1
+	github.com/google/cadvisor => github.com/google/cadvisor v0.45.0
 	github.com/google/cel-go => github.com/google/cel-go v0.12.4
 	github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.6

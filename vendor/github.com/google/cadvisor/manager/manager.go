@@ -155,9 +155,7 @@ func New(memoryCache *memory.InMemoryCache, sysfs sysfs.SysFs, houskeepingConfig
 	selfContainer := "/"
 	var err error
 	// Avoid using GetOwnCgroupPath on cgroup v2 as it is not supported by libcontainer
-	if cgroups.IsCgroup2UnifiedMode() {
-		klog.Warningf("Cannot detect current cgroup on cgroup v2")
-	} else {
+	if !cgroups.IsCgroup2UnifiedMode() {
 		selfContainer, err = cgroups.GetOwnCgroup("cpu")
 		if err != nil {
 			return nil, err
