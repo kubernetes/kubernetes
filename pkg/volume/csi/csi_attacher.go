@@ -43,10 +43,7 @@ import (
 	"k8s.io/utils/clock"
 )
 
-const (
-	persistentVolumeInGlobalPath = "pv"
-	globalMountInGlobalPath      = "globalmount"
-)
+const globalMountInGlobalPath = "globalmount"
 
 type csiAttacher struct {
 	plugin       *csiPlugin
