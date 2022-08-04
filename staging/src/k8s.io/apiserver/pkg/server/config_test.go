@@ -139,7 +139,10 @@ func TestNewWithDelegate(t *testing.T) {
 	wrappingServer.PrepareRun()
 	wrappingServer.RunPostStartHooks(stopCh)
 
-	server := httptest.NewServer(wrappingServer.Handler)
+	server,err := httptest.NewServer(wrappingServer.Handler)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer server.Close()
 
 	// Wait for the hooks to finish before checking the response
