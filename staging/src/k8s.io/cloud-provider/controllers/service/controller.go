@@ -984,13 +984,11 @@ type NodeConditionPredicate func(node *v1.Node) bool
 var (
 	allNodePredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeIncludedPredicate,
-		nodeSchedulablePredicate,
 		nodeUnTaintedPredicate,
 		nodeReadyPredicate,
 	}
 	etpLocalNodePredicates []NodeConditionPredicate = []NodeConditionPredicate{
 		nodeIncludedPredicate,
-		nodeSchedulablePredicate,
 		nodeUnTaintedPredicate,
 	}
 )
@@ -1006,11 +1004,6 @@ func getNodePredicatesForService(service *v1.Service) []NodeConditionPredicate {
 func nodeIncludedPredicate(node *v1.Node) bool {
 	_, hasExcludeBalancerLabel := node.Labels[v1.LabelNodeExcludeBalancers]
 	return !hasExcludeBalancerLabel
-}
-
-// We consider the node for load balancing only when the node is schedulable.
-func nodeSchedulablePredicate(node *v1.Node) bool {
-	return !node.Spec.Unschedulable
 }
 
 // We consider the node for load balancing only when its not tainted for deletion by the cluster autoscaler.
