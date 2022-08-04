@@ -61,51 +61,55 @@ func TestControllerSync(t *testing.T) {
 		// sent to add/update/delete Claim/Volume as real controller would do.
 		{
 			// addClaim gets a new claim. Check it's bound to a volume.
-			"5-2 - complete bind",
-			newVolumeArray("volume5-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
-			newVolumeArray("volume5-2", "1Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController),
-			noclaims, /* added in testAddClaim5_2 */
-			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted),
-			noevents, noerrors,
+			name:            "5-2 - complete bind",
+			initialVolumes:  newVolumeArray("volume5-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
+			expectedVolumes: newVolumeArray("volume5-2", "1Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController),
+			initialClaims:   noclaims, /* added in testAddClaim5_2 */
+			expectedClaims:  newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted),
+			expectedEvents:  noevents,
+			errors:          noerrors,
 			// Custom test function that generates an add event
-			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				claim := newClaim("claim5-2", "uid5-2", "1Gi", "", v1.ClaimPending, nil)
 				reactor.AddClaimEvent(claim)
 				return nil
 			},
 		},
 		{
-			"5-2-2 - complete bind when PV and PVC both exist",
-			newVolumeArray("volume5-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
-			newVolumeArray("volume5-2", "1Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController),
-			newClaimArray("claim5-2", "uid5-2", "1Gi", "", v1.ClaimPending, nil),
-			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted),
-			noevents, noerrors,
-			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+			name:            "5-2-2 - complete bind when PV and PVC both exist",
+			initialVolumes:  newVolumeArray("volume5-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
+			expectedVolumes: newVolumeArray("volume5-2", "1Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController),
+			initialClaims:   newClaimArray("claim5-2", "uid5-2", "1Gi", "", v1.ClaimPending, nil),
+			expectedClaims:  newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted),
+			expectedEvents:  noevents,
+			errors:          noerrors,
+			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				return nil
 			},
 		},
 		{
-			"5-2-3 - complete bind when PV and PVC both exist and PV has AnnPreResizeCapacity annotation",
-			volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
-			volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
-			withExpectedCapacity("2Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "", v1.ClaimPending, nil)),
-			withExpectedCapacity("1Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "volume5-2", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted)),
-			noevents, noerrors,
-			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+			name:            "5-2-3 - complete bind when PV and PVC both exist and PV has AnnPreResizeCapacity annotation",
+			initialVolumes:  volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
+			expectedVolumes: volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController)),
+			initialClaims:   withExpectedCapacity("2Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "", v1.ClaimPending, nil)),
+			expectedClaims:  withExpectedCapacity("1Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "volume5-2", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted)),
+			expectedEvents:  noevents,
+			errors:          noerrors,
+			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				return nil
 			},
 		},
 		{
 			// deleteClaim with a bound claim makes bound volume released.
-			"5-3 - delete claim",
-			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController),
-			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController),
-			newClaimArray("claim5-3", "uid5-3", "1Gi", "volume5-3", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted),
-			noclaims,
-			noevents, noerrors,
+			name:            "5-3 - delete claim",
+			initialVolumes:  newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController),
+			expectedVolumes: newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, classEmpty, volume.AnnBoundByController),
+			initialClaims:   newClaimArray("claim5-3", "uid5-3", "1Gi", "volume5-3", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted),
+			expectedClaims:  noclaims,
+			expectedEvents:  noevents,
+			errors:          noerrors,
 			// Custom test function that generates a delete event
-			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*v1.PersistentVolumeClaim)
 				reactor.DeleteClaimEvent(claim)
@@ -114,14 +118,15 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			// deleteVolume with a bound volume. Check the claim is Lost.
-			"5-4 - delete volume",
-			newVolumeArray("volume5-4", "1Gi", "uid5-4", "claim5-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty),
-			novolumes,
-			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted),
-			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimLost, nil, volume.AnnBoundByController, volume.AnnBindCompleted),
-			[]string{"Warning ClaimLost"}, noerrors,
+			name:            "5-4 - delete volume",
+			initialVolumes:  newVolumeArray("volume5-4", "1Gi", "uid5-4", "claim5-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty),
+			expectedVolumes: novolumes,
+			initialClaims:   newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimBound, nil, volume.AnnBoundByController, volume.AnnBindCompleted),
+			expectedClaims:  newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimLost, nil, volume.AnnBoundByController, volume.AnnBindCompleted),
+			expectedEvents:  []string{"Warning ClaimLost"},
+			errors:          noerrors,
 			// Custom test function that generates a delete event
-			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				obj := ctrl.volumes.store.List()[0]
 				volume := obj.(*v1.PersistentVolume)
 				reactor.DeleteVolumeEvent(volume)
@@ -131,18 +136,19 @@ func TestControllerSync(t *testing.T) {
 		{
 			// deleteClaim with a bound claim makes bound volume released with external deleter.
 			// delete the corresponding volume from apiserver, and report latency metric
-			"5-5 - delete claim and delete volume report metric",
-			volumesWithAnnotation(volume.AnnDynamicallyProvisioned, "gcr.io/vendor-csi",
+			name: "5-5 - delete claim and delete volume report metric",
+			initialVolumes: volumesWithAnnotation(volume.AnnDynamicallyProvisioned, "gcr.io/vendor-csi",
 				newVolumeArray("volume5-5", "10Gi", "uid5-5", "claim5-5", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, volume.AnnBoundByController)),
-			novolumes,
-			claimWithAnnotation(volume.AnnStorageProvisioner, "gcr.io/vendor-csi",
+			expectedVolumes: novolumes,
+			initialClaims: claimWithAnnotation(volume.AnnStorageProvisioner, "gcr.io/vendor-csi",
 				newClaimArray("claim5-5", "uid5-5", "1Gi", "volume5-5", v1.ClaimBound, &classExternal, volume.AnnBoundByController, volume.AnnBindCompleted)),
-			noclaims,
-			noevents, noerrors,
+			expectedClaims: noclaims,
+			expectedEvents: noevents,
+			errors:         noerrors,
 			// Custom test function that generates a delete claim event which should have been caught by
 			// "deleteClaim" to remove the claim from controller's cache, after that, a volume deleted
 			// event will be generated to trigger "deleteVolume" call for metric reporting
-			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				test.initialVolumes[0].Annotations[volume.AnnDynamicallyProvisioned] = "gcr.io/vendor-csi"
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*v1.PersistentVolumeClaim)
@@ -162,16 +168,17 @@ func TestControllerSync(t *testing.T) {
 		{
 			// deleteClaim with a bound claim makes bound volume released with external deleter pending
 			// there should be an entry in operation timestamps cache in controller
-			"5-6 - delete claim and waiting for external volume deletion",
-			volumesWithAnnotation(volume.AnnDynamicallyProvisioned, "gcr.io/vendor-csi", []*v1.PersistentVolume{newExternalProvisionedVolume("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, "fake.driver.csi", nil, volume.AnnBoundByController)}),
-			volumesWithAnnotation(volume.AnnDynamicallyProvisioned, "gcr.io/vendor-csi", []*v1.PersistentVolume{newExternalProvisionedVolume("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classExternal, "fake.driver.csi", nil, volume.AnnBoundByController)}),
-			claimWithAnnotation(volume.AnnStorageProvisioner, "gcr.io/vendor-csi",
+			name:            "5-6 - delete claim and waiting for external volume deletion",
+			initialVolumes:  volumesWithAnnotation(volume.AnnDynamicallyProvisioned, "gcr.io/vendor-csi", []*v1.PersistentVolume{newExternalProvisionedVolume("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, "fake.driver.csi", nil, volume.AnnBoundByController)}),
+			expectedVolumes: volumesWithAnnotation(volume.AnnDynamicallyProvisioned, "gcr.io/vendor-csi", []*v1.PersistentVolume{newExternalProvisionedVolume("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classExternal, "fake.driver.csi", nil, volume.AnnBoundByController)}),
+			initialClaims: claimWithAnnotation(volume.AnnStorageProvisioner, "gcr.io/vendor-csi",
 				newClaimArray("claim5-6", "uid5-6", "1Gi", "volume5-6", v1.ClaimBound, &classExternal, volume.AnnBoundByController, volume.AnnBindCompleted)),
-			noclaims,
-			noevents, noerrors,
+			expectedClaims: noclaims,
+			expectedEvents: noevents,
+			errors:         noerrors,
 			// Custom test function that generates a delete claim event which should have been caught by
 			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
-			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				// should have been provisioned by external provisioner
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*v1.PersistentVolumeClaim)
@@ -197,17 +204,17 @@ func TestControllerSync(t *testing.T) {
 		{
 			// deleteVolume event issued before deleteClaim, no metric should have been reported
 			// and no delete operation start timestamp should be inserted into controller.operationTimestamps cache
-			"5-7 - delete volume event makes claim lost, delete claim event will not report metric",
-			newVolumeArray("volume5-7", "10Gi", "uid5-7", "claim5-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned),
-			novolumes,
-			claimWithAnnotation(volume.AnnStorageProvisioner, "gcr.io/vendor-csi",
+			name:            "5-7 - delete volume event makes claim lost, delete claim event will not report metric",
+			initialVolumes:  newVolumeArray("volume5-7", "10Gi", "uid5-7", "claim5-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, volume.AnnBoundByController, volume.AnnDynamicallyProvisioned),
+			expectedVolumes: novolumes,
+			initialClaims: claimWithAnnotation(volume.AnnStorageProvisioner, "gcr.io/vendor-csi",
 				newClaimArray("claim5-7", "uid5-7", "1Gi", "volume5-7", v1.ClaimBound, &classExternal, volume.AnnBoundByController, volume.AnnBindCompleted)),
-			noclaims,
-			[]string{"Warning ClaimLost"},
-			noerrors,
+			expectedClaims: noclaims,
+			expectedEvents: []string{"Warning ClaimLost"},
+			errors:         noerrors,
 			// Custom test function that generates a delete claim event which should have been caught by
 			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
-			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				volume := ctrl.volumes.store.List()[0].(*v1.PersistentVolume)
 				reactor.DeleteVolumeEvent(volume)
 				err := wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
@@ -248,17 +255,17 @@ func TestControllerSync(t *testing.T) {
 		},
 		{
 			// delete a claim waiting for being bound cleans up provision(volume ref == "") entry from timestamp cache
-			"5-8 - delete claim cleans up operation timestamp cache for provision",
-			novolumes,
-			novolumes,
-			claimWithAnnotation(volume.AnnStorageProvisioner, "gcr.io/vendor-csi",
+			name:            "5-8 - delete claim cleans up operation timestamp cache for provision",
+			initialVolumes:  novolumes,
+			expectedVolumes: novolumes,
+			initialClaims: claimWithAnnotation(volume.AnnStorageProvisioner, "gcr.io/vendor-csi",
 				newClaimArray("claim5-8", "uid5-8", "1Gi", "", v1.ClaimPending, &classExternal)),
-			noclaims,
-			[]string{"Normal ExternalProvisioning"},
-			noerrors,
+			expectedClaims: noclaims,
+			expectedEvents: []string{"Normal ExternalProvisioning"},
+			errors:         noerrors,
 			// Custom test function that generates a delete claim event which should have been caught by
 			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
-			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				// wait until the provision timestamp has been inserted
 				err := wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
 					return ctrl.operationTimestamps.Has("default/claim5-8"), nil
@@ -287,18 +294,18 @@ func TestControllerSync(t *testing.T) {
 		{
 			// Test that the finalizer gets removed if CSI migration is disabled. The in-tree finalizer is added
 			// back on the PV since migration is disabled.
-			"5-9 - volume has its external PV deletion protection finalizer removed as CSI migration is disabled",
-			volumesWithFinalizers(
+			name: "5-9 - volume has its external PV deletion protection finalizer removed as CSI migration is disabled",
+			initialVolumes: volumesWithFinalizers(
 				volumesWithAnnotation(volume.AnnMigratedTo, "pd.csi.storage.gke.io",
 					newVolumeArray("volume-5-9", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned)),
 				[]string{volume.PVDeletionProtectionFinalizer},
 			),
-			volumesWithFinalizers(newVolumeArray("volume-5-9", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned), []string{volume.PVDeletionInTreeProtectionFinalizer}),
-			noclaims,
-			noclaims,
-			noevents,
-			noerrors,
-			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+			expectedVolumes: volumesWithFinalizers(newVolumeArray("volume-5-9", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty, volume.AnnDynamicallyProvisioned), []string{volume.PVDeletionInTreeProtectionFinalizer}),
+			initialClaims:   noclaims,
+			expectedClaims:  noclaims,
+			expectedEvents:  noevents,
+			errors:          noerrors,
+			test: func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				return nil
 			},
 		},
