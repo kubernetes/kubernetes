@@ -2,7 +2,7 @@
 
 module k8s.io/client-go
 
-go 1.18
+go 1.19
 
 require (
 	github.com/Azure/go-autorest/autorest v0.11.18
