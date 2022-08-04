@@ -21,20 +21,18 @@ linters:
   # - structcheck
   # - varcheck
     - ineffassign
-  # TODO(golang): Need to fix this to work with golang 1.19
-  #  - logcheck
+    - logcheck
     - staticcheck
     - stylecheck
     - unused
 
 linters-settings: # please keep this alphabetized
-# TODO(golang): Need to fix this to work with golang 1.19
-#  custom:
-#    logcheck:
-#      # Installed there by hack/verify-golangci-lint.sh.
-#      path: _output/local/bin/logcheck.so
-#      description: structured logging checker
-#      original-url: k8s.io/klog/hack/tools
+  custom:
+    logcheck:
+      # Installed there by hack/verify-golangci-lint.sh.
+      path: _output/local/bin/logcheck.so
+      description: structured logging checker
+      original-url: k8s.io/klog/hack/tools
   staticcheck:
     go: "1.18"
     checks: [
