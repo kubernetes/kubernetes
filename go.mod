@@ -6,7 +6,7 @@
 
 module k8s.io/kubernetes
 
-go 1.18
+go 1.19
 
 require (
 	bitbucket.org/bertimus9/systemstat v0.5.0
