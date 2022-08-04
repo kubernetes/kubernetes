@@ -22,7 +22,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace (
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8
-	k8s.io/mount-utils => ../mount-utils
-)
+replace k8s.io/mount-utils => ../mount-utils

@@ -623,7 +623,6 @@ var (
 
 func getStdHandle(stdhandle uint32) (fd Handle) {
 	r, _ := GetStdHandle(stdhandle)
-	CloseOnExec(r)
 	return r
 }
 
@@ -862,6 +861,7 @@ const socket_error = uintptr(^uint32(0))
 //sys	GetAdaptersAddresses(family uint32, flags uint32, reserved uintptr, adapterAddresses *IpAdapterAddresses, sizePointer *uint32) (errcode error) = iphlpapi.GetAdaptersAddresses
 //sys	GetACP() (acp uint32) = kernel32.GetACP
 //sys	MultiByteToWideChar(codePage uint32, dwFlags uint32, str *byte, nstr int32, wchar *uint16, nwchar int32) (nwrite int32, err error) = kernel32.MultiByteToWideChar
+//sys	getBestInterfaceEx(sockaddr unsafe.Pointer, pdwBestIfIndex *uint32) (errcode error) = iphlpapi.GetBestInterfaceEx
 
 // For testing: clients can set this flag to force
 // creation of IPv6 sockets to return EAFNOSUPPORT.
@@ -1044,6 +1044,14 @@ func Connect(fd Handle, sa Sockaddr) (err error) {
 		return err
 	}
 	return connect(fd, ptr, n)
+}
+
+func GetBestInterfaceEx(sa Sockaddr, pdwBestIfIndex *uint32) (err error) {
+	ptr, _, err := sa.sockaddr()
+	if err != nil {
+		return err
+	}
+	return getBestInterfaceEx(ptr, pdwBestIfIndex)
 }
 
 func Getsockname(fd Handle) (sa Sockaddr, err error) {
