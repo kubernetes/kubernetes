@@ -22,6 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -653,9 +654,7 @@ func TestVolumeBinding(t *testing.T) {
 
 			t.Logf("Verify: call PreFilter and check status")
 			_, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
-			if diff := cmp.Diff(item.wantPreFilterStatus, gotPreFilterStatus); diff != "" {
-				t.Errorf("prefilter status does not match: (-want,+got):\n%s", diff)
-			}
+			assert.Equal(t, item.wantPreFilterStatus, gotPreFilterStatus)
 			if !gotPreFilterStatus.IsSuccess() {
 				// scheduler framework will skip Filter if PreFilter fails
 				return
@@ -677,9 +676,7 @@ func TestVolumeBinding(t *testing.T) {
 			t.Logf("Verify: call Filter and check status")
 			for i, nodeInfo := range nodeInfos {
 				gotStatus := p.Filter(ctx, state, item.pod, nodeInfo)
-				if diff := cmp.Diff(item.wantFilterStatus[i], gotStatus); diff != "" {
-					t.Errorf("filter status does not match for node %q, (-want,+got):\n%s", nodeInfo.Node().Name, diff)
-				}
+				assert.Equal(t, item.wantFilterStatus[i], gotStatus)
 			}
 
 			t.Logf("Verify: Score")
