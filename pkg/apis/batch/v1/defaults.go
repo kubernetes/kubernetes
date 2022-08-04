@@ -18,6 +18,7 @@ package v1
 
 import (
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -49,6 +50,17 @@ func SetDefaults_Job(obj *batchv1.Job) {
 	}
 	if obj.Spec.Suspend == nil {
 		obj.Spec.Suspend = utilpointer.BoolPtr(false)
+	}
+	if obj.Spec.PodFailurePolicy != nil {
+		for _, rule := range obj.Spec.PodFailurePolicy.Rules {
+			if rule.OnPodConditions != nil {
+				for i, pattern := range rule.OnPodConditions {
+					if pattern.Status == "" {
+						rule.OnPodConditions[i].Status = corev1.ConditionTrue
+					}
+				}
+			}
+		}
 	}
 }
 

@@ -47,6 +47,26 @@
     "parallelism": 1,
     "completions": 2,
     "activeDeadlineSeconds": 3,
+    "podFailurePolicy": {
+      "rules": [
+        {
+          "action": "actionValue",
+          "onExitCodes": {
+            "containerName": "containerNameValue",
+            "operator": "operatorValue",
+            "values": [
+              3
+            ]
+          },
+          "onPodConditions": [
+            {
+              "type": "typeValue",
+              "status": "statusValue"
+            }
+          ]
+        }
+      ]
+    },
     "backoffLimit": 7,
     "selector": {
       "matchLabels": {
