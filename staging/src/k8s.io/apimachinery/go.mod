@@ -19,7 +19,7 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
+	golang.org/x/net v0.0.0-20220722155237-a158d28d115b
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/klog/v2 v2.70.1
 	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1
@@ -38,6 +38,7 @@ require (
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
@@ -46,4 +47,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	github.com/yuin/goldmark => github.com/yuin/goldmark v1.4.1
+	golang.org/x/net => golang.org/x/net v0.0.0-20220225172249-27dd8689420f
+	golang.org/x/sync => golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8
+	k8s.io/apimachinery => ../apimachinery
+)

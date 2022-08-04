@@ -17,7 +17,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
+	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -29,6 +29,11 @@ require (
 )
 
 replace (
+	github.com/yuin/goldmark => github.com/yuin/goldmark v1.4.1
+	golang.org/x/mod => golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
+	golang.org/x/net => golang.org/x/net v0.0.0-20220225172249-27dd8689420f
+	golang.org/x/sync => golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
