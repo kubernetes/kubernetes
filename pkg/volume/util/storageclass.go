@@ -55,6 +55,8 @@ func GetDefaultClass(lister storagev1listers.StorageClassLister) (*storagev1.Sto
 		return nil, nil
 	}
 
+	// Primary sort by creation timestamp, newest first
+	// Secondary sort by class name, ascending order
 	sort.Slice(defaultClasses, func(i, j int) bool {
 		if defaultClasses[i].CreationTimestamp.UnixNano() == defaultClasses[j].CreationTimestamp.UnixNano() {
 			return defaultClasses[i].Name < defaultClasses[j].Name
