@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"reflect"
 	"time"
 
 	authnv1 "k8s.io/api/authentication/v1"
@@ -154,7 +153,7 @@ func LogRequestObject(ctx context.Context, obj runtime.Object, objGV schema.Grou
 	if shouldOmitManagedFields(ctx) {
 		copy, ok, err := copyWithoutManagedFields(obj)
 		if err != nil {
-			klog.Warningf("error while dropping managed fields from the request for %q error: %v", reflect.TypeOf(obj).Name(), err)
+			klog.ErrorS(err, "Error while dropping managed fields from the request", "auditID", ae.AuditID)
 		}
 		if ok {
 			obj = copy
@@ -166,7 +165,7 @@ func LogRequestObject(ctx context.Context, obj runtime.Object, objGV schema.Grou
 	ae.RequestObject, err = encodeObject(obj, objGV, s)
 	if err != nil {
 		// TODO(audit): add error slice to audit event struct
-		klog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)
+		klog.ErrorS(err, "Encoding failed of request object", "auditID", ae.AuditID, "gvr", gvr.String(), "obj", obj)
 		return
 	}
 }
@@ -209,7 +208,7 @@ func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupV
 	if shouldOmitManagedFields(ctx) {
 		copy, ok, err := copyWithoutManagedFields(obj)
 		if err != nil {
-			klog.Warningf("error while dropping managed fields from the response for %q error: %v", reflect.TypeOf(obj).Name(), err)
+			klog.ErrorS(err, "Error while dropping managed fields from the response", "auditID", ae.AuditID)
 		}
 		if ok {
 			obj = copy
@@ -220,7 +219,7 @@ func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupV
 	var err error
 	ae.ResponseObject, err = encodeObject(obj, gv, s)
 	if err != nil {
-		klog.Warningf("Audit failed for %q response: %v", reflect.TypeOf(obj).Name(), err)
+		klog.ErrorS(err, "Encoding failed of response object", "auditID", ae.AuditID, "obj", obj)
 	}
 }
 
