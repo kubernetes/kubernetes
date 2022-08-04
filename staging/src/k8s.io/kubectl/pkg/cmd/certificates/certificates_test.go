@@ -293,6 +293,7 @@ func TestCertificates(t *testing.T) {
 				Client:               fakeClient,
 			}
 			streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
+			tf.ClientConfigVal.Transport = fakeClient.Transport
 
 			defer func() {
 				// Restore cmdutil behavior.
