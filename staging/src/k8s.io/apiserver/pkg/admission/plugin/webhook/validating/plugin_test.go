@@ -113,6 +113,8 @@ func TestValidate(t *testing.T) {
 	defer close(stopCh)
 
 	for _, tt := range webhooktesting.NewNonMutatingTestCases(serverURL) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		wh, err := NewValidatingAdmissionWebhook(nil)
 		if err != nil {
 			t.Errorf("%s: failed to create validating webhook: %v", tt.Name, err)
@@ -136,7 +138,7 @@ func TestValidate(t *testing.T) {
 		}
 
 		attr := webhooktesting.NewAttribute(ns, nil, tt.IsDryRun)
-		err = wh.Validate(context.TODO(), attr, objectInterfaces)
+		err = wh.Validate(ctx, attr, objectInterfaces)
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}
