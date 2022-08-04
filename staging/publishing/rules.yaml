@@ -1590,4 +1590,4 @@ recursive-delete-patterns:
 - '*/BUILD.bazel'
 - Gopkg.toml
 - '*/.gitattributes'
-default-go-version: 1.19rc2
+default-go-version: 1.19
