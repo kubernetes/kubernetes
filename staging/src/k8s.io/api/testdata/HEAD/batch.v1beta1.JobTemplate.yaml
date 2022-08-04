@@ -72,6 +72,17 @@ template:
     completions: 2
     manualSelector: true
     parallelism: 1
+    podFailurePolicy:
+      rules:
+      - action: actionValue
+        onExitCodes:
+          containerName: containerNameValue
+          operator: operatorValue
+          values:
+          - 3
+        onPodConditions:
+        - status: statusValue
+          type: typeValue
     selector:
       matchExpressions:
       - key: keyValue

@@ -447,6 +447,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsbatchv1.JobStatusApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobTemplateSpec"):
 		return &applyconfigurationsbatchv1.JobTemplateSpecApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("PodFailurePolicy"):
+		return &applyconfigurationsbatchv1.PodFailurePolicyApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("PodFailurePolicyOnExitCodesRequirement"):
+		return &applyconfigurationsbatchv1.PodFailurePolicyOnExitCodesRequirementApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("PodFailurePolicyOnPodConditionsPattern"):
+		return &applyconfigurationsbatchv1.PodFailurePolicyOnPodConditionsPatternApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("PodFailurePolicyRule"):
+		return &applyconfigurationsbatchv1.PodFailurePolicyRuleApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("UncountedTerminatedPods"):
 		return &applyconfigurationsbatchv1.UncountedTerminatedPodsApplyConfiguration{}
 

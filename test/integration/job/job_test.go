@@ -48,6 +48,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/controller-manager/pkg/informerfactory"
+	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
@@ -58,6 +59,303 @@ import (
 )
 
 const waitInterval = time.Second
+
+// TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart verifies that the job is properly marked as Failed
+// in a scenario when the job controller crashes between removing pod finalizers and marking the job as Failed (based on
+// the pod failure policy). After the finalizer for the failed pod is removed we remove the failed pod. This step is
+// done to simulate what PodGC would do. Then, the test spawns the second instance of the controller to check that it
+// will pick up the job state properly and will mark it as Failed, even if th pod triggering the pod failure policy is
+// already deleted.
+// Note: this scenario requires the use of finalizers. Without finalizers there is no guarantee a failed pod would be
+// checked against the pod failure policy rules before its removal by PodGC.
+func TestJobPodFailurePolicyWithFailedPodDeletedDuringControllerRestart(t *testing.T) {
+	count := 3
+	job := batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:                     "main-container",
+							Image:                    "foo",
+							ImagePullPolicy:          v1.PullIfNotPresent,
+							TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
+						},
+					},
+				},
+			},
+			Parallelism: pointer.Int32(int32(count)),
+			Completions: pointer.Int32(int32(count)),
+			PodFailurePolicy: &batchv1.PodFailurePolicy{
+				Rules: []batchv1.PodFailurePolicyRule{
+					{
+						Action: batchv1.PodFailurePolicyActionFailJob,
+						OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+							Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+							Values:   []int32{5},
+						},
+					},
+				},
+			},
+		},
+	}
+	podStatusMatchingOnExitCodesTerminateRule := v1.PodStatus{
+		Phase: v1.PodFailed,
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				Name: "main-container",
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						ExitCode: 5,
+					},
+				},
+			},
+		},
+	}
+	wFinalizers := true
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, true)()
+	closeFn, restConfig, cs, ns := setup(t, "simple")
+	defer closeFn()
+
+	// Make the job controller significantly slower to trigger race condition.
+	restConfig.QPS = 1
+	restConfig.Burst = 1
+	ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
+	defer func() {
+		cancel()
+	}()
+	restConfig.QPS = 200
+	restConfig.Burst = 200
+
+	// create a job with a failed pod matching the exit code rule and a couple of successful pods
+	jobObj, err := createJobWithDefaults(ctx, cs, ns.Name, &job)
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+	validateJobPodsStatus(ctx, t, cs, jobObj, podsByStatus{
+		Active: count,
+		Ready:  pointer.Int32(0),
+	}, wFinalizers)
+
+	jobPods, err := getJobPods(ctx, t, cs, jobObj)
+	if err != nil {
+		t.Fatalf("Failed to list Job Pods: %v", err)
+	}
+
+	failedIndex := 1
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	// Await for the failed pod (with index failedIndex) to have its finalizer
+	// removed. The finalizer will be removed by the job controller just after
+	// appending the FailureTarget condition to the job to mark it as targeted
+	// for failure.
+	go func() {
+		err := wait.PollImmediate(10*time.Millisecond, time.Minute, func() (bool, error) {
+			failedPodUpdated, err := cs.CoreV1().Pods(jobObj.Namespace).Get(ctx, jobPods[failedIndex].Name, metav1.GetOptions{})
+			if err != nil {
+				return true, err
+			}
+			if len(failedPodUpdated.Finalizers) == 0 {
+				return true, nil
+			}
+			return false, nil
+		})
+		if err != nil {
+			t.Logf("Failed awaiting for the the finalizer removal for pod %v", klog.KObj(jobPods[failedIndex]))
+		}
+		wg.Done()
+	}()
+
+	// We update one pod as failed with state matching the pod failure policy rule. This results in removal
+	// of the pod finalizer from the pod by the job controller.
+	failedPod := jobPods[failedIndex]
+	updatedPod := failedPod.DeepCopy()
+	updatedPod.Status = podStatusMatchingOnExitCodesTerminateRule
+	err, _ = updatePodStatuses(ctx, cs, []v1.Pod{*updatedPod})
+	if err != nil {
+		t.Fatalf("Failed to update pod statuses %q for pods of job %q", err, klog.KObj(jobObj))
+	}
+	wg.Wait()
+
+	t.Logf("Finalizer is removed for the failed pod %q. Shutting down the controller.", klog.KObj(failedPod))
+	// shut down the first job controller as soon as it removed the finalizer for the failed pod. This will
+	// likely happen before the first controller is able to mark the job as Failed.
+	cancel()
+
+	// Delete the failed pod to make sure it is not used by the second instance of the controller
+	ctx, cancel = context.WithCancel(context.Background())
+	err = cs.CoreV1().Pods(failedPod.Namespace).Delete(ctx, failedPod.Name, metav1.DeleteOptions{GracePeriodSeconds: pointer.Int64(0)})
+	if err != nil {
+		t.Fatalf("Error: '%v' while deleting pod: '%v'", err, klog.KObj(failedPod))
+	}
+	t.Logf("The failed pod %q is deleted", klog.KObj(failedPod))
+	cancel()
+
+	// start the second controller to promote the interim FailureTarget job condition as Failed
+	ctx, cancel = startJobControllerAndWaitForCaches(restConfig)
+	// verify the job is correctly marked as Failed
+	validateJobFailed(ctx, t, cs, jobObj)
+	validateNoOrphanPodsWithFinalizers(ctx, t, cs, jobObj)
+}
+
+// TestJobPodFailurePolicy tests handling of pod failures with respect to the
+// configured pod failure policy rules
+func TestJobPodFailurePolicy(t *testing.T) {
+	job := batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:                     "main-container",
+							Image:                    "foo",
+							ImagePullPolicy:          v1.PullIfNotPresent,
+							TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
+						},
+					},
+				},
+			},
+			PodFailurePolicy: &batchv1.PodFailurePolicy{
+				Rules: []batchv1.PodFailurePolicyRule{
+					{
+						Action: batchv1.PodFailurePolicyActionIgnore,
+						OnPodConditions: []batchv1.PodFailurePolicyOnPodConditionsPattern{
+							{
+								Type: v1.AlphaNoCompatGuaranteeDisruptionTarget,
+							},
+						},
+					},
+					{
+						Action: batchv1.PodFailurePolicyActionFailJob,
+						OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+							Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+							Values:   []int32{5, 6, 7},
+						},
+					},
+				},
+			},
+		},
+	}
+	podStatusMatchingOnExitCodesTerminateRule := v1.PodStatus{
+		Phase: v1.PodFailed,
+		ContainerStatuses: []v1.ContainerStatus{
+			{
+				Name: "main-container",
+				State: v1.ContainerState{
+					Terminated: &v1.ContainerStateTerminated{
+						ExitCode: 5,
+					},
+				},
+			},
+		},
+	}
+	podStatusMatchingOnPodConditionsIgnoreRule := v1.PodStatus{
+		Phase: v1.PodFailed,
+		Conditions: []v1.PodCondition{
+			{
+				Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+				Status: v1.ConditionTrue,
+			},
+		},
+	}
+	testCases := map[string]struct {
+		enableJobPodFailurePolicy bool
+		restartController         bool
+		job                       batchv1.Job
+		podStatus                 v1.PodStatus
+		wantActive                int
+		wantFailed                int
+		wantJobConditionType      batchv1.JobConditionType
+	}{
+		"pod status matching the configured FailJob rule on exit codes; job terminated when JobPodFailurePolicy enabled": {
+			enableJobPodFailurePolicy: true,
+			job:                       job,
+			podStatus:                 podStatusMatchingOnExitCodesTerminateRule,
+			wantActive:                0,
+			wantFailed:                1,
+			wantJobConditionType:      batchv1.JobFailed,
+		},
+		"pod status matching the configured FailJob rule on exit codes; with controller restart; job terminated when JobPodFailurePolicy enabled": {
+			enableJobPodFailurePolicy: true,
+			restartController:         true,
+			job:                       job,
+			podStatus:                 podStatusMatchingOnExitCodesTerminateRule,
+			wantActive:                0,
+			wantFailed:                1,
+			wantJobConditionType:      batchv1.JobFailed,
+		},
+		"pod status matching the configured FailJob rule on exit codes; default handling when JobPodFailurePolicy disabled": {
+			enableJobPodFailurePolicy: false,
+			job:                       job,
+			podStatus:                 podStatusMatchingOnExitCodesTerminateRule,
+			wantActive:                1,
+			wantFailed:                1,
+			wantJobConditionType:      batchv1.JobComplete,
+		},
+		"pod status matching the configured Ignore rule on pod conditions; pod failure not counted when JobPodFailurePolicy enabled": {
+			enableJobPodFailurePolicy: true,
+			job:                       job,
+			podStatus:                 podStatusMatchingOnPodConditionsIgnoreRule,
+			wantActive:                1,
+			wantFailed:                0,
+			wantJobConditionType:      batchv1.JobComplete,
+		},
+	}
+	for name, test := range testCases {
+		for _, wFinalizers := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s; finalizers=%t", name, wFinalizers), func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodFailurePolicy, test.enableJobPodFailurePolicy)()
+
+				closeFn, restConfig, clientSet, ns := setup(t, "simple")
+				defer closeFn()
+				ctx, cancel := startJobControllerAndWaitForCaches(restConfig)
+				defer func() {
+					cancel()
+				}()
+
+				jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &test.job)
+				if err != nil {
+					t.Fatalf("Error %q while creating the job %q", err, jobObj.Name)
+				}
+				validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+					Active: 1,
+					Ready:  pointer.Int32(0),
+				}, wFinalizers)
+
+				op := func(p *v1.Pod) bool {
+					p.Status = test.podStatus
+					return true
+				}
+
+				if err, _ := updateJobPodsStatus(ctx, clientSet, jobObj, op, 1); err != nil {
+					t.Fatalf("Error %q while updating pod status for Job: %q", err, jobObj.Name)
+				}
+
+				if test.restartController {
+					cancel()
+					ctx, cancel = startJobControllerAndWaitForCaches(restConfig)
+				}
+
+				validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+					Active: test.wantActive,
+					Failed: test.wantFailed,
+					Ready:  pointer.Int32(0),
+				}, wFinalizers)
+
+				if test.wantJobConditionType == batchv1.JobComplete {
+					if err, _ := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
+						t.Fatalf("Failed setting phase %q on Job Pod: %q", v1.PodSucceeded, err)
+					}
+				}
+				validateJobCondition(ctx, t, clientSet, jobObj, test.wantJobConditionType)
+				validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
+			})
+		}
+	}
+}
 
 // TestNonParallelJob tests that a Job that only executes one Pod. The test
 // recreates the Job controller at some points to make sure a new controller
@@ -676,7 +974,7 @@ func TestJobFailedWithInterrupts(t *testing.T) {
 func validateNoOrphanPodsWithFinalizers(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job) {
 	t.Helper()
 	orphanPods := 0
-	if err := wait.Poll(waitInterval, wait.ForeverTestTimeout, func() (done bool, err error) {
+	if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (done bool, err error) {
 		pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{
 			LabelSelector: metav1.FormatLabelSelector(jobObj.Spec.Selector),
 		})
@@ -735,7 +1033,7 @@ func TestOrphanPodsFinalizersClearedWithFeatureDisabled(t *testing.T) {
 
 	// Restart controller.
 	ctx, cancel = startJobControllerAndWaitForCaches(restConfig)
-	if err := wait.Poll(waitInterval, wait.ForeverTestTimeout, func() (done bool, err error) {
+	if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (done bool, err error) {
 		pods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			t.Fatalf("Failed to list Job Pods: %v", err)
@@ -939,7 +1237,7 @@ type podsByStatus struct {
 func validateJobPodsStatus(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job, desired podsByStatus, wFinalizer bool) {
 	t.Helper()
 	var actualCounts podsByStatus
-	if err := wait.Poll(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
 		updatedJob, err := clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to get updated Job: %v", err)
@@ -980,6 +1278,23 @@ func validateJobPodsStatus(ctx context.Context, t *testing.T, clientSet clientse
 			t.Errorf("Pod %s has tracking finalizer %t, want %t", p.Name, got, wFinalizer)
 		}
 	}
+}
+
+func getJobPods(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job) ([]*v1.Pod, error) {
+	t.Helper()
+	allPods, err := clientSet.CoreV1().Pods(jobObj.Namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	jobPods := make([]*v1.Pod, 0, 0)
+	for _, pod := range allPods.Items {
+		phase := pod.Status.Phase
+		if metav1.IsControlledBy(&pod, jobObj) && (phase == v1.PodPending || phase == v1.PodRunning) {
+			p := pod
+			jobPods = append(jobPods, &p)
+		}
+	}
+	return jobPods, nil
 }
 
 func validateFinishedPodsNoFinalizer(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job) {
@@ -1041,7 +1356,7 @@ func waitForEvent(events watch.Interface, uid types.UID, reason string) error {
 	if reason == "" {
 		return nil
 	}
-	return wait.Poll(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
+	return wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
 		for {
 			var ev watch.Event
 			select {
@@ -1082,7 +1397,7 @@ func validateJobSucceeded(ctx context.Context, t *testing.T, clientSet clientset
 
 func validateJobCondition(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job, cond batchv1.JobConditionType) {
 	t.Helper()
-	if err := wait.Poll(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
 		j, err := clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Failed to obtain updated Job: %v", err)

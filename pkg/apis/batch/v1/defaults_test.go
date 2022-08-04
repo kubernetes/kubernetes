@@ -22,7 +22,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -40,6 +40,97 @@ func TestSetDefaultJob(t *testing.T) {
 		expected     *batchv1.Job
 		expectLabels bool
 	}{
+		"Pod failure policy with some field values unspecified -> set default values": {
+			original: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{Labels: defaultLabels},
+					},
+					PodFailurePolicy: &batchv1.PodFailurePolicy{
+						Rules: []batchv1.PodFailurePolicyRule{
+							{
+								Action: batchv1.PodFailurePolicyActionFailJob,
+								OnPodConditions: []batchv1.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+										Status: v1.ConditionTrue,
+									},
+									{
+										Type:   v1.PodConditionType("MemoryLimitExceeded"),
+										Status: v1.ConditionFalse,
+									},
+									{
+										Type: v1.PodConditionType("DiskLimitExceeded"),
+									},
+								},
+							},
+							{
+								Action: batchv1.PodFailurePolicyActionFailJob,
+								OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+									Values:   []int32{1},
+								},
+							},
+							{
+								Action: batchv1.PodFailurePolicyActionFailJob,
+								OnPodConditions: []batchv1.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type: v1.AlphaNoCompatGuaranteeDisruptionTarget,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &batchv1.Job{
+				Spec: batchv1.JobSpec{
+					Completions:    pointer.Int32Ptr(1),
+					Parallelism:    pointer.Int32Ptr(1),
+					BackoffLimit:   pointer.Int32Ptr(6),
+					CompletionMode: completionModePtr(batchv1.NonIndexedCompletion),
+					Suspend:        pointer.BoolPtr(false),
+					PodFailurePolicy: &batchv1.PodFailurePolicy{
+						Rules: []batchv1.PodFailurePolicyRule{
+							{
+								Action: batchv1.PodFailurePolicyActionFailJob,
+								OnPodConditions: []batchv1.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+										Status: v1.ConditionTrue,
+									},
+									{
+										Type:   v1.PodConditionType("MemoryLimitExceeded"),
+										Status: v1.ConditionFalse,
+									},
+									{
+										Type:   v1.PodConditionType("DiskLimitExceeded"),
+										Status: v1.ConditionTrue,
+									},
+								},
+							},
+							{
+								Action: batchv1.PodFailurePolicyActionFailJob,
+								OnExitCodes: &batchv1.PodFailurePolicyOnExitCodesRequirement{
+									Operator: batchv1.PodFailurePolicyOnExitCodesOpIn,
+									Values:   []int32{1},
+								},
+							},
+							{
+								Action: batchv1.PodFailurePolicyActionFailJob,
+								OnPodConditions: []batchv1.PodFailurePolicyOnPodConditionsPattern{
+									{
+										Type:   v1.AlphaNoCompatGuaranteeDisruptionTarget,
+										Status: v1.ConditionTrue,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectLabels: true,
+		},
 		"All unspecified -> sets all to default values": {
 			original: &batchv1.Job{
 				Spec: batchv1.JobSpec{
@@ -267,6 +358,9 @@ func TestSetDefaultJob(t *testing.T) {
 			validateDefaultInt32(t, "Parallelism", actual.Spec.Parallelism, expected.Spec.Parallelism)
 			validateDefaultInt32(t, "BackoffLimit", actual.Spec.BackoffLimit, expected.Spec.BackoffLimit)
 
+			if diff := cmp.Diff(expected.Spec.PodFailurePolicy, actual.Spec.PodFailurePolicy); diff != "" {
+				t.Errorf("unexpected diff in errors (-want, +got):\n%s", diff)
+			}
 			if test.expectLabels != reflect.DeepEqual(actual.Labels, actual.Spec.Template.Labels) {
 				if test.expectLabels {
 					t.Errorf("Expected labels: %v, got: %v", actual.Spec.Template.Labels, actual.Labels)

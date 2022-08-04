@@ -3041,6 +3041,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: parallelism
       type:
         scalar: numeric
+    - name: podFailurePolicy
+      type:
+        namedType: io.k8s.api.batch.v1.PodFailurePolicy
     - name: selector
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
@@ -3098,6 +3101,58 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.batch.v1.JobSpec
       default: {}
+- name: io.k8s.api.batch.v1.PodFailurePolicy
+  map:
+    fields:
+    - name: rules
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.batch.v1.PodFailurePolicyRule
+          elementRelationship: atomic
+- name: io.k8s.api.batch.v1.PodFailurePolicyOnExitCodesRequirement
+  map:
+    fields:
+    - name: containerName
+      type:
+        scalar: string
+    - name: operator
+      type:
+        scalar: string
+      default: ""
+    - name: values
+      type:
+        list:
+          elementType:
+            scalar: numeric
+          elementRelationship: associative
+- name: io.k8s.api.batch.v1.PodFailurePolicyOnPodConditionsPattern
+  map:
+    fields:
+    - name: status
+      type:
+        scalar: string
+      default: ""
+    - name: type
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.batch.v1.PodFailurePolicyRule
+  map:
+    fields:
+    - name: action
+      type:
+        scalar: string
+      default: ""
+    - name: onExitCodes
+      type:
+        namedType: io.k8s.api.batch.v1.PodFailurePolicyOnExitCodesRequirement
+    - name: onPodConditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.batch.v1.PodFailurePolicyOnPodConditionsPattern
+          elementRelationship: atomic
 - name: io.k8s.api.batch.v1.UncountedTerminatedPods
   map:
     fields:
