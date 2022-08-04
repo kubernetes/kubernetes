@@ -187,6 +187,10 @@ type VolumePlugin interface {
 	// of enabling bulk polling of all nodes. This can speed up verification of
 	// attached volumes by quite a bit, but underlying pluging must support it.
 	SupportsBulkVolumeVerification() bool
+
+	// SupportsSELinuxContextMount returns true if volume plugins supports
+	// mount -o context=XYZ for a given volume.
+	SupportsSELinuxContextMount(spec *Spec) (bool, error)
 }
 
 // PersistentVolumePlugin is an extended interface of VolumePlugin and is used

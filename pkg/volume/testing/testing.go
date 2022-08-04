@@ -181,6 +181,7 @@ type FakeVolumePlugin struct {
 	LimitKey               string
 	ProvisionDelaySeconds  int
 	SupportsRemount        bool
+	SupportsSELinux        bool
 	DisableNodeExpansion   bool
 
 	// default to false which means it is attachable by default
@@ -282,6 +283,10 @@ func (plugin *FakeVolumePlugin) SupportsMountOption() bool {
 
 func (plugin *FakeVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return false
+}
+
+func (plugin *FakeVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return plugin.SupportsSELinux, nil
 }
 
 func (plugin *FakeVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
@@ -545,6 +550,10 @@ func (f *FakeBasicVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return f.Plugin.SupportsBulkVolumeVerification()
 }
 
+func (f *FakeBasicVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return f.Plugin.SupportsSELinuxContextMount(spec)
+}
+
 func (f *FakeBasicVolumePlugin) SupportsMountOption() bool {
 	return f.Plugin.SupportsMountOption()
 }
@@ -624,6 +633,10 @@ func (plugin *FakeFileVolumePlugin) SupportsMountOption() bool {
 
 func (plugin *FakeFileVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return false
+}
+
+func (plugin *FakeFileVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
 }
 
 func (plugin *FakeFileVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {

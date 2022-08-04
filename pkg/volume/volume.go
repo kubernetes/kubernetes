@@ -129,6 +129,7 @@ type MounterArgs struct {
 	FsGroup             *int64
 	FSGroupChangePolicy *v1.PodFSGroupChangePolicy
 	DesiredSize         *resource.Quantity
+	SELinuxLabel        string
 }
 
 // Mounter interface provides methods to set up/mount the volume.
@@ -262,7 +263,8 @@ type Attacher interface {
 
 // DeviceMounterArgs provides auxiliary, optional arguments to DeviceMounter.
 type DeviceMounterArgs struct {
-	FsGroup *int64
+	FsGroup      *int64
+	SELinuxLabel string
 }
 
 // DeviceMounter can mount a block volume to a global path.

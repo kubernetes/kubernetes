@@ -166,7 +166,7 @@ func NewOperationExecutor(
 	}
 }
 
-// MarkVolumeOpts is an struct to pass arguments to MountVolume functions
+// MarkVolumeOpts is a struct to pass arguments to MountVolume functions
 type MarkVolumeOpts struct {
 	PodName             volumetypes.UniquePodName
 	PodUID              types.UID
@@ -177,6 +177,7 @@ type MarkVolumeOpts struct {
 	VolumeGidVolume     string
 	VolumeSpec          *volume.Spec
 	VolumeMountState    VolumeMountState
+	SELinuxMountContext string
 }
 
 // ActualStateOfWorldMounterUpdater defines a set of operations updating the actual
@@ -192,10 +193,10 @@ type ActualStateOfWorldMounterUpdater interface {
 	MarkVolumeMountAsUncertain(markVolumeOpts MarkVolumeOpts) error
 
 	// Marks the specified volume as having been globally mounted.
-	MarkDeviceAsMounted(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error
+	MarkDeviceAsMounted(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath, seLinuxMountContext string) error
 
 	// MarkDeviceAsUncertain marks device state in global mount path as uncertain
-	MarkDeviceAsUncertain(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error
+	MarkDeviceAsUncertain(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath, seLinuxMountContext string) error
 
 	// Marks the specified volume as having its global mount unmounted.
 	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error
@@ -446,6 +447,9 @@ type VolumeToMount struct {
 	// PersistentVolumeSize stores desired size of the volume.
 	// usually this is the size if pv.Spec.Capacity
 	PersistentVolumeSize resource.Quantity
+
+	// SELinux label that should be used to mount.
+	SELinuxLabel string
 }
 
 // DeviceMountState represents device mount state in a global path.
@@ -552,6 +556,8 @@ type AttachedVolume struct {
 	// PluginName is the Unescaped Qualified name of the volume plugin used to
 	// attach and mount this volume.
 	PluginName string
+
+	SELinuxMountContext string
 }
 
 // GenerateMsgDetailed returns detailed msgs for attached volumes
@@ -728,6 +734,10 @@ type MountedVolume struct {
 	// DeviceMountPath contains the path on the node where the device should
 	// be mounted after it is attached.
 	DeviceMountPath string
+
+	// SELinuxMountContext is value of mount option 'mount -o context=XYZ'.
+	// If empty, no such mount option was used.
+	SELinuxMountContext string
 }
 
 // GenerateMsgDetailed returns detailed msgs for mounted volumes

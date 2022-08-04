@@ -165,3 +165,30 @@ func TestSetDefaultCSIDriver(t *testing.T) {
 		})
 	}
 }
+
+func TestSetDefaultSELinuxMountReadWriteOncePodEnabled(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, true)()
+	driver := &storagev1beta1.CSIDriver{}
+
+	// field should be defaulted
+	defaultSELinuxMount := false
+	output := roundTrip(t, runtime.Object(driver)).(*storagev1beta1.CSIDriver)
+	outSELinuxMount := output.Spec.SELinuxMount
+	if outSELinuxMount == nil {
+		t.Errorf("Expected SELinuxMount to be defaulted to: %+v, got: nil", defaultSELinuxMount)
+	} else if *outSELinuxMount != defaultSELinuxMount {
+		t.Errorf("Expected SELinuxMount to be defaulted to: %+v, got: %+v", defaultSELinuxMount, outSELinuxMount)
+	}
+}
+
+func TestSetDefaultSELinuxMountReadWriteOncePodDisabled(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, false)()
+	driver := &storagev1beta1.CSIDriver{}
+
+	// field should not be defaulted
+	output := roundTrip(t, runtime.Object(driver)).(*storagev1beta1.CSIDriver)
+	outSELinuxMount := output.Spec.SELinuxMount
+	if outSELinuxMount != nil {
+		t.Errorf("Expected SELinuxMount remain nil, got: %+v", outSELinuxMount)
+	}
+}

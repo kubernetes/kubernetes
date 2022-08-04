@@ -50,6 +50,9 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		csiDriver.Spec.VolumeLifecycleModes = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		csiDriver.Spec.SELinuxMount = nil
+	}
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -83,8 +86,15 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		newCSIDriver.Spec.VolumeLifecycleModes = nil
 	}
 
+	if oldCSIDriver.Spec.SELinuxMount == nil &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		newCSIDriver.Spec.SELinuxMount = nil
+	}
+
 	// Any changes to the mutable fields increment the generation number.
-	if !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.TokenRequests, newCSIDriver.Spec.TokenRequests) || !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.RequiresRepublish, newCSIDriver.Spec.RequiresRepublish) {
+	if !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.TokenRequests, newCSIDriver.Spec.TokenRequests) ||
+		!apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.RequiresRepublish, newCSIDriver.Spec.RequiresRepublish) ||
+		!apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.SELinuxMount, newCSIDriver.Spec.SELinuxMount) {
 		newCSIDriver.Generation = oldCSIDriver.Generation + 1
 	}
 }

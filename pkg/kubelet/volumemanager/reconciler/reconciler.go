@@ -199,7 +199,7 @@ func (rc *reconciler) reconcile() {
 func (rc *reconciler) unmountVolumes() {
 	// Ensure volumes that should be unmounted are unmounted.
 	for _, mountedVolume := range rc.actualStateOfWorld.GetAllMountedVolumes() {
-		if !rc.desiredStateOfWorld.PodExistsInVolume(mountedVolume.PodName, mountedVolume.VolumeName) {
+		if !rc.desiredStateOfWorld.PodExistsInVolume(mountedVolume.PodName, mountedVolume.VolumeName, mountedVolume.SELinuxMountContext) {
 			// Volume is mounted, unmount it
 			klog.V(5).InfoS(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
 			err := rc.operationExecutor.UnmountVolume(
@@ -217,9 +217,14 @@ func (rc *reconciler) unmountVolumes() {
 func (rc *reconciler) mountOrAttachVolumes() {
 	// Ensure volumes that should be attached/mounted are attached/mounted.
 	for _, volumeToMount := range rc.desiredStateOfWorld.GetVolumesToMount() {
-		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, volumeToMount.PersistentVolumeSize)
+		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName, volumeToMount.PersistentVolumeSize, volumeToMount.SELinuxLabel)
 		volumeToMount.DevicePath = devicePath
-		if cache.IsVolumeNotAttachedError(err) {
+		if cache.IsSELinuxMountMismatchError(err) {
+			// TODO: check error message + lower frequency, this can be noisy
+			klog.ErrorS(err, volumeToMount.GenerateErrorDetailed("mount precondition failed, please report this error in https://github.com/kubernetes/enhancements/issues/1710, together with full Pod yaml file", err).Error(), "pod", klog.KObj(volumeToMount.Pod))
+			// TODO: report error better, this may be too noisy
+			rc.desiredStateOfWorld.AddErrorToPod(volumeToMount.PodName, err.Error())
+		} else if cache.IsVolumeNotAttachedError(err) {
 			rc.waitForVolumeAttach(volumeToMount)
 		} else if !volMounted || cache.IsRemountRequiredError(err) {
 			rc.mountAttachedVolumes(volumeToMount, err)
@@ -373,7 +378,7 @@ func (rc *reconciler) waitForVolumeAttach(volumeToMount cache.VolumeToMount) {
 func (rc *reconciler) unmountDetachDevices() {
 	for _, attachedVolume := range rc.actualStateOfWorld.GetUnmountedVolumes() {
 		// Check IsOperationPending to avoid marking a volume as detached if it's in the process of mounting.
-		if !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName) &&
+		if !rc.desiredStateOfWorld.VolumeExists(attachedVolume.VolumeName, attachedVolume.SELinuxMountContext) &&
 			!rc.operationExecutor.IsOperationPending(attachedVolume.VolumeName, nestedpendingoperations.EmptyUniquePodName, nestedpendingoperations.EmptyNodeName) {
 			if attachedVolume.DeviceMayBeMounted() {
 				// Volume is globally mounted to device, unmount it
@@ -765,7 +770,8 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*gl
 				klog.ErrorS(err, "Could not find device mount path for volume", "volumeName", gvl.volumeName)
 				continue
 			}
-			err = rc.actualStateOfWorld.MarkDeviceAsMounted(gvl.volumeName, gvl.devicePath, deviceMountPath)
+			// TODO(jsafrane): add reconstructed SELinux context
+			err = rc.actualStateOfWorld.MarkDeviceAsMounted(gvl.volumeName, gvl.devicePath, deviceMountPath, "")
 			if err != nil {
 				klog.ErrorS(err, "Could not mark device is mounted to actual state of world", "volume", gvl.volumeName)
 				continue

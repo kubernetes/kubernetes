@@ -1235,7 +1235,7 @@ func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
 				volumeID:            tt.fields.volumeID,
 				specVolumeID:        tt.fields.specVolumeID,
 				readOnly:            tt.fields.readOnly,
-				supportsSELinux:     tt.fields.supportsSELinux,
+				needSELinuxRelabel:  tt.fields.supportsSELinux,
 				spec:                tt.fields.spec,
 				pod:                 tt.fields.pod,
 				podUID:              tt.fields.podUID,

@@ -132,6 +132,10 @@ func (plugin *glusterfsPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *glusterfsPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *glusterfsPlugin) RequiresFSResize() bool {
 	return false
 }

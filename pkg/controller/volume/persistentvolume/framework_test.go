@@ -970,6 +970,10 @@ func (plugin *mockVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string
 	return nil, nil
 }
 
+func (plugin *mockVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *mockVolumePlugin) NewMounter(spec *volume.Spec, podRef *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return nil, fmt.Errorf("Mounter is not supported by this plugin")
 }
