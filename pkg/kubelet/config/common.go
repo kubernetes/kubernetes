@@ -39,7 +39,6 @@ import (
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util/hash"
 
 	"k8s.io/klog/v2"
 )
@@ -55,17 +54,31 @@ func generatePodName(name string, nodeName types.NodeName) string {
 
 func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
 	if len(pod.UID) == 0 {
-		hasher := md5.New()
-		hash.DeepHashObject(hasher, pod)
-		// DeepHashObject resets the hash, so we should write the pod source
-		// information AFTER it.
+		var byte_source []byte
 		if isFile {
-			fmt.Fprintf(hasher, "host:%s", nodeName)
-			fmt.Fprintf(hasher, "file:%s", source)
+			fmt.Fprintf("host:%s", nodeName)
+			fmt.Fprintf("file:%s", source)
+			byte_source, err = ioutil.ReadFile(source)
+			if err != nil {
+				klog.Errorf("Generated UID pod %q read content from %s failed %s", pod.Name, source, err.Error())
+				return err
+			}
 		} else {
-			fmt.Fprintf(hasher, "url:%s", source)
+			fmt.Fprintf("url:%s", source)
+			resp, err := http.Get(source)
+			if err != nil {
+				klog.Errorf("Generated UID pod %q connect %s failed %s", pod.Name, source, err.Error())
+				return err
+			}
+			byte_source, err = ioutil.ReadAll(resp.Body)
+			if err != nil {
+				klog.Errorf("Generated UID pod %q read content from %s failed %s", pod.Name, source, err.Error())
+				return err
+			}
 		}
-		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
+
+		md5sum := md5.Sum(byte_source)
+		pod.UID = types.UID(hex.EncodeToString(md5sum[:]))
 		klog.V(5).InfoS("Generated UID", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
 	}
 
