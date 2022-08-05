@@ -17,8 +17,9 @@ limitations under the License.
 package util
 
 import (
-	"k8s.io/client-go/tools/clientcmd"
 	"testing"
+
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 func TestValidateExactArgNumber(t *testing.T) {
@@ -91,8 +92,13 @@ func TestGetKubeConfigPath(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if GetKubeConfigPath(tt.file) != tt.expected {
-				t.Error("unexpected result")
+			actualResult := GetKubeConfigPath(tt.file)
+			if actualResult != tt.expected {
+				t.Errorf(
+					"failed GetKubeConfigPath:\n\texpected: %s\n\t  actual: %s",
+					tt.expected,
+					actualResult,
+				)
 			}
 		})
 	}
