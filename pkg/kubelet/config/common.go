@@ -21,6 +21,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+        "net/http"
+        "io/ioutil"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,15 +58,15 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 	if len(pod.UID) == 0 {
 		var byte_source []byte
 		if isFile {
-			fmt.Fprintf("host:%s", nodeName)
-			fmt.Fprintf("file:%s", source)
+			var err error
 			byte_source, err = ioutil.ReadFile(source)
 			if err != nil {
-				klog.Errorf("Generated UID pod %q read content from %s failed %s", pod.Name, source, err.Error())
+				klog.Errorf("Generated UID node %q pod %q read content from %s failed %s", nodeName, pod.Name, source, err.Error())
 				return err
+			} else {
+				klog.V(5).InfoS("Generated UID node %q pod %q read content from %s", nodeName, pod.Name, source)
 			}
 		} else {
-			fmt.Fprintf("url:%s", source)
 			resp, err := http.Get(source)
 			if err != nil {
 				klog.Errorf("Generated UID pod %q connect %s failed %s", pod.Name, source, err.Error())
@@ -74,6 +76,8 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 			if err != nil {
 				klog.Errorf("Generated UID pod %q read content from %s failed %s", pod.Name, source, err.Error())
 				return err
+			} else {
+				klog.V(5).InfoS("Generated UID pod %q read content from %s", pod.Name, source)
 			}
 		}
 
