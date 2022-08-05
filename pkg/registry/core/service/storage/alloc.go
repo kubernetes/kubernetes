@@ -324,7 +324,7 @@ func (al *Allocators) txnAllocClusterIPs(service *api.Service, dryRun bool) (tra
 		commit: func() {
 			if !dryRun {
 				if len(allocated) > 0 {
-					klog.V(0).InfoS("allocated clusterIPs",
+					klog.InfoS("allocated clusterIPs",
 						"service", klog.KObj(service),
 						"clusterIPs", allocated)
 				}
@@ -614,7 +614,7 @@ func (al *Allocators) txnUpdateClusterIPs(after After, before Before, dryRun boo
 				return
 			}
 			if len(allocated) > 0 {
-				klog.V(0).InfoS("allocated clusterIPs",
+				klog.InfoS("allocated clusterIPs",
 					"service", klog.KObj(service),
 					"clusterIPs", allocated)
 			}

@@ -170,22 +170,22 @@ func newProxyServer(
 
 		for _, perFamilyIpt := range ipt {
 			if !perFamilyIpt.Present() {
-				klog.V(0).InfoS("kube-proxy running in single-stack mode, this ipFamily is not supported", "ipFamily", perFamilyIpt.Protocol())
+				klog.InfoS("kube-proxy running in single-stack mode, this ipFamily is not supported", "ipFamily", perFamilyIpt.Protocol())
 				dualStack = false
 			}
 		}
 	}
 
 	if proxyMode == proxyconfigapi.ProxyModeIPTables {
-		klog.V(0).InfoS("Using iptables Proxier")
+		klog.InfoS("Using iptables Proxier")
 		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
 			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
 		}
 
 		if dualStack {
-			klog.V(0).InfoS("kube-proxy running in dual-stack mode", "ipFamily", iptInterface.Protocol())
-			klog.V(0).InfoS("Creating dualStackProxier for iptables")
+			klog.InfoS("kube-proxy running in dual-stack mode", "ipFamily", iptInterface.Protocol())
+			klog.InfoS("Creating dualStackProxier for iptables")
 			// Always ordered to match []ipt
 			var localDetectors [2]proxyutiliptables.LocalTrafficDetector
 			localDetectors, err = getDualStackLocalDetectorTuple(detectLocalMode, config, ipt, nodeInfo)
@@ -247,9 +247,9 @@ func newProxyServer(
 		}
 		ipvsInterface = utilipvs.New()
 
-		klog.V(0).InfoS("Using ipvs Proxier")
+		klog.InfoS("Using ipvs Proxier")
 		if dualStack {
-			klog.V(0).InfoS("Creating dualStackProxier for ipvs")
+			klog.InfoS("Creating dualStackProxier for ipvs")
 
 			nodeIPs := nodeIPTuple(config.BindAddress)
 
@@ -321,8 +321,8 @@ func newProxyServer(
 		}
 		proxymetrics.RegisterMetrics()
 	} else {
-		klog.V(0).InfoS("Using userspace Proxier")
-		klog.V(0).InfoS("The userspace proxier is now deprecated and will be removed in a future release, please use 'iptables' or 'ipvs' instead")
+		klog.InfoS("Using userspace Proxier")
+		klog.InfoS("The userspace proxier is now deprecated and will be removed in a future release, please use 'iptables' or 'ipvs' instead")
 
 		// TODO this has side effects that should only happen when Run() is invoked.
 		proxier, err = userspace.NewProxier(
@@ -453,7 +453,7 @@ func getLocalDetector(mode proxyconfigapi.LocalMode, config *proxyconfigapi.Kube
 		}
 		return proxyutiliptables.NewDetectLocalByInterfaceNamePrefix(config.DetectLocal.InterfaceNamePrefix)
 	}
-	klog.V(0).InfoS("Defaulting to no-op detect-local", "detect-local-mode", string(mode))
+	klog.InfoS("Defaulting to no-op detect-local", "detect-local-mode", string(mode))
 	return proxyutiliptables.NewNoOpLocalDetector(), nil
 }
 
