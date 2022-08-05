@@ -39,7 +39,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	node "k8s.io/kubernetes/pkg/apis/node"
 	apinodev1 "k8s.io/kubernetes/pkg/apis/node/v1"
-	"k8s.io/kubernetes/pkg/util/tolerations"
+	"k8s.io/kubernetes/pkg/util/tolerations/merge"
 )
 
 // PluginName indicates name of admission plugin.
@@ -208,7 +208,7 @@ func setScheduling(a admission.Attributes, pod *api.Pod, runtimeClass *nodev1.Ru
 		}
 	}
 
-	newTolerations := tolerations.MergeTolerations(pod.Spec.Tolerations, nodeScheduling.Tolerations)
+	newTolerations := merge.DoTolerationsMerge(pod.Spec.Tolerations, nodeScheduling.Tolerations)
 
 	pod.Spec.NodeSelector = newNodeSelector
 	pod.Spec.Tolerations = newTolerations

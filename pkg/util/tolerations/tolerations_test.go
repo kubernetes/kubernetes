@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/util/tolerations/merge"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -169,11 +170,11 @@ func TestIsSuperset(t *testing.T) {
 	}}
 
 	assertSuperset := func(t *testing.T, super, sub string) {
-		assert.True(t, isSuperset(tolerations[super], tolerations[sub]),
+		assert.True(t, merge.IsSuperset(tolerations[super], tolerations[sub]),
 			"%s should be a superset of %s", super, sub)
 	}
 	assertNotSuperset := func(t *testing.T, super, sub string) {
-		assert.False(t, isSuperset(tolerations[super], tolerations[sub]),
+		assert.False(t, merge.IsSuperset(tolerations[super], tolerations[sub]),
 			"%s should NOT be a superset of %s", super, sub)
 	}
 	contains := func(ss []string, s string) bool {
@@ -303,7 +304,7 @@ func TestMergeTolerations(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := MergeTolerations(getTolerations(test.a), getTolerations(test.b))
+			actual := merge.DoTolerationsMerge(getTolerations(test.a), getTolerations(test.b))
 			require.Len(t, actual, len(test.expected))
 			for i, expect := range getTolerations(test.expected) {
 				assert.Equal(t, expect, actual[i], "expected[%d] = %s", i, test.expected[i])
@@ -355,7 +356,7 @@ func TestFuzzed(t *testing.T) {
 	// Check whether the toleration is a subset of a toleration in the set.
 	isContained := func(toleration api.Toleration, set []api.Toleration) bool {
 		for _, ss := range set {
-			if isSuperset(ss, toleration) {
+			if merge.IsSuperset(ss, toleration) {
 				return true
 			}
 		}
@@ -392,11 +393,11 @@ func TestFuzzed(t *testing.T) {
 		}
 	})
 
-	t.Run("MergeTolerations", func(t *testing.T) {
+	t.Run("DoTolerationsMerge", func(t *testing.T) {
 		for i := 0; i < iterations; i++ {
 			a := genTolerations()
 			b := genTolerations()
-			result := MergeTolerations(a, b)
+			result := merge.DoTolerationsMerge(a, b)
 			for _, tol := range append(a, b...) {
 				require.True(t, isContained(tol, result), debugMsg(a, b, result))
 			}

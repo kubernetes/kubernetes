@@ -36,6 +36,7 @@ import (
 	qoshelper "k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/util/tolerations"
+	"k8s.io/kubernetes/pkg/util/tolerations/merge"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
 
@@ -108,7 +109,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	}
 	// Final merge of tolerations irrespective of pod type.
 	if len(extraTolerations) > 0 {
-		pod.Spec.Tolerations = tolerations.MergeTolerations(pod.Spec.Tolerations, extraTolerations)
+		pod.Spec.Tolerations = merge.DoTolerationsMerge(pod.Spec.Tolerations, extraTolerations)
 	}
 	return p.Validate(ctx, a, o)
 }

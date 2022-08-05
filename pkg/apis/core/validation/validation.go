@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"k8s.io/kubernetes/pkg/util/tolerations/merge"
 	netutils "k8s.io/utils/net"
 )
 
@@ -3398,11 +3399,14 @@ func validateTaintEffect(effect *core.TaintEffect, allowEmpty bool, fldPath *fie
 
 // validateOnlyAddedTolerations validates updated pod tolerations.
 func validateOnlyAddedTolerations(newTolerations []core.Toleration, oldTolerations []core.Toleration, fldPath *field.Path) field.ErrorList {
+	mergedNewTolerations := merge.DoTolerationsMerge(newTolerations, nil)
+	mergedOldTolerations := merge.DoTolerationsMerge(oldTolerations, nil)
+
 	allErrs := field.ErrorList{}
-	for _, old := range oldTolerations {
+	for _, old := range mergedOldTolerations {
 		found := false
 		oldTolerationClone := old.DeepCopy()
-		for _, newToleration := range newTolerations {
+		for _, newToleration := range mergedNewTolerations {
 			// assign to our clone before doing a deep equal so we can allow tolerationseconds to change.
 			oldTolerationClone.TolerationSeconds = newToleration.TolerationSeconds // +k8s:verify-mutation:reason=clone
 			if reflect.DeepEqual(*oldTolerationClone, newToleration) {
@@ -3416,7 +3420,7 @@ func validateOnlyAddedTolerations(newTolerations []core.Toleration, oldToleratio
 		}
 	}
 
-	allErrs = append(allErrs, ValidateTolerations(newTolerations, fldPath)...)
+	allErrs = append(allErrs, ValidateTolerations(mergedNewTolerations, fldPath)...)
 	return allErrs
 }
 

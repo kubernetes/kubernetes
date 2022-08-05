@@ -37,6 +37,7 @@ rules:
       - k8s.io/kubernetes/pkg/util/node
       - k8s.io/kubernetes/pkg/util/parsers
       - k8s.io/kubernetes/pkg/util/taints
+      - k8s.io/kubernetes/pkg/util/tolerations/merge
       - k8s.io/kubernetes/pkg/proxy/util
       - k8s.io/kubernetes/pkg/proxy/util/testing
       - k8s.io/kubernetes/pkg/util/sysctl
