@@ -587,6 +587,73 @@ func TestActualStateOfWorld_FoundDuringReconstruction(t *testing.T) {
 	}
 }
 
+// Call MarkVolumeAsDetached() on a volume which mounted by pod(s) should be skipped
+func Test_MarkVolumeAsDetached_Negative_PodInVolume(t *testing.T) {
+	// Arrange
+	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
+	devicePath := "fake/device/path"
+	asw := NewActualStateOfWorld("mynode", volumePluginMgr)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device1",
+						},
+					},
+				},
+			},
+		},
+	}
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	err := asw.MarkVolumeAsAttached(emptyVolumeName, volumeSpec, "" /* nodeName */, devicePath)
+	if err != nil {
+		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	generatedVolumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	if err != nil {
+		t.Fatalf("GetUniqueVolumeNameFromSpec failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	podName := util.GetUniquePodName(pod)
+	mounter, err := plugin.NewMounter(volumeSpec, pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	mapper, err := plugin.NewBlockVolumeMapper(volumeSpec, pod, volume.VolumeOptions{})
+	if err != nil {
+		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
+		PodName:             podName,
+		PodUID:              pod.UID,
+		VolumeName:          generatedVolumeName,
+		Mounter:             mounter,
+		BlockVolumeMapper:   mapper,
+		OuterVolumeSpecName: volumeSpec.Name(),
+		VolumeSpec:          volumeSpec,
+	}
+	err = asw.AddPodToVolume(markVolumeOpts)
+	if err != nil {
+		t.Fatalf("AddPodToVolume failed. Expected: <no error> Actual: <%v>", err)
+	}
+
+	// Act
+	asw.MarkVolumeAsDetached(generatedVolumeName, "" /* nodeName */)
+
+	// Assert
+	verifyPodExistsInVolumeAsw(t, podName, generatedVolumeName, "fake/device/path" /* expectedDevicePath */, asw)
+}
+
 func getTestPod(podName, podUID, outerVolumeName, pdName string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
