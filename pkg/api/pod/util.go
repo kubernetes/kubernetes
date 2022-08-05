@@ -542,8 +542,6 @@ func dropDisabledFields(
 
 	dropDisabledProcMountField(podSpec, oldPodSpec)
 
-	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
-
 	dropDisabledTopologySpreadConstraintsFields(podSpec, oldPodSpec)
 	dropDisabledNodeInclusionPolicyFields(podSpec, oldPodSpec)
 	dropDisabledMatchLabelKeysField(podSpec, oldPodSpec)
@@ -590,16 +588,6 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 			}
 			return true
 		})
-	}
-}
-
-// dropDisabledCSIVolumeSourceAlphaFields removes disabled alpha fields from []CSIVolumeSource.
-// This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a CSIVolumeSource
-func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) && !csiInUse(oldPodSpec) {
-		for i := range podSpec.Volumes {
-			podSpec.Volumes[i].CSI = nil
-		}
 	}
 }
 
@@ -732,19 +720,6 @@ func probeGracePeriodInUse(podSpec *api.PodSpec) bool {
 	})
 
 	return inUse
-}
-
-// csiInUse returns true if any pod's spec include inline CSI volumes.
-func csiInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	for i := range podSpec.Volumes {
-		if podSpec.Volumes[i].CSI != nil {
-			return true
-		}
-	}
-	return false
 }
 
 // SeccompAnnotationForField takes a pod seccomp profile field and returns the

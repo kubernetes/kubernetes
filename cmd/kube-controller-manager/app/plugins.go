@@ -43,7 +43,6 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/exec"
 )
 
@@ -128,10 +127,7 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persiste
 	}
 
 	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
-	}
+	allPlugins = append(allPlugins, csi.ProbeVolumePlugins()...)
 
 	return allPlugins, nil
 }
