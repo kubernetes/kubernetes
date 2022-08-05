@@ -283,8 +283,10 @@ func TestSchedulerWithExtenders(t *testing.T) {
 			for _, name := range test.nodes {
 				cache.AddNode(createNode(name))
 			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			fwk, err := st.NewFramework(
-				test.registerPlugins, "",
+				test.registerPlugins, "", ctx.Done(),
 				runtime.WithClientSet(client),
 				runtime.WithInformerFactory(informerFactory),
 				runtime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
@@ -304,7 +306,7 @@ func TestSchedulerWithExtenders(t *testing.T) {
 				emptySnapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 			podIgnored := &v1.Pod{}
-			result, err := scheduler.SchedulePod(context.Background(), fwk, framework.NewCycleState(), podIgnored)
+			result, err := scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)
