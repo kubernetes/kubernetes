@@ -615,7 +615,7 @@ func TestMilliCPUToShares(t *testing.T) {
 		{
 			name:     "8",
 			milliCPU: 1024,
-			want:     1049,
+			want:     1048,
 		},
 		{
 			name:     "9",
