@@ -105,8 +105,11 @@ func (u *uidTrackingExpectations) finalizerRemovalObserved(jobKey, deleteKey str
 
 // DeleteExpectations deletes the UID set.
 func (u *uidTrackingExpectations) deleteExpectations(jobKey string) {
-	if err := u.store.Delete(jobKey); err != nil {
-		klog.ErrorS(err, "deleting tracking annotation UID expectations", "job", jobKey)
+	set := u.getSet(jobKey)
+	if set != nil {
+		if err := u.store.Delete(set); err != nil {
+			klog.ErrorS(err, "Could not delete tracking annotation UID expectations", "job", jobKey)
+		}
 	}
 }
 
