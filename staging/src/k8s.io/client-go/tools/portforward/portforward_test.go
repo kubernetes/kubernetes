@@ -19,17 +19,18 @@ package portforward
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 )
@@ -90,6 +91,12 @@ func (c *fakeConnection) RemoveStreams(_ ...httpstream.Stream) {
 func (c *fakeConnection) SetIdleTimeout(timeout time.Duration) {
 	// no-op
 }
+
+type fileDescriptorLimitReached string
+
+func (e fileDescriptorLimitReached) Error() string   { return "fileDescriptorLimitReached" }
+func (e fileDescriptorLimitReached) Timeout() bool   { return false }
+func (e fileDescriptorLimitReached) Temporary() bool { return true }
 
 type fakeListener struct {
 	net.Listener
@@ -559,4 +566,114 @@ func TestWaitForConnectionExitsOnStreamConnClosed(t *testing.T) {
 
 	port := ForwardedPort{}
 	pf.waitForConnection(&listener, port)
+}
+
+type fakeTCPConn struct{}
+
+func (f fakeTCPConn) Read(b []byte) (n int, err error) {
+	return len(b), nil
+}
+
+func (f fakeTCPConn) Write(b []byte) (n int, err error) {
+	return len(b), nil
+}
+
+func (f fakeTCPConn) Close() error {
+	return nil
+}
+
+func (f fakeTCPConn) LocalAddr() net.Addr {
+	return &fakeAddr{}
+}
+
+func (f fakeTCPConn) RemoteAddr() net.Addr {
+	return &fakeAddr{}
+}
+
+func (f fakeTCPConn) SetDeadline(t time.Time) error {
+	return nil
+}
+
+func (f fakeTCPConn) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (f fakeTCPConn) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
+type fakeFDLimitedListener struct {
+	net.Listener
+
+	fakeMaxOpenFile  int32
+	servingConnCount int32
+
+	fdLimitedReached                 bool
+	closeOnce                        sync.Once
+	tryToAcceptAfterFdLimitedReached chan struct{}
+}
+
+func newFDLimitedListener() fakeFDLimitedListener {
+	return fakeFDLimitedListener{
+		fakeMaxOpenFile:                  rand.Int31n(1000),
+		tryToAcceptAfterFdLimitedReached: make(chan struct{}),
+	}
+}
+
+func (l *fakeFDLimitedListener) Close() error {
+	return nil
+}
+
+func (l *fakeFDLimitedListener) Accept() (net.Conn, error) {
+
+	if l.servingConnCount < l.fakeMaxOpenFile {
+		l.servingConnCount += 1
+		return fakeTCPConn{}, nil
+	}
+
+	if l.fdLimitedReached {
+		l.closeOnce.Do(func() {
+			close(l.tryToAcceptAfterFdLimitedReached)
+		})
+	}
+	l.fdLimitedReached = true
+	return nil, fileDescriptorLimitReached("")
+}
+
+func TestPortForwardRetryWhenFDLimitedReached(t *testing.T) {
+	devnull, _ := os.Open(os.DevNull)
+
+	pf, err := New(&fakeDialer{}, []string{":2222"}, nil, nil, devnull, devnull)
+	if err != nil {
+		t.Fatalf("error while calling New: %s", err)
+	}
+
+	listener := newFDLimitedListener()
+	defer listener.Close()
+
+	pf.streamConn = &fakeConnection{
+		closeChan: make(chan bool),
+		dataStream: &fakeStream{
+			readFunc: func(p []byte) (int, error) {
+				return len(p), nil
+			},
+			writeFunc: func(p []byte) (int, error) {
+				return len(p), nil
+			},
+		},
+		errorStream: &fakeStream{
+			readFunc: func(p []byte) (int, error) {
+				return len(p), nil
+			},
+			writeFunc: func(p []byte) (int, error) {
+				return len(p), nil
+			},
+		},
+	}
+
+	defer pf.streamConn.Close()
+
+	port := ForwardedPort{}
+	go pf.waitForConnection(&listener, port)
+	<-listener.tryToAcceptAfterFdLimitedReached
 }

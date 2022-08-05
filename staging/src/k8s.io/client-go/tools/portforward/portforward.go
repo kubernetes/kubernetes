@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -299,6 +300,7 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 // waitForConnection waits for new connections to listener and handles them in
 // the background.
 func (pf *PortForwarder) waitForConnection(listener net.Listener, port ForwardedPort) {
+	var tempDelay time.Duration // how long to sleep on accept failure
 	for {
 		select {
 		case <-pf.streamConn.CloseChan():
@@ -306,10 +308,19 @@ func (pf *PortForwarder) waitForConnection(listener net.Listener, port Forwarded
 		default:
 			conn, err := listener.Accept()
 			if err != nil {
-				// TODO consider using something like https://github.com/hydrogen18/stoppableListener?
-				if !strings.Contains(strings.ToLower(err.Error()), "use of closed network connection") {
-					runtime.HandleError(fmt.Errorf("error accepting connection on port %d: %v", port.Local, err))
+				if ne, ok := err.(net.Error); ok && ne.Temporary() {
+					if tempDelay == 0 {
+						tempDelay = 5 * time.Millisecond
+					} else {
+						tempDelay *= 2
+					}
+					if max := 1 * time.Second; tempDelay > max {
+						tempDelay = max
+					}
+					runtime.HandleError(fmt.Errorf("accepting error: %v; retrying in %v", err, tempDelay))
+					continue
 				}
+				runtime.HandleError(fmt.Errorf("error accepting connection on port %d: %v", port.Local, err))
 				return
 			}
 			go pf.handleConnection(conn, port)
