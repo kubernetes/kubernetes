@@ -49,7 +49,7 @@ type NodeScore struct {
 }
 
 // PluginToNodeScores declares a map from plugin name to its NodeScoreList.
-type PluginToNodeScores map[string]NodeScoreList
+type PluginToNodeScores map[ScorePlugin]NodeScoreList
 
 // NodeToStatusMap declares map from node name to its status.
 type NodeToStatusMap map[string]*Status
