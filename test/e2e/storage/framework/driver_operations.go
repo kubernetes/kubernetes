@@ -22,6 +22,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -57,6 +58,11 @@ func CopyStorageClass(sc *storagev1.StorageClass, ns string, suffix string) *sto
 	copy := sc.DeepCopy()
 	copy.ObjectMeta.Name = names.SimpleNameGenerator.GenerateName(ns + "-" + suffix)
 	copy.ResourceVersion = ""
+
+	// Remove the default annotation from the storage class if they exists.
+	// Multiple storage classes with this annotation will result in failure.
+	delete(copy.Annotations, util.BetaIsDefaultStorageClassAnnotation)
+	delete(copy.Annotations, util.IsDefaultStorageClassAnnotation)
 	return copy
 }
 
