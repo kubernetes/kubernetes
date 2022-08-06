@@ -102,7 +102,7 @@ type SchedulingQueue interface {
 	MoveAllToActiveOrBackoffQueue(event framework.ClusterEvent, preCheck PreEnqueueCheck)
 	AssignedPodAdded(pod *v1.Pod)
 	AssignedPodUpdated(pod *v1.Pod)
-	PendingPods() []*v1.Pod
+	PendingPods() ([]*v1.Pod, string)
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
 	Close()
@@ -678,9 +678,12 @@ func (p *PriorityQueue) getUnschedulablePodsWithMatchingAffinityTerm(pod *v1.Pod
 	return podsToMove
 }
 
-// PendingPods returns all the pending pods in the queue. This function is
-// used for debugging purposes in the scheduler cache dumper and comparer.
-func (p *PriorityQueue) PendingPods() []*v1.Pod {
+var pendingPodsSummary = "activeQ:%v; backoffQ:%v; unschedulablePods:%v"
+
+// PendingPods returns all the pending pods in the queue; accompanied by a debugging string
+// recording showing the number of pods in each queue respectively.
+// This function is used for debugging purposes in the scheduler cache dumper and comparer.
+func (p *PriorityQueue) PendingPods() ([]*v1.Pod, string) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	var result []*v1.Pod
@@ -693,7 +696,7 @@ func (p *PriorityQueue) PendingPods() []*v1.Pod {
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
 		result = append(result, pInfo.Pod)
 	}
-	return result
+	return result, fmt.Sprintf(pendingPodsSummary, p.activeQ.Len(), p.podBackoffQ.Len(), len(p.unschedulablePods.podInfoMap))
 }
 
 // Close closes the priority queue.
