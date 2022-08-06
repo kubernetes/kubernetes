@@ -88,7 +88,8 @@ func TestCoreResourceEnqueue(t *testing.T) {
 
 	// Wait for the three pods to be present in the scheduling queue.
 	if err := wait.Poll(time.Millisecond*200, wait.ForeverTestTimeout, func() (bool, error) {
-		return len(testCtx.Scheduler.SchedulingQueue.PendingPods()) == 3, nil
+		pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+		return len(pendingPods) == 3, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +264,8 @@ func TestCustomResourceEnqueue(t *testing.T) {
 
 	// Wait for the testing Pod to be present in the scheduling queue.
 	if err := wait.Poll(time.Millisecond*200, wait.ForeverTestTimeout, func() (bool, error) {
-		return len(testCtx.Scheduler.SchedulingQueue.PendingPods()) == 1, nil
+		pendingPods, _ := testCtx.Scheduler.SchedulingQueue.PendingPods()
+		return len(pendingPods) == 1, nil
 	}); err != nil {
 		t.Fatal(err)
 	}

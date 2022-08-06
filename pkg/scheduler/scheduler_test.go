@@ -418,7 +418,7 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 // getPodFromPriorityQueue is the function used in the TestDefaultErrorFunc test to get
 // the specific pod from the given priority queue. It returns the found pod in the priority queue.
 func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v1.Pod {
-	podList := queue.PendingPods()
+	podList, _ := queue.PendingPods()
 	if len(podList) == 0 {
 		return nil
 	}
