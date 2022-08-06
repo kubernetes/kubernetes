@@ -902,16 +902,16 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(score, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	pluginToNodeScores := make(framework.PluginToNodeScores, len(f.scorePlugins))
+	pluginToNodeScores := make(map[framework.ScorePlugin]framework.NodeScoreList, len(f.scorePlugins))
 	for _, pl := range f.scorePlugins {
-		pluginToNodeScores[pl.Name()] = make(framework.NodeScoreList, len(nodes))
+		pluginToNodeScores[pl] = make(framework.NodeScoreList, len(nodes))
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	errCh := parallelize.NewErrorChannel()
 
 	// Run Score method for each node in parallel.
 	f.Parallelizer().Until(ctx, len(nodes), func(index int) {
-		for _, pl := range f.scorePlugins {
+		for pl, nl := range pluginToNodeScores {
 			nodeName := nodes[index].Name
 			s, status := f.runScorePlugin(ctx, pl, state, pod, nodeName)
 			if !status.IsSuccess() {
@@ -919,7 +919,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 				errCh.SendErrorWithCancel(err, cancel)
 				return
 			}
-			pluginToNodeScores[pl.Name()][index] = framework.NodeScore{
+			nl[index] = framework.NodeScore{
 				Name:  nodeName,
 				Score: s,
 			}
@@ -932,7 +932,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	// Run NormalizeScore method for each ScorePlugin in parallel.
 	f.Parallelizer().Until(ctx, len(f.scorePlugins), func(index int) {
 		pl := f.scorePlugins[index]
-		nodeScoreList := pluginToNodeScores[pl.Name()]
+		nodeScoreList := pluginToNodeScores[pl]
 		if pl.ScoreExtensions() == nil {
 			return
 		}
@@ -952,7 +952,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 		pl := f.scorePlugins[index]
 		// Score plugins' weight has been checked when they are initialized.
 		weight := f.scorePluginWeight[pl.Name()]
-		nodeScoreList := pluginToNodeScores[pl.Name()]
+		nodeScoreList := pluginToNodeScores[pl]
 
 		for i, nodeScore := range nodeScoreList {
 			// return error if score plugin returns invalid score.
