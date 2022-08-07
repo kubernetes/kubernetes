@@ -802,7 +802,8 @@ func TestGetDeletableResources(t *testing.T) {
 }
 
 // TestGarbageCollectorSync ensures that a discovery client error
-// will not cause the garbage collector to block infinitely.
+// or an informer sync error will not cause the garbage
+// collector to block infinitely.
 func TestGarbageCollectorSync(t *testing.T) {
 	serverResources := []*metav1.APIResourceList{
 		{
@@ -920,6 +921,107 @@ func TestGarbageCollectorSync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
 	}
+
+	// Add fake controller simulate the initial not-synced informer which will be synced at the end.
+	fc := fakeController{}
+	gc.dependencyGraphBuilder.monitors[schema.GroupVersionResource{
+		Version:  "v1",
+		Resource: "secrets",
+	}] = &monitor{controller: &fc}
+
+	fakeDiscoveryClient.setPreferredResources(unsyncableServerResources)
+	fakeDiscoveryClient.setError(nil)
+
+	time.Sleep(1 * time.Second)
+
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	if err != nil {
+		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
+	}
+
+	// The informer is synced now.
+	fc.SetSynced(true)
+
+	time.Sleep(1 * time.Second)
+
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	if err != nil {
+		t.Fatalf("Expected garbagecollector.Sync to still be running but it is blocked: %v", err)
+	}
+
+}
+
+func TestGarbageCollectorRun(t *testing.T) {
+	serverResources := []*metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete", "list", "watch"}},
+				{Name: "secrets", Namespaced: true, Kind: "Secret", Verbs: metav1.Verbs{"delete", "list", "watch"}},
+			},
+		},
+	}
+	fakeDiscoveryClient := &fakeServerResources{
+		PreferredResources: serverResources,
+		Error:              fmt.Errorf("error calling discoveryClient.ServerPreferredResources()"),
+		Lock:               sync.Mutex{},
+		InterfaceUsedCount: 0,
+	}
+
+	testHandler := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"GET" + "/api/v1/pods": {
+				200,
+				[]byte("{}"),
+			},
+			"GET" + "/api/v1/secrets": {
+				404,
+				[]byte("{}"),
+			},
+		},
+	}
+	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+	defer srv.Close()
+	clientConfig.ContentConfig.NegotiatedSerializer = nil
+	client, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rm := &testRESTMapper{testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)}
+	metadataClient, err := metadata.NewForConfig(clientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
+	gc, err := NewGarbageCollector(client, metadataClient, rm, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go gc.Run(ctx, 1)
+	go gc.Sync(fakeDiscoveryClient, 200*time.Millisecond, ctx.Done())
+
+	// Wait until the sync discovers the initial resources
+	time.Sleep(1 * time.Second)
+
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	if err != nil {
+		t.Fatalf("Expected garbagecollector.Sync to be running but it is blocked: %v", err)
+	}
+
+	fakeDiscoveryClient.setPreferredResources(serverResources)
+	fakeDiscoveryClient.setError(nil)
+
+	err = expectSyncNotBlocked(fakeDiscoveryClient, &gc.workerLock)
+	if err != nil {
+		t.Fatalf("Expected garbagecollector.Sync to be running but it is blocked: %v", err)
+	}
 }
 
 func expectSyncNotBlocked(fakeDiscoveryClient *fakeServerResources, workerLock *sync.RWMutex) error {
@@ -987,6 +1089,29 @@ func (f *fakeServerResources) getInterfaceUsedCount() int {
 
 func (*fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
 	return nil, nil
+}
+
+type fakeController struct {
+	synced bool
+	lock   sync.Mutex
+}
+
+func (f *fakeController) Run(stopCh <-chan struct{}) {
+	return
+}
+
+func (f *fakeController) HasSynced() bool {
+	return f.synced
+}
+
+func (f *fakeController) SetSynced(synced bool) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.synced = synced
+}
+
+func (f *fakeController) LastSyncResourceVersion() string {
+	return ""
 }
 
 func TestConflictingData(t *testing.T) {
@@ -1652,7 +1777,7 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)),
-						makeNode(deployment1apps, virtual)}, // parent node switched to alternate identity, still virtual
+						makeNode(deployment1apps, virtual)},                                  // parent node switched to alternate identity, still virtual
 					absentOwnerCache: []objectReference{badSecretReferenceWithDeploymentUID}, // remember absence of bad parent coordinates
 					pendingAttemptToDelete: []*node{
 						makeNode(badChildPod, withOwners(badSecretReferenceWithDeploymentUID)), // child of bad parent coordinates enqueued for delete attempt
@@ -1797,7 +1922,7 @@ func TestConflictingData(t *testing.T) {
 				insertEvent(makeAddEvent(deployment1apps)),
 				assertState(state{
 					pendingGraphChanges: []*event{
-						makeAddEvent(deployment1apps),                                // good parent observation sneaked in
+						makeAddEvent(deployment1apps), // good parent observation sneaked in
 						makeVirtualDeleteEvent(badSecretReferenceWithDeploymentUID)}, // bad virtual parent not found, queued virtual delete event
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)),
@@ -1869,7 +1994,7 @@ func TestConflictingData(t *testing.T) {
 				assertState(state{
 					graphNodes: []*node{
 						makeNode(goodChildPod, withOwners(deployment1apps)), // good child added
-						makeNode(deployment1apps, virtual)},                 // virtual parent added
+						makeNode(deployment1apps, virtual)}, // virtual parent added
 					pendingAttemptToDelete: []*node{
 						makeNode(deployment1apps, virtual), // virtual parent enqueued for delete attempt
 					},
@@ -2057,7 +2182,7 @@ func TestConflictingData(t *testing.T) {
 						makeNode(pod2ns1, withOwners(pod1ns1)),
 						makeNode(pod1nonamespace, virtual)},
 					pendingAttemptToDelete: []*node{
-						makeNode(pod1nonamespace, virtual),      // virtual parent queued for deletion
+						makeNode(pod1nonamespace, virtual), // virtual parent queued for deletion
 						makeNode(pod2ns1, withOwners(pod1ns1))}, // mismatched child queued for deletion
 				}),
 
@@ -2178,7 +2303,7 @@ func TestConflictingData(t *testing.T) {
 					graphNodes: []*node{
 						makeNode(node1, withOwners(pod1nonamespace)),
 						makeNode(pod2ns1, withOwners(pod1ns1)),
-						makeNode(pod1nonamespace, virtual)}, // missing virtual parent replaced with alternate coordinates, still virtual
+						makeNode(pod1nonamespace, virtual)},      // missing virtual parent replaced with alternate coordinates, still virtual
 					absentOwnerCache: []objectReference{pod1ns1}, // cached absence of missing parent
 					pendingAttemptToDelete: []*node{
 						makeNode(pod2ns1, withOwners(pod1ns1)), // good child of missing parent enqueued for deletion

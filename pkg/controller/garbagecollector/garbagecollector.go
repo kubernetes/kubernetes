@@ -159,11 +159,13 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 
 	go gc.dependencyGraphBuilder.Run(ctx.Done())
 
-	if !cache.WaitForNamedCacheSync("garbage collector", ctx.Done(), gc.dependencyGraphBuilder.IsSynced) {
-		return
+	if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(ctx.Done(), 30*time.Second), gc.dependencyGraphBuilder.IsSynced) {
+		klog.Warningf("Garbage collector: the resource monitors could not be synced")
+	} else {
+		klog.Infof("Garbage collector: all resource monitors have synced")
 	}
 
-	klog.Infof("Garbage collector: all resource monitors have synced. Proceeding to collect garbage")
+	klog.Infof("Garbage collector: proceeding to collect garbage")
 
 	// gc workers
 	for i := 0; i < workers; i++ {

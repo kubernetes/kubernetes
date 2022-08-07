@@ -46,6 +46,8 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/controller-manager/pkg/informerfactory"
+	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/test/integration"
@@ -199,13 +201,14 @@ func createRandomCustomResourceDefinition(
 }
 
 type testContext struct {
-	tearDown           func()
-	gc                 *garbagecollector.GarbageCollector
-	clientSet          clientset.Interface
-	apiExtensionClient apiextensionsclientset.Interface
-	dynamicClient      dynamic.Interface
-	metadataClient     metadata.Interface
-	startGC            func(workers int)
+	tearDown              func()
+	gc                    *garbagecollector.GarbageCollector
+	clientSet             clientset.Interface
+	apiExtensionClient    apiextensionsclientset.Interface
+	apiRegistrationClient apiregistrationclient.ApiregistrationV1Interface
+	dynamicClient         dynamic.Interface
+	metadataClient        metadata.Interface
+	startGC               func(workers int, delayRun time.Duration)
 	// syncPeriod is how often the GC started with startGC will be resynced.
 	syncPeriod time.Duration
 }
@@ -242,6 +245,10 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	if err != nil {
 		t.Fatalf("failed to create dynamicClient: %v", err)
 	}
+	apiRegClient, err := apiregistrationclient.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("failed to create apiClient: %v", err)
+	}
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
 	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
 	alwaysStarted := make(chan struct{})
@@ -264,30 +271,32 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		result.TearDownFn()
 	}
 	syncPeriod := 5 * time.Second
-	startGC := func(workers int) {
+	startGC := func(workers int, delayRun time.Duration) {
 		go wait.Until(func() {
 			// Resetting the REST mapper will also invalidate the underlying discovery
 			// client. This is a leaky abstraction and assumes behavior about the REST
 			// mapper, but we'll deal with it for now.
 			restMapper.Reset()
 		}, syncPeriod, ctx.Done())
-		go gc.Run(ctx, workers)
 		go gc.Sync(clientSet.Discovery(), syncPeriod, ctx.Done())
+		time.Sleep(delayRun)
+		go gc.Run(ctx, workers)
 	}
 
 	if workerCount > 0 {
-		startGC(workerCount)
+		startGC(workerCount, 0)
 	}
 
 	return &testContext{
-		tearDown:           tearDown,
-		gc:                 gc,
-		clientSet:          clientSet,
-		apiExtensionClient: apiExtensionClient,
-		dynamicClient:      dynamicClient,
-		metadataClient:     metadataClient,
-		startGC:            startGC,
-		syncPeriod:         syncPeriod,
+		tearDown:              tearDown,
+		gc:                    gc,
+		clientSet:             clientSet,
+		apiExtensionClient:    apiExtensionClient,
+		apiRegistrationClient: apiRegClient,
+		dynamicClient:         dynamicClient,
+		metadataClient:        metadataClient,
+		startGC:               startGC,
+		syncPeriod:            syncPeriod,
 	}
 }
 
@@ -997,11 +1006,16 @@ func TestDoubleDeletionWithFinalizer(t *testing.T) {
 func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	ctx := setup(t, 0)
 	defer ctx.tearDown()
-	gc, clientSet := ctx.gc, ctx.clientSet
+	clientSet := ctx.clientSet
 
 	ns := createNamespaceOrDie("foo", clientSet, t)
 	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
+	testBlockingOwnerRefDoesBlock(t, ctx, ns, 0)
+}
+
+func testBlockingOwnerRefDoesBlock(t *testing.T, ctx *testContext, ns *v1.Namespace, delayRun time.Duration) {
+	gc, clientSet := ctx.gc, ctx.clientSet
 	podClient := clientSet.CoreV1().Pods(ns.Name)
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	// create the RC with the orphan finalizer set
@@ -1020,13 +1034,11 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 		t.Fatalf("Failed to create Pod: %v", err)
 	}
 
-	// this makes sure the garbage collector will have added the pod to its
-	// dependency graph before handling the foreground deletion of the rc.
-	ctx.startGC(5)
+	ctx.startGC(5, delayRun)
 	timeout := make(chan struct{})
 	time.AfterFunc(5*time.Second, func() { close(timeout) })
 	if !cache.WaitForCacheSync(timeout, gc.IsSynced) {
-		t.Fatalf("failed to wait for garbage collector to be synced")
+		t.Logf("failed to wait for garbage collector to be synced, still continue")
 	}
 
 	err = rcClient.Delete(context.TODO(), toBeDeletedRCName, getForegroundOptions())
@@ -1275,4 +1287,92 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 	}); err != nil {
 		t.Fatalf("failed waiting for dependent %q (owned by %q) to be deleted", dependent.GetName(), owner.GetName())
 	}
+}
+
+func TestDiscoveryFailedOnGCStart(t *testing.T) {
+	ctx := setup(t, 0)
+	defer ctx.tearDown()
+	apiRegClient, clientSet := ctx.apiRegistrationClient, ctx.clientSet
+
+	// Create a fake apiservice to simulate discovery failed
+	apiservice, err := apiRegClient.APIServices().Create(context.TODO(), &apiregistration.APIService{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "APIService",
+			APIVersion: "apiregistration.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "v1.test.io",
+		},
+		Spec: apiregistration.APIServiceSpec{
+			Service: &apiregistration.ServiceReference{
+				Namespace: "default",
+				Name:      "test",
+			},
+			Group:                "test.io",
+			Version:              "v1",
+			GroupPriorityMinimum: 1,
+			VersionPriority:      1,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create apiservice: %v", err)
+	}
+	defer apiRegClient.APIServices().Delete(context.TODO(), apiservice.Name, metav1.DeleteOptions{})
+
+	ns := createNamespaceOrDie("gc-discovery-fail", clientSet, t)
+	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+
+	testBlockingOwnerRefDoesBlock(t, ctx, ns, 1*time.Second)
+}
+
+func TestCacheSyncFailedOnGCStart(t *testing.T) {
+	ctx := setup(t, 0)
+	defer ctx.tearDown()
+	apiExtensionClient, dynamicClient, clientSet := ctx.apiExtensionClient, ctx.dynamicClient, ctx.clientSet
+
+	ns := createNamespaceOrDie("gc-cache-sync-fail", clientSet, t)
+	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+
+	// Create a def with `v1beta1` version and a cr of the def, then update the def added
+	// with "v1" version as default and a fake conversion webhook, it will cause the
+	// cache syncing failed.
+	def, dc := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
+	_, err := dc.Create(context.TODO(), newCRDInstance(def, ns.Name, names.SimpleNameGenerator.GenerateName("foo-")), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create cr: %v", err)
+	}
+	def, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), def.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get cr: %v", err)
+	}
+	def.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
+		Strategy: apiextensionsv1.WebhookConverter,
+		Webhook: &apiextensionsv1.WebhookConversion{
+			ClientConfig: &apiextensionsv1.WebhookClientConfig{
+				Service: &apiextensionsv1.ServiceReference{
+					Namespace: ns.Name,
+					Name:      "foo",
+				},
+				CABundle: []byte("Cg=="),
+			},
+			ConversionReviewVersions: []string{
+				"v1beta1", "v1",
+			},
+		},
+	}
+	defv1 := def.Spec.Versions[0].DeepCopy()
+	defv1.Name = "v1"
+	defv1beta1 := def.Spec.Versions[0]
+	defv1beta1.Served = false
+	defv1beta1.Storage = false
+	def.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
+		*defv1,
+		defv1beta1,
+	}
+	_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), def, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("update def error: %v", err)
+	}
+
+	testBlockingOwnerRefDoesBlock(t, ctx, ns, 0)
 }
