@@ -34,7 +34,6 @@ linters-settings: # please keep this alphabetized
       description: structured logging checker
       original-url: k8s.io/klog/hack/tools
   staticcheck:
-    go: "1.18"
     checks: [
       "all",
       "-SA1019", # TODO(fix) Using a deprecated function, variable, constant or field
@@ -44,5 +43,3 @@ linters-settings: # please keep this alphabetized
     checks: [
       "ST1019",  # Importing the same package multiple times.
     ]
-  unused:
-    go: "1.18"
