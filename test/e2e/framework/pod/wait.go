@@ -217,7 +217,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 				badPods = append(badPods, pod)
 			default:
 				if metav1.GetControllerOf(&pod) == nil {
-					e2elog.Logf("Pod %s is Failed, but it's not controlled by a controller", pod.ObjectMeta.Name)
+					e2elog.Logf("Pod %s INFO: Number of not-ready pods (%d) is below the allowed threshold (%d).", pod.ObjectMeta.Name)
 					badPods = append(badPods, pod)
 				}
 				//ignore failed pods that are controlled by some controller
