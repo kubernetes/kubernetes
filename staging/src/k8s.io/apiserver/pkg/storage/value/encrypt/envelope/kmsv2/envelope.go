@@ -47,6 +47,8 @@ type Service interface {
 	Encrypt(ctx context.Context, uid string, data []byte) (*EncryptResponse, error)
 	// Status returns the status of the KMS.
 	Status(ctx context.Context) (*StatusResponse, error)
+	// Stop the service and close connections.
+	Stop() error
 }
 
 type envelopeTransformer struct {
@@ -175,6 +177,12 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 
 	// Serialize the EncryptedObject to a byte array.
 	return t.doEncode(encObject)
+}
+
+// Stop the service and close the connections.
+func (t *envelopeTransformer) Stop() error {
+	t.transformers.Clear()
+	return t.envelopeService.Stop()
 }
 
 // addTransformer inserts a new transformer to the Envelope cache of DEKs for future reads.

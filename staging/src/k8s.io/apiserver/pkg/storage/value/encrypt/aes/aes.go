@@ -84,6 +84,10 @@ func (t *gcm) TransformToStorage(ctx context.Context, data []byte, dataCtx value
 	return result[:nonceSize+len(cipherText)], nil
 }
 
+func (t *gcm) Stop() error {
+	return nil
+}
+
 // cbc implements encryption at rest of the provided values given a cipher.Block algorithm.
 type cbc struct {
 	block cipher.Block
@@ -150,4 +154,8 @@ func (t *cbc) TransformToStorage(ctx context.Context, data []byte, dataCtx value
 	mode := cipher.NewCBCEncrypter(t.block, iv)
 	mode.CryptBlocks(result[blockSize:], result[blockSize:])
 	return result, nil
+}
+
+func (t *cbc) Stop() error {
+	return nil
 }

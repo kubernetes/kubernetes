@@ -74,6 +74,10 @@ func (t *testEnvelopeService) Status(ctx context.Context) (*StatusResponse, erro
 	return &StatusResponse{KeyID: t.keyVersion}, nil
 }
 
+func (t *testEnvelopeService) Stop() error {
+	return nil
+}
+
 func (t *testEnvelopeService) SetDisabledStatus(status bool) {
 	t.disabled = status
 }

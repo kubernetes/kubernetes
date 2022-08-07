@@ -135,6 +135,13 @@ func (g *gRPCService) Encrypt(plain []byte) ([]byte, error) {
 	return response.Cipher, nil
 }
 
+// Stop the connection.
+func (g *gRPCService) Stop() error {
+	g.mux.Lock()
+	defer g.mux.Unlock()
+	return g.connection.Close()
+}
+
 func (g *gRPCService) interceptor(
 	ctx context.Context,
 	method string,

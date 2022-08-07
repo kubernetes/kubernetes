@@ -91,6 +91,10 @@ func (p *prefixTransformer) TransformToStorage(ctx context.Context, data []byte,
 	return data, p.err
 }
 
+func (p *prefixTransformer) Stop() error {
+	return nil
+}
+
 func (p *prefixTransformer) resetReads() {
 	p.reads = 0
 }
@@ -1251,6 +1255,10 @@ func (t *fancyTransformer) TransformFromStorage(ctx context.Context, data []byte
 
 func (t *fancyTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) ([]byte, error) {
 	return t.transformer.TransformToStorage(ctx, data, dataCtx)
+}
+
+func (t *fancyTransformer) Stop() error {
+	return t.transformer.Stop()
 }
 
 func (t *fancyTransformer) createObject(ctx context.Context) error {

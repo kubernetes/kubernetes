@@ -44,6 +44,8 @@ type Service interface {
 	Decrypt(data []byte) ([]byte, error)
 	// Encrypt bytes to a ciphertext.
 	Encrypt(data []byte) ([]byte, error)
+	// Stop the service and close the connections.
+	Stop() error
 }
 
 type envelopeTransformer struct {
@@ -151,6 +153,12 @@ func (t *envelopeTransformer) TransformToStorage(ctx context.Context, data []byt
 	b.AddBytes(result)
 
 	return b.Bytes()
+}
+
+// Stop the service and close the connections.
+func (t *envelopeTransformer) Stop() error {
+	t.transformers.Clear()
+	return t.envelopeService.Stop()
 }
 
 var _ value.Transformer = &envelopeTransformer{}

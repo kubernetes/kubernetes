@@ -348,6 +348,11 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 		return nil, nil, err
 	}
 
+	transformer := c.Transformer
+	if transformer == nil {
+		transformer = value.IdentityTransformer
+	}
+
 	var once sync.Once
 	destroyFunc := func() {
 		// we know that storage destroy funcs are called multiple times (due to reuse in subresources).
@@ -357,11 +362,8 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.
 			stopCompactor()
 			stopDBSizeMonitor()
 			client.Close()
+			transformer.Stop()
 		})
-	}
-	transformer := c.Transformer
-	if transformer == nil {
-		transformer = value.IdentityTransformer
 	}
 	return etcd3.New(client, c.Codec, newFunc, c.Prefix, c.GroupResource, transformer, c.Paging, c.LeaseManagerConfig), destroyFunc, nil
 }

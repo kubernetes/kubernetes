@@ -44,6 +44,10 @@ func (t *testTransformer) TransformToStorage(ctx context.Context, data []byte, d
 	return t.to, t.err
 }
 
+func (t *testTransformer) Stop() error {
+	return nil
+}
+
 func TestPrefixFrom(t *testing.T) {
 	testErr := fmt.Errorf("test error")
 	transformErr := fmt.Errorf("transform error")

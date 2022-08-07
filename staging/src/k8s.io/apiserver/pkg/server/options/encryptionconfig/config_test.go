@@ -85,6 +85,10 @@ func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
 	return []byte(base64.StdEncoding.EncodeToString(data)), nil
 }
 
+func (t *testEnvelopeService) Stop() error {
+	return nil
+}
+
 // testKMSv2EnvelopeService is a mock kmsv2 envelope service which can be used to simulate remote Envelope v2 services
 // for testing of the envelope transformer with other transformers.
 type testKMSv2EnvelopeService struct {
@@ -113,6 +117,10 @@ func (t *testKMSv2EnvelopeService) Status(ctx context.Context) (*envelopekmsv2.S
 		return nil, t.err
 	}
 	return &envelopekmsv2.StatusResponse{Healthz: "ok", KeyID: "1", Version: "v2alpha1"}, nil
+}
+
+func (t *testKMSv2EnvelopeService) Stop() error {
+	return nil
 }
 
 // The factory method to create mock envelope service.

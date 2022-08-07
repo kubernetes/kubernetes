@@ -68,3 +68,7 @@ func (t *secretboxTransformer) TransformToStorage(ctx context.Context, data []by
 	}
 	return secretbox.Seal(nonce[:], data, &nonce, &t.key), nil
 }
+
+func (t *secretboxTransformer) Stop() error {
+	return nil
+}

@@ -128,3 +128,7 @@ func (g *gRPCService) Status(ctx context.Context) (*StatusResponse, error) {
 	}
 	return &StatusResponse{Version: response.Version, Healthz: response.Healthz, KeyID: response.KeyId}, nil
 }
+
+func (g *gRPCService) Stop() error {
+	return g.connection.Close()
+}

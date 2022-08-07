@@ -49,6 +49,8 @@ type Transformer interface {
 	TransformFromStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, stale bool, err error)
 	// TransformToStorage may transform the provided data into the appropriate form in storage or return an error.
 	TransformToStorage(ctx context.Context, data []byte, dataCtx Context) (out []byte, err error)
+	// Stop the transformer and close grpcservice
+	Stop() error
 }
 
 type identityTransformer struct{}
@@ -61,6 +63,10 @@ func (identityTransformer) TransformFromStorage(ctx context.Context, data []byte
 }
 func (identityTransformer) TransformToStorage(ctx context.Context, data []byte, dataCtx Context) ([]byte, error) {
 	return data, nil
+}
+
+func (identityTransformer) Stop() error {
+	return nil
 }
 
 // DefaultContext is a simple implementation of Context for a slice of bytes.
@@ -98,6 +104,12 @@ func (t *MutableTransformer) TransformToStorage(ctx context.Context, data []byte
 	transformer := t.transformer
 	t.lock.RUnlock()
 	return transformer.TransformToStorage(ctx, data, dataCtx)
+}
+
+func (t *MutableTransformer) Stop() error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	return t.transformer.Stop()
 }
 
 // PrefixTransformer holds a transformer interface and the prefix that the transformation is located under.
@@ -207,4 +219,15 @@ func (t *prefixTransformers) TransformToStorage(ctx context.Context, data []byte
 	}
 	prefixedData = append(prefixedData, result...)
 	return prefixedData, nil
+}
+
+func (t *prefixTransformers) Stop() error {
+	var errs []error
+	for _, transformer := range t.transformers {
+		if err := transformer.Transformer.Stop(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.NewAggregate(errs)
 }

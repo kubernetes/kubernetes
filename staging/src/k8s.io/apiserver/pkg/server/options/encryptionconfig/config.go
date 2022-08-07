@@ -537,3 +537,14 @@ func (u unionTransformers) TransformFromStorage(ctx context.Context, data []byte
 func (u unionTransformers) TransformToStorage(ctx context.Context, data []byte, dataCtx value.Context) (out []byte, err error) {
 	return u[0].TransformToStorage(ctx, data, dataCtx)
 }
+
+func (u unionTransformers) Stop() error {
+	var errs []error
+	for _, transformer := range u {
+		if err := transformer.Stop(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return utilerrors.NewAggregate(errs)
+}
