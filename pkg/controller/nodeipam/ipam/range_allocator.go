@@ -41,13 +41,6 @@ import (
 	controllerutil "k8s.io/kubernetes/pkg/controller/util/node"
 )
 
-// cidrs are reserved, then node resource is patched with them
-// this type holds the reservation info for a node
-type nodeReservedCIDRs struct {
-	allocatedCIDRs []*net.IPNet
-	nodeName       string
-}
-
 type rangeAllocator struct {
 	client clientset.Interface
 	// cluster cidrs as passed in during controller creation
@@ -333,7 +326,7 @@ func (r *rangeAllocator) updateCIDRsAllocation(data nodeReservedCIDRs) error {
 	var err error
 	var node *v1.Node
 	defer r.removeNodeFromProcessing(data.nodeName)
-	cidrsString := cidrsAsString(data.allocatedCIDRs)
+	cidrsString := ipnetToStringList(data.allocatedCIDRs)
 	node, err = r.nodeLister.Get(data.nodeName)
 	if err != nil {
 		klog.Errorf("Failed while getting node %v for updating Node.Spec.PodCIDRs: %v", data.nodeName, err)
@@ -390,13 +383,4 @@ func (r *rangeAllocator) updateCIDRsAllocation(data nodeReservedCIDRs) error {
 		}
 	}
 	return err
-}
-
-// converts a slice of cidrs into <c-1>,<c-2>,<c-n>
-func cidrsAsString(inCIDRs []*net.IPNet) []string {
-	outCIDRs := make([]string, len(inCIDRs))
-	for idx, inCIDR := range inCIDRs {
-		outCIDRs[idx] = inCIDR.String()
-	}
-	return outCIDRs
 }

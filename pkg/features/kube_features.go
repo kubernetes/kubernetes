@@ -588,6 +588,13 @@ const (
 	// Enables the usage of different protocols in the same Service with type=LoadBalancer
 	MixedProtocolLBService featuregate.Feature = "MixedProtocolLBService"
 
+	// owner: @sarveshr7
+	// kep: http://kep.k8s.io/2593
+	// alpha: v1.25
+	//
+	// Enables the MultiCIDR Range allocator.
+	MultiCIDRRangeAllocator featuregate.Feature = "MultiCIDRRangeAllocator"
+
 	// owner: @rikatz
 	// kep: http://kep.k8s.io/2079
 	// alpha: v1.21
@@ -1041,6 +1048,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	MinDomainsInPodTopologySpread: {Default: false, PreRelease: featuregate.Beta},
 
 	MixedProtocolLBService: {Default: true, PreRelease: featuregate.Beta},
+
+	MultiCIDRRangeAllocator: {Default: false, PreRelease: featuregate.Alpha},
 
 	NetworkPolicyEndPort: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.27
 

@@ -50,8 +50,10 @@ func setupAllocator(kubeConfig *restclient.Config, config *Config, clusterCIDR, 
 
 	sharedInformer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 	ipamController, err := nodeipam.NewNodeIpamController(
-		sharedInformer.Core().V1().Nodes(), config.Cloud, clientSet,
-		[]*net.IPNet{clusterCIDR}, serviceCIDR, nil, []int{subnetMaskSize}, config.AllocatorType,
+		sharedInformer.Core().V1().Nodes(),
+		sharedInformer.Networking().V1alpha1().ClusterCIDRs(),
+		config.Cloud, clientSet, []*net.IPNet{clusterCIDR}, serviceCIDR, nil,
+		[]int{subnetMaskSize}, config.AllocatorType,
 	)
 	if err != nil {
 		return nil, shutdownFunc, err
