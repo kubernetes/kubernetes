@@ -47,6 +47,9 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		driver1 := &storagev1.CSIDriver{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "inline-driver-" + string(uuid.NewUUID()),
+				Labels: map[string]string{
+					"test": f.UniqueName,
+				},
 			},
 
 			Spec: storagev1.CSIDriverSpec{
@@ -59,6 +62,9 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		driver2 := &storagev1.CSIDriver{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "inline-driver-" + string(uuid.NewUUID()),
+				Labels: map[string]string{
+					"test": f.UniqueName,
+				},
 			},
 
 			Spec: storagev1.CSIDriverSpec{
@@ -69,12 +75,6 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 				FSGroupPolicy: &defaultFSGroupPolicy,
 			},
 		}
-
-		ginkgo.By("listing existing drivers")
-		driverList, err := client.List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		numDriversBefore := len(driverList.Items)
-		numDriversAfter := numDriversBefore + 2
 
 		ginkgo.By("creating")
 		createdDriver1, err := client.Create(context.TODO(), driver1, metav1.CreateOptions{})
@@ -95,18 +95,26 @@ var _ = utils.SIGDescribe("CSIInlineVolumes", func() {
 		framework.ExpectEqual(retrievedDriver2.UID, createdDriver2.UID)
 
 		ginkgo.By("listing")
-		driverList, err = client.List(context.TODO(), metav1.ListOptions{})
+		driverList, err := client.List(context.TODO(), metav1.ListOptions{LabelSelector: "test=" + f.UniqueName})
 		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(driverList.Items), numDriversAfter, "list should have %d items, got: %s", numDriversAfter, driverList)
+		framework.ExpectEqual(len(driverList.Items), 2, "filtered list should have 2 items, got: %s", driverList)
 
 		ginkgo.By("deleting")
-		err = client.Delete(context.TODO(), createdDriver1.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
-		err = client.Delete(context.TODO(), createdDriver2.Name, metav1.DeleteOptions{})
-		framework.ExpectNoError(err)
-		driverList, err = client.List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		framework.ExpectEqual(len(driverList.Items), numDriversBefore, "list should have %d items, got: %s", numDriversBefore, driverList)
+		for _, driver := range driverList.Items {
+			err := client.Delete(context.TODO(), driver.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+			retrievedDriver, err := client.Get(context.TODO(), driver.Name, metav1.GetOptions{})
+			switch {
+			case apierrors.IsNotFound(err):
+				// Okay, normal case.
+			case err != nil:
+				framework.Failf("expected 404, got %#v", err)
+			case retrievedDriver.DeletionTimestamp != nil:
+				// Okay, normal case.
+			default:
+				framework.Failf("CSIDriver should have been deleted or have DeletionTimestamp, but instead got: %s", retrievedDriver)
+			}
+		}
 	})
 
 	// TODO: promote to framework.ConformanceIt
