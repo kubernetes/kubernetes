@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	configv1beta2 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 	configv1beta3 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3"
 )
@@ -51,6 +52,9 @@ func loadConfig(data []byte) (*config.KubeSchedulerConfiguration, error) {
 		// conversion. See KubeSchedulerConfiguration internal type definition for
 		// more details.
 		cfgObj.TypeMeta.APIVersion = gvk.GroupVersion().String()
+		if cfgObj.TypeMeta.APIVersion == configv1beta2.SchemeGroupVersion.String() {
+			klog.InfoS("KubeSchedulerConfiguration v1beta2 is deprecated in v1.25, will be removed in v1.26")
+		}
 		return cfgObj, nil
 	}
 	return nil, fmt.Errorf("couldn't decode as KubeSchedulerConfiguration, got %s: ", gvk)
@@ -70,8 +74,10 @@ func encodeConfig(cfg *config.KubeSchedulerConfiguration) (*bytes.Buffer, error)
 		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta2.SchemeGroupVersion)
 	case configv1beta3.SchemeGroupVersion.String():
 		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta3.SchemeGroupVersion)
+	case configv1.SchemeGroupVersion.String():
+		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1.SchemeGroupVersion)
 	default:
-		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta3.SchemeGroupVersion)
+		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1.SchemeGroupVersion)
 	}
 	if err := encoder.Encode(cfg, buf); err != nil {
 		return buf, err

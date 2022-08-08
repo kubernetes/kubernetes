@@ -29,12 +29,9 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -278,8 +275,6 @@ func TestPluginGetVolumeName(t *testing.T) {
 }
 
 func TestPluginGetVolumeNameWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-
 	modes := []storage.VolumeLifecycleMode{
 		storage.VolumeLifecyclePersistent,
 	}
@@ -331,47 +326,6 @@ func TestPluginGetVolumeNameWithInline(t *testing.T) {
 }
 
 func TestPluginCanSupport(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, false)()
-
-	tests := []struct {
-		name       string
-		spec       *volume.Spec
-		canSupport bool
-	}{
-		{
-			name:       "no spec provided",
-			canSupport: false,
-		},
-		{
-			name:       "can support volume source",
-			spec:       volume.NewSpecFromVolume(makeTestVol("test-vol", testDriver)),
-			canSupport: false, // csi inline not enabled
-		},
-		{
-			name:       "can support persistent volume source",
-			spec:       volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 20, testDriver, testVol), true),
-			canSupport: true,
-		},
-	}
-
-	plug, tmpDir := newTestPlugin(t, nil)
-	defer os.RemoveAll(tmpDir)
-	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-
-			actual := plug.CanSupport(tc.spec)
-			if tc.canSupport != actual {
-				t.Errorf("expecting canSupport %t, got %t", tc.canSupport, actual)
-			}
-		})
-	}
-}
-
-func TestPluginCanSupportWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-
 	tests := []struct {
 		name       string
 		spec       *volume.Spec
@@ -504,8 +458,6 @@ func TestPluginConstructVolumeSpec(t *testing.T) {
 }
 
 func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-
 	testCases := []struct {
 		name       string
 		originSpec *volume.Spec
@@ -755,7 +707,6 @@ func TestPluginNewMounter(t *testing.T) {
 }
 
 func TestPluginNewMounterWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	bothModes := []storage.VolumeLifecycleMode{
 		storage.VolumeLifecycleEphemeral,
 		storage.VolumeLifecyclePersistent,
@@ -993,7 +944,6 @@ func TestPluginNewDetacher(t *testing.T) {
 }
 
 func TestPluginCanAttach(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	tests := []struct {
 		name       string
 		driverName string
@@ -1047,7 +997,6 @@ func TestPluginCanAttach(t *testing.T) {
 }
 
 func TestPluginFindAttachablePlugin(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	tests := []struct {
 		name       string
 		driverName string
@@ -1123,7 +1072,6 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 }
 
 func TestPluginCanDeviceMount(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	tests := []struct {
 		name           string
 		driverName     string
@@ -1175,7 +1123,6 @@ func TestPluginCanDeviceMount(t *testing.T) {
 }
 
 func TestPluginFindDeviceMountablePluginBySpec(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	tests := []struct {
 		name           string
 		driverName     string

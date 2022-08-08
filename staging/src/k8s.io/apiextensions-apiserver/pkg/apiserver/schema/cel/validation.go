@@ -62,30 +62,52 @@ type Validator struct {
 // NewValidator returns compiles all the CEL programs defined in x-kubernetes-validations extensions
 // of the Structural schema and returns a custom resource validator that contains nested
 // validators for all items, properties and additionalProperties that transitively contain validator rules.
-// Returns nil only if there no validator rules in the Structural schema. May return a validator containing
-// only errors.
+// Returns nil if there are no validator rules in the Structural schema. May return a validator containing only errors.
 // Adding perCallLimit as input arg for testing purpose only. Callers should always use const PerCallLimit as input
-func NewValidator(s *schema.Structural, perCallLimit uint64) *Validator {
-	return validator(s, true, perCallLimit)
+func NewValidator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *Validator {
+	if !hasXValidations(s) {
+		return nil
+	}
+	return validator(s, isResourceRoot, model.SchemaDeclType(s, isResourceRoot), perCallLimit)
 }
 
-func validator(s *schema.Structural, isResourceRoot bool, perCallLimit uint64) *Validator {
-	compiledRules, err := Compile(s, isResourceRoot, perCallLimit)
+// validator creates a Validator for all x-kubernetes-validations at the level of the provided schema and lower and
+// returns the Validator if any x-kubernetes-validations exist in the schema, or nil if no x-kubernetes-validations
+// exist. declType is expected to be a CEL DeclType corresponding to the structural schema.
+func validator(s *schema.Structural, isResourceRoot bool, declType *model.DeclType, perCallLimit uint64) *Validator {
+	compiledRules, err := Compile(s, declType, perCallLimit)
 	var itemsValidator, additionalPropertiesValidator *Validator
 	var propertiesValidators map[string]Validator
 	if s.Items != nil {
-		itemsValidator = validator(s.Items, s.Items.XEmbeddedResource, perCallLimit)
+		itemsValidator = validator(s.Items, s.Items.XEmbeddedResource, declType.ElemType, perCallLimit)
 	}
 	if len(s.Properties) > 0 {
 		propertiesValidators = make(map[string]Validator, len(s.Properties))
-		for k, prop := range s.Properties {
-			if p := validator(&prop, prop.XEmbeddedResource, perCallLimit); p != nil {
+		for k, p := range s.Properties {
+			prop := p
+			var fieldType *model.DeclType
+			if escapedPropName, ok := model.Escape(k); ok {
+				if f, ok := declType.Fields[escapedPropName]; ok {
+					fieldType = f.Type
+				} else {
+					// fields with unknown types are omitted from CEL validation entirely
+					continue
+				}
+			} else {
+				// field may be absent from declType if the property name is unescapable, in which case we should convert
+				// the field value type to a DeclType.
+				fieldType = model.SchemaDeclType(&prop, prop.XEmbeddedResource)
+				if fieldType == nil {
+					continue
+				}
+			}
+			if p := validator(&prop, prop.XEmbeddedResource, fieldType, perCallLimit); p != nil {
 				propertiesValidators[k] = *p
 			}
 		}
 	}
 	if s.AdditionalProperties != nil && s.AdditionalProperties.Structural != nil {
-		additionalPropertiesValidator = validator(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource, perCallLimit)
+		additionalPropertiesValidator = validator(s.AdditionalProperties.Structural, s.AdditionalProperties.Structural.XEmbeddedResource, declType.ElemType, perCallLimit)
 	}
 	if len(compiledRules) > 0 || err != nil || itemsValidator != nil || additionalPropertiesValidator != nil || len(propertiesValidators) > 0 {
 		var activationFactory func(*schema.Structural, interface{}, interface{}) interpreter.Activation = validationActivationWithoutOldSelf
@@ -357,4 +379,27 @@ func (s *Validator) validateArray(ctx context.Context, fldPath *field.Path, sts 
 func MapIsCorrelatable(mapType *string) bool {
 	// if a third map type is introduced, assume it's not correlatable. granular is the default if unspecified.
 	return mapType == nil || *mapType == "granular" || *mapType == "atomic"
+}
+
+func hasXValidations(s *schema.Structural) bool {
+	if s == nil {
+		return false
+	}
+	if len(s.XValidations) > 0 {
+		return true
+	}
+	if hasXValidations(s.Items) {
+		return true
+	}
+	if s.AdditionalProperties != nil && hasXValidations(s.AdditionalProperties.Structural) {
+		return true
+	}
+	if s.Properties != nil {
+		for _, prop := range s.Properties {
+			if hasXValidations(&prop) {
+				return true
+			}
+		}
+	}
+	return false
 }

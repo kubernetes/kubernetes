@@ -50,7 +50,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -58,7 +57,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/component-base/featuregate"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
@@ -438,7 +436,7 @@ func CheckTestingNSDeletedExcept(c clientset.Interface, skip string) error {
 	return fmt.Errorf("Waiting for terminating namespaces to be deleted timed out")
 }
 
-//WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
+// WaitForServiceEndpointsNum waits until the amount of endpoints that implement service to expectNum.
 func WaitForServiceEndpointsNum(c clientset.Interface, namespace, serviceName string, expectNum int, interval, timeout time.Duration) error {
 	return wait.Poll(interval, timeout, func() (bool, error) {
 		Logf("Waiting for amount of service:%s endpoints to be %d", serviceName, expectNum)
@@ -776,8 +774,6 @@ func (f *Framework) testContainerOutputMatcher(scenarioName string,
 type ContainerType int
 
 const (
-	// FeatureEphemeralContainers allows running an ephemeral container in pod namespaces to troubleshoot a running pod
-	FeatureEphemeralContainers featuregate.Feature = "EphemeralContainers"
 	// Containers is for normal containers
 	Containers ContainerType = 1 << iota
 	// InitContainers is for init containers
@@ -790,11 +786,7 @@ const (
 // types except for the ones guarded by feature gate.
 // Copied from pkg/api/v1/pod to avoid pulling extra dependencies
 func allFeatureEnabledContainers() ContainerType {
-	containerType := AllContainers
-	if !utilfeature.DefaultFeatureGate.Enabled(FeatureEphemeralContainers) {
-		containerType &= ^EphemeralContainers
-	}
-	return containerType
+	return AllContainers
 }
 
 // ContainerVisitor is called with each container spec, and returns true
@@ -1374,18 +1366,22 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 
 // WatchEventSequenceVerifier ...
 // manages a watch for a given resource, ensures that events take place in a given order, retries the test on failure
-//   testContext         cancelation signal across API boundries, e.g: context.TODO()
-//   dc                  sets up a client to the API
-//   resourceType        specify the type of resource
-//   namespace           select a namespace
-//   resourceName        the name of the given resource
-//   listOptions         options used to find the resource, recommended to use listOptions.labelSelector
-//   expectedWatchEvents array of events which are expected to occur
-//   scenario            the test itself
-//   retryCleanup        a function to run which ensures that there are no dangling resources upon test failure
+//
+//	testContext         cancelation signal across API boundries, e.g: context.TODO()
+//	dc                  sets up a client to the API
+//	resourceType        specify the type of resource
+//	namespace           select a namespace
+//	resourceName        the name of the given resource
+//	listOptions         options used to find the resource, recommended to use listOptions.labelSelector
+//	expectedWatchEvents array of events which are expected to occur
+//	scenario            the test itself
+//	retryCleanup        a function to run which ensures that there are no dangling resources upon test failure
+//
 // this tooling relies on the test to return the events as they occur
 // the entire scenario must be run to ensure that the desired watch events arrive in order (allowing for interweaving of watch events)
-//   if an expected watch event is missing we elect to clean up and run the entire scenario again
+//
+//	if an expected watch event is missing we elect to clean up and run the entire scenario again
+//
 // we try the scenario three times to allow the sequencing to fail a couple of times
 func WatchEventSequenceVerifier(ctx context.Context, dc dynamic.Interface, resourceType schema.GroupVersionResource, namespace string, resourceName string, listOptions metav1.ListOptions, expectedWatchEvents []watch.Event, scenario func(*watchtools.RetryWatcher) []watch.Event, retryCleanup func() error) {
 	listWatcher := &cache.ListWatch{

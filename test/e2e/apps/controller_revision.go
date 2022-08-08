@@ -104,7 +104,24 @@ var _ = SIGDescribe("ControllerRevision [Serial]", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should manage the lifecycle of a ControllerRevision", func() {
+	/*
+		Release: v1.25
+		Testname: ControllerRevision, resource lifecycle
+		Description: Creating a DaemonSet MUST succeed. Listing all
+		ControllerRevisions with a label selector MUST find only one.
+		After patching the ControllerRevision with a new label, the label
+		MUST be found. Creating a new ControllerRevision for the DaemonSet
+		MUST succeed. Listing the ControllerRevisions by label selector
+		MUST find only two. Deleting a ControllerRevision MUST succeed.
+		Listing the ControllerRevisions by label selector MUST find only
+		one. After updating the ControllerRevision with a new label, the
+		label MUST be found. Patching the DaemonSet MUST succeed. Listing the
+		ControllerRevisions by label selector MUST find only two. Deleting
+		a collection of ControllerRevision via a label selector MUST succeed.
+		Listing the ControllerRevisions by label selector MUST find only one.
+		The current ControllerRevision revision MUST be 3.
+	*/
+	framework.ConformanceIt("should manage the lifecycle of a ControllerRevision", func() {
 		csAppsV1 := f.ClientSet.AppsV1()
 
 		dsLabel := map[string]string{"daemonset-name": dsName}

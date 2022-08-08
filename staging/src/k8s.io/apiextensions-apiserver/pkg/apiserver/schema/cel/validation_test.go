@@ -24,10 +24,12 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
+
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apiextensions-apiserver/third_party/forked/celopenapi/model"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kube-openapi/pkg/validation/strfmt"
 )
 
 // TestValidationExpressions tests CEL integration with custom resource values and OpenAPIv3.
@@ -773,7 +775,7 @@ func TestValidationExpressions(t *testing.T) {
 			}),
 			valid: []string{
 				// 'kind', 'apiVersion', 'metadata.name' and 'metadata.generateName' are always accessible
-				// even if not specified in the schema, regardless of if x-preserve-unknown-fields is set.
+				// even if not specified in the schema, regardless of if x-kubernetes-preserve-unknown-fields is set.
 				"self.embedded.kind == 'Pod'",
 				"self.embedded.apiVersion == 'v1'",
 				"self.embedded.metadata.name == 'foo'",
@@ -783,7 +785,7 @@ func TestValidationExpressions(t *testing.T) {
 				"has(self.embedded)",
 			},
 			// only field declared in the schema can be field selected in CEL expressions, regardless of if
-			// x-preserve-unknown-fields is set.
+			// x-kubernetes-preserve-unknown-fields is set.
 			errors: map[string]string{
 				"has(self.embedded.spec)": "undefined field 'spec'",
 			},
@@ -1605,8 +1607,7 @@ func TestValidationExpressions(t *testing.T) {
 				"dyn([1, 2]).sum() == 3",
 				"dyn([1.0, 2.0]).sum() == 3.0",
 
-				// TODO: enable once type system fix it made to CEL
-				//"[].sum() == 0", // An empty list returns an 0 int
+				"[].sum() == 0", // An empty list returns an 0 int
 			},
 			errors: map[string]string{
 				// return an error for min/max on empty list
@@ -1768,7 +1769,7 @@ func TestValidationExpressions(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, tt.isRoot, PerCallLimit)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -1792,7 +1793,7 @@ func TestValidationExpressions(t *testing.T) {
 				}
 				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s, PerCallLimit)
+					celValidator := NewValidator(&s, true, PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -1809,6 +1810,244 @@ func TestValidationExpressions(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestValidationExpressionsInSchema tests CEL integration with custom resource values and OpenAPIv3 for cases
+// where the validation rules are defined at any level within the schema.
+func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema *schema.Structural
+		obj    interface{}
+		oldObj interface{}
+		errors []string // strings that error message must contain
+	}{
+		{name: "invalid rule under array items",
+			obj: map[string]interface{}{
+				"f": []interface{}{1},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": listType(cloneWithRule(&integerType, "self == 'abc'")),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under array items, parent has rule",
+			obj: map[string]interface{}{
+				"f": []interface{}{1},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": withRule(listType(cloneWithRule(&integerType, "self == 'abc'")), "1 == 1"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under additionalProperties",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{"k": 1},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": mapType(cloneWithRule(&integerType, "self == 'abc'")),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under additionalProperties, parent has rule",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{"k": 1},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": withRule(mapType(cloneWithRule(&integerType, "self == 'abc'")), "1 == 1"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under unescaped field name",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under unescaped field name, parent has rule",
+			obj: map[string]interface{}{
+				"f": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}), "1 == 1"),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		// check that escaped field names do not impact CEL rule validation
+		{name: "invalid rule under escaped field name",
+			obj: map[string]interface{}{
+				"f/2": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f/2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under escaped field name, parent has rule",
+			obj: map[string]interface{}{
+				"f/2": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f/2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}), "1 == 1"),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "failing rule under escaped field name",
+			obj: map[string]interface{}{
+				"f/2": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"f/2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2"),
+			}),
+			errors: []string{"Invalid value: \"object\": failed rule: self.m == 2"},
+		},
+		// unescapable field names that are not accessed by the CEL rule are allowed and should not impact CEL rule validation
+		{name: "invalid rule under unescapable field name",
+			obj: map[string]interface{}{
+				"a@b": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"a@b": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "invalid rule under unescapable field name, parent has rule",
+			obj: map[string]interface{}{
+				"f@2": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: withRulePtr(objectTypePtr(map[string]schema.Structural{
+				"f@2": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 'abc'"),
+			}), "1 == 1"),
+			errors: []string{"found no matching overload for '_==_' applied to '(int, string)"},
+		},
+		{name: "failing rule under unescapable field name",
+			obj: map[string]interface{}{
+				"a@b": map[string]interface{}{
+					"m": 1,
+				},
+			},
+			schema: objectTypePtr(map[string]schema.Structural{
+				"a@b": withRule(objectType(map[string]schema.Structural{"m": integerType}), "self.m == 2"),
+			}),
+			errors: []string{"Invalid value: \"object\": failed rule: self.m == 2"},
+		},
+		{name: "matchExpressions - 'values' must be specified when 'operator' is 'In' or 'NotIn'",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "tier",
+						"operator": "In",
+						"values":   []interface{}{},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, (rule.operator != "In" && rule.operator != "NotIn") || ((has(rule.values) && size(rule.values) > 0)))`),
+			errors: []string{"failed rule"},
+		},
+		{name: "matchExpressions - 'values' may not be specified when 'operator' is 'Exists' or 'DoesNotExist'",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "tier",
+						"operator": "Exists",
+						"values":   []interface{}{"somevalue"},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, (rule.operator != "Exists" && rule.operator != "DoesNotExist") || ((!has(rule.values) || size(rule.values) == 0)))`),
+			errors: []string{"failed rule"},
+		},
+		{name: "matchExpressions - invalid selector operator",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "tier",
+						"operator": "badop",
+						"values":   []interface{}{},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, rule.operator == "In" || rule.operator == "NotIn" || rule.operator == "DoesNotExist")`),
+			errors: []string{"failed rule"},
+		},
+		{name: "matchExpressions - invalid label value",
+			obj: map[string]interface{}{
+				"matchExpressions": []interface{}{
+					map[string]interface{}{
+						"key":      "badkey!",
+						"operator": "Exists",
+						"values":   []interface{}{},
+					},
+				},
+			},
+			schema: genMatchSelectorSchema(`self.matchExpressions.all(rule, size(rule.key) <= 63 && rule.key.matches("^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$"))`),
+			errors: []string{"failed rule"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.TODO()
+			celValidator := validator(tt.schema, true, model.SchemaDeclType(tt.schema, true), PerCallLimit)
+			if celValidator == nil {
+				t.Fatal("expected non nil validator")
+			}
+			errs, _ := celValidator.Validate(ctx, field.NewPath("root"), tt.schema, tt.obj, tt.oldObj, math.MaxInt)
+			unmatched := map[string]struct{}{}
+			for _, e := range tt.errors {
+				unmatched[e] = struct{}{}
+			}
+			for _, err := range errs {
+				if err.Type != field.ErrorTypeInvalid {
+					t.Errorf("expected only ErrorTypeInvalid errors, but got: %v", err)
+					continue
+				}
+				matched := false
+				for expected := range unmatched {
+					if strings.Contains(err.Error(), expected) {
+						delete(unmatched, expected)
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					t.Errorf("expected error to contain one of %v, but got: %v", unmatched, err)
+				}
+			}
+			if len(unmatched) > 0 {
+				t.Errorf("expected errors %v", unmatched)
+			}
+		})
+	}
+}
+
+func genMatchSelectorSchema(rule string) *schema.Structural {
+	s := withRule(objectType(map[string]schema.Structural{
+		"matchExpressions": listType(objectTypePtr(map[string]schema.Structural{
+			"key":      stringType,
+			"operator": stringType,
+			"values":   listType(&stringType),
+		})),
+	}), rule)
+	return &s
 }
 
 func TestCELValidationLimit(t *testing.T) {
@@ -1834,7 +2073,7 @@ func TestCELValidationLimit(t *testing.T) {
 				t.Run(validRule, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, false, PerCallLimit)
+					celValidator := validator(&s, false, model.SchemaDeclType(&s, false), PerCallLimit)
 
 					// test with cost budget exceeded
 					errs, _ := celValidator.Validate(ctx, field.NewPath("root"), &s, tt.obj, nil, 0)
@@ -1855,7 +2094,7 @@ func TestCELValidationLimit(t *testing.T) {
 
 					// test with PerCallLimit exceeded
 					found = false
-					celValidator = NewValidator(&s, 0)
+					celValidator = NewValidator(&s, true, 0)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -1902,7 +2141,7 @@ func TestCELValidationContextCancellation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, PerCallLimit)
+			celValidator := NewValidator(&s, true, PerCallLimit)
 			if celValidator == nil {
 				t.Fatal("expected non nil validator")
 			}
@@ -1968,7 +2207,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 					t.Parallel()
 					s := withRule(*tt.schema, validRule)
-					celValidator := validator(&s, tt.isRoot, PerCallLimit)
+					celValidator := validator(&s, tt.isRoot, model.SchemaDeclType(&s, tt.isRoot), PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -1992,7 +2231,7 @@ func TestCELMaxRecursionDepth(t *testing.T) {
 				}
 				t.Run(testName, func(t *testing.T) {
 					s := withRule(*tt.schema, rule)
-					celValidator := NewValidator(&s, PerCallLimit)
+					celValidator := NewValidator(&s, true, PerCallLimit)
 					if celValidator == nil {
 						t.Fatal("expected non nil validator")
 					}
@@ -2037,7 +2276,7 @@ func BenchmarkCELValidationWithContext(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, PerCallLimit)
+			celValidator := NewValidator(&s, true, PerCallLimit)
 			if celValidator == nil {
 				b.Fatal("expected non nil validator")
 			}
@@ -2077,7 +2316,7 @@ func BenchmarkCELValidationWithCancelledContext(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			ctx := context.TODO()
 			s := withRule(*tt.schema, tt.rule)
-			celValidator := NewValidator(&s, PerCallLimit)
+			celValidator := NewValidator(&s, true, PerCallLimit)
 			if celValidator == nil {
 				b.Fatal("expected non nil validator")
 			}
@@ -2131,7 +2370,7 @@ func BenchmarkCELValidationWithAndWithoutOldSelfReference(b *testing.B) {
 					},
 				},
 			}
-			validator := NewValidator(s, PerCallLimit)
+			validator := NewValidator(s, true, PerCallLimit)
 			if validator == nil {
 				b.Fatal("expected non nil validator")
 			}
@@ -2283,6 +2522,20 @@ func withRule(s schema.Structural, rule string) schema.Structural {
 		},
 	}
 	return s
+}
+
+func withRulePtr(s *schema.Structural, rule string) *schema.Structural {
+	s.Extensions.XValidations = apiextensions.ValidationRules{
+		{
+			Rule: rule,
+		},
+	}
+	return s
+}
+
+func cloneWithRule(s *schema.Structural, rule string) *schema.Structural {
+	s = s.DeepCopy()
+	return withRulePtr(s, rule)
 }
 
 func withMaxLength(s schema.Structural, maxLength *int64) schema.Structural {

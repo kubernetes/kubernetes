@@ -41,9 +41,9 @@ import (
 )
 
 /*
-	Test to verify volume status after node power off:
-	1. Verify the pod got provisioned on a different node with volume attached to it
-	2. Verify the volume is detached from the powered off node
+Test to verify volume status after node power off:
+1. Verify the pod got provisioned on a different node with volume attached to it
+2. Verify the volume is detached from the powered off node
 */
 var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("node-poweroff")

@@ -17,13 +17,18 @@ limitations under the License.
 package windows
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+
+	semver "github.com/blang/semver/v4"
 )
 
 // waits for a deployment to be created and the desired replicas
@@ -43,4 +48,21 @@ func waitForDeployment(getDeploymentFunc func() (*appsv1.Deployment, error), int
 		framework.Logf("deployment status %s", &deployment.Status)
 		return util.DeploymentComplete(deployment, &deployment.Status), nil
 	})
+}
+
+// gets the container runtime and version for a node
+func getNodeContainerRuntimeAndVersion(n v1.Node) (string, semver.Version, error) {
+	containerRuntimeVersionString := n.Status.NodeInfo.DeepCopy().ContainerRuntimeVersion
+	parts := strings.Split(containerRuntimeVersionString, "://")
+
+	if len(parts) != 2 {
+		return "", semver.Version{}, fmt.Errorf("could not get container runtime and version from '%s'", containerRuntimeVersionString)
+	}
+
+	v, err := semver.ParseTolerant(parts[1])
+	if err != nil {
+		return "", semver.Version{}, err
+	}
+
+	return parts[0], v, nil
 }

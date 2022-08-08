@@ -63,7 +63,7 @@ func (tsc *topologySpreadConstraint) matchNodeInclusionPolicies(pod *v1.Pod, nod
 // .DefaultConstraints and the selectors from the services, replication
 // controllers, replica sets and stateful sets that match the pod.
 func (pl *PodTopologySpread) buildDefaultConstraints(p *v1.Pod, action v1.UnsatisfiableConstraintAction) ([]topologySpreadConstraint, error) {
-	constraints, err := filterTopologySpreadConstraints(pl.defaultConstraints, action, pl.enableMinDomainsInPodTopologySpread, pl.enableNodeInclusionPolicyInPodTopologySpread)
+	constraints, err := pl.filterTopologySpreadConstraints(pl.defaultConstraints, p.Labels, action)
 	if err != nil || len(constraints) == 0 {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func nodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints 
 	return true
 }
 
-func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, action v1.UnsatisfiableConstraintAction, enableMinDomainsInPodTopologySpread, enableNodeInclusionPolicyInPodTopologySpread bool) ([]topologySpreadConstraint, error) {
+func (pl *PodTopologySpread) filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, podLabels map[string]string, action v1.UnsatisfiableConstraintAction) ([]topologySpreadConstraint, error) {
 	var result []topologySpreadConstraint
 	for _, c := range constraints {
 		if c.WhenUnsatisfiable == action {
@@ -95,6 +95,19 @@ func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, 
 			if err != nil {
 				return nil, err
 			}
+
+			if pl.enableMatchLabelKeysInPodTopologySpread && len(c.MatchLabelKeys) > 0 {
+				matchLabels := make(labels.Set)
+				for _, labelKey := range c.MatchLabelKeys {
+					if value, ok := podLabels[labelKey]; ok {
+						matchLabels[labelKey] = value
+					}
+				}
+				if len(matchLabels) > 0 {
+					selector = mergeLabelSetWithSelector(matchLabels, selector)
+				}
+			}
+
 			tsc := topologySpreadConstraint{
 				MaxSkew:            c.MaxSkew,
 				TopologyKey:        c.TopologyKey,
@@ -103,10 +116,10 @@ func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, 
 				NodeAffinityPolicy: v1.NodeInclusionPolicyHonor,  // If NodeAffinityPolicy is nil, we treat NodeAffinityPolicy as "Honor".
 				NodeTaintsPolicy:   v1.NodeInclusionPolicyIgnore, // If NodeTaintsPolicy is nil, we treat NodeTaintsPolicy as "Ignore".
 			}
-			if enableMinDomainsInPodTopologySpread && c.MinDomains != nil {
+			if pl.enableMinDomainsInPodTopologySpread && c.MinDomains != nil {
 				tsc.MinDomains = *c.MinDomains
 			}
-			if enableNodeInclusionPolicyInPodTopologySpread {
+			if pl.enableNodeInclusionPolicyInPodTopologySpread {
 				if c.NodeAffinityPolicy != nil {
 					tsc.NodeAffinityPolicy = *c.NodeAffinityPolicy
 				}
@@ -118,6 +131,17 @@ func filterTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, 
 		}
 	}
 	return result, nil
+}
+
+func mergeLabelSetWithSelector(matchLabels labels.Set, s labels.Selector) labels.Selector {
+	mergedSelector := labels.SelectorFromSet(matchLabels)
+	if requirements, ok := s.Requirements(); ok {
+		for _, r := range requirements {
+			mergedSelector = mergedSelector.Add(r)
+		}
+	}
+
+	return mergedSelector
 }
 
 func countPodsMatchSelector(podInfos []*framework.PodInfo, selector labels.Selector, ns string) int {

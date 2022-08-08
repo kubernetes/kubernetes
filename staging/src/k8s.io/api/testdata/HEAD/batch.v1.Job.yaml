@@ -39,6 +39,17 @@ spec:
   completions: 2
   manualSelector: true
   parallelism: 1
+  podFailurePolicy:
+    rules:
+    - action: actionValue
+      onExitCodes:
+        containerName: containerNameValue
+        operator: operatorValue
+        values:
+        - 3
+      onPodConditions:
+      - status: statusValue
+        type: typeValue
   selector:
     matchExpressions:
     - key: keyValue
@@ -597,6 +608,7 @@ spec:
       hostIPC: true
       hostNetwork: true
       hostPID: true
+      hostUsers: true
       hostname: hostnameValue
       imagePullSecrets:
       - name: nameValue
@@ -851,6 +863,8 @@ spec:
             - valuesValue
           matchLabels:
             matchLabelsKey: matchLabelsValue
+        matchLabelKeys:
+        - matchLabelKeysValue
         maxSkew: 1
         minDomains: 5
         nodeAffinityPolicy: nodeAffinityPolicyValue

@@ -581,6 +581,7 @@ template:
     hostIPC: true
     hostNetwork: true
     hostPID: true
+    hostUsers: true
     hostname: hostnameValue
     imagePullSecrets:
     - name: nameValue
@@ -835,6 +836,8 @@ template:
           - valuesValue
         matchLabels:
           matchLabelsKey: matchLabelsValue
+      matchLabelKeys:
+      - matchLabelKeysValue
       maxSkew: 1
       minDomains: 5
       nodeAffinityPolicy: nodeAffinityPolicyValue

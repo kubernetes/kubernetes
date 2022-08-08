@@ -6,10 +6,11 @@ package container
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
+	"sigs.k8s.io/kustomize/kyaml/errors"
 	runtimeexec "sigs.k8s.io/kustomize/kyaml/fn/runtime/exec"
 	"sigs.k8s.io/kustomize/kyaml/fn/runtime/runtimeutil"
-
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
@@ -151,11 +152,14 @@ func (c *Filter) setupExec() error {
 	if c.Exec.Path != "" {
 		return nil
 	}
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
+
+	if c.Exec.WorkingDir == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return errors.Wrap(err)
+		}
+		c.Exec.WorkingDir = wd
 	}
-	c.Exec.WorkingDir = wd
 
 	path, args := c.getCommand()
 	c.Exec.Path = path
@@ -183,13 +187,16 @@ func (c *Filter) getCommand() (string, []string) {
 		// note: don't make fs readonly because things like heredoc rely on writing tmp files
 	}
 
-	// TODO(joncwong): Allow StorageMount fields to have default values.
 	for _, storageMount := range c.StorageMounts {
+		// convert declarative relative paths to absolute (otherwise docker will throw an error)
+		if !filepath.IsAbs(storageMount.Src) {
+			storageMount.Src = filepath.Join(c.Exec.WorkingDir, storageMount.Src)
+		}
 		args = append(args, "--mount", storageMount.String())
 	}
 
 	args = append(args, runtimeutil.NewContainerEnvFromStringSlice(c.Env).GetDockerFlags()...)
-	a := append(args, c.Image)
+	a := append(args, c.Image) //nolint:gocritic
 	return "docker", a
 }
 

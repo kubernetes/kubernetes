@@ -21,7 +21,10 @@ package mount
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/moby/sys/mountinfo"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -59,6 +62,7 @@ const (
 type Mounter struct {
 	mounterPath                string
 	withSystemd                *bool
+	trySystemd                 bool
 	withSafeNotMountedBehavior bool
 }
 
@@ -70,6 +74,19 @@ var _ MounterForceUnmounter = &Mounter{}
 func New(mounterPath string) Interface {
 	return &Mounter{
 		mounterPath:                mounterPath,
+		trySystemd:                 true,
+		withSafeNotMountedBehavior: detectSafeNotMountedBehavior(),
+	}
+}
+
+// NewWithoutSystemd returns a Linux specific mount.Interface for the current
+// system. It provides options to override the default mounter behavior.
+// mounterPath allows using an alternative to `/bin/mount` for mounting. Any
+// detection for systemd functionality is disabled with this Mounter.
+func NewWithoutSystemd(mounterPath string) Interface {
+	return &Mounter{
+		mounterPath:                mounterPath,
+		trySystemd:                 false,
 		withSafeNotMountedBehavior: detectSafeNotMountedBehavior(),
 	}
 }
@@ -77,6 +94,10 @@ func New(mounterPath string) Interface {
 // hasSystemd validates that the withSystemd bool is set, if it is not,
 // detectSystemd will be called once for this Mounter instance.
 func (mounter *Mounter) hasSystemd() bool {
+	if !mounter.trySystemd {
+		mounter.withSystemd = &mounter.trySystemd
+	}
+
 	if mounter.withSystemd == nil {
 		withSystemd := detectSystemd()
 		mounter.withSystemd = &withSystemd
@@ -105,11 +126,11 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 	mounterPath := ""
 	bind, bindOpts, bindRemountOpts, bindRemountOptsSensitive := MakeBindOptsSensitive(options, sensitiveOptions)
 	if bind {
-		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, nil /* mountFlags */, true)
+		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive, nil /* mountFlags */, mounter.trySystemd)
 		if err != nil {
 			return err
 		}
-		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, nil /* mountFlags */, true)
+		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive, nil /* mountFlags */, mounter.trySystemd)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
 	fsTypesNeedMounter := map[string]struct{}{
@@ -121,7 +142,7 @@ func (mounter *Mounter) MountSensitive(source string, target string, fstype stri
 	if _, ok := fsTypesNeedMounter[fstype]; ok {
 		mounterPath = mounter.mounterPath
 	}
-	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options, sensitiveOptions, nil /* mountFlags */, true)
+	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options, sensitiveOptions, nil /* mountFlags */, mounter.trySystemd)
 }
 
 // MountSensitiveWithoutSystemd is the same as MountSensitive() but disable using systemd mount.
@@ -164,7 +185,7 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 		mountCmd = mounterPath
 	}
 
-	if mounter.hasSystemd() && systemdMountRequired {
+	if systemdMountRequired && mounter.hasSystemd() {
 		// Try to run mount via systemd-run --scope. This will escape the
 		// service where kubelet runs and any fuse daemons will be started in a
 		// specific scope. kubelet service than can be restarted without killing
@@ -690,6 +711,63 @@ func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 	}
 
 	return refs, nil
+}
+
+// IsMountPoint determines if a file is a mountpoint.
+// It first detects bind & any other mountpoints using
+// MountedFast function. If the MountedFast function returns
+// sure as true and err as nil, then a mountpoint is detected
+// successfully. When an error is returned by MountedFast, the
+// following is true:
+// 1. All errors are returned with IsMountPoint as false
+// except os.IsPermission.
+// 2. When os.IsPermission is returned by MountedFast, List()
+// is called to confirm if the given file is a mountpoint are not.
+//
+// os.ErrNotExist should always be returned if a file does not exist
+// as callers have in past relied on this error and not fallback.
+//
+// When MountedFast returns sure as false and err as nil (eg: in
+// case of bindmounts on kernel version 5.10- ); mounter.List()
+// endpoint is called to enumerate all the mountpoints and check if
+// it is mountpoint match or not.
+func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
+	isMnt, sure, isMntErr := mountinfo.MountedFast(file)
+	if sure && isMntErr == nil {
+		return isMnt, nil
+	}
+	if isMntErr != nil {
+		if errors.Is(isMntErr, fs.ErrNotExist) {
+			return false, fs.ErrNotExist
+		}
+		// We were not allowed to do the simple stat() check, e.g. on NFS with
+		// root_squash. Fall back to /proc/mounts check below when
+		// fs.ErrPermission is returned.
+		if !errors.Is(isMntErr, fs.ErrPermission) {
+			return false, isMntErr
+		}
+	}
+	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts.
+	resolvedFile, err := filepath.EvalSymlinks(file)
+	if err != nil {
+		if errors.Is(isMntErr, fs.ErrNotExist) {
+			return false, fs.ErrNotExist
+		}
+		return false, err
+	}
+
+	// check all mountpoints since MountedFast is not sure.
+	// is not reliable for some mountpoint types.
+	mountPoints, mountPointsErr := mounter.List()
+	if mountPointsErr != nil {
+		return false, mountPointsErr
+	}
+	for _, mp := range mountPoints {
+		if isMountPointMatch(mp, resolvedFile) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // tryUnmount calls plain "umount" and waits for unmountTimeout for it to finish.

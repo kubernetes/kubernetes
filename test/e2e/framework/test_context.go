@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/ginkgo/v2/types"
 
 	restclient "k8s.io/client-go/rest"
@@ -55,24 +56,24 @@ const (
 // into the code which uses the settings.
 //
 // The recommendation for those settings is:
-// - They are stored in their own context structure or local
-//   variables.
-// - The standard `flag` package is used to register them.
-//   The flag name should follow the pattern <part1>.<part2>....<partn>
-//   where the prefix is unlikely to conflict with other tests or
-//   standard packages and each part is in lower camel case. For
-//   example, test/e2e/storage/csi/context.go could define
-//   storage.csi.numIterations.
-// - framework/config can be used to simplify the registration of
-//   multiple options with a single function call:
-//   var storageCSI {
-//       NumIterations `default:"1" usage:"number of iterations"`
-//   }
-//   _ config.AddOptions(&storageCSI, "storage.csi")
-// - The direct use Viper in tests is possible, but discouraged because
-//   it only works in test suites which use Viper (which is not
-//   required) and the supported options cannot be
-//   discovered by a test suite user.
+//   - They are stored in their own context structure or local
+//     variables.
+//   - The standard `flag` package is used to register them.
+//     The flag name should follow the pattern <part1>.<part2>....<partn>
+//     where the prefix is unlikely to conflict with other tests or
+//     standard packages and each part is in lower camel case. For
+//     example, test/e2e/storage/csi/context.go could define
+//     storage.csi.numIterations.
+//   - framework/config can be used to simplify the registration of
+//     multiple options with a single function call:
+//     var storageCSI {
+//     NumIterations `default:"1" usage:"number of iterations"`
+//     }
+//     _ config.AddOptions(&storageCSI, "storage.csi")
+//   - The direct use Viper in tests is possible, but discouraged because
+//     it only works in test suites which use Viper (which is not
+//     required) and the supported options cannot be
+//     discovered by a test suite user.
 //
 // Test suite authors can use framework/viper to make all command line
 // parameters also configurable via a configuration file.
@@ -189,6 +190,9 @@ type TestContextType struct {
 	// RequireDevices makes mandatory on the environment on which tests are run 1+ devices exposed through device plugins.
 	// With this enabled The e2e tests requiring devices for their operation can assume that if devices aren't reported, the test can fail
 	RequireDevices bool
+
+	// Enable volume drivers which are disabled by default. See test/e2e/storage/in_tree_volumes.go for details.
+	EnabledVolumeDrivers []string
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
@@ -262,6 +266,27 @@ type CloudConfig struct {
 // TestContext should be used by all tests to access common context data.
 var TestContext TestContextType
 
+// StringArrayValue is used with flag.Var for a comma-separated list of strings placed into a string array.
+type stringArrayValue struct {
+	stringArray *[]string
+}
+
+func (v stringArrayValue) String() string {
+	if v.stringArray != nil {
+		return strings.Join(*v.stringArray, ",")
+	}
+	return ""
+}
+
+func (v stringArrayValue) Set(s string) error {
+	if len(s) == 0 {
+		*v.stringArray = []string{}
+	} else {
+		*v.stringArray = strings.Split(s, ",")
+	}
+	return nil
+}
+
 // ClusterIsIPv6 returns true if the cluster is IPv6
 func (tc TestContextType) ClusterIsIPv6() bool {
 	return tc.IPFamily == "ipv6"
@@ -319,6 +344,8 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 
 	flags.StringVar(&TestContext.SnapshotControllerPodName, "snapshot-controller-pod-name", "", "The pod name to use for identifying the snapshot controller in the kube-system namespace.")
 	flags.IntVar(&TestContext.SnapshotControllerHTTPPort, "snapshot-controller-http-port", 0, "The port to use for snapshot controller HTTP communication.")
+
+	flags.Var(&stringArrayValue{&TestContext.EnabledVolumeDrivers}, "enabled-volume-drivers", "Comma-separated list of in-tree volume drivers to enable for testing. This is only needed for in-tree drivers disabled by default. An example is gcepd; see test/e2e/storage/in_tree_volumes.go for full details.")
 }
 
 func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
@@ -330,14 +357,6 @@ func CreateGinkgoConfig() (types.SuiteConfig, types.ReporterConfig) {
 	suiteConfig.RandomizeAllSpecs = true
 	// Turn on verbose by default to get spec names
 	reporterConfig.Verbose = true
-	// Enable JUnit output to the result directory, but only if not already specified
-	// via -junit-report.
-	if reporterConfig.JUnitReport == "" && TestContext.ReportDir != "" {
-		// With Ginkgo v1, we used to write one file per parallel node. Now Ginkgo v2 automatically
-		// merges all results into a single file for us. The 01 suffix is kept in case that users
-		// expect files to be called "junit_<prefix><number>.xml".
-		reporterConfig.JUnitReport = path.Join(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
-	}
 	// Disable skipped tests unless they are explicitly requested.
 	if len(suiteConfig.FocusStrings) == 0 && len(suiteConfig.SkipStrings) == 0 {
 		suiteConfig.SkipStrings = []string{`\[Flaky\]|\[Feature:.+\]`}
@@ -535,4 +554,54 @@ func AfterReadingAllFlags(t *TestContextType) {
 		}
 		os.Exit(1)
 	}
+
+	if TestContext.ReportDir != "" {
+		ginkgo.ReportAfterSuite("Kubernetes e2e JUnit report", writeJUnitReport)
+	}
+}
+
+// writeJUnitReport generates a JUnit file in the e2e report directory that is
+// shorter than the one normally written by `ginkgo --junit-report`. This is
+// needed because the full report can become too large for tools like Spyglass
+// (https://github.com/kubernetes/kubernetes/issues/111510).
+//
+// Users who want the full report can use `--junit-report`.
+func writeJUnitReport(report ginkgo.Report) {
+	trimmedReport := report
+	trimmedReport.SpecReports = nil
+	for _, specReport := range report.SpecReports {
+		// Remove details for any spec that hasn't failed. In Prow,
+		// the test output captured in build-log.txt has all of this
+		// information, so we don't need it in the XML.
+		if specReport.State != types.SpecStateFailed {
+			specReport.CapturedGinkgoWriterOutput = ""
+			specReport.CapturedStdOutErr = ""
+		}
+
+		// Remove report entries generated by ginkgo.By("doing
+		// something") because those are not useful (just have the
+		// start time) and cause Spyglass to show an additional "open
+		// stdout" button with a summary of the steps, which usually
+		// doesn't help. We don't remove all entries because other
+		// measurements also get reported this way.
+		//
+		// Removing the report entries is okay because message text was
+		// already added to the test output when ginkgo.By was called.
+		reportEntries := specReport.ReportEntries
+		specReport.ReportEntries = nil
+		for _, reportEntry := range reportEntries {
+			if reportEntry.Name != "By Step" {
+				specReport.ReportEntries = append(specReport.ReportEntries, reportEntry)
+			}
+		}
+
+		trimmedReport.SpecReports = append(trimmedReport.SpecReports, specReport)
+	}
+
+	// With Ginkgo v1, we used to write one file per parallel node. Now
+	// Ginkgo v2 automatically merges all results into a report for us. The
+	// 01 suffix is kept in case that users expect files to be called
+	// "junit_<prefix><number>.xml".
+	junitReport := path.Join(TestContext.ReportDir, "junit_"+TestContext.ReportPrefix+"01.xml")
+	reporters.GenerateJUnitReport(trimmedReport, junitReport)
 }

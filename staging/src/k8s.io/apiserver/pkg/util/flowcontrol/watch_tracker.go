@@ -195,8 +195,9 @@ func (w *watchTracker) forgetWatch(identifier *watchIdentifier, index *indexValu
 // GetInterestedWatchCount implements WatchTracker interface.
 //
 // TODO(wojtek-t): As of now, requestInfo for object creation (POST) doesn't
-//  contain the Name field set. Figure out if we can somehow get it for the
-//  more accurate cost estimation.
+//
+//	contain the Name field set. Figure out if we can somehow get it for the
+//	more accurate cost estimation.
 //
 // TODO(wojtek-t): Figure out how to approach DELETECOLLECTION calls.
 func (w *watchTracker) GetInterestedWatchCount(requestInfo *request.RequestInfo) int {

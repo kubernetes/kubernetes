@@ -230,6 +230,10 @@ func (plugin *portworxVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *portworxVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func getVolumeSource(
 	spec *volume.Spec) (*v1.PortworxVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.PortworxVolume != nil {

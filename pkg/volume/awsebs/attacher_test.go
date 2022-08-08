@@ -21,6 +21,7 @@ package awsebs
 
 import (
 	"errors"
+	"os"
 	"testing"
 
 	"k8s.io/klog/v2"
@@ -145,7 +146,7 @@ func TestAttachDetach(t *testing.T) {
 // newPlugin creates a new gcePersistentDiskPlugin with fake cloud, NewAttacher
 // and NewDetacher won't work.
 func newPlugin(t *testing.T) *awsElasticBlockStorePlugin {
-	host := volumetest.NewFakeVolumeHost(t, "/tmp", nil, nil)
+	host := volumetest.NewFakeVolumeHost(t, os.TempDir(), nil, nil)
 	plugins := ProbeVolumePlugins()
 	plugin := plugins[0]
 	plugin.Init(host)

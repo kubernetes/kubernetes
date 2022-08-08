@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -780,6 +781,22 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	RegisterNode *bool `json:"registerNode,omitempty"`
+	// Tracing specifies the versioned configuration for OpenTelemetry tracing clients.
+	// See http://kep.k8s.io/2832 for more details.
+	// +featureGate=KubeletTracing
+	// +optional
+	Tracing *tracingapi.TracingConfiguration `json:"tracing,omitempty"`
+
+	// LocalStorageCapacityIsolation enables local ephemeral storage isolation feature. The default setting is true.
+	// This feature allows users to set request/limit for container's ephemeral storage and manage it in a similar way
+	// as cpu and memory. It also allows setting sizeLimit for emptyDir volume, which will trigger pod eviction if disk
+	// usage from the volume exceeds the limit.
+	// This feature depends on the capability of detecting correct root file system disk usage. For certain systems,
+	// such as kind rootless, if this capability cannot be supported, the feature LocalStorageCapacityIsolation should be
+	// disabled. Once disabled, user should not set request/limit for container's ephemeral storage, or sizeLimit for emptyDir.
+	// Default: true
+	// +optional
+	LocalStorageCapacityIsolation *bool `json:"localStorageCapacityIsolation,omitempty"`
 }
 
 type KubeletAuthorizationMode string

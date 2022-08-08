@@ -146,14 +146,15 @@ type remoteSubnetInfo struct {
 const NETWORK_TYPE_OVERLAY = "overlay"
 
 func newHostNetworkService() (HostNetworkService, hcn.SupportedFeatures) {
-	var hns HostNetworkService
-	hns = hnsV1{}
+	var h HostNetworkService
 	supportedFeatures := hcn.GetSupportedFeatures()
 	if supportedFeatures.Api.V2 {
-		hns = hnsV2{}
+		h = hns{}
+	} else {
+		panic("Windows HNS Api V2 required. This version of windows does not support API V2")
 	}
 
-	return hns, supportedFeatures
+	return h, supportedFeatures
 }
 
 func getNetworkName(hnsNetworkName string) (string, error) {
@@ -296,10 +297,10 @@ func (info *endpointsInfo) GetZone() string {
 	return ""
 }
 
-//Uses mac prefix and IPv4 address to return a mac address
-//This ensures mac addresses are unique for proper load balancing
-//There is a possibility of MAC collisions but this Mac address is used for remote endpoints only
-//and not sent on the wire.
+// Uses mac prefix and IPv4 address to return a mac address
+// This ensures mac addresses are unique for proper load balancing
+// There is a possibility of MAC collisions but this Mac address is used for remote endpoints only
+// and not sent on the wire.
 func conjureMac(macPrefix string, ip net.IP) string {
 	if ip4 := ip.To4(); ip4 != nil {
 		a, b, c, d := ip4[0], ip4[1], ip4[2], ip4[3]

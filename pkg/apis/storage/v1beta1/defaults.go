@@ -57,11 +57,15 @@ func SetDefaults_CSIDriver(obj *storagev1beta1.CSIDriver) {
 		obj.Spec.FSGroupPolicy = new(storagev1beta1.FSGroupPolicy)
 		*obj.Spec.FSGroupPolicy = storagev1beta1.ReadWriteOnceWithFSTypeFSGroupPolicy
 	}
-	if len(obj.Spec.VolumeLifecycleModes) == 0 && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+	if len(obj.Spec.VolumeLifecycleModes) == 0 {
 		obj.Spec.VolumeLifecycleModes = append(obj.Spec.VolumeLifecycleModes, storagev1beta1.VolumeLifecyclePersistent)
 	}
 	if obj.Spec.RequiresRepublish == nil {
 		obj.Spec.RequiresRepublish = new(bool)
 		*(obj.Spec.RequiresRepublish) = false
+	}
+	if obj.Spec.SELinuxMount == nil && utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
+		obj.Spec.SELinuxMount = new(bool)
+		*(obj.Spec.SELinuxMount) = false
 	}
 }

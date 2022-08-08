@@ -693,8 +693,9 @@ func (adc *attachDetachController) processVolumesInUse(
 // For each VA object, this function checks if its present in the ASW.
 // If not, adds the volume to ASW as an "uncertain" attachment.
 // In the reconciler, the logic checks if the volume is present in the DSW;
-//   if yes, the reconciler will attempt attach on the volume;
-//   if not (could be a dangling attachment), the reconciler will detach this volume.
+//
+//	if yes, the reconciler will attempt attach on the volume;
+//	if not (could be a dangling attachment), the reconciler will detach this volume.
 func (adc *attachDetachController) processVolumeAttachments() error {
 	vas, err := adc.volumeAttachmentLister.List(labels.Everything())
 	if err != nil {
@@ -816,6 +817,10 @@ func (adc *attachDetachController) GetPodsDir() string {
 
 func (adc *attachDetachController) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
 	return ""
+}
+
+func (adc *attachDetachController) GetHostIDsForPod(pod *v1.Pod, containerUID, containerGID *int64) (hostUID, hostGID *int64, err error) {
+	return nil, nil, nil
 }
 
 func (adc *attachDetachController) GetPodPluginDir(podUID types.UID, pluginName string) string {

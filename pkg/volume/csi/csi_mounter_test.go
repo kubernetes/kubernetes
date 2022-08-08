@@ -22,9 +22,9 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -111,7 +111,6 @@ func TestMounterSetUp(t *testing.T) {
 		driver                string
 		volumeContext         map[string]string
 		expectedVolumeContext map[string]string
-		csiInlineVolume       bool
 	}{
 		{
 			name:                  "no pod info",
@@ -141,20 +140,19 @@ func TestMounterSetUp(t *testing.T) {
 			name:                  "add pod info",
 			driver:                "info",
 			volumeContext:         nil,
-			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
+			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false"},
 		},
 		{
 			name:                  "add pod info -> keep existing volumeContext",
 			driver:                "info",
 			volumeContext:         map[string]string{"foo": "bar"},
-			expectedVolumeContext: map[string]string{"foo": "bar", "csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns"},
+			expectedVolumeContext: map[string]string{"foo": "bar", "csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false"},
 		},
 		{
 			name:                  "CSIInlineVolume pod info",
 			driver:                "info",
 			volumeContext:         nil,
 			expectedVolumeContext: map[string]string{"csi.storage.k8s.io/pod.uid": "test-pod", "csi.storage.k8s.io/serviceAccount.name": "test-service-account", "csi.storage.k8s.io/pod.name": "test-pod", "csi.storage.k8s.io/pod.namespace": "test-ns", "csi.storage.k8s.io/ephemeral": "false"},
-			csiInlineVolume:       true,
 		},
 	}
 
@@ -162,11 +160,8 @@ func TestMounterSetUp(t *testing.T) {
 	currentPodInfoMount := true
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Modes must be set if (and only if) CSIInlineVolume is enabled.
-			var modes []storage.VolumeLifecycleMode
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.csiInlineVolume)()
-			if test.csiInlineVolume {
-				modes = append(modes, storage.VolumeLifecyclePersistent)
+			modes := []storage.VolumeLifecycleMode{
+				storage.VolumeLifecyclePersistent,
 			}
 			fakeClient := fakeclient.NewSimpleClientset(
 				getTestCSIDriver("no-info", &noPodMountInfo, nil, modes),
@@ -500,8 +495,6 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 }
 
 func TestMounterSetUpWithInline(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
-
 	testCases := []struct {
 		name       string
 		podUID     types.UID
@@ -903,19 +896,25 @@ func TestUnmounterTeardown(t *testing.T) {
 	pv := makeTestPV("test-pv", 10, testDriver, testVol)
 
 	// save the data file prior to unmount
-	dir := filepath.Join(getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host), "/mount")
+	targetDir := getTargetPath(testPodUID, pv.ObjectMeta.Name, plug.host)
+	dir := filepath.Join(targetDir, "mount")
 	if err := os.MkdirAll(dir, 0755); err != nil && !os.IsNotExist(err) {
 		t.Errorf("failed to create dir [%s]: %v", dir, err)
 	}
 
 	// do a fake local mount
 	diskMounter := util.NewSafeFormatAndMountFromHost(plug.GetPluginName(), plug.host)
-	if err := diskMounter.FormatAndMount("/fake/device", dir, "testfs", nil); err != nil {
+	device := "/fake/device"
+	if goruntime.GOOS == "windows" {
+		// We need disk numbers on Windows.
+		device = "1"
+	}
+	if err := diskMounter.FormatAndMount(device, dir, "testfs", nil); err != nil {
 		t.Errorf("failed to mount dir [%s]: %v", dir, err)
 	}
 
 	if err := saveVolumeData(
-		path.Dir(dir),
+		targetDir,
 		volDataFileName,
 		map[string]string{
 			volDataKey.specVolID:  pv.ObjectMeta.Name,
@@ -977,7 +976,6 @@ func TestIsCorruptedDir(t *testing.T) {
 }
 
 func TestPodServiceAccountTokenAttrs(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	scheme := runtime.NewScheme()
 	utilruntime.Must(pkgauthenticationv1.RegisterDefaults(scheme))
 	utilruntime.Must(pkgstoragev1.RegisterDefaults(scheme))
@@ -1229,7 +1227,7 @@ func Test_csiMountMgr_supportsFSGroup(t *testing.T) {
 				volumeID:            tt.fields.volumeID,
 				specVolumeID:        tt.fields.specVolumeID,
 				readOnly:            tt.fields.readOnly,
-				supportsSELinux:     tt.fields.supportsSELinux,
+				needSELinuxRelabel:  tt.fields.supportsSELinux,
 				spec:                tt.fields.spec,
 				pod:                 tt.fields.pod,
 				podUID:              tt.fields.podUID,

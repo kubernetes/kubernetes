@@ -39,4 +39,5 @@ rules:
       - k8s.io/kubernetes/pkg/util/taints
       - k8s.io/kubernetes/pkg/proxy/util
       - k8s.io/kubernetes/pkg/proxy/util/testing
+      - k8s.io/kubernetes/pkg/util/slice
       - k8s.io/kubernetes/pkg/util/sysctl

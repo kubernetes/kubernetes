@@ -28,11 +28,14 @@ import (
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -125,16 +128,20 @@ type Evaluator struct {
 
 // Preempt returns a PostFilterResult carrying suggested nominatedNodeName, along with a Status.
 // The semantics of returned <PostFilterResult, Status> varies on different scenarios:
-// - <nil, Error>. This denotes it's a transient/rare error that may be self-healed in future cycles.
-// - <nil, Unschedulable>. This status is mostly as expected like the preemptor is waiting for the
-//   victims to be fully terminated.
-// - In both cases above, a nil PostFilterResult is returned to keep the pod's nominatedNodeName unchanged.
 //
-// - <non-nil PostFilterResult, Unschedulable>. It indicates the pod cannot be scheduled even with preemption.
-//   In this case, a non-nil PostFilterResult is returned and result.NominatingMode instructs how to deal with
-//   the nominatedNodeName.
-// - <non-nil PostFilterResult}, Success>. It's the regular happy path
-//   and the non-empty nominatedNodeName will be applied to the preemptor pod.
+//   - <nil, Error>. This denotes it's a transient/rare error that may be self-healed in future cycles.
+//
+//   - <nil, Unschedulable>. This status is mostly as expected like the preemptor is waiting for the
+//     victims to be fully terminated.
+//
+//   - In both cases above, a nil PostFilterResult is returned to keep the pod's nominatedNodeName unchanged.
+//
+//   - <non-nil PostFilterResult, Unschedulable>. It indicates the pod cannot be scheduled even with preemption.
+//     In this case, a non-nil PostFilterResult is returned and result.NominatingMode instructs how to deal with
+//     the nominatedNodeName.
+//
+//   - <non-nil PostFilterResult}, Success>. It's the regular happy path
+//     and the non-empty nominatedNodeName will be applied to the preemptor pod.
 func (ev *Evaluator) Preempt(ctx context.Context, pod *v1.Pod, m framework.NodeToStatusMap) (*framework.PostFilterResult, *framework.Status) {
 	// 0) Fetch the latest version of <pod>.
 	// It's safe to directly fetch pod here. Because the informer cache has already been
@@ -336,9 +343,26 @@ func (ev *Evaluator) prepareCandidate(ctx context.Context, c Candidate, pod *v1.
 		// Otherwise we should delete the victim.
 		if waitingPod := fh.GetWaitingPod(victim.UID); waitingPod != nil {
 			waitingPod.Reject(pluginName, "preempted")
-		} else if err := util.DeletePod(ctx, cs, victim); err != nil {
-			klog.ErrorS(err, "Preempting pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
-			return framework.AsStatus(err)
+		} else {
+			if feature.DefaultFeatureGate.Enabled(features.PodDisruptionConditions) {
+				condition := &v1.PodCondition{
+					Type:    v1.AlphaNoCompatGuaranteeDisruptionTarget,
+					Status:  v1.ConditionTrue,
+					Reason:  "PreemptionByKubeScheduler",
+					Message: "Kube-scheduler: preempting",
+				}
+				newStatus := pod.Status.DeepCopy()
+				if apipod.UpdatePodCondition(newStatus, condition) {
+					if err := util.PatchPodStatus(ctx, cs, victim, newStatus); err != nil {
+						klog.ErrorS(err, "Preparing pod preemption", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
+						return framework.AsStatus(err)
+					}
+				}
+			}
+			if err := util.DeletePod(ctx, cs, victim); err != nil {
+				klog.ErrorS(err, "Preempting pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
+				return framework.AsStatus(err)
+			}
 		}
 		fh.EventRecorder().Eventf(victim, pod, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v",
 			pod.Namespace, pod.Name, c.Name())

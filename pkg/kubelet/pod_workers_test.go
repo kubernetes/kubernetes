@@ -852,6 +852,8 @@ func TestStaticPodExclusion(t *testing.T) {
 		Pod:        newNamedPod("5-static", "test1", "pod1", true),
 		UpdateType: kubetypes.SyncPodUpdate,
 	})
+	// Wait for the previous work to be delivered to the worker
+	drainAllWorkers(podWorkers)
 	channels.Channel("5-static").Hold()
 	podWorkers.UpdatePod(UpdatePodOptions{
 		Pod:        newNamedPod("5-static", "test1", "pod1", true),

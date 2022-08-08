@@ -275,3 +275,77 @@ func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
 		})
 	}
 }
+
+func TestGetAPIServerVirtualIP(t *testing.T) {
+	var tests = []struct {
+		name, svcSubnet, expectedIP string
+		expectedErr                 bool
+	}{
+		{
+			name:        "subnet mask 24",
+			svcSubnet:   "10.96.0.12/24",
+			expectedIP:  "10.96.0.1",
+			expectedErr: false,
+		},
+		{
+			name:        "subnet mask 12",
+			svcSubnet:   "10.96.0.0/12",
+			expectedIP:  "10.96.0.1",
+			expectedErr: false,
+		},
+		{
+			name:        "subnet mask 26",
+			svcSubnet:   "10.87.116.64/26",
+			expectedIP:  "10.87.116.65",
+			expectedErr: false,
+		},
+		{
+			name:        "dual-stack ipv4 primary, subnet mask 26",
+			svcSubnet:   "10.87.116.64/26,fd03::/112",
+			expectedIP:  "10.87.116.65",
+			expectedErr: false,
+		},
+		{
+			name:        "dual-stack, subnet mask 26 , missing first ip segment",
+			svcSubnet:   ",10.87.116.64/26",
+			expectedErr: true,
+		},
+		{
+			name:        "dual-stack ipv4 primary, subnet mask 26, missing second ip segment",
+			svcSubnet:   "10.87.116.64/26,",
+			expectedErr: true,
+		},
+		{
+			name:        "dual-stack ipv6 primary, subnet mask 112",
+			svcSubnet:   "fd03::/112,10.87.116.64/26",
+			expectedIP:  "fd03::1",
+			expectedErr: false,
+		},
+		{
+			name:        "dual-stack, subnet mask 26, missing first ip segment",
+			svcSubnet:   ",fd03::/112",
+			expectedErr: true,
+		},
+		{
+			name:        "dual-stack, subnet mask 26, missing second ip segment",
+			svcSubnet:   "fd03::/112,",
+			expectedErr: true,
+		},
+	}
+	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
+			virtualIP, err := GetAPIServerVirtualIP(rt.svcSubnet)
+			if (err != nil) != rt.expectedErr {
+				t.Errorf("failed APIServerVirtualIP:\n\texpectedErr: %v, got: %v", rt.expectedErr, err)
+			} else if !rt.expectedErr {
+				if virtualIP.String() != rt.expectedIP {
+					t.Errorf(
+						"failed APIServerVirtualIP:\n\texpected: %s\n\t  actual: %s",
+						rt.expectedIP,
+						virtualIP.String(),
+					)
+				}
+			}
+		})
+	}
+}

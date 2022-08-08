@@ -222,7 +222,7 @@ func (r *withRetry) Before(ctx context.Context, request *Request) error {
 		}
 	}
 
-	// if we are here, we have made attempt(s) al least once before.
+	// if we are here, we have made attempt(s) at least once before.
 	if request.backoff != nil {
 		delay := request.backoff.CalculateBackoff(url)
 		if r.retryAfter.Wait > delay {

@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -496,6 +497,36 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: "invalid configuration: taint.TimeAdded is not nil",
+		},
+		{
+			name: "specify tracing with KubeletTracing disabled",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				samplingRate := int32(99999)
+				conf.FeatureGates = map[string]bool{"KubeletTracing": false}
+				conf.Tracing = &tracingapi.TracingConfiguration{SamplingRatePerMillion: &samplingRate}
+				return conf
+			},
+			errMsg: "invalid configuration: tracing should not be configured if KubeletTracing feature flag is disabled.",
+		},
+		{
+			name: "specify tracing invalid sampling rate",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				samplingRate := int32(-1)
+				conf.FeatureGates = map[string]bool{"KubeletTracing": true}
+				conf.Tracing = &tracingapi.TracingConfiguration{SamplingRatePerMillion: &samplingRate}
+				return conf
+			},
+			errMsg: "tracing.samplingRatePerMillion: Invalid value: -1: sampling rate must be positive",
+		},
+		{
+			name: "specify tracing invalid endpoint",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				ep := "dn%2s://localhost:4317"
+				conf.FeatureGates = map[string]bool{"KubeletTracing": true}
+				conf.Tracing = &tracingapi.TracingConfiguration{Endpoint: &ep}
+				return conf
+			},
+			errMsg: "tracing.endpoint: Invalid value: \"dn%2s://localhost:4317\": parse \"dn%2s://localhost:4317\": first path segment in URL cannot contain colon",
 		},
 	}
 

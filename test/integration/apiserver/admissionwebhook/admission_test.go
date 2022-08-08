@@ -491,7 +491,7 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 		// force enable all resources so we can check storage.
 		"--runtime-config=api/all=true",
 		// enable feature-gates that protect resources to check their storage, too.
-		"--feature-gates=EphemeralContainers=true",
+		// e.g. "--feature-gates=EphemeralContainers=true",
 	}, etcdConfig)
 	defer server.TearDownFn()
 
@@ -1716,7 +1716,8 @@ func createV1MutationWebhook(client clientset.Interface, endpoint, convertedEndp
 }
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:
-//     go run generate_cert.go  --rsa-bits 2048 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+//
+//	go run generate_cert.go  --rsa-bits 2048 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var localhostCert = []byte(`-----BEGIN CERTIFICATE-----
 MIIDGDCCAgCgAwIBAgIQTKCKn99d5HhQVCLln2Q+eTANBgkqhkiG9w0BAQsFADAS
 MRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw

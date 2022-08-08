@@ -330,7 +330,7 @@ func (r *ByteReader) decode(originalYAML string, index int, decoder *yaml.Decode
 			// derive and add the seqindent annotation
 			seqIndentStyle := yaml.DeriveSeqIndentStyle(originalYAML)
 			if seqIndentStyle != "" {
-				r.SetAnnotations[kioutil.SeqIndentAnnotation] = fmt.Sprintf("%s", seqIndentStyle)
+				r.SetAnnotations[kioutil.SeqIndentAnnotation] = seqIndentStyle
 			}
 		}
 	}

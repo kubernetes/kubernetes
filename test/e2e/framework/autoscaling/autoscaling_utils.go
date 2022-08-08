@@ -684,7 +684,7 @@ func DeleteContainerResourceHPA(rc *ResourceConsumer, autoscalerName string) {
 	rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
 }
 
-func CreateCPUHorizontalPodAutoscalerWithBehavior(rc *ResourceConsumer, cpu, minReplicas, maxRepl, downscaleStabilizationSeconds int32) *autoscalingv2.HorizontalPodAutoscaler {
+func CreateCPUHorizontalPodAutoscalerWithBehavior(rc *ResourceConsumer, cpu int32, minReplicas int32, maxRepl int32, behavior *autoscalingv2.HorizontalPodAutoscalerBehavior) *autoscalingv2.HorizontalPodAutoscaler {
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rc.name,
@@ -710,11 +710,7 @@ func CreateCPUHorizontalPodAutoscalerWithBehavior(rc *ResourceConsumer, cpu, min
 					},
 				},
 			},
-			Behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
-				ScaleDown: &autoscalingv2.HPAScalingRules{
-					StabilizationWindowSeconds: &downscaleStabilizationSeconds,
-				},
-			},
+			Behavior: behavior,
 		},
 	}
 	hpa, errHPA := rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
@@ -722,11 +718,52 @@ func CreateCPUHorizontalPodAutoscalerWithBehavior(rc *ResourceConsumer, cpu, min
 	return hpa
 }
 
+func HPABehaviorWithScaleUpAndDownRules(scaleUpRule, scaleDownRule *autoscalingv2.HPAScalingRules) *autoscalingv2.HorizontalPodAutoscalerBehavior {
+	return &autoscalingv2.HorizontalPodAutoscalerBehavior{
+		ScaleUp:   scaleUpRule,
+		ScaleDown: scaleDownRule,
+	}
+}
+
+func HPAStabilizationWindowScalingRule(stabilizationDuration int32) *autoscalingv2.HPAScalingRules {
+	return &autoscalingv2.HPAScalingRules{
+		StabilizationWindowSeconds: &stabilizationDuration,
+	}
+}
+
+func HPAPolicyDisabledScalingRule() *autoscalingv2.HPAScalingRules {
+	disabledPolicy := autoscalingv2.DisabledPolicySelect
+	return &autoscalingv2.HPAScalingRules{
+		SelectPolicy: &disabledPolicy,
+	}
+}
+
+func HPABehaviorWithStabilizationWindows(upscaleStabilization, downscaleStabilization time.Duration) *autoscalingv2.HorizontalPodAutoscalerBehavior {
+	return HPABehaviorWithScaleUpAndDownRules(
+		/*scaleUpRule=*/ HPAStabilizationWindowScalingRule(int32(upscaleStabilization.Seconds())),
+		/*scaleDownRule=*/ HPAStabilizationWindowScalingRule(int32(downscaleStabilization.Seconds())),
+	)
+}
+
+func HPABehaviorWithScaleUpDisabled() *autoscalingv2.HorizontalPodAutoscalerBehavior {
+	return HPABehaviorWithScaleUpAndDownRules(
+		/*scaleUpRule=*/ HPAPolicyDisabledScalingRule(),
+		/*scaleDownRule=*/ nil,
+	)
+}
+
+func HPABehaviorWithScaleDownDisabled() *autoscalingv2.HorizontalPodAutoscalerBehavior {
+	return HPABehaviorWithScaleUpAndDownRules(
+		/*scaleUpRule=*/ nil,
+		/*scaleDownRule=*/ HPAPolicyDisabledScalingRule(),
+	)
+}
+
 func DeleteHPAWithBehavior(rc *ResourceConsumer, autoscalerName string) {
 	rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
 }
 
-//SidecarStatusType type for sidecar status
+// SidecarStatusType type for sidecar status
 type SidecarStatusType bool
 
 const (
@@ -734,7 +771,7 @@ const (
 	Disable SidecarStatusType = false
 )
 
-//SidecarWorkloadType type of the sidecar
+// SidecarWorkloadType type of the sidecar
 type SidecarWorkloadType string
 
 const (

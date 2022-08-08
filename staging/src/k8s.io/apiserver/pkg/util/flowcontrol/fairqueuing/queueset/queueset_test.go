@@ -120,9 +120,9 @@ type uniformClient struct {
 	// period
 	split bool
 	// initialSeats is the number of seats this request occupies in the first phase of execution
-	initialSeats uint
+	initialSeats uint64
 	// finalSeats is the number occupied during the second phase of execution
-	finalSeats uint
+	finalSeats uint64
 }
 
 func newUniformClient(hash uint64, nThreads, nCalls int, execDuration, thinkDuration time.Duration) uniformClient {
@@ -142,13 +142,13 @@ func (uc uniformClient) setSplit() uniformClient {
 	return uc
 }
 
-func (uc uniformClient) setInitWidth(seats uint) uniformClient {
+func (uc uniformClient) setInitWidth(seats uint64) uniformClient {
 	uc.initialSeats = seats
 	return uc
 }
 
 func (uc uniformClient) pad(finalSeats int, duration time.Duration) uniformClient {
-	uc.finalSeats = uint(finalSeats)
+	uc.finalSeats = uint64(finalSeats)
 	uc.padDuration = duration
 	return uc
 }
@@ -970,19 +970,19 @@ func TestTimeout(t *testing.T) {
 
 // TestContextCancel tests cancellation of a request's context.
 // The outline is:
-// 1. Use a concurrency limit of 1.
-// 2. Start request 1.
-// 3. Use a fake clock for the following logic, to insulate from scheduler noise.
-// 4. The exec fn of request 1 starts request 2, which should wait
-//    in its queue.
-// 5. The exec fn of request 1 also forks a goroutine that waits 1 second
-//    and then cancels the context of request 2.
-// 6. The exec fn of request 1, if StartRequest 2 returns a req2 (which is the normal case),
-//    calls `req2.Finish`, which is expected to return after the context cancel.
-// 7. The queueset interface allows StartRequest 2 to return `nil` in this situation,
-//    if the scheduler gets the cancel done before StartRequest finishes;
-//    the test handles this without regard to whether the implementation will ever do that.
-// 8. Check that the above took exactly 1 second.
+//  1. Use a concurrency limit of 1.
+//  2. Start request 1.
+//  3. Use a fake clock for the following logic, to insulate from scheduler noise.
+//  4. The exec fn of request 1 starts request 2, which should wait
+//     in its queue.
+//  5. The exec fn of request 1 also forks a goroutine that waits 1 second
+//     and then cancels the context of request 2.
+//  6. The exec fn of request 1, if StartRequest 2 returns a req2 (which is the normal case),
+//     calls `req2.Finish`, which is expected to return after the context cancel.
+//  7. The queueset interface allows StartRequest 2 to return `nil` in this situation,
+//     if the scheduler gets the cancel done before StartRequest finishes;
+//     the test handles this without regard to whether the implementation will ever do that.
+//  8. Check that the above took exactly 1 second.
 func TestContextCancel(t *testing.T) {
 	metrics.Register()
 	metrics.Reset()

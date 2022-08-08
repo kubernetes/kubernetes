@@ -451,6 +451,7 @@ func initScheduler(stop <-chan struct{}, cache internalcache.Cache, queue intern
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	fwk, err := st.NewFramework(registerPluginFuncs,
 		testSchedulerName,
+		stop,
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)),
@@ -552,7 +553,9 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
-			_, err := st.NewFramework(registerPluginFuncs, "test", frameworkruntime.WithInformerFactory(fakeInformerFactory))
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			_, err := st.NewFramework(registerPluginFuncs, "test", stopCh, frameworkruntime.WithInformerFactory(fakeInformerFactory))
 
 			if len(tt.wantErr) > 0 {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {

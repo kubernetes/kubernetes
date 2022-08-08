@@ -421,7 +421,7 @@ const (
 	ModeNode string = "Node"
 
 	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "3.7"
+	PauseVersion = "3.8"
 
 	// CgroupDriverSystemd holds the systemd driver type
 	CgroupDriverSystemd = "systemd"
@@ -573,7 +573,7 @@ func EtcdSupportedVersion(supportedEtcdVersion map[uint8]string, versionString s
 		if desiredVersion > max {
 			etcdStringVersion = supportedEtcdVersion[max]
 		}
-		warning = fmt.Errorf("could not find officially supported version of etcd for Kubernetes %s, falling back to the nearest etcd version (%s)",
+		warning = errors.Errorf("could not find officially supported version of etcd for Kubernetes %s, falling back to the nearest etcd version (%s)",
 			versionString, etcdStringVersion)
 	}
 

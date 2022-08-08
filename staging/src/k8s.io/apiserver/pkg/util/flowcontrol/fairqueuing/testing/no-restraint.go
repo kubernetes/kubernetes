@@ -60,9 +60,6 @@ func (noRestraint) StartRequest(ctx context.Context, workEstimate *fcrequest.Wor
 	return noRestraintRequest{}, false
 }
 
-func (noRestraint) UpdateObservations() {
-}
-
 func (noRestraint) Dump(bool) debug.QueueSetDump {
 	return debug.QueueSetDump{}
 }

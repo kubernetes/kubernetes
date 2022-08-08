@@ -350,3 +350,79 @@ func TestKMSProviderCacheSize(t *testing.T) {
 		})
 	}
 }
+
+func TestKMSProviderAPIVersion(t *testing.T) {
+	apiVersionField := field.NewPath("Resource").Index(0).Child("Provider").Index(0).Child("KMS").Child("APIVersion")
+
+	testCases := []struct {
+		desc string
+		in   *config.KMSConfiguration
+		want field.ErrorList
+	}{
+		{
+			desc: "valid v1 api version",
+			in:   &config.KMSConfiguration{APIVersion: "v1"},
+			want: field.ErrorList{},
+		},
+		{
+			desc: "valid v2 api version",
+			in:   &config.KMSConfiguration{APIVersion: "v2"},
+			want: field.ErrorList{},
+		},
+		{
+			desc: "invalid api version",
+			in:   &config.KMSConfiguration{APIVersion: "v3"},
+			want: field.ErrorList{
+				field.Invalid(apiVersionField, "v3", fmt.Sprintf(unsupportedKMSAPIVersionErrFmt, "apiVersion")),
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := validateKMSAPIVersion(tt.in, apiVersionField)
+			if d := cmp.Diff(tt.want, got); d != "" {
+				t.Fatalf("KMS Provider validation mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
+func TestKMSProviderName(t *testing.T) {
+	nameField := field.NewPath("Resource").Index(0).Child("Provider").Index(0).Child("KMS").Child("name")
+
+	testCases := []struct {
+		desc string
+		in   *config.KMSConfiguration
+		want field.ErrorList
+	}{
+		{
+			desc: "valid name",
+			in:   &config.KMSConfiguration{Name: "foo"},
+			want: field.ErrorList{},
+		},
+		{
+			desc: "empty name",
+			in:   &config.KMSConfiguration{},
+			want: field.ErrorList{
+				field.Required(nameField, fmt.Sprintf(mandatoryFieldErrFmt, "name", "provider")),
+			},
+		},
+		{
+			desc: "invalid name with :",
+			in:   &config.KMSConfiguration{Name: "foo:bar"},
+			want: field.ErrorList{
+				field.Invalid(nameField, "foo:bar", fmt.Sprintf(invalidKMSConfigNameErrFmt, "foo:bar")),
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			got := validateKMSConfigName(tt.in, nameField)
+			if d := cmp.Diff(tt.want, got); d != "" {
+				t.Fatalf("KMS Provider validation mismatch (-want +got):\n%s", d)
+			}
+		})
+	}
+}

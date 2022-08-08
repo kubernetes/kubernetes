@@ -33,13 +33,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-scheduler/config/v1beta3"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -150,17 +153,17 @@ func TestPreemption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error registering a filter: %v", err)
 	}
-	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-		Profiles: []v1beta3.KubeSchedulerProfile{{
+	cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+		Profiles: []configv1.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta3.Plugins{
-				Filter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
+			Plugins: &configv1.Plugins{
+				Filter: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
 						{Name: filterPluginName},
 					},
 				},
-				PreFilter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
+				PreFilter: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
 						{Name: filterPluginName},
 					},
 				},
@@ -186,13 +189,40 @@ func TestPreemption(t *testing.T) {
 
 	maxTokens := 1000
 	tests := []struct {
-		name                string
-		existingPods        []*v1.Pod
-		pod                 *v1.Pod
-		initTokens          int
-		unresolvable        bool
-		preemptedPodIndexes map[int]struct{}
+		name                          string
+		existingPods                  []*v1.Pod
+		pod                           *v1.Pod
+		initTokens                    int
+		unresolvable                  bool
+		preemptedPodIndexes           map[int]struct{}
+		enablePodDisruptionConditions bool
 	}{
+		{
+			name:       "basic pod preemption with PodDisruptionConditions enabled",
+			initTokens: maxTokens,
+			existingPods: []*v1.Pod{
+				initPausePod(&testutils.PausePodConfig{
+					Name:      "victim-pod",
+					Namespace: testCtx.NS.Name,
+					Priority:  &lowPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(400, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					},
+				}),
+			},
+			pod: initPausePod(&testutils.PausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: testCtx.NS.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				},
+			}),
+			preemptedPodIndexes:           map[int]struct{}{0: {}},
+			enablePodDisruptionConditions: true,
+		},
 		{
 			name:       "basic pod preemption",
 			initTokens: maxTokens,
@@ -412,6 +442,7 @@ func TestPreemption(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodDisruptionConditions, test.enablePodDisruptionConditions)()
 			filter.Tokens = test.initTokens
 			filter.Unresolvable = test.unresolvable
 			pods := make([]*v1.Pod, len(test.existingPods))
@@ -432,6 +463,16 @@ func TestPreemption(t *testing.T) {
 				if _, found := test.preemptedPodIndexes[i]; found {
 					if err = wait.Poll(time.Second, wait.ForeverTestTimeout, podIsGettingEvicted(cs, p.Namespace, p.Name)); err != nil {
 						t.Errorf("Pod %v/%v is not getting evicted.", p.Namespace, p.Name)
+					}
+					pod, err := cs.CoreV1().Pods(p.Namespace).Get(testCtx.Ctx, p.Name, metav1.GetOptions{})
+					if err != nil {
+						t.Errorf("Error %v when getting the updated status for pod %v/%v ", err, p.Namespace, p.Name)
+					}
+					_, cond := podutil.GetPodCondition(&pod.Status, v1.AlphaNoCompatGuaranteeDisruptionTarget)
+					if test.enablePodDisruptionConditions == true && cond == nil {
+						t.Errorf("Pod %q does not have the expected condition: %q", klog.KObj(pod), v1.AlphaNoCompatGuaranteeDisruptionTarget)
+					} else if test.enablePodDisruptionConditions == false && cond != nil {
+						t.Errorf("Pod %q has an unexpected condition: %q", klog.KObj(pod), v1.AlphaNoCompatGuaranteeDisruptionTarget)
 					}
 				} else {
 					if p.DeletionTimestamp != nil {
@@ -986,7 +1027,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 		podNamesToDelete []string
 
 		// Register dummy plugin to simulate particular scheduling failures. Optional.
-		customPlugins     *v1beta3.Plugins
+		customPlugins     *configv1.Plugins
 		outOfTreeRegistry frameworkruntime.Registry
 	}{
 		{
@@ -1068,9 +1109,9 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 				waitForNominatedNodeName,
 			},
 			podNamesToDelete: []string{fmt.Sprintf("low-%v", doNotFailMe)},
-			customPlugins: &v1beta3.Plugins{
-				PreBind: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
+			customPlugins: &configv1.Plugins{
+				PreBind: configv1.PluginSet{
+					Enabled: []configv1.Plugin{
 						{Name: alwaysFailPlugin},
 					},
 				},
@@ -1081,8 +1122,8 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
-				Profiles: []v1beta3.KubeSchedulerProfile{{
+			cfg := configtesting.V1ToInternalWithDefaults(t, configv1.KubeSchedulerConfiguration{
+				Profiles: []configv1.KubeSchedulerProfile{{
 					SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
 					Plugins:       tt.customPlugins,
 				}},

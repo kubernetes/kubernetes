@@ -30,14 +30,14 @@ import (
 )
 
 /*
-	Tests to verify volume provisioning on a clustered datastore
-	1. Static provisioning
-	2. Dynamic provisioning
-	3. Dynamic provisioning with spbm policy
+Tests to verify volume provisioning on a clustered datastore
+1. Static provisioning
+2. Dynamic provisioning
+3. Dynamic provisioning with spbm policy
 
-	This test reads env
-	1. CLUSTER_DATASTORE which should be set to clustered datastore
-	2. VSPHERE_SPBM_POLICY_DS_CLUSTER which should be set to a tag based spbm policy tagged to a clustered datastore
+This test reads env
+1. CLUSTER_DATASTORE which should be set to clustered datastore
+2. VSPHERE_SPBM_POLICY_DS_CLUSTER which should be set to a tag based spbm policy tagged to a clustered datastore
 */
 var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-provision")

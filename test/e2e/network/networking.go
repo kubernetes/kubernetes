@@ -618,13 +618,13 @@ var _ = common.SIGDescribe("Networking", func() {
 
 		ginkgo.By("verifying that kubelet rules are eventually recreated")
 		err = utilwait.PollImmediate(framework.Poll, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
-			result, err = e2essh.SSH("sudo iptables-save -t nat", host, framework.TestContext.Provider)
+			result, err = e2essh.SSH("sudo iptables-save -t mangle", host, framework.TestContext.Provider)
 			if err != nil || result.Code != 0 {
 				e2essh.LogResult(result)
 				return false, err
 			}
 
-			if strings.Contains(result.Stdout, "\n-A KUBE-MARK-DROP ") {
+			if strings.Contains(result.Stdout, "\n:KUBE-IPTABLES-HINT") {
 				return true, nil
 			}
 			return false, nil

@@ -84,6 +84,7 @@ const (
 	// owner: @cici37
 	// kep: http://kep.k8s.io/2876
 	// alpha: v1.23
+	// beta: v1.25
 	//
 	// Enables expression validation for Custom Resource
 	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
@@ -105,6 +106,13 @@ const (
 	//
 	// Allows for updating watchcache resource version with progress notify events.
 	EfficientWatchResumption featuregate.Feature = "EfficientWatchResumption"
+
+	// owner: @aramase
+	// kep: http://kep.k8s.io/3299
+	// alpha: v1.25
+	//
+	// Enables KMS v2 API for encryption at rest.
+	KMSv2 featuregate.Feature = "KMSv2"
 
 	// owner: @jiahuif
 	// kep: http://kep.k8s.io/2887
@@ -198,11 +206,13 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	AdvancedAuditing: {Default: true, PreRelease: featuregate.GA},
 
-	CustomResourceValidationExpressions: {Default: false, PreRelease: featuregate.Alpha},
+	CustomResourceValidationExpressions: {Default: true, PreRelease: featuregate.Beta},
 
 	DryRun: {Default: true, PreRelease: featuregate.GA},
 
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+
+	KMSv2: {Default: false, PreRelease: featuregate.Alpha},
 
 	OpenAPIEnums: {Default: true, PreRelease: featuregate.Beta},
 

@@ -46,7 +46,11 @@ import (
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String() is changed
 	// to "v1"?
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
@@ -2478,18 +2482,30 @@ func Test_generateAPIPodStatus(t *testing.T) {
 		},
 		RestartPolicy: v1.RestartPolicyAlways,
 	}
+	sandboxReadyStatus := &kubecontainer.PodStatus{
+		SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+			{
+				Network: &runtimeapi.PodSandboxNetworkStatus{
+					Ip: "10.0.0.10",
+				},
+				Metadata: &runtimeapi.PodSandboxMetadata{Attempt: uint32(0)},
+				State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+			},
+		},
+	}
 	now := metav1.Now()
 
 	tests := []struct {
-		name             string
-		pod              *v1.Pod
-		currentStatus    *kubecontainer.PodStatus
-		unreadyContainer []string
-		previousStatus   v1.PodStatus
-		expected         v1.PodStatus
+		name                           string
+		pod                            *v1.Pod
+		currentStatus                  *kubecontainer.PodStatus
+		unreadyContainer               []string
+		previousStatus                 v1.PodStatus
+		expected                       v1.PodStatus
+		expectedPodHasNetworkCondition v1.PodCondition
 	}{
 		{
-			name: "no current status, with previous statuses and deletion",
+			name: "current status ready, with previous statuses and deletion",
 			pod: &v1.Pod{
 				Spec: desiredState,
 				Status: v1.PodStatus{
@@ -2500,7 +2516,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{Name: "my-pod", DeletionTimestamp: &now},
 			},
-			currentStatus: &kubecontainer.PodStatus{},
+			currentStatus: sandboxReadyStatus,
 			previousStatus: v1.PodStatus{
 				ContainerStatuses: []v1.ContainerStatus{
 					runningState("containerA"),
@@ -2522,9 +2538,13 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingWithLastTerminationUnknown("containerB", 0)),
 				},
 			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionTrue,
+			},
 		},
 		{
-			name: "no current status, with previous statuses and no deletion",
+			name: "current status ready, with previous statuses and no deletion",
 			pod: &v1.Pod{
 				Spec: desiredState,
 				Status: v1.PodStatus{
@@ -2534,7 +2554,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					},
 				},
 			},
-			currentStatus: &kubecontainer.PodStatus{},
+			currentStatus: sandboxReadyStatus,
 			previousStatus: v1.PodStatus{
 				ContainerStatuses: []v1.ContainerStatus{
 					runningState("containerA"),
@@ -2555,6 +2575,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingWithLastTerminationUnknown("containerA", 1)),
 					ready(waitingWithLastTerminationUnknown("containerB", 1)),
 				},
+			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionTrue,
 			},
 		},
 		{
@@ -2590,6 +2614,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingWithLastTerminationUnknown("containerA", 1)),
 					ready(waitingWithLastTerminationUnknown("containerB", 1)),
 				},
+			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionFalse,
 			},
 		},
 		{
@@ -2631,6 +2659,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 				Reason:  "Test",
 				Message: "test",
+			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionFalse,
 			},
 		},
 		{
@@ -2680,6 +2712,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				Reason:  "Test",
 				Message: "test",
 			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionFalse,
+			},
 		},
 		{
 			name: "running can revert to pending",
@@ -2693,7 +2729,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					},
 				},
 			},
-			currentStatus: &kubecontainer.PodStatus{},
+			currentStatus: sandboxReadyStatus,
 			previousStatus: v1.PodStatus{
 				ContainerStatuses: []v1.ContainerStatus{
 					waitingState("containerA"),
@@ -2715,6 +2751,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingStateWithReason("containerB", "ContainerCreating")),
 				},
 			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionTrue,
+			},
 		},
 		{
 			name: "reason and message are preserved when phase doesn't change",
@@ -2729,6 +2769,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 			},
 			currentStatus: &kubecontainer.PodStatus{
+				SandboxStatuses: sandboxReadyStatus.SandboxStatuses,
 				ContainerStatuses: []*kubecontainer.Status{
 					{
 						ID:        kubecontainer.ContainerID{ID: "foo"},
@@ -2764,6 +2805,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(withID(runningStateWithStartedAt("containerB", time.Unix(1, 0).UTC()), "://foo")),
 				},
 			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionTrue,
+			},
 		},
 		{
 			name: "reason and message are cleared when phase changes",
@@ -2778,6 +2823,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 			},
 			currentStatus: &kubecontainer.PodStatus{
+				SandboxStatuses: sandboxReadyStatus.SandboxStatuses,
 				ContainerStatuses: []*kubecontainer.Status{
 					{
 						ID:        kubecontainer.ContainerID{ID: "c1"},
@@ -2817,22 +2863,32 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(withID(runningStateWithStartedAt("containerB", time.Unix(2, 0).UTC()), "://c2")),
 				},
 			},
+			expectedPodHasNetworkCondition: v1.PodCondition{
+				Type:   kubetypes.PodHasNetwork,
+				Status: v1.ConditionTrue,
+			},
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-			defer testKubelet.Cleanup()
-			kl := testKubelet.kubelet
-			kl.statusManager.SetPodStatus(test.pod, test.previousStatus)
-			for _, name := range test.unreadyContainer {
-				kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
-			}
-			actual := kl.generateAPIPodStatus(test.pod, test.currentStatus)
-			if !apiequality.Semantic.DeepEqual(test.expected, actual) {
-				t.Fatalf("Unexpected status: %s", diff.ObjectReflectDiff(actual, test.expected))
-			}
-		})
+		for _, enablePodHasNetworkCondition := range []bool{false, true} {
+			t.Run(test.name, func(t *testing.T) {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodHasNetworkCondition, enablePodHasNetworkCondition)()
+				testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+				defer testKubelet.Cleanup()
+				kl := testKubelet.kubelet
+				kl.statusManager.SetPodStatus(test.pod, test.previousStatus)
+				for _, name := range test.unreadyContainer {
+					kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
+				}
+				actual := kl.generateAPIPodStatus(test.pod, test.currentStatus)
+				if enablePodHasNetworkCondition {
+					test.expected.Conditions = append([]v1.PodCondition{test.expectedPodHasNetworkCondition}, test.expected.Conditions...)
+				}
+				if !apiequality.Semantic.DeepEqual(test.expected, actual) {
+					t.Fatalf("Unexpected status: %s", diff.ObjectReflectDiff(actual, test.expected))
+				}
+			})
+		}
 	}
 }
 

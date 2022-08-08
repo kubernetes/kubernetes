@@ -170,7 +170,7 @@ func NewApplyFlags(f cmdutil.Factory, streams genericclioptions.IOStreams) *Appl
 	return &ApplyFlags{
 		Factory:     f,
 		RecordFlags: genericclioptions.NewRecordFlags(),
-		DeleteFlags: delete.NewDeleteFlags("that contains the configuration to apply"),
+		DeleteFlags: delete.NewDeleteFlags("The files that contain the configurations to apply."),
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
 
 		Overwrite:    true,
@@ -371,6 +371,12 @@ func (o *ApplyOptions) Validate() error {
 
 	if o.Prune && !o.All && o.Selector == "" {
 		return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector")
+	}
+
+	// Do not force the recreation of an object(s) if we're pruning; this can cause
+	// undefined behavior since object UID's change.
+	if o.Prune && o.DeleteOptions.ForceDeletion {
+		return fmt.Errorf("--force cannot be used with --prune")
 	}
 
 	return nil

@@ -132,6 +132,10 @@ func (plugin *glusterfsPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *glusterfsPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *glusterfsPlugin) RequiresFSResize() bool {
 	return false
 }
@@ -415,7 +419,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 }
 
-//getVolumeInfo returns 'path' and 'readonly' field values from the provided glusterfs spec.
+// getVolumeInfo returns 'path' and 'readonly' field values from the provided glusterfs spec.
 func getVolumeInfo(spec *volume.Spec) (string, bool, error) {
 	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
 		return spec.Volume.Glusterfs.Path, spec.Volume.Glusterfs.ReadOnly, nil
@@ -559,9 +563,9 @@ func (plugin *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAll
 }
 
 // Return the gid table for a storage class.
-// - If this is the first time, fill it with all the gids
-//   used in PVs of this storage class by traversing the PVs.
-// - Adapt the range of the table to the current range of the SC.
+//   - If this is the first time, fill it with all the gids
+//     used in PVs of this storage class by traversing the PVs.
+//   - Adapt the range of the table to the current range of the SC.
 func (plugin *glusterfsPlugin) getGidTable(className string, min int, max int) (*MinMaxAllocator, error) {
 	plugin.gidTableLock.Lock()
 	gidTable, ok := plugin.gidTable[className]

@@ -100,6 +100,10 @@ func (plugin *awsElasticBlockStorePlugin) SupportsBulkVolumeVerification() bool 
 	return true
 }
 
+func (plugin *awsElasticBlockStorePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *awsElasticBlockStorePlugin) GetVolumeLimits() (map[string]int64, error) {
 	volumeLimits := map[string]int64{
 		util.EBSVolumeLimitKey: util.DefaultMaxEBSVolumes,

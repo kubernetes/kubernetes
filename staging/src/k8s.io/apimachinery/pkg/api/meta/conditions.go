@@ -24,9 +24,9 @@ import (
 
 // SetStatusCondition sets the corresponding condition in conditions to newCondition.
 // conditions must be non-nil.
-// 1. if the condition of the specified type already exists (all fields of the existing condition are updated to
-//    newCondition, LastTransitionTime is set to now if the new status differs from the old status)
-// 2. if a condition of the specified type does not exist (LastTransitionTime is set to now() if unset, and newCondition is appended)
+//  1. if the condition of the specified type already exists (all fields of the existing condition are updated to
+//     newCondition, LastTransitionTime is set to now if the new status differs from the old status)
+//  2. if a condition of the specified type does not exist (LastTransitionTime is set to now() if unset, and newCondition is appended)
 func SetStatusCondition(conditions *[]metav1.Condition, newCondition metav1.Condition) {
 	if conditions == nil {
 		return

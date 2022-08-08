@@ -158,12 +158,6 @@ func newTestPod() *v1.Pod {
 
 func newSeccompPod(podFieldProfile, containerFieldProfile *v1.SeccompProfile, podAnnotationProfile, containerAnnotationProfile string) *v1.Pod {
 	pod := newTestPod()
-	if podAnnotationProfile != "" {
-		pod.Annotations = map[string]string{v1.SeccompPodAnnotationKey: podAnnotationProfile}
-	}
-	if containerAnnotationProfile != "" {
-		pod.Annotations = map[string]string{v1.SeccompContainerAnnotationKeyPrefix + "": containerAnnotationProfile}
-	}
 	if podFieldProfile != nil {
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			SeccompProfile: podFieldProfile,

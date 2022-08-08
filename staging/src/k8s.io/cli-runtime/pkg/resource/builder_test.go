@@ -810,12 +810,12 @@ func TestKustomizeDirectoryBuilder(t *testing.T) {
 		{
 			directory: filepath.Join(dir, "kustomization.yaml"),
 			expectErr: true,
-			errMsg:    "must be a directory so that it can used as a build root",
+			errMsg:    "must build at directory",
 		},
 		{
 			directory: "../../artifacts/kustomization/should-not-load.yaml",
 			expectErr: true,
-			errMsg:    "must be a directory so that it can used as a build root",
+			errMsg:    "must build at directory",
 		},
 	}
 	for _, tt := range tests {

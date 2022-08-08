@@ -167,6 +167,20 @@ func (c *convert) makeRef(model proto.Schema, preserveUnknownFields bool) schema
 		// reference a named type
 		_, n := path.Split(r.Reference())
 		tr.NamedType = &n
+
+		ext := model.GetExtensions()
+		if val, ok := ext["x-kubernetes-map-type"]; ok {
+			switch val {
+			case "atomic":
+				relationship := schema.Atomic
+				tr.ElementRelationship = &relationship
+			case "granular":
+				relationship := schema.Separable
+				tr.ElementRelationship = &relationship
+			default:
+				c.reportError("unknown map type %v", val)
+			}
+		}
 	} else {
 		// compute the type inline
 		c2 := c.push("inlined in "+c.currentName, &tr.Inlined)

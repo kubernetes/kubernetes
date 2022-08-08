@@ -19,23 +19,38 @@ package options
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
 
 	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/semconv"
 	"google.golang.org/grpc"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apiserver/pkg/apis/apiserver"
+	"k8s.io/apiserver/pkg/apis/apiserver/install"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
-	"k8s.io/apiserver/pkg/tracing"
-	"k8s.io/component-base/traces"
+	"k8s.io/apiserver/pkg/util/feature"
+	tracing "k8s.io/component-base/tracing"
+	tracingapi "k8s.io/component-base/tracing/api/v1"
 	"k8s.io/utils/path"
 )
 
 const apiserverService = "apiserver"
+
+var (
+	cfgScheme = runtime.NewScheme()
+	codecs    = serializer.NewCodecFactory(cfgScheme)
+)
+
+func init() {
+	install.Install(cfgScheme)
+}
 
 // TracingOptions contain configuration options for tracing
 // exporters
@@ -64,21 +79,21 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 	if o == nil || o.ConfigFile == "" {
 		return nil
 	}
+	if !feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
+		return fmt.Errorf("APIServerTracing feature is not enabled, but tracing config file was provided")
+	}
 
-	npConfig, err := tracing.ReadTracingConfiguration(o.ConfigFile)
+	traceConfig, err := ReadTracingConfiguration(o.ConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read tracing config: %v", err)
 	}
 
-	errs := tracing.ValidateTracingConfiguration(npConfig)
+	errs := tracingapi.ValidateTracingConfiguration(traceConfig, feature.DefaultFeatureGate, nil)
 	if len(errs) > 0 {
 		return fmt.Errorf("failed to validate tracing configuration: %v", errs.ToAggregate())
 	}
 
 	opts := []otlpgrpc.Option{}
-	if npConfig.Endpoint != nil {
-		opts = append(opts, otlpgrpc.WithEndpoint(*npConfig.Endpoint))
-	}
 	if es != nil {
 		// Only use the egressselector dialer if egressselector is enabled.
 		// Endpoint is on the "ControlPlane" network
@@ -93,21 +108,19 @@ func (o *TracingOptions) ApplyTo(es *egressselector.EgressSelector, c *server.Co
 		opts = append(opts, otlpgrpc.WithDialOption(grpc.WithContextDialer(otelDialer)))
 	}
 
-	sampler := sdktrace.NeverSample()
-	if npConfig.SamplingRatePerMillion != nil && *npConfig.SamplingRatePerMillion > 0 {
-		sampler = sdktrace.TraceIDRatioBased(float64(*npConfig.SamplingRatePerMillion) / float64(1000000))
-	}
-
 	resourceOpts := []resource.Option{
 		resource.WithAttributes(
 			semconv.ServiceNameKey.String(apiserverService),
 			semconv.ServiceInstanceIDKey.String(c.APIServerID),
 		),
 	}
-	tp := traces.NewProvider(context.Background(), sampler, resourceOpts, opts...)
-	c.TracerProvider = &tp
+	tp, err := tracing.NewProvider(context.Background(), traceConfig, opts, resourceOpts)
+	if err != nil {
+		return err
+	}
+	c.TracerProvider = tp
 	if c.LoopbackClientConfig != nil {
-		c.LoopbackClientConfig.Wrap(traces.WrapperFor(c.TracerProvider))
+		c.LoopbackClientConfig.Wrap(tracing.WrapperFor(c.TracerProvider))
 	}
 	return nil
 }
@@ -124,4 +137,25 @@ func (o *TracingOptions) Validate() (errs []error) {
 		errs = append(errs, fmt.Errorf("error checking if tracing-config-file %s exists: %v", o.ConfigFile, err))
 	}
 	return
+}
+
+// ReadTracingConfiguration reads the tracing configuration from a file
+func ReadTracingConfiguration(configFilePath string) (*tracingapi.TracingConfiguration, error) {
+	if configFilePath == "" {
+		return nil, fmt.Errorf("tracing config file was empty")
+	}
+	data, err := ioutil.ReadFile(configFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read tracing configuration from %q: %v", configFilePath, err)
+	}
+	internalConfig := &apiserver.TracingConfiguration{}
+	// this handles json/yaml/whatever, and decodes all registered version to the internal version
+	if err := runtime.DecodeInto(codecs.UniversalDecoder(), data, internalConfig); err != nil {
+		return nil, fmt.Errorf("unable to decode tracing configuration data: %v", err)
+	}
+	tc := &tracingapi.TracingConfiguration{
+		Endpoint:               internalConfig.Endpoint,
+		SamplingRatePerMillion: internalConfig.SamplingRatePerMillion,
+	}
+	return tc, nil
 }
