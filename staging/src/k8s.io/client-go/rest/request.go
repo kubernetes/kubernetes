@@ -508,6 +508,84 @@ func (r *Request) URL() *url.URL {
 	return finalURL
 }
 
+// finalURLTemplate is similar to URL(), but will make all specific parameter values equal
+// - instead of name or namespace, "{name}" and "{namespace}" will be used, and all query
+// parameters will be reset. This creates a copy of the url so as not to change the
+// underlying object.
+func (r Request) finalURLTemplate() url.URL {
+	newParams := url.Values{}
+	v := []string{"{value}"}
+	for k := range r.params {
+		newParams[k] = v
+	}
+	r.params = newParams
+	url := r.URL()
+
+	segments := strings.Split(url.Path, "/")
+	groupIndex := 0
+	index := 0
+	trimmedBasePath := ""
+	if url != nil && r.c.base != nil && strings.Contains(url.Path, r.c.base.Path) {
+		p := strings.TrimPrefix(url.Path, r.c.base.Path)
+		if !strings.HasPrefix(p, "/") {
+			p = "/" + p
+		}
+		// store the base path that we have trimmed so we can append it
+		// before returning the URL
+		trimmedBasePath = r.c.base.Path
+		segments = strings.Split(p, "/")
+		groupIndex = 1
+	}
+	if len(segments) <= 2 {
+		return *url
+	}
+
+	const CoreGroupPrefix = "api"
+	const NamedGroupPrefix = "apis"
+	isCoreGroup := segments[groupIndex] == CoreGroupPrefix
+	isNamedGroup := segments[groupIndex] == NamedGroupPrefix
+	if isCoreGroup {
+		// checking the case of core group with /api/v1/... format
+		index = groupIndex + 2
+	} else if isNamedGroup {
+		// checking the case of named group with /apis/apps/v1/... format
+		index = groupIndex + 3
+	} else {
+		// this should not happen that the only two possibilities are /api... and /apis..., just want to put an
+		// outlet here in case more API groups are added in future if ever possible:
+		// https://kubernetes.io/docs/concepts/overview/kubernetes-api/#api-groups
+		// if a wrong API groups name is encountered, return the {prefix} for url.Path
+		url.Path = "/{prefix}"
+		url.RawQuery = ""
+		return *url
+	}
+	//switch segLength := len(segments) - index; segLength {
+	switch {
+	// case len(segments) - index == 1:
+	// resource (with no name) do nothing
+	case len(segments)-index == 2:
+		// /$RESOURCE/$NAME: replace $NAME with {name}
+		segments[index+1] = "{name}"
+	case len(segments)-index == 3:
+		if segments[index+2] == "finalize" || segments[index+2] == "status" {
+			// /$RESOURCE/$NAME/$SUBRESOURCE: replace $NAME with {name}
+			segments[index+1] = "{name}"
+		} else {
+			// /namespace/$NAMESPACE/$RESOURCE: replace $NAMESPACE with {namespace}
+			segments[index+1] = "{namespace}"
+		}
+	case len(segments)-index >= 4:
+		segments[index+1] = "{namespace}"
+		// /namespace/$NAMESPACE/$RESOURCE/$NAME: replace $NAMESPACE with {namespace},  $NAME with {name}
+		if segments[index+3] != "finalize" && segments[index+3] != "status" {
+			// /$RESOURCE/$NAME/$SUBRESOURCE: replace $NAME with {name}
+			segments[index+3] = "{name}"
+		}
+	}
+	url.Path = path.Join(trimmedBasePath, path.Join(segments...))
+	return *url
+}
+
 func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) error {
 	if r.rateLimiter == nil {
 		return nil
@@ -537,7 +615,7 @@ func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) err
 		// but we use a throttled logger to prevent spamming.
 		globalThrottledLogger.Infof("%s", message)
 	}
-	metrics.RateLimiterLatency.Observe(ctx, r.verb, *r.URL(), latency)
+	metrics.RateLimiterLatency.Observe(ctx, r.verb, r.finalURLTemplate(), latency)
 
 	return err
 }
@@ -826,7 +904,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 	//Metrics for total request latency
 	start := time.Now()
 	defer func() {
-		metrics.RequestLatency.Observe(ctx, r.verb, *r.URL(), time.Since(start))
+		metrics.RequestLatency.Observe(ctx, r.verb, r.finalURLTemplate(), time.Since(start))
 	}()
 
 	if r.err != nil {
