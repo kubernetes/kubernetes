@@ -532,44 +532,6 @@ func TestSharedInformerRemoveForeignHandler(t *testing.T) {
 	}
 }
 
-func TestSharedInformerRemoveNonComparableHandler(t *testing.T) {
-	source := fcache.NewFakeControllerSource()
-	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
-
-	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second)
-
-	handler1 := ResourceEventHandlerFuncs{}
-	handle1, err := informer.AddEventHandler(handler1)
-	if err != nil {
-		t.Errorf("informer did not add handler1: %s", err)
-		return
-	}
-	handler2 := &ResourceEventHandlerFuncs{}
-	handle2, err := informer.AddEventHandler(handler2)
-	if err != nil {
-		t.Errorf("informer did not add handler2: %s", err)
-		return
-	}
-
-	if eventHandlerCount(informer) != 2 {
-		t.Errorf("informer has %d registered handler(s), instead of 2", eventHandlerCount(informer))
-	}
-
-	if err := informer.RemoveEventHandler(handle2); err != nil {
-		t.Errorf("removing of pointer handler failed: %s", err)
-	}
-	if eventHandlerCount(informer) != 1 {
-		t.Errorf("after removal informer has %d registered handler(s), instead of 1", eventHandlerCount(informer))
-	}
-
-	if err := informer.RemoveEventHandler(handle1); err != nil {
-		t.Errorf("removing of non-pointer handler failed: %s", err)
-	}
-	if eventHandlerCount(informer) != 0 {
-		t.Errorf("after removal informer has %d registered handler(s), instead of 0", eventHandlerCount(informer))
-	}
-}
-
 func TestSharedInformerMultipleRegistration(t *testing.T) {
 	source := fcache.NewFakeControllerSource()
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
