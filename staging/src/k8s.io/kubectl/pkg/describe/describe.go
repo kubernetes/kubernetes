@@ -947,8 +947,6 @@ func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 			printAzureDiskVolumeSource(volume.VolumeSource.AzureDisk, w)
 		case volume.VolumeSource.VsphereVolume != nil:
 			printVsphereVolumeSource(volume.VolumeSource.VsphereVolume, w)
-		case volume.VolumeSource.Cinder != nil:
-			printCinderVolumeSource(volume.VolumeSource.Cinder, w)
 		case volume.VolumeSource.PhotonPersistentDisk != nil:
 			printPhotonPersistentDiskVolumeSource(volume.VolumeSource.PhotonPersistentDisk, w)
 		case volume.VolumeSource.PortworxVolume != nil:
@@ -1225,24 +1223,6 @@ func printPhotonPersistentDiskVolumeSource(photon *corev1.PhotonPersistentDiskVo
 		"    PdID:\t%v\n"+
 		"    FSType:\t%v\n",
 		photon.PdID, photon.FSType)
-}
-
-func printCinderVolumeSource(cinder *corev1.CinderVolumeSource, w PrefixWriter) {
-	w.Write(LEVEL_2, "Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
-		"    VolumeID:\t%v\n"+
-		"    FSType:\t%v\n"+
-		"    ReadOnly:\t%v\n"+
-		"    SecretRef:\t%v\n",
-		cinder.VolumeID, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
-}
-
-func printCinderPersistentVolumeSource(cinder *corev1.CinderPersistentVolumeSource, w PrefixWriter) {
-	w.Write(LEVEL_2, "Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
-		"    VolumeID:\t%v\n"+
-		"    FSType:\t%v\n"+
-		"    ReadOnly:\t%v\n"+
-		"    SecretRef:\t%v\n",
-		cinder.VolumeID, cinder.FSType, cinder.ReadOnly, cinder.SecretRef)
 }
 
 func printScaleIOVolumeSource(sio *corev1.ScaleIOVolumeSource, w PrefixWriter) {
@@ -1562,8 +1542,6 @@ func describePersistentVolume(pv *corev1.PersistentVolume, events *corev1.EventL
 			printQuobyteVolumeSource(pv.Spec.Quobyte, w)
 		case pv.Spec.VsphereVolume != nil:
 			printVsphereVolumeSource(pv.Spec.VsphereVolume, w)
-		case pv.Spec.Cinder != nil:
-			printCinderPersistentVolumeSource(pv.Spec.Cinder, w)
 		case pv.Spec.AzureDisk != nil:
 			printAzureDiskVolumeSource(pv.Spec.AzureDisk, w)
 		case pv.Spec.PhotonPersistentDisk != nil:

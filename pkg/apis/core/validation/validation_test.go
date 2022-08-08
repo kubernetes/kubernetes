@@ -4092,20 +4092,6 @@ func TestValidateVolumes(t *testing.T) {
 				field: "rbd.image",
 			}},
 		},
-		// Cinder
-		{
-			name: "valid Cinder",
-			vol: core.Volume{
-				Name: "cinder",
-				VolumeSource: core.VolumeSource{
-					Cinder: &core.CinderVolumeSource{
-						VolumeID: "29ea5088-4f60-4757-962e-dba678767887",
-						FSType:   "ext4",
-						ReadOnly: false,
-					},
-				},
-			},
-		},
 		// CephFS
 		{
 			name: "valid CephFS",

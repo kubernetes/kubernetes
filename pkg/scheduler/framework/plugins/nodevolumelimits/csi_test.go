@@ -58,8 +58,6 @@ func getVolumeLimitKey(filterType string) v1.ResourceName {
 		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
 	case azureDiskVolumeFilterType:
 		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
-	case cinderVolumeFilterType:
-		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
 	default:
 		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
 	}
