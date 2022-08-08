@@ -663,8 +663,8 @@ type sharedProcessor struct {
 }
 
 func (p *sharedProcessor) getListener(registration ResourceEventHandlerRegistration) *processorListener {
-	p.listenersLock.Lock()
-	defer p.listenersLock.Unlock()
+	p.listenersLock.RLock()
+	defer p.listenersLock.RUnlock()
 
 	if p.listeners == nil {
 		return nil
@@ -744,16 +744,19 @@ func (p *sharedProcessor) run(stopCh <-chan struct{}) {
 	}()
 	<-stopCh
 
-	p.listenersLock.Lock()
-	defer p.listenersLock.Unlock()
-	for listener := range p.listeners {
-		close(listener.addCh) // Tell .pop() to stop. .pop() will tell .run() to stop
-	}
-	p.wg.Wait() // Wait for all .pop() and .run() to stop
+	func() {
+		p.listenersLock.Lock()
+		defer p.listenersLock.Unlock()
+		for listener := range p.listeners {
+			close(listener.addCh) // Tell .pop() to stop. .pop() will tell .run() to stop
+		}
 
-	// Wipe out list of listeners since they are now closed
-	// (processorListener cannot be re-used)
-	p.listeners = nil
+		// Wipe out list of listeners since they are now closed
+		// (processorListener cannot be re-used)
+		p.listeners = nil
+	}()
+
+	p.wg.Wait() // Wait for all .pop() and .run() to stop
 }
 
 // shouldResync queries every listener to determine if any of them need a resync, based on each
