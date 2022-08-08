@@ -754,6 +754,10 @@ func (p *sharedProcessor) run(stopCh <-chan struct{}) {
 		// Wipe out list of listeners since they are now closed
 		// (processorListener cannot be re-used)
 		p.listeners = nil
+
+		// Reset to false since there are nil listeners, also to block new listeners
+		// that are added from being run now that the processor was stopped
+		p.listenersStarted = false
 	}()
 
 	p.wg.Wait() // Wait for all .pop() and .run() to stop
