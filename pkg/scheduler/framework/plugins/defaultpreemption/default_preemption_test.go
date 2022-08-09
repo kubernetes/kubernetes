@@ -351,7 +351,9 @@ func TestPostFilter(t *testing.T) {
 			if tt.extender != nil {
 				extenders = append(extenders, tt.extender)
 			}
-			f, err := st.NewFramework(registeredPlugins, "",
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			f, err := st.NewFramework(registeredPlugins, "", ctx.Done(),
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
@@ -371,11 +373,11 @@ func TestPostFilter(t *testing.T) {
 
 			state := framework.NewCycleState()
 			// Ensure <state> is populated.
-			if _, status := f.RunPreFilterPlugins(context.Background(), state, tt.pod); !status.IsSuccess() {
+			if _, status := f.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 
-			gotResult, gotStatus := p.PostFilter(context.TODO(), state, tt.pod, tt.filteredNodesStatuses)
+			gotResult, gotStatus := p.PostFilter(ctx, state, tt.pod, tt.filteredNodesStatuses)
 			// As we cannot compare two errors directly due to miss the equal method for how to compare two errors, so just need to compare the reasons.
 			if gotStatus.Code() == framework.Error {
 				if diff := cmp.Diff(tt.wantStatus.Reasons(), gotStatus.Reasons()); diff != "" {
@@ -1083,8 +1085,11 @@ func TestDryRunPreemption(t *testing.T) {
 				// or minCandidateNodesAbsolute. This is only done in a handful of tests.
 				parallelism = 1
 			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			fwk, err := st.NewFramework(
-				registeredPlugins, "",
+				registeredPlugins, "", ctx.Done(),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
@@ -1094,8 +1099,6 @@ func TestDryRunPreemption(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
@@ -1125,7 +1128,7 @@ func TestDryRunPreemption(t *testing.T) {
 			for cycle, pod := range tt.testPods {
 				state := framework.NewCycleState()
 				// Some tests rely on PreFilter plugin to compute its CycleState.
-				if _, status := fwk.RunPreFilterPlugins(context.Background(), state, pod); !status.IsSuccess() {
+				if _, status := fwk.RunPreFilterPlugins(ctx, state, pod); !status.IsSuccess() {
 					t.Errorf("cycle %d: Unexpected PreFilter Status: %v", cycle, status)
 				}
 				pe := preemption.Evaluator{
@@ -1137,7 +1140,7 @@ func TestDryRunPreemption(t *testing.T) {
 					Interface:  pl,
 				}
 				offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-				got, _, _ := pe.DryRunPreemption(context.Background(), pod, nodeInfos, tt.pdbs, offset, numCandidates)
+				got, _, _ := pe.DryRunPreemption(ctx, pod, nodeInfos, tt.pdbs, offset, numCandidates)
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
@@ -1334,6 +1337,8 @@ func TestSelectBestCandidate(t *testing.T) {
 			cs := clientsetfake.NewSimpleClientset(objs...)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			fwk, err := st.NewFramework(
 				[]st.RegisterPluginFunc{
 					tt.registerPlugin,
@@ -1341,6 +1346,7 @@ func TestSelectBestCandidate(t *testing.T) {
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
+				ctx.Done(),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 			)
@@ -1350,7 +1356,7 @@ func TestSelectBestCandidate(t *testing.T) {
 
 			state := framework.NewCycleState()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
-			if _, status := fwk.RunPreFilterPlugins(context.Background(), state, tt.pod); !status.IsSuccess() {
+			if _, status := fwk.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 			nodeInfos, err := snapshot.NodeInfos().List()
@@ -1373,7 +1379,7 @@ func TestSelectBestCandidate(t *testing.T) {
 				Interface:  pl,
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-			candidates, _, _ := pe.DryRunPreemption(context.Background(), tt.pod, nodeInfos, nil, offset, numCandidates)
+			candidates, _, _ := pe.DryRunPreemption(ctx, tt.pod, nodeInfos, nil, offset, numCandidates)
 			s := pe.SelectCandidate(candidates)
 			if s == nil || len(s.Name()) == 0 {
 				return
@@ -1445,7 +1451,9 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
-			f, err := st.NewFramework(registeredPlugins, "",
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			f, err := st.NewFramework(registeredPlugins, "", stopCh,
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
 			)
 			if err != nil {
@@ -1639,10 +1647,10 @@ func TestPreempt(t *testing.T) {
 				return true, nil, nil
 			})
 
-			stop := make(chan struct{})
-			defer close(stop)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-			cache := internalcache.New(time.Duration(0), stop)
+			cache := internalcache.New(time.Duration(0), ctx.Done())
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
@@ -1678,6 +1686,7 @@ func TestPreempt(t *testing.T) {
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
 				"",
+				ctx.Done(),
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),
@@ -1691,7 +1700,7 @@ func TestPreempt(t *testing.T) {
 
 			state := framework.NewCycleState()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
-			if _, s := fwk.RunPreFilterPlugins(context.Background(), state, test.pod); !s.IsSuccess() {
+			if _, s := fwk.RunPreFilterPlugins(ctx, state, test.pod); !s.IsSuccess() {
 				t.Errorf("Unexpected preFilterStatus: %v", s)
 			}
 			// Call preempt and check the expected results.
@@ -1710,7 +1719,7 @@ func TestPreempt(t *testing.T) {
 				State:      state,
 				Interface:  &pl,
 			}
-			res, status := pe.Preempt(context.Background(), test.pod, make(framework.NodeToStatusMap))
+			res, status := pe.Preempt(ctx, test.pod, make(framework.NodeToStatusMap))
 			if !status.IsSuccess() && !status.IsUnschedulable() {
 				t.Errorf("unexpected error in preemption: %v", status.AsError())
 			}
@@ -1746,7 +1755,7 @@ func TestPreempt(t *testing.T) {
 			}
 
 			// Call preempt again and make sure it doesn't preempt any more pods.
-			res, status = pe.Preempt(context.Background(), test.pod, make(framework.NodeToStatusMap))
+			res, status = pe.Preempt(ctx, test.pod, make(framework.NodeToStatusMap))
 			if !status.IsSuccess() && !status.IsUnschedulable() {
 				t.Errorf("unexpected error in preemption: %v", status.AsError())
 			}

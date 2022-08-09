@@ -669,17 +669,29 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			resizeOptions.DeviceStagePath = deviceMountPath
 		}
 
-		kvh, ok := og.GetVolumePluginMgr().Host.(volume.KubeletVolumeHost)
-		if !ok {
-			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume type assertion error", fmt.Errorf("volume host does not implement KubeletVolumeHost interface"))
-			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
-		}
-		uid := util.FsUserFrom(volumeToMount.Pod)
-		hostUID, hostGID, err := kvh.GetHostIDsForPod(volumeToMount.Pod, uid, fsGroup)
-		if err != nil {
-			msg := fmt.Sprintf("MountVolume.GetHostIDsForPod failed to find host ID in user namespace (UID: %v GID: %v)", uid, fsGroup)
-			eventErr, detailedErr := volumeToMount.GenerateError(msg, err)
-			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		// No mapping is needed for hostUID/hostGID if userns is not used.
+		// Therefore, just assign the container users to host UID/GID.
+		hostUID := util.FsUserFrom(volumeToMount.Pod)
+		hostGID := fsGroup
+		if utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesStatelessPodsSupport) {
+			// Without userns hostUID/GID was the user inside the container too.
+			containerUID, containerGID := hostUID, hostGID
+
+			kvh, ok := og.GetVolumePluginMgr().Host.(volume.KubeletVolumeHost)
+			if !ok {
+				msg := fmt.Errorf("volume host does not implement KubeletVolumeHost interface")
+				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume type assertion error", msg)
+				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+			}
+
+			// This pod _might_ use userns. GetHostIDsForPod() will give us the right
+			// UID/GID to use for this pod (no matter if the pod uses userns or not).
+			hostUID, hostGID, err = kvh.GetHostIDsForPod(volumeToMount.Pod, containerUID, containerGID)
+			if err != nil {
+				msg := fmt.Sprintf("MountVolume.GetHostIDsForPod failed to find host ID in user namespace (UID: %v GID: %v)", containerUID, containerGID)
+				eventErr, detailedErr := volumeToMount.GenerateError(msg, err)
+				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+			}
 		}
 
 		// Execute mount

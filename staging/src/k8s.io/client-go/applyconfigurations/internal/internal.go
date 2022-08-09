@@ -9593,6 +9593,41 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: number
       type:
         scalar: numeric
+- name: io.k8s.api.networking.v1alpha1.ClusterCIDR
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.networking.v1alpha1.ClusterCIDRSpec
+      default: {}
+- name: io.k8s.api.networking.v1alpha1.ClusterCIDRSpec
+  map:
+    fields:
+    - name: ipv4
+      type:
+        scalar: string
+      default: ""
+    - name: ipv6
+      type:
+        scalar: string
+      default: ""
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
+    - name: perNodeHostBits
+      type:
+        scalar: numeric
+      default: 0
 - name: io.k8s.api.networking.v1beta1.HTTPIngressPath
   map:
     fields:

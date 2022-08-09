@@ -1871,6 +1871,13 @@
     visible at runtime in the container.
   release: v1.9
   file: test/e2e/common/node/downwardapi.go
+- testname: Ephemeral Container Creation
+  codename: '[sig-node] Ephemeral Containers [NodeConformance] will start an ephemeral
+    container in an existing pod [Conformance]'
+  description: Adding an ephemeral container to pod.spec MUST result in the container
+    running.
+  release: "1.25"
+  file: test/e2e/common/node/ephemeral_containers.go
 - testname: init-container-starts-app-restartalways-pod
   codename: '[sig-node] InitContainer [NodeConformance] should invoke init containers
     on a RestartAlways pod [Conformance]'

@@ -134,9 +134,6 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	switch {
 	case volSrc != nil:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-			return fmt.Errorf("CSIInlineVolume feature required")
-		}
 		if c.volumeLifecycleMode != storage.VolumeLifecycleEphemeral {
 			return fmt.Errorf("unexpected volume mode: %s", c.volumeLifecycleMode)
 		}
@@ -430,10 +427,6 @@ func (c *csiMountMgr) supportsFSGroup(fsType string, fsGroup *int64, driverPolic
 		}
 		return true
 	} else if c.spec.Volume != nil && c.spec.Volume.CSI != nil {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-			klog.V(4).Info(log("mounter.SetupAt WARNING: skipping fsGroup, CSIInlineVolume feature required"))
-			return false
-		}
 		// Inline CSI volumes are always mounted with RWO AccessMode by SetUpAt
 		return true
 	}
