@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/util/covariation"
 )
 
 // Store is a generic object storage and processing interface.  A
@@ -286,13 +285,4 @@ func NewIndexer(keyFunc KeyFunc, indexers Indexers) Indexer {
 		},
 		keyFunc: keyFunc,
 	}
-}
-
-// IndexerWithJointIndexer covariant Indexer to JointIndexer
-func IndexerWithJointIndexer(indexer Indexer) (JointIndexer, error) {
-	i, err := covariation.Covariant(indexer, (*JointIndexer)(nil))
-	if err != nil {
-		return nil, err
-	}
-	return i.(JointIndexer), nil
 }

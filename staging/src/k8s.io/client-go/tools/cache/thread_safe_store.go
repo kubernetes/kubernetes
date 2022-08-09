@@ -21,7 +21,6 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/covariation"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -341,7 +340,7 @@ func (c *threadSafeMap) ByIndexes(conds IndexConditions) ([]interface{}, error) 
 
 	set := sets.NewString()
 	for _, cond := range conds {
-		populatedIndex, err := c.getIndex(cond)
+		populatedIndex, err := c.storeKeysByIndexCondition(cond)
 		if err != nil {
 			return nil, err
 		}
@@ -360,8 +359,8 @@ func (c *threadSafeMap) ByIndexes(conds IndexConditions) ([]interface{}, error) 
 	return list, nil
 }
 
-// getIndex can get Index by given IndexCondition
-func (c *threadSafeMap) getIndex(cond IndexCondition) (sets.String, error) {
+// storeKeysByIndexCondition get a set of Store keys of the objects that match the given IndexCondition
+func (c *threadSafeMap) storeKeysByIndexCondition(cond IndexCondition) (sets.String, error) {
 	indexFunc := c.indexers[cond.IndexName]
 	if indexFunc == nil {
 		return nil, fmt.Errorf("Index with name %s does not exist", cond.IndexName)
@@ -371,7 +370,7 @@ func (c *threadSafeMap) getIndex(cond IndexCondition) (sets.String, error) {
 
 	set := index[cond.IndexedValue]
 
-	populatedIndex, err := c.populateIndex(cond.Operator, set)
+	populatedIndex, err := c.applyOperator(cond.Operator, set)
 	if err != nil {
 		return nil, err
 	}
@@ -379,8 +378,8 @@ func (c *threadSafeMap) getIndex(cond IndexCondition) (sets.String, error) {
 	return populatedIndex, nil
 }
 
-// populateIndex would populate real Index according to Operator
-func (c *threadSafeMap) populateIndex(op selection.Operator, set sets.String) (sets.String, error) {
+// applyOperator would populate real Index according to Operator
+func (c *threadSafeMap) applyOperator(op selection.Operator, set sets.String) (sets.String, error) {
 	switch op {
 	case selection.Equals, selection.DoubleEquals:
 		return set, nil
@@ -389,7 +388,7 @@ func (c *threadSafeMap) populateIndex(op selection.Operator, set sets.String) (s
 		// todo(weilaaa): support more selections
 	}
 
-	return nil, fmt.Errorf("not support selector operator: %v", op)
+	return nil, fmt.Errorf("operator \"%v\" is not supported", op)
 }
 
 // IndexKeys returns a list of the Store keys of the objects whose indexed values in the given index include the given indexed value.
@@ -441,13 +440,4 @@ func NewThreadSafeStore(indexers Indexers, indices Indices) ThreadSafeStore {
 			indices:  indices,
 		},
 	}
-}
-
-// StorageWithJointIndexer covariant ThreadSafeStore to ThreadSafeStoreWithJointIndexer
-func StorageWithJointIndexer(threadSafeStore ThreadSafeStore) (ThreadSafeStoreWithJointIndexer, error) {
-	storage, err := covariation.Covariant(threadSafeStore, (*ThreadSafeStoreWithJointIndexer)(nil))
-	if err != nil {
-		return nil, err
-	}
-	return storage.(ThreadSafeStoreWithJointIndexer), nil
 }
