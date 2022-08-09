@@ -28,7 +28,7 @@ const (
 	// EBSVolumeLimitKey resource name that will store volume limits for EBS
 	EBSVolumeLimitKey = "attachable-volumes-aws-ebs"
 	// EBSNitroLimitRegex finds nitro instance types with different limit than EBS defaults
-	EBSNitroLimitRegex = "^[cmr]5.*|t3|z1d"
+	EBSNitroLimitRegex = "^[cmr][56].*|t3|z1d"
 	// DefaultMaxEBSVolumes is the limit for volumes attached to an instance.
 	// Amazon recommends no more than 40; the system root volume uses at least one.
 	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html#linux-specific-volume-limits
