@@ -163,13 +163,8 @@ func intervalMetricAvg(snapshot0, snapshot1 metricSnapshot, plLabel string) plMe
 // This test differs from TestPriorityLevelIsolation since TestPriorityLevelIsolation checks throughput instead
 // of concurrency. In order to mitigate the effects of system noise, authorization webhook is used to artificially
 // increase request execution time to make the system noise relatively insignificant.
-//
 // Secondarily, this test also checks the observed seat utilizations against values derived from expecting that
 // the throughput observed by the client equals the execution throughput observed by the server.
-//
-// This test recognizes that there is noise in the measurements coming from uncontrolled overheads
-// and unsynchronized reading of related quantities.  This test takes as a relative error margin 2 times
-// the smaller (of the two traffic classes) coefficient of variation of the client-observed latency.
 func TestConcurrencyIsolation(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.APIPriorityAndFairness, true)()
 	// NOTE: disabling the feature should fail the test
@@ -315,8 +310,9 @@ func TestConcurrencyIsolation(t *testing.T) {
 	t.Logf("Error margin is %v", margin)
 
 	isConcurrencyExpected := func(name string, observed float64, expected float64) bool {
-		t.Logf("%v relative error is %v", name, math.Abs(expected-observed)/expected)
-		return math.Abs(expected-observed)/expected <= margin
+		relativeErr := math.Abs(expected-observed) / expected
+		t.Logf("%v relative error is %v", name, relativeErr)
+		return relativeErr <= margin
 	}
 	if !isConcurrencyExpected(plNoxu1.Name, noxu1ObservedConcurrency, noxu1ExpectedConcurrency) {
 		t.Errorf("Concurrency observed by noxu1 is off. Expected: %v, observed: %v", noxu1ExpectedConcurrency, noxu1ObservedConcurrency)
