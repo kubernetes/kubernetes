@@ -78,6 +78,15 @@ var (
 	KindReplicaSet = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}
 )
 
+// ScalingDirection identifies the scale direction for HPA Behavior.
+type ScalingDirection int
+
+const (
+	DirectionUnknown ScalingDirection = iota
+	ScaleUpDirection
+	ScaleDownDirection
+)
+
 /*
 ResourceConsumer is a tool for testing. It helps create specified usage of CPU or memory (Warning: memory not supported)
 typical use case:
@@ -725,38 +734,65 @@ func HPABehaviorWithScaleUpAndDownRules(scaleUpRule, scaleDownRule *autoscalingv
 	}
 }
 
-func HPAStabilizationWindowScalingRule(stabilizationDuration int32) *autoscalingv2.HPAScalingRules {
+func HPABehaviorWithScalingRuleInDirection(scalingDirection ScalingDirection, rule *autoscalingv2.HPAScalingRules) *autoscalingv2.HorizontalPodAutoscalerBehavior {
+	var scaleUpRule, scaleDownRule *autoscalingv2.HPAScalingRules
+	if scalingDirection == ScaleUpDirection {
+		scaleUpRule = rule
+	}
+	if scalingDirection == ScaleDownDirection {
+		scaleDownRule = rule
+	}
+	return HPABehaviorWithScaleUpAndDownRules(scaleUpRule, scaleDownRule)
+}
+
+func HPAScalingRuleWithStabilizationWindow(stabilizationDuration int32) *autoscalingv2.HPAScalingRules {
 	return &autoscalingv2.HPAScalingRules{
 		StabilizationWindowSeconds: &stabilizationDuration,
 	}
 }
 
-func HPAPolicyDisabledScalingRule() *autoscalingv2.HPAScalingRules {
+func HPAScalingRuleWithPolicyDisabled() *autoscalingv2.HPAScalingRules {
 	disabledPolicy := autoscalingv2.DisabledPolicySelect
 	return &autoscalingv2.HPAScalingRules{
 		SelectPolicy: &disabledPolicy,
 	}
 }
 
+func HPAScalingRuleWithScalingPolicy(policyType autoscalingv2.HPAScalingPolicyType, value, periodSeconds int32) *autoscalingv2.HPAScalingRules {
+	stabilizationWindowDisabledDuration := int32(0)
+	selectPolicy := autoscalingv2.MaxChangePolicySelect
+	return &autoscalingv2.HPAScalingRules{
+		Policies: []autoscalingv2.HPAScalingPolicy{
+			{
+				Type:          policyType,
+				Value:         value,
+				PeriodSeconds: periodSeconds,
+			},
+		},
+		SelectPolicy:               &selectPolicy,
+		StabilizationWindowSeconds: &stabilizationWindowDisabledDuration,
+	}
+}
+
 func HPABehaviorWithStabilizationWindows(upscaleStabilization, downscaleStabilization time.Duration) *autoscalingv2.HorizontalPodAutoscalerBehavior {
-	return HPABehaviorWithScaleUpAndDownRules(
-		/*scaleUpRule=*/ HPAStabilizationWindowScalingRule(int32(upscaleStabilization.Seconds())),
-		/*scaleDownRule=*/ HPAStabilizationWindowScalingRule(int32(downscaleStabilization.Seconds())),
-	)
+	scaleUpRule := HPAScalingRuleWithStabilizationWindow(int32(upscaleStabilization.Seconds()))
+	scaleDownRule := HPAScalingRuleWithStabilizationWindow(int32(downscaleStabilization.Seconds()))
+	return HPABehaviorWithScaleUpAndDownRules(scaleUpRule, scaleDownRule)
 }
 
-func HPABehaviorWithScaleUpDisabled() *autoscalingv2.HorizontalPodAutoscalerBehavior {
-	return HPABehaviorWithScaleUpAndDownRules(
-		/*scaleUpRule=*/ HPAPolicyDisabledScalingRule(),
-		/*scaleDownRule=*/ nil,
-	)
+func HPABehaviorWithScaleDisabled(scalingDirection ScalingDirection) *autoscalingv2.HorizontalPodAutoscalerBehavior {
+	scalingRule := HPAScalingRuleWithPolicyDisabled()
+	return HPABehaviorWithScalingRuleInDirection(scalingDirection, scalingRule)
 }
 
-func HPABehaviorWithScaleDownDisabled() *autoscalingv2.HorizontalPodAutoscalerBehavior {
-	return HPABehaviorWithScaleUpAndDownRules(
-		/*scaleUpRule=*/ nil,
-		/*scaleDownRule=*/ HPAPolicyDisabledScalingRule(),
-	)
+func HPABehaviorWithScaleLimitedByNumberOfPods(scalingDirection ScalingDirection, numberOfPods, periodSeconds int32) *autoscalingv2.HorizontalPodAutoscalerBehavior {
+	scalingRule := HPAScalingRuleWithScalingPolicy(autoscalingv2.PodsScalingPolicy, numberOfPods, periodSeconds)
+	return HPABehaviorWithScalingRuleInDirection(scalingDirection, scalingRule)
+}
+
+func HPABehaviorWithScaleLimitedByPercentage(scalingDirection ScalingDirection, percentage, periodSeconds int32) *autoscalingv2.HorizontalPodAutoscalerBehavior {
+	scalingRule := HPAScalingRuleWithScalingPolicy(autoscalingv2.PercentScalingPolicy, percentage, periodSeconds)
+	return HPABehaviorWithScalingRuleInDirection(scalingDirection, scalingRule)
 }
 
 func DeleteHPAWithBehavior(rc *ResourceConsumer, autoscalerName string) {
