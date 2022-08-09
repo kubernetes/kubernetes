@@ -7123,6 +7123,32 @@ func TestUpdatePatchAllocatedValues(t *testing.T) {
 				svctest.SetNodePorts(30118, 0)), // set [0] to HCNP's value, omit [1]
 			expectError: true,
 		},
+	}, {
+		name: "update-hcnp",
+		create: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30093, 30076),
+				svctest.SetHealthCheckNodePort(30118)),
+			expectClusterIPs:          true,
+			expectNodePorts:           true,
+			expectHealthCheckNodePort: true,
+		},
+		update: svcTestCase{
+			svc: svctest.MakeService("foo",
+				svctest.SetTypeLoadBalancer,
+				svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+				svctest.SetPorts(
+					svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+					svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+				svctest.SetNodePorts(30093, 30076),
+				svctest.SetHealthCheckNodePort(30111)),
+			expectError: true,
+		},
 	}}
 
 	helpTestCreateUpdateDelete(t, testCases)
