@@ -87,9 +87,9 @@ func waitForHTTPServers(k *kubeManager, model *Model) error {
 	for i := 0; i < maxTries; i++ {
 		for caseName, testCase := range testCases {
 			if notReady[caseName] {
-				reachability := NewReachability(model.AllPods(), true)
+				reachability := NewReachability(k.AllPodStrings(), true)
 				testCase.Reachability = reachability
-				ProbePodToPodConnectivity(k, model, testCase)
+				ProbePodToPodConnectivity(k, k.AllPods(), k.DNSDomain(), testCase)
 				_, wrong, _, _ := reachability.Summary(ignoreLoopback)
 				if wrong == 0 {
 					framework.Logf("server %s is ready", caseName)
@@ -108,16 +108,16 @@ func waitForHTTPServers(k *kubeManager, model *Model) error {
 }
 
 // ValidateOrFail validates connectivity
-func ValidateOrFail(k8s *kubeManager, model *Model, testCase *TestCase) {
+func ValidateOrFail(k8s *kubeManager, testCase *TestCase) {
 	ginkgo.By("Validating reachability matrix...")
 
 	// 1st try
 	ginkgo.By("Validating reachability matrix... (FIRST TRY)")
-	ProbePodToPodConnectivity(k8s, model, testCase)
+	ProbePodToPodConnectivity(k8s, k8s.AllPods(), k8s.DNSDomain(), testCase)
 	// 2nd try, in case first one failed
 	if _, wrong, _, _ := testCase.Reachability.Summary(ignoreLoopback); wrong != 0 {
 		framework.Logf("failed first probe %d wrong results ... retrying (SECOND TRY)", wrong)
-		ProbePodToPodConnectivity(k8s, model, testCase)
+		ProbePodToPodConnectivity(k8s, k8s.AllPods(), k8s.DNSDomain(), testCase)
 	}
 
 	// at this point we know if we passed or failed, print final matrix and pass/fail the test.
@@ -131,40 +131,43 @@ func ValidateOrFail(k8s *kubeManager, model *Model, testCase *TestCase) {
 	framework.Logf("VALIDATION SUCCESSFUL")
 }
 
-// UpdateNamespaceLabels sets the labels for a namespace
-func UpdateNamespaceLabels(k8s *kubeManager, ns string, newNsLabel map[string]string) {
-	err := k8s.setNamespaceLabels(ns, newNsLabel)
-	framework.ExpectNoError(err, "Update namespace %s labels", ns)
-	err = wait.PollImmediate(waitInterval, waitTimeout, func() (done bool, err error) {
-		namespace, err := k8s.getNamespace(ns)
-		if err != nil {
-			return false, err
-		}
-		for key, expected := range newNsLabel {
-			if actual, ok := namespace.Labels[key]; !ok || (expected != actual) {
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-	framework.ExpectNoError(err, "Unable to wait for ns %s to update labels", ns)
+// AddNamespaceLabels adds a new label to a namespace
+func AddNamespaceLabel(k8s *kubeManager, name string, key string, val string) {
+	ns, err := k8s.getNamespace(name)
+	framework.ExpectNoError(err, "Unable to get namespace %s", name)
+	ns.Labels[key] = val
+	_, err = k8s.clientSet.CoreV1().Namespaces().Update(context.TODO(), ns, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "Unable to update namespace %s", name)
 }
 
-// AddPodLabels adds new labels to a deployment's template
-func AddPodLabels(k8s *kubeManager, pod *Pod, newPodLabels map[string]string) {
-	kubePod, err := k8s.clientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Unable to get pod %s/%s", pod.Namespace, pod.Name)
+// DeleteNamespaceLabel deletes a label from a namespace (if present)
+func DeleteNamespaceLabel(k8s *kubeManager, name string, key string) {
+	ns, err := k8s.getNamespace(name)
+	framework.ExpectNoError(err, "Unable to get namespace %s", name)
+	if _, ok := ns.Labels[key]; !ok {
+		// nothing to do if the label is not present
+		return
+	}
+	delete(ns.Labels, key)
+	_, err = k8s.clientSet.CoreV1().Namespaces().Update(context.TODO(), ns, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "Unable to update namespace %s", name)
+}
+
+// AddPodLabels adds new labels to a running pod
+func AddPodLabels(k8s *kubeManager, namespace string, name string, newPodLabels map[string]string) {
+	kubePod, err := k8s.clientSet.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Unable to get pod %s/%s", namespace, name)
 	if kubePod.Labels == nil {
 		kubePod.Labels = map[string]string{}
 	}
 	for key, val := range newPodLabels {
 		kubePod.Labels[key] = val
 	}
-	_, err = k8s.clientSet.CoreV1().Pods(pod.Namespace).Update(context.TODO(), kubePod, metav1.UpdateOptions{})
-	framework.ExpectNoError(err, "Unable to add pod %s/%s labels", pod.Namespace, pod.Name)
+	_, err = k8s.clientSet.CoreV1().Pods(namespace).Update(context.TODO(), kubePod, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "Unable to add pod %s/%s labels", namespace, name)
 
 	err = wait.PollImmediate(waitInterval, waitTimeout, func() (done bool, err error) {
-		waitForPod, err := k8s.getPod(pod.Namespace, pod.Name)
+		waitForPod, err := k8s.getPod(namespace, name)
 		if err != nil {
 			return false, err
 		}
@@ -175,33 +178,31 @@ func AddPodLabels(k8s *kubeManager, pod *Pod, newPodLabels map[string]string) {
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err, "Unable to wait for pod %s/%s to update labels", pod.Namespace, pod.Name)
-}
-
-// ResetNamespaceLabels resets the labels for a namespace
-func ResetNamespaceLabels(k8s *kubeManager, ns string) {
-	UpdateNamespaceLabels(k8s, ns, (&Namespace{Name: ns}).LabelSelector())
+	framework.ExpectNoError(err, "Unable to wait for pod %s/%s to update labels", namespace, name)
 }
 
 // ResetPodLabels resets the labels for a deployment's template
-func ResetPodLabels(k8s *kubeManager, pod *Pod) {
-	kubePod, err := k8s.clientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Unable to get pod %s/%s", pod.Namespace, pod.Name)
-	kubePod.Labels = pod.LabelSelector()
-	_, err = k8s.clientSet.CoreV1().Pods(pod.Namespace).Update(context.TODO(), kubePod, metav1.UpdateOptions{})
-	framework.ExpectNoError(err, "Unable to add pod %s/%s labels", pod.Namespace, pod.Name)
+func ResetPodLabels(k8s *kubeManager, namespace string, name string) {
+	kubePod, err := k8s.clientSet.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Unable to get pod %s/%s", namespace, name)
+	labels := map[string]string{
+		podNameLabelKey(): name,
+	}
+	kubePod.Labels = labels
+	_, err = k8s.clientSet.CoreV1().Pods(namespace).Update(context.TODO(), kubePod, metav1.UpdateOptions{})
+	framework.ExpectNoError(err, "Unable to add pod %s/%s labels", namespace, name)
 
 	err = wait.PollImmediate(waitInterval, waitTimeout, func() (done bool, err error) {
-		waitForPod, err := k8s.getPod(pod.Namespace, pod.Name)
+		waitForPod, err := k8s.getPod(namespace, name)
 		if err != nil {
 			return false, nil
 		}
-		for key, expected := range pod.LabelSelector() {
+		for key, expected := range labels {
 			if actual, ok := waitForPod.Labels[key]; !ok || (expected != actual) {
 				return false, nil
 			}
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err, "Unable to wait for pod %s/%s to update labels", pod.Namespace, pod.Name)
+	framework.ExpectNoError(err, "Unable to wait for pod %s/%s to update labels", namespace, name)
 }

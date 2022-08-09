@@ -79,21 +79,21 @@ func (p *Peer) Matches(pod PodString) bool {
 
 // Reachability packages the data for a cluster-wide connectivity probe
 type Reachability struct {
-	Expected *TruthTable
-	Observed *TruthTable
-	Pods     []*Pod
+	Expected   *TruthTable
+	Observed   *TruthTable
+	PodStrings []PodString
 }
 
 // NewReachability instantiates a reachability
-func NewReachability(pods []*Pod, defaultExpectation bool) *Reachability {
+func NewReachability(podStrings []PodString, defaultExpectation bool) *Reachability {
 	var podNames []string
-	for _, pod := range pods {
-		podNames = append(podNames, pod.PodString().String())
+	for _, podString := range podStrings {
+		podNames = append(podNames, podString.String())
 	}
 	r := &Reachability{
-		Expected: NewTruthTableFromItems(podNames, &defaultExpectation),
-		Observed: NewTruthTableFromItems(podNames, nil),
-		Pods:     pods,
+		Expected:   NewTruthTableFromItems(podNames, &defaultExpectation),
+		Observed:   NewTruthTableFromItems(podNames, nil),
+		PodStrings: podStrings,
 	}
 	return r
 }
@@ -101,8 +101,8 @@ func NewReachability(pods []*Pod, defaultExpectation bool) *Reachability {
 // AllowLoopback expects all communication from a pod to itself to be allowed.
 // In general, call it after setting up any other rules since loopback logic follows no policy.
 func (r *Reachability) AllowLoopback() {
-	for _, pod := range r.Pods {
-		podName := pod.PodString().String()
+	for _, podString := range r.PodStrings {
+		podName := podString.String()
 		r.Expected.Set(podName, podName, true)
 	}
 }
@@ -130,11 +130,11 @@ func (r *Reachability) ExpectAllEgress(pod PodString, connected bool) {
 
 // ExpectPeer sets expected values using Peer matchers
 func (r *Reachability) ExpectPeer(from *Peer, to *Peer, connected bool) {
-	for _, fromPod := range r.Pods {
-		if from.Matches(fromPod.PodString()) {
-			for _, toPod := range r.Pods {
-				if to.Matches(toPod.PodString()) {
-					r.Expected.Set(string(fromPod.PodString()), string(toPod.PodString()), connected)
+	for _, fromPod := range r.PodStrings {
+		if from.Matches(fromPod) {
+			for _, toPod := range r.PodStrings {
+				if to.Matches(toPod) {
+					r.Expected.Set(fromPod.String(), toPod.String(), connected)
 				}
 			}
 		}
@@ -143,7 +143,7 @@ func (r *Reachability) ExpectPeer(from *Peer, to *Peer, connected bool) {
 
 // Observe records a single connectivity observation
 func (r *Reachability) Observe(fromPod PodString, toPod PodString, isConnected bool) {
-	r.Observed.Set(string(fromPod), string(toPod), isConnected)
+	r.Observed.Set(fromPod.String(), toPod.String(), isConnected)
 }
 
 // Summary produces a useful summary of expected and observed data
