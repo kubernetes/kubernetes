@@ -57,31 +57,31 @@ func generatePodName(name string, nodeName types.NodeName) string {
 func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
 	if len(pod.UID) == 0 {
 		var byte_source []byte
+		var errReadSource error
 		if isFile {
-			var err error
-			byte_source, err = ioutil.ReadFile(source)
-			if err != nil {
-				klog.Errorf("Generated UID node %q pod %q read content from %s failed %s", nodeName, pod.Name, source, err.Error())
-				return err
-			} else {
-				klog.V(5).InfoS("Generated UID node %q pod %q read content from %s", nodeName, pod.Name, source)
-			}
+			byte_source, errReadSource = ioutil.ReadFile(source)
 		} else {
-			resp, err := http.Get(source)
-			if err != nil {
-				klog.Errorf("Generated UID pod %q connect %s failed %s", pod.Name, source, err.Error())
-				return err
-			}
-			byte_source, err = ioutil.ReadAll(resp.Body)
-			if err != nil {
-				klog.Errorf("Generated UID pod %q read content from %s failed %s", pod.Name, source, err.Error())
-				return err
-			} else {
-				klog.V(5).InfoS("Generated UID pod %q read content from %s", pod.Name, source)
+			var resp *http.Response
+			resp, errReadSource = http.Get(source)
+			if errReadSource == nil {
+				byte_source, errReadSource = ioutil.ReadAll(resp.Body)
 			}
 		}
 
+		if errReadSource != nil {
+			klog.Errorf("Generated UID", "pod", klog.KObj(pod), "source", source, "error", errReadSource.Error())
+			return errReadSource
+		}
+
+		// Delete annotation
+		str := regexp.MustCompile("(?m)#.*$").ReplaceAllString(strings.TrimSpace(string(byte_source)), "${1}")
+
+		//Delete blank lines
+		str = regexp.MustCompile(`[\t\r\n]+`).ReplaceAllString(strings.TrimSpace(str), "\n")
+
+		byte_source = *(*[]byte)(unsafe.Pointer(&str))
 		md5sum := md5.Sum(byte_source)
+
 		pod.UID = types.UID(hex.EncodeToString(md5sum[:]))
 		klog.V(5).InfoS("Generated UID", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
 	}
