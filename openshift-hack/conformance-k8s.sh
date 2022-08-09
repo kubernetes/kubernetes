@@ -80,9 +80,16 @@ ginkgo \
 
 rename -v junit_ junit_serial_ "${test_report_dir}"/junit*.xml
 
+# Skip Serial (those were run above) and...
+# any matching 'session affinity timeout' as those will fail.
+# on a cluster using OVNKubernetes which is the default CNI in 4.12+.
+# The same is done for the more extensive suite of tests run in
+# test-kubernetes-e2e.sh.
+TEST_SKIPS="\[Serial\]| session affinity timeout "
+
 # shellcheck disable=SC2086
 ginkgo \
-  -nodes 4 -noColor '-skip=\[Serial\]' '-focus=\[Conformance\]' \
+  -nodes 4 -noColor "-skip=${TEST_SKIPS}" '-focus=\[Conformance\]' \
   ${e2e_test} -- \
   -report-dir "${test_report_dir}" \
   -allowed-not-ready-nodes ${unschedulable} \
