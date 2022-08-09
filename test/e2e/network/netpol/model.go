@@ -29,43 +29,35 @@ import (
 // Model defines the namespaces, deployments, services, pods, containers and associated
 // data for network policy test cases and provides the source of truth
 type Model struct {
-	Namespaces    []*Namespace
-	allPodStrings *[]PodString
-	allPods       *[]*Pod
-	// the raw data
-	NamespaceNames []string
-	PodNames       []string
-	Ports          []int32
-	Protocols      []v1.Protocol
-	DNSDomain      string
+	Namespaces []*Namespace
+	PodNames   []string
+	Ports      []int32
+	Protocols  []v1.Protocol
 }
 
 // NewWindowsModel returns a model specific to windows testing.
-func NewWindowsModel(namespaces []string, podNames []string, ports []int32, dnsDomain string) *Model {
-	return NewModel(namespaces, podNames, ports, []v1.Protocol{v1.ProtocolTCP, v1.ProtocolUDP}, dnsDomain)
+func NewWindowsModel(namespaceBaseNames []string, podNames []string, ports []int32) *Model {
+	return NewModel(namespaceBaseNames, podNames, ports, []v1.Protocol{v1.ProtocolTCP, v1.ProtocolUDP})
 }
 
 // NewModel instantiates a model based on:
-// - namespaces
+// - namespaceBaseNames
 // - pods
 // - ports to listen on
 // - protocols to listen on
 // The total number of pods is the number of namespaces x the number of pods per namespace.
 // The number of containers per pod is the number of ports x the number of protocols.
 // The *total* number of containers is namespaces x pods x ports x protocols.
-func NewModel(namespaces []string, podNames []string, ports []int32, protocols []v1.Protocol, dnsDomain string) *Model {
+func NewModel(namespaceBaseNames []string, podNames []string, ports []int32, protocols []v1.Protocol) *Model {
 	model := &Model{
-		NamespaceNames: namespaces,
-		PodNames:       podNames,
-		Ports:          ports,
-		Protocols:      protocols,
-		DNSDomain:      dnsDomain,
+		PodNames:  podNames,
+		Ports:     ports,
+		Protocols: protocols,
 	}
-	framework.Logf("DnsDomain %v", model.DNSDomain)
 
 	// build the entire "model" for the overall test, which means, building
 	// namespaces, pods, containers for each protocol.
-	for _, ns := range namespaces {
+	for _, ns := range namespaceBaseNames {
 		var pods []*Pod
 		for _, podName := range podNames {
 			var containers []*Container
@@ -78,112 +70,30 @@ func NewModel(namespaces []string, podNames []string, ports []int32, protocols [
 				}
 			}
 			pods = append(pods, &Pod{
-				Namespace:  ns,
 				Name:       podName,
 				Containers: containers,
 			})
 		}
-		model.Namespaces = append(model.Namespaces, &Namespace{Name: ns, Pods: pods})
+		model.Namespaces = append(model.Namespaces, &Namespace{
+			BaseName: ns,
+			Pods:     pods,
+		})
 	}
 	return model
-}
-
-// GetProbeTimeoutSeconds returns a timeout for how long the probe should work before failing a check, and takes windows heuristics into account, where requests can take longer sometimes.
-func (m *Model) GetProbeTimeoutSeconds() int {
-	timeoutSeconds := 1
-	if framework.NodeOSDistroIs("windows") {
-		timeoutSeconds = 3
-	}
-	return timeoutSeconds
-}
-
-// GetWorkers returns the number of workers suggested to run when testing.
-func (m *Model) GetWorkers() int {
-	return 3
-}
-
-// NewReachability instantiates a default-true reachability from the model's pods
-func (m *Model) NewReachability() *Reachability {
-	return NewReachability(m.AllPods(), true)
-}
-
-// AllPodStrings returns a slice of all pod strings
-func (m *Model) AllPodStrings() []PodString {
-	if m.allPodStrings == nil {
-		var pods []PodString
-		for _, ns := range m.Namespaces {
-			for _, pod := range ns.Pods {
-				pods = append(pods, pod.PodString())
-			}
-		}
-		m.allPodStrings = &pods
-	}
-	return *m.allPodStrings
-}
-
-// AllPods returns a slice of all pods
-func (m *Model) AllPods() []*Pod {
-	if m.allPods == nil {
-		var pods []*Pod
-		for _, ns := range m.Namespaces {
-			for _, pod := range ns.Pods {
-				pods = append(pods, pod)
-			}
-		}
-		m.allPods = &pods
-	}
-	return *m.allPods
-}
-
-// FindPod returns the pod of matching namespace and name, or an error
-func (m *Model) FindPod(ns string, name string) (*Pod, error) {
-	for _, namespace := range m.Namespaces {
-		for _, pod := range namespace.Pods {
-			if namespace.Name == ns && pod.Name == name {
-				return pod, nil
-			}
-		}
-	}
-	return nil, fmt.Errorf("unable to find pod %s/%s", ns, name)
 }
 
 // Namespace is the abstract representation of what matters to network policy
 // tests for a namespace; i.e. it ignores kube implementation details
 type Namespace struct {
-	Name string
-	Pods []*Pod
-}
-
-// Spec builds a kubernetes namespace spec
-func (ns *Namespace) Spec() *v1.Namespace {
-	return &v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   ns.Name,
-			Labels: ns.LabelSelector(),
-		},
-	}
-}
-
-// LabelSelector returns the default labels that should be placed on a namespace
-// in order for it to be uniquely selectable by label selectors
-func (ns *Namespace) LabelSelector() map[string]string {
-	return map[string]string{
-		"ns": ns.Name,
-	}
+	BaseName string
+	Pods     []*Pod
 }
 
 // Pod is the abstract representation of what matters to network policy tests for
 // a pod; i.e. it ignores kube implementation details
 type Pod struct {
-	Namespace  string
 	Name       string
 	Containers []*Container
-	ServiceIP  string
-}
-
-// PodString returns a corresponding pod string
-func (p *Pod) PodString() PodString {
-	return NewPodString(p.Namespace, p.Name)
 }
 
 // ContainerSpecs builds kubernetes container specs for the pod
@@ -195,31 +105,27 @@ func (p *Pod) ContainerSpecs() []v1.Container {
 	return containers
 }
 
-func (p *Pod) labelSelectorKey() string {
+func podNameLabelKey() string {
 	return "pod"
 }
 
-func (p *Pod) labelSelectorValue() string {
-	return p.Name
-}
-
-// LabelSelector returns the default labels that should be placed on a pod/deployment
+// Labels returns the default labels that should be placed on a pod/deployment
 // in order for it to be uniquely selectable by label selectors
-func (p *Pod) LabelSelector() map[string]string {
+func (p *Pod) Labels() map[string]string {
 	return map[string]string{
-		p.labelSelectorKey(): p.labelSelectorValue(),
+		podNameLabelKey(): p.Name,
 	}
 }
 
 // KubePod returns the kube pod (will add label selectors for windows if needed).
-func (p *Pod) KubePod() *v1.Pod {
+func (p *Pod) KubePod(namespace string) *v1.Pod {
 	zero := int64(0)
 
 	thePod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      p.Name,
-			Labels:    p.LabelSelector(),
-			Namespace: p.Namespace,
+			Labels:    p.Labels(),
+			Namespace: namespace,
 		},
 		Spec: v1.PodSpec{
 			TerminationGracePeriodSeconds: &zero,
@@ -235,26 +141,25 @@ func (p *Pod) KubePod() *v1.Pod {
 	return thePod
 }
 
-// QualifiedServiceAddress returns the address that can be used to hit a service from
-// any namespace in the cluster
-func (p *Pod) QualifiedServiceAddress(dnsDomain string) string {
-	return fmt.Sprintf("%s.%s.svc.%s", p.ServiceName(), p.Namespace, dnsDomain)
+// QualifiedServiceAddress returns the address that can be used to access the service
+func (p *Pod) QualifiedServiceAddress(namespace string, dnsDomain string) string {
+	return fmt.Sprintf("%s.%s.svc.%s", p.ServiceName(namespace), namespace, dnsDomain)
 }
 
 // ServiceName returns the unqualified service name
-func (p *Pod) ServiceName() string {
-	return fmt.Sprintf("s-%s-%s", p.Namespace, p.Name)
+func (p *Pod) ServiceName(namespace string) string {
+	return fmt.Sprintf("s-%s-%s", namespace, p.Name)
 }
 
 // Service returns a kube service spec
-func (p *Pod) Service() *v1.Service {
+func (p *Pod) Service(namespace string) *v1.Service {
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      p.ServiceName(),
-			Namespace: p.Namespace,
+			Name:      p.ServiceName(namespace),
+			Namespace: namespace,
 		},
 		Spec: v1.ServiceSpec{
-			Selector: p.LabelSelector(),
+			Selector: p.Labels(),
 		},
 	}
 	for _, container := range p.Containers {
