@@ -17,7 +17,6 @@ limitations under the License.
 package filesystem
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,10 +32,7 @@ var _ Filesystem = &DefaultFs{}
 
 // NewTempFs returns a fake Filesystem in temporary directory, useful for unit tests
 func NewTempFs() Filesystem {
-	path, _ := ioutil.TempDir(
-		"",
-		"tmpfs",
-	)
+	path, _ := os.MkdirTemp("", "tmpfs")
 	return &DefaultFs{
 		root: path,
 	}
@@ -89,33 +85,45 @@ func (fs *DefaultFs) RemoveAll(path string) error {
 	return os.RemoveAll(fs.prefix(path))
 }
 
-// Remove via os.RemoveAll
+// Remove via os.Remove
 func (fs *DefaultFs) Remove(name string) error {
 	return os.Remove(fs.prefix(name))
 }
 
-// ReadFile via ioutil.ReadFile
+// ReadFile via os.ReadFile
 func (fs *DefaultFs) ReadFile(filename string) ([]byte, error) {
-	return ioutil.ReadFile(fs.prefix(filename))
+	return os.ReadFile(fs.prefix(filename))
 }
 
-// TempDir via ioutil.TempDir
+// TempDir via os.MkdirTemp
 func (fs *DefaultFs) TempDir(dir, prefix string) (string, error) {
-	return ioutil.TempDir(fs.prefix(dir), prefix)
+	return os.MkdirTemp(fs.prefix(dir), prefix)
 }
 
-// TempFile via ioutil.TempFile
+// TempFile via os.CreateTemp
 func (fs *DefaultFs) TempFile(dir, prefix string) (File, error) {
-	file, err := ioutil.TempFile(fs.prefix(dir), prefix)
+	file, err := os.CreateTemp(fs.prefix(dir), prefix)
 	if err != nil {
 		return nil, err
 	}
 	return &defaultFile{file}, nil
 }
 
-// ReadDir via ioutil.ReadDir
+// ReadDir via os.ReadDir
 func (fs *DefaultFs) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(fs.prefix(dirname))
+	entries, err := os.ReadDir(fs.prefix(dirname))
+	if err != nil {
+		return nil, err
+	}
+	infos := make([]os.FileInfo, 0, len(entries))
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		infos = append(infos, info)
+	}
+	return infos, nil
 }
 
 // Walk via filepath.Walk
