@@ -19,8 +19,10 @@ package factory
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -28,9 +30,12 @@ import (
 	"time"
 
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"go.etcd.io/etcd/client/pkg/v3/logutil"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,6 +68,14 @@ const (
 	dbMetricsMonitorJitter = 0.5
 )
 
+// TODO(negz): Stop using a package scoped logger. At the time of writing we're
+// creating an etcd client for each CRD. We need to pass each etcd client a
+// logger or each client will create its own, which comes with a significant
+// memory cost (around 20% of the API server's memory when hundreds of CRDs are
+// present). The correct fix here is to not create a client per CRD. See
+// https://github.com/kubernetes/kubernetes/issues/111476 for more.
+var etcd3ClientLogger *zap.Logger
+
 func init() {
 	// grpcprom auto-registers (via an init function) their client metrics, since we are opting out of
 	// using the global prometheus registry and using our own wrapped global registry,
@@ -70,6 +83,30 @@ func init() {
 	// For reference: https://github.com/kubernetes/kubernetes/pull/81387
 	legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
 	dbMetricsMonitors = make(map[string]struct{})
+
+	c := logutil.DefaultZapLoggerConfig
+	c.Level = zap.NewAtomicLevelAt(etcdClientDebugLevel())
+	l, err := c.Build()
+	if err != nil {
+		l = zap.NewNop()
+	}
+	etcd3ClientLogger = l.Named("etcd-client")
+}
+
+// etcdClientDebugLevel translates ETCD_CLIENT_DEBUG into zap log level.
+// NOTE(negz): This is a copy of a private etcd client function:
+// https://github.com/etcd-io/etcd/blob/v3.5.4/client/v3/logger.go#L47
+func etcdClientDebugLevel() zapcore.Level {
+	envLevel := os.Getenv("ETCD_CLIENT_DEBUG")
+	if envLevel == "" || envLevel == "true" {
+		return zapcore.InfoLevel
+	}
+	var l zapcore.Level
+	if err := l.Set(envLevel); err == nil {
+		log.Printf("Deprecated env ETCD_CLIENT_DEBUG value. Using default level: 'info'")
+		return zapcore.InfoLevel
+	}
+	return l
 }
 
 func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
@@ -172,6 +209,7 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 		}
 		dialOptions = append(dialOptions, grpc.WithContextDialer(dialer))
 	}
+
 	cfg := clientv3.Config{
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
@@ -179,6 +217,7 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 		DialOptions:          dialOptions,
 		Endpoints:            c.ServerList,
 		TLS:                  tlsConfig,
+		Logger:               etcd3ClientLogger,
 	}
 
 	return clientv3.New(cfg)
