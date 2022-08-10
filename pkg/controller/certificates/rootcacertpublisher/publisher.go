@@ -182,7 +182,7 @@ func (c *Publisher) processNextWorkItem() bool {
 func (c *Publisher) syncNamespace(ns string) (err error) {
 	startTime := time.Now()
 	defer func() {
-		recordMetrics(startTime, ns, err)
+		recordMetrics(startTime, err)
 		klog.V(4).Infof("Finished syncing namespace %q (%v)", ns, time.Since(startTime))
 	}()
 
