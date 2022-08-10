@@ -20,6 +20,11 @@ rules:
     source:
       branch: release-1.24
       dir: staging/src/k8s.io/code-generator
+  - name: release-1.25
+    go: 1.19
+    source:
+      branch: release-1.25
+      dir: staging/src/k8s.io/code-generator
 - destination: apimachinery
   branches:
   - name: master
