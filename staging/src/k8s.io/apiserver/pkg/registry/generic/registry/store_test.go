@@ -2318,6 +2318,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		config := cacherstorage.Config{
 			Storage:        s,
 			Versioner:      storage.APIObjectVersioner{},
+			GroupResource:  schema.GroupResource{Resource: "pods"},
 			ResourcePrefix: podPrefix,
 			KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
 			GetAttrsFunc:   getPodAttrs,
