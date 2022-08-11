@@ -43,7 +43,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/component-base/configz"
@@ -146,7 +145,7 @@ func newProxyServer(
 	var proxier proxy.Provider
 	var detectLocalMode proxyconfigapi.LocalMode
 
-	proxyMode := getProxyMode(string(config.Mode), canUseIPVS, iptables.LinuxKernelCompatTester{})
+	proxyMode := getProxyMode(string(config.Mode), canUseIPVS)
 	detectLocalMode, err = getDetectLocalMode(config)
 	if err != nil {
 		return nil, fmt.Errorf("cannot determine detect-local-mode: %v", err)
@@ -556,42 +555,26 @@ func cidrTuple(cidrList string) [2]string {
 	return cidrs
 }
 
-func getProxyMode(proxyMode string, canUseIPVS bool, kcompat iptables.KernelCompatTester) string {
+func getProxyMode(proxyMode string, canUseIPVS bool) string {
 	switch proxyMode {
 	case proxyModeUserspace:
 		return proxyModeUserspace
 	case proxyModeIPTables:
-		return tryIPTablesProxy(kcompat)
+		return proxyModeIPTables
 	case proxyModeIPVS:
-		return tryIPVSProxy(canUseIPVS, kcompat)
+		return tryIPVSProxy(canUseIPVS)
 	}
 	klog.InfoS("Unknown proxy mode, assuming iptables proxy", "proxyMode", proxyMode)
-	return tryIPTablesProxy(kcompat)
+	return proxyModeIPTables
 }
 
-func tryIPVSProxy(canUseIPVS bool, kcompat iptables.KernelCompatTester) string {
+func tryIPVSProxy(canUseIPVS bool) string {
 	if canUseIPVS {
 		return proxyModeIPVS
 	}
 
-	// Try to fallback to iptables before falling back to userspace
 	klog.V(1).InfoS("Can't use ipvs proxier, trying iptables proxier")
-	return tryIPTablesProxy(kcompat)
-}
-
-func tryIPTablesProxy(kcompat iptables.KernelCompatTester) string {
-	// guaranteed false on error, error only necessary for debugging
-	useIPTablesProxy, err := iptables.CanUseIPTablesProxier(kcompat)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("can't determine whether to use iptables proxy, using userspace proxier: %v", err))
-		return proxyModeUserspace
-	}
-	if useIPTablesProxy {
-		return proxyModeIPTables
-	}
-	// Fallback.
-	klog.V(1).InfoS("Can't use iptables proxy, using userspace proxier")
-	return proxyModeUserspace
+	return proxyModeIPTables
 }
 
 // cleanupAndExit remove iptables rules and ipset/ipvs rules
