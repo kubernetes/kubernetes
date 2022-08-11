@@ -70,7 +70,8 @@ type Config struct {
 	// An underlying storage.Versioner.
 	Versioner storage.Versioner
 
-	// The GroupResource the cacher is caching. Used for disambiguating *unstructured.Unstructured (CRDs) in logging.
+	// The GroupResource the cacher is caching. Used for disambiguating *unstructured.Unstructured (CRDs) in logging
+	// and metrics.
 	GroupResource schema.GroupResource
 
 	// The Cache will be caching objects of a given Type and assumes that they
@@ -384,7 +385,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	watchCache := newWatchCache(
-		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, objType)
+		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource)
 	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
@@ -430,7 +431,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 		successfulList = true
 		c.ready.set(true)
 		klog.V(1).Infof("cacher (%v): initialized", c.groupResource.String())
-		metrics.WatchCacheInitializations.WithLabelValues(c.objectType.String()).Inc()
+		metrics.WatchCacheInitializations.WithLabelValues(c.groupResource.String()).Inc()
 	})
 	defer func() {
 		if successfulList {
@@ -804,7 +805,7 @@ func (c *Cacher) dispatchEvents() {
 				c.dispatchEvent(&event)
 			}
 			lastProcessedResourceVersion = event.ResourceVersion
-			metrics.EventsCounter.WithLabelValues(c.objectType.String()).Inc()
+			metrics.EventsCounter.WithLabelValues(c.groupResource.String()).Inc()
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
 			// Never send a bookmark event if we did not see an event here, this is fine
@@ -1281,7 +1282,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
 		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v", c.groupResource.String(), c.identifier, len(c.input), len(c.result))
-		metrics.TerminatedWatchersCounter.WithLabelValues(c.objectType.String()).Inc()
+		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.String()).Inc()
 		c.forget(false)
 	}
 
@@ -1479,9 +1480,8 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 		initEventCount++
 	}
 
-	objType := c.objectType.String()
 	if initEventCount > 0 {
-		metrics.InitCounter.WithLabelValues(objType).Add(float64(initEventCount))
+		metrics.InitCounter.WithLabelValues(c.groupResource.String()).Add(float64(initEventCount))
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
