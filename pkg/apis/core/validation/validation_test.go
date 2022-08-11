@@ -19976,6 +19976,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 	fieldPathMatchLabelKeys := subFldPath0.Child("matchLabelKeys")
 	nodeAffinityField := subFldPath0.Child("nodeAffinityPolicy")
 	nodeTaintsField := subFldPath0.Child("nodeTaintsPolicy")
+	labelSelectorField := subFldPath0.Child("labelSelector")
 	unknown := core.NodeInclusionPolicy("Unknown")
 	ignore := core.NodeInclusionPolicyIgnore
 	honor := core.NodeInclusionPolicyHonor
@@ -19984,6 +19985,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		name            string
 		constraints     []core.TopologySpreadConstraint
 		wantFieldErrors field.ErrorList
+		opts            PodValidationOptions
 	}{
 		{
 			name: "all required fields ok",
@@ -20185,11 +20187,53 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			},
 			wantFieldErrors: []*field.Error{field.Invalid(fieldPathMatchLabelKeys.Index(0), "foo", "exists in both matchLabelKeys and labelSelector")},
 		},
+		{
+			name: "invalid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					MinDomains:        nil,
+					LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "foo"}},
+				},
+			},
+			wantFieldErrors: []*field.Error{field.Invalid(labelSelectorField.Child("matchLabels"), "NoUppercaseOrSpecialCharsLike=Equals", "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')")},
+			opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
+		},
+		{
+			name: "invalid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is true",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					MinDomains:        nil,
+					LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "foo"}},
+				},
+			},
+			wantFieldErrors: []*field.Error{},
+			opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: true},
+		},
+		{
+			name: "valid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
+			constraints: []core.TopologySpreadConstraint{
+				{
+					MaxSkew:           1,
+					TopologyKey:       "k8s.io/zone",
+					WhenUnsatisfiable: core.DoNotSchedule,
+					MinDomains:        nil,
+					LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "foo"}},
+				},
+			},
+			wantFieldErrors: []*field.Error{},
+			opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			errs := validateTopologySpreadConstraints(tc.constraints, fieldPath)
+			errs := validateTopologySpreadConstraints(tc.constraints, fieldPath, tc.opts)
 			if diff := cmp.Diff(tc.wantFieldErrors, errs); diff != "" {
 				t.Errorf("unexpected field errors (-want, +got):\n%s", diff)
 			}
