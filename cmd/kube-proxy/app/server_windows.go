@@ -52,10 +52,10 @@ import (
 
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.CleanupAndExit, o.master)
+	return newProxyServer(o.config, o.master)
 }
 
-func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExit bool, master string) (*ProxyServer, error) {
+func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string) (*ProxyServer, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
@@ -64,11 +64,6 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		c.Set(config)
 	} else {
 		return nil, fmt.Errorf("unable to register configz: %s", err)
-	}
-
-	// We omit creation of pretty much everything if we run in cleanup mode
-	if cleanupAndExit {
-		return &ProxyServer{}, nil
 	}
 
 	if len(config.ShowHiddenMetricsForVersion) > 0 {
@@ -224,4 +219,9 @@ func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) string {
 	// Fallback.
 	klog.V(1).InfoS("Can't use winkernel proxy, using userspace proxier")
 	return proxyModeUserspace
+}
+
+// cleanupAndExit cleans up after a previous proxy run
+func cleanupAndExit() error {
+	return errors.New("--cleanup-and-exit is not implemented on Windows")
 }
