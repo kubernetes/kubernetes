@@ -27,6 +27,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -232,11 +233,50 @@ func testUnixDomainSocket(t *testing.T, label string) {
 	assert.True(t, result, "Unexpected result: false from IsUnixDomainSocket: %v for %s", result, label)
 }
 
+// This is required as on Windows it's possible for the socket file backing a Unix domain socket to
+// exist but not be ready for socket communications yet as per
+// https://github.com/kubernetes/kubernetes/issues/104584
+func testPendingUnixDomainSocket(t *testing.T, label string) {
+	// Create a temporary file that will simulate the Unix domain socket file in a
+	// not-yet-ready state. We need this because the Kubelet keeps an eye on file
+	// changes and acts on them, leading to potential race issues as described in
+	// the referenced issue above
+	f, err := ioutil.TempFile("", "test-domain-socket")
+	require.NoErrorf(t, err, "Failed to create file for test purposes: %v while setting up: %s", err, label)
+	testFile := f.Name()
+	f.Close()
+
+	// Start the check at this point
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		result, err := IsUnixDomainSocket(testFile)
+		assert.Nil(t, err, "Unexpected error: %v from IsUnixDomainSocket for %s", err, label)
+		assert.True(t, result, "Unexpected result: false from IsUnixDomainSocket: %v for %s", result, label)
+		wg.Done()
+	}()
+
+	// Wait a sufficient amount of time to make sure the retry logic kicks in
+	time.Sleep(socketDialRetryPeriod)
+
+	// Replace the temporary file with an actual Unix domain socket file
+	os.Remove(testFile)
+	ta, err := net.ResolveUnixAddr("unix", testFile)
+	require.NoErrorf(t, err, "Failed to ResolveUnixAddr: %v while setting up: %s", err, label)
+	unixln, err := net.ListenUnix("unix", ta)
+	require.NoErrorf(t, err, "Failed to ListenUnix: %v while setting up: %s", err, label)
+
+	// Wait for the goroutine to finish, then close the socket
+	wg.Wait()
+	unixln.Close()
+}
+
 func TestIsUnixDomainSocket(t *testing.T) {
 	testPipe(t, "Named Pipe")
 	testRegularFile(t, "Regular File that Exists", true)
 	testRegularFile(t, "Regular File that Does Not Exist", false)
 	testUnixDomainSocket(t, "Unix Domain Socket File")
+	testPendingUnixDomainSocket(t, "Pending Unix Domain Socket File")
 }
 
 func TestNormalizePath(t *testing.T) {
