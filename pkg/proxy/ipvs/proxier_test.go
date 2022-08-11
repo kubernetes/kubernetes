@@ -364,9 +364,9 @@ func TestCanUseIPVSProxier(t *testing.T) {
 	for i := range testCases {
 		handle := &fakeKernelHandler{modules: testCases[i].mods, kernelVersion: testCases[i].kernelVersion}
 		versioner := &fakeIPSetVersioner{version: testCases[i].ipsetVersion, err: testCases[i].ipsetErr}
-		ok, err := CanUseIPVSProxier(handle, versioner, testCases[i].scheduler)
-		if ok != testCases[i].ok {
-			t.Errorf("Case [%d], expect %v, got %v: err: %v", i, testCases[i].ok, ok, err)
+		err := CanUseIPVSProxier(handle, versioner, testCases[i].scheduler)
+		if (err == nil) != testCases[i].ok {
+			t.Errorf("Case [%d], expect %v, got err: %v", i, testCases[i].ok, err)
 		}
 	}
 }

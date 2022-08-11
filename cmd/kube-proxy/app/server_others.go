@@ -90,24 +90,8 @@ func newProxyServer(
 		return nil, fmt.Errorf("unable to register configz: %s", err)
 	}
 
-	var iptInterface utiliptables.Interface
 	var ipvsInterface utilipvs.Interface
-	var kernelHandler ipvs.KernelHandler
 	var ipsetInterface utilipset.Interface
-
-	// Create a iptables utils.
-	execer := exec.New()
-
-	kernelHandler = ipvs.NewLinuxKernelHandler()
-	ipsetInterface = utilipset.New(execer)
-	canUseIPVS, err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface, config.IPVS.Scheduler)
-	if string(config.Mode) == proxyModeIPVS && err != nil {
-		klog.ErrorS(err, "Can't use the IPVS proxier")
-	}
-
-	if canUseIPVS {
-		ipvsInterface = utilipvs.New()
-	}
 
 	if len(config.ShowHiddenMetricsForVersion) > 0 {
 		metrics.SetShowHidden()
@@ -145,7 +129,7 @@ func newProxyServer(
 	var proxier proxy.Provider
 	var detectLocalMode proxyconfigapi.LocalMode
 
-	proxyMode := getProxyMode(string(config.Mode), canUseIPVS)
+	proxyMode := getProxyMode(string(config.Mode))
 	detectLocalMode, err = getDetectLocalMode(config)
 	if err != nil {
 		return nil, fmt.Errorf("cannot determine detect-local-mode: %v", err)
@@ -167,7 +151,8 @@ func newProxyServer(
 	if netutils.IsIPv6(nodeIP) {
 		primaryProtocol = utiliptables.ProtocolIPv6
 	}
-	iptInterface = utiliptables.New(execer, primaryProtocol)
+	execer := exec.New()
+	iptInterface := utiliptables.New(execer, primaryProtocol)
 
 	var ipt [2]utiliptables.Interface
 	dualStack := true // While we assume that node supports, we do further checks below
@@ -255,6 +240,13 @@ func newProxyServer(
 		}
 		proxymetrics.RegisterMetrics()
 	} else if proxyMode == proxyModeIPVS {
+		kernelHandler := ipvs.NewLinuxKernelHandler()
+		ipsetInterface = utilipset.New(execer)
+		if err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface, config.IPVS.Scheduler); err != nil {
+			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
+		}
+		ipvsInterface = utilipvs.New()
+
 		klog.V(0).InfoS("Using ipvs Proxier")
 		if dualStack {
 			klog.V(0).InfoS("Creating dualStackProxier for ipvs")
@@ -555,26 +547,13 @@ func cidrTuple(cidrList string) [2]string {
 	return cidrs
 }
 
-func getProxyMode(proxyMode string, canUseIPVS bool) string {
-	switch proxyMode {
-	case proxyModeUserspace:
-		return proxyModeUserspace
-	case proxyModeIPTables:
+func getProxyMode(proxyMode string) string {
+	if proxyMode == "" {
+		klog.InfoS("Using iptables proxy")
 		return proxyModeIPTables
-	case proxyModeIPVS:
-		return tryIPVSProxy(canUseIPVS)
+	} else {
+		return proxyMode
 	}
-	klog.InfoS("Unknown proxy mode, assuming iptables proxy", "proxyMode", proxyMode)
-	return proxyModeIPTables
-}
-
-func tryIPVSProxy(canUseIPVS bool) string {
-	if canUseIPVS {
-		return proxyModeIPVS
-	}
-
-	klog.V(1).InfoS("Can't use ipvs proxier, trying iptables proxier")
-	return proxyModeIPTables
 }
 
 // cleanupAndExit remove iptables rules and ipset/ipvs rules
