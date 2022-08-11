@@ -85,6 +85,7 @@ var args = []string{
 	"--cluster-signing-legacy-unknown-key-file=/cluster-signing-legacy-unknown/key-file",
 	"--concurrent-deployment-syncs=10",
 	"--concurrent-statefulset-syncs=15",
+	"--concurrent-daemonset-syncs=10",
 	"--concurrent-endpoint-syncs=10",
 	"--concurrent-ephemeralvolume-syncs=10",
 	"--concurrent-service-endpoint-syncs=10",
@@ -254,7 +255,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		DaemonSetController: &DaemonSetControllerOptions{
 			&daemonconfig.DaemonSetControllerConfiguration{
-				ConcurrentDaemonSetSyncs: 2,
+				ConcurrentDaemonSetSyncs: 10,
 			},
 		},
 		DeploymentController: &DeploymentControllerOptions{
@@ -526,7 +527,7 @@ func TestApplyTo(t *testing.T) {
 				},
 			},
 			DaemonSetController: daemonconfig.DaemonSetControllerConfiguration{
-				ConcurrentDaemonSetSyncs: 2,
+				ConcurrentDaemonSetSyncs: 10,
 			},
 			DeploymentController: deploymentconfig.DeploymentControllerConfiguration{
 				ConcurrentDeploymentSyncs: 10,
