@@ -2319,6 +2319,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		config := cacherstorage.Config{
 			Storage:        s,
 			Versioner:      etcd3.APIObjectVersioner{},
+			GroupResource:  schema.GroupResource{Resource: "pods"},
 			ResourcePrefix: podPrefix,
 			KeyFunc: func(ctx context.Context, obj runtime.Object) (string, error) {
 				return storage.NoNamespaceKeyFunc(podPrefix, obj)
