@@ -74,12 +74,11 @@ var timeoutForNodePodCIDR = 5 * time.Minute
 
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.CleanupAndExit, o.master)
+	return newProxyServer(o.config, o.master)
 }
 
 func newProxyServer(
 	config *proxyconfigapi.KubeProxyConfiguration,
-	cleanupAndExit bool,
 	master string) (*ProxyServer, error) {
 
 	if config == nil {
@@ -109,15 +108,6 @@ func newProxyServer(
 
 	if canUseIPVS {
 		ipvsInterface = utilipvs.New()
-	}
-
-	// We omit creation of pretty much everything if we run in cleanup mode
-	if cleanupAndExit {
-		return &ProxyServer{
-			execer:         execer,
-			IpvsInterface:  ipvsInterface,
-			IpsetInterface: ipsetInterface,
-		}, nil
 	}
 
 	if len(config.ShowHiddenMetricsForVersion) > 0 {
@@ -602,4 +592,30 @@ func tryIPTablesProxy(kcompat iptables.KernelCompatTester) string {
 	// Fallback.
 	klog.V(1).InfoS("Can't use iptables proxy, using userspace proxier")
 	return proxyModeUserspace
+}
+
+// cleanupAndExit remove iptables rules and ipset/ipvs rules
+func cleanupAndExit() error {
+	execer := exec.New()
+
+	// cleanup IPv6 and IPv4 iptables rules, regardless of current configuration
+	ipts := []utiliptables.Interface{
+		utiliptables.New(execer, utiliptables.ProtocolIPv4),
+		utiliptables.New(execer, utiliptables.ProtocolIPv6),
+	}
+
+	ipsetInterface := utilipset.New(execer)
+	ipvsInterface := utilipvs.New()
+
+	var encounteredError bool
+	for _, ipt := range ipts {
+		encounteredError = userspace.CleanupLeftovers(ipt) || encounteredError
+		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
+		encounteredError = ipvs.CleanupLeftovers(ipvsInterface, ipt, ipsetInterface) || encounteredError
+	}
+	if encounteredError {
+		return errors.New("encountered an error while tearing down rules")
+	}
+
+	return nil
 }

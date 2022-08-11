@@ -19,7 +19,6 @@ limitations under the License.
 package app
 
 import (
-	"errors"
 	goflag "flag"
 	"fmt"
 	"net"
@@ -75,9 +74,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
-	"k8s.io/kubernetes/pkg/proxy/iptables"
-	"k8s.io/kubernetes/pkg/proxy/ipvs"
-	"k8s.io/kubernetes/pkg/proxy/userspace"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -100,7 +96,6 @@ const (
 // proxyRun defines the interface to run a specified ProxyServer
 type proxyRun interface {
 	Run() error
-	CleanupAndExit() error
 }
 
 // Options contains everything necessary to create and run a proxy server.
@@ -314,13 +309,13 @@ func (o *Options) Run() error {
 		return o.writeConfigFile()
 	}
 
+	if o.CleanupAndExit {
+		return cleanupAndExit()
+	}
+
 	proxyServer, err := NewProxyServer(o)
 	if err != nil {
 		return err
-	}
-
-	if o.CleanupAndExit {
-		return proxyServer.CleanupAndExit()
 	}
 
 	o.proxyServer = proxyServer
@@ -813,27 +808,6 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 		return floor, nil
 	}
 	return 0, nil
-}
-
-// CleanupAndExit remove iptables rules and ipset/ipvs rules in ipvs proxy mode
-// and exit if success return nil
-func (s *ProxyServer) CleanupAndExit() error {
-	// cleanup IPv6 and IPv4 iptables rules
-	ipts := []utiliptables.Interface{
-		utiliptables.New(s.execer, utiliptables.ProtocolIPv4),
-		utiliptables.New(s.execer, utiliptables.ProtocolIPv6),
-	}
-	var encounteredError bool
-	for _, ipt := range ipts {
-		encounteredError = userspace.CleanupLeftovers(ipt) || encounteredError
-		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
-		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, ipt, s.IpsetInterface) || encounteredError
-	}
-	if encounteredError {
-		return errors.New("encountered an error while tearing down rules")
-	}
-
-	return nil
 }
 
 // detectNodeIP returns the nodeIP used by the proxier
