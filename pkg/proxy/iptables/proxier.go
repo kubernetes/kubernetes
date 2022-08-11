@@ -85,34 +85,6 @@ const (
 	largeClusterEndpointsThreshold = 1000
 )
 
-// KernelCompatTester tests whether the required kernel capabilities are
-// present to run the iptables proxier.
-type KernelCompatTester interface {
-	IsCompatible() error
-}
-
-// CanUseIPTablesProxier returns true if we should use the iptables Proxier
-// instead of the "classic" userspace Proxier.
-func CanUseIPTablesProxier(kcompat KernelCompatTester) (bool, error) {
-	if err := kcompat.IsCompatible(); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-var _ KernelCompatTester = LinuxKernelCompatTester{}
-
-// LinuxKernelCompatTester is the Linux implementation of KernelCompatTester
-type LinuxKernelCompatTester struct{}
-
-// IsCompatible checks for the required sysctls.  We don't care about the value, just
-// that it exists.  If this Proxier is chosen, we'll initialize it as we
-// need.
-func (lkct LinuxKernelCompatTester) IsCompatible() error {
-	_, err := utilsysctl.New().GetSysctl(sysctlRouteLocalnet)
-	return err
-}
-
 const sysctlRouteLocalnet = "net/ipv4/conf/all/route_localnet"
 const sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
 
