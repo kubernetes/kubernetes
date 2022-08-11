@@ -48,10 +48,6 @@ import (
 	testingclock "k8s.io/utils/clock/testing"
 )
 
-var (
-	objectType = reflect.TypeOf(&v1.Pod{})
-)
-
 // verifies the cacheWatcher.process goroutine is properly cleaned up even if
 // the writes to cacheWatcher.result channel is blocked.
 func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
