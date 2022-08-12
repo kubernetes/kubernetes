@@ -18,7 +18,6 @@ package cache
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -544,7 +543,7 @@ func (cache *cacheImpl) UpdatePod(oldPod, newPod *v1.Pod) error {
 		if currState.pod.Spec.NodeName != newPod.Spec.NodeName {
 			klog.ErrorS(nil, "Pod updated on a different node than previously added to", "pod", klog.KObj(oldPod))
 			klog.ErrorS(nil, "scheduler cache is corrupted and can badly affect scheduling decisions")
-			os.Exit(1)
+			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
 		return cache.updatePod(oldPod, newPod)
 	}
@@ -570,7 +569,7 @@ func (cache *cacheImpl) RemovePod(pod *v1.Pod) error {
 			// An empty NodeName is possible when the scheduler misses a Delete
 			// event and it gets the last known state from the informer cache.
 			klog.ErrorS(nil, "scheduler cache is corrupted and can badly affect scheduling decisions")
-			os.Exit(1)
+			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
 	}
 	return cache.removePod(currState.pod)
@@ -748,7 +747,7 @@ func (cache *cacheImpl) cleanupAssumedPods(now time.Time) {
 		ps, ok := cache.podStates[key]
 		if !ok {
 			klog.ErrorS(nil, "Key found in assumed set but not in podStates, potentially a logical error")
-			os.Exit(1)
+			klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 		}
 		if !ps.bindingFinished {
 			klog.V(5).InfoS("Could not expire cache for pod as binding is still in progress",
