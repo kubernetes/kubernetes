@@ -455,7 +455,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					},
 				},
 			}, true),
-			expectedError: `[0].clientConfig.url: Invalid value: "": host must be provided`,
+			expectedError: `[0].clientConfig.url: Invalid value: "": host must be specified`,
 		},
 		{
 			name: "wrong scheme",
@@ -479,7 +479,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					},
 				},
 			}, true),
-			expectedError: `host must be provided`,
+			expectedError: `host must be specified`,
 		},
 		{
 			name: "fragment",
@@ -527,7 +527,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 					},
 				},
 			}, true),
-			expectedError: `host must be provided`,
+			expectedError: `host must be specified`,
 		},
 		{
 			name: "path must start with slash",
@@ -757,11 +757,11 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			err := errs.ToAggregate()
 			if err != nil {
 				if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
-					t.Errorf("expected to contain %s, got %s", e, a)
+					t.Errorf("expected to contain:\n  %s\ngot:\n  %s", e, a)
 				}
 			} else {
 				if test.expectedError != "" {
-					t.Errorf("unexpected no error, expected to contain %s", test.expectedError)
+					t.Errorf("unexpected no error, expected to contain:\n  %s", test.expectedError)
 				}
 			}
 		})
@@ -916,11 +916,11 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 			err := errs.ToAggregate()
 			if err != nil {
 				if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
-					t.Errorf("expected to contain %s, got %s", e, a)
+					t.Errorf("expected to contain:\n  %s\ngot:\n  %s", e, a)
 				}
 			} else {
 				if test.expectedError != "" {
-					t.Errorf("unexpected no error, expected to contain %s", test.expectedError)
+					t.Errorf("unexpected no error, expected to contain:\n  %s", test.expectedError)
 				}
 			}
 		})
@@ -1355,7 +1355,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					},
 				},
 			}, true),
-			expectedError: `[0].clientConfig.url: Invalid value: "": host must be provided`,
+			expectedError: `[0].clientConfig.url: Invalid value: "": host must be specified`,
 		},
 		{
 			name: "wrong scheme",
@@ -1379,7 +1379,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					},
 				},
 			}, true),
-			expectedError: `host must be provided`,
+			expectedError: `host must be specified`,
 		},
 		{
 			name: "fragment",
@@ -1427,7 +1427,7 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 					},
 				},
 			}, true),
-			expectedError: `host must be provided`,
+			expectedError: `host must be specified`,
 		},
 		{
 			name: "path must start with slash",
@@ -1657,11 +1657,11 @@ func TestValidateMutatingWebhookConfiguration(t *testing.T) {
 			err := errs.ToAggregate()
 			if err != nil {
 				if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
-					t.Errorf("expected to contain %s, got %s", e, a)
+					t.Errorf("expected to contain:\n  %s\ngot:\n  %s", e, a)
 				}
 			} else {
 				if test.expectedError != "" {
-					t.Errorf("unexpected no error, expected to contain %s", test.expectedError)
+					t.Errorf("unexpected no error, expected to contain:\n  %s", test.expectedError)
 				}
 			}
 		})
@@ -1849,11 +1849,11 @@ func TestValidateMutatingWebhookConfigurationUpdate(t *testing.T) {
 			err := errs.ToAggregate()
 			if err != nil {
 				if e, a := test.expectedError, err.Error(); !strings.Contains(a, e) || e == "" {
-					t.Errorf("expected to contain %s, got %s", e, a)
+					t.Errorf("expected to contain:\n  %s\ngot:\n  %s", e, a)
 				}
 			} else {
 				if test.expectedError != "" {
-					t.Errorf("unexpected no error, expected to contain %s", test.expectedError)
+					t.Errorf("unexpected no error, expected to contain:\n  %s", test.expectedError)
 				}
 			}
 		})
