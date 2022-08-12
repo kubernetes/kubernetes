@@ -907,6 +907,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 		pluginToNodeScores[pl.Name()] = make(framework.NodeScoreList, len(nodes))
 	}
 	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	errCh := parallelize.NewErrorChannel()
 
 	// Run Score method for each node in parallel.
