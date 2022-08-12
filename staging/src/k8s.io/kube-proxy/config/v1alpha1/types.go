@@ -189,9 +189,9 @@ type KubeProxyConfiguration struct {
 // ProxyMode represents modes used by the Kubernetes proxy server.
 //
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
-// (newer, faster), 'ipvs'(newest, better in performance and scalability).
+// (newer, faster), 'ipvs' (newest, better in performance and scalability).
 //
-// Two modes of proxy are available in Windows platform: 'userspace'(older, stable) and 'kernelspace' (newer, faster).
+// Two modes of proxy are available in Windows platform: 'userspace' (older, stable) and 'kernelspace' (newer, faster).
 //
 // In Linux platform, if proxy mode is blank, use the best-available proxy (currently iptables, but may change in the
 // future). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are
