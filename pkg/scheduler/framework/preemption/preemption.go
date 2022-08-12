@@ -549,6 +549,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentia
 	nonViolatingCandidates := newCandidateList(numCandidates)
 	violatingCandidates := newCandidateList(numCandidates)
 	parallelCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	nodeStatuses := make(framework.NodeToStatusMap)
 	var statusesLock sync.Mutex
 	var errs []error
