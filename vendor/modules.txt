@@ -299,9 +299,12 @@ github.com/go-logr/logr
 github.com/go-logr/zapr
 # github.com/go-openapi/jsonpointer v0.19.5 => github.com/go-openapi/jsonpointer v0.19.5
 github.com/go-openapi/jsonpointer
-# github.com/go-openapi/jsonreference v0.19.5 => github.com/go-openapi/jsonreference v0.19.5
+# github.com/go-openapi/jsonreference v0.20.0 => github.com/go-openapi/jsonreference v0.19.5
 github.com/go-openapi/jsonreference
-# github.com/go-openapi/swag v0.19.14 => github.com/go-openapi/swag v0.19.14
+# github.com/go-openapi/spec v0.20.6 => github.com/go-openapi/spec v0.20.6
+## explicit
+github.com/go-openapi/spec
+# github.com/go-openapi/swag v0.19.15 => github.com/go-openapi/swag v0.19.14
 github.com/go-openapi/swag
 # github.com/go-ozzo/ozzo-validation v3.5.0+incompatible => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 ## explicit
@@ -2448,7 +2451,7 @@ sigs.k8s.io/kustomize/kyaml/yaml/merge2
 sigs.k8s.io/kustomize/kyaml/yaml/merge3
 sigs.k8s.io/kustomize/kyaml/yaml/schema
 sigs.k8s.io/kustomize/kyaml/yaml/walk
-# sigs.k8s.io/structured-merge-diff/v4 v4.2.1 => sigs.k8s.io/structured-merge-diff/v4 v4.2.1
+# sigs.k8s.io/structured-merge-diff/v4 v4.2.3 => sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 ## explicit
 sigs.k8s.io/structured-merge-diff/v4/fieldpath
 sigs.k8s.io/structured-merge-diff/v4/merge
@@ -2574,6 +2577,7 @@ sigs.k8s.io/yaml
 # github.com/go-logr/zapr => github.com/go-logr/zapr v1.2.0
 # github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
 # github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
+# github.com/go-openapi/spec => github.com/go-openapi/spec v0.20.6
 # github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.14
 # github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 # github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
@@ -2850,5 +2854,5 @@ sigs.k8s.io/yaml
 # sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.10.2
 # sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.4.1
 # sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.13.0
-# sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.2.1
+# sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 # sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0

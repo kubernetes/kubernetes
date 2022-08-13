@@ -11,6 +11,8 @@ require (
 )
 
 replace (
+	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
+	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.14
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 )
