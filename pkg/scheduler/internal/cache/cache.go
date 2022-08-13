@@ -379,7 +379,7 @@ func (cache *cacheImpl) AssumePod(pod *v1.Pod) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	if _, ok := cache.podStates[key]; ok {
-		return fmt.Errorf("pod %v is in the cache, so can't be assumed", klog.KObj(pod))
+		return fmt.Errorf("pod %v is in the cache, so can't be assumed", key)
 	}
 
 	return cache.addPod(pod, true)
@@ -424,14 +424,14 @@ func (cache *cacheImpl) ForgetPod(pod *v1.Pod) error {
 
 	currState, ok := cache.podStates[key]
 	if ok && currState.pod.Spec.NodeName != pod.Spec.NodeName {
-		return fmt.Errorf("pod %v was assumed on %v but assigned to %v", klog.KObj(pod), pod.Spec.NodeName, currState.pod.Spec.NodeName)
+		return fmt.Errorf("pod %v was assumed on %v but assigned to %v", key, pod.Spec.NodeName, currState.pod.Spec.NodeName)
 	}
 
 	// Only assumed pod can be forgotten.
 	if ok && cache.assumedPods.Has(key) {
 		return cache.removePod(pod)
 	}
-	return fmt.Errorf("pod %v wasn't assumed so cannot be forgotten", klog.KObj(pod))
+	return fmt.Errorf("pod %v wasn't assumed so cannot be forgotten", key)
 }
 
 // Assumes that lock is already acquired.
@@ -478,7 +478,6 @@ func (cache *cacheImpl) removePod(pod *v1.Pod) error {
 	n, ok := cache.nodes[pod.Spec.NodeName]
 	if !ok {
 		klog.ErrorS(nil, "Node not found when trying to remove pod", "node", klog.KRef("", pod.Spec.NodeName), "pod", klog.KObj(pod))
-
 	} else {
 		if err := n.info.RemovePod(pod); err != nil {
 			return err
@@ -524,7 +523,7 @@ func (cache *cacheImpl) AddPod(pod *v1.Pod) error {
 			klog.ErrorS(err, "Error occurred while adding pod")
 		}
 	default:
-		return fmt.Errorf("pod %v was already in added state", klog.KObj(pod))
+		return fmt.Errorf("pod %v was already in added state", key)
 	}
 	return nil
 }
@@ -549,7 +548,7 @@ func (cache *cacheImpl) UpdatePod(oldPod, newPod *v1.Pod) error {
 		}
 		return cache.updatePod(oldPod, newPod)
 	}
-	return fmt.Errorf("pod %v is not added to scheduler cache, so cannot be updated", klog.KObj(oldPod))
+	return fmt.Errorf("pod %v is not added to scheduler cache, so cannot be updated", key)
 }
 
 func (cache *cacheImpl) RemovePod(pod *v1.Pod) error {
@@ -563,7 +562,7 @@ func (cache *cacheImpl) RemovePod(pod *v1.Pod) error {
 
 	currState, ok := cache.podStates[key]
 	if !ok {
-		return fmt.Errorf("pod %v is not found in scheduler cache, so cannot be removed from it", klog.KObj(pod))
+		return fmt.Errorf("pod %v is not found in scheduler cache, so cannot be removed from it", key)
 	}
 	if currState.pod.Spec.NodeName != pod.Spec.NodeName {
 		klog.ErrorS(nil, "Pod was added to a different node than it was assumed", "pod", klog.KObj(pod), "assumedNode", klog.KRef("", pod.Spec.NodeName), "currentNode", klog.KRef("", currState.pod.Spec.NodeName))
@@ -602,7 +601,7 @@ func (cache *cacheImpl) GetPod(pod *v1.Pod) (*v1.Pod, error) {
 
 	podState, ok := cache.podStates[key]
 	if !ok {
-		return nil, fmt.Errorf("pod %v does not exist in scheduler cache", klog.KObj(pod))
+		return nil, fmt.Errorf("pod %v does not exist in scheduler cache", key)
 	}
 
 	return podState.pod, nil
