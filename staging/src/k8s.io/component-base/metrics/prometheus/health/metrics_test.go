@@ -32,10 +32,10 @@ var (
 func TestObserveHealthcheck(t *testing.T) {
 	defer legacyregistry.Reset()
 	defer ResetHealthMetrics()
-	initialState := ERROR
+	initialState := Error
 	healthcheckName := "healthcheck-a"
 	initialOutput := `
-        # HELP k8s_healthcheck [ALPHA] This metric records the result of a single health check.
+        # HELP k8s_healthcheck [ALPHA] This metric records the result of a single healthcheck.
         # TYPE k8s_healthcheck gauge
         k8s_healthcheck{name="healthcheck-a",status="error",type="healthz"} 1
         k8s_healthcheck{name="healthcheck-a",status="pending",type="healthz"} 0
@@ -51,10 +51,10 @@ func TestObserveHealthcheck(t *testing.T) {
 		{
 			desc:     "test pending",
 			name:     healthcheckName,
-			hcType:   HEALTHZ,
-			hcStatus: PENDING,
+			hcType:   Healthz,
+			hcStatus: Pending,
 			want: `
-        # HELP k8s_healthcheck [ALPHA] This metric records the result of a single health check.
+        # HELP k8s_healthcheck [ALPHA] This metric records the result of a single healthcheck.
         # TYPE k8s_healthcheck gauge
         k8s_healthcheck{name="healthcheck-a",status="error",type="healthz"} 0
         k8s_healthcheck{name="healthcheck-a",status="pending",type="healthz"} 1
@@ -64,10 +64,10 @@ func TestObserveHealthcheck(t *testing.T) {
 		{
 			desc:     "test success",
 			name:     healthcheckName,
-			hcType:   HEALTHZ,
-			hcStatus: SUCCESS,
+			hcType:   Healthz,
+			hcStatus: Success,
 			want: `
-        # HELP k8s_healthcheck [ALPHA] This metric records the result of a single health check.
+        # HELP k8s_healthcheck [ALPHA] This metric records the result of a single healthcheck.
         # TYPE k8s_healthcheck gauge
         k8s_healthcheck{name="healthcheck-a",status="error",type="healthz"} 0
         k8s_healthcheck{name="healthcheck-a",status="pending",type="healthz"} 0
