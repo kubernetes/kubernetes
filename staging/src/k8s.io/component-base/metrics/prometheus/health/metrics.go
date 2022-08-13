@@ -27,32 +27,33 @@ import (
 type HealthcheckStatus string
 
 const (
-	SUCCESS HealthcheckStatus = "success"
-	ERROR   HealthcheckStatus = "error"
-	PENDING HealthcheckStatus = "pending"
+	Success HealthcheckStatus = "success"
+	Error   HealthcheckStatus = "error"
+	Pending HealthcheckStatus = "pending"
 )
 
 type HealthcheckType string
 
 const (
-	LIVEZ   HealthcheckType = "livez"
-	READYZ  HealthcheckType = "readyz"
-	HEALTHZ HealthcheckType = "healthz"
+	Livez   HealthcheckType = "livez"
+	Readyz  HealthcheckType = "readyz"
+	Healthz HealthcheckType = "healthz"
 )
 
 var (
 	// healthcheck is a Prometheus Gauge metrics used for recording the results of a k8s healthcheck.
 	healthcheck = k8smetrics.NewGaugeVec(
 		&k8smetrics.GaugeOpts{
-			Name:           "k8s_healthcheck",
-			Help:           "This metric records the result of a single health check.",
+			Namespace:      "k8s",
+			Name:           "healthcheck",
+			Help:           "This metric records the result of a single healthcheck.",
 			StabilityLevel: k8smetrics.ALPHA,
 		},
 		[]string{"name", "type", "status"},
 	)
-	statuses  = []HealthcheckStatus{SUCCESS, ERROR, PENDING}
-	statusSet = map[HealthcheckStatus]struct{}{SUCCESS: {}, ERROR: {}, PENDING: {}}
-	checkSet  = map[HealthcheckType]struct{}{LIVEZ: {}, READYZ: {}, HEALTHZ: {}}
+	statuses  = []HealthcheckStatus{Success, Error, Pending}
+	statusSet = map[HealthcheckStatus]struct{}{Success: {}, Error: {}, Pending: {}}
+	checkSet  = map[HealthcheckType]struct{}{Livez: {}, Readyz: {}, Healthz: {}}
 )
 
 func init() {
