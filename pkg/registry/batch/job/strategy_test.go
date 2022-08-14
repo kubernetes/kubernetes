@@ -330,11 +330,11 @@ func testJobStrategy(t *testing.T) {
 		Spec: batch.JobSpec{
 			Selector:       validSelector,
 			Template:       validPodTemplateSpec,
-			ManualSelector: pointer.BoolPtr(true),
-			Completions:    pointer.Int32Ptr(2),
+			ManualSelector: pointer.Bool(true),
+			Completions:    pointer.Int32(2),
 			// Set gated values.
-			Suspend:                 pointer.BoolPtr(true),
-			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
+			Suspend:                 pointer.Bool(true),
+			TTLSecondsAfterFinished: pointer.Int32(0),
 			CompletionMode:          completionModePtr(batch.IndexedCompletion),
 		},
 		Status: batch.JobStatus{
@@ -387,9 +387,9 @@ func testJobStrategy(t *testing.T) {
 		},
 		Spec: batch.JobSpec{
 			Parallelism: &parallelism,
-			Completions: pointer.Int32Ptr(2),
+			Completions: pointer.Int32(2),
 			// Update gated features.
-			TTLSecondsAfterFinished: pointer.Int32Ptr(1),
+			TTLSecondsAfterFinished: pointer.Int32(1),
 			CompletionMode:          completionModePtr(batch.IndexedCompletion), // No change because field is immutable.
 		},
 		Status: batch.JobStatus{
@@ -431,9 +431,9 @@ func testJobStrategy(t *testing.T) {
 
 	// Test updating suspend false->true and nil-> true when the feature gate is
 	// disabled. We don't care about other combinations.
-	job.Spec.Suspend, updatedJob.Spec.Suspend = pointer.BoolPtr(false), pointer.BoolPtr(true)
+	job.Spec.Suspend, updatedJob.Spec.Suspend = pointer.Bool(false), pointer.Bool(true)
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
-	job.Spec.Suspend, updatedJob.Spec.Suspend = nil, pointer.BoolPtr(true)
+	job.Spec.Suspend, updatedJob.Spec.Suspend = nil, pointer.Bool(true)
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
 
 	// Make sure we correctly implement the interface.
@@ -488,12 +488,12 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: pointer.Bool(true),
+					Parallelism:    pointer.Int32(1),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Parallelism = pointer.Int32Ptr(2)
+				job.Spec.Parallelism = pointer.Int32(2)
 			},
 		},
 		"update completions disallowed": {
@@ -506,13 +506,13 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
-					Completions:    pointer.Int32Ptr(1),
+					ManualSelector: pointer.Bool(true),
+					Parallelism:    pointer.Int32(1),
+					Completions:    pointer.Int32(1),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Completions = pointer.Int32Ptr(2)
+				job.Spec.Completions = pointer.Int32(2)
 			},
 			wantErrs: field.ErrorList{
 				{Type: field.ErrorTypeInvalid, Field: "spec.completions"},
@@ -529,8 +529,8 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: pointer.Bool(true),
+					Parallelism:    pointer.Int32(1),
 				},
 			},
 			update: func(job *batch.Job) {
@@ -551,8 +551,8 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: pointer.Bool(true),
+					Parallelism:    pointer.Int32(1),
 				},
 			},
 			update: func(job *batch.Job) {
@@ -576,8 +576,8 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: pointer.Bool(true),
+					Parallelism:    pointer.Int32(1),
 				},
 			},
 			update: func(job *batch.Job) {
@@ -596,8 +596,8 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
+					ManualSelector: pointer.Bool(true),
+					Parallelism:    pointer.Int32(1),
 				},
 			},
 			update: func(job *batch.Job) {
@@ -619,9 +619,9 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
-					Suspend:        pointer.BoolPtr(true),
+					ManualSelector: pointer.Bool(true),
+					Parallelism:    pointer.Int32(1),
+					Suspend:        pointer.Bool(true),
 				},
 				Status: batch.JobStatus{
 					StartTime: &now,
@@ -646,9 +646,9 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
-					Suspend:        pointer.BoolPtr(true),
+					ManualSelector: pointer.Bool(true),
+					Parallelism:    pointer.Int32(1),
+					Suspend:        pointer.Bool(true),
 				},
 			},
 			update: func(job *batch.Job) {
@@ -667,9 +667,9 @@ func TestJobStrategyValidateUpdate(t *testing.T) {
 				Spec: batch.JobSpec{
 					Selector:       validSelector,
 					Template:       validPodTemplateSpec,
-					ManualSelector: pointer.BoolPtr(true),
-					Parallelism:    pointer.Int32Ptr(1),
-					Suspend:        pointer.BoolPtr(true),
+					ManualSelector: pointer.Bool(true),
+					Parallelism:    pointer.Int32(1),
+					Suspend:        pointer.Bool(true),
 				},
 			},
 			update: func(job *batch.Job) {

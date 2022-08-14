@@ -31,7 +31,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func TestCheckGeneratedNameError(t *testing.T) {
@@ -402,22 +402,22 @@ func TestDropTypeDependentFields(t *testing.T) {
 		}
 	}
 	setAllocateLoadBalancerNodePortsTrue := func(svc *api.Service) {
-		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+		svc.Spec.AllocateLoadBalancerNodePorts = pointer.Bool(true)
 	}
 	setAllocateLoadBalancerNodePortsFalse := func(svc *api.Service) {
-		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
+		svc.Spec.AllocateLoadBalancerNodePorts = pointer.Bool(false)
 	}
 	clearAllocateLoadBalancerNodePorts := func(svc *api.Service) {
 		svc.Spec.AllocateLoadBalancerNodePorts = nil
 	}
 	setLoadBalancerClass := func(svc *api.Service) {
-		svc.Spec.LoadBalancerClass = utilpointer.StringPtr("test-load-balancer-class")
+		svc.Spec.LoadBalancerClass = pointer.String("test-load-balancer-class")
 	}
 	clearLoadBalancerClass := func(svc *api.Service) {
 		svc.Spec.LoadBalancerClass = nil
 	}
 	changeLoadBalancerClass := func(svc *api.Service) {
-		svc.Spec.LoadBalancerClass = utilpointer.StringPtr("test-load-balancer-class-changed")
+		svc.Spec.LoadBalancerClass = pointer.String("test-load-balancer-class-changed")
 	}
 
 	testCases := []struct {

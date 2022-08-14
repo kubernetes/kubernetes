@@ -42,7 +42,7 @@ func makeTestContainerMetricsHPA(hasContainerMetric bool) *autoscaling.Horizonta
 				Container: "test-container",
 				Target: autoscaling.MetricTarget{
 					Type:               autoscaling.UtilizationMetricType,
-					AverageUtilization: pointer.Int32Ptr(30),
+					AverageUtilization: pointer.Int32(30),
 				},
 			},
 		})
