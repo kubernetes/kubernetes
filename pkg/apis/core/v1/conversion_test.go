@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -246,7 +246,7 @@ func TestReplicationControllerConversion(t *testing.T) {
 				Namespace: "namespace",
 			},
 			Spec: v1.ReplicationControllerSpec{
-				Replicas:        utilpointer.Int32Ptr(1),
+				Replicas:        pointer.Int32(1),
 				MinReadySeconds: 32,
 				Selector:        map[string]string{"foo": "bar", "bar": "foo"},
 				Template: &v1.PodTemplateSpec{

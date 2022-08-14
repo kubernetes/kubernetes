@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/node"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -227,12 +227,12 @@ func TestValidateScheduling(t *testing.T) {
 				Key:               "valid",
 				Operator:          core.TolerationOpExists,
 				Effect:            core.TaintEffectNoExecute,
-				TolerationSeconds: utilpointer.Int64Ptr(5),
+				TolerationSeconds: pointer.Int64(5),
 			}, {
 				Key:               "valid",
 				Operator:          core.TolerationOpExists,
 				Effect:            core.TaintEffectNoExecute,
-				TolerationSeconds: utilpointer.Int64Ptr(10),
+				TolerationSeconds: pointer.Int64(10),
 			}},
 		},
 		expectErrs: 1,
