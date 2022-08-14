@@ -35,7 +35,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 
 	"k8s.io/klog/v2"
 )
@@ -126,7 +126,7 @@ func NewHollowProxyOrDie(
 			Recorder:         recorder,
 			ProxyMode:        "fake",
 			NodeRef:          nodeRef,
-			OOMScoreAdj:      utilpointer.Int32Ptr(0),
+			OOMScoreAdj:      pointer.Int32(0),
 			ConfigSyncPeriod: 30 * time.Second,
 		},
 	}, nil
