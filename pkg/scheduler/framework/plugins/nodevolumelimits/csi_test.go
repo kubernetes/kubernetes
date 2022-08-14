@@ -35,7 +35,7 @@ import (
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -636,7 +636,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 			}
 			if addLimits {
 				driver.Allocatable = &storagev1.VolumeNodeResources{
-					Count: utilpointer.Int32Ptr(int32(limit)),
+					Count: pointer.Int32(int32(limit)),
 				}
 			}
 			csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, driver)

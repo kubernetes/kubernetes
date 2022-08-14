@@ -230,7 +230,7 @@ func (p *PodWrapper) OwnerReference(name string, gvk schema.GroupVersionKind) *P
 			APIVersion: gvk.GroupVersion().String(),
 			Kind:       gvk.Kind,
 			Name:       name,
-			Controller: pointer.BoolPtr(true),
+			Controller: pointer.Bool(true),
 		},
 	}
 	return p
