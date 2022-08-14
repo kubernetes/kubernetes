@@ -67,6 +67,7 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 	// make sure kubelet readonly (10255) and cadvisor (4194) ports are closed on the public IP address
 	disabledPorts := []int{ports.KubeletReadOnlyPort, 4194}
 	for _, port := range disabledPorts {
+		port := port
 		ginkgo.It(fmt.Sprintf("should not have port %d open on its all public IP addresses", port), func() {
 			portClosedTest(f, node, port)
 		})
