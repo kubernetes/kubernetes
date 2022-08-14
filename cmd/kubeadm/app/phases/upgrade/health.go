@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -114,14 +114,14 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 			Namespace: ns,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: utilpointer.Int32Ptr(0),
+			BackoffLimit: pointer.Int32(0),
 			Template: v1.PodTemplateSpec{
 				Spec: v1.PodSpec{
 					RestartPolicy: v1.RestartPolicyNever,
 					SecurityContext: &v1.PodSecurityContext{
-						RunAsUser:    utilpointer.Int64Ptr(999),
-						RunAsGroup:   utilpointer.Int64Ptr(999),
-						RunAsNonRoot: utilpointer.BoolPtr(true),
+						RunAsUser:    pointer.Int64(999),
+						RunAsGroup:   pointer.Int64(999),
+						RunAsNonRoot: pointer.Bool(true),
 					},
 					Tolerations: []v1.Toleration{
 						{
