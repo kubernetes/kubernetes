@@ -31,7 +31,7 @@ import (
 	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -792,14 +792,14 @@ func getFakePVCLister(filterName string) fakeframework.PersistentVolumeClaimList
 			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCWithDefaultSCPod"},
 			Spec: v1.PersistentVolumeClaimSpec{
 				VolumeName:       "",
-				StorageClassName: utilpointer.StringPtr("standard-sc"),
+				StorageClassName: pointer.String("standard-sc"),
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "unboundPVCWithInvalidSCPod"},
 			Spec: v1.PersistentVolumeClaimSpec{
 				VolumeName:       "",
-				StorageClassName: utilpointer.StringPtr("invalid-sc"),
+				StorageClassName: pointer.String("invalid-sc"),
 			},
 		},
 	}
