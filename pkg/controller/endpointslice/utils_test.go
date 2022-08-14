@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func TestNewEndpointSlice(t *testing.T) {
@@ -256,11 +256,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(true),
-					Serving:     utilpointer.BoolPtr(true),
-					Terminating: utilpointer.BoolPtr(false),
+					Ready:       pointer.Bool(true),
+					Serving:     pointer.Bool(true),
+					Terminating: pointer.Bool(false),
 				},
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -276,11 +276,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(true),
-					Serving:     utilpointer.BoolPtr(true),
-					Terminating: utilpointer.BoolPtr(false),
+					Ready:       pointer.Bool(true),
+					Serving:     pointer.Bool(true),
+					Terminating: pointer.Bool(false),
 				},
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -296,11 +296,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(false),
-					Serving:     utilpointer.BoolPtr(false),
-					Terminating: utilpointer.BoolPtr(false),
+					Ready:       pointer.Bool(false),
+					Serving:     pointer.Bool(false),
+					Terminating: pointer.Bool(false),
 				},
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -316,11 +316,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(true),
-					Serving:     utilpointer.BoolPtr(false),
-					Terminating: utilpointer.BoolPtr(false),
+					Ready:       pointer.Bool(true),
+					Serving:     pointer.Bool(false),
+					Terminating: pointer.Bool(false),
 				},
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -337,12 +337,12 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(true),
-					Serving:     utilpointer.BoolPtr(true),
-					Terminating: utilpointer.BoolPtr(false),
+					Ready:       pointer.Bool(true),
+					Serving:     pointer.Bool(true),
+					Terminating: pointer.Bool(false),
 				},
-				Zone:     utilpointer.StringPtr("us-central1-a"),
-				NodeName: utilpointer.StringPtr("node-1"),
+				Zone:     pointer.String("us-central1-a"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -359,12 +359,12 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.4"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(true),
-					Serving:     utilpointer.BoolPtr(true),
-					Terminating: utilpointer.BoolPtr(false),
+					Ready:       pointer.Bool(true),
+					Serving:     pointer.Bool(true),
+					Terminating: pointer.Bool(false),
 				},
-				Zone:     utilpointer.StringPtr("us-central1-a"),
-				NodeName: utilpointer.StringPtr("node-1"),
+				Zone:     pointer.String("us-central1-a"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -381,13 +381,13 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(true),
-					Serving:     utilpointer.BoolPtr(true),
-					Terminating: utilpointer.BoolPtr(false),
+					Ready:       pointer.Bool(true),
+					Serving:     pointer.Bool(true),
+					Terminating: pointer.Bool(false),
 				},
 				Hostname: &readyPodHostname.Spec.Hostname,
-				Zone:     utilpointer.StringPtr("us-central1-a"),
-				NodeName: utilpointer.StringPtr("node-1"),
+				Zone:     pointer.String("us-central1-a"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -403,11 +403,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(true),
-					Serving:     utilpointer.BoolPtr(true),
-					Terminating: utilpointer.BoolPtr(false),
+					Ready:       pointer.Bool(true),
+					Serving:     pointer.Bool(true),
+					Terminating: pointer.Bool(false),
 				},
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -423,11 +423,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(false),
-					Serving:     utilpointer.BoolPtr(true),
-					Terminating: utilpointer.BoolPtr(true),
+					Ready:       pointer.Bool(false),
+					Serving:     pointer.Bool(true),
+					Terminating: pointer.Bool(true),
 				},
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -443,11 +443,11 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses: []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{
-					Ready:       utilpointer.BoolPtr(false),
-					Serving:     utilpointer.BoolPtr(false),
-					Terminating: utilpointer.BoolPtr(true),
+					Ready:       pointer.Bool(false),
+					Serving:     pointer.Bool(false),
+					Terminating: pointer.Bool(true),
 				},
-				NodeName: utilpointer.StringPtr("node-1"),
+				NodeName: pointer.String("node-1"),
 				TargetRef: &v1.ObjectReference{
 					Kind:      "Pod",
 					Namespace: ns,
@@ -527,7 +527,7 @@ func TestGetEndpointPorts(t *testing.T) {
 						Port:        80,
 						TargetPort:  intstr.FromInt(80),
 						Protocol:    protoTCP,
-						AppProtocol: utilpointer.StringPtr("example.com/custom-protocol"),
+						AppProtocol: pointer.String("example.com/custom-protocol"),
 					}},
 				},
 			},
@@ -539,10 +539,10 @@ func TestGetEndpointPorts(t *testing.T) {
 				},
 			},
 			expectedPorts: []*discovery.EndpointPort{{
-				Name:        utilpointer.StringPtr("http"),
-				Port:        utilpointer.Int32Ptr(80),
+				Name:        pointer.String("http"),
+				Port:        pointer.Int32(80),
 				Protocol:    &protoTCP,
-				AppProtocol: utilpointer.StringPtr("example.com/custom-protocol"),
+				AppProtocol: pointer.String("example.com/custom-protocol"),
 			}},
 		},
 		"service with named port and AppProtocol on one port": {
@@ -557,7 +557,7 @@ func TestGetEndpointPorts(t *testing.T) {
 						Name:        "https",
 						Protocol:    protoTCP,
 						TargetPort:  intstr.FromString("https"),
-						AppProtocol: utilpointer.StringPtr("https"),
+						AppProtocol: pointer.String("https"),
 					}},
 				},
 			},
@@ -573,14 +573,14 @@ func TestGetEndpointPorts(t *testing.T) {
 				},
 			},
 			expectedPorts: []*discovery.EndpointPort{{
-				Name:     utilpointer.StringPtr("http"),
-				Port:     utilpointer.Int32Ptr(80),
+				Name:     pointer.String("http"),
+				Port:     pointer.Int32(80),
 				Protocol: &protoTCP,
 			}, {
-				Name:        utilpointer.StringPtr("https"),
-				Port:        utilpointer.Int32Ptr(443),
+				Name:        pointer.String("https"),
+				Port:        pointer.Int32(443),
 				Protocol:    &protoTCP,
-				AppProtocol: utilpointer.StringPtr("https"),
+				AppProtocol: pointer.String("https"),
 			}},
 		},
 	}

@@ -220,7 +220,7 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 					CompletedIndexes: tc.prevSucceeded,
 				},
 				Spec: batch.JobSpec{
-					Completions: pointer.Int32Ptr(tc.completions),
+					Completions: pointer.Int32(tc.completions),
 				},
 			}
 			if tc.trackingWithFinalizers {
