@@ -28,7 +28,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimetesting "k8s.io/cri-api/pkg/apis/testing"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 func seccompLocalhostRef(profileName string) string {
@@ -279,7 +279,7 @@ func TestFieldProfile(t *testing.T) {
 			description: "SeccompProfileTypeLocalhost should return localhost",
 			scmpProfile: &v1.SeccompProfile{
 				Type:             v1.SeccompProfileTypeLocalhost,
-				LocalhostProfile: utilpointer.StringPtr("profile.json"),
+				LocalhostProfile: pointer.String("profile.json"),
 			},
 			rootPath:        "/test/",
 			expectedProfile: "localhost//test/profile.json",
@@ -335,7 +335,7 @@ func TestFieldProfileDefaultSeccomp(t *testing.T) {
 			description: "SeccompProfileTypeLocalhost should return localhost",
 			scmpProfile: &v1.SeccompProfile{
 				Type:             v1.SeccompProfileTypeLocalhost,
-				LocalhostProfile: utilpointer.StringPtr("profile.json"),
+				LocalhostProfile: pointer.String("profile.json"),
 			},
 			rootPath:        "/test/",
 			expectedProfile: "localhost//test/profile.json",

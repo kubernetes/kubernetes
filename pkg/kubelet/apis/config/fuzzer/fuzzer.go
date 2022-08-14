@@ -30,7 +30,7 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/pointer"
 )
 
 // Funcs returns the fuzzer functions for the kubeletconfig apis.
@@ -109,7 +109,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Logging.Format = "text"
 			}
 			obj.EnableSystemLogHandler = true
-			obj.MemoryThrottlingFactor = utilpointer.Float64Ptr(rand.Float64())
+			obj.MemoryThrottlingFactor = pointer.Float64(rand.Float64())
 			obj.LocalStorageCapacityIsolation = true
 		},
 	}
