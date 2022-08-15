@@ -127,8 +127,8 @@ func (kl *Kubelet) removeOrphanedPodVolumeDirs(uid types.UID) []error {
 	}
 	if len(volumePaths) > 0 {
 		for _, volumePath := range volumePaths {
-			if err := syscall.Rmdir(volumePath); err != nil {
-				orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but failed to rmdir() volume at path %v: %v", uid, volumePath, err))
+			if err := os.RemoveAll(volumePath); err != nil {
+				orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but failed to RemoveAll() volume at path %v: %v", uid, volumePath, err))
 			} else {
 				klog.InfoS("Cleaned up orphaned volume from pod", "podUID", uid, "path", volumePath)
 			}
