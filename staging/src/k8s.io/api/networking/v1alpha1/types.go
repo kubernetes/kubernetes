@@ -19,6 +19,23 @@ package v1alpha1
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+const (
+
+	// LabelServiceIPAddressFamily is used to indicate the IP family of a Kubernetes IPAddress.
+	LabelServiceIPAddressFamily = "ipaddress.kubernetes.io/ip-family"
+
+	// LabelServiceCIDRFromFlags is used to indicate the service ip CIDR was generated
+	// from the apiserver flags.
+	LabelServiceCIDRFromFlags = "service-cidr.kubernetes.io/service-cidr-from-flags"
+
+	// ServiceCIDRProtectionFinalizer is used to protect service-cidrs deletion.
+	ServiceCIDRProtectionFinalizer = "kubernetes.io/service-cidr-protection"
+
+	// IPAddressProtectionFinalizer is used to protect ip addresses deletion.
+	IPAddressProtectionFinalizer = "kubernetes.io/ip-protection"
 )
 
 // +genclient
@@ -92,4 +109,92 @@ type ClusterCIDRList struct {
 
 	// Items is the list of ClusterCIDRs.
 	Items []ClusterCIDR `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
+
+// ServiceCIDR defines a range of IPs using CIDR format (192.168.0.0/24 or 2001:db2::0/64).
+type ServiceCIDR struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// +optional
+	Spec ServiceCIDRSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+}
+
+// ServiceCIDRSpec describe how the ServiceCIDR's specification looks like.
+type ServiceCIDRSpec struct {
+	// IPv4 defines an IPv4 IP block in CIDR notation(e.g. "192.168.0.0/24").
+	// This field is immutable.
+	// +optional
+	IPv4 string `json:"ipv4cidr,omitempty" protobuf:"bytes,1,opt,name=ipv4cidr"`
+
+	// IPv6 defines an IPv6 IP block in CIDR notation(e.g. "fd12:3456:789a:1::/64").
+	// This field is immutable.
+	// +optional
+	IPv6 string `json:"ipv6cidr,omitempty" protobuf:"bytes,2,opt,name=ipv6cidr"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
+
+// ServiceCIDRList contains a list of ServiceCIDR objects.
+type ServiceCIDRList struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items           []ServiceCIDR `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
+
+// IPAddress represents an IP used by Kubernetes associated to a ServiceCIDR.
+// The name of the object is the IP address in canonical format.
+type IPAddress struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	// +optional
+	Spec IPAddressSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
+}
+
+// IPAddressSpec describe the attributes in an IP Address,
+type IPAddressSpec struct {
+	// ParentRef references the resources (usually Services) that a IPAddress wants to be attached to.
+	// +required
+	ParentRef *ParentReference `json:"parentRef,omitempty" protobuf:"bytes,1,opt,name=parentRef"`
+}
+type ParentReference struct {
+	// Group is the group of the referent.
+	// +optional
+	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
+	// Kind is kind of the referent.
+	// +optional
+	Resource string `json:"kind,omitempty" protobuf:"bytes,2,opt,name=resource"`
+	// Namespace is the namespace of the referent
+	// +optional
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
+	// Name is the name of the referent
+	// +optional
+	Name string `json:"name,omitempty" protobuf:"bytes,4,opt,name=name"`
+	// UID is the uid of the referent
+	// +optional
+	UID types.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.26
+
+// IPAddressList contains a list of IPAddress.
+type IPAddressList struct {
+	metav1.TypeMeta `json:",inline"`
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Items           []IPAddress `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
