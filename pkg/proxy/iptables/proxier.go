@@ -846,6 +846,9 @@ func (proxier *Proxier) syncProxyRules() {
 		if !success {
 			klog.InfoS("Sync failed", "retryingTime", proxier.syncPeriod)
 			proxier.syncRunner.RetryAfter(proxier.syncPeriod)
+			if tryPartialSync {
+				metrics.IptablesPartialRestoreFailuresTotal.Inc()
+			}
 			// proxier.serviceChanges and proxier.endpointChanges have already
 			// been flushed, so we've lost the state needed to be able to do
 			// a partial sync.

@@ -7684,6 +7684,7 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
+	metrics.RegisterMetrics()
 
 	// Create initial state
 	var svc2 *v1.Service
@@ -7878,8 +7879,10 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 
 	// Add a service, sync, then add its endpoints. (The first sync will be a no-op other
 	// than adding the REJECT rule. The second sync will create the new service.)
+	var svc4 *v1.Service
 	makeServiceMap(fp,
 		makeTestService("ns4", "svc4", func(svc *v1.Service) {
+			svc4 = svc
 			svc.Spec.Type = v1.ServiceTypeClusterIP
 			svc.Spec.ClusterIP = "172.30.0.44"
 			svc.Spec.Ports = []v1.ServicePort{{
@@ -8080,6 +8083,102 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
 		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
 		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		COMMIT
+		`)
+	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
+
+	// Now force a partial resync error and ensure that it recovers correctly
+	if fp.needFullSync {
+		t.Fatalf("Proxier unexpectedly already needs a full sync?")
+	}
+	prFailures, err := testutil.GetCounterMetricValue(metrics.IptablesPartialRestoreFailuresTotal)
+	if err != nil {
+		t.Fatalf("Could not get partial restore failures metric: %v", err)
+	}
+	if prFailures != 0.0 {
+		t.Errorf("Already did a partial resync? Something failed earlier!")
+	}
+
+	// Add a rule jumping from svc3's service chain to svc4's endpoint, then try to
+	// delete svc4. This will fail because the partial resync won't rewrite svc3's
+	// rules and so the partial restore would leave a dangling jump from there to
+	// svc4's endpoint. The proxier will then queue a full resync in response to the
+	// partial resync failure, and the full resync will succeed (since it will rewrite
+	// svc3's rules as well).
+	//
+	// This is an absurd scenario, but it has to be; partial resync failures are
+	// supposed to be impossible; if we knew of any non-absurd scenario that would
+	// cause such a failure, then that would be a bug and we would fix it.
+	if _, err := fp.iptables.ChainExists(utiliptables.TableNAT, utiliptables.Chain("KUBE-SEP-AYCN5HPXMIRJNJXU")); err != nil {
+		t.Fatalf("svc4's endpoint chain unexpected already does not exist!")
+	}
+	if _, err := fp.iptables.EnsureRule(utiliptables.Append, utiliptables.TableNAT, utiliptables.Chain("KUBE-SVC-X27LE4BHSL4DOUIK"), "-j", "KUBE-SEP-AYCN5HPXMIRJNJXU"); err != nil {
+		t.Fatalf("Could not add bad iptables rule: %v", err)
+	}
+
+	fp.OnServiceDelete(svc4)
+	fp.syncProxyRules()
+
+	if _, err := fp.iptables.ChainExists(utiliptables.TableNAT, utiliptables.Chain("KUBE-SEP-AYCN5HPXMIRJNJXU")); err != nil {
+		t.Errorf("svc4's endpoint chain was successfully deleted despite dangling references!")
+	}
+	if !fp.needFullSync {
+		t.Errorf("Proxier did not fail on previous partial resync?")
+	}
+	updatedPRFailures, err := testutil.GetCounterMetricValue(metrics.IptablesPartialRestoreFailuresTotal)
+	if err != nil {
+		t.Errorf("Could not get partial restore failures metric: %v", err)
+	}
+	if updatedPRFailures != prFailures+1.0 {
+		t.Errorf("Partial restore failures metric was not incremented after failed partial resync (expected %.02f, got %.02f)", prFailures+1.0, updatedPRFailures)
+	}
+
+	// On retry we should do a full resync, which should succeed (and delete svc4)
+	fp.syncProxyRules()
+
+	expected = dedent.Dedent(`
+		*filter
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
+		:KUBE-EXTERNAL-SERVICES - [0:0]
+		:KUBE-FORWARD - [0:0]
+		:KUBE-PROXY-FIREWALL - [0:0]
+		-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark 0x4000/0x4000 -j ACCEPT
+		-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+		COMMIT
+		*nat
+		:KUBE-NODEPORTS - [0:0]
+		:KUBE-SERVICES - [0:0]
+		:KUBE-MARK-MASQ - [0:0]
+		:KUBE-POSTROUTING - [0:0]
+		:KUBE-SEP-AYCN5HPXMIRJNJXU - [0:0]
+		:KUBE-SEP-DKCFIS26GWF2WLWC - [0:0]
+		:KUBE-SEP-JVVZVJ7BSEPPRNBS - [0:0]
+		:KUBE-SEP-SNQ3ZNILQDEJNDQO - [0:0]
+		:KUBE-SVC-4SW47YFZTEDKD3PK - [0:0]
+		:KUBE-SVC-X27LE4BHSL4DOUIK - [0:0]
+		:KUBE-SVC-XPGD46QRK7WJZT7O - [0:0]
+		-A KUBE-SERVICES -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 -j KUBE-SVC-XPGD46QRK7WJZT7O
+		-A KUBE-SERVICES -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 -j KUBE-SVC-X27LE4BHSL4DOUIK
+		-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
+		-A KUBE-POSTROUTING -m mark ! --mark 0x4000/0x4000 -j RETURN
+		-A KUBE-POSTROUTING -j MARK --xor-mark 0x4000
+		-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -j MASQUERADE
+		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -s 10.0.3.2 -j KUBE-MARK-MASQ
+		-A KUBE-SEP-DKCFIS26GWF2WLWC -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.2:80
+		-A KUBE-SEP-JVVZVJ7BSEPPRNBS -m comment --comment ns3/svc3:p80 -s 10.0.3.3 -j KUBE-MARK-MASQ
+		-A KUBE-SEP-JVVZVJ7BSEPPRNBS -m comment --comment ns3/svc3:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.3.3:80
+		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -s 10.0.1.1 -j KUBE-MARK-MASQ
+		-A KUBE-SEP-SNQ3ZNILQDEJNDQO -m comment --comment ns1/svc1:p80 -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
+		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 cluster IP" -m tcp -p tcp -d 172.30.0.43 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.2:80" -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-DKCFIS26GWF2WLWC
+		-A KUBE-SVC-X27LE4BHSL4DOUIK -m comment --comment "ns3/svc3:p80 -> 10.0.3.3:80" -j KUBE-SEP-JVVZVJ7BSEPPRNBS
+		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 cluster IP" -m tcp -p tcp -d 172.30.0.41 --dport 80 ! -s 10.0.0.0/8 -j KUBE-MARK-MASQ
+		-A KUBE-SVC-XPGD46QRK7WJZT7O -m comment --comment "ns1/svc1:p80 -> 10.0.1.1:80" -j KUBE-SEP-SNQ3ZNILQDEJNDQO
+		-X KUBE-SEP-AYCN5HPXMIRJNJXU
+		-X KUBE-SVC-4SW47YFZTEDKD3PK
 		COMMIT
 		`)
 	assertIPTablesRulesEqual(t, getLine(), false, expected, fp.iptablesData.String())
