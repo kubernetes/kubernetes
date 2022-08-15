@@ -178,11 +178,15 @@ func (e *Runner) SetDataInitializer(builder func(cmd *cobra.Command, args []stri
 // This action can be executed explicitly out, when it is necessary to get the RunData
 // before actually executing Run, or implicitly when invoking Run.
 func (e *Runner) InitData(args []string) (RunData, error) {
-	if e.runData == nil && e.runDataInitializer != nil {
-		var err error
-		if e.runData, err = e.runDataInitializer(e.runCmd, args); err != nil {
-			return nil, err
-		}
+	if e.runData == nil {
+		 if e.runDataInitializer != nil {
+			 var err error
+			 if e.runData, err = e.runDataInitializer(e.runCmd, args); err != nil {
+				 return nil, err
+			 }
+		 } else {
+			 return nil, errors.Errorf("e.runData and e.runDataInitializer are both nil.")
+		 }
 	}
 
 	return e.runData, nil
