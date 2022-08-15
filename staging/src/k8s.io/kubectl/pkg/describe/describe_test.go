@@ -5751,6 +5751,95 @@ Events:           <none>` + "\n",
 	}
 }
 
+func TestDescribeServiceCIDR(t *testing.T) {
+
+	testcases := map[string]struct {
+		input  *fake.Clientset
+		output string
+	}{
+		"ServiceCIDR v1alpha1": {
+			input: fake.NewSimpleClientset(&networkingv1alpha1.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1alpha1.ServiceCIDRSpec{
+					IPv4: "10.1.0.0/16",
+					IPv6: "fd00:1:1::/64",
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+IPv4:         10.1.0.0/16
+IPv6:         fd00:1:1::/64
+Events:       <none>` + "\n",
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			c := &describeClient{T: t, Namespace: "foo", Interface: tc.input}
+			d := ServiceCIDRDescriber{c}
+			out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if out != tc.output {
+				t.Errorf("expected :\n%s\nbut got output:\n%s diff:\n%s", tc.output, out, cmp.Diff(tc.output, out))
+			}
+		})
+	}
+}
+
+func TestDescribeIPAddress(t *testing.T) {
+
+	testcases := map[string]struct {
+		input  *fake.Clientset
+		output string
+	}{
+		"IPAddress v1alpha1": {
+			input: fake.NewSimpleClientset(&networkingv1alpha1.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo.123",
+				},
+				Spec: networkingv1alpha1.IPAddressSpec{
+					ParentRef: &networkingv1alpha1.ParentReference{
+						Group:     "mygroup",
+						Resource:  "myresource",
+						Namespace: "mynamespace",
+						Name:      "myname",
+					},
+				},
+			}),
+
+			output: `Name:         foo.123
+Labels:       <none>
+Annotations:  <none>
+Parent Reference:
+  Group:      mygroup
+  Resource:   myresource
+  Namespace:  mynamespace
+  Name:       myname
+Events:       <none>` + "\n",
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			c := &describeClient{T: t, Namespace: "foo", Interface: tc.input}
+			d := IPAddressDescriber{c}
+			out, err := d.Describe("bar", "foo.123", DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if out != tc.output {
+				t.Errorf("expected :\n%s\nbut got output:\n%s diff:\n%s", tc.output, out, cmp.Diff(tc.output, out))
+			}
+		})
+	}
+}
+
 func TestControllerRef(t *testing.T) {
 	var replicas int32 = 1
 	f := fake.NewSimpleClientset(

@@ -217,6 +217,8 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]ResourceDescr
 		{Group: networkingv1.GroupName, Kind: "Ingress"}:                          &IngressDescriber{c},
 		{Group: networkingv1.GroupName, Kind: "IngressClass"}:                     &IngressClassDescriber{c},
 		{Group: networkingv1alpha1.GroupName, Kind: "ClusterCIDR"}:                &ClusterCIDRDescriber{c},
+		{Group: networkingv1alpha1.GroupName, Kind: "ServiceCIDR"}:                &ServiceCIDRDescriber{c},
+		{Group: networkingv1alpha1.GroupName, Kind: "IPAddress"}:                  &IPAddressDescriber{c},
 		{Group: batchv1.GroupName, Kind: "Job"}:                                   &JobDescriber{c},
 		{Group: batchv1.GroupName, Kind: "CronJob"}:                               &CronJobDescriber{c},
 		{Group: batchv1beta1.GroupName, Kind: "CronJob"}:                          &CronJobDescriber{c},
@@ -2918,6 +2920,86 @@ func (c *ClusterCIDRDescriber) describeClusterCIDRV1alpha1(cc *networkingv1alpha
 
 		if cc.Spec.IPv6 != "" {
 			w.Write(LEVEL_0, "IPv6:\t%s\n", cc.Spec.IPv6)
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
+}
+
+// ServiceCIDRDescriber generates information about a ServiceCIDR.
+type ServiceCIDRDescriber struct {
+	client clientset.Interface
+}
+
+func (c *ServiceCIDRDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	var events *corev1.EventList
+
+	svcV1alpha1, err := c.client.NetworkingV1alpha1().ServiceCIDRs().Get(context.TODO(), name, metav1.GetOptions{})
+	if err == nil {
+		if describerSettings.ShowEvents {
+			events, _ = searchEvents(c.client.CoreV1(), svcV1alpha1, describerSettings.ChunkSize)
+		}
+		return c.describeServiceCIDRV1alpha1(svcV1alpha1, events)
+	}
+	return "", err
+}
+
+func (c *ServiceCIDRDescriber) describeServiceCIDRV1alpha1(svc *networkingv1alpha1.ServiceCIDR, events *corev1.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%v\n", svc.Name)
+		printLabelsMultiline(w, "Labels", svc.Labels)
+		printAnnotationsMultiline(w, "Annotations", svc.Annotations)
+
+		if svc.Spec.IPv4 != "" {
+			w.Write(LEVEL_0, "IPv4:\t%s\n", svc.Spec.IPv4)
+		}
+
+		if svc.Spec.IPv6 != "" {
+			w.Write(LEVEL_0, "IPv6:\t%s\n", svc.Spec.IPv6)
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
+}
+
+// ServiceCIDRDescriber generates information about a ServiceCIDR.
+type IPAddressDescriber struct {
+	client clientset.Interface
+}
+
+func (c *IPAddressDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	var events *corev1.EventList
+
+	ipV1alpha1, err := c.client.NetworkingV1alpha1().IPAddresses().Get(context.TODO(), name, metav1.GetOptions{})
+	if err == nil {
+		if describerSettings.ShowEvents {
+			events, _ = searchEvents(c.client.CoreV1(), ipV1alpha1, describerSettings.ChunkSize)
+		}
+		return c.describeIPAddressV1alpha1(ipV1alpha1, events)
+	}
+	return "", err
+}
+
+func (c *IPAddressDescriber) describeIPAddressV1alpha1(ip *networkingv1alpha1.IPAddress, events *corev1.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%v\n", ip.Name)
+		printLabelsMultiline(w, "Labels", ip.Labels)
+		printAnnotationsMultiline(w, "Annotations", ip.Annotations)
+
+		if ip.Spec.ParentRef != nil {
+			w.Write(LEVEL_0, "Parent Reference:\n")
+			w.Write(LEVEL_1, "Group:\t%v\n", ip.Spec.ParentRef.Group)
+			w.Write(LEVEL_1, "Resource:\t%v\n", ip.Spec.ParentRef.Resource)
+			w.Write(LEVEL_1, "Namespace:\t%v\n", ip.Spec.ParentRef.Namespace)
+			w.Write(LEVEL_1, "Name:\t%v\n", ip.Spec.ParentRef.Name)
 		}
 
 		if events != nil {
