@@ -37,6 +37,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
@@ -45,12 +46,15 @@ import (
 // A wrapper around v1.PodStatus that includes a version to enforce that stale pod statuses are
 // not sent to the API server.
 type versionedPodStatus struct {
-	status v1.PodStatus
-	// Monotonically increasing version number (per pod).
+	// version is a monotonically increasing version number (per pod).
 	version uint64
 	// Pod name & namespace, for sending updates to API server.
 	podName      string
 	podNamespace string
+	// at is the time at which the most recent status update was detected
+	at time.Time
+
+	status v1.PodStatus
 }
 
 type podStatusSyncRequest struct {
@@ -545,6 +549,16 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 		podName:      pod.Name,
 		podNamespace: pod.Namespace,
 	}
+
+	// Multiple status updates can be generated before we update the API server,
+	// so we track the time from the first status update until we retire it to
+	// the API.
+	if cachedStatus.at.IsZero() {
+		newStatus.at = time.Now()
+	} else {
+		newStatus.at = cachedStatus.at
+	}
+
 	m.podStatuses[pod.UID] = newStatus
 
 	select {
@@ -685,7 +699,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	mergedStatus := mergePodStatus(pod.Status, status.status, m.podDeletionSafety.PodCouldHaveRunningContainers(pod))
 
 	newPod, patchBytes, unchanged, err := statusutil.PatchPodStatus(context.TODO(), m.kubeClient, pod.Namespace, pod.Name, pod.UID, pod.Status, mergedStatus)
-	klog.V(3).InfoS("Patch status for pod", "pod", klog.KObj(pod), "patch", string(patchBytes))
+	klog.V(3).InfoS("Patch status for pod", "pod", klog.KObj(pod), "podUID", uid, "patch", string(patchBytes))
 
 	if err != nil {
 		klog.InfoS("Failed to update status for pod", "pod", klog.KObj(pod), "err", err)
@@ -696,6 +710,14 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	} else {
 		klog.V(3).InfoS("Status for pod updated successfully", "pod", klog.KObj(pod), "statusVersion", status.version, "status", mergedStatus)
 		pod = newPod
+	}
+
+	// measure how long the status update took to propagate from generation to update on the server
+	if status.at.IsZero() {
+		klog.V(3).InfoS("Pod had no status time set", "pod", klog.KObj(pod), "podUID", uid, "version", status.version)
+	} else {
+		duration := time.Now().Sub(status.at).Truncate(time.Millisecond)
+		metrics.PodStatusSyncDuration.Observe(duration.Seconds())
 	}
 
 	m.apiStatusVersions[kubetypes.MirrorPodUID(pod.UID)] = status.version
