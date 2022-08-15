@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -217,16 +218,22 @@ func (f *FakeIPTables) SaveInto(table iptables.Table, buffer *bytes.Buffer) erro
 	return f.saveTable(table, buffer)
 }
 
-func (f *FakeIPTables) restoreTable(newTable *Table, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
+// This is not a complete list but it's enough to pass the unit tests
+var builtinTargets = sets.NewString("ACCEPT", "DROP", "RETURN", "REJECT", "DNAT", "SNAT", "MASQUERADE", "MARK")
+
+func (f *FakeIPTables) restoreTable(newDump *IPTablesDump, newTable *Table, flush iptables.FlushFlag, counters iptables.RestoreCountersFlag) error {
 	oldTable, err := f.Dump.GetTable(newTable.Name)
 	if err != nil {
 		return err
 	}
 
+	backupChains := make([]Chain, len(oldTable.Chains))
+	copy(backupChains, oldTable.Chains)
+
+	// Update internal state
 	if flush == iptables.FlushTables {
 		oldTable.Chains = make([]Chain, 0, len(newTable.Chains))
 	}
-
 	for _, newChain := range newTable.Chains {
 		oldChain, _ := f.Dump.GetChain(newTable.Name, newChain.Name)
 		switch {
@@ -235,7 +242,6 @@ func (f *FakeIPTables) restoreTable(newTable *Table, flush iptables.FlushFlag, c
 		case oldChain == nil && !newChain.Deleted:
 			oldTable.Chains = append(oldTable.Chains, newChain)
 		case oldChain != nil && newChain.Deleted:
-			// FIXME: should make sure chain is not referenced from other jumps
 			_ = f.DeleteChain(newTable.Name, newChain.Name)
 		case oldChain != nil && !newChain.Deleted:
 			// replace old data with new
@@ -246,6 +252,35 @@ func (f *FakeIPTables) restoreTable(newTable *Table, flush iptables.FlushFlag, c
 			}
 		}
 	}
+
+	// Now check that all old/new jumps are valid
+	for _, chain := range oldTable.Chains {
+		for _, rule := range chain.Rules {
+			if rule.Jump == nil {
+				continue
+			}
+			if builtinTargets.Has(rule.Jump.Value) {
+				continue
+			}
+
+			jumpedChain, _ := f.Dump.GetChain(oldTable.Name, iptables.Chain(rule.Jump.Value))
+			if jumpedChain == nil {
+				newChain, _ := newDump.GetChain(oldTable.Name, iptables.Chain(rule.Jump.Value))
+				if newChain != nil {
+					// rule is an old rule that jumped to a chain which
+					// was deleted by newDump.
+					oldTable.Chains = backupChains
+					return fmt.Errorf("deleted chain %q is referenced by existing rules", newChain.Name)
+				} else {
+					// rule is a new rule that jumped to a chain that was
+					// neither created nor pre-existing
+					oldTable.Chains = backupChains
+					return fmt.Errorf("rule %q jumps to a non-existent chain", rule.Raw)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -261,7 +296,7 @@ func (f *FakeIPTables) Restore(table iptables.Table, data []byte, flush iptables
 		return err
 	}
 
-	return f.restoreTable(newTable, flush, counters)
+	return f.restoreTable(dump, newTable, flush, counters)
 }
 
 // RestoreAll is part of iptables.Interface
@@ -272,7 +307,7 @@ func (f *FakeIPTables) RestoreAll(data []byte, flush iptables.FlushFlag, counter
 	}
 
 	for i := range dump.Tables {
-		err = f.restoreTable(&dump.Tables[i], flush, counters)
+		err = f.restoreTable(dump, &dump.Tables[i], flush, counters)
 		if err != nil {
 			return err
 		}

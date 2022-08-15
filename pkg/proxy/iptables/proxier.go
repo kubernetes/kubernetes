@@ -839,11 +839,15 @@ func (proxier *Proxier) syncProxyRules() {
 	klog.V(2).InfoS("Syncing iptables rules")
 
 	success := false
+	didPartialSync := false
 	defer func() {
 		if !success {
 			klog.InfoS("Sync failed", "retryingTime", proxier.syncPeriod)
 			proxier.syncRunner.RetryAfter(proxier.syncPeriod)
-			proxier.needFullSync = true
+			if didPartialSync {
+				metrics.IptablesPartialRestoreFailuresTotal.Inc()
+				proxier.needFullSync = true
+			}
 		}
 	}()
 
@@ -1206,6 +1210,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// then we can omit them from the restore input. (We have already marked
 		// them in activeNATChains, so they won't get deleted.)
 		if !proxier.needFullSync && !serviceChanged.Has(svcName.NamespacedName.String()) && !endpointsChanged.Has(svcName.NamespacedName.String()) {
+			didPartialSync = true
 			continue
 		}
 
