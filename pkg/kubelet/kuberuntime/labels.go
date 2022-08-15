@@ -111,6 +111,12 @@ func newPodAnnotations(pod *v1.Pod) map[string]string {
 			egress.Add(val)
 		}
 	}
+	if ingress.Value() == 0 {
+		ingress = *resource.NewQuantity(10, resource.DecimalSI)
+	}
+	if egress.Value() == 0 {
+		egress = *resource.NewQuantity(10, resource.DecimalSI)
+	}
 	annotations[podNetworkIOIngress] = fmt.Sprintf("%dM", ingress.Value())
 	annotations[podNetworkIOEgress] = fmt.Sprintf("%dM", egress.Value())
 	return annotations
