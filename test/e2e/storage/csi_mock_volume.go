@@ -362,7 +362,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				init(testParameters{registerDriver: test.deployClusterRegistrar, disableAttach: test.disableAttach})
 				defer cleanup()
 
-				volumeType := t.volumeType
+				volumeType := test.volumeType
 				if volumeType == "" {
 					volumeType = pvcReference
 				}
@@ -1740,7 +1740,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				init(testParameters{
 					disableAttach:          true,
 					registerDriver:         true,
-					enableVolumeMountGroup: t.enableVolumeMountGroup,
+					enableVolumeMountGroup: test.enableVolumeMountGroup,
 					hooks:                  createFSGroupRequestPreHook(&nodeStageFsGroup, &nodePublishFsGroup),
 				})
 				defer cleanup()
@@ -1798,6 +1798,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			},
 		}
 		for _, test := range tests {
+			test := test
 			ginkgo.It(test.name, func() {
 				hooks := createPreHook("CreateSnapshot", test.createSnapshotHook)
 				init(testParameters{
@@ -1888,6 +1889,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			},
 		}
 		for _, test := range tests {
+			test := test
 			ginkgo.It(test.name, func() {
 				init(testParameters{
 					disableAttach:  true,
