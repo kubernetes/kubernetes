@@ -243,8 +243,6 @@ type Dependencies struct {
 	TLSOptions           *server.TLSOptions
 	RemoteRuntimeService internalapi.RuntimeService
 	RemoteImageService   internalapi.ImageManagerService
-	// remove it after cadvisor.UsingLegacyCadvisorStats dropped.
-	useLegacyCadvisorStats bool
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -301,8 +299,6 @@ func PreInitRuntimeService(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if kubeDeps.RemoteImageService, err = remote.NewRemoteImageService(remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout.Duration); err != nil {
 		return err
 	}
-
-	kubeDeps.useLegacyCadvisorStats = cadvisor.UsingLegacyCadvisorStats(remoteRuntimeEndpoint)
 
 	return nil
 }
@@ -662,26 +658,15 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	hostStatsProvider := stats.NewHostStatsProvider(kubecontainer.RealOS{}, func(podUID types.UID) string {
 		return getEtcHostsPath(klet.getPodDir(podUID))
 	})
-	if kubeDeps.useLegacyCadvisorStats {
-		klet.StatsProvider = stats.NewCadvisorStatsProvider(
-			klet.cadvisor,
-			klet.resourceAnalyzer,
-			klet.podManager,
-			klet.runtimeCache,
-			klet.containerRuntime,
-			klet.statusManager,
-			hostStatsProvider)
-	} else {
-		klet.StatsProvider = stats.NewCRIStatsProvider(
-			klet.cadvisor,
-			klet.resourceAnalyzer,
-			klet.podManager,
-			klet.runtimeCache,
-			kubeDeps.RemoteRuntimeService,
-			kubeDeps.RemoteImageService,
-			hostStatsProvider,
-			utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI))
-	}
+	klet.StatsProvider = stats.NewCRIStatsProvider(
+		klet.cadvisor,
+		klet.resourceAnalyzer,
+		klet.podManager,
+		klet.runtimeCache,
+		kubeDeps.RemoteRuntimeService,
+		kubeDeps.RemoteImageService,
+		hostStatsProvider,
+		utilfeature.DefaultFeatureGate.Enabled(features.PodAndContainerStatsFromCRI))
 
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)

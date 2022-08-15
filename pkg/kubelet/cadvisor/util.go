@@ -19,16 +19,9 @@ package cadvisor
 import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-)
-
-const (
-	// CrioSocket is the path to the CRI-O socket.
-	// Please keep this in sync with the one in:
-	// github.com/google/cadvisor/tree/master/container/crio/client.go
-	CrioSocket = "/var/run/crio/crio.sock"
 )
 
 // CapacityFromMachineInfo returns the capacity of the resources from the machine info.
@@ -61,13 +54,4 @@ func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceLis
 			resource.BinarySI),
 	}
 	return c
-}
-
-// UsingLegacyCadvisorStats returns true if container stats are provided by cadvisor instead of through the CRI.
-// CRI integrations should get container metrics via CRI.
-// TODO: cri-o relies on cadvisor as a temporary workaround. The code should
-// be removed. Related issue:
-// https://github.com/kubernetes/kubernetes/issues/51798
-func UsingLegacyCadvisorStats(runtimeEndpoint string) bool {
-	return runtimeEndpoint == CrioSocket || runtimeEndpoint == "unix://"+CrioSocket
 }
