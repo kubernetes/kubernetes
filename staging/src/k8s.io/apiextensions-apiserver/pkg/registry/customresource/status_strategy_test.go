@@ -22,7 +22,10 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
+var errorListObj field.ErrorList
+var errorListOld field.ErrorList
 
 func TestPrepareForUpdate(t *testing.T) {
 	strategy := statusStrategy{}
@@ -133,6 +136,11 @@ func TestPrepareForUpdate(t *testing.T) {
 		strategy.PrepareForUpdate(context.TODO(), tc.obj, tc.old)
 		if !reflect.DeepEqual(tc.obj, tc.expected) {
 			t.Errorf("test %d failed: expected: %v, got %v", index, tc.expected, tc.obj)
+		}
+		errorListObj = strategy.Validate(context.TODO(), tc.obj)
+		errorListOld = strategy.Validate(context.TODO(), tc.old)
+		if reflect.DeepEqual(len(errorListOld), 0) && !reflect.DeepEqual(len(errorListObj), 0) {
+			t.Error("validation failed")
 		}
 	}
 }
