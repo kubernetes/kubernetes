@@ -86,13 +86,6 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 )
 
-const (
-	proxyModeUserspace   = "userspace"
-	proxyModeIPTables    = "iptables"
-	proxyModeIPVS        = "ipvs"
-	proxyModeKernelspace = "kernelspace" //nolint:deadcode,varcheck
-)
-
 // proxyRun defines the interface to run a specified ProxyServer
 type proxyRun interface {
 	Run() error
@@ -540,7 +533,7 @@ type ProxyServer struct {
 	Recorder               events.EventRecorder
 	ConntrackConfiguration kubeproxyconfig.KubeProxyConntrackConfiguration
 	Conntracker            Conntracker // if nil, ignored
-	ProxyMode              string
+	ProxyMode              kubeproxyconfig.ProxyMode
 	NodeRef                *v1.ObjectReference
 	MetricsBindAddress     string
 	BindAddressHardFail    bool
@@ -611,7 +604,7 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 	go wait.Until(fn, 5*time.Second, wait.NeverStop)
 }
 
-func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh chan error) {
+func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, errCh chan error) {
 	if len(bindAddress) == 0 {
 		return
 	}
