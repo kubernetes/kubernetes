@@ -17,6 +17,8 @@ limitations under the License.
 package fuzzer
 
 import (
+	"net/netip"
+
 	fuzz "github.com/google/gofuzz"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/networking"
@@ -74,5 +76,40 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			}
 		},
+		func(obj *networking.ServiceCIDR, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			cidrv4 := generateRandomCIDR(false, c)
+			obj.Spec.IPv4 = cidrv4
+			cidrv6 := generateRandomCIDR(true, c)
+			obj.Spec.IPv6 = cidrv6
+		},
+		func(obj *networking.IPAddress, c fuzz.Continue) {
+			c.FuzzNoCustom(obj) // fuzz self without calling this function again
+			// length in bytes of the IP Family: IPv4: 4 bytes IPv6: 16 bytes
+			boolean := []bool{false, true}
+			is6 := boolean[c.Rand.Intn(2)]
+			cidr := generateRandomCIDR(is6, c)
+			obj.Name = cidr
+		},
 	}
+}
+
+func generateRandomCIDR(is6 bool, c fuzz.Continue) string {
+	n := 4
+	if is6 {
+		n = 16
+	}
+	bytes := make([]byte, n)
+	for i := 0; i < n; i++ {
+		bytes[i] = uint8(c.Rand.Intn(255))
+	}
+
+	ip, ok := netip.AddrFromSlice(bytes)
+	if !ok {
+		return ""
+	}
+
+	bits := c.Rand.Intn(n * 8)
+	prefix := netip.PrefixFrom(ip, bits)
+	return prefix.Masked().String()
 }

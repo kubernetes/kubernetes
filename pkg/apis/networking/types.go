@@ -18,6 +18,7 @@ package networking
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -684,4 +685,93 @@ type ClusterCIDRList struct {
 
 	// Items is the list of ClusterCIDRs.
 	Items []ClusterCIDR
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ServiceCIDR defines a range of IPs using CIDR format (192.168.0.0/24 or 2001:db2::0/64).
+type ServiceCIDR struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+
+	// Spec of the ServiceCIDR
+	// +optional
+	Spec ServiceCIDRSpec
+}
+
+// ServiceCIDRSpec describe how the ServiceCIDR's specification looks like.
+type ServiceCIDRSpec struct {
+	// IPv4 defines an IPv4 IP block in CIDR notation(e.g. "192.168.0.0/24").
+	// This field is immutable.
+	// +optional
+	IPv4 string
+
+	// IPv6CIDR defines an IPv6 IP block in CIDR notation(e.g. "fd12:3456:789a:1::/64").
+	// This field is immutable.
+	// +optional
+	IPv6 string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ServiceCIDRList contains a list of ServiceCIDR objects.
+type ServiceCIDRList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of ServiceCIDR
+	Items []ServiceCIDR
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// IPAddress represents an IP used by Kubernetes associated to an IPRange.
+// The name of the object is the IP address in canonical format.
+type IPAddress struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+	// +optional
+	Spec IPAddressSpec
+}
+
+// IPAddressSpec describe the attributes in an IP Address,
+type IPAddressSpec struct {
+	// ParentRef references the resources (usually Services) that a IPAddress wants to be attached to.
+	// +required
+	ParentRef *ParentReference
+}
+type ParentReference struct {
+	// Group is the group of the referent.
+	// +optional
+	Group string
+	// Kind is kind of the referent.
+	// +optional
+	Resource string
+	// Namespace is the namespace of the referent
+	// +optional
+	Namespace string
+	// Name is the name of the referent
+	// +optional
+	Name string
+	// UID is the uid of the referent
+	// +optional
+	UID types.UID
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// IPAddressList contains a list of IPAddress.
+type IPAddressList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of IPAddress
+	Items []IPAddress
 }
