@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	testedMetrics = []string{"k8s_healthcheck"}
+	testedMetrics = []string{"k8s_healthcheck", "k8s_healthchecks_total"}
 )
 
 func TestObserveHealthcheck(t *testing.T) {
@@ -40,6 +40,9 @@ func TestObserveHealthcheck(t *testing.T) {
         k8s_healthcheck{name="healthcheck-a",status="error",type="healthz"} 1
         k8s_healthcheck{name="healthcheck-a",status="pending",type="healthz"} 0
         k8s_healthcheck{name="healthcheck-a",status="success",type="healthz"} 0
+        # HELP k8s_healthchecks_total [ALPHA] This metric records the results of all healthcheck.
+        # TYPE k8s_healthchecks_total counter
+        k8s_healthchecks_total{name="healthcheck-a",status="error",type="healthz"} 1
 `
 	testCases := []struct {
 		desc     string
@@ -59,6 +62,10 @@ func TestObserveHealthcheck(t *testing.T) {
         k8s_healthcheck{name="healthcheck-a",status="error",type="healthz"} 0
         k8s_healthcheck{name="healthcheck-a",status="pending",type="healthz"} 1
         k8s_healthcheck{name="healthcheck-a",status="success",type="healthz"} 0
+        # HELP k8s_healthchecks_total [ALPHA] This metric records the results of all healthcheck.
+        # TYPE k8s_healthchecks_total counter
+        k8s_healthchecks_total{name="healthcheck-a",status="error",type="healthz"} 1
+        k8s_healthchecks_total{name="healthcheck-a",status="pending",type="healthz"} 1
 `,
 		},
 		{
@@ -72,12 +79,17 @@ func TestObserveHealthcheck(t *testing.T) {
         k8s_healthcheck{name="healthcheck-a",status="error",type="healthz"} 0
         k8s_healthcheck{name="healthcheck-a",status="pending",type="healthz"} 0
         k8s_healthcheck{name="healthcheck-a",status="success",type="healthz"} 1
+        # HELP k8s_healthchecks_total [ALPHA] This metric records the results of all healthcheck.
+        # TYPE k8s_healthchecks_total counter
+        k8s_healthchecks_total{name="healthcheck-a",status="error",type="healthz"} 1
+        k8s_healthchecks_total{name="healthcheck-a",status="success",type="healthz"} 1
 `,
 		},
 	}
 
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
+			defer ResetHealthMetrics()
 			// let's first record an error as initial state
 			err := ObserveHealthcheck(context.Background(), test.name, test.hcType, initialState)
 			if err != nil {

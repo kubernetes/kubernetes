@@ -51,6 +51,17 @@ var (
 		},
 		[]string{"name", "type", "status"},
 	)
+
+	// healthchecksTotal is a Prometheus Counter metrics used for counting the results of a k8s healthcheck.
+	healthchecksTotal = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Namespace:      "k8s",
+			Name:           "healthchecks_total",
+			Help:           "This metric records the results of all healthcheck.",
+			StabilityLevel: k8smetrics.ALPHA,
+		},
+		[]string{"name", "type", "status"},
+	)
 	statuses  = []HealthcheckStatus{Success, Error, Pending}
 	statusSet = map[HealthcheckStatus]struct{}{Success: {}, Error: {}, Pending: {}}
 	checkSet  = map[HealthcheckType]struct{}{Livez: {}, Readyz: {}, Healthz: {}}
@@ -58,10 +69,12 @@ var (
 
 func init() {
 	legacyregistry.MustRegister(healthcheck)
+	legacyregistry.MustRegister(healthchecksTotal)
 }
 
 func ResetHealthMetrics() {
 	healthcheck.Reset()
+	healthchecksTotal.Reset()
 }
 
 func ObserveHealthcheck(ctx context.Context, name string, healthcheckType HealthcheckType, status HealthcheckStatus) error {
@@ -76,6 +89,7 @@ func ObserveHealthcheck(ctx context.Context, name string, healthcheckType Health
 			healthcheck.WithContext(ctx).WithLabelValues(name, string(healthcheckType), string(s)).Set(0)
 		}
 	}
+	healthchecksTotal.WithContext(ctx).WithLabelValues(name, string(healthcheckType), string(status)).Inc()
 	healthcheck.WithContext(ctx).WithLabelValues(name, string(healthcheckType), string(status)).Set(1)
 	return nil
 }
