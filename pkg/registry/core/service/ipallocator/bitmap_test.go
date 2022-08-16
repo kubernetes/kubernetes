@@ -52,6 +52,19 @@ func TestAllocate(t *testing.T) {
 			alreadyAllocated: "192.168.1.1",
 		},
 		{
+			name:     "IPv4 large",
+			cidr:     "10.0.0.0/15",
+			family:   api.IPv4Protocol,
+			free:     131070,
+			released: "10.0.0.5",
+			outOfRange: []string{
+				"10.0.0.0",      // reserved (base address)
+				"10.15.255.255", // reserved (broadcast address)
+				"10.255.255.2",  // not in range
+			},
+			alreadyAllocated: "10.0.0.1",
+		},
+		{
 			name:     "IPv6",
 			cidr:     "2001:db8:1::/48",
 			family:   api.IPv6Protocol,
@@ -67,96 +80,97 @@ func TestAllocate(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		_, cidr, err := netutils.ParseCIDRSloppy(tc.cidr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		r, err := NewInMemory(cidr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Logf("base: %v", r.base.Bytes())
-		if f := r.Free(); f != tc.free {
-			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free, f)
-		}
-
-		rCIDR := r.CIDR()
-		if rCIDR.String() != tc.cidr {
-			t.Errorf("[%s] wrong CIDR: expected %v, got %v", tc.name, tc.cidr, rCIDR.String())
-		}
-
-		if r.IPFamily() != tc.family {
-			t.Errorf("[%s] wrong IP family: expected %v, got %v", tc.name, tc.family, r.IPFamily())
-		}
-
-		if f := r.Used(); f != 0 {
-			t.Errorf("[%s]: wrong used: expected %d, got %d", tc.name, 0, f)
-		}
-		found := sets.NewString()
-		count := 0
-		for r.Free() > 0 {
-			ip, err := r.AllocateNext()
+		t.Run(tc.name, func(t *testing.T) {
+			_, cidr, err := netutils.ParseCIDRSloppy(tc.cidr)
 			if err != nil {
-				t.Fatalf("[%s] error @ %d: %v", tc.name, count, err)
-			}
-			count++
-			if !cidr.Contains(ip) {
-				t.Fatalf("[%s] allocated %s which is outside of %s", tc.name, ip, cidr)
-			}
-			if found.Has(ip.String()) {
-				t.Fatalf("[%s] allocated %s twice @ %d", tc.name, ip, count)
-			}
-			found.Insert(ip.String())
-		}
-		if _, err := r.AllocateNext(); err != ErrFull {
-			t.Fatal(err)
-		}
-
-		released := netutils.ParseIPSloppy(tc.released)
-		if err := r.Release(released); err != nil {
-			t.Fatal(err)
-		}
-		if f := r.Free(); f != 1 {
-			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, 1, f)
-		}
-		if f := r.Used(); f != (tc.free - 1) {
-			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free-1, f)
-		}
-		ip, err := r.AllocateNext()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !released.Equal(ip) {
-			t.Errorf("[%s] unexpected %s : %s", tc.name, ip, released)
-		}
-
-		if err := r.Release(released); err != nil {
-			t.Fatal(err)
-		}
-		for _, outOfRange := range tc.outOfRange {
-			err = r.Allocate(netutils.ParseIPSloppy(outOfRange))
-			if _, ok := err.(*ErrNotInRange); !ok {
 				t.Fatal(err)
 			}
-		}
-		if err := r.Allocate(netutils.ParseIPSloppy(tc.alreadyAllocated)); err != ErrAllocated {
-			t.Fatal(err)
-		}
-		if f := r.Free(); f != 1 {
-			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, 1, f)
-		}
-		if f := r.Used(); f != (tc.free - 1) {
-			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free-1, f)
-		}
-		if err := r.Allocate(released); err != nil {
-			t.Fatal(err)
-		}
-		if f := r.Free(); f != 0 {
-			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, 0, f)
-		}
-		if f := r.Used(); f != tc.free {
-			t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free, f)
-		}
+			r, err := NewInMemory(cidr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if f := r.Free(); f != tc.free {
+				t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free, f)
+			}
+
+			rCIDR := r.CIDR()
+			if rCIDR.String() != tc.cidr {
+				t.Errorf("[%s] wrong CIDR: expected %v, got %v", tc.name, tc.cidr, rCIDR.String())
+			}
+
+			if r.IPFamily() != tc.family {
+				t.Errorf("[%s] wrong IP family: expected %v, got %v", tc.name, tc.family, r.IPFamily())
+			}
+
+			if f := r.Used(); f != 0 {
+				t.Errorf("[%s]: wrong used: expected %d, got %d", tc.name, 0, f)
+			}
+			found := sets.NewString()
+			count := 0
+			for r.Free() > 0 {
+				ip, err := r.AllocateNext()
+				if err != nil {
+					t.Fatalf("[%s] error @ %d: %v", tc.name, count, err)
+				}
+				count++
+				if !cidr.Contains(ip) {
+					t.Fatalf("[%s] allocated %s which is outside of %s", tc.name, ip, cidr)
+				}
+				if found.Has(ip.String()) {
+					t.Fatalf("[%s] allocated %s twice @ %d", tc.name, ip, count)
+				}
+				found.Insert(ip.String())
+			}
+			if _, err := r.AllocateNext(); err != ErrFull {
+				t.Fatal(err)
+			}
+
+			released := netutils.ParseIPSloppy(tc.released)
+			if err := r.Release(released); err != nil {
+				t.Fatal(err)
+			}
+			if f := r.Free(); f != 1 {
+				t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, 1, f)
+			}
+			if f := r.Used(); f != (tc.free - 1) {
+				t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free-1, f)
+			}
+			ip, err := r.AllocateNext()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !released.Equal(ip) {
+				t.Errorf("[%s] unexpected %s : %s", tc.name, ip, released)
+			}
+
+			if err := r.Release(released); err != nil {
+				t.Fatal(err)
+			}
+			for _, outOfRange := range tc.outOfRange {
+				err = r.Allocate(netutils.ParseIPSloppy(outOfRange))
+				if _, ok := err.(*ErrNotInRange); !ok {
+					t.Fatal(err)
+				}
+			}
+			if err := r.Allocate(netutils.ParseIPSloppy(tc.alreadyAllocated)); err != ErrAllocated {
+				t.Fatal(err)
+			}
+			if f := r.Free(); f != 1 {
+				t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, 1, f)
+			}
+			if f := r.Used(); f != (tc.free - 1) {
+				t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free-1, f)
+			}
+			if err := r.Allocate(released); err != nil {
+				t.Fatal(err)
+			}
+			if f := r.Free(); f != 0 {
+				t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, 0, f)
+			}
+			if f := r.Used(); f != tc.free {
+				t.Errorf("[%s] wrong free: expected %d, got %d", tc.name, tc.free, f)
+			}
+		})
 	}
 }
 
@@ -270,8 +284,6 @@ func TestAllocateSmall(t *testing.T) {
 	if r.max != 2 {
 		t.Fatalf("expected range equal to 2, got: %v", r)
 	}
-
-	t.Logf("allocated: %v", found)
 }
 
 func TestForEach(t *testing.T) {
@@ -825,5 +837,40 @@ func Test_calculateRangeOffset(t *testing.T) {
 				t.Errorf("DynamicRangeOffset() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// cpu: Intel(R) Xeon(R) CPU E5-2678 v3 @ 2.50GHz
+// BenchmarkAllocateNextIPv4
+// BenchmarkAllocateNextIPv4-24    	 1175304	       870.9 ns/op	    1337 B/op	      11 allocs/op
+func BenchmarkAllocateNextIPv4Size1048574(b *testing.B) {
+	_, cidr, err := netutils.ParseCIDRSloppy("10.0.0.0/12")
+	if err != nil {
+		b.Fatal(err)
+	}
+	r, err := NewInMemory(cidr)
+	if err != nil {
+		b.Fatal(err)
+	}
+	for n := 0; n < b.N; n++ {
+		r.AllocateNext()
+	}
+}
+
+// This is capped to 65535
+// cpu: Intel(R) Xeon(R) CPU E5-2678 v3 @ 2.50GHz
+// BenchmarkAllocateNextIPv6
+// BenchmarkAllocateNextIPv6-24    	 5779431	       194.0 ns/op	      18 B/op	       2 allocs/op
+func BenchmarkAllocateNextIPv6Size65535(b *testing.B) {
+	_, cidr, err := netutils.ParseCIDRSloppy("fd00::/24")
+	if err != nil {
+		b.Fatal(err)
+	}
+	r, err := NewInMemory(cidr)
+	if err != nil {
+		b.Fatal(err)
+	}
+	for n := 0; n < b.N; n++ {
+		r.AllocateNext()
 	}
 }
