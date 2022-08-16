@@ -102,9 +102,9 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 	}
 
 	var proxier proxy.Provider
-	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
+	proxyMode := getProxyMode(config.Mode, winkernel.WindowsKernelCompatTester{})
 	dualStackMode := getDualStackMode(config.Winkernel.NetworkName, winkernel.DualStackCompatTester{})
-	if proxyMode == proxyModeKernelspace {
+	if proxyMode == proxyconfigapi.ProxyModeKernelspace {
 		klog.V(0).InfoS("Using Kernelspace Proxier.")
 		if dualStackMode {
 			klog.V(0).InfoS("Creating dualStackProxier for Windows kernel.")
@@ -166,7 +166,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, master string
 		}
 	}
 	useEndpointSlices := true
-	if proxyMode == proxyModeUserspace {
+	if proxyMode == proxyconfigapi.ProxyModeUserspace {
 		// userspace mode doesn't support endpointslice.
 		useEndpointSlices = false
 	}
@@ -192,18 +192,18 @@ func getDualStackMode(networkname string, compatTester winkernel.StackCompatTest
 	return compatTester.DualStackCompatible(networkname)
 }
 
-func getProxyMode(proxyMode string, kcompat winkernel.KernelCompatTester) string {
-	if proxyMode == proxyModeKernelspace {
+func getProxyMode(proxyMode proxyconfigapi.ProxyMode, kcompat winkernel.KernelCompatTester) proxyconfigapi.ProxyMode {
+	if proxyMode == proxyconfigapi.ProxyModeKernelspace {
 		return tryWinKernelSpaceProxy(kcompat)
 	}
-	return proxyModeUserspace
+	return proxyconfigapi.ProxyModeUserspace
 }
 
 func detectNumCPU() int {
 	return goruntime.NumCPU()
 }
 
-func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) string {
+func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) proxyconfigapi.ProxyMode {
 	// Check for Windows Kernel Version if we can support Kernel Space proxy
 	// Check for Windows Version
 
@@ -211,14 +211,14 @@ func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) string {
 	useWinKernelProxy, err := winkernel.CanUseWinKernelProxier(kcompat)
 	if err != nil {
 		klog.ErrorS(err, "Can't determine whether to use windows kernel proxy, using userspace proxier")
-		return proxyModeUserspace
+		return proxyconfigapi.ProxyModeUserspace
 	}
 	if useWinKernelProxy {
-		return proxyModeKernelspace
+		return proxyconfigapi.ProxyModeKernelspace
 	}
 	// Fallback.
 	klog.V(1).InfoS("Can't use winkernel proxy, using userspace proxier")
-	return proxyModeUserspace
+	return proxyconfigapi.ProxyModeUserspace
 }
 
 // cleanupAndExit cleans up after a previous proxy run
