@@ -59,4 +59,67 @@ func (ClusterCIDRSpec) SwaggerDoc() map[string]string {
 	return map_ClusterCIDRSpec
 }
 
+var map_IPAddress = map[string]string{
+	"": "IPAddress represents an IP used by Kubernetes associated to a ServiceCIDR. The name of the object is the IP address in canonical format.",
+}
+
+func (IPAddress) SwaggerDoc() map[string]string {
+	return map_IPAddress
+}
+
+var map_IPAddressList = map[string]string{
+	"": "IPAddressList contains a list of IPAddress.",
+}
+
+func (IPAddressList) SwaggerDoc() map[string]string {
+	return map_IPAddressList
+}
+
+var map_IPAddressSpec = map[string]string{
+	"":          "IPAddressSpec describe the attributes in an IP Address,",
+	"parentRef": "ParentRef references the resources (usually Services) that a IPAddress wants to be attached to.",
+}
+
+func (IPAddressSpec) SwaggerDoc() map[string]string {
+	return map_IPAddressSpec
+}
+
+var map_ParentReference = map[string]string{
+	"group":     "Group is the group of the referent.",
+	"kind":      "Kind is kind of the referent.",
+	"namespace": "Namespace is the namespace of the referent",
+	"name":      "Name is the name of the referent",
+	"uid":       "UID is the uid of the referent",
+}
+
+func (ParentReference) SwaggerDoc() map[string]string {
+	return map_ParentReference
+}
+
+var map_ServiceCIDR = map[string]string{
+	"": "ServiceCIDR defines a range of IPs using CIDR format (192.168.0.0/24 or 2001:db2::0/64).",
+}
+
+func (ServiceCIDR) SwaggerDoc() map[string]string {
+	return map_ServiceCIDR
+}
+
+var map_ServiceCIDRList = map[string]string{
+	"": "ServiceCIDRList contains a list of ServiceCIDR objects.",
+}
+
+func (ServiceCIDRList) SwaggerDoc() map[string]string {
+	return map_ServiceCIDRList
+}
+
+var map_ServiceCIDRSpec = map[string]string{
+	"":         "ServiceCIDRSpec describe how the ServiceCIDR's specification looks like.",
+	"ipv4cidr": "IPv4 defines an IPv4 IP block in CIDR notation(e.g. \"192.168.0.0/24\"). This field is immutable.",
+	"ipv6cidr": "IPv6 defines an IPv6 IP block in CIDR notation(e.g. \"fd12:3456:789a:1::/64\"). This field is immutable.",
+}
+
+func (ServiceCIDRSpec) SwaggerDoc() map[string]string {
+	return map_ServiceCIDRSpec
+}
+
 // AUTO-GENERATED FUNCTIONS END HERE

@@ -31,6 +31,8 @@ import (
 	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
+
+	k8s_io_apimachinery_pkg_types "k8s.io/apimachinery/pkg/types"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -128,10 +130,213 @@ func (m *ClusterCIDRSpec) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ClusterCIDRSpec proto.InternalMessageInfo
 
+func (m *IPAddress) Reset()      { *m = IPAddress{} }
+func (*IPAddress) ProtoMessage() {}
+func (*IPAddress) Descriptor() ([]byte, []int) {
+	return fileDescriptor_c1b7ac8d7d97acec, []int{3}
+}
+func (m *IPAddress) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *IPAddress) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *IPAddress) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IPAddress.Merge(m, src)
+}
+func (m *IPAddress) XXX_Size() int {
+	return m.Size()
+}
+func (m *IPAddress) XXX_DiscardUnknown() {
+	xxx_messageInfo_IPAddress.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_IPAddress proto.InternalMessageInfo
+
+func (m *IPAddressList) Reset()      { *m = IPAddressList{} }
+func (*IPAddressList) ProtoMessage() {}
+func (*IPAddressList) Descriptor() ([]byte, []int) {
+	return fileDescriptor_c1b7ac8d7d97acec, []int{4}
+}
+func (m *IPAddressList) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *IPAddressList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *IPAddressList) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IPAddressList.Merge(m, src)
+}
+func (m *IPAddressList) XXX_Size() int {
+	return m.Size()
+}
+func (m *IPAddressList) XXX_DiscardUnknown() {
+	xxx_messageInfo_IPAddressList.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_IPAddressList proto.InternalMessageInfo
+
+func (m *IPAddressSpec) Reset()      { *m = IPAddressSpec{} }
+func (*IPAddressSpec) ProtoMessage() {}
+func (*IPAddressSpec) Descriptor() ([]byte, []int) {
+	return fileDescriptor_c1b7ac8d7d97acec, []int{5}
+}
+func (m *IPAddressSpec) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *IPAddressSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *IPAddressSpec) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IPAddressSpec.Merge(m, src)
+}
+func (m *IPAddressSpec) XXX_Size() int {
+	return m.Size()
+}
+func (m *IPAddressSpec) XXX_DiscardUnknown() {
+	xxx_messageInfo_IPAddressSpec.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_IPAddressSpec proto.InternalMessageInfo
+
+func (m *ParentReference) Reset()      { *m = ParentReference{} }
+func (*ParentReference) ProtoMessage() {}
+func (*ParentReference) Descriptor() ([]byte, []int) {
+	return fileDescriptor_c1b7ac8d7d97acec, []int{6}
+}
+func (m *ParentReference) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ParentReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *ParentReference) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ParentReference.Merge(m, src)
+}
+func (m *ParentReference) XXX_Size() int {
+	return m.Size()
+}
+func (m *ParentReference) XXX_DiscardUnknown() {
+	xxx_messageInfo_ParentReference.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ParentReference proto.InternalMessageInfo
+
+func (m *ServiceCIDR) Reset()      { *m = ServiceCIDR{} }
+func (*ServiceCIDR) ProtoMessage() {}
+func (*ServiceCIDR) Descriptor() ([]byte, []int) {
+	return fileDescriptor_c1b7ac8d7d97acec, []int{7}
+}
+func (m *ServiceCIDR) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ServiceCIDR) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *ServiceCIDR) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ServiceCIDR.Merge(m, src)
+}
+func (m *ServiceCIDR) XXX_Size() int {
+	return m.Size()
+}
+func (m *ServiceCIDR) XXX_DiscardUnknown() {
+	xxx_messageInfo_ServiceCIDR.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ServiceCIDR proto.InternalMessageInfo
+
+func (m *ServiceCIDRList) Reset()      { *m = ServiceCIDRList{} }
+func (*ServiceCIDRList) ProtoMessage() {}
+func (*ServiceCIDRList) Descriptor() ([]byte, []int) {
+	return fileDescriptor_c1b7ac8d7d97acec, []int{8}
+}
+func (m *ServiceCIDRList) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ServiceCIDRList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *ServiceCIDRList) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ServiceCIDRList.Merge(m, src)
+}
+func (m *ServiceCIDRList) XXX_Size() int {
+	return m.Size()
+}
+func (m *ServiceCIDRList) XXX_DiscardUnknown() {
+	xxx_messageInfo_ServiceCIDRList.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ServiceCIDRList proto.InternalMessageInfo
+
+func (m *ServiceCIDRSpec) Reset()      { *m = ServiceCIDRSpec{} }
+func (*ServiceCIDRSpec) ProtoMessage() {}
+func (*ServiceCIDRSpec) Descriptor() ([]byte, []int) {
+	return fileDescriptor_c1b7ac8d7d97acec, []int{9}
+}
+func (m *ServiceCIDRSpec) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ServiceCIDRSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	b = b[:cap(b)]
+	n, err := m.MarshalToSizedBuffer(b)
+	if err != nil {
+		return nil, err
+	}
+	return b[:n], nil
+}
+func (m *ServiceCIDRSpec) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ServiceCIDRSpec.Merge(m, src)
+}
+func (m *ServiceCIDRSpec) XXX_Size() int {
+	return m.Size()
+}
+func (m *ServiceCIDRSpec) XXX_DiscardUnknown() {
+	xxx_messageInfo_ServiceCIDRSpec.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ServiceCIDRSpec proto.InternalMessageInfo
+
 func init() {
 	proto.RegisterType((*ClusterCIDR)(nil), "k8s.io.api.networking.v1alpha1.ClusterCIDR")
 	proto.RegisterType((*ClusterCIDRList)(nil), "k8s.io.api.networking.v1alpha1.ClusterCIDRList")
 	proto.RegisterType((*ClusterCIDRSpec)(nil), "k8s.io.api.networking.v1alpha1.ClusterCIDRSpec")
+	proto.RegisterType((*IPAddress)(nil), "k8s.io.api.networking.v1alpha1.IPAddress")
+	proto.RegisterType((*IPAddressList)(nil), "k8s.io.api.networking.v1alpha1.IPAddressList")
+	proto.RegisterType((*IPAddressSpec)(nil), "k8s.io.api.networking.v1alpha1.IPAddressSpec")
+	proto.RegisterType((*ParentReference)(nil), "k8s.io.api.networking.v1alpha1.ParentReference")
+	proto.RegisterType((*ServiceCIDR)(nil), "k8s.io.api.networking.v1alpha1.ServiceCIDR")
+	proto.RegisterType((*ServiceCIDRList)(nil), "k8s.io.api.networking.v1alpha1.ServiceCIDRList")
+	proto.RegisterType((*ServiceCIDRSpec)(nil), "k8s.io.api.networking.v1alpha1.ServiceCIDRSpec")
 }
 
 func init() {
@@ -139,39 +344,55 @@ func init() {
 }
 
 var fileDescriptor_c1b7ac8d7d97acec = []byte{
-	// 506 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x93, 0x4f, 0x8f, 0xd2, 0x40,
-	0x18, 0xc6, 0xe9, 0x2e, 0x24, 0x6b, 0xc1, 0xb0, 0xe9, 0x45, 0xc2, 0x61, 0x20, 0x9c, 0x48, 0x8c,
-	0x33, 0xb2, 0x21, 0xc4, 0xab, 0xdd, 0x4d, 0x94, 0xc4, 0x3f, 0xd8, 0x4d, 0x3c, 0x18, 0x0f, 0x0e,
-	0xe5, 0xb5, 0x8c, 0xd0, 0xce, 0x64, 0x66, 0xa8, 0xf1, 0xe6, 0x47, 0xf0, 0x2b, 0xe9, 0x89, 0xe3,
-	0x1e, 0xf7, 0x44, 0xa4, 0x7e, 0x01, 0x3f, 0x82, 0x99, 0xa1, 0xbb, 0x94, 0x45, 0x57, 0xbd, 0x75,
-	0xde, 0xf9, 0x3d, 0xcf, 0xfb, 0x3e, 0x7d, 0x5b, 0xf7, 0xc9, 0xec, 0x91, 0xc2, 0x8c, 0x93, 0xd9,
-	0x62, 0x0c, 0x32, 0x01, 0x0d, 0x8a, 0xa4, 0x90, 0x4c, 0xb8, 0x24, 0xf9, 0x05, 0x15, 0x8c, 0x24,
-	0xa0, 0x3f, 0x72, 0x39, 0x63, 0x49, 0x44, 0xd2, 0x1e, 0x9d, 0x8b, 0x29, 0xed, 0x91, 0x08, 0x12,
-	0x90, 0x54, 0xc3, 0x04, 0x0b, 0xc9, 0x35, 0xf7, 0xd0, 0x86, 0xc7, 0x54, 0x30, 0xbc, 0xe5, 0xf1,
-	0x15, 0xdf, 0x7c, 0x10, 0x31, 0x3d, 0x5d, 0x8c, 0x71, 0xc8, 0x63, 0x12, 0xf1, 0x88, 0x13, 0x2b,
-	0x1b, 0x2f, 0xde, 0xdb, 0x93, 0x3d, 0xd8, 0xa7, 0x8d, 0x5d, 0xb3, 0x53, 0x68, 0x1f, 0x72, 0x09,
-	0x24, 0xdd, 0x6b, 0xd9, 0xec, 0x6f, 0x99, 0x98, 0x86, 0x53, 0x96, 0x80, 0xfc, 0x44, 0xc4, 0x2c,
-	0x32, 0x05, 0x45, 0x62, 0xd0, 0xf4, 0x77, 0x2a, 0xf2, 0x27, 0x95, 0x5c, 0x24, 0x9a, 0xc5, 0xb0,
-	0x27, 0x18, 0xfc, 0x4d, 0xa0, 0xc2, 0x29, 0xc4, 0xf4, 0xa6, 0xae, 0xf3, 0xcd, 0x71, 0xab, 0xa7,
-	0xf3, 0x85, 0xd2, 0x20, 0x4f, 0x87, 0x67, 0x81, 0xf7, 0xce, 0x3d, 0x32, 0x33, 0x4d, 0xa8, 0xa6,
-	0x0d, 0xa7, 0xed, 0x74, 0xab, 0x27, 0x0f, 0xf1, 0xf6, 0xa5, 0x5d, 0x5b, 0x63, 0x31, 0x8b, 0x4c,
-	0x41, 0x61, 0x43, 0xe3, 0xb4, 0x87, 0x5f, 0x8e, 0x3f, 0x40, 0xa8, 0x9f, 0x83, 0xa6, 0xbe, 0xb7,
-	0x5c, 0xb5, 0x4a, 0xd9, 0xaa, 0xe5, 0x6e, 0x6b, 0xc1, 0xb5, 0xab, 0xf7, 0xca, 0x2d, 0x2b, 0x01,
-	0x61, 0xe3, 0xc0, 0xba, 0x13, 0x7c, 0xfb, 0x4a, 0x70, 0x61, 0xb8, 0x73, 0x01, 0xa1, 0x5f, 0xcb,
-	0xcd, 0xcb, 0xe6, 0x14, 0x58, 0xab, 0xce, 0x57, 0xc7, 0xad, 0x17, 0xb8, 0x67, 0x4c, 0x69, 0xef,
-	0xed, 0x5e, 0x10, 0xfc, 0x6f, 0x41, 0x8c, 0xda, 0xc6, 0x38, 0xce, 0x3b, 0x1d, 0x5d, 0x55, 0x0a,
-	0x21, 0x46, 0x6e, 0x85, 0x69, 0x88, 0x55, 0xe3, 0xa0, 0x7d, 0xd8, 0xad, 0x9e, 0xdc, 0xff, 0x8f,
-	0x14, 0xfe, 0xdd, 0xdc, 0xb7, 0x32, 0x34, 0x0e, 0xc1, 0xc6, 0xa8, 0xf3, 0x73, 0x37, 0x83, 0x49,
-	0xe7, 0xbd, 0x76, 0x6b, 0x09, 0x9f, 0xc0, 0x39, 0xcc, 0x21, 0xd4, 0x5c, 0xe6, 0x39, 0xda, 0xc5,
-	0x66, 0xe6, 0xb3, 0x33, 0x53, 0xbf, 0x28, 0x70, 0xfe, 0x71, 0xb6, 0x6a, 0xd5, 0x8a, 0x95, 0x60,
-	0xc7, 0xc7, 0x7b, 0xec, 0xd6, 0x05, 0x48, 0x03, 0x3c, 0xe5, 0x4a, 0xfb, 0x4c, 0x2b, 0xbb, 0x8d,
-	0x8a, 0x7f, 0x2f, 0x1f, 0xad, 0x3e, 0xda, 0xbd, 0x0e, 0x6e, 0xf2, 0x5e, 0xdb, 0x2d, 0x33, 0x91,
-	0xf6, 0x1b, 0x87, 0x6d, 0xa7, 0x7b, 0x67, 0xbb, 0x94, 0xe1, 0x28, 0xed, 0x07, 0xf6, 0x26, 0x27,
-	0x06, 0x8d, 0xf2, 0x1e, 0x31, 0xb0, 0xc4, 0xc0, 0x3f, 0x5b, 0xae, 0x51, 0xe9, 0x62, 0x8d, 0x4a,
-	0x97, 0x6b, 0x54, 0xfa, 0x9c, 0x21, 0x67, 0x99, 0x21, 0xe7, 0x22, 0x43, 0xce, 0x65, 0x86, 0x9c,
-	0xef, 0x19, 0x72, 0xbe, 0xfc, 0x40, 0xa5, 0x37, 0xe8, 0xf6, 0x7f, 0xfc, 0x57, 0x00, 0x00, 0x00,
-	0xff, 0xff, 0xdf, 0x1d, 0xe9, 0x86, 0x1d, 0x04, 0x00, 0x00,
+	// 754 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x96, 0xcf, 0x4f, 0xdb, 0x48,
+	0x14, 0xc7, 0x63, 0x92, 0x48, 0xf1, 0x00, 0x0a, 0xeb, 0xcb, 0x46, 0x1c, 0x9c, 0x6c, 0xf6, 0x92,
+	0xd5, 0x2e, 0x36, 0x20, 0x14, 0xed, 0x15, 0x13, 0x89, 0x8d, 0xb4, 0x0b, 0xd9, 0x41, 0xf4, 0x50,
+	0x71, 0xa8, 0x63, 0x3f, 0x1c, 0x37, 0xf8, 0x87, 0x66, 0xc6, 0xa9, 0xb8, 0xf5, 0x4f, 0xe8, 0x3f,
+	0xd4, 0x4a, 0xed, 0x89, 0x23, 0x47, 0x4e, 0x51, 0x71, 0xff, 0x81, 0x9e, 0xdb, 0x4b, 0x35, 0x13,
+	0xc7, 0x76, 0x12, 0x02, 0xf4, 0x82, 0xb8, 0x31, 0xef, 0x7d, 0xde, 0x77, 0xde, 0xf3, 0x7c, 0x79,
+	0x0a, 0x3a, 0x1c, 0xfe, 0x4d, 0x35, 0x37, 0xd0, 0x87, 0x51, 0x1f, 0x88, 0x0f, 0x0c, 0xa8, 0x3e,
+	0x02, 0xdf, 0x0e, 0x88, 0x9e, 0x24, 0xcc, 0xd0, 0xd5, 0x7d, 0x60, 0x6f, 0x02, 0x32, 0x74, 0x7d,
+	0x47, 0x1f, 0xed, 0x98, 0x17, 0xe1, 0xc0, 0xdc, 0xd1, 0x1d, 0xf0, 0x81, 0x98, 0x0c, 0x6c, 0x2d,
+	0x24, 0x01, 0x0b, 0x14, 0x75, 0xc2, 0x6b, 0x66, 0xe8, 0x6a, 0x19, 0xaf, 0x4d, 0xf9, 0xcd, 0x2d,
+	0xc7, 0x65, 0x83, 0xa8, 0xaf, 0x59, 0x81, 0xa7, 0x3b, 0x81, 0x13, 0xe8, 0xa2, 0xac, 0x1f, 0x9d,
+	0x8b, 0x93, 0x38, 0x88, 0xbf, 0x26, 0x72, 0x9b, 0xcd, 0xdc, 0xf5, 0x56, 0x40, 0x40, 0x1f, 0x2d,
+	0x5c, 0xb9, 0xb9, 0x97, 0x31, 0x9e, 0x69, 0x0d, 0x5c, 0x1f, 0xc8, 0xa5, 0x1e, 0x0e, 0x1d, 0x1e,
+	0xa0, 0xba, 0x07, 0xcc, 0xbc, 0xab, 0x4a, 0x5f, 0x56, 0x45, 0x22, 0x9f, 0xb9, 0x1e, 0x2c, 0x14,
+	0xb4, 0x1f, 0x2a, 0xa0, 0xd6, 0x00, 0x3c, 0x73, 0xbe, 0xae, 0xf9, 0x49, 0x42, 0xab, 0x07, 0x17,
+	0x11, 0x65, 0x40, 0x0e, 0xba, 0x1d, 0xac, 0xbc, 0x42, 0x15, 0xde, 0x93, 0x6d, 0x32, 0xb3, 0x26,
+	0x35, 0xa4, 0xd6, 0xea, 0xee, 0xb6, 0x96, 0x7d, 0xb4, 0x54, 0x5a, 0x0b, 0x87, 0x0e, 0x0f, 0x50,
+	0x8d, 0xd3, 0xda, 0x68, 0x47, 0x3b, 0xee, 0xbf, 0x06, 0x8b, 0xfd, 0x07, 0xcc, 0x34, 0x94, 0xab,
+	0x71, 0xbd, 0x10, 0x8f, 0xeb, 0x28, 0x8b, 0xe1, 0x54, 0x55, 0xf9, 0x1f, 0x95, 0x68, 0x08, 0x56,
+	0x6d, 0x45, 0xa8, 0xeb, 0xda, 0xfd, 0x4f, 0xa2, 0xe5, 0x9a, 0x3b, 0x09, 0xc1, 0x32, 0xd6, 0x12,
+	0xf1, 0x12, 0x3f, 0x61, 0x21, 0xd5, 0xfc, 0x28, 0xa1, 0x6a, 0x8e, 0xfb, 0xd7, 0xa5, 0x4c, 0x39,
+	0x5b, 0x18, 0x44, 0x7b, 0xdc, 0x20, 0xbc, 0x5a, 0x8c, 0xb1, 0x91, 0xdc, 0x54, 0x99, 0x46, 0x72,
+	0x43, 0xf4, 0x50, 0xd9, 0x65, 0xe0, 0xd1, 0xda, 0x4a, 0xa3, 0xd8, 0x5a, 0xdd, 0xfd, 0xf3, 0x27,
+	0xa6, 0x30, 0xd6, 0x13, 0xdd, 0x72, 0x97, 0x2b, 0xe0, 0x89, 0x50, 0xf3, 0xeb, 0xec, 0x0c, 0x7c,
+	0x3a, 0xe5, 0x05, 0x5a, 0xf3, 0x03, 0x1b, 0x4e, 0xe0, 0x02, 0x2c, 0x16, 0x90, 0x64, 0x8e, 0x46,
+	0xfe, 0x32, 0x6e, 0x3b, 0xde, 0xf5, 0x51, 0x8e, 0x33, 0x36, 0xe2, 0x71, 0x7d, 0x2d, 0x1f, 0xc1,
+	0x33, 0x3a, 0xca, 0x3e, 0xaa, 0x86, 0x40, 0x38, 0xf0, 0x4f, 0x40, 0x99, 0xe1, 0x32, 0x2a, 0x5e,
+	0xa3, 0x6c, 0xfc, 0x9a, 0xb4, 0x56, 0xed, 0xcd, 0xa6, 0xf1, 0x3c, 0xaf, 0x34, 0x50, 0xc9, 0x0d,
+	0x47, 0x7b, 0xb5, 0x62, 0x43, 0x6a, 0xc9, 0xd9, 0xa3, 0x74, 0x7b, 0xa3, 0x3d, 0x2c, 0x32, 0x09,
+	0xd1, 0xae, 0x95, 0x16, 0x88, 0xb6, 0x20, 0xda, 0xcd, 0x0f, 0x12, 0x92, 0xbb, 0xbd, 0x7d, 0xdb,
+	0x26, 0x40, 0xe9, 0x13, 0x38, 0xef, 0x78, 0xc6, 0x79, 0x5b, 0x0f, 0xbd, 0x59, 0xda, 0xda, 0x52,
+	0xdf, 0xbd, 0x97, 0xd0, 0x7a, 0x4a, 0x3d, 0x81, 0xeb, 0x8e, 0x66, 0x5d, 0xf7, 0xc7, 0xa3, 0x27,
+	0x58, 0xe2, 0x39, 0x2f, 0xd7, 0xbe, 0x30, 0xdc, 0x19, 0x92, 0x43, 0x93, 0x80, 0xcf, 0x30, 0x9c,
+	0x27, 0xfd, 0x3f, 0xf8, 0x0f, 0xda, 0x9b, 0x16, 0x00, 0x01, 0xdf, 0x02, 0x63, 0x3d, 0x1e, 0xd7,
+	0xe5, 0x34, 0x88, 0x33, 0xc1, 0xe6, 0x77, 0x09, 0x55, 0xe7, 0x68, 0xe5, 0x77, 0x54, 0x76, 0x48,
+	0x10, 0x85, 0xe2, 0x36, 0x39, 0xeb, 0xf3, 0x90, 0x07, 0xf1, 0x24, 0xa7, 0xfc, 0x85, 0x2a, 0x04,
+	0x68, 0x10, 0x11, 0x0b, 0xc4, 0xe3, 0xc9, 0xd9, 0x57, 0xc2, 0x49, 0x1c, 0xa7, 0x84, 0xa2, 0x23,
+	0xd9, 0x37, 0x3d, 0xa0, 0xa1, 0x69, 0x41, 0xe2, 0xcf, 0x5f, 0x12, 0x5c, 0x3e, 0x9a, 0x26, 0x70,
+	0xc6, 0x70, 0xa7, 0xf2, 0xc3, 0xbc, 0x53, 0x39, 0x8b, 0x45, 0x46, 0x31, 0x50, 0x31, 0x72, 0xed,
+	0x5a, 0x59, 0x00, 0xdb, 0x09, 0x50, 0x3c, 0xed, 0x76, 0xbe, 0x8d, 0xeb, 0xbf, 0x2d, 0xdb, 0xbc,
+	0xec, 0x32, 0x04, 0xaa, 0x9d, 0x76, 0x3b, 0x98, 0x17, 0x8b, 0x4d, 0x7b, 0x02, 0x64, 0xe4, 0x5a,
+	0xf0, 0x3c, 0x37, 0x6d, 0xae, 0xb9, 0x7b, 0x37, 0x6d, 0x8e, 0x7b, 0x86, 0x9b, 0x36, 0xd7, 0xdd,
+	0x12, 0xd7, 0xc3, 0xcc, 0x08, 0xc2, 0xf7, 0x2d, 0x54, 0xe1, 0x3b, 0xcb, 0x72, 0x6d, 0x92, 0x18,
+	0x71, 0x76, 0xa3, 0xa5, 0xd9, 0x84, 0x6c, 0x0b, 0x72, 0xe5, 0x8e, 0xcd, 0x96, 0x66, 0x8d, 0xce,
+	0xd5, 0xad, 0x5a, 0xb8, 0xbe, 0x55, 0x0b, 0x37, 0xb7, 0x6a, 0xe1, 0x6d, 0xac, 0x4a, 0x57, 0xb1,
+	0x2a, 0x5d, 0xc7, 0xaa, 0x74, 0x13, 0xab, 0xd2, 0xe7, 0x58, 0x95, 0xde, 0x7d, 0x51, 0x0b, 0x2f,
+	0xd5, 0xfb, 0x7f, 0xc1, 0xfc, 0x08, 0x00, 0x00, 0xff, 0xff, 0x05, 0x53, 0x5d, 0x8f, 0xfb, 0x08,
+	0x00, 0x00,
 }
 
 func (m *ClusterCIDR) Marshal() (dAtA []byte, err error) {
@@ -312,6 +533,302 @@ func (m *ClusterCIDRSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *IPAddress) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *IPAddress) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *IPAddress) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	{
+		size, err := m.Spec.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x12
+	{
+		size, err := m.ObjectMeta.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *IPAddressList) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *IPAddressList) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *IPAddressList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Items) > 0 {
+		for iNdEx := len(m.Items) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Items[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	{
+		size, err := m.ListMeta.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *IPAddressSpec) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *IPAddressSpec) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *IPAddressSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.ParentRef != nil {
+		{
+			size, err := m.ParentRef.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ParentReference) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ParentReference) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ParentReference) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.UID)
+	copy(dAtA[i:], m.UID)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.UID)))
+	i--
+	dAtA[i] = 0x2a
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0x22
+	i -= len(m.Namespace)
+	copy(dAtA[i:], m.Namespace)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Namespace)))
+	i--
+	dAtA[i] = 0x1a
+	i -= len(m.Resource)
+	copy(dAtA[i:], m.Resource)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Resource)))
+	i--
+	dAtA[i] = 0x12
+	i -= len(m.Group)
+	copy(dAtA[i:], m.Group)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Group)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *ServiceCIDR) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ServiceCIDR) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ServiceCIDR) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	{
+		size, err := m.Spec.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0x12
+	{
+		size, err := m.ObjectMeta.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *ServiceCIDRList) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ServiceCIDRList) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ServiceCIDRList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Items) > 0 {
+		for iNdEx := len(m.Items) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Items[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	{
+		size, err := m.ListMeta.MarshalToSizedBuffer(dAtA[:i])
+		if err != nil {
+			return 0, err
+		}
+		i -= size
+		i = encodeVarintGenerated(dAtA, i, uint64(size))
+	}
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *ServiceCIDRSpec) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ServiceCIDRSpec) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ServiceCIDRSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.IPv6)
+	copy(dAtA[i:], m.IPv6)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.IPv6)))
+	i--
+	dAtA[i] = 0x12
+	i -= len(m.IPv4)
+	copy(dAtA[i:], m.IPv4)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.IPv4)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintGenerated(dAtA []byte, offset int, v uint64) int {
 	offset -= sovGenerated(v)
 	base := offset
@@ -371,6 +888,111 @@ func (m *ClusterCIDRSpec) Size() (n int) {
 	return n
 }
 
+func (m *IPAddress) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.ObjectMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Spec.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *IPAddressList) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.ListMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Items) > 0 {
+		for _, e := range m.Items {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *IPAddressSpec) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ParentRef != nil {
+		l = m.ParentRef.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *ParentReference) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Group)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Resource)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Namespace)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.UID)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *ServiceCIDR) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.ObjectMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	l = m.Spec.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
+func (m *ServiceCIDRList) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = m.ListMeta.Size()
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Items) > 0 {
+		for _, e := range m.Items {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
+func (m *ServiceCIDRSpec) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.IPv4)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.IPv6)
+	n += 1 + l + sovGenerated(uint64(l))
+	return n
+}
+
 func sovGenerated(x uint64) (n int) {
 	return (math_bits.Len64(x|1) + 6) / 7
 }
@@ -411,6 +1033,95 @@ func (this *ClusterCIDRSpec) String() string {
 	s := strings.Join([]string{`&ClusterCIDRSpec{`,
 		`NodeSelector:` + strings.Replace(fmt.Sprintf("%v", this.NodeSelector), "NodeSelector", "v11.NodeSelector", 1) + `,`,
 		`PerNodeHostBits:` + fmt.Sprintf("%v", this.PerNodeHostBits) + `,`,
+		`IPv4:` + fmt.Sprintf("%v", this.IPv4) + `,`,
+		`IPv6:` + fmt.Sprintf("%v", this.IPv6) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *IPAddress) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&IPAddress{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "IPAddressSpec", "IPAddressSpec", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *IPAddressList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForItems := "[]IPAddress{"
+	for _, f := range this.Items {
+		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "IPAddress", "IPAddress", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForItems += "}"
+	s := strings.Join([]string{`&IPAddressList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + repeatedStringForItems + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *IPAddressSpec) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&IPAddressSpec{`,
+		`ParentRef:` + strings.Replace(this.ParentRef.String(), "ParentReference", "ParentReference", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ParentReference) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ParentReference{`,
+		`Group:` + fmt.Sprintf("%v", this.Group) + `,`,
+		`Resource:` + fmt.Sprintf("%v", this.Resource) + `,`,
+		`Namespace:` + fmt.Sprintf("%v", this.Namespace) + `,`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`UID:` + fmt.Sprintf("%v", this.UID) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ServiceCIDR) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ServiceCIDR{`,
+		`ObjectMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ObjectMeta), "ObjectMeta", "v1.ObjectMeta", 1), `&`, ``, 1) + `,`,
+		`Spec:` + strings.Replace(strings.Replace(this.Spec.String(), "ServiceCIDRSpec", "ServiceCIDRSpec", 1), `&`, ``, 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ServiceCIDRList) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForItems := "[]ServiceCIDR{"
+	for _, f := range this.Items {
+		repeatedStringForItems += strings.Replace(strings.Replace(f.String(), "ServiceCIDR", "ServiceCIDR", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForItems += "}"
+	s := strings.Join([]string{`&ServiceCIDRList{`,
+		`ListMeta:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ListMeta), "ListMeta", "v1.ListMeta", 1), `&`, ``, 1) + `,`,
+		`Items:` + repeatedStringForItems + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *ServiceCIDRSpec) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&ServiceCIDRSpec{`,
 		`IPv4:` + fmt.Sprintf("%v", this.IPv4) + `,`,
 		`IPv6:` + fmt.Sprintf("%v", this.IPv6) + `,`,
 		`}`,
@@ -775,6 +1486,882 @@ func (m *ClusterCIDRSpec) Unmarshal(dAtA []byte) error {
 			m.IPv4 = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IPv6", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.IPv6 = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *IPAddress) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: IPAddress: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: IPAddress: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Spec.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *IPAddressList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: IPAddressList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: IPAddressList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Items = append(m.Items, IPAddress{})
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *IPAddressSpec) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: IPAddressSpec: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: IPAddressSpec: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ParentRef", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ParentRef == nil {
+				m.ParentRef = &ParentReference{}
+			}
+			if err := m.ParentRef.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ParentReference) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ParentReference: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ParentReference: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Group", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Group = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Resource", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Resource = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Namespace", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Namespace = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field UID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.UID = k8s_io_apimachinery_pkg_types.UID(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ServiceCIDR) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ServiceCIDR: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ServiceCIDR: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ObjectMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ObjectMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Spec", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.Spec.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ServiceCIDRList) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ServiceCIDRList: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ServiceCIDRList: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ListMeta", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if err := m.ListMeta.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Items", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Items = append(m.Items, ServiceCIDR{})
+			if err := m.Items[len(m.Items)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ServiceCIDRSpec) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ServiceCIDRSpec: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ServiceCIDRSpec: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field IPv4", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.IPv4 = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field IPv6", wireType)
 			}
