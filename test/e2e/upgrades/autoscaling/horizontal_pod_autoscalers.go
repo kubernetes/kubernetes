@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -31,7 +31,7 @@ import (
 // HPAUpgradeTest tests that HPA rescales target resource correctly before and after a cluster upgrade.
 type HPAUpgradeTest struct {
 	rc  *e2eautoscaling.ResourceConsumer
-	hpa *autoscalingv1.HorizontalPodAutoscaler
+	hpa *autoscalingv2.HorizontalPodAutoscaler
 }
 
 // Name returns the tracking name of the test.

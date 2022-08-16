@@ -76,6 +76,8 @@ var (
 	KindDeployment = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "Deployment"}
 	// KindReplicaSet is the GVK for ReplicaSet
 	KindReplicaSet = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}
+	// KindCRD is the GVK for CRD for test purposes
+	KindCRD = schema.GroupVersionKind{Group: "test", Version: "v1", Kind: "TestCustomCRD"}
 )
 
 // ScalingDirection identifies the scale direction for HPA Behavior.
@@ -615,33 +617,58 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
 }
 
-// CreateCPUHorizontalPodAutoscaler create a horizontalPodAutoscaler with CPU target
-// for consuming resources.
-func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) *autoscalingv1.HorizontalPodAutoscaler {
-	hpa := &autoscalingv1.HorizontalPodAutoscaler{
+func CreateCpuHorizontalPodAutoscalerWithCustomTargetRef(rc *ResourceConsumer, targetRef autoscalingv2.CrossVersionObjectReference, namespace string, cpu, minReplicas, maxReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      rc.name,
-			Namespace: rc.nsName,
+			Name:      targetRef.Name,
+			Namespace: namespace,
 		},
-		Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
-				APIVersion: rc.kind.GroupVersion().String(),
-				Kind:       rc.kind.Kind,
-				Name:       rc.name,
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: targetRef,
+			MinReplicas:    &minReplicas,
+			MaxReplicas:    maxReplicas,
+			Metrics: []autoscalingv2.MetricSpec{
+				{
+					Type: autoscalingv2.ResourceMetricSourceType,
+					Resource: &autoscalingv2.ResourceMetricSource{
+						Name: v1.ResourceCPU,
+						Target: autoscalingv2.MetricTarget{
+							Type:               autoscalingv2.UtilizationMetricType,
+							AverageUtilization: &cpu,
+						},
+					},
+				},
 			},
-			MinReplicas:                    &minReplicas,
-			MaxReplicas:                    maxRepl,
-			TargetCPUUtilizationPercentage: &cpu,
 		},
 	}
-	hpa, errHPA := rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
+	hpa, errHPA := rc.clientSet.AutoscalingV2().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
 	framework.ExpectNoError(errHPA)
 	return hpa
+}
+
+// CreateCPUHorizontalPodAutoscaler create a horizontalPodAutoscaler with CPU target
+// for consuming resources.
+func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxReplicas int32) *autoscalingv2.HorizontalPodAutoscaler {
+	targetRef := autoscalingv2.CrossVersionObjectReference{
+		APIVersion: rc.kind.GroupVersion().String(),
+		Kind:       rc.kind.Kind,
+		Name:       rc.name,
+	}
+
+	return CreateCpuHorizontalPodAutoscalerWithCustomTargetRef(rc, targetRef, rc.nsName, cpu, minReplicas, maxReplicas)
 }
 
 // DeleteHorizontalPodAutoscaler delete the horizontalPodAutoscaler for consuming resources.
 func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) {
 	rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
+}
+
+func CustomCRDTargetRef() autoscalingv2.CrossVersionObjectReference {
+	return autoscalingv2.CrossVersionObjectReference{
+		Kind:       "TestCustomCRD",
+		Name:       "test-custom-crd",
+		APIVersion: "test/v1",
+	}
 }
 
 // runReplicaSet launches (and verifies correctness) of a replicaset.
