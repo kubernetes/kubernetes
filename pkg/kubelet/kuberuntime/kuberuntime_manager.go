@@ -148,9 +148,6 @@ type kubeGenericRuntimeManager struct {
 	// PodState provider instance
 	podStateProvider podStateProvider
 
-	// Use the default AppArmor profile for all workloads.
-	apparmorDefault bool
-
 	// Use RuntimeDefault as the default seccomp profile for all workloads.
 	seccompDefault bool
 
