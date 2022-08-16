@@ -2195,3 +2195,315 @@ func TestValidateClusterConfigUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateServiceCIDR(t *testing.T) {
+
+	testCases := map[string]struct {
+		expectedErrors int
+		ipRange        *networking.ServiceCIDR
+	}{
+		"empty-iprange": {
+			expectedErrors: 1,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+			},
+		},
+		"good-iprange-ipv4": {
+			expectedErrors: 0,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					IPv4: "192.168.0.0/24",
+				},
+			},
+		},
+		"good-iprange-ipv6": {
+			expectedErrors: 0,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					IPv6: "fd00:1234::/64",
+				},
+			},
+		},
+		"not-iprange-ipv4": {
+			expectedErrors: 1,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					IPv4: "sadasdsad",
+				},
+			},
+		},
+		"iponly-iprange-ipv4": {
+			expectedErrors: 1,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					IPv4: "192.168.0.1",
+				},
+			},
+		},
+		"badip-iprange-ipv4": {
+			expectedErrors: 2,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					IPv4: "192.168.0.1/24",
+				},
+			},
+		},
+		"badip-iprange-ipv6": {
+			expectedErrors: 2,
+			ipRange: &networking.ServiceCIDR{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+				Spec: networking.ServiceCIDRSpec{
+					IPv6: "fd00:1234::2/64",
+				},
+			},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateServiceCIDR(testCase.ipRange)
+			if len(errs) != testCase.expectedErrors {
+				t.Errorf("Expected %d errors, got %d errors: %v", testCase.expectedErrors, len(errs), errs)
+			}
+		})
+	}
+}
+
+func TestValidateServiceCIDRUpdate(t *testing.T) {
+	oldServiceCIDR := &networking.ServiceCIDR{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "mysvc",
+			ResourceVersion: "1",
+		},
+		Spec: networking.ServiceCIDRSpec{
+			IPv4: "192.168.0.0/24",
+			IPv6: "2001:db2::/64",
+		},
+	}
+
+	testCases := []struct {
+		name      string
+		svc       func(svc *networking.ServiceCIDR) *networking.ServiceCIDR
+		expectErr bool
+	}{
+		{
+			name: "Successful update, no changes",
+			svc: func(svc *networking.ServiceCIDR) *networking.ServiceCIDR {
+				out := svc.DeepCopy()
+				return out
+			},
+			expectErr: false,
+		},
+
+		{
+			name: "Failed update, update spec.IPv4",
+			svc: func(svc *networking.ServiceCIDR) *networking.ServiceCIDR {
+				out := svc.DeepCopy()
+				out.Spec.IPv4 = "10.0.0.0/16"
+				return out
+			}, expectErr: true,
+		},
+		{
+			name: "Failed update, update spec.IPv6",
+			svc: func(svc *networking.ServiceCIDR) *networking.ServiceCIDR {
+				out := svc.DeepCopy()
+				out.Spec.IPv4 = "fd00:1:2:3::/64"
+				return out
+			}, expectErr: true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := ValidateServiceCIDRUpdate(testCase.svc(oldServiceCIDR), oldServiceCIDR)
+			if !testCase.expectErr && err != nil {
+				t.Errorf("ValidateServiceCIDRUpdate must be successful for test '%s', got %v", testCase.name, err)
+			}
+			if testCase.expectErr && err == nil {
+				t.Errorf("ValidateServiceCIDRUpdate must return error for test: %s, but got nil", testCase.name)
+			}
+		})
+	}
+}
+
+func TestValidateIPAddress(t *testing.T) {
+	testCases := map[string]struct {
+		expectedErrors int
+		ipAddress      *networking.IPAddress
+	}{
+		"empty-ipaddress-bad-name": {
+			expectedErrors: 1,
+			ipAddress: &networking.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-name",
+				},
+			},
+		},
+
+		"good-ipaddress": {
+			expectedErrors: 0,
+			ipAddress: &networking.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "192.168.1.1",
+				},
+			},
+		},
+		"good-ipv6address": {
+			expectedErrors: 0,
+			ipAddress: &networking.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "2001:4860:4860::8888",
+				},
+			},
+		},
+		"non-canonica-ipv6address": {
+			expectedErrors: 1,
+			ipAddress: &networking.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "2001:4860:4860:0::8888",
+				},
+			},
+		},
+		"good-ipaddress-reference": {
+			expectedErrors: 0,
+			ipAddress: &networking.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "192.168.1.1",
+				},
+				Spec: networking.IPAddressSpec{
+					ParentRef: &networking.ParentReference{
+						Group:     "",
+						Resource:  "Service",
+						Name:      "foo",
+						Namespace: "bar",
+					},
+				},
+			},
+		},
+		"wrong-ipaddress-reference": {
+			expectedErrors: 1,
+			ipAddress: &networking.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "192.168.1.1",
+				},
+				Spec: networking.IPAddressSpec{
+					ParentRef: &networking.ParentReference{
+						Group:     "custom.resource.com",
+						Resource:  "Service",
+						Name:      "foo$%&",
+						Namespace: "",
+					},
+				},
+			},
+		},
+		"wrong-ipaddress-reference-multiple-errors": {
+			expectedErrors: 4,
+			ipAddress: &networking.IPAddress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "192.168.1.1",
+				},
+				Spec: networking.IPAddressSpec{
+					ParentRef: &networking.ParentReference{
+						Group:     ".cust@m.resource.com",
+						Resource:  "",
+						Name:      "",
+						Namespace: "bar$$$$$%@",
+					},
+				},
+			},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateIPAddress(testCase.ipAddress)
+			if len(errs) != testCase.expectedErrors {
+				t.Errorf("Expected %d errors, got %d errors: %v", testCase.expectedErrors, len(errs), errs)
+			}
+		})
+	}
+}
+
+func TestValidateIPAddressUpdate(t *testing.T) {
+	old := &networking.IPAddress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "192.168.1.1",
+			ResourceVersion: "1",
+		},
+		Spec: networking.IPAddressSpec{
+			ParentRef: &networking.ParentReference{
+				Group:     "custom.resource.com",
+				Resource:  "Service",
+				Name:      "foo",
+				Namespace: "bar",
+			},
+		},
+	}
+
+	testCases := []struct {
+		name      string
+		new       func(svc *networking.IPAddress) *networking.IPAddress
+		expectErr bool
+	}{
+		{
+			name: "Successful update, no changes",
+			new: func(old *networking.IPAddress) *networking.IPAddress {
+				out := old.DeepCopy()
+				return out
+			},
+			expectErr: false,
+		},
+
+		{
+			name: "Failed update, update spec.ParentRef",
+			new: func(svc *networking.IPAddress) *networking.IPAddress {
+				out := svc.DeepCopy()
+				out.Spec.ParentRef = &networking.ParentReference{
+					Group:     "custom.resource.com",
+					Resource:  "Gateway",
+					Name:      "foo",
+					Namespace: "bar",
+				}
+
+				return out
+			}, expectErr: true,
+		},
+		{
+			name: "Failed update, delete spec.ParentRef",
+			new: func(svc *networking.IPAddress) *networking.IPAddress {
+				out := svc.DeepCopy()
+				out.Spec.ParentRef = nil
+				return out
+			}, expectErr: true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := ValidateIPAddressUpdate(testCase.new(old), old)
+			if !testCase.expectErr && err != nil {
+				t.Errorf("ValidateIPAddressUpdate must be successful for test '%s', got %v", testCase.name, err)
+			}
+			if testCase.expectErr && err == nil {
+				t.Errorf("ValidateIPAddressUpdate must return error for test: %s, but got nil", testCase.name)
+			}
+		})
+	}
+}

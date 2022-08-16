@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"net/netip"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -688,6 +689,7 @@ func ValidateClusterCIDRSpec(spec *networking.ClusterCIDRSpec, fldPath *field.Pa
 	// Validate specified IPv6 CIDR and PerNodeHostBits.
 	if spec.IPv6 != "" {
 		allErrs = append(allErrs, validateCIDRConfig(spec.IPv6, spec.PerNodeHostBits, 128, v1.IPv6Protocol, fldPath)...)
+
 	}
 
 	return allErrs
@@ -739,5 +741,131 @@ func validateClusterCIDRUpdateSpec(update, old *networking.ClusterCIDRSpec, fldP
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.IPv4, old.IPv4, fldPath.Child("ipv4"))...)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.IPv6, old.IPv6, fldPath.Child("ipv6"))...)
 
+	return allErrs
+}
+
+var ValidateServiceCIDRName = apimachineryvalidation.NameIsDNSSubdomain
+
+func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&cidrConfig.ObjectMeta, false, ValidateServiceCIDRName, field.NewPath("metadata"))
+
+	if cidrConfig.Spec.IPv4 == "" && cidrConfig.Spec.IPv6 == "" {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("Spec"), cidrConfig.Spec, "at least one CIDR required"))
+	}
+
+	if cidrConfig.Spec.IPv4 != "" {
+		prefix, err := netip.ParsePrefix(cidrConfig.Spec.IPv4)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("IPv4"), cidrConfig.Spec.IPv4, err.Error()))
+		} else {
+			if prefix.Addr() != prefix.Masked().Addr() {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("IPv4"), cidrConfig.Spec.IPv4, "wrong CIDR format, IP doesn't match network IP address"))
+			}
+			if prefix.Masked().String() != cidrConfig.Spec.IPv4 {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("IPv4"), cidrConfig.Spec.IPv4, "CIDR not in canonical format"))
+			}
+			if !prefix.Addr().Is4() {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("IPv4"), cidrConfig.Spec.IPv4, "not IPv4 family CIDR"))
+			}
+		}
+	}
+
+	if cidrConfig.Spec.IPv6 != "" {
+		prefix, err := netip.ParsePrefix(cidrConfig.Spec.IPv6)
+		if err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("IPv6"), cidrConfig.Spec.IPv6, err.Error()))
+		} else {
+			if prefix.Addr() != prefix.Masked().Addr() {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("IPv6"), cidrConfig.Spec.IPv6, "wrong CIDR format, IP doesn't match network IP address"))
+			}
+			if prefix.Masked().String() != cidrConfig.Spec.IPv6 {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("IPv6"), cidrConfig.Spec.IPv6, "CIDR not in canonical format"))
+			}
+			if !prefix.Addr().Is6() {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("IPv6"), cidrConfig.Spec.IPv6, "not IPv6 family CIDR"))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateServiceCIDRUpdate tests if an update to a ServiceCIDR is valid.
+func ValidateServiceCIDRUpdate(update, old *networking.ServiceCIDR) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.IPv4, old.Spec.IPv4, field.NewPath("spec").Child("ipv4"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.IPv6, old.Spec.IPv6, field.NewPath("spec").Child("ipv6"))...)
+
+	return allErrs
+}
+
+// ValidateIPAddressName validates that the name is the decimal representation of an IP address
+func ValidateIPAddressName(name string, prefix bool) []string {
+	var errs []string
+	if prefix {
+		errs = append(errs, "prefix not allowed")
+	}
+	ip, err := netip.ParseAddr(name)
+	if err != nil {
+		errs = append(errs, err.Error())
+	} else if ip.String() != name {
+		errs = append(errs, "not a valid ip in canonical format")
+
+	}
+	return errs
+}
+
+func ValidateIPAddress(ipAddress *networking.IPAddress) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&ipAddress.ObjectMeta, false, ValidateIPAddressName, field.NewPath("metadata"))
+	errs := validateIPAddressParentReference(ipAddress.Spec.ParentRef, field.NewPath("spec"))
+	allErrs = append(allErrs, errs...)
+	return allErrs
+
+}
+
+// validateIngressTypedLocalObjectReference ensures that Parameters fields are valid.
+func validateIPAddressParentReference(params *networking.ParentReference, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if params == nil {
+		return allErrs
+	}
+
+	if params.Group != "" {
+		for _, msg := range validation.IsDNS1123Subdomain(params.Group) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), params.Group, msg))
+		}
+	}
+
+	if params.Resource == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), "resource is required"))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Resource) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resource"), params.Resource, msg))
+		}
+	}
+
+	if params.Name == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "name is required"))
+	} else {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
+		}
+	}
+
+	if params.Namespace != "" {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Namespace) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), params.Namespace, msg))
+		}
+	}
+	return allErrs
+}
+
+// ValidateIPAddressUpdate tests if an update to an IPAddress is valid.
+func ValidateIPAddressUpdate(update, old *networking.IPAddress) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef"))...)
 	return allErrs
 }
