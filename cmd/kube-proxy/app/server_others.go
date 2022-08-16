@@ -129,7 +129,7 @@ func newProxyServer(
 	var proxier proxy.Provider
 	var detectLocalMode proxyconfigapi.LocalMode
 
-	proxyMode := getProxyMode(string(config.Mode))
+	proxyMode := getProxyMode(config.Mode)
 	detectLocalMode, err = getDetectLocalMode(config)
 	if err != nil {
 		return nil, fmt.Errorf("cannot determine detect-local-mode: %v", err)
@@ -157,7 +157,7 @@ func newProxyServer(
 	var ipt [2]utiliptables.Interface
 	dualStack := true // While we assume that node supports, we do further checks below
 
-	if proxyMode != proxyModeUserspace {
+	if proxyMode != proxyconfigapi.ProxyModeUserspace {
 		// Create iptables handlers for both families, one is already created
 		// Always ordered as IPv4, IPv6
 		if primaryProtocol == utiliptables.ProtocolIPv4 {
@@ -176,7 +176,7 @@ func newProxyServer(
 		}
 	}
 
-	if proxyMode == proxyModeIPTables {
+	if proxyMode == proxyconfigapi.ProxyModeIPTables {
 		klog.V(0).InfoS("Using iptables Proxier")
 		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
@@ -239,7 +239,7 @@ func newProxyServer(
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 		proxymetrics.RegisterMetrics()
-	} else if proxyMode == proxyModeIPVS {
+	} else if proxyMode == proxyconfigapi.ProxyModeIPVS {
 		kernelHandler := ipvs.NewLinuxKernelHandler()
 		ipsetInterface = utilipset.New(execer)
 		if err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface, config.IPVS.Scheduler); err != nil {
@@ -342,7 +342,7 @@ func newProxyServer(
 	}
 
 	useEndpointSlices := true
-	if proxyMode == proxyModeUserspace {
+	if proxyMode == proxyconfigapi.ProxyModeUserspace {
 		// userspace mode doesn't support endpointslice.
 		useEndpointSlices = false
 	}
@@ -547,10 +547,10 @@ func cidrTuple(cidrList string) [2]string {
 	return cidrs
 }
 
-func getProxyMode(proxyMode string) string {
+func getProxyMode(proxyMode proxyconfigapi.ProxyMode) proxyconfigapi.ProxyMode {
 	if proxyMode == "" {
 		klog.InfoS("Using iptables proxy")
-		return proxyModeIPTables
+		return proxyconfigapi.ProxyModeIPTables
 	} else {
 		return proxyMode
 	}
