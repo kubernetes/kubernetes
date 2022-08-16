@@ -56,6 +56,8 @@ type Range struct {
 	metrics metricsRecorderInterface
 }
 
+var _ Interface = (*Range)(nil)
+
 // New creates a Range over a net.IPNet, calling allocatorFactory to construct the backing store.
 func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorWithOffsetFactory) (*Range, error) {
 	max := netutils.RangeSize(cidr)
