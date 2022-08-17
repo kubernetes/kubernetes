@@ -746,7 +746,7 @@ func getCurrentTopologiesNumber(cs clientset.Interface, nodes *v1.NodeList, keys
 				break
 			}
 		}
-		if !found {
+		if !found && len(topo) > 0 {
 			framework.Logf("found topology %v", topo)
 			topos = append(topos, topo)
 			topoCount = append(topoCount, 1)
