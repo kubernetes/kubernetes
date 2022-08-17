@@ -119,7 +119,7 @@ type KubeletConfiguration struct {
 	// staticPodURLHeader is a map of slices with HTTP headers to use when accessing the podURL.
 	// Default: nil
 	// +optional
-	StaticPodURLHeader map[string][]string `json:"staticPodURLHeader,omitempty"`
+	StaticPodURLHeader map[string][]string `json:"staticPodURLHeader,omitempty" datapolicy:"token"`
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces).
 	// Default: "0.0.0.0"
