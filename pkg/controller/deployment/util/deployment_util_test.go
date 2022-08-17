@@ -1248,3 +1248,55 @@ func TestGetDeploymentsForReplicaSet(t *testing.T) {
 	}
 
 }
+func generateRSWithRevision(revision string) apps.ReplicaSet {
+	return apps.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:         randomUID(),
+			Name:        names.SimpleNameGenerator.GenerateName("replicaset"),
+			Labels:      map[string]string{"foo": "bar"},
+			Annotations: map[string]string{RevisionAnnotation: revision},
+		},
+	}
+}
+
+func TestLastRevision(t *testing.T) {
+	rs1 := generateRSWithRevision("1")
+	rs2 := generateRSWithRevision("2")
+	rs3 := generateRSWithRevision("3")
+	rs4 := generateRSWithRevision("4")
+
+	tests := []struct {
+		name         string
+		replicaSets  []*apps.ReplicaSet
+		wantRevision int64
+	}{
+		{
+			name:         "replicaSet have only one member",
+			replicaSets:  []*apps.ReplicaSet{&rs1},
+			wantRevision: 0,
+		},
+		{
+			name:         "replicaSets have two members",
+			replicaSets:  []*apps.ReplicaSet{&rs1, &rs2},
+			wantRevision: 1,
+		},
+		{
+			name:         "replicaSets have more than two members",
+			replicaSets:  []*apps.ReplicaSet{&rs1, &rs2, &rs3},
+			wantRevision: 2,
+		},
+		{
+			name:         "replicaSets have more than two members with revision is out of order",
+			replicaSets:  []*apps.ReplicaSet{&rs2, &rs3, &rs4, &rs1},
+			wantRevision: 3,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res := LastRevision(test.replicaSets)
+			if res != test.wantRevision {
+				t.Errorf("The expected version is %d, but the actual version is %d", test.wantRevision, res)
+			}
+		})
+	}
+}
