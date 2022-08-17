@@ -1731,8 +1731,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			},
 		}
 		for _, t := range tests {
-			test := t
-			ginkgo.It(test.name, func() {
+			t := t
+			ginkgo.It(t.name, func() {
 				var nodeStageFsGroup, nodePublishFsGroup string
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("FSGroupPolicy is only applied on linux nodes -- skipping")
@@ -1740,7 +1740,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				init(testParameters{
 					disableAttach:          true,
 					registerDriver:         true,
-					enableVolumeMountGroup: test.enableVolumeMountGroup,
+					enableVolumeMountGroup: t.enableVolumeMountGroup,
 					hooks:                  createFSGroupRequestPreHook(&nodeStageFsGroup, &nodePublishFsGroup),
 				})
 				defer cleanup()
@@ -2479,14 +2479,14 @@ func createPreHook(method string, callback func(counter int64) error) *drivers.H
 func createFSGroupRequestPreHook(nodeStageFsGroup, nodePublishFsGroup *string) *drivers.Hooks {
 	return &drivers.Hooks{
 		Pre: func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
-			nodeStageRequest, ok := request.(csipbv1.NodeStageVolumeRequest)
+			nodeStageRequest, ok := request.(*csipbv1.NodeStageVolumeRequest)
 			if ok {
 				mountVolume := nodeStageRequest.GetVolumeCapability().GetMount()
 				if mountVolume != nil {
 					*nodeStageFsGroup = mountVolume.VolumeMountGroup
 				}
 			}
-			nodePublishRequest, ok := request.(csipbv1.NodePublishVolumeRequest)
+			nodePublishRequest, ok := request.(*csipbv1.NodePublishVolumeRequest)
 			if ok {
 				mountVolume := nodePublishRequest.GetVolumeCapability().GetMount()
 				if mountVolume != nil {
