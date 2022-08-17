@@ -89,6 +89,18 @@ type ServerRunOptions struct {
 	// This grace period is orthogonal to other grace periods, and
 	// it is not overridden by any other grace period.
 	ShutdownWatchTerminationGracePeriod time.Duration
+
+	// SendRetryAfterWhileNotReadyOnce, if enabled, the apiserver will
+	// reject all incoming requests with a 503 status code and a
+	// 'Retry-After' response header until the apiserver has fully
+	// initialized, except for requests from a designated debugger group.
+	// This option ensures that the system stays consistent even when
+	// requests are received before the server has been initialized.
+	// In particular, it prevents child deletion in case of GC or/and
+	// orphaned content in case of the namespaces controller.
+	// NOTE: this option is applicable to Microshift only,
+	//  this should never be enabled for OCP.
+	SendRetryAfterWhileNotReadyOnce bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -104,6 +116,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		JSONPatchMaxCopyBytes:               defaults.JSONPatchMaxCopyBytes,
 		MaxRequestBodyBytes:                 defaults.MaxRequestBodyBytes,
 		ShutdownSendRetryAfter:              false,
+		SendRetryAfterWhileNotReadyOnce:     false,
 	}
 }
 
@@ -124,6 +137,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.PublicAddress = s.AdvertiseAddress
 	c.ShutdownSendRetryAfter = s.ShutdownSendRetryAfter
 	c.ShutdownWatchTerminationGracePeriod = s.ShutdownWatchTerminationGracePeriod
+	c.SendRetryAfterWhileNotReadyOnce = s.SendRetryAfterWhileNotReadyOnce
 
 	return nil
 }
@@ -336,6 +350,13 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.ShutdownWatchTerminationGracePeriod, "shutdown-watch-termination-grace-period", s.ShutdownWatchTerminationGracePeriod, ""+
 		"This option, if set, represents the maximum amount of grace period the apiserver will wait "+
 		"for active watch request(s) to drain during the graceful server shutdown window.")
+
+	// NOTE: this option is applicable to Microshift only, this should never be enabled for OCP.
+	fs.BoolVar(&s.SendRetryAfterWhileNotReadyOnce, "send-retry-after-while-not-ready-once", s.SendRetryAfterWhileNotReadyOnce, ""+
+		"If true, incoming request(s) will be rejected with a '503' status code and a 'Retry-After' response header "+
+		"until the apiserver has initialized, except for requests from a certain group. This option ensures that the system stays "+
+		"consistent even when requests arrive at the server before it has been initialized. "+
+		"This option is applicable to Microshift only, this should never be enabled for OCP")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }
