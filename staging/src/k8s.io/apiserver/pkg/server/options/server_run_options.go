@@ -108,6 +108,18 @@ type ServerRunOptions struct {
 	// If true, APIs identified by group/version that are enabled in the --runtime-config flag will be installed even if it is introduced after the emulation version. --runtime-config flag values that identify multiple APIs, such as api/all,api/ga,api/beta, are not influenced by this flag and will only enable APIs available at the current emulation version.
 	// If false, error would be thrown if any GroupVersion or GroupVersionResource explicitly enabled in the --runtime-config flag is introduced after the emulation version.
 	RuntimeConfigEmulationForwardCompatible bool
+
+	// SendRetryAfterWhileNotReadyOnce, if enabled, the apiserver will
+	// reject all incoming requests with a 503 status code and a
+	// 'Retry-After' response header until the apiserver has fully
+	// initialized, except for requests from a designated debugger group.
+	// This option ensures that the system stays consistent even when
+	// requests are received before the server has been initialized.
+	// In particular, it prevents child deletion in case of GC or/and
+	// orphaned content in case of the namespaces controller.
+	// NOTE: this option is applicable to Microshift only,
+	//  this should never be enabled for OCP.
+	SendRetryAfterWhileNotReadyOnce bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -136,6 +148,7 @@ func NewServerRunOptionsForComponent(componentName string, componentGlobalsRegis
 		ShutdownSendRetryAfter:              false,
 		ComponentName:                       componentName,
 		ComponentGlobalsRegistry:            componentGlobalsRegistry,
+		SendRetryAfterWhileNotReadyOnce:     false,
 	}
 }
 
@@ -164,6 +177,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.FeatureGate = s.ComponentGlobalsRegistry.FeatureGateFor(s.ComponentName)
 	c.EmulationForwardCompatible = s.EmulationForwardCompatible
 	c.RuntimeConfigEmulationForwardCompatible = s.RuntimeConfigEmulationForwardCompatible
+	c.SendRetryAfterWhileNotReadyOnce = s.SendRetryAfterWhileNotReadyOnce
 
 	return nil
 }
@@ -397,6 +411,13 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.ShutdownWatchTerminationGracePeriod, "shutdown-watch-termination-grace-period", s.ShutdownWatchTerminationGracePeriod, ""+
 		"This option, if set, represents the maximum amount of grace period the apiserver will wait "+
 		"for active watch request(s) to drain during the graceful server shutdown window.")
+
+	// NOTE: this option is applicable to Microshift only, this should never be enabled for OCP.
+	fs.BoolVar(&s.SendRetryAfterWhileNotReadyOnce, "send-retry-after-while-not-ready-once", s.SendRetryAfterWhileNotReadyOnce, ""+
+		"If true, incoming request(s) will be rejected with a '503' status code and a 'Retry-After' response header "+
+		"until the apiserver has initialized, except for requests from a certain group. This option ensures that the system stays "+
+		"consistent even when requests arrive at the server before it has been initialized. "+
+		"This option is applicable to Microshift only, this should never be enabled for OCP")
 
 	s.ComponentGlobalsRegistry.AddFlags(fs)
 	fs.BoolVar(&s.EmulationForwardCompatible, "emulation-forward-compatible", s.EmulationForwardCompatible, ""+
