@@ -1322,6 +1322,12 @@ EOF
 KUBE_APISERVER_REQUEST_TIMEOUT_SEC: $(yaml-quote "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC}")
 EOF
     fi
+    # KUBE_APISERVER_GODEBUG (if set) controls the value of GODEBUG env var for kube-apiserver.
+    if [ -n "${KUBE_APISERVER_GODEBUG:-}" ]; then
+      cat >>"$file" <<EOF
+KUBE_APISERVER_GODEBUG: $(yaml-quote "${KUBE_APISERVER_GODEBUG}")
+EOF
+    fi
     # ETCD_IMAGE (if set) allows to use a custom etcd image.
     if [ -n "${ETCD_IMAGE:-}" ]; then
       cat >>"$file" <<EOF
