@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	discoveryv1 "k8s.io/apiserver/pkg/endpoints/discovery/v1"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
@@ -178,7 +180,10 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	if !foundGroup {
 		c.groupHandler.unsetDiscovery(version.Group)
 		c.versionHandler.unsetDiscovery(version)
-		c.resourceManager.RemoveGroup(version.Group)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
+			c.resourceManager.RemoveGroup(version.Group)
+		}
 		return nil
 	}
 
@@ -195,20 +200,25 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 
 	if !foundVersion {
 		c.versionHandler.unsetDiscovery(version)
-		c.resourceManager.RemoveGroupVersion(metav1.GroupVersion{
-			Group:   version.Group,
-			Version: version.Version,
-		})
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
+			c.resourceManager.RemoveGroupVersion(metav1.GroupVersion{
+				Group:   version.Group,
+				Version: version.Version,
+			})
+		}
 		return nil
 	}
 	c.versionHandler.setDiscovery(version, discovery.NewAPIVersionHandler(Codecs, version, discovery.APIResourceListerFunc(func() []metav1.APIResource {
 		return apiResourcesForDiscovery
 	})))
 
-	c.resourceManager.AddGroupVersion(version.Group, metav1.DiscoveryGroupVersion{
-		Version:      version.Version,
-		APIResources: discoveryv1.APIResourcesToDiscoveryAPIResources(apiResourcesForDiscovery),
-	})
+	if utilfeature.DefaultFeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
+		c.resourceManager.AddGroupVersion(version.Group, metav1.DiscoveryGroupVersion{
+			Version:      version.Version,
+			APIResources: discoveryv1.APIResourcesToDiscoveryAPIResources(apiResourcesForDiscovery),
+		})
+	}
 	return nil
 }
 

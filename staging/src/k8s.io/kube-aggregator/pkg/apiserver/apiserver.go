@@ -173,7 +173,7 @@ func (cfg *Config) Complete() CompletedConfig {
 	// the kube aggregator wires its own discovery mechanism
 	// TODO eventually collapse this by extracting all of the discovery out
 	c.GenericConfig.EnableDiscovery = false
-	c.GenericConfig.EnableDiscoveryV1 = false
+	c.GenericConfig.EnableAggregatedDiscoveryEndpoint = false
 
 	version := version.Get()
 	c.GenericConfig.Version = &version
@@ -385,31 +385,34 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 		})
 	}
 
-	s.discoveryAggregationController = NewDiscoveryManager(
-		aggregatorscheme.Codecs,
-		s.GenericAPIServer.Serializer,
-	)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+		s.discoveryAggregationController = NewDiscoveryManager(
+			aggregatorscheme.Codecs,
+			s.GenericAPIServer.Serializer,
+		)
 
-	// Inform discovery manager of all local api servers which contain
-	// crds/builtin types
-	s.discoveryAggregationController.AddLocalAPIService("kube-aggregator", s.GenericAPIServer.DiscoveryResourceManager)
+		// Inform discovery manager of all local api servers which contain
+		// crds/builtin types
+		s.discoveryAggregationController.AddLocalAPIService(
+			"kube-aggregator", s.GenericAPIServer.DiscoveryResourceManager)
 
-	i := 0
-	for delegate := s.GenericAPIServer.NextDelegate(); delegate != nil && delegate.NextDelegate() != nil; delegate = delegate.NextDelegate() {
-		s.discoveryAggregationController.AddLocalAPIService("delegate_"+strconv.Itoa(i), delegate.UnprotectedHandler())
-		i++
+		i := 0
+		for delegate := s.GenericAPIServer.NextDelegate(); delegate != nil && delegate.NextDelegate() != nil; delegate = delegate.NextDelegate() {
+			s.discoveryAggregationController.AddLocalAPIService("delegate_"+strconv.Itoa(i), delegate.UnprotectedHandler())
+			i++
+		}
+
+		// Setup discovery endpoint
+		s.GenericAPIServer.Handler.GoRestfulContainer.Add(s.discoveryAggregationController.WebService())
+		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-controller", func(context genericapiserver.PostStartHookContext) error {
+			// Run discovery manager's worker to watch for new/removed/updated
+			// APIServices to the discovery document can be updated at runtime
+			//
+			// Run populates only the local APIServices and returns an error if
+			// there was any.
+			return s.discoveryAggregationController.Run(context.StopCh)
+		})
 	}
-
-	// Setup discovery endpoint
-	s.GenericAPIServer.Handler.GoRestfulContainer.Add(s.discoveryAggregationController.WebService())
-	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-controller", func(context genericapiserver.PostStartHookContext) error {
-		// Run discovery manager's worker to watch for new/removed/updated
-		// APIServices to the discovery document can be updated at runtime
-		//
-		// Run populates only the local APIServices and returns an error if
-		// there was any.
-		return s.discoveryAggregationController.Run(context.StopCh)
-	})
 
 	prepared := s.GenericAPIServer.PrepareRun()
 
@@ -461,7 +464,9 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 			s.openAPIV3AggregationController.UpdateAPIService(proxyHandler, apiService)
 		}
 		// Forward calls to discovery manager to update discovery document
-		s.discoveryAggregationController.AddAPIService(apiService, proxyHandler)
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+			s.discoveryAggregationController.AddAPIService(apiService, proxyHandler)
+		}
 		return nil
 	}
 
@@ -492,7 +497,9 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 
 	// Forward calls to discovery manager to update discovery document
 	// This must be called after the proxyHandler for the apiservices are set up
-	s.discoveryAggregationController.AddAPIService(apiService, proxyHandler)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+		s.discoveryAggregationController.AddAPIService(apiService, proxyHandler)
+	}
 
 	// if we're dealing with the legacy group, we're done here
 	if apiService.Name == legacyAPIServiceName {
@@ -523,7 +530,9 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 // It's a slow moving API, so it's ok to run the controller on a single thread.
 func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 	// Forward calls to discovery manager to update discovery document
-	s.discoveryAggregationController.RemoveAPIService(apiServiceName)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+		s.discoveryAggregationController.RemoveAPIService(apiServiceName)
+	}
 
 	version := v1helper.APIServiceNameToGroupVersion(apiServiceName)
 

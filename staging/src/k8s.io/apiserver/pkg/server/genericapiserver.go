@@ -141,6 +141,7 @@ type GenericAPIServer struct {
 	// DiscoveryGroupManager serves /apis
 	DiscoveryGroupManager discovery.GroupManager
 
+	// DiscoveryResourceManager serves /discovery/<version>
 	DiscoveryResourceManager discoveryv1.ResourceManager
 
 	// Enable swagger and/or OpenAPI if these configs are non-nil.
@@ -684,14 +685,17 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 			return fmt.Errorf("unable to setup API %v: %v", apiGroupInfo, err)
 		}
 		resourceInfos = append(resourceInfos, r...)
-		klog.Infof("Adding GroupVersion %s %s to DiscoveryManager", groupVersion.Group, groupVersion.Version)
-		s.DiscoveryResourceManager.AddGroupVersion(
-			apiGroupInfo.PrioritizedVersions[0].Group,
-			metav1.DiscoveryGroupVersion{
-				Version:      groupVersion.Version,
-				APIResources: discoveryv1.APIResourcesToDiscoveryAPIResources(apiResources),
-			},
-		)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
+			klog.Infof("Adding GroupVersion %s %s to DiscoveryManager", groupVersion.Group, groupVersion.Version)
+			s.DiscoveryResourceManager.AddGroupVersion(
+				apiGroupInfo.PrioritizedVersions[0].Group,
+				metav1.DiscoveryGroupVersion{
+					Version:      groupVersion.Version,
+					APIResources: discoveryv1.APIResourcesToDiscoveryAPIResources(apiResources),
+				},
+			)
+		}
 	}
 
 	s.RegisterDestroyFunc(apiGroupInfo.destroyStorage)

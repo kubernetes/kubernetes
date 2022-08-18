@@ -35,6 +35,13 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
+	// owner: @jefftree @alexzielenski
+	// alpha: v1.25
+	//
+	// Enables a single HTTP endpoint /discovery/v1 which supports native HTTP
+	// caching with ETags containing all APIResources known to the apiserver.
+	AggregatedDiscoveryEndpoint featuregate.Feature = "AggregatedDiscoveryEndpoint"
+
 	// owner: @smarterclayton
 	// alpha: v1.8
 	// beta: v1.9

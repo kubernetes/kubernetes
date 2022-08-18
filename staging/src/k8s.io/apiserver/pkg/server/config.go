@@ -53,6 +53,7 @@ import (
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -118,10 +119,13 @@ type Config struct {
 	// FlowControl, if not nil, gives priority and fairness to request handling
 	FlowControl utilflowcontrol.Interface
 
-	EnableIndex       bool
-	EnableProfiling   bool
-	EnableDiscovery   bool
-	EnableDiscoveryV1 bool
+	EnableIndex     bool
+	EnableProfiling bool
+	EnableDiscovery bool
+
+	// Toggles whether /discovery/v1 endpoint with ALL resources known to
+	// apiserver is added to the http handler
+	EnableAggregatedDiscoveryEndpoint bool
 
 	// Requires generic profiling enabled
 	EnableContentionProfiling bool
@@ -341,7 +345,6 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		LivezChecks:                 append([]healthz.HealthChecker{}, defaultHealthChecks...),
 		EnableIndex:                 true,
 		EnableDiscovery:             true,
-		EnableDiscoveryV1:           true,
 		EnableProfiling:             true,
 		EnableMetrics:               true,
 		MaxRequestsInFlight:         400,
@@ -377,6 +380,8 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
 		TracerProvider:        oteltrace.NewNoopTracerProvider(),
+		// Default is to advertise /discovery endpoint is the feature is enabled
+		EnableAggregatedDiscoveryEndpoint: utilfeature.DefaultFeatureGate.Enabled(features.AggregatedDiscoveryEndpoint),
 	}
 }
 
@@ -650,8 +655,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		readyzChecks:     c.ReadyzChecks,
 		livezGracePeriod: c.LivezGracePeriod,
 
-		DiscoveryGroupManager:    discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
-		DiscoveryResourceManager: discoveryv1.NewResourceManager(c.Serializer),
+		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
 
 		maxRequestBodyBytes: c.MaxRequestBodyBytes,
 		livezClock:          clock.RealClock{},
@@ -665,6 +669,10 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		Version: c.Version,
 
 		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
+		s.DiscoveryResourceManager = discoveryv1.NewResourceManager(c.Serializer)
 	}
 
 	for {
@@ -899,7 +907,7 @@ func installAPI(s *GenericAPIServer, c *Config) {
 	if c.EnableDiscovery {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryGroupManager.WebService())
 	}
-	if c.EnableDiscoveryV1 {
+	if c.EnableAggregatedDiscoveryEndpoint && utilfeature.DefaultFeatureGate.Enabled(features.AggregatedDiscoveryEndpoint) {
 		s.Handler.GoRestfulContainer.Add(s.DiscoveryResourceManager.WebService())
 	}
 	if c.FlowControl != nil && utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
