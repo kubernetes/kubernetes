@@ -257,9 +257,6 @@ type Config struct {
 
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
-
-	// CompressionDisabledFunc returns whether compression should be disabled for a given request.
-	CompressionDisabledFunc genericapifilters.CompressionDisabledFunc
 }
 
 type RecommendedConfig struct {
@@ -858,9 +855,6 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericfilters.WithHSTS(handler, c.HSTSDirectives)
 	if c.ShutdownSendRetryAfter {
 		handler = genericfilters.WithRetryAfter(handler, c.lifecycleSignals.NotAcceptingNewRequest.Signaled())
-	}
-	if c.CompressionDisabledFunc != nil {
-		handler = genericapifilters.WithCompressionDisabled(handler, c.CompressionDisabledFunc)
 	}
 	handler = genericfilters.WithHTTPLogging(handler)
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
