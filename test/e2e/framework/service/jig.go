@@ -417,7 +417,7 @@ func (j *TestJig) waitForAvailableEndpoint(timeout time.Duration) error {
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				if es, ok := obj.(*discoveryv1.EndpointSlice); ok {
-					// TODO: currently we only consider addreses in 1 slice, but services with
+					// TODO: currently we only consider addresses in 1 slice, but services with
 					// a large number of endpoints (>1000) may have multiple slices. Some slices
 					// with only a few addresses. We should check the addresses in all slices.
 					if len(es.Endpoints) > 0 && len(es.Endpoints[0].Addresses) > 0 {
@@ -427,7 +427,7 @@ func (j *TestJig) waitForAvailableEndpoint(timeout time.Duration) error {
 			},
 			UpdateFunc: func(old, cur interface{}) {
 				if es, ok := cur.(*discoveryv1.EndpointSlice); ok {
-					// TODO: currently we only consider addreses in 1 slice, but services with
+					// TODO: currently we only consider addresses in 1 slice, but services with
 					// a large number of endpoints (>1000) may have multiple slices. Some slices
 					// with only a few addresses. We should check the addresses in all slices.
 					if len(es.Endpoints) > 0 && len(es.Endpoints[0].Addresses) > 0 {
