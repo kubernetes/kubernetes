@@ -89,7 +89,7 @@ var warnOnce sync.Once
 func newAzureAuthProvider(_ string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
 	// deprecated in v1.22, remove in v1.25
 	warnOnce.Do(func() {
-		klog.Warningf(`WARNING: the azure auth plugin is deprecated in v1.22+, unavailable in v1.25+; use https://github.com/Azure/kubelogin instead.
+		klog.Warningf(`WARNING: the azure auth plugin is deprecated in v1.22+, unavailable in v1.26+; use https://github.com/Azure/kubelogin instead.
 To learn more, consult https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins`)
 	})
 
