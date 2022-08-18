@@ -24,13 +24,13 @@ import (
 
 // Fake is a map-backed implementation of sysctl.Interface, for testing/mocking.
 type Fake struct {
-	Settings map[string]int
+	Settings map[string][]int
 }
 
 // NewFake creates a fake sysctl implementation.
 func NewFake() *Fake {
 	return &Fake{
-		Settings: make(map[string]int),
+		Settings: make(map[string][]int),
 	}
 }
 
@@ -40,12 +40,34 @@ func (m *Fake) GetSysctl(sysctl string) (int, error) {
 	if !found {
 		return -1, os.ErrNotExist
 	}
-	return v, nil
+	if len(v) < 1 {
+		return -1, os.ErrInvalid
+	}
+	return v[0], nil
+}
+
+// GetSysctl returns two values for the specified sysctl setting
+func (m *Fake) GetSysctlTwo(sysctl string) (int, int, error) {
+	v, found := m.Settings[sysctl]
+	if !found {
+		return -1, -1, os.ErrNotExist
+	}
+	if len(v) < 2 {
+		return -1, -1, os.ErrInvalid
+	}
+	return v[0], v[1], nil
+
 }
 
 // SetSysctl modifies the specified sysctl flag to the new value.
 func (m *Fake) SetSysctl(sysctl string, newVal int) error {
-	m.Settings[sysctl] = newVal
+	m.Settings[sysctl] = []int{newVal}
+	return nil
+}
+
+// SetSysctl modifies the specified sysctl flag to two new values
+func (m *Fake) SetSysctlTwo(sysctl string, newFirstVal int, newSecondVal int) error {
+	m.Settings[sysctl] = []int{newFirstVal, newSecondVal}
 	return nil
 }
 

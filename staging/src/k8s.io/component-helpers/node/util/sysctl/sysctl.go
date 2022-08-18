@@ -17,6 +17,7 @@ limitations under the License.
 package sysctl
 
 import (
+	"fmt"
 	"os"
 	"path"
 	"strconv"
@@ -68,8 +69,12 @@ const (
 type Interface interface {
 	// GetSysctl returns the value for the specified sysctl setting
 	GetSysctl(sysctl string) (int, error)
+	// GetSysctl returns two values for the specified sysctl setting
+	GetSysctlTwo(sysctl string) (int, int, error)
 	// SetSysctl modifies the specified sysctl flag to the new value
 	SetSysctl(sysctl string, newVal int) error
+	// SetSysctl modifies the specified sysctl flag to two new values
+	SetSysctlTwo(sysctl string, newFirstVal int, newSecondVal int) error
 }
 
 // New returns a new Interface for accessing sysctl
@@ -81,20 +86,66 @@ func New() Interface {
 type procSysctl struct {
 }
 
-// GetSysctl returns the value for the specified sysctl setting
-func (*procSysctl) GetSysctl(sysctl string) (int, error) {
+// getSysctlVals returns numOfVals values for the specified sysctl setting
+func getSysctlVals(sysctl string, numOfVals int) ([]int, error) {
 	data, err := os.ReadFile(path.Join(sysctlBase, sysctl))
 	if err != nil {
-		return -1, err
+		return nil, err
 	}
-	val, err := strconv.Atoi(strings.Trim(string(data), " \n"))
+
+	valStrs := strings.Fields(strings.Trim(string(data), "\n"))
+	if len(valStrs) < numOfVals {
+		return nil, fmt.Errorf("%q doesn't have (%d) value(s)", sysctl, numOfVals)
+	}
+
+	vals := []int{}
+	for i := 0; i < numOfVals; i++ {
+		val, err := strconv.Atoi(valStrs[i])
+		if err != nil {
+			return nil, err
+		}
+		vals = append(vals, val)
+	}
+
+	return vals, nil
+}
+
+// setSysctlVals modifies the specified sysctl flag to new values
+func setSysctlVals(sysctl string, newVals []int) error {
+	var data string
+	for i, val := range newVals {
+		data += strconv.Itoa(val)
+		if i != len(newVals)-1 {
+			data += "\t"
+		}
+	}
+	return os.WriteFile(path.Join(sysctlBase, sysctl), []byte(data), 0640)
+}
+
+// GetSysctl returns the value for the specified sysctl setting
+func (*procSysctl) GetSysctl(sysctl string) (int, error) {
+	vals, err := getSysctlVals(sysctl, 1)
 	if err != nil {
 		return -1, err
 	}
-	return val, nil
+	return vals[0], nil
+}
+
+// GetSysctl returns two values for the specified sysctl setting
+func (*procSysctl) GetSysctlTwo(sysctl string) (int, int, error) {
+	vals, err := getSysctlVals(sysctl, 2)
+	if err != nil {
+		return -1, -1, err
+	}
+	return vals[0], vals[1], nil
 }
 
 // SetSysctl modifies the specified sysctl flag to the new value
 func (*procSysctl) SetSysctl(sysctl string, newVal int) error {
-	return os.WriteFile(path.Join(sysctlBase, sysctl), []byte(strconv.Itoa(newVal)), 0640)
+	return setSysctlVals(sysctl, []int{newVal})
+}
+
+// SetSysctl modifies the specified sysctl flag to two new values
+func (*procSysctl) SetSysctlTwo(sysctl string, newFirstVal int, newSecondVal int) error {
+	return setSysctlVals(sysctl, []int{newFirstVal, newSecondVal})
 }
