@@ -172,7 +172,7 @@ func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest Reque
 	defer func() {
 		klog.V(7).Infof("Handle(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, isExempt=%v, queued=%v, Finish() => panicking=%v idle=%v",
 			requestDigest, fs.Name, fs.Spec.DistinguisherMethod, pl.Name, isExempt, queued, panicking, idle)
-		if idle && !panicking {
+		if idle {
 			cfgCtlr.maybeReap(pl.Name)
 		}
 	}()
