@@ -197,14 +197,6 @@ func goRuntimeMemStats() memStatsMetrics {
 			),
 			eval:    func(ms *runtime.MemStats) float64 { return float64(ms.NextGC) },
 			valType: GaugeValue,
-		}, {
-			desc: NewDesc(
-				memstatNamespace("gc_cpu_fraction"),
-				"The fraction of this program's available CPU time used by the GC since the program started.",
-				nil, nil,
-			),
-			eval:    func(ms *runtime.MemStats) float64 { return ms.GCCPUFraction },
-			valType: GaugeValue,
 		},
 	}
 }
@@ -268,7 +260,6 @@ func (c *baseGoCollector) Collect(ch chan<- Metric) {
 	quantiles[0.0] = stats.PauseQuantiles[0].Seconds()
 	ch <- MustNewConstSummary(c.gcDesc, uint64(stats.NumGC), stats.PauseTotal.Seconds(), quantiles)
 	ch <- MustNewConstMetric(c.gcLastTimeDesc, GaugeValue, float64(stats.LastGC.UnixNano())/1e9)
-
 	ch <- MustNewConstMetric(c.goInfoDesc, GaugeValue, 1)
 }
 
@@ -278,6 +269,7 @@ func memstatNamespace(s string) string {
 
 // memStatsMetrics provide description, evaluator, runtime/metrics name, and
 // value type for memstat metrics.
+// TODO(bwplotka): Remove with end Go 1.16 EOL and replace with runtime/metrics.Description
 type memStatsMetrics []struct {
 	desc    *Desc
 	eval    func(*runtime.MemStats) float64
