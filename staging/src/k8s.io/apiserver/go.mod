@@ -52,7 +52,7 @@ require (
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.30
 	sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6
-	sigs.k8s.io/structured-merge-diff/v4 v4.2.1
+	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 	sigs.k8s.io/yaml v1.2.0
 )
 
