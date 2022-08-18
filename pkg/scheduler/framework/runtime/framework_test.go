@@ -1677,7 +1677,7 @@ func TestPreBindPlugins(t *testing.T) {
 			wantStatus: nil,
 		},
 		{
-			name: "UnshedulablePreBindPlugin",
+			name: "UnschedulablePreBindPlugin",
 			plugins: []*TestPlugin{
 				{
 					name: "TestPlugin",
@@ -1835,7 +1835,7 @@ func TestReservePlugins(t *testing.T) {
 			wantStatus: nil,
 		},
 		{
-			name: "UnshedulableReservePlugin",
+			name: "UnschedulableReservePlugin",
 			plugins: []*TestPlugin{
 				{
 					name: "TestPlugin",
