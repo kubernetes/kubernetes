@@ -528,6 +528,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
 		nodeStatusMaxImages:                     nodeStatusMaxImages,
+		podsToRetry:                             sync.Map{},
 	}
 
 	if klet.cloud != nil {
@@ -1179,6 +1180,9 @@ type Kubelet struct {
 
 	// Manage user namespaces
 	usernsManager *usernsManager
+
+	// Store need removed pods while podSources have not been ready
+	podsToRetry sync.Map
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1940,8 +1944,9 @@ func (kl *Kubelet) deletePod(pod *v1.Pod) error {
 		return fmt.Errorf("deletePod does not allow nil pod")
 	}
 	if !kl.sourcesReady.AllReady() {
-		// If the sources aren't ready, skip deletion, as we may accidentally delete pods
-		// for sources that haven't reported yet.
+		// If the sources aren't ready, skip deletion, the housekeeping will try to remove again while all sources ready
+		kl.podsToRetry.Store(pod.UID, pod)
+		klog.V(3).InfoS("Skipping delete because sources aren't ready yet, queuing for retry", "pod", klog.KObj(pod), "podUID", pod.UID)
 		return fmt.Errorf("skipping delete because sources aren't ready yet")
 	}
 	klog.V(3).InfoS("Pod has been deleted and must be killed", "pod", klog.KObj(pod), "podUID", pod.UID)
@@ -2179,10 +2184,22 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			if duration > housekeepingWarningDuration {
 				klog.ErrorS(fmt.Errorf("housekeeping took too long"), "Housekeeping took longer than 15s", "seconds", duration.Seconds())
 			}
+			// While receiving a REMOVE event before sourcesReady, the deletePod will be skipped, we retry to do remove here after sourcesReady
+			processWaitRemovePods(kl)
 			klog.V(4).InfoS("SyncLoop (housekeeping) end")
 		}
 	}
 	return true
+}
+
+func processWaitRemovePods(kl *Kubelet) {
+	kl.podsToRetry.Range(func(key, value any) bool {
+		if pod, ok := value.(*v1.Pod); ok {
+			kl.deletePod(pod)
+		}
+		kl.podsToRetry.Delete(key)
+		return true
+	})
 }
 
 func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandler, probe, status string) {
@@ -2229,6 +2246,11 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
 	for _, pod := range pods {
+		if !kl.sourcesReady.AllReady() {
+			if _, loaded := kl.podsToRetry.LoadAndDelete(pod.UID); loaded {
+				klog.V(3).InfoS("Cancelling retry to delete while received add again as sources aren't ready yet", "pod", klog.KObj(pod), "podUID", pod.UID)
+			}
+		}
 		existingPods := kl.podManager.GetPods()
 		// Always add the pod to the pod manager. Kubelet relies on the pod
 		// manager as the source of truth for the desired state. If a pod does

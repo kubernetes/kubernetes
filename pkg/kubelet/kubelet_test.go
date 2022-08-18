@@ -27,6 +27,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -389,6 +390,7 @@ func newTestKubeletWithImageList(
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
 	kubelet.kubeletConfiguration.LocalStorageCapacityIsolation = localStorageCapacityIsolation
+	kubelet.podsToRetry = sync.Map{}
 	return &TestKubelet{kubelet, fakeRuntime, fakeContainerManager, fakeKubeClient, fakeMirrorClient, fakeClock, nil, plug}
 }
 
@@ -2605,6 +2607,41 @@ func TestSyncLabels(t *testing.T) {
 				t.Fatalf("expected labels to be reconciled but it failed with %v", err)
 			}
 		})
+	}
+}
+
+func TestRetryRemovePodAfterSourcesReady(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	pods := []*v1.Pod{
+		podWithUIDNameNs("12345678", "pod1", "ns"),
+		podWithUIDNameNs("12345679", "pod2", "ns"),
+	}
+
+	kl.podManager.SetPods(pods)
+
+	ready := false
+	kl.sourcesReady = config.NewSourcesReady(func(_ sets.String) bool { return ready })
+
+	kl.HandlePodRemoves([]*v1.Pod{
+		podWithUIDNameNs("12345678", "pod1", "ns"),
+	})
+	time.Sleep(2 * time.Second)
+	// Sources are not ready yet. Don't remove any pods.
+	if expect, actual := []types.UID(nil), kl.podWorkers.(*fakePodWorkers).triggeredDeletion; !reflect.DeepEqual(expect, actual) {
+		t.Fatalf("expected %v kills, got %v", expect, actual)
+	}
+
+	ready = true
+	ch := make(chan time.Time)
+	close(ch)
+
+	kl.syncLoopIteration(make(chan kubetypes.PodUpdate), kl, make(chan time.Time), ch, make(chan *pleg.PodLifecycleEvent, 1))
+
+	// Sources are ready. Remove unwanted pods.
+	if expect, actual := []types.UID{"12345678"}, kl.podWorkers.(*fakePodWorkers).triggeredDeletion; !reflect.DeepEqual(expect, actual) {
+		t.Fatalf("expected %v kills, got %v", expect, actual)
 	}
 }
 
