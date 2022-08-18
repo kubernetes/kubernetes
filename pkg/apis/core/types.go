@@ -154,7 +154,7 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
 	// +optional
 	StorageOS *StorageOSVolumeSource
-	// CSI (Container Storage Interface) represents ephemeral storage that is handled by certain external CSI drivers (Beta feature).
+	// CSI (Container Storage Interface) represents ephemeral storage that is handled by certain external CSI drivers.
 	// +optional
 	CSI *CSIVolumeSource
 	// Ephemeral represents a volume that is handled by a cluster storage driver.
@@ -2430,6 +2430,10 @@ const (
 	PodReasonUnschedulable = "Unschedulable"
 	// ContainersReady indicates whether all containers in the pod are ready.
 	ContainersReady PodConditionType = "ContainersReady"
+	// AlphaNoCompatGuaranteeDisruptionTarget indicates the pod is about to be deleted due to a
+	// disruption (such as preemption, eviction API or garbage-collection).
+	// The constant is to be renamed once the name is accepted within the KEP-3329.
+	AlphaNoCompatGuaranteeDisruptionTarget PodConditionType = "DisruptionTarget"
 )
 
 // PodCondition represents pod's condition
@@ -2829,7 +2833,6 @@ type PodSpec struct {
 	// pod to perform user-initiated actions such as debugging. This list cannot be specified when
 	// creating a pod, and it cannot be modified by updating the pod spec. In order to add an
 	// ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.
-	// This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.
 	// +optional
 	EphemeralContainers []EphemeralContainer
 	// +optional
@@ -2973,6 +2976,7 @@ type PodSpec struct {
 	// If the OS field is set to windows, following fields must be unset:
 	// - spec.hostPID
 	// - spec.hostIPC
+	// - spec.hostUsers
 	// - spec.securityContext.seLinuxOptions
 	// - spec.securityContext.seccompProfile
 	// - spec.securityContext.fsGroup
@@ -2992,7 +2996,6 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.runAsUser
 	// - spec.containers[*].securityContext.runAsGroup
 	// +optional
-	// This is a beta field and requires the IdentifyPodOS feature
 	OS *PodOS
 }
 
@@ -3076,6 +3079,18 @@ type PodSecurityContext struct {
 	// +k8s:conversion-gen=false
 	// +optional
 	ShareProcessNamespace *bool
+	// Use the host's user namespace.
+	// Optional: Default to true.
+	// If set to true or not present, the pod will be run in the host user namespace, useful
+	// for when the pod needs a feature only available to the host user namespace, such as
+	// loading a kernel module with CAP_SYS_MODULE.
+	// When set to false, a new user namespace is created for the pod. Setting false is useful
+	// for mitigating container breakout vulnerabilities even allowing users to run their
+	// containers as root without actually having root privileges on the host.
+	// Note that this field cannot be set when spec.os.name is windows.
+	// +k8s:conversion-gen=false
+	// +optional
+	HostUsers *bool
 	// The SELinux context to be applied to all containers.
 	// If unspecified, the container runtime will allocate a random SELinux context for each
 	// container.  May also be set in SecurityContext.  If set in
@@ -3222,8 +3237,9 @@ type PodDNSConfigOption struct {
 
 // PodIP represents the IP address of a pod.
 // IP address information. Each entry includes:
-//    IP: An IP address allocated to the pod. Routable at least within
-//        the cluster.
+//
+//	IP: An IP address allocated to the pod. Routable at least within
+//	    the cluster.
 type PodIP struct {
 	IP string
 }
@@ -3326,8 +3342,6 @@ var _ = Container(EphemeralContainerCommon{})
 //
 // To add an ephemeral container, use the ephemeralcontainers subresource of an existing
 // Pod. Ephemeral containers may not be removed or restarted.
-//
-// This is a beta feature available on clusters that haven't disabled the EphemeralContainers feature gate.
 type EphemeralContainer struct {
 	// Ephemeral containers have all of the fields of Container, plus additional fields
 	// specific to ephemeral containers. Fields in common with Container are in the
@@ -3390,7 +3404,6 @@ type PodStatus struct {
 	ContainerStatuses []ContainerStatus
 
 	// Status for any ephemeral containers that have run in this pod.
-	// This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.
 	// +optional
 	EphemeralContainerStatuses []ContainerStatus
 }
@@ -3736,27 +3749,27 @@ const (
 	IPv6Protocol IPFamily = "IPv6"
 )
 
-// IPFamilyPolicyType represents the dual-stack-ness requested or required by a Service
-type IPFamilyPolicyType string
+// IPFamilyPolicy represents the dual-stack-ness requested or required by a Service
+type IPFamilyPolicy string
 
 const (
 	// IPFamilyPolicySingleStack indicates that this service is required to have a single IPFamily.
 	// The IPFamily assigned is based on the default IPFamily used by the cluster
 	// or as identified by service.spec.ipFamilies field
-	IPFamilyPolicySingleStack IPFamilyPolicyType = "SingleStack"
+	IPFamilyPolicySingleStack IPFamilyPolicy = "SingleStack"
 	// IPFamilyPolicyPreferDualStack indicates that this service prefers dual-stack when
 	// the cluster is configured for dual-stack. If the cluster is not configured
 	// for dual-stack the service will be assigned a single IPFamily. If the IPFamily is not
 	// set in service.spec.ipFamilies then the service will be assigned the default IPFamily
 	// configured on the cluster
-	IPFamilyPolicyPreferDualStack IPFamilyPolicyType = "PreferDualStack"
+	IPFamilyPolicyPreferDualStack IPFamilyPolicy = "PreferDualStack"
 	// IPFamilyPolicyRequireDualStack indicates that this service requires dual-stack. Using
 	// IPFamilyPolicyRequireDualStack on a single stack cluster will result in validation errors. The
 	// IPFamilies (and their order) assigned  to this service is based on service.spec.ipFamilies. If
 	// service.spec.ipFamilies was not provided then it will be assigned according to how they are
 	// configured on the cluster. If service.spec.ipFamilies has only one entry then the alternative
 	// IPFamily will be added by apiserver
-	IPFamilyPolicyRequireDualStack IPFamilyPolicyType = "RequireDualStack"
+	IPFamilyPolicyRequireDualStack IPFamilyPolicy = "RequireDualStack"
 )
 
 // ServiceSpec describes the attributes that a user creates on a service
@@ -3829,7 +3842,7 @@ type ServiceSpec struct {
 	// to this service can be controlled by service.spec.ipFamilies and service.spec.clusterIPs
 	// respectively.
 	// +optional
-	IPFamilyPolicy *IPFamilyPolicyType
+	IPFamilyPolicy *IPFamilyPolicy
 
 	// ExternalName is the external reference that kubedns or equivalent will
 	// return as a CNAME record for this service. No proxying will be involved.
@@ -4036,17 +4049,18 @@ type ServiceAccountList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Endpoints is a collection of endpoints that implement the actual service.  Example:
-//   Name: "mysvc",
-//   Subsets: [
-//     {
-//       Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
-//       Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
-//     },
-//     {
-//       Addresses: [{"ip": "10.10.3.3"}],
-//       Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
-//     },
-//  ]
+//
+//	 Name: "mysvc",
+//	 Subsets: [
+//	   {
+//	     Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//	     Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//	   },
+//	   {
+//	     Addresses: [{"ip": "10.10.3.3"}],
+//	     Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
+//	   },
+//	]
 type Endpoints struct {
 	metav1.TypeMeta
 	// +optional
@@ -4059,13 +4073,16 @@ type Endpoints struct {
 // EndpointSubset is a group of addresses with a common set of ports.  The
 // expanded set of endpoints is the Cartesian product of Addresses x Ports.
 // For example, given:
-//   {
-//     Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
-//     Ports:     [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
-//   }
+//
+//	{
+//	  Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//	  Ports:     [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//	}
+//
 // The resulting set of endpoints can be viewed as:
-//     a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
-//     b: [ 10.10.1.1:309, 10.10.2.2:309 ]
+//
+//	a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
+//	b: [ 10.10.1.1:309, 10.10.2.2:309 ]
 type EndpointSubset struct {
 	Addresses         []EndpointAddress
 	NotReadyAddresses []EndpointAddress
@@ -5711,7 +5728,7 @@ type TopologySpreadConstraint struct {
 	// because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
 	// it will violate MaxSkew.
 	//
-	// This is an alpha field and requires enabling MinDomainsInPodTopologySpread feature gate.
+	// This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
 	// +optional
 	MinDomains *int32
 	// NodeAffinityPolicy indicates how we will treat Pod's nodeAffinity/nodeSelector
@@ -5733,6 +5750,15 @@ type TopologySpreadConstraint struct {
 	// This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
 	// +optional
 	NodeTaintsPolicy *NodeInclusionPolicy
+	// MatchLabelKeys is a set of pod label keys to select the pods over which
+	// spreading will be calculated. The keys are used to lookup values from the
+	// incoming pod labels, those key-value labels are ANDed with labelSelector
+	// to select the group of existing pods over which spreading will be calculated
+	// for the incoming pod. Keys that don't exist in the incoming pod labels will
+	// be ignored. A null or empty list means only match against labelSelector.
+	// +listType=atomic
+	// +optional
+	MatchLabelKeys []string
 }
 
 // These are the built-in errors for PortStatus.

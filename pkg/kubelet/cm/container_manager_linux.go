@@ -554,7 +554,8 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	activePods ActivePodsFunc,
 	sourcesReady config.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
-	runtimeService internalapi.RuntimeService) error {
+	runtimeService internalapi.RuntimeService,
+	localStorageCapacityIsolation bool) error {
 
 	// Initialize CPU manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
@@ -578,7 +579,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	// allocatable of the node
 	cm.nodeInfo = node
 
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
+	if localStorageCapacityIsolation {
 		rootfs, err := cm.cadvisorInterface.RootFsInfo()
 		if err != nil {
 			return fmt.Errorf("failed to get rootfs info: %v", err)
@@ -861,7 +862,6 @@ func getContainer(pid int) (string, error) {
 //
 // The reason of leaving kernel threads at root cgroup is that we don't want to tie the
 // execution of these threads with to-be defined /system quota and create priority inversions.
-//
 func ensureSystemCgroups(rootCgroupPath string, manager cgroups.Manager) error {
 	// Move non-kernel PIDs to the system container.
 	// Only keep errors on latest attempt.
@@ -916,8 +916,8 @@ func isKernelPid(pid int) bool {
 
 // GetCapacity returns node capacity data for "cpu", "memory", "ephemeral-storage", and "huge-pages*"
 // At present this method is only invoked when introspecting ephemeral storage
-func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
+func (cm *containerManagerImpl) GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList {
+	if localStorageCapacityIsolation {
 		// We store allocatable ephemeral-storage in the capacity property once we Start() the container manager
 		if _, ok := cm.capacity[v1.ResourceEphemeralStorage]; !ok {
 			// If we haven't yet stored the capacity for ephemeral-storage, we can try to fetch it directly from cAdvisor,

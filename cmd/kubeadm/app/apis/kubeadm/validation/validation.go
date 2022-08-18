@@ -478,8 +478,7 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, erro
 		// assume it is an integer, if not it will fail later
 		maskSize, err = strconv.Atoi(v)
 		if err != nil {
-			errors.Wrapf(err, "could not parse the value of the kube-controller-manager flag %s as an integer: %v", maskArg, err)
-			return 0, err
+			return 0, errors.Wrapf(err, "could not parse the value of the kube-controller-manager flag %s as an integer", maskArg)
 		}
 	} else if isIPv6 {
 		maskSize = defaultNodeMaskCIDRIPv6

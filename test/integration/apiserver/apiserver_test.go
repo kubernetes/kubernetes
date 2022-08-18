@@ -401,10 +401,14 @@ func TestListOptions(t *testing.T) {
 			}
 
 			// compact some of the revision history in etcd so we can test "too old" resource versions
-			_, kvClient, err := integration.GetEtcdClients(*storageTransport)
+			rawClient, kvClient, err := integration.GetEtcdClients(*storageTransport)
 			if err != nil {
 				t.Fatal(err)
 			}
+			// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
+			// close the client (which we can do by closing rawClient).
+			defer rawClient.Close()
+
 			revision, err := strconv.Atoi(oldestUncompactedRv)
 			if err != nil {
 				t.Fatal(err)
@@ -721,6 +725,69 @@ func TestAPIListChunking(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(names, []string{"test-0", "test-1", "test-2", "test-3"}) {
+		t.Errorf("unexpected items: %#v", list)
+	}
+}
+
+func TestAPIListChunkingWithLabelSelector(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APIListChunking, true)()
+	clientSet, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	ns := framework.CreateNamespaceOrDie(clientSet, "list-paging-with-label-selector", t)
+	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
+
+	rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
+
+	for i := 0; i < 10; i++ {
+		rs := newRS(ns.Name)
+		rs.Name = fmt.Sprintf("test-%d", i)
+		odd := i%2 != 0
+		rs.Labels = map[string]string{"odd-index": strconv.FormatBool(odd)}
+		if _, err := rsClient.Create(context.TODO(), rs, metav1.CreateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	calls := 0
+	firstRV := ""
+	p := &pager.ListPager{
+		PageSize: 1,
+		PageFn: pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
+			calls++
+			list, err := rsClient.List(context.TODO(), opts)
+			if err != nil {
+				return nil, err
+			}
+			if calls == 1 {
+				firstRV = list.ResourceVersion
+			}
+			return list, err
+		}),
+	}
+	listObj, _, err := p.List(context.Background(), metav1.ListOptions{LabelSelector: "odd-index=true", Limit: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Errorf("unexpected list invocations: %d", calls)
+	}
+	list := listObj.(metav1.ListInterface)
+	if len(list.GetContinue()) != 0 {
+		t.Errorf("unexpected continue: %s", list.GetContinue())
+	}
+	if list.GetResourceVersion() != firstRV {
+		t.Errorf("unexpected resource version: %s instead of %s", list.GetResourceVersion(), firstRV)
+	}
+	var names []string
+	if err := meta.EachListItem(listObj, func(obj runtime.Object) error {
+		rs := obj.(*apps.ReplicaSet)
+		names = append(names, rs.Name)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(names, []string{"test-1", "test-3", "test-5", "test-7", "test-9"}) {
 		t.Errorf("unexpected items: %#v", list)
 	}
 }

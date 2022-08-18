@@ -40,7 +40,8 @@ var (
 
 // IsListType returns true if the provided Object has a slice called Items.
 // TODO: Replace the code in this check with an interface comparison by
-//   creating and enforcing that lists implement a list accessor.
+//
+//	creating and enforcing that lists implement a list accessor.
 func IsListType(obj runtime.Object) bool {
 	switch t := obj.(type) {
 	case runtime.Unstructured:
@@ -97,7 +98,7 @@ func getItemsPtr(list runtime.Object) (interface{}, error) {
 		return nil, errExpectFieldItems
 	}
 	switch items.Kind() {
-	case reflect.Interface, reflect.Ptr:
+	case reflect.Interface, reflect.Pointer:
 		target := reflect.TypeOf(items.Interface()).Elem()
 		if target.Kind() != reflect.Slice {
 			return nil, errExpectSliceItems
@@ -130,7 +131,7 @@ func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
 		return nil
 	}
 	takeAddr := false
-	if elemType := items.Type().Elem(); elemType.Kind() != reflect.Ptr && elemType.Kind() != reflect.Interface {
+	if elemType := items.Type().Elem(); elemType.Kind() != reflect.Pointer && elemType.Kind() != reflect.Interface {
 		if !items.Index(0).CanAddr() {
 			return fmt.Errorf("unable to take address of items in %T for EachListItem", obj)
 		}

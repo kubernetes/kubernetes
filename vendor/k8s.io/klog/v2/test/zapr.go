@@ -37,6 +37,10 @@ func ZaprOutputMappingDirect() map[string]string {
 `: `{"caller":"test/output.go:<LINE>","msg":"helper","v":0,"akey":"avalue"}
 `,
 
+		`I output.go:<LINE>] "test" akey="avalue" akey="avalue2"
+`: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"akey":"avalue","akey":"avalue2"}
+`,
+
 		`I output.go:<LINE>] "hello/world: test" akey="avalue"
 `: `{"logger":"hello.world","caller":"test/output.go:<LINE>","msg":"test","v":0,"akey":"avalue"}
 `,
@@ -67,6 +71,26 @@ func ZaprOutputMappingDirect() map[string]string {
 
 		`I output.go:<LINE>] "test" pods=[kube-system/pod-1 kube-system/pod-2]
 `: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"pods":[{"name":"pod-1","namespace":"kube-system"},{"name":"pod-2","namespace":"kube-system"}]}
+`,
+
+		`I output.go:<LINE>] "test" pods="[kube-system/pod-1 kube-system/pod-2]"
+`: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"pods":[{"name":"pod-1","namespace":"kube-system"},{"name":"pod-2","namespace":"kube-system"}]}
+`,
+
+		`I output.go:<LINE>] "test" pods="[]"
+`: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"pods":null}
+`,
+
+		`I output.go:<LINE>] "test" pods="<KObjSlice needs a slice, got type int>"
+`: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"pods":"<KObjSlice needs a slice, got type int>"}
+`,
+
+		`I output.go:<LINE>] "test" ints="<KObjSlice needs a slice of values implementing KMetadata, got type int>"
+`: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"ints":"<KObjSlice needs a slice of values implementing KMetadata, got type int>"}
+`,
+
+		`I output.go:<LINE>] "test" pods="[kube-system/pod-1 <nil>]"
+`: `{"caller":"test/output.go:<LINE>","msg":"test","v":0,"pods":[{"name":"pod-1","namespace":"kube-system"},null]}
 `,
 
 		`I output.go:<LINE>] "test" akey="avalue"
@@ -137,8 +161,12 @@ I output.go:<LINE>] "odd WithValues" keyWithoutValue="(MISSING)"
 `: `{"caller":"test/output.go:<LINE>","msg":"error panic","errError":"PANIC=fake Error panic"}
 `,
 
-		`I output.go:<LINE>] "marshaler panic" obj={}
+		`I output.go:<LINE>] "marshaler panic" obj="<panic: fake MarshalLog panic>"
 `: `{"caller":"test/output.go:<LINE>","msg":"marshaler panic","v":0,"objError":"PANIC=fake MarshalLog panic"}
+`,
+
+		`I output.go:<LINE>] "marshaler recursion" obj={}
+`: `{"caller":"test/output.go:<LINE>","msg":"marshaler recursion","v":0,"obj":{}}
 `,
 
 		// klog.Info
@@ -189,6 +217,21 @@ I output.go:<LINE>] "odd WithValues" keyWithoutValue="(MISSING)"
 		// klog.V(1).InfoS
 		`I output.go:<LINE>] "hello" what="one world"
 `: `{"caller":"test/output.go:<LINE>","msg":"hello","v":1,"what":"one world"}
+`,
+
+		`I output.go:<LINE>] "integer keys" %!s(int=1)="value" %!s(int=2)="value2" akey="avalue" akey2="(MISSING)"
+`: `{"caller":"test/output.go:<WITH-VALUES>","msg":"non-string key argument passed to logging, ignoring all later arguments","invalid key":1}
+{"caller":"test/output.go:<LINE>","msg":"odd number of arguments passed as key-value pairs for logging","ignored key":"akey2"}
+{"caller":"test/output.go:<LINE>","msg":"integer keys","v":0,"akey":"avalue"}
+`,
+
+		`I output.go:<LINE>] "struct keys" {name}="value" test="other value" key="val"
+`: `{"caller":"test/output.go:<WITH-VALUES>","msg":"non-string key argument passed to logging, ignoring all later arguments","invalid key":{}}
+{"caller":"test/output.go:<LINE>","msg":"struct keys","v":0,"key":"val"}
+`,
+		`I output.go:<LINE>] "map keys" map[test:%!s(bool=true)]="test"
+`: `{"caller":"test/output.go:<LINE>","msg":"non-string key argument passed to logging, ignoring all later arguments","invalid key":{"test":true}}
+{"caller":"test/output.go:<LINE>","msg":"map keys","v":0}
 `,
 	}
 }
@@ -263,6 +306,18 @@ I output.go:<LINE>] "test" firstKey=1 secondKey=3
 {"caller":"test/output.go:<LINE>","msg":"test","v":0,"firstKey":1,"secondKey":2}
 {"caller":"test/output.go:<LINE>","msg":"test","v":0,"firstKey":1}
 {"caller":"test/output.go:<LINE>","msg":"test","v":0,"firstKey":1,"secondKey":3}
+`,
+		`I output.go:<LINE>] "integer keys" %!s(int=1)="value" %!s(int=2)="value2" akey="avalue" akey2="(MISSING)"
+`: `{"caller":"test/output.go:<LINE>","msg":"non-string key argument passed to logging, ignoring all later arguments","invalid key":1}
+{"caller":"test/output.go:<LINE>","msg":"integer keys","v":0}
+`,
+		`I output.go:<LINE>] "struct keys" {name}="value" test="other value" key="val"
+`: `{"caller":"test/output.go:<LINE>","msg":"non-string key argument passed to logging, ignoring all later arguments","invalid key":{}}
+{"caller":"test/output.go:<LINE>","msg":"struct keys","v":0}
+`,
+		`I output.go:<LINE>] "map keys" map[test:%!s(bool=true)]="test"
+`: `{"caller":"test/output.go:<LINE>","msg":"non-string key argument passed to logging, ignoring all later arguments","invalid key":{"test":true}}
+{"caller":"test/output.go:<LINE>","msg":"map keys","v":0}
 `,
 	} {
 		mapping[key] = value

@@ -9,7 +9,6 @@
 // It can be used to install and remove them. It can also start,
 // stop and pause them. The package can query / change current
 // service state and config parameters.
-//
 package mgr
 
 import (

@@ -26,7 +26,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -425,7 +425,7 @@ current-context: local-context
 		})
 
 		ginkgo.AfterEach(func() {
-			if ginkgo.CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
+			if ginkgo.CurrentSpecReport().Failed() && framework.TestContext.DumpLogsOnFailure {
 				ginkgo.By("Get node problem detector log")
 				log, err := e2epod.GetPodLogs(c, ns, name, name)
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())

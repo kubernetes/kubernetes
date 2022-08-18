@@ -46,6 +46,7 @@ import (
 	flowcontrolv1beta2 "k8s.io/api/flowcontrol/v1beta2"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
+	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -91,6 +92,7 @@ import (
 	applyconfigurationsimagepolicyv1alpha1 "k8s.io/client-go/applyconfigurations/imagepolicy/v1alpha1"
 	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	applyconfigurationsnetworkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
+	applyconfigurationsnetworkingv1alpha1 "k8s.io/client-go/applyconfigurations/networking/v1alpha1"
 	applyconfigurationsnetworkingv1beta1 "k8s.io/client-go/applyconfigurations/networking/v1beta1"
 	applyconfigurationsnodev1 "k8s.io/client-go/applyconfigurations/node/v1"
 	applyconfigurationsnodev1alpha1 "k8s.io/client-go/applyconfigurations/node/v1alpha1"
@@ -447,6 +449,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsbatchv1.JobStatusApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("JobTemplateSpec"):
 		return &applyconfigurationsbatchv1.JobTemplateSpecApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("PodFailurePolicy"):
+		return &applyconfigurationsbatchv1.PodFailurePolicyApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("PodFailurePolicyOnExitCodesRequirement"):
+		return &applyconfigurationsbatchv1.PodFailurePolicyOnExitCodesRequirementApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("PodFailurePolicyOnPodConditionsPattern"):
+		return &applyconfigurationsbatchv1.PodFailurePolicyOnPodConditionsPatternApplyConfiguration{}
+	case batchv1.SchemeGroupVersion.WithKind("PodFailurePolicyRule"):
+		return &applyconfigurationsbatchv1.PodFailurePolicyRuleApplyConfiguration{}
 	case batchv1.SchemeGroupVersion.WithKind("UncountedTerminatedPods"):
 		return &applyconfigurationsbatchv1.UncountedTerminatedPodsApplyConfiguration{}
 
@@ -1197,6 +1207,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1.NetworkPolicyStatusApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("ServiceBackendPort"):
 		return &applyconfigurationsnetworkingv1.ServiceBackendPortApplyConfiguration{}
+
+		// Group=networking.k8s.io, Version=v1alpha1
+	case networkingv1alpha1.SchemeGroupVersion.WithKind("ClusterCIDR"):
+		return &applyconfigurationsnetworkingv1alpha1.ClusterCIDRApplyConfiguration{}
+	case networkingv1alpha1.SchemeGroupVersion.WithKind("ClusterCIDRSpec"):
+		return &applyconfigurationsnetworkingv1alpha1.ClusterCIDRSpecApplyConfiguration{}
 
 		// Group=networking.k8s.io, Version=v1beta1
 	case networkingv1beta1.SchemeGroupVersion.WithKind("HTTPIngressPath"):

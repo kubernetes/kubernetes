@@ -47,7 +47,7 @@ type ContainerManager interface {
 	// Runs the container manager's housekeeping.
 	// - Ensures that the Docker daemon is in a container.
 	// - Creates the system container where all non-containerized processes run.
-	Start(*v1.Node, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService) error
+	Start(*v1.Node, ActivePodsFunc, config.SourcesReady, status.PodStatusProvider, internalapi.RuntimeService, bool) error
 
 	// SystemCgroupsLimit returns resources allocated to system cgroups in the machine.
 	// These cgroups include the system and Kubernetes services.
@@ -73,7 +73,7 @@ type ContainerManager interface {
 	GetNodeAllocatableReservation() v1.ResourceList
 
 	// GetCapacity returns the amount of compute resources tracked by container manager available on the node.
-	GetCapacity() v1.ResourceList
+	GetCapacity(localStorageCapacityIsolation bool) v1.ResourceList
 
 	// GetDevicePluginResourceCapacity returns the node capacity (amount of total device plugin resources),
 	// node allocatable (amount of total healthy resources reported by device plugin),

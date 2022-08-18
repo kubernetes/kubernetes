@@ -293,18 +293,19 @@ func mergeFilteredHints(numaNodes []int, filteredHints [][]TopologyHint) Topolog
 // permutation as it is found. It is the equivalent of:
 //
 // for i := 0; i < len(providerHints[0]); i++
-//     for j := 0; j < len(providerHints[1]); j++
-//         for k := 0; k < len(providerHints[2]); k++
-//             ...
-//             for z := 0; z < len(providerHints[-1]); z++
-//                 permutation := []TopologyHint{
-//                     providerHints[0][i],
-//                     providerHints[1][j],
-//                     providerHints[2][k],
-//                     ...
-//                     providerHints[-1][z]
-//                 }
-//                 callback(permutation)
+//
+//	for j := 0; j < len(providerHints[1]); j++
+//	    for k := 0; k < len(providerHints[2]); k++
+//	        ...
+//	        for z := 0; z < len(providerHints[-1]); z++
+//	            permutation := []TopologyHint{
+//	                providerHints[0][i],
+//	                providerHints[1][j],
+//	                providerHints[2][k],
+//	                ...
+//	                providerHints[-1][z]
+//	            }
+//	            callback(permutation)
 func iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback func([]TopologyHint)) {
 	// Internal helper function to accumulate the permutation before calling the callback.
 	var iterate func(i int, accum []TopologyHint)

@@ -57,6 +57,7 @@
         "expirationSeconds": 2
       }
     ],
-    "requiresRepublish": true
+    "requiresRepublish": true,
+    "seLinuxMount": true
   }
 }

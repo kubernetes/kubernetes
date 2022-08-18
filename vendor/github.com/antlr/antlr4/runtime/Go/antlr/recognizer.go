@@ -49,7 +49,7 @@ var tokenTypeMapCache = make(map[string]int)
 var ruleIndexMapCache = make(map[string]int)
 
 func (b *BaseRecognizer) checkVersion(toolVersion string) {
-	runtimeVersion := "4.9.3"
+	runtimeVersion := "4.10.1"
 	if runtimeVersion != toolVersion {
 		fmt.Println("ANTLR runtime and generated code versions disagree: " + runtimeVersion + "!=" + toolVersion)
 	}

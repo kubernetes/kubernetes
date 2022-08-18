@@ -45,8 +45,9 @@ type ExtenderPreemptionArgs struct {
 }
 
 // Victims represents:
-//   pods:  a group of pods expected to be preempted.
-//   numPDBViolations: the count of violations of PodDisruptionBudget
+//
+//	pods:  a group of pods expected to be preempted.
+//	numPDBViolations: the count of violations of PodDisruptionBudget
 type Victims struct {
 	Pods             []*v1.Pod
 	NumPDBViolations int64
@@ -58,9 +59,10 @@ type MetaPod struct {
 }
 
 // MetaVictims represents:
-//   pods:  a group of pods expected to be preempted.
-//     Only Pod identifiers will be sent and user are expect to get v1.Pod in their own way.
-//   numPDBViolations: the count of violations of PodDisruptionBudget
+//
+//	pods:  a group of pods expected to be preempted.
+//	  Only Pod identifiers will be sent and user are expect to get v1.Pod in their own way.
+//	numPDBViolations: the count of violations of PodDisruptionBudget
 type MetaVictims struct {
 	Pods             []*MetaPod
 	NumPDBViolations int64

@@ -866,6 +866,132 @@ func TestCacheIncreaseDoesNotBreakWatch(t *testing.T) {
 	}
 }
 
+func TestSuggestedWatchChannelSize(t *testing.T) {
+	testCases := []struct {
+		name        string
+		capacity    int
+		indexExists bool
+		triggerUsed bool
+		expected    int
+	}{
+		{
+			name:        "capacity=100, indexExists, triggerUsed",
+			capacity:    100,
+			indexExists: true,
+			triggerUsed: true,
+			expected:    10,
+		},
+		{
+			name:        "capacity=100, indexExists, !triggerUsed",
+			capacity:    100,
+			indexExists: true,
+			triggerUsed: false,
+			expected:    10,
+		},
+		{
+			name:        "capacity=100, !indexExists",
+			capacity:    100,
+			indexExists: false,
+			triggerUsed: false,
+			expected:    10,
+		},
+		{
+			name:        "capacity=750, indexExists, triggerUsed",
+			capacity:    750,
+			indexExists: true,
+			triggerUsed: true,
+			expected:    10,
+		},
+		{
+			name:        "capacity=750, indexExists, !triggerUsed",
+			capacity:    750,
+			indexExists: true,
+			triggerUsed: false,
+			expected:    10,
+		},
+		{
+			name:        "capacity=750, !indexExists",
+			capacity:    750,
+			indexExists: false,
+			triggerUsed: false,
+			expected:    10,
+		},
+		{
+			name:        "capacity=7500, indexExists, triggerUsed",
+			capacity:    7500,
+			indexExists: true,
+			triggerUsed: true,
+			expected:    10,
+		},
+		{
+			name:        "capacity=7500, indexExists, !triggerUsed",
+			capacity:    7500,
+			indexExists: true,
+			triggerUsed: false,
+			expected:    100,
+		},
+		{
+			name:        "capacity=7500, !indexExists",
+			capacity:    7500,
+			indexExists: false,
+			triggerUsed: false,
+			expected:    100,
+		},
+		{
+			name:        "capacity=75000, indexExists, triggerUsed",
+			capacity:    75000,
+			indexExists: true,
+			triggerUsed: true,
+			expected:    10,
+		},
+		{
+			name:        "capacity=75000, indexExists, !triggerUsed",
+			capacity:    75000,
+			indexExists: true,
+			triggerUsed: false,
+			expected:    1000,
+		},
+		{
+			name:        "capacity=75000, !indexExists",
+			capacity:    75000,
+			indexExists: false,
+			triggerUsed: false,
+			expected:    100,
+		},
+		{
+			name:        "capacity=750000, indexExists, triggerUsed",
+			capacity:    750000,
+			indexExists: true,
+			triggerUsed: true,
+			expected:    10,
+		},
+		{
+			name:        "capacity=750000, indexExists, !triggerUsed",
+			capacity:    750000,
+			indexExists: true,
+			triggerUsed: false,
+			expected:    1000,
+		},
+		{
+			name:        "capacity=750000, !indexExists",
+			capacity:    750000,
+			indexExists: false,
+			triggerUsed: false,
+			expected:    100,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			store := newTestWatchCache(test.capacity, &cache.Indexers{})
+			got := store.suggestedWatchChannelSize(test.indexExists, test.triggerUsed)
+			if got != test.expected {
+				t.Errorf("unexpected channel size got: %v, expected: %v", got, test.expected)
+			}
+		})
+	}
+}
+
 func BenchmarkWatchCache_updateCache(b *testing.B) {
 	store := newTestWatchCache(defaultUpperBoundCapacity, &cache.Indexers{})
 	store.cache = store.cache[:0]

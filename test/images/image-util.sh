@@ -282,7 +282,7 @@ if [[ "${WHAT}" == "all-conformance" ]]; then
   # Discussed during Conformance Office Hours Meeting (2019.12.17):
   # https://docs.google.com/document/d/1W31nXh9RYAb_VaYkwuPLd1hFxuRX3iU0DmaQ4lkCsX8/edit#heading=h.l87lu17xm9bh
   shift
-  conformance_images=("busybox" "agnhost" "echoserver" "jessie-dnsutils" "kitten" "nautilus" "nonewprivs" "resource-consumer" "sample-apiserver")
+  conformance_images=("busybox" "agnhost" "jessie-dnsutils" "kitten" "nautilus" "nonewprivs" "resource-consumer" "sample-apiserver")
   for image in "${conformance_images[@]}"; do
     eval "${TASK}" "${image}" "$@"
   done

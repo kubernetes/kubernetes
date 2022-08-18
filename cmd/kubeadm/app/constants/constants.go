@@ -189,7 +189,7 @@ const (
 	// system:nodes group subject is removed if present.
 	NodesClusterRoleBinding = "system:node"
 
-	// KubeletBaseConfigMapRolePrefix defines the base kubelet configuration ConfigMap.
+	// KubeletBaseConfigMapRole defines the base kubelet configuration ConfigMap.
 	KubeletBaseConfigMapRole = "kubeadm:kubelet-config"
 	// KubeProxyClusterRoleBindingName sets the name for the kube-proxy CluterRoleBinding
 	KubeProxyClusterRoleBindingName = "kubeadm:node-proxier"
@@ -218,6 +218,8 @@ const (
 	APICallWithReadTimeout = 15 * time.Second
 	// PullImageRetry specifies how many times ContainerRuntime retries when pulling image failed
 	PullImageRetry = 5
+	// RemoveContainerRetry specifies how many times ContainerRuntime retries when removing container failed
+	RemoveContainerRetry = 5
 
 	// DefaultControlPlaneTimeout specifies the default control plane (actually API Server) timeout for use by kubeadm
 	DefaultControlPlaneTimeout = 4 * time.Minute
@@ -362,6 +364,9 @@ const (
 	// TODO: Find a better place for this constant
 	YAMLDocumentSeparator = "---\n"
 
+	// CIKubernetesVersionPrefix is the prefix for CI Kubernetes version
+	CIKubernetesVersionPrefix = "ci/"
+
 	// DefaultAPIServerBindAddress is the default bind address for the API Server
 	DefaultAPIServerBindAddress = "0.0.0.0"
 
@@ -416,7 +421,7 @@ const (
 	ModeNode string = "Node"
 
 	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "3.7"
+	PauseVersion = "3.8"
 
 	// CgroupDriverSystemd holds the systemd driver type
 	CgroupDriverSystemd = "systemd"
@@ -568,7 +573,7 @@ func EtcdSupportedVersion(supportedEtcdVersion map[uint8]string, versionString s
 		if desiredVersion > max {
 			etcdStringVersion = supportedEtcdVersion[max]
 		}
-		warning = fmt.Errorf("could not find officially supported version of etcd for Kubernetes %s, falling back to the nearest etcd version (%s)",
+		warning = errors.Errorf("could not find officially supported version of etcd for Kubernetes %s, falling back to the nearest etcd version (%s)",
 			versionString, etcdStringVersion)
 	}
 

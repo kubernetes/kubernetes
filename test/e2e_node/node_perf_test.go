@@ -33,7 +33,7 @@ import (
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e_node/perf/workloads"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -126,12 +126,30 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		// Create the pod.
 		pod = f.PodClient().CreateSync(pod)
 		// Wait for pod success.
-		f.PodClient().WaitForSuccess(pod.Name, wl.Timeout())
+		// but avoid using WaitForSuccess because we want the container logs upon failure #109295
+		podErr := e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), wl.Timeout(),
+			func(pod *v1.Pod) (bool, error) {
+				switch pod.Status.Phase {
+				case v1.PodFailed:
+					return true, fmt.Errorf("pod %q failed with reason: %q, message: %q", pod.Name, pod.Status.Reason, pod.Status.Message)
+				case v1.PodSucceeded:
+					return true, nil
+				default:
+					return false, nil
+				}
+			},
+		)
 		podLogs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		framework.ExpectNoError(err)
+		if podErr != nil {
+			framework.Logf("dumping pod logs due to pod error detected: \n%s", podLogs)
+			framework.Failf("pod error: %v", podErr)
+		}
 		perf, err := wl.ExtractPerformanceFromLogs(podLogs)
 		framework.ExpectNoError(err)
 		framework.Logf("Time to complete workload %s: %v", wl.Name(), perf)
+		// using framework.ExpectNoError for consistency would cause changes the output format
+		gomega.Expect(podErr).To(gomega.Succeed(), "wait for pod %q to succeed", pod.Name)
 	}
 
 	ginkgo.BeforeEach(func() {

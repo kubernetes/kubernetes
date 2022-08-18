@@ -131,7 +131,7 @@ func (in instrumentedRuntimeService) ContainerStatus(containerID string, verbose
 	return out, err
 }
 
-func (in instrumentedRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+func (in instrumentedRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.ContainerResources) error {
 	const operation = "update_container"
 	defer recordOperation(operation, time.Now())
 
@@ -323,4 +323,22 @@ func (in instrumentedImageManagerService) ImageFsInfo() ([]*runtimeapi.Filesyste
 	fsInfo, err := in.service.ImageFsInfo()
 	recordError(operation, err)
 	return fsInfo, nil
+}
+
+func (in instrumentedRuntimeService) CheckpointContainer(options *runtimeapi.CheckpointContainerRequest) error {
+	const operation = "checkpoint_container"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.CheckpointContainer(options)
+	recordError(operation, err)
+	return err
+}
+
+func (in instrumentedRuntimeService) GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error {
+	const operation = "get_container_events"
+	defer recordOperation(operation, time.Now())
+
+	err := in.service.GetContainerEvents(containerEventsCh)
+	recordError(operation, err)
+	return err
 }

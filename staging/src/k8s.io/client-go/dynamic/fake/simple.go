@@ -491,8 +491,7 @@ func (c *dynamicResourceClient) Apply(ctx context.Context, name string, obj *uns
 	if err := c.client.scheme.Convert(uncastRet, ret, nil); err != nil {
 		return nil, err
 	}
-	return ret, err
-	return nil, nil
+	return ret, nil
 }
 
 func (c *dynamicResourceClient) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options metav1.ApplyOptions) (*unstructured.Unstructured, error) {

@@ -40,11 +40,10 @@ import (
 //
 // Example client session:
 //
-//    CONNECT http://server.com with subprotocol "channel.k8s.io"
-//    WRITE []byte{0, 102, 111, 111, 10} # send "foo\n" on channel 0 (STDIN)
-//    READ  []byte{1, 10}                # receive "\n" on channel 1 (STDOUT)
-//    CLOSE
-//
+//	CONNECT http://server.com with subprotocol "channel.k8s.io"
+//	WRITE []byte{0, 102, 111, 111, 10} # send "foo\n" on channel 0 (STDIN)
+//	READ  []byte{1, 10}                # receive "\n" on channel 1 (STDOUT)
+//	CLOSE
 const ChannelWebSocketProtocol = "channel.k8s.io"
 
 // The Websocket subprotocol "base64.channel.k8s.io" base64 encodes each message with a character
@@ -56,11 +55,10 @@ const ChannelWebSocketProtocol = "channel.k8s.io"
 //
 // Example client session:
 //
-//    CONNECT http://server.com with subprotocol "base64.channel.k8s.io"
-//    WRITE []byte{48, 90, 109, 57, 118, 67, 103, 111, 61} # send "foo\n" (base64: "Zm9vCgo=") on channel '0' (STDIN)
-//    READ  []byte{49, 67, 103, 61, 61} # receive "\n" (base64: "Cg==") on channel '1' (STDOUT)
-//    CLOSE
-//
+//	CONNECT http://server.com with subprotocol "base64.channel.k8s.io"
+//	WRITE []byte{48, 90, 109, 57, 118, 67, 103, 111, 61} # send "foo\n" (base64: "Zm9vCgo=") on channel '0' (STDIN)
+//	READ  []byte{49, 67, 103, 61, 61} # receive "\n" (base64: "Cg==") on channel '1' (STDOUT)
+//	CLOSE
 const Base64ChannelWebSocketProtocol = "base64.channel.k8s.io"
 
 type codecType int

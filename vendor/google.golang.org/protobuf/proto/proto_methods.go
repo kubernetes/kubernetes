@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // The protoreflect build tag disables use of fast-path methods.
+//go:build !protoreflect
 // +build !protoreflect
 
 package proto

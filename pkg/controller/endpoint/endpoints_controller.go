@@ -426,7 +426,7 @@ func (e *Controller) syncService(ctx context.Context, key string) error {
 		if err != nil {
 			// this will happen, if the cluster runs with some nodes configured as dual stack and some as not
 			// such as the case of an upgrade..
-			klog.V(2).Infof("failed to find endpoint for service:%v with ClusterIP:%v on pod:%v with error:%v", service.Name, service.Spec.ClusterIP, pod.Name, err)
+			klog.V(2).Infof("Failed to find endpoint for service:%s with ClusterIP:%s on pod:%s with error:%v", service.Name, service.Spec.ClusterIP, klog.KObj(pod), err)
 			continue
 		}
 

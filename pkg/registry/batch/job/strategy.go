@@ -100,6 +100,9 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	} else {
 		dropJobTrackingAnnotation(job)
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) {
+		job.Spec.PodFailurePolicy = nil
+	}
 
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
 }
@@ -131,6 +134,10 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers) && !hasJobTrackingAnnotation(oldJob) {
 		dropJobTrackingAnnotation(newJob)
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodFailurePolicy) && oldJob.Spec.PodFailurePolicy == nil {
+		newJob.Spec.PodFailurePolicy = nil
 	}
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)

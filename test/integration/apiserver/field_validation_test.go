@@ -38,6 +38,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 
 	"k8s.io/kubernetes/test/integration/framework"
@@ -49,8 +50,10 @@ var (
 		"apiVersion": "apps/v1",
 		"kind": "Deployment",
 		"metadata": {
+			"name": "dupename",
 			"name": "%s",
-			"labels": {"app": "nginx"}
+			"labels": {"app": "nginx"},
+			"unknownMeta": "metaVal"
 		},
 		"spec": {
 			"unknown1": "val1",
@@ -118,7 +121,9 @@ var (
 	invalidBodyYAML = `apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: dupename
   name: %s
+  unknownMeta: metaVal
   labels:
     app: nginx
 spec:
@@ -236,7 +241,9 @@ spec:
 	"apiVersion": "%s",
 	"kind": "%s",
 	"metadata": {
+		"name": "dupename",
 		"name": "%s",
+		"unknownMeta": "metaVal",
 		"resourceVersion": "%s"
 	},
 	"spec": {
@@ -252,7 +259,16 @@ spec:
 				"hostPort": 8081,
 				"hostPort": 8082,
 				"unknownNested": "val"
-			}]
+			}],
+		"embeddedObj": {
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "my-cm",
+				"namespace": "my-ns",
+				"unknownEmbeddedMeta": "foo"
+			}
+		}
 	}
 }`
 
@@ -271,7 +287,14 @@ spec:
 				"containerPort": 8080,
 				"protocol": "TCP",
 				"hostPort": 8081
-			}]
+			}],
+		"embeddedObj": {
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "my-cm"
+			}
+		}
 	}
 }
 	`
@@ -280,8 +303,10 @@ spec:
 apiVersion: "%s"
 kind: "%s"
 metadata:
+  name: dupename
   name: "%s"
   resourceVersion: "%s"
+  unknownMeta: metaVal
 spec:
   unknown1: val1
   unknownDupe: valDupe
@@ -294,7 +319,14 @@ spec:
     protocol: TCP
     hostPort: 8081
     hostPort: 8082
-    unknownNested: val`
+    unknownNested: val
+  embeddedObj:
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: my-cm
+      namespace: my-ns
+      unknownEmbeddedMeta: foo`
 
 	crdValidBodyYAML = `
 apiVersion: "%s"
@@ -308,7 +340,13 @@ spec:
   - name: portName
     containerPort: 8080
     protocol: TCP
-    hostPort: 8081`
+    hostPort: 8081
+  embeddedObj:
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: my-cm
+      namespace: my-ns`
 
 	crdApplyInvalidBody = `
 {
@@ -326,7 +364,15 @@ spec:
 			"protocol": "TCP",
 			"hostPort": 8081,
 			"hostPort": 8082
-		}]
+		}],
+		"embeddedObj": {
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "my-cm",
+				"namespace": "my-ns"
+			}
+		}
 	}
 }`
 
@@ -344,7 +390,15 @@ spec:
 			"containerPort": 8080,
 			"protocol": "TCP",
 			"hostPort": 8082
-		}]
+		}],
+		"embeddedObj": {
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "my-cm",
+				"namespace": "my-ns"
+			}
+		}
 	}
 }`
 
@@ -362,7 +416,15 @@ spec:
 			"containerPort": 8080,
 			"protocol": "TCP",
 			"hostPort": 8083
-		}]
+		}],
+		"embeddedObj": {
+			"apiVersion": "v1",
+			"kind": "ConfigMap",
+			"metadata": {
+				"name": "my-cm",
+				"namespace": "my-ns"
+			}
+		}
 	}
 }`
 
@@ -396,6 +458,21 @@ spec:
 						},
 						"knownField1": {
 							"type": "string"
+						},
+						"embeddedObj": {
+							"x-kubernetes-embedded-resource": true,
+							"type": "object",
+							"properties": {
+								"apiversion": {
+									"type": "string"
+								},
+								"kind": {
+									"type": "string"
+								},
+								"metadata": {
+									"type": "object"
+								}
+							}
 						},
 						"ports": {
 							"type": "array",
@@ -516,7 +593,7 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 				FieldValidation: "Strict",
 			},
 			bodyBase:            invalidBodyJSON,
-			strictDecodingError: `strict decoding error: unknown field "spec.unknown1", unknown field "spec.unknownDupe", duplicate field "spec.paused", unknown field "spec.template.spec.containers[0].unknownNested", duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
+			strictDecodingError: `strict decoding error: duplicate field "metadata.name", unknown field "metadata.unknownMeta", unknown field "spec.unknown1", unknown field "spec.unknownDupe", duplicate field "spec.paused", unknown field "spec.template.spec.containers[0].unknownNested", duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 		},
 		{
 			name: "post-warn-validation",
@@ -525,6 +602,8 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 			},
 			bodyBase: invalidBodyJSON,
 			strictDecodingWarnings: []string{
+				`duplicate field "metadata.name"`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
 				`duplicate field "spec.paused"`,
@@ -546,6 +625,8 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 			name:     "post-no-validation",
 			bodyBase: invalidBodyJSON,
 			strictDecodingWarnings: []string{
+				`duplicate field "metadata.name"`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
 				`duplicate field "spec.paused"`,
@@ -564,9 +645,10 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 			bodyBase:    invalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingError: `strict decoding error: yaml: unmarshal errors:
-  line 10: key "unknownDupe" already set in map
-  line 12: key "paused" already set in map
-  line 26: key "imagePullPolicy" already set in map, unknown field "spec.template.spec.containers[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
+  line 5: key "name" already set in map
+  line 12: key "unknownDupe" already set in map
+  line 14: key "paused" already set in map
+  line 28: key "imagePullPolicy" already set in map, unknown field "metadata.unknownMeta", unknown field "spec.template.spec.containers[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name: "post-warn-validation-yaml",
@@ -576,9 +658,11 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 			bodyBase:    invalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingWarnings: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "paused" already set in map`,
-				`line 26: key "imagePullPolicy" already set in map`,
+				`line 5: key "name" already set in map`,
+				`line 12: key "unknownDupe" already set in map`,
+				`line 14: key "paused" already set in map`,
+				`line 28: key "imagePullPolicy" already set in map`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.template.spec.containers[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -597,9 +681,11 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 			bodyBase:    invalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingWarnings: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "paused" already set in map`,
-				`line 26: key "imagePullPolicy" already set in map`,
+				`line 5: key "name" already set in map`,
+				`line 12: key "unknownDupe" already set in map`,
+				`line 14: key "paused" already set in map`,
+				`line 28: key "imagePullPolicy" already set in map`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.template.spec.containers[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -609,6 +695,7 @@ func testFieldValidationPost(t *testing.T, client clientset.Interface) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			klog.Warningf("running tc named: %s", tc.name)
 			body := []byte(fmt.Sprintf(tc.bodyBase, fmt.Sprintf("test-deployment-%s", tc.name)))
 			req := client.CoreV1().RESTClient().Post().
 				AbsPath("/apis/apps/v1").
@@ -667,7 +754,7 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 				FieldValidation: "Strict",
 			},
 			putBodyBase:         invalidBodyJSON,
-			strictDecodingError: `strict decoding error: unknown field "spec.unknown1", unknown field "spec.unknownDupe", duplicate field "spec.paused", unknown field "spec.template.spec.containers[0].unknownNested", duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
+			strictDecodingError: `strict decoding error: duplicate field "metadata.name", unknown field "metadata.unknownMeta", unknown field "spec.unknown1", unknown field "spec.unknownDupe", duplicate field "spec.paused", unknown field "spec.template.spec.containers[0].unknownNested", duplicate field "spec.template.spec.containers[0].imagePullPolicy"`,
 		},
 		{
 			name: "put-warn-validation",
@@ -676,6 +763,8 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 			},
 			putBodyBase: invalidBodyJSON,
 			strictDecodingWarnings: []string{
+				`duplicate field "metadata.name"`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
 				`duplicate field "spec.paused"`,
@@ -687,16 +776,18 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 			},
 		},
 		{
-			name: "put-default-ignore-validation",
+			name: "put-ignore-validation",
 			opts: metav1.UpdateOptions{
 				FieldValidation: "Ignore",
 			},
 			putBodyBase: invalidBodyJSON,
 		},
 		{
-			name:        "put-ignore-validation",
+			name:        "put-no-validation",
 			putBodyBase: invalidBodyJSON,
 			strictDecodingWarnings: []string{
+				`duplicate field "metadata.name"`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
 				`duplicate field "spec.paused"`,
@@ -715,9 +806,10 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 			putBodyBase: invalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingError: `strict decoding error: yaml: unmarshal errors:
-  line 10: key "unknownDupe" already set in map
-  line 12: key "paused" already set in map
-  line 26: key "imagePullPolicy" already set in map, unknown field "spec.template.spec.containers[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
+  line 5: key "name" already set in map
+  line 12: key "unknownDupe" already set in map
+  line 14: key "paused" already set in map
+  line 28: key "imagePullPolicy" already set in map, unknown field "metadata.unknownMeta", unknown field "spec.template.spec.containers[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
 		},
 		{
 			name: "put-warn-validation-yaml",
@@ -727,9 +819,11 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 			putBodyBase: invalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingWarnings: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "paused" already set in map`,
-				`line 26: key "imagePullPolicy" already set in map`,
+				`line 5: key "name" already set in map`,
+				`line 12: key "unknownDupe" already set in map`,
+				`line 14: key "paused" already set in map`,
+				`line 28: key "imagePullPolicy" already set in map`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.template.spec.containers[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -748,9 +842,11 @@ func testFieldValidationPut(t *testing.T, client clientset.Interface) {
 			putBodyBase: invalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingWarnings: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "paused" already set in map`,
-				`line 26: key "imagePullPolicy" already set in map`,
+				`line 5: key "name" already set in map`,
+				`line 12: key "unknownDupe" already set in map`,
+				`line 14: key "paused" already set in map`,
+				`line 28: key "imagePullPolicy" already set in map`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.template.spec.containers[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
@@ -1421,7 +1517,7 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 				FieldValidation: "Strict",
 			},
 			body:                crdInvalidBody,
-			strictDecodingError: `strict decoding error: duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
+			strictDecodingError: `strict decoding error: duplicate field "metadata.name", duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "metadata.unknownMeta", unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe", unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 		},
 		{
 			name: "crd-post-warn-validation",
@@ -1430,12 +1526,15 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 			},
 			body: crdInvalidBody,
 			strictDecodingWarnings: []string{
+				`duplicate field "metadata.name"`,
 				`duplicate field "spec.unknownDupe"`,
 				`duplicate field "spec.knownField1"`,
 				`duplicate field "spec.ports[0].hostPort"`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 		{
@@ -1449,12 +1548,15 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 			name: "crd-post-no-validation",
 			body: crdInvalidBody,
 			strictDecodingWarnings: []string{
+				`duplicate field "metadata.name"`,
 				`duplicate field "spec.unknownDupe"`,
 				`duplicate field "spec.knownField1"`,
 				`duplicate field "spec.ports[0].hostPort"`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 		{
@@ -1465,9 +1567,10 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 			body:        crdInvalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingError: `strict decoding error: yaml: unmarshal errors:
-  line 10: key "unknownDupe" already set in map
-  line 12: key "knownField1" already set in map
-  line 18: key "hostPort" already set in map, unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
+  line 6: key "name" already set in map
+  line 12: key "unknownDupe" already set in map
+  line 14: key "knownField1" already set in map
+  line 20: key "hostPort" already set in map, unknown field "metadata.unknownMeta", unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe", unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 		},
 		{
 			name: "crd-post-warn-validation-yaml",
@@ -1477,12 +1580,15 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 			body:        crdInvalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingWarnings: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "knownField1" already set in map`,
-				`line 18: key "hostPort" already set in map`,
+				`line 6: key "name" already set in map`,
+				`line 12: key "unknownDupe" already set in map`,
+				`line 14: key "knownField1" already set in map`,
+				`line 20: key "hostPort" already set in map`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 		{
@@ -1498,17 +1604,21 @@ func testFieldValidationPostCRD(t *testing.T, rest rest.Interface, gvk schema.Gr
 			body:        crdInvalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingWarnings: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "knownField1" already set in map`,
-				`line 18: key "hostPort" already set in map`,
+				`line 6: key "name" already set in map`,
+				`line 12: key "unknownDupe" already set in map`,
+				`line 14: key "knownField1" already set in map`,
+				`line 20: key "hostPort" already set in map`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			klog.Warningf("running tc named: %s", tc.name)
 			kind := gvk.Kind
 			apiVersion := gvk.Group + "/" + gvk.Version
 
@@ -1558,7 +1668,7 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 				FieldValidation: "Strict",
 			},
 			body:                crdInvalidBody,
-			strictDecodingError: `strict decoding error: duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "spec.ports[0].unknownNested"`,
+			strictDecodingError: `strict decoding error: duplicate field "metadata.name", duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "metadata.unknownMeta", unknown field "spec.ports[0].unknownNested", unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 		},
 		{
 			name: "schemaless-crd-post-warn-validation",
@@ -1567,10 +1677,13 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 			},
 			body: crdInvalidBody,
 			strictDecodingWarnings: []string{
+				`duplicate field "metadata.name"`,
 				`duplicate field "spec.unknownDupe"`,
 				`duplicate field "spec.knownField1"`,
 				`duplicate field "spec.ports[0].hostPort"`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 		{
@@ -1584,10 +1697,13 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 			name: "schemaless-crd-post-no-validation",
 			body: crdInvalidBody,
 			strictDecodingWarnings: []string{
+				`duplicate field "metadata.name"`,
 				`duplicate field "spec.unknownDupe"`,
 				`duplicate field "spec.knownField1"`,
 				`duplicate field "spec.ports[0].hostPort"`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 		{
@@ -1598,9 +1714,10 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 			body:        crdInvalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingError: `strict decoding error: yaml: unmarshal errors:
-  line 10: key "unknownDupe" already set in map
-  line 12: key "knownField1" already set in map
-  line 18: key "hostPort" already set in map, unknown field "spec.ports[0].unknownNested"`,
+  line 6: key "name" already set in map
+  line 12: key "unknownDupe" already set in map
+  line 14: key "knownField1" already set in map
+  line 20: key "hostPort" already set in map, unknown field "metadata.unknownMeta", unknown field "spec.ports[0].unknownNested", unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 		},
 		{
 			name: "schemaless-crd-post-warn-validation-yaml",
@@ -1610,10 +1727,13 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 			body:        crdInvalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingWarnings: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "knownField1" already set in map`,
-				`line 18: key "hostPort" already set in map`,
+				`line 6: key "name" already set in map`,
+				`line 12: key "unknownDupe" already set in map`,
+				`line 14: key "knownField1" already set in map`,
+				`line 20: key "hostPort" already set in map`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 		{
@@ -1629,10 +1749,13 @@ func testFieldValidationPostCRDSchemaless(t *testing.T, rest rest.Interface, gvk
 			body:        crdInvalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingWarnings: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "knownField1" already set in map`,
-				`line 18: key "hostPort" already set in map`,
+				`line 6: key "name" already set in map`,
+				`line 12: key "unknownDupe" already set in map`,
+				`line 14: key "knownField1" already set in map`,
+				`line 20: key "hostPort" already set in map`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 	}
@@ -1695,7 +1818,7 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 				FieldValidation: "Strict",
 			},
 			putBody:             crdInvalidBody,
-			strictDecodingError: `strict decoding error: duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
+			strictDecodingError: `strict decoding error: duplicate field "metadata.name", duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "metadata.unknownMeta", unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe", unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 		},
 		{
 			name: "crd-put-warn-validation",
@@ -1704,12 +1827,15 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 			},
 			putBody: crdInvalidBody,
 			strictDecodingWarnings: []string{
+				`duplicate field "metadata.name"`,
 				`duplicate field "spec.unknownDupe"`,
 				`duplicate field "spec.knownField1"`,
 				`duplicate field "spec.ports[0].hostPort"`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 		{
@@ -1723,12 +1849,15 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 			name:    "crd-put-no-validation",
 			putBody: crdInvalidBody,
 			strictDecodingWarnings: []string{
+				`duplicate field "metadata.name"`,
 				`duplicate field "spec.unknownDupe"`,
 				`duplicate field "spec.knownField1"`,
 				`duplicate field "spec.ports[0].hostPort"`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 		{
@@ -1739,9 +1868,10 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 			putBody:     crdInvalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingError: `strict decoding error: yaml: unmarshal errors:
-  line 10: key "unknownDupe" already set in map
-  line 12: key "knownField1" already set in map
-  line 18: key "hostPort" already set in map, unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe"`,
+  line 6: key "name" already set in map
+  line 12: key "unknownDupe" already set in map
+  line 14: key "knownField1" already set in map
+  line 20: key "hostPort" already set in map, unknown field "metadata.unknownMeta", unknown field "spec.ports[0].unknownNested", unknown field "spec.unknown1", unknown field "spec.unknownDupe", unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 		},
 		{
 			name: "crd-put-warn-validation-yaml",
@@ -1751,12 +1881,15 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 			putBody:     crdInvalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingWarnings: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "knownField1" already set in map`,
-				`line 18: key "hostPort" already set in map`,
+				`line 6: key "name" already set in map`,
+				`line 12: key "unknownDupe" already set in map`,
+				`line 14: key "knownField1" already set in map`,
+				`line 20: key "hostPort" already set in map`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 		{
@@ -1772,12 +1905,15 @@ func testFieldValidationPutCRD(t *testing.T, rest rest.Interface, gvk schema.Gro
 			putBody:     crdInvalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingWarnings: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "knownField1" already set in map`,
-				`line 18: key "hostPort" already set in map`,
+				`line 6: key "name" already set in map`,
+				`line 12: key "unknownDupe" already set in map`,
+				`line 14: key "knownField1" already set in map`,
+				`line 20: key "hostPort" already set in map`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
 				`unknown field "spec.unknown1"`,
 				`unknown field "spec.unknownDupe"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 	}
@@ -1847,7 +1983,7 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 				FieldValidation: "Strict",
 			},
 			putBody:             crdInvalidBody,
-			strictDecodingError: `strict decoding error: duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "spec.ports[0].unknownNested"`,
+			strictDecodingError: `strict decoding error: duplicate field "metadata.name", duplicate field "spec.unknownDupe", duplicate field "spec.knownField1", duplicate field "spec.ports[0].hostPort", unknown field "metadata.unknownMeta", unknown field "spec.ports[0].unknownNested", unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 		},
 		{
 			name: "schemaless-crd-put-warn-validation",
@@ -1856,10 +1992,13 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 			},
 			putBody: crdInvalidBody,
 			strictDecodingWarnings: []string{
+				`duplicate field "metadata.name"`,
 				`duplicate field "spec.unknownDupe"`,
 				`duplicate field "spec.knownField1"`,
 				`duplicate field "spec.ports[0].hostPort"`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 		{
@@ -1873,10 +2012,13 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 			name:    "schemaless-crd-put-no-validation",
 			putBody: crdInvalidBody,
 			strictDecodingWarnings: []string{
+				`duplicate field "metadata.name"`,
 				`duplicate field "spec.unknownDupe"`,
 				`duplicate field "spec.knownField1"`,
 				`duplicate field "spec.ports[0].hostPort"`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 		{
@@ -1887,9 +2029,10 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 			putBody:     crdInvalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingError: `strict decoding error: yaml: unmarshal errors:
-  line 10: key "unknownDupe" already set in map
-  line 12: key "knownField1" already set in map
-  line 18: key "hostPort" already set in map, unknown field "spec.ports[0].unknownNested"`,
+  line 6: key "name" already set in map
+  line 12: key "unknownDupe" already set in map
+  line 14: key "knownField1" already set in map
+  line 20: key "hostPort" already set in map, unknown field "metadata.unknownMeta", unknown field "spec.ports[0].unknownNested", unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 		},
 		{
 			name: "schemaless-crd-put-warn-validation-yaml",
@@ -1899,10 +2042,13 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 			putBody:     crdInvalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingWarnings: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "knownField1" already set in map`,
-				`line 18: key "hostPort" already set in map`,
+				`line 6: key "name" already set in map`,
+				`line 12: key "unknownDupe" already set in map`,
+				`line 14: key "knownField1" already set in map`,
+				`line 20: key "hostPort" already set in map`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 		{
@@ -1918,10 +2064,13 @@ func testFieldValidationPutCRDSchemaless(t *testing.T, rest rest.Interface, gvk 
 			putBody:     crdInvalidBodyYAML,
 			contentType: "application/yaml",
 			strictDecodingWarnings: []string{
-				`line 10: key "unknownDupe" already set in map`,
-				`line 12: key "knownField1" already set in map`,
-				`line 18: key "hostPort" already set in map`,
+				`line 6: key "name" already set in map`,
+				`line 12: key "unknownDupe" already set in map`,
+				`line 14: key "knownField1" already set in map`,
+				`line 20: key "hostPort" already set in map`,
+				`unknown field "metadata.unknownMeta"`,
 				`unknown field "spec.ports[0].unknownNested"`,
+				`unknown field "spec.embeddedObj.metadata.unknownEmbeddedMeta"`,
 			},
 		},
 	}

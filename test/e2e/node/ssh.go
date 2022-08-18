@@ -25,7 +25,7 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const maxNodes = 100

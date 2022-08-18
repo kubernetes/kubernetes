@@ -105,6 +105,10 @@ func (plugin *projectedPlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *projectedPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 func (plugin *projectedPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	return &projectedVolumeMounter{
 		projectedVolume: &projectedVolume{

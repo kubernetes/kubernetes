@@ -1142,6 +1142,7 @@ func TestPrefix(t *testing.T) {
 func Test_growSlice(t *testing.T) {
 	type args struct {
 		initialCapacity int
+		initialLen      int
 		v               reflect.Value
 		maxCapacity     int
 		sizes           []int
@@ -1150,6 +1151,7 @@ func Test_growSlice(t *testing.T) {
 		name string
 		args args
 		cap  int
+		len  int
 	}{
 		{
 			name: "empty",
@@ -1181,13 +1183,29 @@ func Test_growSlice(t *testing.T) {
 			args: args{initialCapacity: 5, maxCapacity: 10, sizes: []int{8, 4}},
 			cap:  8,
 		},
+		{
+			name: "with existing capacity and length above max",
+			args: args{initialCapacity: 12, initialLen: 5, maxCapacity: 10, sizes: []int{8, 4}},
+			cap:  12,
+			len:  5,
+		},
+		{
+			name: "with existing capacity and length below max",
+			args: args{initialCapacity: 5, initialLen: 3, maxCapacity: 10, sizes: []int{8, 4}},
+			cap:  8,
+			len:  3,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.args.initialCapacity > 0 {
-				tt.args.v = reflect.ValueOf(make([]example.Pod, 0, tt.args.initialCapacity))
+				val := make([]example.Pod, tt.args.initialLen, tt.args.initialCapacity)
+				for i := 0; i < tt.args.initialLen; i++ {
+					val[i].Name = fmt.Sprintf("test-%d", i)
+				}
+				tt.args.v = reflect.ValueOf(val)
 			}
-			// reflection requires that the value be addressible in order to call set,
+			// reflection requires that the value be addressable in order to call set,
 			// so we must ensure the value we created is available on the heap (not a problem
 			// for normal usage)
 			if !tt.args.v.CanAddr() {
@@ -1198,6 +1216,17 @@ func Test_growSlice(t *testing.T) {
 			growSlice(tt.args.v, tt.args.maxCapacity, tt.args.sizes...)
 			if tt.cap != tt.args.v.Cap() {
 				t.Errorf("Unexpected capacity: got=%d want=%d", tt.args.v.Cap(), tt.cap)
+			}
+			if tt.len != tt.args.v.Len() {
+				t.Errorf("Unexpected length: got=%d want=%d", tt.args.v.Len(), tt.len)
+			}
+			for i := 0; i < tt.args.v.Len(); i++ {
+				nameWanted := fmt.Sprintf("test-%d", i)
+				val := tt.args.v.Index(i).Interface()
+				pod, ok := val.(example.Pod)
+				if !ok || pod.Name != nameWanted {
+					t.Errorf("Unexpected element value: got=%s, want=%s", pod.Name, nameWanted)
+				}
 			}
 		})
 	}

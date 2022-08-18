@@ -59,7 +59,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	utilptr "k8s.io/utils/pointer"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -362,7 +362,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				init(testParameters{registerDriver: test.deployClusterRegistrar, disableAttach: test.disableAttach})
 				defer cleanup()
 
-				volumeType := t.volumeType
+				volumeType := test.volumeType
 				if volumeType == "" {
 					volumeType = pvcReference
 				}
@@ -1731,8 +1731,8 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			},
 		}
 		for _, t := range tests {
-			test := t
-			ginkgo.It(test.name, func() {
+			t := t
+			ginkgo.It(t.name, func() {
 				var nodeStageFsGroup, nodePublishFsGroup string
 				if framework.NodeOSDistroIs("windows") {
 					e2eskipper.Skipf("FSGroupPolicy is only applied on linux nodes -- skipping")
@@ -1798,6 +1798,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			},
 		}
 		for _, test := range tests {
+			test := test
 			ginkgo.It(test.name, func() {
 				hooks := createPreHook("CreateSnapshot", test.createSnapshotHook)
 				init(testParameters{
@@ -1888,6 +1889,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			},
 		}
 		for _, test := range tests {
+			test := test
 			ginkgo.It(test.name, func() {
 				init(testParameters{
 					disableAttach:  true,
@@ -2477,14 +2479,14 @@ func createPreHook(method string, callback func(counter int64) error) *drivers.H
 func createFSGroupRequestPreHook(nodeStageFsGroup, nodePublishFsGroup *string) *drivers.Hooks {
 	return &drivers.Hooks{
 		Pre: func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
-			nodeStageRequest, ok := request.(csipbv1.NodeStageVolumeRequest)
+			nodeStageRequest, ok := request.(*csipbv1.NodeStageVolumeRequest)
 			if ok {
 				mountVolume := nodeStageRequest.GetVolumeCapability().GetMount()
 				if mountVolume != nil {
 					*nodeStageFsGroup = mountVolume.VolumeMountGroup
 				}
 			}
-			nodePublishRequest, ok := request.(csipbv1.NodePublishVolumeRequest)
+			nodePublishRequest, ok := request.(*csipbv1.NodePublishVolumeRequest)
 			if ok {
 				mountVolume := nodePublishRequest.GetVolumeCapability().GetMount()
 				if mountVolume != nil {

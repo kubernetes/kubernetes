@@ -715,7 +715,7 @@ func assertEqualTypes(t *testing.T, path []string, a, b reflect.Type) {
 			path = path[:len(path)-1]
 		}
 
-	case reflect.Ptr, reflect.Slice:
+	case reflect.Pointer, reflect.Slice:
 		aElemType := a.Elem()
 		bElemType := b.Elem()
 		assertEqualTypes(t, path, aElemType, bElemType)

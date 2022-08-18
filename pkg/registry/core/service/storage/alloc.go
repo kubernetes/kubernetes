@@ -1012,7 +1012,7 @@ func isMatchingPreferDualStackClusterIPFields(after After, before Before) bool {
 
 // Helper to avoid nil-checks all over.  Callers of this need to be checking
 // for an exact value.
-func getIPFamilyPolicy(svc *api.Service) api.IPFamilyPolicyType {
+func getIPFamilyPolicy(svc *api.Service) api.IPFamilyPolicy {
 	if svc.Spec.IPFamilyPolicy == nil {
 		return "" // callers need to handle this
 	}

@@ -28,7 +28,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -174,5 +174,57 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 		// watch for pod failed reason instead of termination of pod
 		err := e2epod.WaitForPodFailedReason(f.ClientSet, pod, "SysctlForbidden", f.Timeouts.PodStart)
 		framework.ExpectNoError(err)
+	})
+
+	/*
+	  Release: v1.23
+	  Testname: Sysctl, test sysctls supports slashes
+	  Description: Pod is created with kernel/shm_rmid_forced sysctl. Support slashes as sysctl separator. The '/' separator is also accepted in place of a '.'
+	  [LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
+	*/
+	ginkgo.It("should support sysctls with slashes as separator [MinimumKubeletVersion:1.23]", func() {
+		pod := testPod()
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{
+			Sysctls: []v1.Sysctl{
+				{
+					Name:  "kernel/shm_rmid_forced",
+					Value: "1",
+				},
+			},
+		}
+		pod.Spec.Containers[0].Command = []string{"/bin/sysctl", "kernel/shm_rmid_forced"}
+
+		ginkgo.By("Creating a pod with the kernel/shm_rmid_forced sysctl")
+		pod = podClient.Create(pod)
+
+		ginkgo.By("Watching for error events or started pod")
+		// watch for events instead of termination of pod because the kubelet deletes
+		// failed pods without running containers. This would create a race as the pod
+		// might have already been deleted here.
+		ev, err := f.PodClient().WaitForErrorEventOrSuccess(pod)
+		framework.ExpectNoError(err)
+		gomega.Expect(ev).To(gomega.BeNil())
+
+		ginkgo.By("Waiting for pod completion")
+		err = e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+		framework.ExpectNoError(err)
+		pod, err = podClient.Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Checking that the pod succeeded")
+		framework.ExpectEqual(pod.Status.Phase, v1.PodSucceeded)
+
+		ginkgo.By("Getting logs from the pod")
+		log, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Checking that the sysctl is actually updated")
+		// Note that either "/" or "."  may be used as separators within sysctl variable names.
+		// "kernel.shm_rmid_forced=1" and "kernel/shm_rmid_forced=1" are equivalent.
+		// Run "/bin/sysctl kernel/shm_rmid_forced" command on Linux system
+		// The displayed result is "kernel.shm_rmid_forced=1"
+		// Therefore, the substring that needs to be checked for the obtained pod log is
+		// "kernel.shm_rmid_forced=1" instead of "kernel/shm_rmid_forced=1".
+		gomega.Expect(log).To(gomega.ContainSubstring("kernel.shm_rmid_forced = 1"))
 	})
 })

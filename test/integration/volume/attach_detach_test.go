@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -37,7 +36,6 @@ import (
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -157,7 +155,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		},
 	}
 
-	testClient, ctrl, _, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
+	testClient, ctrl, pvCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
@@ -169,23 +167,25 @@ func TestPodDeletionWithDswp(t *testing.T) {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
-	stopCh := make(chan struct{})
+	// start controller loop
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	go informers.Core().V1().Nodes().Informer().Run(stopCh)
+	go informers.Core().V1().Nodes().Informer().Run(ctx.Done())
 	if _, err := testClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
 	podInformer := informers.Core().V1().Pods().Informer()
-	go podInformer.Run(podStopCh)
+	go podInformer.Run(ctx.Done())
 
-	// start controller loop
-	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
-	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
-	go informers.Storage().V1().VolumeAttachments().Informer().Run(stopCh)
-	initCSIObjects(stopCh, informers)
-	go ctrl.Run(stopCh)
-	defer close(stopCh)
+	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(ctx.Done())
+	go informers.Core().V1().PersistentVolumes().Informer().Run(ctx.Done())
+	go informers.Storage().V1().VolumeAttachments().Informer().Run(ctx.Done())
+	initCSIObjects(ctx.Done(), informers)
+	go ctrl.Run(ctx.Done())
+	// Run pvCtrl to avoid leaking goroutines started during its creation.
+	go pvCtrl.Run(ctx)
 
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
@@ -213,9 +213,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 }
 
 func initCSIObjects(stopCh <-chan struct{}, informers clientgoinformers.SharedInformerFactory) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
-		go informers.Storage().V1().CSINodes().Informer().Run(stopCh)
-	}
+	go informers.Storage().V1().CSINodes().Informer().Run(stopCh)
 	go informers.Storage().V1().CSIDrivers().Informer().Run(stopCh)
 }
 
@@ -234,13 +232,14 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 		},
 	}
 
-	testClient, ctrl, _, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
+	testClient, ctrl, pvCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
+	defer close(podStopCh)
 
 	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
@@ -256,12 +255,16 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	go podInformer.Run(podStopCh)
 
 	// start controller loop
-	stopCh := make(chan struct{})
-	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
-	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
-	go informers.Storage().V1().VolumeAttachments().Informer().Run(stopCh)
-	initCSIObjects(stopCh, informers)
-	go ctrl.Run(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(ctx.Done())
+	go informers.Core().V1().PersistentVolumes().Informer().Run(ctx.Done())
+	go informers.Storage().V1().VolumeAttachments().Informer().Run(ctx.Done())
+	initCSIObjects(ctx.Done(), informers)
+	go ctrl.Run(ctx.Done())
+	// Run pvCtrl to avoid leaking goroutines started during its creation.
+	go pvCtrl.Run(ctx)
 
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
@@ -284,9 +287,6 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	}
 
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 20*time.Second, "expected 0 pods in dsw after pod completion", 0)
-
-	close(podStopCh)
-	close(stopCh)
 }
 
 func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
@@ -305,13 +305,14 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 		},
 	}
 
-	testClient, ctrl, _, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
+	testClient, ctrl, pvCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
 
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
+	defer close(podStopCh)
 
 	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
@@ -327,12 +328,16 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	go podInformer.Run(podStopCh)
 
 	// start controller loop
-	stopCh := make(chan struct{})
-	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
-	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
-	go informers.Storage().V1().VolumeAttachments().Informer().Run(stopCh)
-	initCSIObjects(stopCh, informers)
-	go ctrl.Run(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(ctx.Done())
+	go informers.Core().V1().PersistentVolumes().Informer().Run(ctx.Done())
+	go informers.Storage().V1().VolumeAttachments().Informer().Run(ctx.Done())
+	initCSIObjects(ctx.Done(), informers)
+	go ctrl.Run(ctx.Done())
+	// Run pvCtrl to avoid leaking goroutines started during its creation.
+	go pvCtrl.Run(ctx)
 
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
@@ -355,9 +360,6 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	}
 
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 20*time.Second, "expected non-zero pods in dsw if KeepTerminatedPodVolumesAnnotation is set", 1)
-
-	close(podStopCh)
-	close(stopCh)
 }
 
 // wait for the podInformer to observe the pods. Call this function before
@@ -485,7 +487,7 @@ func TestPodAddedByDswp(t *testing.T) {
 			},
 		},
 	}
-	testClient, ctrl, _, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
+	testClient, ctrl, pvCtrl, informers := createAdClients(t, server, defaultSyncPeriod, defaultTimerConfig)
 
 	ns := framework.CreateNamespaceOrDie(testClient, namespaceName, t)
 	defer framework.DeleteNamespaceOrDie(testClient, ns, t)
@@ -507,12 +509,16 @@ func TestPodAddedByDswp(t *testing.T) {
 	go podInformer.Run(podStopCh)
 
 	// start controller loop
-	stopCh := make(chan struct{})
-	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
-	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
-	go informers.Storage().V1().VolumeAttachments().Informer().Run(stopCh)
-	initCSIObjects(stopCh, informers)
-	go ctrl.Run(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(ctx.Done())
+	go informers.Core().V1().PersistentVolumes().Informer().Run(ctx.Done())
+	go informers.Storage().V1().VolumeAttachments().Informer().Run(ctx.Done())
+	initCSIObjects(ctx.Done(), informers)
+	go ctrl.Run(ctx.Done())
+	// Run pvCtrl to avoid leaking goroutines started during its creation.
+	go pvCtrl.Run(ctx)
 
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
@@ -542,8 +548,6 @@ func TestPodAddedByDswp(t *testing.T) {
 
 	// the findAndAddActivePods loop turns every 3 minute
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 200*time.Second, "expected 2 pods in dsw after pod addition", 2)
-
-	close(stopCh)
 }
 
 func TestPVCBoundWithADC(t *testing.T) {
@@ -596,6 +600,8 @@ func TestPVCBoundWithADC(t *testing.T) {
 
 	// start controller loop
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	informers.Start(ctx.Done())
 	informers.WaitForCacheSync(ctx.Done())
 	initCSIObjects(ctx.Done(), informers)
@@ -610,7 +616,6 @@ func TestPVCBoundWithADC(t *testing.T) {
 		createPVForPVC(t, testClient, pvc)
 	}
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 60*time.Second, "expected 4 pods in dsw after PVCs are bound", 4)
-	cancel()
 }
 
 // Create PV for PVC, pv controller will bind them together.

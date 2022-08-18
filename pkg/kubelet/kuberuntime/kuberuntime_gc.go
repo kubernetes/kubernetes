@@ -268,10 +268,10 @@ func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSour
 
 // evictSandboxes remove all evictable sandboxes. An evictable sandbox must
 // meet the following requirements:
-//   1. not in ready state
-//   2. contains no containers.
-//   3. belong to a non-existent (i.e., already removed) pod, or is not the
-//      most recently created sandbox for the pod.
+//  1. not in ready state
+//  2. contains no containers.
+//  3. belong to a non-existent (i.e., already removed) pod, or is not the
+//     most recently created sandbox for the pod.
 func (cgc *containerGC) evictSandboxes(evictNonDeletedPods bool) error {
 	containers, err := cgc.manager.getKubeletContainers(true)
 	if err != nil {

@@ -212,16 +212,12 @@ I output.go:<LINE>] "test" firstKey=1 secondKey=3
 			expectedOutput: `I output.go:<LINE>] "test"
 `,
 		},
-		// TODO: unify behavior of loggers.
-		// klog doesn't deduplicate, klogr and textlogger do. We can ensure via static code analysis
-		// that this doesn't occur, so we shouldn't pay the runtime overhead for deduplication here
-		// and remove that from klogr and textlogger (https://github.com/kubernetes/klog/issues/286).
-		// 		"print duplicate keys in arguments": {
-		// 			text:   "test",
-		// 			values: []interface{}{"akey", "avalue", "akey", "avalue2"},
-		// 			expectedOutput: `I output.go:<LINE>] "test" akey="avalue" akey="avalue2"
-		// `,
-		// 		},
+		"print duplicate keys in arguments": {
+			text:   "test",
+			values: []interface{}{"akey", "avalue", "akey", "avalue2"},
+			expectedOutput: `I output.go:<LINE>] "test" akey="avalue" akey="avalue2"
+`,
+		},
 		"preserve order of key/value pairs": {
 			withValues: []interface{}{"akey9", "avalue9", "akey8", "avalue8", "akey1", "avalue1"},
 			text:       "test",
@@ -268,6 +264,47 @@ I output.go:<LINE>] "test" firstKey=1 secondKey=3
 					&kmeta{Name: "pod-2", Namespace: "kube-system"},
 				})},
 			expectedOutput: `I output.go:<LINE>] "test" pods=[kube-system/pod-1 kube-system/pod-2]
+`,
+		},
+		"KObjSlice okay": {
+			text: "test",
+			values: []interface{}{"pods",
+				klog.KObjSlice([]interface{}{
+					&kmeta{Name: "pod-1", Namespace: "kube-system"},
+					&kmeta{Name: "pod-2", Namespace: "kube-system"},
+				})},
+			expectedOutput: `I output.go:<LINE>] "test" pods="[kube-system/pod-1 kube-system/pod-2]"
+`,
+		},
+		"KObjSlice nil arg": {
+			text: "test",
+			values: []interface{}{"pods",
+				klog.KObjSlice(nil)},
+			expectedOutput: `I output.go:<LINE>] "test" pods="[]"
+`,
+		},
+		"KObjSlice int arg": {
+			text: "test",
+			values: []interface{}{"pods",
+				klog.KObjSlice(1)},
+			expectedOutput: `I output.go:<LINE>] "test" pods="<KObjSlice needs a slice, got type int>"
+`,
+		},
+		"KObjSlice nil entry": {
+			text: "test",
+			values: []interface{}{"pods",
+				klog.KObjSlice([]interface{}{
+					&kmeta{Name: "pod-1", Namespace: "kube-system"},
+					nil,
+				})},
+			expectedOutput: `I output.go:<LINE>] "test" pods="[kube-system/pod-1 <nil>]"
+`,
+		},
+		"KObjSlice ints": {
+			text: "test",
+			values: []interface{}{"ints",
+				klog.KObjSlice([]int{1, 2, 3})},
+			expectedOutput: `I output.go:<LINE>] "test" ints="<KObjSlice needs a slice of values implementing KMetadata, got type int>"
 `,
 		},
 		"regular error types as value": {
@@ -321,7 +358,34 @@ I output.go:<LINE>] "test" firstKey=1 secondKey=3
 		"MarshalLog() that panics": {
 			text:   "marshaler panic",
 			values: []interface{}{"obj", faultyMarshaler{}},
-			expectedOutput: `I output.go:<LINE>] "marshaler panic" obj={}
+			expectedOutput: `I output.go:<LINE>] "marshaler panic" obj="<panic: fake MarshalLog panic>"
+`,
+		},
+		"MarshalLog() that returns itself": {
+			text:   "marshaler recursion",
+			values: []interface{}{"obj", recursiveMarshaler{}},
+			expectedOutput: `I output.go:<LINE>] "marshaler recursion" obj={}
+`,
+		},
+		"handle integer keys": {
+			withValues: []interface{}{1, "value", 2, "value2"},
+			text:       "integer keys",
+			values:     []interface{}{"akey", "avalue", "akey2"},
+			expectedOutput: `I output.go:<LINE>] "integer keys" %!s(int=1)="value" %!s(int=2)="value2" akey="avalue" akey2="(MISSING)"
+`,
+		},
+		"struct keys": {
+			withValues: []interface{}{struct{ name string }{"name"}, "value", "test", "other value"},
+			text:       "struct keys",
+			values:     []interface{}{"key", "val"},
+			expectedOutput: `I output.go:<LINE>] "struct keys" {name}="value" test="other value" key="val"
+`,
+		},
+		"map keys": {
+			withValues: []interface{}{},
+			text:       "map keys",
+			values:     []interface{}{map[string]bool{"test": true}, "test"},
+			expectedOutput: `I output.go:<LINE>] "map keys" map[test:%!s(bool=true)]="test"
 `,
 		},
 	}
@@ -764,6 +828,15 @@ func (f faultyMarshaler) MarshalLog() interface{} {
 }
 
 var _ logr.Marshaler = faultyMarshaler{}
+
+type recursiveMarshaler struct{}
+
+// MarshalLog returns itself, which could cause the logger to recurse infinitely.
+func (r recursiveMarshaler) MarshalLog() interface{} {
+	return r
+}
+
+var _ logr.Marshaler = recursiveMarshaler{}
 
 type faultyError struct{}
 

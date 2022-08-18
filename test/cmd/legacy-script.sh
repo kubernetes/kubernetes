@@ -41,6 +41,7 @@ source "${KUBE_ROOT}/test/cmd/debug.sh"
 source "${KUBE_ROOT}/test/cmd/delete.sh"
 source "${KUBE_ROOT}/test/cmd/diff.sh"
 source "${KUBE_ROOT}/test/cmd/discovery.sh"
+source "${KUBE_ROOT}/test/cmd/events.sh"
 source "${KUBE_ROOT}/test/cmd/exec.sh"
 source "${KUBE_ROOT}/test/cmd/generic-resources.sh"
 source "${KUBE_ROOT}/test/cmd/get.sh"
@@ -84,6 +85,7 @@ PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
 clusterroles="clusterroles"
 configmaps="configmaps"
 csr="csr"
+cronjob="cronjobs"
 deployments="deployments"
 namespaces="namespaces"
 nodes="nodes"
@@ -551,6 +553,14 @@ runTests() {
 
   if kube::test::if_supports_resource "${pods}" ; then
     record_command run_kubectl_get_tests
+  fi
+
+  ##################
+  # Kubectl events #
+  ##################
+
+  if kube::test::if_supports_resource "${cronjob}" ; then
+    record_command run_kubectl_events_tests
   fi
 
   ################

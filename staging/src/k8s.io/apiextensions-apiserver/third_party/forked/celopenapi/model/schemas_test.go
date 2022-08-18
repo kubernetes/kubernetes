@@ -107,8 +107,16 @@ func TestSchemaDeclTypes(t *testing.T) {
 			t.Errorf("missing type in rule types: %s", exp)
 			continue
 		}
-		if !proto.Equal(expType.ExprType(), actType.ExprType()) {
-			t.Errorf("incompatible CEL types. got=%v, wanted=%v", actType.ExprType(), expType.ExprType())
+		expT, err := expType.ExprType()
+		if err != nil {
+			t.Errorf("fail to get cel type: %s", err)
+		}
+		actT, err := actType.ExprType()
+		if err != nil {
+			t.Errorf("fail to get cel type: %s", err)
+		}
+		if !proto.Equal(expT, actT) {
+			t.Errorf("incompatible CEL types. got=%v, wanted=%v", expT, actT)
 		}
 	}
 }
@@ -501,4 +509,33 @@ func TestEstimateMaxLengthJSON(t *testing.T) {
 
 func maxPtr(max int64) *int64 {
 	return &max
+}
+
+func genNestedSchema(depth int) *schema.Structural {
+	var generator func(d int) schema.Structural
+	generator = func(d int) schema.Structural {
+		nodeTemplate := schema.Structural{
+			Generic: schema.Generic{
+				Type:                 "object",
+				AdditionalProperties: &schema.StructuralOrBool{},
+			},
+		}
+		if d == 1 {
+			return nodeTemplate
+		} else {
+			mapType := generator(d - 1)
+			nodeTemplate.Generic.AdditionalProperties.Structural = &mapType
+			return nodeTemplate
+		}
+	}
+	schema := generator(depth)
+	return &schema
+}
+
+func BenchmarkDeeplyNestedSchemaDeclType(b *testing.B) {
+	benchmarkSchema := genNestedSchema(10)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		SchemaDeclType(benchmarkSchema, false)
+	}
 }

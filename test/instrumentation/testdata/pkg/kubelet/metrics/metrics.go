@@ -28,28 +28,22 @@ import (
 
 // This const block defines the metric names for the kubelet metrics.
 const (
-	KubeletSubsystem             = "kubelet"
-	NodeNameKey                  = "node_name"
-	NodeLabelKey                 = "node"
-	PodWorkerDurationKey         = "pod_worker_duration_seconds"
-	PodStartDurationKey          = "pod_start_duration_seconds"
-	CgroupManagerOperationsKey   = "cgroup_manager_duration_seconds"
-	PodWorkerStartDurationKey    = "pod_worker_start_duration_seconds"
-	PLEGRelistDurationKey        = "pleg_relist_duration_seconds"
-	PLEGDiscardEventsKey         = "pleg_discard_events"
-	PLEGRelistIntervalKey        = "pleg_relist_interval_seconds"
-	PLEGLastSeenKey              = "pleg_last_seen_seconds"
-	EvictionsKey                 = "evictions"
-	EvictionStatsAgeKey          = "eviction_stats_age_seconds"
-	PreemptionsKey               = "preemptions"
-	VolumeStatsCapacityBytesKey  = "volume_stats_capacity_bytes"
-	VolumeStatsAvailableBytesKey = "volume_stats_available_bytes"
-	VolumeStatsUsedBytesKey      = "volume_stats_used_bytes"
-	VolumeStatsInodesKey         = "volume_stats_inodes"
-	VolumeStatsInodesFreeKey     = "volume_stats_inodes_free"
-	VolumeStatsInodesUsedKey     = "volume_stats_inodes_used"
-	RunningPodsKey               = "running_pods"
-	RunningContainersKey         = "running_containers"
+	KubeletSubsystem           = "kubelet"
+	NodeNameKey                = "node_name"
+	NodeLabelKey               = "node"
+	PodWorkerDurationKey       = "pod_worker_duration_seconds"
+	PodStartDurationKey        = "pod_start_duration_seconds"
+	CgroupManagerOperationsKey = "cgroup_manager_duration_seconds"
+	PodWorkerStartDurationKey  = "pod_worker_start_duration_seconds"
+	PLEGRelistDurationKey      = "pleg_relist_duration_seconds"
+	PLEGDiscardEventsKey       = "pleg_discard_events"
+	PLEGRelistIntervalKey      = "pleg_relist_interval_seconds"
+	PLEGLastSeenKey            = "pleg_last_seen_seconds"
+	EvictionsKey               = "evictions"
+	EvictionStatsAgeKey        = "eviction_stats_age_seconds"
+	PreemptionsKey             = "preemptions"
+	RunningPodsKey             = "running_pods"
+	RunningContainersKey       = "running_containers"
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
 	RuntimeOperationsDurationKey = "runtime_operations_duration_seconds"
@@ -70,6 +64,7 @@ const (
 )
 
 var (
+	defObjectives = map[float64]float64{0.5: 0.5, 0.75: 0.75}
 	// NodeName is a Gauge that tracks the ode's name. The count is always 1.
 	NodeName = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
@@ -160,10 +155,10 @@ var (
 	PLEGRelistInterval = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           PLEGRelistIntervalKey,
+			Name:           "test_histogram_metric",
 			Help:           "Interval in seconds between relisting in PLEG.",
 			Buckets:        metrics.DefBuckets,
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.STABLE,
 		},
 	)
 	// PLEGLastSeen is a Gauge giving the Unix timestamp when the Kubelet's
@@ -265,6 +260,32 @@ var (
 			Help:           "Duration in seconds to serve a device plugin Allocation request. Broken down by resource name.",
 			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource_name"},
+	)
+
+	// TestSummary is a Summary that tracks the cumulative number of device plugin registrations.
+	// Broken down by resource name.
+	TestSummary = metrics.NewSummary(
+		&metrics.SummaryOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "summary_metric_test",
+			Help:           "Cumulative number of device plugin registrations. Broken down by resource name.",
+			StabilityLevel: metrics.STABLE,
+		},
+	)
+	// TestSummaryVec is a NewSummaryVec that tracks the duration (in seconds) to serve a device plugin allocation request.
+	// Broken down by resource name.
+	TestSummaryVec = metrics.NewSummaryVec(
+		&metrics.SummaryOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "summary_vec_metric_test",
+			Help:           "Duration in seconds to serve a device plugin Allocation request. Broken down by resource name.",
+			Objectives:     defObjectives,
+			MaxAge:         metrics.DefMaxAge,
+			AgeBuckets:     metrics.DefAgeBuckets,
+			BufCap:         metrics.DefBufCap,
+			StabilityLevel: metrics.STABLE,
 		},
 		[]string{"resource_name"},
 	)

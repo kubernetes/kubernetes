@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -94,6 +93,8 @@ const (
 
 var metadataAccessor = meta.NewAccessor()
 
+var attachFunc = attach.DefaultAttachFunc
+
 type RunObject struct {
 	Object  runtime.Object
 	Mapping *meta.RESTMapping
@@ -105,7 +106,6 @@ type RunOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
-	DeleteFlags   *cmddelete.DeleteFlags
 	DeleteOptions *cmddelete.DeleteOptions
 
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -135,7 +135,6 @@ type RunOptions struct {
 func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 	return &RunOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-		DeleteFlags: cmddelete.NewDeleteFlags("to use to replace the resource."),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -159,7 +158,6 @@ func NewCmdRun(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 		},
 	}
 
-	o.DeleteFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
 
@@ -226,17 +224,16 @@ func (o *RunOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	deleteOpts, err := o.DeleteFlags.ToOptions(dynamicClient, o.IOStreams)
-	if err != nil {
-		return err
+	o.DeleteOptions = &cmddelete.DeleteOptions{
+		CascadingStrategy: metav1.DeletePropagationBackground,
+		DynamicClient:     dynamicClient,
+		GracePeriod:       -1,
+		IgnoreNotFound:    true,
+		IOStreams:         o.IOStreams,
+		Quiet:             o.Quiet,
+		Timeout:           time.Duration(0),
+		WaitForDeletion:   false,
 	}
-
-	deleteOpts.IgnoreNotFound = true
-	deleteOpts.WaitForDeletion = false
-	deleteOpts.GracePeriod = -1
-	deleteOpts.Quiet = o.Quiet
-
-	o.DeleteOptions = deleteOpts
 
 	return nil
 }
@@ -325,7 +322,11 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	if o.Attach {
 		if remove {
-			defer o.removeCreatedObjects(f, createdObjects)
+			defer func() {
+				if err := o.removeCreatedObjects(f, createdObjects); err != nil {
+					fmt.Fprintf(o.ErrOut, "Delete failed: %v\n", err)
+				}
+			}()
 		}
 
 		opts := &attach.AttachOptions{
@@ -345,9 +346,9 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			return err
 		}
 		opts.Config = config
-		opts.AttachFunc = attach.DefaultAttachFunc
+		opts.AttachFunc = attachFunc
 
-		clientset, err := kubernetes.NewForConfig(config)
+		clientset, err := f.KubernetesClientSet()
 		if err != nil {
 			return err
 		}
@@ -486,7 +487,7 @@ func handleAttachPod(f cmdutil.Factory, podClient corev1client.PodsGetter, ns, n
 	}
 
 	if err := opts.Run(); err != nil {
-		fmt.Fprintf(opts.ErrOut, "Error attaching, falling back to logs: %v\n", err)
+		fmt.Fprintf(opts.ErrOut, "warning: couldn't attach to pod/%s, falling back to streaming logs: %v\n", name, err)
 		return logOpts(f, pod, opts)
 	}
 	return nil

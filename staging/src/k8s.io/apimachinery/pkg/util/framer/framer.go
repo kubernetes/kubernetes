@@ -56,10 +56,10 @@ type lengthDelimitedFrameReader struct {
 //
 // The protocol is:
 //
-//   stream: message ...
-//   message: prefix body
-//   prefix: 4 byte uint32 in BigEndian order, denotes length of body
-//   body: bytes (0..prefix)
+//	stream: message ...
+//	message: prefix body
+//	prefix: 4 byte uint32 in BigEndian order, denotes length of body
+//	body: bytes (0..prefix)
 //
 // If the buffer passed to Read is not long enough to contain an entire frame, io.ErrShortRead
 // will be returned along with the number of bytes read.

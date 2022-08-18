@@ -31,6 +31,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
+var supportedScoringStrategyTypes = sets.NewString(
+	string(config.LeastAllocated),
+	string(config.MostAllocated),
+	string(config.RequestedToCapacityRatio),
+)
+
 // ValidateDefaultPreemptionArgs validates that DefaultPreemptionArgs are correct.
 func ValidateDefaultPreemptionArgs(path *field.Path, args *config.DefaultPreemptionArgs) error {
 	var allErrs field.ErrorList
@@ -304,10 +310,14 @@ func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFi
 		}
 	}
 
+	strategyPath := path.Child("scoringStrategy")
 	if args.ScoringStrategy != nil {
-		allErrs = append(allErrs, validateResources(args.ScoringStrategy.Resources, path.Child("resources"))...)
+		if !supportedScoringStrategyTypes.Has(string(args.ScoringStrategy.Type)) {
+			allErrs = append(allErrs, field.NotSupported(strategyPath.Child("type"), args.ScoringStrategy.Type, supportedScoringStrategyTypes.List()))
+		}
+		allErrs = append(allErrs, validateResources(args.ScoringStrategy.Resources, strategyPath.Child("resources"))...)
 		if args.ScoringStrategy.RequestedToCapacityRatio != nil {
-			allErrs = append(allErrs, validateFunctionShape(args.ScoringStrategy.RequestedToCapacityRatio.Shape, path.Child("shape"))...)
+			allErrs = append(allErrs, validateFunctionShape(args.ScoringStrategy.RequestedToCapacityRatio.Shape, strategyPath.Child("shape"))...)
 		}
 	}
 

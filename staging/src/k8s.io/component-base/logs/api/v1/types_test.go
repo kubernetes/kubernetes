@@ -228,7 +228,7 @@ func notZeroRecursive(t *testing.T, i interface{}, path string) bool {
 	kind := typeOfI.Kind()
 	value := reflect.ValueOf(i)
 	switch kind {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if !notZeroRecursive(t, value.Elem().Interface(), path) {
 			valid = false
 		}

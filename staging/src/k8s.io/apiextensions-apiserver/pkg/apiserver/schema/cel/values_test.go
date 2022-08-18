@@ -621,44 +621,48 @@ func TestMapper(t *testing.T) {
 }
 
 func BenchmarkUnstructuredToVal(b *testing.B) {
+	u := []interface{}{
+		map[string]interface{}{
+			"key": "a",
+			"val": 1,
+		},
+		map[string]interface{}{
+			"key": "b",
+			"val": 2,
+		},
+		map[string]interface{}{
+			"key": "@b",
+			"val": 2,
+		},
+	}
+
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		if val := UnstructuredToVal([]interface{}{
-			map[string]interface{}{
-				"key": "a",
-				"val": 1,
-			},
-			map[string]interface{}{
-				"key": "b",
-				"val": 2,
-			},
-			map[string]interface{}{
-				"key": "@b",
-				"val": 2,
-			},
-		}, &mapListSchema); val == nil {
+		if val := UnstructuredToVal(u, &mapListSchema); val == nil {
 			b.Fatal(val)
 		}
 	}
 }
 
 func BenchmarkUnstructuredToValWithEscape(b *testing.B) {
+	u := []interface{}{
+		map[string]interface{}{
+			"key": "a.1",
+			"val": "__i.1",
+		},
+		map[string]interface{}{
+			"key": "b.1",
+			"val": 2,
+		},
+	}
+
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for n := 0; n < b.N; n++ {
-		if val := UnstructuredToVal([]interface{}{
-			map[string]interface{}{
-				"key": "a.1",
-				"val": "__i.1",
-			},
-			map[string]interface{}{
-				"key": "b.1",
-				"val": 2,
-			},
-		}, &mapListSchema); val == nil {
+		if val := UnstructuredToVal(u, &mapListSchema); val == nil {
 			b.Fatal(val)
 		}
 	}

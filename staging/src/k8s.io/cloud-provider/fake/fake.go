@@ -53,6 +53,7 @@ var _ cloudprovider.Routes = (*Cloud)(nil)
 var _ cloudprovider.Zones = (*Cloud)(nil)
 var _ cloudprovider.PVLabeler = (*Cloud)(nil)
 var _ cloudprovider.Clusters = (*Cloud)(nil)
+var _ cloudprovider.InstancesV2 = (*Cloud)(nil)
 
 // Cloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
 type Cloud struct {
@@ -92,6 +93,8 @@ type Cloud struct {
 	addCallLock   sync.Mutex
 	cloudprovider.Zone
 	VolumeLabelMap map[string]map[string]string
+
+	OverrideInstanceMetadata func(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error)
 
 	RequestDelay time.Duration
 }
@@ -328,6 +331,9 @@ func (f *Cloud) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, erro
 
 // InstanceMetadata returns metadata of the specified instance.
 func (f *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+	if f.OverrideInstanceMetadata != nil {
+		return f.OverrideInstanceMetadata(ctx, node)
+	}
 	f.addCall("instance-metadata-by-provider-id")
 	f.addressesMux.Lock()
 	defer f.addressesMux.Unlock()

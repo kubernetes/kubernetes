@@ -29,12 +29,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eingress "k8s.io/kubernetes/test/e2e/framework/ingress"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -448,7 +448,12 @@ func generateScaleTestServiceSpec(suffix string) *v1.Service {
 func generateScaleTestBackendDeploymentSpec(numReplicas int32) *appsv1.Deployment {
 	d := e2edeployment.NewDeployment(
 		scaleTestBackendName, numReplicas, scaleTestLabels, scaleTestBackendName,
-		imageutils.GetE2EImage(imageutils.EchoServer), appsv1.RollingUpdateDeploymentStrategyType)
+		imageutils.GetE2EImage(imageutils.Agnhost), appsv1.RollingUpdateDeploymentStrategyType)
+	d.Spec.Template.Spec.Containers[0].Command = []string{
+		"/agnhost",
+		"netexec",
+		"--http-port=8080",
+	}
 	d.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 8080}}
 	d.Spec.Template.Spec.Containers[0].ReadinessProbe = &v1.Probe{
 		ProbeHandler: v1.ProbeHandler{

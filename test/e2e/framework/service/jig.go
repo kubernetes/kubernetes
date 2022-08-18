@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -961,10 +961,10 @@ func (j *TestJig) checkClusterIPServiceReachability(svc *v1.Service, pod *v1.Pod
 }
 
 // checkNodePortServiceReachability ensures that service of type nodePort are reachable
-// - Internal clients should be reachable to service over -
-//   	ServiceName:ServicePort, ClusterIP:ServicePort and NodeInternalIPs:NodePort
-// - External clients should be reachable to service over -
-//   	NodePublicIPs:NodePort
+//   - Internal clients should be reachable to service over -
+//     ServiceName:ServicePort, ClusterIP:ServicePort and NodeInternalIPs:NodePort
+//   - External clients should be reachable to service over -
+//     NodePublicIPs:NodePort
 func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod) error {
 	clusterIP := svc.Spec.ClusterIP
 	servicePorts := svc.Spec.Ports

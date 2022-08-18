@@ -21,7 +21,8 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/known/anypb"
+
+	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
 // Equal returns whether two proto.Message instances are equal using the following criteria:

@@ -43,8 +43,9 @@ type ContainerManager interface {
 	ListContainers(filter *runtimeapi.ContainerFilter) ([]*runtimeapi.Container, error)
 	// ContainerStatus returns the status of the container.
 	ContainerStatus(containerID string, verbose bool) (*runtimeapi.ContainerStatusResponse, error)
-	// UpdateContainerResources updates the cgroup resources for the container.
-	UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error
+	// UpdateContainerResources updates ContainerConfig of the container synchronously.
+	// If runtime fails to transactionally update the requested resources, an error is returned.
+	UpdateContainerResources(containerID string, resources *runtimeapi.ContainerResources) error
 	// ExecSync executes a command in the container, and returns the stdout output.
 	// If command exits with a non-zero exit code, an error is returned.
 	ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error)
@@ -56,6 +57,10 @@ type ContainerManager interface {
 	// for the container. If it returns error, new container log file MUST NOT
 	// be created.
 	ReopenContainerLog(ContainerID string) error
+	// CheckpointContainer checkpoints a container
+	CheckpointContainer(options *runtimeapi.CheckpointContainerRequest) error
+	// GetContainerEvents gets container events from the CRI runtime
+	GetContainerEvents(containerEventsCh chan *runtimeapi.ContainerEventResponse) error
 }
 
 // PodSandboxManager contains methods for operating on PodSandboxes. The methods

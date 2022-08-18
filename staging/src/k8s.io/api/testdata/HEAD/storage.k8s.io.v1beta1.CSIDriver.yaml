@@ -37,6 +37,7 @@ spec:
   fsGroupPolicy: fsGroupPolicyValue
   podInfoOnMount: true
   requiresRepublish: true
+  seLinuxMount: true
   storageCapacity: true
   tokenRequests:
   - audience: audienceValue

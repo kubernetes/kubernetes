@@ -106,7 +106,7 @@ type ReplaceOptions struct {
 func NewReplaceOptions(streams genericclioptions.IOStreams) *ReplaceOptions {
 	return &ReplaceOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("replaced"),
-		DeleteFlags: delete.NewDeleteFlags("to use to replace the resource."),
+		DeleteFlags: delete.NewDeleteFlags("The files that contain the configurations to replace."),
 
 		IOStreams: streams,
 	}
@@ -227,8 +227,12 @@ func (o *ReplaceOptions) Validate() error {
 		return fmt.Errorf("--timeout must have --force specified")
 	}
 
+	if o.DeleteOptions.ForceDeletion && o.DryRunStrategy != cmdutil.DryRunNone {
+		return fmt.Errorf("--dry-run can not be used when --force is set")
+	}
+
 	if cmdutil.IsFilenameSliceEmpty(o.DeleteOptions.FilenameOptions.Filenames, o.DeleteOptions.FilenameOptions.Kustomize) {
-		return fmt.Errorf("Must specify --filename to replace")
+		return fmt.Errorf("must specify --filename to replace")
 	}
 
 	if len(o.Raw) > 0 {

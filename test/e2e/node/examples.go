@@ -36,7 +36,7 @@ import (
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (

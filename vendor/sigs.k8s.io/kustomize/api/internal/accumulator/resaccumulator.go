@@ -107,7 +107,6 @@ func (ra *ResAccumulator) findVarValueFromResources(v types.Var) (interface{}, e
 	for _, res := range ra.resMap.Resources() {
 		for _, varName := range res.GetRefVarNames() {
 			if varName == v.Name {
-				//nolint: staticcheck
 				s, err := res.GetFieldValue(v.FieldRef.FieldPath)
 				if err != nil {
 					return "", fmt.Errorf(

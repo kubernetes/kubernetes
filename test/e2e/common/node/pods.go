@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -53,8 +54,9 @@ import (
 	e2ewebsocket "k8s.io/kubernetes/test/e2e/framework/websocket"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/pointer"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -1067,6 +1069,57 @@ var _ = SIGDescribe("Pods", func() {
 		if !apierrors.IsNotFound(err) {
 			framework.Failf("expected IsNotFound error, got %#v", err)
 		}
+	})
+
+	/*
+		Release: v1.25
+		Testname: Pods, patching status
+		Description: A pod is created which MUST succeed
+		and be found running. The pod status when patched
+		MUST succeed. Given the patching of the pod status,
+		the fields MUST equal the new values.
+	*/
+	framework.ConformanceIt("should patch a pod status", func() {
+		ns := f.Namespace.Name
+		podClient := f.ClientSet.CoreV1().Pods(ns)
+		podName := "pod-" + utilrand.String(5)
+		label := map[string]string{"e2e": podName}
+
+		ginkgo.By("Create a pod")
+		testPod := e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   podName,
+				Labels: label,
+			},
+			Spec: v1.PodSpec{
+				TerminationGracePeriodSeconds: pointer.Int64(1),
+				Containers: []v1.Container{
+					{
+						Name:  "agnhost",
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					},
+				},
+			},
+		})
+		pod, err := podClient.Create(context.TODO(), testPod, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create Pod %v in namespace %v", testPod.ObjectMeta.Name, ns)
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod), "Pod didn't start within time out period")
+
+		ginkgo.By("patching /status")
+		podStatus := v1.PodStatus{
+			Message: "Patched by e2e test",
+			Reason:  "E2E",
+		}
+		pStatusJSON, err := json.Marshal(podStatus)
+		framework.ExpectNoError(err, "Failed to marshal. %v", podStatus)
+
+		pStatus, err := podClient.Patch(context.TODO(), podName, types.MergePatchType,
+			[]byte(`{"metadata":{"annotations":{"patchedstatus":"true"}},"status":`+string(pStatusJSON)+`}`),
+			metav1.PatchOptions{}, "status")
+		framework.ExpectNoError(err, "failed to patch pod: %q", podName)
+		framework.ExpectEqual(pStatus.Status.Message, "Patched by e2e test", fmt.Sprintf("Status.Message for %q was %q but expected it to be \"Patched by e2e test\"", podName, pStatus.Status.Message))
+		framework.ExpectEqual(pStatus.Status.Reason, "E2E", fmt.Sprintf("Status.Reason for %q was %q but expected it to be \"E2E\"", podName, pStatus.Status.Reason))
+		framework.Logf("Status Message: %q and Reason: %q", pStatus.Status.Message, pStatus.Status.Reason)
 	})
 })
 

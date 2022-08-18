@@ -26,9 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
-	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 
@@ -145,8 +144,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 	/*
 		Release: v1.16
-		Testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in object
-		Description: Register a custom resource definition with x-preserve-unknown-fields in the top level object.
+		Testname: Custom Resource OpenAPI Publish, with x-kubernetes-preserve-unknown-fields in object
+		Description: Register a custom resource definition with x-kubernetes-preserve-unknown-fields in the top level object.
 		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST contain a valid DESCRIPTION stanza.
 	*/
@@ -186,8 +185,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 	/*
 		Release: v1.16
-		Testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields at root
-		Description: Register a custom resource definition with x-preserve-unknown-fields in the schema root.
+		Testname: Custom Resource OpenAPI Publish, with x-kubernetes-preserve-unknown-fields at root
+		Description: Register a custom resource definition with x-kubernetes-preserve-unknown-fields in the schema root.
 		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST show the custom resource KIND.
 	*/
@@ -227,8 +226,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", fu
 
 	/*
 		Release: v1.16
-		Testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in embedded object
-		Description: Register a custom resource definition with x-preserve-unknown-fields in an embedded object.
+		Testname: Custom Resource OpenAPI Publish, with x-kubernetes-preserve-unknown-fields in embedded object
+		Description: Register a custom resource definition with x-kubernetes-preserve-unknown-fields in an embedded object.
 		Attempt to create and apply a change a custom resource, via kubectl; kubectl validation MUST accept unknown
 		properties. Attempt kubectl explain; the output MUST show that x-preserve-unknown-properties is used on the
 		nested field.
@@ -696,7 +695,7 @@ func convertJSONSchemaProps(in []byte, out *spec.Schema) error {
 	if err := apiextensionsv1.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(&external, &internal, nil); err != nil {
 		return err
 	}
-	kubeOut := kubeopenapispec.Schema{}
+	kubeOut := spec.Schema{}
 	if err := validation.ConvertJSONSchemaPropsWithPostProcess(&internal, &kubeOut, validation.StripUnsupportedFormatsPostProcess); err != nil {
 		return err
 	}

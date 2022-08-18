@@ -418,41 +418,44 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // or the secure port cannot be listened on initially.
 // This is the diagram of what channels/signals are dependent on each other:
 //
-//                                  stopCh
-//                                    |
-//           ---------------------------------------------------------
-//           |                                                       |
-//    ShutdownInitiated (shutdownInitiatedCh)                        |
-//           |                                                       |
-// (ShutdownDelayDuration)                                    (PreShutdownHooks)
-//           |                                                       |
-//  AfterShutdownDelayDuration (delayedStopCh)   PreShutdownHooksStopped (preShutdownHooksHasStoppedCh)
-//           |                                                       |
-//           |-------------------------------------------------------|
-//                                    |
-//                                    |
-//               NotAcceptingNewRequest (notAcceptingNewRequestCh)
-//                                    |
-//                                    |
-//           |---------------------------------------------------------|
-//           |                        |              |                 |
-//        [without                 [with             |                 |
-// ShutdownSendRetryAfter]  ShutdownSendRetryAfter]  |                 |
-//           |                        |              |                 |
-//           |                        ---------------|                 |
-//           |                                       |                 |
-//           |                         (HandlerChainWaitGroup::Wait)   |
-//           |                                       |                 |
-//           |                    InFlightRequestsDrained (drainedCh)  |
-//           |                                       |                 |
-//           ----------------------------------------|-----------------|
-//                                 |                 |
-//                       stopHttpServerCh     (AuditBackend::Shutdown())
-//                                 |
-//                       listenerStoppedCh
-//                                 |
-//      HTTPServerStoppedListening (httpServerStoppedListeningCh)
+//	                              stopCh
+//	                                |
+//	       ---------------------------------------------------------
+//	       |                                                       |
+//	ShutdownInitiated (shutdownInitiatedCh)                        |
+//	       |                                                       |
 //
+// (ShutdownDelayDuration)                                    (PreShutdownHooks)
+//
+//	         |                                                       |
+//	AfterShutdownDelayDuration (delayedStopCh)   PreShutdownHooksStopped (preShutdownHooksHasStoppedCh)
+//	         |                                                       |
+//	         |-------------------------------------------------------|
+//	                                  |
+//	                                  |
+//	             NotAcceptingNewRequest (notAcceptingNewRequestCh)
+//	                                  |
+//	                                  |
+//	         |---------------------------------------------------------|
+//	         |                        |              |                 |
+//	      [without                 [with             |                 |
+//
+// ShutdownSendRetryAfter]  ShutdownSendRetryAfter]  |                 |
+//
+//	     |                        |              |                 |
+//	     |                        ---------------|                 |
+//	     |                                       |                 |
+//	     |                         (HandlerChainWaitGroup::Wait)   |
+//	     |                                       |                 |
+//	     |                    InFlightRequestsDrained (drainedCh)  |
+//	     |                                       |                 |
+//	     ----------------------------------------|-----------------|
+//	                           |                 |
+//	                 stopHttpServerCh     (AuditBackend::Shutdown())
+//	                           |
+//	                 listenerStoppedCh
+//	                           |
+//	HTTPServerStoppedListening (httpServerStoppedListeningCh)
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
 	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
@@ -497,7 +500,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	if s.ShutdownSendRetryAfter {
 		// when this mode is enabled, we do the following:
 		// - the server will continue to listen until all existing requests in flight
-		//   (not including active long runnning requests) have been drained.
+		//   (not including active long running requests) have been drained.
 		// - once drained, http Server Shutdown is invoked with a timeout of 2s,
 		//   net/http waits for 1s for the peer to respond to a GO_AWAY frame, so
 		//   we should wait for a minimum of 2s

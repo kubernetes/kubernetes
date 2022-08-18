@@ -44,17 +44,18 @@ popd >/dev/null
 
 cd "${KUBE_ROOT}"
 
-# The config is in ${KUBE_ROOT}/.golangci.yaml where it will be found
-# even when golangci-lint is invoked in a sub-directory.
-#
-# The logcheck plugin currently has to be configured via env variables
-# (https://github.com/golangci/golangci-lint/issues/1512).
-#
-# Remember to clean the golangci-lint cache when changing
-# the configuration and running this script multiple times,
-# otherwise golangci-lint will report stale results:
-# _output/local/bin/golangci-lint cache clean
+## The config is in ${KUBE_ROOT}/.golangci.yaml where it will be found
+## even when golangci-lint is invoked in a sub-directory.
+##
+## The logcheck plugin currently has to be configured via env variables
+## (https://github.com/golangci/golangci-lint/issues/1512).
+##
+## Remember to clean the golangci-lint cache when changing
+## the configuration and running this script multiple times,
+## otherwise golangci-lint will report stale results:
+## _output/local/bin/golangci-lint cache clean
 export LOGCHECK_CONFIG="${KUBE_ROOT}/hack/logcheck.conf"
+
 echo 'running golangci-lint ' >&2
 res=0
 if [[ "$#" -gt 0 ]]; then

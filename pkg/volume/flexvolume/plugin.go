@@ -287,6 +287,10 @@ func (plugin *flexVolumePlugin) SupportsBulkVolumeVerification() bool {
 	return false
 }
 
+func (plugin *flexVolumePlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bool, error) {
+	return false, nil
+}
+
 // Returns true iff the given command is known to be unsupported.
 func (plugin *flexVolumePlugin) isUnsupported(command string) bool {
 	plugin.Lock()

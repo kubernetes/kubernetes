@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,7 +49,7 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 
 	ns := driverNamespace.Name
 
-	podEventLog := ginkgo.GinkgoWriter
+	var podEventLog io.Writer = ginkgo.GinkgoWriter
 	var podEventLogCloser io.Closer
 	to := podlogs.LogOutput{
 		StatusWriter: ginkgo.GinkgoWriter,
@@ -57,14 +57,17 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 	if framework.TestContext.ReportDir == "" {
 		to.LogWriter = ginkgo.GinkgoWriter
 	} else {
-		test := ginkgo.CurrentGinkgoTestDescription()
+		test := ginkgo.CurrentSpecReport()
 		// Clean up each individual component text such that
 		// it contains only characters that are valid as file
 		// name.
 		reg := regexp.MustCompile("[^a-zA-Z0-9_-]+")
-		var components []string
-		for _, component := range test.ComponentTexts {
-			components = append(components, reg.ReplaceAllString(component, "_"))
+		var testName []string
+		for _, text := range test.ContainerHierarchyTexts {
+			testName = append(testName, reg.ReplaceAllString(text, "_"))
+			if len(test.LeafNodeText) > 0 {
+				testName = append(testName, reg.ReplaceAllString(test.LeafNodeText, "_"))
+			}
 		}
 		// We end the prefix with a slash to ensure that all logs
 		// end up in a directory named after the current test.
@@ -74,7 +77,7 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 		// keeps each directory name smaller (the full test
 		// name at one point exceeded 256 characters, which was
 		// too much for some filesystems).
-		logDir := framework.TestContext.ReportDir + "/" + strings.Join(components, "/")
+		logDir := framework.TestContext.ReportDir + "/" + strings.Join(testName, "/")
 		to.LogPathPrefix = logDir + "/"
 
 		err := os.MkdirAll(logDir, 0755)

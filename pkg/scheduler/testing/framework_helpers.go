@@ -18,7 +18,6 @@ package testing
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -29,7 +28,7 @@ import (
 var configDecoder = scheme.Codecs.UniversalDecoder()
 
 // NewFramework creates a Framework from the register functions and options.
-func NewFramework(fns []RegisterPluginFunc, profileName string, opts ...runtime.Option) (framework.Framework, error) {
+func NewFramework(fns []RegisterPluginFunc, profileName string, stopCh <-chan struct{}, opts ...runtime.Option) (framework.Framework, error) {
 	registry := runtime.Registry{}
 	profile := &schedulerapi.KubeSchedulerProfile{
 		SchedulerName: profileName,
@@ -38,7 +37,7 @@ func NewFramework(fns []RegisterPluginFunc, profileName string, opts ...runtime.
 	for _, f := range fns {
 		f(&registry, profile)
 	}
-	return runtime.NewFramework(registry, profile, wait.NeverStop, opts...)
+	return runtime.NewFramework(registry, profile, stopCh, opts...)
 }
 
 // RegisterPluginFunc is a function signature used in method RegisterFilterPlugin()

@@ -337,6 +337,7 @@ type PersistentVolumeSpec struct {
 	// claim.VolumeName is the authoritative bind between PV and PVC.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding
 	// +optional
+	// +structType=granular
 	ClaimRef *ObjectReference `json:"claimRef,omitempty" protobuf:"bytes,4,opt,name=claimRef"`
 	// persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim.
 	// Valid options are Retain (default for manually created PersistentVolumes), Delete (default
@@ -2333,12 +2334,12 @@ type Container struct {
 	// Cannot be updated.
 	// +optional
 	WorkingDir string `json:"workingDir,omitempty" protobuf:"bytes,5,opt,name=workingDir"`
-	// List of ports to expose from the container. Exposing a port here gives
-	// the system additional information about the network connections a
-	// container uses, but is primarily informational. Not specifying a port here
+	// List of ports to expose from the container. Not specifying a port here
 	// DOES NOT prevent that port from being exposed. Any port which is
 	// listening on the default "0.0.0.0" address inside a container will be
 	// accessible from the network.
+	// Modifying this array with strategic merge patch may corrupt the data.
+	// For more information See https://github.com/kubernetes/kubernetes/issues/108255.
 	// Cannot be updated.
 	// +optional
 	// +patchMergeKey=containerPort
@@ -2653,6 +2654,10 @@ const (
 	PodReady PodConditionType = "Ready"
 	// PodScheduled represents status of the scheduling process for this pod.
 	PodScheduled PodConditionType = "PodScheduled"
+	// AlphaNoCompatGuaranteeDisruptionTarget indicates the pod is about to be deleted due to a
+	// disruption (such as preemption, eviction API or garbage-collection).
+	// The constant is to be renamed once the name is accepted within the KEP-3329.
+	AlphaNoCompatGuaranteeDisruptionTarget PodConditionType = "DisruptionTarget"
 )
 
 // These are reasons for a pod's transition to a condition.
@@ -3090,7 +3095,6 @@ type PodSpec struct {
 	// pod to perform user-initiated actions such as debugging. This list cannot be specified when
 	// creating a pod, and it cannot be modified by updating the pod spec. In order to add an
 	// ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.
-	// This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
@@ -3286,6 +3290,7 @@ type PodSpec struct {
 	// If the OS field is set to windows, following fields must be unset:
 	// - spec.hostPID
 	// - spec.hostIPC
+	// - spec.hostUsers
 	// - spec.securityContext.seLinuxOptions
 	// - spec.securityContext.seccompProfile
 	// - spec.securityContext.fsGroup
@@ -3305,8 +3310,19 @@ type PodSpec struct {
 	// - spec.containers[*].securityContext.runAsUser
 	// - spec.containers[*].securityContext.runAsGroup
 	// +optional
-	// This is a beta field and requires the IdentifyPodOS feature
 	OS *PodOS `json:"os,omitempty" protobuf:"bytes,36,opt,name=os"`
+	// Use the host's user namespace.
+	// Optional: Default to true.
+	// If set to true or not present, the pod will be run in the host user namespace, useful
+	// for when the pod needs a feature only available to the host user namespace, such as
+	// loading a kernel module with CAP_SYS_MODULE.
+	// When set to false, a new userns is created for the pod. Setting false is useful for
+	// mitigating container breakout vulnerabilities even allowing users to run their
+	// containers as root without actually having root privileges on the host.
+	// This field is alpha-level and is only honored by servers that enable the UserNamespacesSupport feature.
+	// +k8s:conversion-gen=false
+	// +optional
+	HostUsers *bool `json:"hostUsers,omitempty" protobuf:"bytes,37,opt,name=hostUsers"`
 }
 
 // OSName is the set of OS'es that can be used in OS.
@@ -3434,7 +3450,7 @@ type TopologySpreadConstraint struct {
 	// because computed skew will be 3(3 - 0) if new Pod is scheduled to any of the three zones,
 	// it will violate MaxSkew.
 	//
-	// This is an alpha field and requires enabling MinDomainsInPodTopologySpread feature gate.
+	// This is a beta field and requires the MinDomainsInPodTopologySpread feature gate to be enabled (enabled by default).
 	// +optional
 	MinDomains *int32 `json:"minDomains,omitempty" protobuf:"varint,5,opt,name=minDomains"`
 	// NodeAffinityPolicy indicates how we will treat Pod's nodeAffinity/nodeSelector
@@ -3456,6 +3472,15 @@ type TopologySpreadConstraint struct {
 	// This is a alpha-level feature enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
 	// +optional
 	NodeTaintsPolicy *NodeInclusionPolicy `json:"nodeTaintsPolicy,omitempty" protobuf:"bytes,7,opt,name=nodeTaintsPolicy"`
+	// MatchLabelKeys is a set of pod label keys to select the pods over which
+	// spreading will be calculated. The keys are used to lookup values from the
+	// incoming pod labels, those key-value labels are ANDed with labelSelector
+	// to select the group of existing pods over which spreading will be calculated
+	// for the incoming pod. Keys that don't exist in the incoming pod labels will
+	// be ignored. A null or empty list means only match against labelSelector.
+	// +listType=atomic
+	// +optional
+	MatchLabelKeys []string `json:"matchLabelKeys,omitempty" protobuf:"bytes,8,opt,name=matchLabelKeys"`
 }
 
 const (
@@ -3647,7 +3672,8 @@ type PodDNSConfigOption struct {
 
 // IP address information for entries in the (plural) PodIPs field.
 // Each entry includes:
-//    IP: An IP address allocated to the pod. Routable at least within the cluster.
+//
+//	IP: An IP address allocated to the pod. Routable at least within the cluster.
 type PodIP struct {
 	// ip is an IP address (IPv4 or IPv6) assigned to the pod
 	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
@@ -3804,8 +3830,6 @@ var _ = Container(EphemeralContainerCommon{})
 //
 // To add an ephemeral container, use the ephemeralcontainers subresource of an existing
 // Pod. Ephemeral containers may not be removed or restarted.
-//
-// This is a beta feature available on clusters that haven't disabled the EphemeralContainers feature gate.
 type EphemeralContainer struct {
 	// Ephemeral containers have all of the fields of Container, plus additional fields
 	// specific to ephemeral containers. Fields in common with Container are in the
@@ -3907,7 +3931,6 @@ type PodStatus struct {
 	// +optional
 	QOSClass PodQOSClass `json:"qosClass,omitempty" protobuf:"bytes,9,rep,name=qosClass"`
 	// Status for any ephemeral containers that have run in this pod.
-	// This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.
 	// +optional
 	EphemeralContainerStatuses []ContainerStatus `json:"ephemeralContainerStatuses,omitempty" protobuf:"bytes,13,rep,name=ephemeralContainerStatuses"`
 }
@@ -4300,29 +4323,33 @@ const (
 	IPv6Protocol IPFamily = "IPv6"
 )
 
-// IPFamilyPolicyType represents the dual-stack-ness requested or required by a Service
+// IPFamilyPolicy represents the dual-stack-ness requested or required by a Service
 // +enum
-type IPFamilyPolicyType string
+type IPFamilyPolicy string
 
 const (
 	// IPFamilyPolicySingleStack indicates that this service is required to have a single IPFamily.
 	// The IPFamily assigned is based on the default IPFamily used by the cluster
 	// or as identified by service.spec.ipFamilies field
-	IPFamilyPolicySingleStack IPFamilyPolicyType = "SingleStack"
+	IPFamilyPolicySingleStack IPFamilyPolicy = "SingleStack"
 	// IPFamilyPolicyPreferDualStack indicates that this service prefers dual-stack when
 	// the cluster is configured for dual-stack. If the cluster is not configured
 	// for dual-stack the service will be assigned a single IPFamily. If the IPFamily is not
 	// set in service.spec.ipFamilies then the service will be assigned the default IPFamily
 	// configured on the cluster
-	IPFamilyPolicyPreferDualStack IPFamilyPolicyType = "PreferDualStack"
+	IPFamilyPolicyPreferDualStack IPFamilyPolicy = "PreferDualStack"
 	// IPFamilyPolicyRequireDualStack indicates that this service requires dual-stack. Using
 	// IPFamilyPolicyRequireDualStack on a single stack cluster will result in validation errors. The
 	// IPFamilies (and their order) assigned  to this service is based on service.spec.ipFamilies. If
 	// service.spec.ipFamilies was not provided then it will be assigned according to how they are
 	// configured on the cluster. If service.spec.ipFamilies has only one entry then the alternative
 	// IPFamily will be added by apiserver
-	IPFamilyPolicyRequireDualStack IPFamilyPolicyType = "RequireDualStack"
+	IPFamilyPolicyRequireDualStack IPFamilyPolicy = "RequireDualStack"
 )
+
+// for backwards compat
+// +enum
+type IPFamilyPolicyType = IPFamilyPolicy
 
 // ServiceSpec describes the attributes that a user creates on a service.
 type ServiceSpec struct {
@@ -4475,6 +4502,7 @@ type ServiceSpec struct {
 	// service or not.  If this field is specified when creating a Service
 	// which does not need it, creation will fail. This field will be wiped
 	// when updating a Service to no longer need it (e.g. changing type).
+	// This field cannot be updated once set.
 	// +optional
 	HealthCheckNodePort int32 `json:"healthCheckNodePort,omitempty" protobuf:"bytes,12,opt,name=healthCheckNodePort"`
 
@@ -4528,7 +4556,7 @@ type ServiceSpec struct {
 	// ipFamilies and clusterIPs fields depend on the value of this field. This
 	// field will be wiped when updating a service to type ExternalName.
 	// +optional
-	IPFamilyPolicy *IPFamilyPolicyType `json:"ipFamilyPolicy,omitempty" protobuf:"bytes,17,opt,name=ipFamilyPolicy,casttype=IPFamilyPolicyType"`
+	IPFamilyPolicy *IPFamilyPolicy `json:"ipFamilyPolicy,omitempty" protobuf:"bytes,17,opt,name=ipFamilyPolicy,casttype=IPFamilyPolicy"`
 
 	// allocateLoadBalancerNodePorts defines if NodePorts will be automatically
 	// allocated for services with type LoadBalancer.  Default is "true". It
@@ -4721,17 +4749,18 @@ type ServiceAccountList struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Endpoints is a collection of endpoints that implement the actual service. Example:
-//   Name: "mysvc",
-//   Subsets: [
-//     {
-//       Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
-//       Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
-//     },
-//     {
-//       Addresses: [{"ip": "10.10.3.3"}],
-//       Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
-//     },
-//  ]
+//
+//	 Name: "mysvc",
+//	 Subsets: [
+//	   {
+//	     Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//	     Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//	   },
+//	   {
+//	     Addresses: [{"ip": "10.10.3.3"}],
+//	     Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
+//	   },
+//	]
 type Endpoints struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -4753,13 +4782,16 @@ type Endpoints struct {
 // EndpointSubset is a group of addresses with a common set of ports. The
 // expanded set of endpoints is the Cartesian product of Addresses x Ports.
 // For example, given:
-//   {
-//     Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
-//     Ports:     [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
-//   }
+//
+//	{
+//	  Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//	  Ports:     [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//	}
+//
 // The resulting set of endpoints can be viewed as:
-//     a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
-//     b: [ 10.10.1.1:309, 10.10.2.2:309 ]
+//
+//	a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
+//	b: [ 10.10.1.1:309, 10.10.2.2:309 ]
 type EndpointSubset struct {
 	// IP addresses which offer the related ports that are marked as ready. These endpoints
 	// should be considered safe for load balancers and clients to utilize.
@@ -5632,6 +5664,7 @@ type ServiceProxyOptions struct {
 //     and the version of the actual struct is irrelevant.
 //  5. We cannot easily change it.  Because this type is embedded in many locations, updates to this type
 //     will affect numerous schemas.  Don't make new APIs embed an underspecified API type they do not control.
+//
 // Instead of using this type, create a locally provided and used type that is well-focused on your reference.
 // For example, ServiceReferences for admission registration: https://github.com/kubernetes/api/blob/release-1.17/admissionregistration/v1/types.go#L533 .
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

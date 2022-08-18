@@ -103,9 +103,9 @@ type testCase struct {
 	Workloads []*workload
 	// SchedulerConfigFile is the path of scheduler configuration
 	SchedulerConfigFile string
-	// TODO(#93792): reduce config toil by having a default pod and node spec per
-	// testCase? CreatePods and CreateNodes ops will inherit these unless
-	// manually overridden.
+	// Default path to spec file describing the pods to create. Optional.
+	// This path can be overridden in createPodsOp by setting PodTemplatePath .
+	DefaultPodTemplatePath *string
 }
 
 func (tc *testCase) collectsMetrics() bool {
@@ -147,12 +147,14 @@ type params struct {
 // UnmarshalJSON is a custom unmarshaler for params.
 //
 // from(json):
-// 	{
-// 		"initNodes": 500,
-// 		"initPods": 50
-// 	}
+//
+//	{
+//		"initNodes": 500,
+//		"initPods": 50
+//	}
 //
 // to:
+//
 //	params{
 //		params: map[string]int{
 //			"intNodes": 500,
@@ -160,7 +162,6 @@ type params struct {
 //		},
 //		isUsed: map[string]bool{}, // empty map
 //	}
-//
 func (p *params) UnmarshalJSON(b []byte) error {
 	aux := map[string]int{}
 
@@ -353,6 +354,7 @@ type createPodsOp struct {
 	// namespace of the format "namespace-<number>".
 	Namespace *string
 	// Path to spec file describing the pods to schedule. Optional.
+	// If nil, DefaultPodTemplatePath will be used.
 	PodTemplatePath *string
 	// Whether or not to wait for all pods in this op to get scheduled. Optional,
 	// defaults to false.
@@ -634,7 +636,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 			b.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}
-	finalFunc, podInformer, client, dynClient := mustSetupScheduler(cfg)
+	finalFunc, podInformer, client, dynClient := mustSetupScheduler(b, cfg)
 	b.Cleanup(finalFunc)
 
 	var mu sync.Mutex
@@ -707,6 +709,9 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 					b.Fatalf("failed to create namespace for Pod: %v", namespace)
 				}
 				numPodsScheduledPerNamespace[namespace] = 0
+			}
+			if concreteOp.PodTemplatePath == nil {
+				concreteOp.PodTemplatePath = tc.DefaultPodTemplatePath
 			}
 			var collectors []testDataCollector
 			var collectorCtx context.Context

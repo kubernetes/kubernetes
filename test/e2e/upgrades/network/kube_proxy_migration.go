@@ -32,7 +32,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (

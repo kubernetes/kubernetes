@@ -136,9 +136,6 @@ type FunctionSpec struct {
 
 	// ExecSpec is the spec for running a function as an executable
 	Exec ExecSpec `json:"exec,omitempty" yaml:"exec,omitempty"`
-
-	// Mounts are the storage or directories to mount into the container
-	StorageMounts []StorageMount `json:"mounts,omitempty" yaml:"mounts,omitempty"`
 }
 
 type ExecSpec struct {
@@ -208,9 +205,7 @@ func GetFunctionSpec(n *yaml.RNode) *FunctionSpec {
 	if err != nil {
 		return nil
 	}
-
 	if fn := getFunctionSpecFromAnnotation(n, meta); fn != nil {
-		fn.StorageMounts = []StorageMount{}
 		return fn
 	}
 

@@ -231,6 +231,19 @@ items:
     - deletecollection
     - patch
     - update
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - get
+    - list
+    - patch
+    - update
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

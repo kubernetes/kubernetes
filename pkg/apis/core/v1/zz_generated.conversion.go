@@ -6093,6 +6093,7 @@ func autoConvert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSe
 	// INFO: in.HostPID opted out of conversion generation
 	// INFO: in.HostIPC opted out of conversion generation
 	// INFO: in.ShareProcessNamespace opted out of conversion generation
+	// INFO: in.HostUsers opted out of conversion generation
 	out.SELinuxOptions = (*v1.SELinuxOptions)(unsafe.Pointer(in.SELinuxOptions))
 	out.WindowsOptions = (*v1.WindowsSecurityContextOptions)(unsafe.Pointer(in.WindowsOptions))
 	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
@@ -6186,6 +6187,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s
 	out.TopologySpreadConstraints = *(*[]core.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
 	out.SetHostnameAsFQDN = (*bool)(unsafe.Pointer(in.SetHostnameAsFQDN))
 	out.OS = (*core.PodOS)(unsafe.Pointer(in.OS))
+	// INFO: in.HostUsers opted out of conversion generation
 	return nil
 }
 
@@ -7709,7 +7711,7 @@ func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *cor
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
 	out.SessionAffinityConfig = (*core.SessionAffinityConfig)(unsafe.Pointer(in.SessionAffinityConfig))
 	out.IPFamilies = *(*[]core.IPFamily)(unsafe.Pointer(&in.IPFamilies))
-	out.IPFamilyPolicy = (*core.IPFamilyPolicyType)(unsafe.Pointer(in.IPFamilyPolicy))
+	out.IPFamilyPolicy = (*core.IPFamilyPolicy)(unsafe.Pointer(in.IPFamilyPolicy))
 	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
 	out.LoadBalancerClass = (*string)(unsafe.Pointer(in.LoadBalancerClass))
 	out.InternalTrafficPolicy = (*core.ServiceInternalTrafficPolicyType)(unsafe.Pointer(in.InternalTrafficPolicy))
@@ -7728,7 +7730,7 @@ func autoConvert_core_ServiceSpec_To_v1_ServiceSpec(in *core.ServiceSpec, out *v
 	out.ClusterIP = in.ClusterIP
 	out.ClusterIPs = *(*[]string)(unsafe.Pointer(&in.ClusterIPs))
 	out.IPFamilies = *(*[]v1.IPFamily)(unsafe.Pointer(&in.IPFamilies))
-	out.IPFamilyPolicy = (*v1.IPFamilyPolicyType)(unsafe.Pointer(in.IPFamilyPolicy))
+	out.IPFamilyPolicy = (*v1.IPFamilyPolicy)(unsafe.Pointer(in.IPFamilyPolicy))
 	out.ExternalName = in.ExternalName
 	out.ExternalIPs = *(*[]string)(unsafe.Pointer(&in.ExternalIPs))
 	out.LoadBalancerIP = in.LoadBalancerIP
@@ -7999,6 +8001,7 @@ func autoConvert_v1_TopologySpreadConstraint_To_core_TopologySpreadConstraint(in
 	out.MinDomains = (*int32)(unsafe.Pointer(in.MinDomains))
 	out.NodeAffinityPolicy = (*core.NodeInclusionPolicy)(unsafe.Pointer(in.NodeAffinityPolicy))
 	out.NodeTaintsPolicy = (*core.NodeInclusionPolicy)(unsafe.Pointer(in.NodeTaintsPolicy))
+	out.MatchLabelKeys = *(*[]string)(unsafe.Pointer(&in.MatchLabelKeys))
 	return nil
 }
 
@@ -8015,6 +8018,7 @@ func autoConvert_core_TopologySpreadConstraint_To_v1_TopologySpreadConstraint(in
 	out.MinDomains = (*int32)(unsafe.Pointer(in.MinDomains))
 	out.NodeAffinityPolicy = (*v1.NodeInclusionPolicy)(unsafe.Pointer(in.NodeAffinityPolicy))
 	out.NodeTaintsPolicy = (*v1.NodeInclusionPolicy)(unsafe.Pointer(in.NodeTaintsPolicy))
+	out.MatchLabelKeys = *(*[]string)(unsafe.Pointer(&in.MatchLabelKeys))
 	return nil
 }
 

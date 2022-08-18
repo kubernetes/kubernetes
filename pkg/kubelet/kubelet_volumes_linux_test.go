@@ -54,6 +54,10 @@ func validateDirNotExists(dir string) error {
 }
 
 func TestCleanupOrphanedPodDirs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	testCases := map[string]struct {
 		pods         []*v1.Pod
 		prepareFunc  func(kubelet *Kubelet) error

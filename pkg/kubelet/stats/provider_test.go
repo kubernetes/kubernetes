@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	gomock "github.com/golang/mock/gomock"
+	"github.com/golang/mock/gomock"
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	fuzz "github.com/google/gofuzz"
@@ -450,6 +450,28 @@ func getTerminatedContainerInfo(seed int, podName string, podNamespace string, c
 	cinfo := getTestContainerInfo(seed, podName, podNamespace, containerName)
 	cinfo.Stats[0].Memory.RSS = 0
 	cinfo.Stats[0].CpuInst.Usage.Total = 0
+	cinfo.Stats[0].Network = &cadvisorapiv2.NetworkStats{
+		Interfaces: []cadvisorapiv1.InterfaceStats{{
+			Name:     "eth0",
+			RxBytes:  0,
+			RxErrors: 0,
+			TxBytes:  0,
+			TxErrors: 0,
+		}, {
+			Name:     "cbr0",
+			RxBytes:  0,
+			RxErrors: 0,
+			TxBytes:  0,
+			TxErrors: 0,
+		}},
+	}
+	return cinfo
+}
+
+func getContainerInfoWithZeroCpuMem(seed int, podName string, podNamespace string, containerName string) cadvisorapiv2.ContainerInfo {
+	cinfo := getTestContainerInfo(seed, podName, podNamespace, containerName)
+	cinfo.Stats[0].Memory.RSS = 0
+	cinfo.Stats[0].CpuInst.Usage.Total = 0
 	return cinfo
 }
 
@@ -645,28 +667,6 @@ func checkNetworkStats(t *testing.T, label string, seed int, stats *statsapi.Net
 	assert.EqualValues(t, 100, *stats.Interfaces[1].TxBytes, label+".Net.TxErrors")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].TxErrors, label+".Net.TxErrors")
 
-}
-
-// container which had no stats should have zero-valued CPU usage
-func checkEmptyCPUStats(t *testing.T, label string, seed int, stats *statsapi.CPUStats) {
-	require.NotNil(t, stats.Time, label+".CPU.Time")
-	require.NotNil(t, stats.UsageNanoCores, label+".CPU.UsageNanoCores")
-	require.NotNil(t, stats.UsageNanoCores, label+".CPU.UsageCoreSeconds")
-	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".CPU.Time")
-	assert.EqualValues(t, 0, *stats.UsageNanoCores, label+".CPU.UsageCores")
-	assert.EqualValues(t, 0, *stats.UsageCoreNanoSeconds, label+".CPU.UsageCoreSeconds")
-}
-
-// container which had no stats should have zero-valued Memory usage
-func checkEmptyMemoryStats(t *testing.T, label string, seed int, info cadvisorapiv2.ContainerInfo, stats *statsapi.MemoryStats) {
-	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Mem.Time")
-	require.NotNil(t, stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
-	assert.EqualValues(t, 0, *stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
-	assert.Nil(t, stats.UsageBytes, label+".Mem.UsageBytes")
-	assert.Nil(t, stats.RSSBytes, label+".Mem.RSSBytes")
-	assert.Nil(t, stats.PageFaults, label+".Mem.PageFaults")
-	assert.Nil(t, stats.MajorPageFaults, label+".Mem.MajorPageFaults")
-	assert.Nil(t, stats.AvailableBytes, label+".Mem.AvailableBytes")
 }
 
 func checkCPUStats(t *testing.T, label string, seed int, stats *statsapi.CPUStats) {

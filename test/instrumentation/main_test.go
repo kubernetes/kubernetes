@@ -540,18 +540,6 @@ func TestIncorrectStableMetricDeclarations(t *testing.T) {
 		err      error
 	}{
 		{
-			testName: "Fail on stable summary metric (Summary is DEPRECATED)",
-			err:      fmt.Errorf("testdata/metric.go:4:9: Stable summary metric is not supported"),
-			src: `
-package test
-import "k8s.io/component-base/metrics"
-var _ = metrics.NewSummary(
-		&metrics.SummaryOpts{
-			StabilityLevel: metrics.STABLE,
-		},
-	)
-`},
-		{
 			testName: "Fail on stable metric with attribute set to unknown variable",
 			err:      fmt.Errorf("testdata/metric.go:6:4: Metric attribute was not correctly set. Please use only global consts in same file"),
 			src: `
@@ -708,7 +696,7 @@ var _ = metrics.NewCounter(
 	)
 `},
 		{
-			testName: "error stable historgram with unknown prometheus bucket variable",
+			testName: "error stable histogram with unknown prometheus bucket variable",
 			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
 			src: `
 package test
@@ -723,7 +711,22 @@ var _ = metrics.NewHistogram(
 	)
 `},
 		{
-			testName: "error stable historgram with unknown bucket variable",
+			testName: "error stable summary with unknown prometheus objective variable",
+			err:      fmt.Errorf("testdata/metric.go:9:16: Objectives should be set to map of floats to floats"),
+			src: `
+package test
+import "k8s.io/component-base/metrics"
+import "github.com/prometheus/client_golang/prometheus"
+var _ = metrics.NewSummary(
+		&metrics.SummaryOpts{
+			Name: "summary",
+			StabilityLevel: metrics.STABLE,
+			Objectives: prometheus.FakeObjectives,
+		},
+	)
+`},
+		{
+			testName: "error stable histogram with unknown bucket variable",
 			err:      fmt.Errorf("testdata/metric.go:9:13: Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"),
 			src: `
 package test

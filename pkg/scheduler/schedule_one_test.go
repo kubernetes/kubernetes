@@ -573,26 +573,22 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			fwk, err := st.NewFramework(registerPluginFuncs,
 				testSchedulerName,
+				ctx.Done(),
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(eventBroadcaster.NewRecorder(scheme.Scheme, testSchedulerName)))
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
 			s := newScheduler(
 				cache,
 				nil,
 				func() *framework.QueuedPodInfo {
 					return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(item.sendPod)}
-				},
-				func(p *framework.QueuedPodInfo, err error) {
-					gotPod = p.Pod
-					gotError = err
 				},
 				nil,
 				internalqueue.NewTestQueue(ctx, nil),
@@ -604,6 +600,13 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				0)
 			s.SchedulePod = func(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
 				return item.mockResult.result, item.mockResult.err
+			}
+			s.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo) {
+				gotPod = p.Pod
+				gotError = err
+
+				msg := truncateMessage(err.Error())
+				fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 			}
 			called := make(chan struct{})
 			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
@@ -1043,22 +1046,22 @@ func TestSchedulerBinding(t *testing.T) {
 				}
 				return false, nil, nil
 			})
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			fwk, err := st.NewFramework([]st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			}, "", frameworkruntime.WithClientSet(client), frameworkruntime.WithEventRecorder(&events.FakeRecorder{}))
+			}, "", ctx.Done(), frameworkruntime.WithClientSet(client), frameworkruntime.WithEventRecorder(&events.FakeRecorder{}))
 			if err != nil {
 				t.Fatal(err)
 			}
-			stop := make(chan struct{})
-			defer close(stop)
 			sched := &Scheduler{
 				Extenders:                test.extenders,
-				Cache:                    internalcache.New(100*time.Millisecond, stop),
+				Cache:                    internalcache.New(100*time.Millisecond, ctx.Done()),
 				nodeInfoSnapshot:         nil,
 				percentageOfNodesToScore: 0,
 			}
-			err = sched.bind(context.Background(), fwk, pod, "node", nil)
+			err = sched.bind(ctx, fwk, pod, "node", nil)
 			if err != nil {
 				t.Error(err)
 			}
@@ -1756,7 +1759,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						Operator: metav1.LabelSelectorOpExists,
 					},
 				},
-			}, nil, nil, nil).Obj(),
+			}, nil, nil, nil, nil).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("pod1").UID("pod1").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
 			},
@@ -1783,7 +1786,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 						Operator: metav1.LabelSelectorOpExists,
 					},
 				},
-			}, nil, nil, nil).Obj(),
+			}, nil, nil, nil, nil).Obj(),
 			pods: []*v1.Pod{
 				st.MakePod().Name("pod1a").UID("pod1a").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
 				st.MakePod().Name("pod1b").UID("pod1b").Label("foo", "").Node("node1").Phase(v1.PodRunning).Obj(),
@@ -2009,7 +2012,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			}
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			fwk, err := st.NewFramework(
-				test.registerPlugins, "",
+				test.registerPlugins, "", ctx.Done(),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
@@ -2020,7 +2023,6 @@ func TestSchedulerSchedulePod(t *testing.T) {
 
 			scheduler := newScheduler(
 				cache,
-				nil,
 				nil,
 				nil,
 				nil,
@@ -2061,6 +2063,9 @@ func TestSchedulerSchedulePod(t *testing.T) {
 func TestFindFitAllError(t *testing.T) {
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(nodes)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
 			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -2069,13 +2074,14 @@ func TestFindFitAllError(t *testing.T) {
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
+		ctx.Done(),
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
+	_, diagnosis, err := scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), &v1.Pod{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2096,6 +2102,9 @@ func TestFindFitAllError(t *testing.T) {
 func TestFindFitSomeError(t *testing.T) {
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(nodes)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
 			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -2104,6 +2113,7 @@ func TestFindFitSomeError(t *testing.T) {
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
+		ctx.Done(),
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 	)
 	if err != nil {
@@ -2111,7 +2121,7 @@ func TestFindFitSomeError(t *testing.T) {
 	}
 
 	pod := st.MakePod().Name("1").UID("1").Obj()
-	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), pod)
+	_, diagnosis, err := scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2175,8 +2185,10 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 				registerFakeFilterFunc,
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			fwk, err := st.NewFramework(
-				registerPlugins, "",
+				registerPlugins, "", ctx.Done(),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 			)
 			if err != nil {
@@ -2190,7 +2202,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			fwk.AddNominatedPod(framework.NewPodInfo(st.MakePod().UID("nominated").Priority(midPriority).Obj()),
 				&framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "1"})
 
-			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), test.pod)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -2202,10 +2214,10 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 }
 
 // The point of this test is to show that you:
-// - get the same priority for a zero-request pod as for a pod with the defaults requests,
-//   both when the zero-request pod is already on the node and when the zero-request pod
-//   is the one being scheduled.
-// - don't get the same score no matter what we schedule.
+//   - get the same priority for a zero-request pod as for a pod with the defaults requests,
+//     both when the zero-request pod is already on the node and when the zero-request pod
+//     is the one being scheduled.
+//   - don't get the same score no matter what we schedule.
 func TestZeroRequest(t *testing.T) {
 	// A pod with no resources. We expect spreading to count it as having the default resources.
 	noResources := v1.PodSpec{
@@ -2309,8 +2321,10 @@ func TestZeroRequest(t *testing.T) {
 				st.RegisterPreScorePlugin(selectorspread.Name, selectorspread.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			fwk, err := st.NewFramework(
-				pluginRegistrations, "",
+				pluginRegistrations, "", ctx.Done(),
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithClientSet(client),
@@ -2328,11 +2342,9 @@ func TestZeroRequest(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				snapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 
-			ctx := context.Background()
 			state := framework.NewCycleState()
 			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, state, test.pod)
 			if err != nil {
@@ -2415,6 +2427,8 @@ func TestFairEvaluationForNodes(t *testing.T) {
 	}
 	nodes := makeNodeList(nodeNames)
 	sched := makeScheduler(nodes)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	fwk, err := st.NewFramework(
 		[]st.RegisterPluginFunc{
 			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -2422,6 +2436,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
 		"",
+		ctx.Done(),
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(nil)),
 	)
 	if err != nil {
@@ -2434,7 +2449,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
-		nodesThatFit, _, err := sched.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
+		nodesThatFit, _, err := sched.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), &v1.Pod{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -2495,8 +2510,10 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				registerFakeFilterFunc,
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			fwk, err := st.NewFramework(
-				registerPlugins, "",
+				registerPlugins, "", ctx.Done(),
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator(informerFactory.Core().V1().Pods().Lister())),
 			)
@@ -2512,11 +2529,10 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				nil,
 				nil,
 				nil,
-				nil,
 				snapshot,
 				schedulerapi.DefaultPercentageOfNodesToScore)
 
-			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), test.pod)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -2568,7 +2584,6 @@ func makeScheduler(nodes []*v1.Node) *Scheduler {
 
 	s := newScheduler(
 		cache,
-		nil,
 		nil,
 		nil,
 		nil,
@@ -2658,6 +2673,7 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 	fwk, _ := st.NewFramework(
 		fns,
 		testSchedulerName,
+		ctx.Done(),
 		frameworkruntime.WithClientSet(client),
 		frameworkruntime.WithEventRecorder(recorder),
 		frameworkruntime.WithInformerFactory(informerFactory),
@@ -2671,9 +2687,6 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 		func() *framework.QueuedPodInfo {
 			return &framework.QueuedPodInfo{PodInfo: framework.NewPodInfo(clientcache.Pop(queuedPodStore).(*v1.Pod))}
 		},
-		func(p *framework.QueuedPodInfo, err error) {
-			errChan <- err
-		},
 		nil,
 		schedulingQueue,
 		profile.Map{
@@ -2682,6 +2695,12 @@ func setupTestScheduler(ctx context.Context, queuedPodStore *clientcache.FIFO, c
 		client,
 		internalcache.NewEmptySnapshot(),
 		schedulerapi.DefaultPercentageOfNodesToScore)
+	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, err error, _ string, _ *framework.NominatingInfo) {
+		errChan <- err
+
+		msg := truncateMessage(err.Error())
+		fwk.EventRecorder().Eventf(p.Pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+	}
 	return sched, bindingChan, errChan
 }
 

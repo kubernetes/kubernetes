@@ -19,7 +19,6 @@ package upgrade
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -35,11 +34,13 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
+	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -223,6 +224,29 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 		printConfiguration(&cfg.ClusterConfiguration, os.Stdout, printer)
 	}
 
+	// Handle a dupliate prefix URL scheme in the Node CRI socket.
+	// Older versions of kubeadm(v1.24.0~2) upgrade may add one or two extra prefix `unix://`
+	// TODO: this fix can be removed in 1.26 once all user node sockets have a correct URL scheme:
+	// https://github.com/kubernetes/kubeadm/issues/2426
+	dupURLScheme := strings.HasPrefix(cfg.NodeRegistration.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://"+kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://")
+	if dupURLScheme {
+		socket := strings.ReplaceAll(cfg.NodeRegistration.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://", "")
+		cfg.NodeRegistration.CRISocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + socket
+		var hostname string
+		if len(cfg.NodeRegistration.Name) > 0 {
+			hostname = cfg.NodeRegistration.Name
+		} else {
+			hostname, err = os.Hostname()
+			if err != nil {
+				return nil, nil, nil, errors.Wrapf(err, "failed to get hostname")
+			}
+		}
+		klog.V(2).Infof("ensuring that Node %q has a CRI socket annotation with correct URL scheme %q", hostname, cfg.NodeRegistration.CRISocket)
+		if err := patchnodephase.AnnotateCRISocket(client, hostname, cfg.NodeRegistration.CRISocket); err != nil {
+			return nil, nil, nil, errors.Wrapf(err, "error updating the CRI socket for Node %q", cfg.NodeRegistration.CRISocket)
+		}
+	}
+
 	// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
 	return client, upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client), newK8sVersion), cfg, nil
 }
@@ -300,22 +324,4 @@ func getWaiter(dryRun bool, client clientset.Interface, timeout time.Duration) a
 		return dryrunutil.NewWaiter()
 	}
 	return apiclient.NewKubeWaiter(client, timeout, os.Stdout)
-}
-
-// InteractivelyConfirmUpgrade asks the user whether they _really_ want to upgrade.
-func InteractivelyConfirmUpgrade(question string) error {
-
-	fmt.Printf("[upgrade/confirm] %s [y/N]: ", question)
-
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Scan()
-	if err := scanner.Err(); err != nil {
-		return errors.Wrap(err, "couldn't read from standard input")
-	}
-	answer := scanner.Text()
-	if strings.ToLower(answer) == "y" || strings.ToLower(answer) == "yes" {
-		return nil
-	}
-
-	return errors.New("won't proceed; the user didn't answer (Y|y) in order to continue")
 }

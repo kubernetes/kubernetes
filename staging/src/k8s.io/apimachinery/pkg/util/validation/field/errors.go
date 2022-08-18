@@ -42,9 +42,9 @@ func (v *Error) Error() string {
 	return fmt.Sprintf("%s: %s", v.Field, v.ErrorBody())
 }
 
-type omitValueType struct{}
+type OmitValueType struct{}
 
-var omitValue = omitValueType{}
+var omitValue = OmitValueType{}
 
 // ErrorBody returns the error message without the field name.  This is useful
 // for building nice-looking higher-level error reporting.
@@ -66,7 +66,7 @@ func (v *Error) ErrorBody() string {
 		valueType := reflect.TypeOf(value)
 		if value == nil || valueType == nil {
 			value = "null"
-		} else if valueType.Kind() == reflect.Ptr {
+		} else if valueType.Kind() == reflect.Pointer {
 			if reflectValue := reflect.ValueOf(value); reflectValue.IsNil() {
 				value = "null"
 			} else {

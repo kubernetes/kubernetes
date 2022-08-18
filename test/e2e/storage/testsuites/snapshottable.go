@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
@@ -39,7 +39,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -442,11 +441,11 @@ func deleteVolumeSnapshot(f *framework.Framework, dc dynamic.Interface, sr *stor
 	switch pattern.SnapshotDeletionPolicy {
 	case storageframework.DeleteSnapshot:
 		ginkgo.By("checking the SnapshotContent has been deleted")
-		err = utils.WaitForGVRDeletion(dc, storageutils.SnapshotContentGVR, vscontent.GetName(), framework.Poll, f.Timeouts.SnapshotDelete)
+		err = storageutils.WaitForGVRDeletion(dc, storageutils.SnapshotContentGVR, vscontent.GetName(), framework.Poll, f.Timeouts.SnapshotDelete)
 		framework.ExpectNoError(err)
 	case storageframework.RetainSnapshot:
 		ginkgo.By("checking the SnapshotContent has not been deleted")
-		err = utils.WaitForGVRDeletion(dc, storageutils.SnapshotContentGVR, vscontent.GetName(), 1*time.Second /* poll */, 30*time.Second /* timeout */)
+		err = storageutils.WaitForGVRDeletion(dc, storageutils.SnapshotContentGVR, vscontent.GetName(), 1*time.Second /* poll */, 30*time.Second /* timeout */)
 		framework.ExpectError(err)
 	}
 }

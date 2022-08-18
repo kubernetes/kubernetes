@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	eventv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -35,6 +36,8 @@ import (
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
+	netutils "k8s.io/utils/net"
+
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
@@ -60,7 +63,6 @@ import (
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 	ephemeralvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/ephemeral/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
-	netutils "k8s.io/utils/net"
 )
 
 var args = []string{
@@ -295,6 +297,7 @@ func TestAddFlags(t *testing.T) {
 				ConcurrentGCSyncs: 30,
 				GCIgnoredResources: []garbagecollectorconfig.GroupResource{
 					{Group: "", Resource: "events"},
+					{Group: eventv1.GroupName, Resource: "events"},
 				},
 				EnableGarbageCollector: false,
 			},
@@ -550,6 +553,7 @@ func TestApplyTo(t *testing.T) {
 				ConcurrentGCSyncs: 30,
 				GCIgnoredResources: []garbagecollectorconfig.GroupResource{
 					{Group: "", Resource: "events"},
+					{Group: eventv1.GroupName, Resource: "events"},
 				},
 				EnableGarbageCollector: false,
 			},

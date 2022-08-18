@@ -84,7 +84,7 @@ func UnstructuredToVal(unstructured interface{}, schema *structuralschema.Struct
 				},
 			}
 		}
-		// A object with x-preserve-unknown-fields but no properties or additionalProperties is treated
+		// A object with x-kubernetes-preserve-unknown-fields but no properties or additionalProperties is treated
 		// as an empty object.
 		if schema.XPreserveUnknownFields {
 			return &unstructuredMap{

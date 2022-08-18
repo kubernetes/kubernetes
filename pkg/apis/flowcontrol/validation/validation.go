@@ -468,10 +468,10 @@ func ValidatePriorityLevelConfigurationCondition(condition *flowcontrol.Priority
 }
 
 // ValidateNonResourceURLPath validates non-resource-url path by following rules:
-//   1. Slash must be the leading character of the path
-//   2. White-space is forbidden in the path
-//   3. Continuous/double slash is forbidden in the path
-//   4. Wildcard "*" should only do suffix glob matching. Note that wildcard also matches slashes.
+//  1. Slash must be the leading character of the path
+//  2. White-space is forbidden in the path
+//  3. Continuous/double slash is forbidden in the path
+//  4. Wildcard "*" should only do suffix glob matching. Note that wildcard also matches slashes.
 func ValidateNonResourceURLPath(path string, fldPath *field.Path) *field.Error {
 	if len(path) == 0 {
 		return field.Invalid(fldPath, path, "must not be empty")

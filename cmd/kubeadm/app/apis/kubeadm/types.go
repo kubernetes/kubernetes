@@ -84,8 +84,14 @@ type ClusterConfiguration struct {
 
 	// Networking holds configuration for the networking topology of the cluster.
 	Networking Networking
+
 	// KubernetesVersion is the target version of the control plane.
 	KubernetesVersion string
+
+	// CIKubernetesVersion is the target CI version of the control plane.
+	// Useful for running kubeadm with CI Kubernetes version.
+	// +k8s:conversion-gen=false
+	CIKubernetesVersion string
 
 	// ControlPlaneEndpoint sets a stable IP address or DNS name for the control plane; it
 	// can be a valid IP address or a RFC-1123 DNS subdomain, both with optional TCP port.

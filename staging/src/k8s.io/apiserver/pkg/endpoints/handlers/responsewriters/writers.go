@@ -36,7 +36,6 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
@@ -89,6 +88,7 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 // a client and the feature gate for APIResponseCompression is enabled.
 func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
 	trace := utiltrace.New("SerializeObject",
+		utiltrace.Field{"audit-id", request.GetAuditIDTruncated(req.Context())},
 		utiltrace.Field{"method", req.Method},
 		utiltrace.Field{"url", req.URL.Path},
 		utiltrace.Field{"protocol", req.Proto},
@@ -272,7 +272,7 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 	audit.LogResponseObject(req.Context(), object, gv, s)
 
 	encoder := s.EncoderForVersion(serializer.Serializer, gv)
-	endpointsrequest.TrackSerializeResponseObjectLatency(req.Context(), func() {
+	request.TrackSerializeResponseObjectLatency(req.Context(), func() {
 		SerializeObject(serializer.MediaType, encoder, w, req, statusCode, object)
 	})
 }

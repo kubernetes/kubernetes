@@ -64,7 +64,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -1104,8 +1104,15 @@ func generateBacksideHTTPSServiceSpec() *v1.Service {
 
 func generateBacksideHTTPSDeploymentSpec() *appsv1.Deployment {
 	labels := map[string]string{"app": "echoheaders-https"}
-	d := e2edeployment.NewDeployment("echoheaders-https", 0, labels, "echoheaders-https", imageutils.GetE2EImage(imageutils.EchoServer), appsv1.RollingUpdateDeploymentStrategyType)
+	d := e2edeployment.NewDeployment("echoheaders-https", 0, labels, "echoheaders-https", imageutils.GetE2EImage(imageutils.Agnhost), appsv1.RollingUpdateDeploymentStrategyType)
 	d.Spec.Replicas = nil
+	d.Spec.Template.Spec.Containers[0].Command = []string{
+		"/agnhost",
+		"netexec",
+		"--http-port=8443",
+		"--tls-cert-file=/localhost.crt",
+		"--tls-private-key-file=/localhost.key",
+	}
 	d.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{
 		ContainerPort: 8443,
 		Name:          "echo-443",

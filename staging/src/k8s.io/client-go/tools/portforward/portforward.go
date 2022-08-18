@@ -62,18 +62,18 @@ type ForwardedPort struct {
 }
 
 /*
-	valid port specifications:
+valid port specifications:
 
-	5000
-	- forwards from localhost:5000 to pod:5000
+5000
+- forwards from localhost:5000 to pod:5000
 
-	8888:5000
-	- forwards from localhost:8888 to pod:5000
+8888:5000
+- forwards from localhost:8888 to pod:5000
 
-	0:5000
-	:5000
-	- selects a random available local port,
-	  forwards from localhost:<random port> to pod:5000
+0:5000
+:5000
+  - selects a random available local port,
+    forwards from localhost:<random port> to pod:5000
 */
 func parsePorts(ports []string) ([]ForwardedPort, error) {
 	var forwards []ForwardedPort

@@ -52,8 +52,8 @@ import (
 //	10. Send out the CL for review and submit it.
 const (
 	Major      = 1
-	Minor      = 27
-	Patch      = 1
+	Minor      = 28
+	Patch      = 0
 	PreRelease = ""
 )
 

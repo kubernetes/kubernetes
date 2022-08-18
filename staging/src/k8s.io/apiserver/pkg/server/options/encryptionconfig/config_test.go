@@ -32,8 +32,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
+	envelopekmsv2 "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 const (
@@ -81,6 +85,36 @@ func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
 	return []byte(base64.StdEncoding.EncodeToString(data)), nil
 }
 
+// testKMSv2EnvelopeService is a mock kmsv2 envelope service which can be used to simulate remote Envelope v2 services
+// for testing of the envelope transformer with other transformers.
+type testKMSv2EnvelopeService struct {
+	err error
+}
+
+func (t *testKMSv2EnvelopeService) Decrypt(ctx context.Context, uid string, req *envelopekmsv2.DecryptRequest) ([]byte, error) {
+	if t.err != nil {
+		return nil, t.err
+	}
+	return base64.StdEncoding.DecodeString(string(req.Ciphertext))
+}
+
+func (t *testKMSv2EnvelopeService) Encrypt(ctx context.Context, uid string, data []byte) (*envelopekmsv2.EncryptResponse, error) {
+	if t.err != nil {
+		return nil, t.err
+	}
+	return &envelopekmsv2.EncryptResponse{
+		Ciphertext: []byte(base64.StdEncoding.EncodeToString(data)),
+		KeyID:      "1",
+	}, nil
+}
+
+func (t *testKMSv2EnvelopeService) Status(ctx context.Context) (*envelopekmsv2.StatusResponse, error) {
+	if t.err != nil {
+		return nil, t.err
+	}
+	return &envelopekmsv2.StatusResponse{Healthz: "ok", KeyID: "1", Version: "v2alpha1"}, nil
+}
+
 // The factory method to create mock envelope service.
 func newMockEnvelopeService(endpoint string, timeout time.Duration) (envelope.Service, error) {
 	return &testEnvelopeService{nil}, nil
@@ -89,6 +123,16 @@ func newMockEnvelopeService(endpoint string, timeout time.Duration) (envelope.Se
 // The factory method to create mock envelope service which always returns error.
 func newMockErrorEnvelopeService(endpoint string, timeout time.Duration) (envelope.Service, error) {
 	return &testEnvelopeService{errors.New("test")}, nil
+}
+
+// The factory method to create mock envelope kmsv2 service.
+func newMockEnvelopeKMSv2Service(endpoint string, timeout time.Duration) (envelopekmsv2.Service, error) {
+	return &testKMSv2EnvelopeService{nil}, nil
+}
+
+// The factory method to create mock envelope kmsv2 service which always returns error.
+func newMockErrorEnvelopeKMSv2Service(endpoint string, timeout time.Duration) (envelopekmsv2.Service, error) {
+	return &testKMSv2EnvelopeService{errors.New("test")}, nil
 }
 
 func TestLegacyConfig(t *testing.T) {
@@ -112,10 +156,11 @@ func TestLegacyConfig(t *testing.T) {
 						},
 					}},
 					{KMS: &apiserverconfig.KMSConfiguration{
-						Name:      "testprovider",
-						Endpoint:  "unix:///tmp/testprovider.sock",
-						CacheSize: &cacheSize,
-						Timeout:   &metav1.Duration{Duration: 3 * time.Second},
+						APIVersion: "v1",
+						Name:       "testprovider",
+						Endpoint:   "unix:///tmp/testprovider.sock",
+						CacheSize:  &cacheSize,
+						Timeout:    &metav1.Duration{Duration: 3 * time.Second},
 					}},
 					{AESCBC: &apiserverconfig.AESConfiguration{
 						Keys: []apiserverconfig.Key{
@@ -138,11 +183,15 @@ func TestLegacyConfig(t *testing.T) {
 }
 
 func TestEncryptionProviderConfigCorrect(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
 	// Set factory for mock envelope service
 	factory := envelopeServiceFactory
+	factoryKMSv2 := envelopeKMSv2ServiceFactory
 	envelopeServiceFactory = newMockEnvelopeService
+	envelopeKMSv2ServiceFactory = newMockEnvelopeKMSv2Service
 	defer func() {
 		envelopeServiceFactory = factory
+		envelopeKMSv2ServiceFactory = factoryKMSv2
 	}()
 
 	// Creates compound/prefix transformers with different ordering of available transformers.
@@ -178,12 +227,19 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSFirst)
 	}
 
+	correctConfigWithKMSv2First := "testdata/valid-configs/kmsv2-first.yaml"
+	kmsv2FirstTransformerOverrides, err := parseEncryptionConfiguration(mustConfigReader(t, correctConfigWithKMSv2First))
+	if err != nil {
+		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSv2First)
+	}
+
 	// Pick the transformer for any of the returned resources.
 	identityFirstTransformer := identityFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 	aesGcmFirstTransformer := aesGcmFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 	aesCbcFirstTransformer := aesCbcFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 	secretboxFirstTransformer := secretboxFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 	kmsFirstTransformer := kmsFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
+	kmsv2FirstTransformer := kmsv2FirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 
 	ctx := context.Background()
 	dataCtx := value.DefaultContext([]byte(sampleContextText))
@@ -198,6 +254,7 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 		{secretboxFirstTransformer, "secretboxFirst"},
 		{identityFirstTransformer, "identityFirst"},
 		{kmsFirstTransformer, "kmsFirst"},
+		{kmsv2FirstTransformer, "kmvs2First"},
 	}
 
 	for _, testCase := range transformers {
@@ -222,22 +279,28 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 }
 
 func TestKMSPluginHealthz(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
+
 	service, err := envelope.NewGRPCService("unix:///tmp/testprovider.sock", 3*time.Second)
 	if err != nil {
 		t.Fatalf("Could not initialize envelopeService, error: %v", err)
+	}
+	serviceKMSv2, err := envelopekmsv2.NewGRPCService("unix:///tmp/testprovider.sock", 3*time.Second)
+	if err != nil {
+		t.Fatalf("Could not initialize kmsv2 envelopeService, error: %v", err)
 	}
 
 	testCases := []struct {
 		desc    string
 		config  string
-		want    []*kmsPluginProbe
+		want    []interface{}
 		wantErr bool
 	}{
 		{
 			desc:   "Install Healthz",
 			config: "testdata/valid-configs/kms/default-timeout.yaml",
-			want: []*kmsPluginProbe{
-				{
+			want: []interface{}{
+				&kmsPluginProbe{
 					name:    "foo",
 					Service: service,
 				},
@@ -246,12 +309,12 @@ func TestKMSPluginHealthz(t *testing.T) {
 		{
 			desc:   "Install multiple healthz",
 			config: "testdata/valid-configs/kms/multiple-providers.yaml",
-			want: []*kmsPluginProbe{
-				{
+			want: []interface{}{
+				&kmsPluginProbe{
 					name:    "foo",
 					Service: service,
 				},
-				{
+				&kmsPluginProbe{
 					name:    "bar",
 					Service: service,
 				},
@@ -260,6 +323,26 @@ func TestKMSPluginHealthz(t *testing.T) {
 		{
 			desc:   "No KMS Providers",
 			config: "testdata/valid-configs/aes/aes-gcm.yaml",
+		},
+		{
+			desc:   "Install multiple healthz with v1 and v2",
+			config: "testdata/valid-configs/kms/multiple-providers-kmsv2.yaml",
+			want: []interface{}{
+				&kmsv2PluginProbe{
+					name:    "foo",
+					Service: serviceKMSv2,
+				},
+				&kmsPluginProbe{
+					name:    "bar",
+					Service: service,
+				},
+			},
+		},
+		{
+			desc:    "Invalid API version",
+			config:  "testdata/invalid-configs/kms/invalid-apiversion.yaml",
+			want:    nil,
+			wantErr: true,
 		},
 	}
 
@@ -270,7 +353,7 @@ func TestKMSPluginHealthz(t *testing.T) {
 				t.Fatalf("got %v, want nil for error", err)
 			}
 
-			if d := cmp.Diff(tt.want, got, cmp.Comparer(serviceComparer)); d != "" {
+			if d := cmp.Diff(tt.want, got, cmp.Comparer(serviceComparer), cmp.Comparer(serviceKMSv2Comparer)); d != "" {
 				t.Fatalf("HealthzConfig mismatch (-want +got):\n%s", d)
 			}
 		})
@@ -320,9 +403,56 @@ func TestKMSPluginHealthzTTL(t *testing.T) {
 	}
 }
 
+func TestKMSv2PluginHealthzTTL(t *testing.T) {
+	service, _ := newMockEnvelopeKMSv2Service("unix:///tmp/testprovider.sock", 3*time.Second)
+	errService, _ := newMockErrorEnvelopeKMSv2Service("unix:///tmp/testprovider.sock", 3*time.Second)
+
+	testCases := []struct {
+		desc    string
+		probe   *kmsv2PluginProbe
+		wantTTL time.Duration
+	}{
+		{
+			desc: "kmsv2 provider in good state",
+			probe: &kmsv2PluginProbe{
+				name:         "test",
+				ttl:          kmsPluginHealthzNegativeTTL,
+				Service:      service,
+				l:            &sync.Mutex{},
+				lastResponse: &kmsPluginHealthzResponse{},
+			},
+			wantTTL: kmsPluginHealthzPositiveTTL,
+		},
+		{
+			desc: "kmsv2 provider in bad state",
+			probe: &kmsv2PluginProbe{
+				name:         "test",
+				ttl:          kmsPluginHealthzPositiveTTL,
+				Service:      errService,
+				l:            &sync.Mutex{},
+				lastResponse: &kmsPluginHealthzResponse{},
+			},
+			wantTTL: kmsPluginHealthzNegativeTTL,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			tt.probe.Check()
+			if tt.probe.ttl != tt.wantTTL {
+				t.Fatalf("want ttl %v, got ttl %v", tt.wantTTL, tt.probe.ttl)
+			}
+		})
+	}
+}
+
 // As long as got and want contain envelope.Service we will return true.
 // If got has an envelope.Service and want does note (or vice versa) this will return false.
 func serviceComparer(_, _ envelope.Service) bool {
+	return true
+}
+
+func serviceKMSv2Comparer(_, _ envelopekmsv2.Service) bool {
 	return true
 }
 
@@ -412,4 +542,39 @@ func getTransformerFromEncryptionConfig(t *testing.T, encryptionConfigPath strin
 		return transformer
 	}
 	panic("unreachable")
+}
+
+func TestIsKMSv2ProviderHealthyError(t *testing.T) {
+	testCases := []struct {
+		desc           string
+		statusResponse *envelopekmsv2.StatusResponse
+	}{
+		{
+			desc: "healthz status is not ok",
+			statusResponse: &envelopekmsv2.StatusResponse{
+				Healthz: "unhealthy",
+			},
+		},
+		{
+			desc: "version is not v2alpha1",
+			statusResponse: &envelopekmsv2.StatusResponse{
+				Version: "v1beta1",
+			},
+		},
+		{
+			desc: "missing keyID",
+			statusResponse: &envelopekmsv2.StatusResponse{
+				Healthz: "ok",
+				Version: "v2alpha1",
+			},
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			if err := isKMSv2ProviderHealthy("testplugin", tt.statusResponse); err == nil {
+				t.Fatalf("isKMSv2ProviderHealthy() should have returned an error")
+			}
+		})
+	}
 }

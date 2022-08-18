@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	resourcecli "k8s.io/cli-runtime/pkg/resource"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
@@ -68,7 +67,7 @@ type QuotaOpts struct {
 
 	Client              *coreclient.CoreV1Client
 	DryRunStrategy      cmdutil.DryRunStrategy
-	DryRunVerifier      *resourcecli.QueryParamVerifier
+	DryRunVerifier      *resource.QueryParamVerifier
 	ValidationDirective string
 
 	genericclioptions.IOStreams
@@ -138,7 +137,7 @@ func (o *QuotaOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []strin
 	if err != nil {
 		return err
 	}
-	o.DryRunVerifier = resourcecli.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
+	o.DryRunVerifier = resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
 
 	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {

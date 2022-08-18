@@ -45,76 +45,7 @@ const (
 )
 
 func TestGetNetworkByName(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testGetNetworkByName(t, hnsV1)
-	testGetNetworkByName(t, hnsV2)
-}
-func TestGetEndpointByID(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testGetEndpointByID(t, hnsV1)
-	testGetEndpointByID(t, hnsV2)
-}
-func TestGetEndpointByIpAddressAndName(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testGetEndpointByIpAddressAndName(t, hnsV1)
-	testGetEndpointByIpAddressAndName(t, hnsV2)
-}
-func TestCreateEndpointLocal(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testCreateEndpointLocal(t, hnsV1)
-	testCreateEndpointLocal(t, hnsV2)
-}
-func TestCreateEndpointRemotePA(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testCreateEndpointRemote(t, hnsV1, epPaAddress)
-	testCreateEndpointRemote(t, hnsV2, epPaAddress)
-}
-func TestCreateEndpointRemoteNoPA(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testCreateEndpointRemote(t, hnsV1, "")
-	testCreateEndpointRemote(t, hnsV2, "")
-}
-func TestDeleteEndpoint(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testDeleteEndpoint(t, hnsV1)
-	testDeleteEndpoint(t, hnsV2)
-}
-func TestGetLoadBalancerExisting(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testGetLoadBalancerExisting(t, hnsV1)
-	testGetLoadBalancerExisting(t, hnsV2)
-}
-func TestGetLoadBalancerNew(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testGetLoadBalancerNew(t, hnsV1)
-	testGetLoadBalancerNew(t, hnsV2)
-}
-func TestDeleteLoadBalancer(t *testing.T) {
-	hnsV1 := hnsV1{}
-	hnsV2 := hnsV2{}
-
-	testDeleteLoadBalancer(t, hnsV1)
-	testDeleteLoadBalancer(t, hnsV2)
-}
-func testGetNetworkByName(t *testing.T, hns HostNetworkService) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 
 	network, err := hns.getNetworkByName(Network.Name)
@@ -130,7 +61,9 @@ func testGetNetworkByName(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testGetEndpointByID(t *testing.T, hns HostNetworkService) {
+
+func TestGetEndpointByID(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -167,7 +100,9 @@ func testGetEndpointByID(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testGetEndpointByIpAddressAndName(t *testing.T, hns HostNetworkService) {
+
+func TestGetEndpointByIpAddressAndName(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -215,7 +150,9 @@ func testGetEndpointByIpAddressAndName(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testCreateEndpointLocal(t *testing.T, hns HostNetworkService) {
+
+func TestCreateEndpointLocal(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 
 	endpoint := &endpointsInfo{
@@ -251,8 +188,11 @@ func testCreateEndpointLocal(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testCreateEndpointRemote(t *testing.T, hns HostNetworkService, providerAddress string) {
+
+func TestCreateEndpointRemote(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
+	providerAddress := epPaAddress
 
 	endpoint := &endpointsInfo{
 		ip:              epIpAddressRemote,
@@ -291,7 +231,9 @@ func testCreateEndpointRemote(t *testing.T, hns HostNetworkService, providerAddr
 		t.Error(err)
 	}
 }
-func testDeleteEndpoint(t *testing.T, hns HostNetworkService) {
+
+func TestDeleteEndpoint(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -325,7 +267,8 @@ func testDeleteEndpoint(t *testing.T, hns HostNetworkService) {
 	}
 }
 
-func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
+func TestGetLoadBalancerExisting(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 	lbs := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
 
@@ -369,6 +312,7 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 	}
 	endpoints := []endpointsInfo{*endpoint}
 	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort, lbs)
+
 	if err != nil {
 		t.Error(err)
 	}
@@ -390,7 +334,9 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
+
+func TestGetLoadBalancerNew(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 	// We keep this empty to ensure we test for new load balancer creation.
 	lbs := make(map[loadBalancerIdentifier]*(loadBalancerInfo))
@@ -440,7 +386,9 @@ func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
-func testDeleteLoadBalancer(t *testing.T, hns HostNetworkService) {
+
+func TestDeleteLoadBalancer(t *testing.T) {
+	hns := hns{}
 	Network := mustTestNetwork(t)
 
 	ipConfig := &hcn.IpConfig{
@@ -492,6 +440,7 @@ func testDeleteLoadBalancer(t *testing.T, hns HostNetworkService) {
 		t.Error(err)
 	}
 }
+
 func mustTestNetwork(t *testing.T) *hcn.HostComputeNetwork {
 	network, err := createTestNetwork()
 	if err != nil {
@@ -502,6 +451,7 @@ func mustTestNetwork(t *testing.T) *hcn.HostComputeNetwork {
 	}
 	return network
 }
+
 func createTestNetwork() (*hcn.HostComputeNetwork, error) {
 	network := &hcn.HostComputeNetwork{
 		Type: NETWORK_TYPE_OVERLAY,

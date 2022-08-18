@@ -88,7 +88,7 @@ func TestPatchPodStatus(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			_, patchBytes, unchanged, err := PatchPodStatus(client, ns, name, uid, getPodStatus(), tc.mutate(getPodStatus()))
+			_, patchBytes, unchanged, err := PatchPodStatus(context.TODO(), client, ns, name, uid, getPodStatus(), tc.mutate(getPodStatus()))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

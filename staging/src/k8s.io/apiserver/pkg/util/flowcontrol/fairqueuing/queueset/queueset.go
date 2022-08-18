@@ -243,6 +243,9 @@ func (qs *queueSet) setConfiguration(ctx context.Context, qCfg fq.QueuingConfig,
 	if qll < 1 {
 		qll = 1
 	}
+	if qCfg.DesiredNumQueues > 0 {
+		qll *= qCfg.DesiredNumQueues
+	}
 	qs.reqsGaugePair.RequestsWaiting.SetDenominator(float64(qll))
 	qs.reqsGaugePair.RequestsExecuting.SetDenominator(float64(dCfg.ConcurrencyLimit))
 	qs.execSeatsGauge.SetDenominator(float64(dCfg.ConcurrencyLimit))
@@ -808,8 +811,8 @@ func (qs *queueSet) findDispatchQueueLocked() (*queue, *request) {
 	// If the requested final seats exceed capacity of that queue,
 	// we reduce them to current capacity and adjust additional latency
 	// to preserve the total amount of work.
-	if oldestReqFromMinQueue.workEstimate.FinalSeats > uint(qs.dCfg.ConcurrencyLimit) {
-		finalSeats := uint(qs.dCfg.ConcurrencyLimit)
+	if oldestReqFromMinQueue.workEstimate.FinalSeats > uint64(qs.dCfg.ConcurrencyLimit) {
+		finalSeats := uint64(qs.dCfg.ConcurrencyLimit)
 		additionalLatency := oldestReqFromMinQueue.workEstimate.finalWork.DurationPerSeat(float64(finalSeats))
 		oldestReqFromMinQueue.workEstimate.FinalSeats = finalSeats
 		oldestReqFromMinQueue.workEstimate.AdditionalLatency = additionalLatency
@@ -986,12 +989,6 @@ func removeQueueAndUpdateIndexes(queues []*queue, index int) []*queue {
 		keptQueues[i].index--
 	}
 	return keptQueues
-}
-
-func (qs *queueSet) UpdateObservations() {
-	qs.reqsGaugePair.RequestsWaiting.Add(0)
-	qs.reqsGaugePair.RequestsExecuting.Add(0)
-	qs.execSeatsGauge.Add(0)
 }
 
 func (qs *queueSet) Dump(includeRequestDetails bool) debug.QueueSetDump {
