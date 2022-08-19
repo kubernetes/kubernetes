@@ -97,9 +97,12 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 	g.generateStruct(sw, typeParams)
 
 	if typeParams.Tags.GenerateClient {
-		if typeParams.Tags.NonNamespaced {
+		switch {
+		case !hasObjectMetaField(t):
+			sw.Do(clientgenTypeConstructorWithoutObjectMeta, typeParams)
+		case typeParams.Tags.NonNamespaced:
 			sw.Do(clientgenTypeConstructorNonNamespaced, typeParams)
-		} else {
+		default:
 			sw.Do(clientgenTypeConstructorNamespaced, typeParams)
 		}
 		if typeParams.OpenAPIType != nil {
@@ -119,6 +122,15 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 func hasTypeMetaField(t *types.Type) bool {
 	for _, member := range t.Members {
 		if typeMeta.Name == member.Type.Name && member.Embedded {
+			return true
+		}
+	}
+	return false
+}
+
+func hasObjectMetaField(t *types.Type) bool {
+	for _, member := range t.Members {
+		if objectMeta.Name == member.Type.Name && member.Embedded {
 			return true
 		}
 	}
@@ -330,6 +342,17 @@ func $.ApplyConfig.Type|public$(name string) *$.ApplyConfig.ApplyConfiguration|p
 }
 `
 
+var clientgenTypeConstructorWithoutObjectMeta = `
+// $.ApplyConfig.Type|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
+// apply.
+func $.ApplyConfig.Type|public$(name string) *$.ApplyConfig.ApplyConfiguration|public$ {
+  b := &$.ApplyConfig.ApplyConfiguration|public${}
+  b.WithKind("$.ApplyConfig.Type|singularKind$")
+  b.WithAPIVersion("$.APIVersion$")
+  return b
+}
+`
+
 var constructorWithTypeMeta = `
 // $.ApplyConfig.ApplyConfiguration|public$ constructs an declarative configuration of the $.ApplyConfig.Type|public$ type for use with
 // apply.
@@ -375,7 +398,18 @@ func Extract$.ApplyConfig.Type|public$Status($.Struct|private$ *$.Struct|raw$, f
 }
 `, typeParams)
 	}
-	sw.Do(`
+	if !hasObjectMetaField(typeParams.Struct) {
+		sw.Do(`
+func extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldManager string, subresource string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
+	b := &$.ApplyConfig.ApplyConfiguration|public${}
+	err := $.ExtractInto|raw$($.Struct|private$, $.ParserFunc|raw$().Type("$.OpenAPIType$"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+`, typeParams)
+
+	} else { // it has objectMeta
+		sw.Do(`
 func extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldManager string, subresource string) (*$.ApplyConfig.ApplyConfiguration|public$, error) {
 	b := &$.ApplyConfig.ApplyConfiguration|public${}
 	err := $.ExtractInto|raw$($.Struct|private$, $.ParserFunc|raw$().Type("$.OpenAPIType$"), fieldManager, b, subresource)
@@ -384,8 +418,9 @@ func extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldMa
 	}
 	b.WithName($.Struct|private$.Name)
 `, typeParams)
-	if !typeParams.Tags.NonNamespaced {
-		sw.Do("b.WithNamespace($.Struct|private$.Namespace)\n", typeParams)
+		if !typeParams.Tags.NonNamespaced {
+			sw.Do("b.WithNamespace($.Struct|private$.Namespace)\n", typeParams)
+		}
 	}
 	sw.Do(`
 	b.WithKind("$.ApplyConfig.Type|singularKind$")
