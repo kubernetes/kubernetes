@@ -523,6 +523,15 @@ func strategicPatchObject(
 	validationDirective string,
 	openapiModel proto.Schema,
 ) error {
+	// kcp: because we support using CRDs to represent built-in Kubernetes types (e.g. deployments) that do support
+	// strategic patch, we have to make sure we deep copy originalObject if it's already unstructured.Unstructured,
+	// because runtime.DefaultUnstructuredConverter.ToUnstructured returns the underlying map from an Unstructured
+	// without copying it, meaning that the call to applyPatchToObject below mutates the original Unstructured
+	// content unless we've first made a deep copy.
+	if _, ok := originalObject.(runtime.Unstructured); ok {
+		copiedOriginal := originalObject.DeepCopyObject()
+		originalObject = copiedOriginal
+	}
 	originalObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(originalObject)
 	if err != nil {
 		return err
