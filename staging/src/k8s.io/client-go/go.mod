@@ -34,11 +34,12 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed
-	sigs.k8s.io/structured-merge-diff/v4 v4.2.1
+	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 	sigs.k8s.io/yaml v1.2.0
 )
 
 replace (
+	github.com/json-iterator/go => github.com/json-iterator/go v1.1.11
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go

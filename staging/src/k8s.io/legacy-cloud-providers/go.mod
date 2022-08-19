@@ -44,6 +44,7 @@ require (
 )
 
 replace (
+	github.com/json-iterator/go => github.com/json-iterator/go v1.1.11
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

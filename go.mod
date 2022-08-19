@@ -54,7 +54,7 @@ require (
 	github.com/heketi/heketi v10.3.0+incompatible
 	github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6 // indirect
 	github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
-	github.com/json-iterator/go v1.1.11
+	github.com/json-iterator/go v1.1.12
 	github.com/libopenstorage/openstorage v1.0.0
 	github.com/lithammer/dedent v1.1.0
 	github.com/lpabon/godbc v0.1.1 // indirect
@@ -135,7 +135,7 @@ require (
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/system-validators v1.5.0
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed
-	sigs.k8s.io/structured-merge-diff/v4 v4.2.1
+	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 	sigs.k8s.io/yaml v1.2.0
 )
 
@@ -529,6 +529,6 @@ replace (
 	sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.13
 	sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.2.0
 	sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.11.0
-	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.2.1
+	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.2.0
 )

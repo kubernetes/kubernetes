@@ -8,7 +8,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/gogo/protobuf v1.3.2
-	github.com/json-iterator/go v1.1.11
+	github.com/json-iterator/go v1.1.12
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
@@ -22,10 +22,11 @@ require (
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kube-openapi v0.0.0-20211109043538-20434351676c
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed
-	sigs.k8s.io/structured-merge-diff/v4 v4.2.1
+	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 )
 
 replace (
+	github.com/json-iterator/go => github.com/json-iterator/go v1.1.11
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

@@ -14,7 +14,7 @@ require (
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gnostic v0.5.5
-	github.com/json-iterator/go v1.1.11
+	github.com/json-iterator/go v1.1.12
 	github.com/kr/text v0.2.0 // indirect
 	github.com/moby/spdystream v0.2.0
 	github.com/modern-go/reflect2 v1.0.1
@@ -32,8 +32,11 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/kube-openapi v0.0.0-20211109043538-20434351676c
-	sigs.k8s.io/structured-merge-diff/v4 v4.2.1
+	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 	sigs.k8s.io/yaml v1.2.0
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	github.com/json-iterator/go => github.com/json-iterator/go v1.1.11
+	k8s.io/apimachinery => ../apimachinery
+)
