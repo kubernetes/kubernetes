@@ -54,13 +54,11 @@ func TestUserNsManagerAllocate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, userNsLength, int(length), "m.isSet(%d).length=%v", allocated, length)
 	assert.Equal(t, true, m.isSet(allocated), "m.isSet(%d)", allocated)
-	assert.Equal(t, userNsLength*2, int(allocated))
 
 	allocated2, length2, err := m.allocateOne("two")
 	assert.NoError(t, err)
 	assert.NotEqual(t, allocated, allocated2, "allocated != allocated2")
 	assert.Equal(t, length, length2, "length == length2")
-	assert.Equal(t, uint32(userNsLength*3), allocated2)
 
 	// verify that re-adding the same pod with the same settings won't fail
 	err = m.record("two", allocated2, length2)
@@ -78,7 +76,6 @@ func TestUserNsManagerAllocate(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		allocated, length, err = m.allocateOne(types.UID(fmt.Sprintf("%d", i)))
 		assert.Equal(t, userNsLength, int(length), "length is not the expected. iter: %v", i)
-		assert.Equal(t, userNsLength*(i+2), int(allocated), "firstID is not the expected. iter: %v", i)
 		assert.NoError(t, err)
 		allocs = append(allocs, allocated)
 	}
@@ -304,43 +301,5 @@ func TestUserNsManagerHostIDFromMapping(t *testing.T) {
 				t.Errorf("expected: %v - got: %v", tc.expHostId, id)
 			}
 		})
-	}
-}
-
-func BenchmarkBitmaskFindAndSetFirstZero(t *testing.B) {
-	b := makeBitArray(userNsLength)
-	for i := 0; i < userNsLength; i++ {
-		_, found := b.findAvailable()
-		assert.True(t, found)
-	}
-}
-
-func BenchmarkBitmaskSetAndClear(t *testing.B) {
-	b := makeBitArray(userNsLength)
-	for i := uint32(0); i < userNsLength; i++ {
-		b.set(i)
-		b.clear(i)
-	}
-}
-
-func BenchmarkBitmaskFindAndSetFirstZeroAndClear(t *testing.B) {
-	b := makeBitArray(userNsLength)
-	for i := 0; i < userNsLength; i++ {
-		ret, found := b.findAvailable()
-		assert.True(t, found)
-		b.clear(ret)
-	}
-}
-
-func BenchmarkBitmaskFindAndSetFirstZeroAndClear0Every2(t *testing.B) {
-	// it is an interesting edge case as it forces a full scan
-	// on each second allocation.
-	b := makeBitArray(userNsLength)
-	for i := 0; i < userNsLength; i++ {
-		_, found := b.findAvailable()
-		assert.True(t, found)
-		if i%2 == 0 {
-			b.clear(0)
-		}
 	}
 }
