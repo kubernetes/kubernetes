@@ -118,7 +118,7 @@ func (g *applyConfigurationGenerator) GenerateType(c *generator.Context, t *type
 
 func hasTypeMetaField(t *types.Type) bool {
 	for _, member := range t.Members {
-		if typeMeta.Name == member.Type.Name {
+		if typeMeta.Name == member.Type.Name && member.Embedded {
 			return true
 		}
 	}
