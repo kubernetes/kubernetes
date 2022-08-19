@@ -1225,3 +1225,56 @@ func TestIsZeroCIDR(t *testing.T) {
 		})
 	}
 }
+
+func TestIsPortOverlapWithEphemeralRange(t *testing.T) {
+	testCases := []struct {
+		name     string
+		port     int
+		first    int
+		last     int
+		expected bool
+	}{
+		{
+			name:     "On the left of the range",
+			port:     33332,
+			first:    33333,
+			last:     44444,
+			expected: false,
+		},
+		{
+			name:     "Exactly overlap the first port",
+			port:     33333,
+			first:    33333,
+			last:     44444,
+			expected: true,
+		},
+		{
+			name:     "Overlap within the range",
+			port:     36666,
+			first:    33333,
+			last:     44444,
+			expected: true,
+		},
+		{
+			name:     "Exactly overlap the last port",
+			port:     44444,
+			first:    33333,
+			last:     44444,
+			expected: true,
+		},
+		{
+			name:     "On the right of the range",
+			port:     44445,
+			first:    33333,
+			last:     44444,
+			expected: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsPortOverlapWithEphemeralRange(tc.port, tc.first, tc.last); tc.expected != got {
+				t.Errorf("IsPortOverlapWithEphemeralRange() = %t, want %t", got, tc.expected)
+			}
+		})
+	}
+}

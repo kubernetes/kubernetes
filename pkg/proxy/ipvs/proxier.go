@@ -40,6 +40,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
+	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -209,6 +211,7 @@ const (
 	sysctlForward                 = "net/ipv4/ip_forward"
 	sysctlArpIgnore               = "net/ipv4/conf/all/arp_ignore"
 	sysctlArpAnnounce             = "net/ipv4/conf/all/arp_announce"
+	sysctlIPLocalPortRange        = "net/ipv4/ip_local_port_range"
 )
 
 // Proxier is an ipvs based proxy for connections between a localhost:lport
@@ -296,6 +299,8 @@ type Proxier struct {
 	// A Set is used here since we end up calculating endpoint topology multiple times for the same Service
 	// if it has multiple ports but each Service should only be counted once.
 	serviceNoLocalEndpointsExternal sets.Set[string]
+
+	leaseClient coordinationv1client.LeasesGetter
 }
 
 // Proxier implements proxy.Provider
@@ -312,6 +317,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	ipset utilipset.Interface,
 	sysctl utilsysctl.Interface,
 	exec utilexec.Interface,
+	client clientset.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	excludeCIDRs []string,
@@ -469,6 +475,7 @@ func NewDualStackProxier(
 	ipset utilipset.Interface,
 	sysctl utilsysctl.Interface,
 	exec utilexec.Interface,
+	client clientset.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	excludeCIDRs []string,
@@ -494,7 +501,7 @@ func NewDualStackProxier(
 
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], ipvs, safeIpset, sysctl,
-		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
+		exec, client, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[0], hostname, nodeIP[0],
 		recorder, healthzServer, scheduler, ipFamilyMap[v1.IPv4Protocol], kernelHandler)
@@ -503,7 +510,7 @@ func NewDualStackProxier(
 	}
 
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], ipvs, safeIpset, sysctl,
-		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
+		exec, client, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		tcpTimeout, tcpFinTimeout, udpTimeout, masqueradeAll, masqueradeBit,
 		localDetectors[1], hostname, nodeIP[1],
 		nil, nil, scheduler, ipFamilyMap[v1.IPv6Protocol], kernelHandler)
@@ -1444,6 +1451,13 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			nodePortSet.activeEntries.Insert(entry.String())
 		}
+
+		// Check if NodePort and HCNP overlaps with on-node ephemeral range
+		utilproxy.CheckPortOverlapWithEphemeralRange(proxier.recorder,
+			proxier.leaseClient,
+			svcInfo.NodePort(),
+			svcInfo.HealthCheckNodePort(),
+			proxier.hostname, svcPortNameString)
 	}
 
 	// Set the KUBE-IPVS-IPS set to the "activeBindAddrs"

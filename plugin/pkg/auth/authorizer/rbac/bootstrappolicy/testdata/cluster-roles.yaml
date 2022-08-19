@@ -1198,6 +1198,21 @@ items:
     - list
     - watch
   - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
+  - apiGroups:
+    - coordination.k8s.io
+    resourceNames:
+    - kube-proxy
+    resources:
+    - leases
+    verbs:
+    - get
+    - update
+  - apiGroups:
     - ""
     - events.k8s.io
     resources:

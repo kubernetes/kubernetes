@@ -534,6 +534,10 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
 		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 
+		// Leases
+		rbacv1helpers.NewRule("create").Groups(coordinationGroup).Resources("leases").RuleOrDie(),
+		rbacv1helpers.NewRule("get", "update").Groups(coordinationGroup).Resources("leases").Names("kube-proxy").RuleOrDie(),
+
 		eventsRule(),
 	}
 	nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())

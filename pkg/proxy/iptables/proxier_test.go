@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
@@ -332,6 +333,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		localhostNodePorts:       true,
 		nodePortAddresses:        utilproxy.NewNodePortAddresses(nil),
 		networkInterfacer:        networkInterfacer,
+		leaseClient:              clientsetfake.NewSimpleClientset().CoordinationV1(),
 	}
 	p.setInitialized(true)
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)

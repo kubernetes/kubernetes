@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/features"
@@ -176,6 +177,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		networkInterfacer:     proxyutiltest.NewFakeNetwork(),
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
 		ipFamily:              ipFamily,
+		leaseClient:           clientsetfake.NewSimpleClientset().CoordinationV1(),
 	}
 	p.setInitialized(true)
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)

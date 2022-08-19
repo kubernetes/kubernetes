@@ -96,6 +96,7 @@ func NewHollowProxyOrDie(
 			iptInterface,
 			sysctl,
 			execer,
+			client,
 			proxierSyncPeriod,
 			proxierMinSyncPeriod,
 			false,

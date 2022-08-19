@@ -25,17 +25,21 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
+	coordinationv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
+	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
+	"k8s.io/klog/v2"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	netutils "k8s.io/utils/net"
-
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -44,6 +48,9 @@ const (
 
 	// IPv6ZeroCIDR is the CIDR block for the whole IPv6 address space
 	IPv6ZeroCIDR = "::/0"
+
+	// on-node ephemeral range file
+	ipLocalPortRangeFile = "net/ipv4/ip_local_port_range"
 )
 
 var (
@@ -499,5 +506,93 @@ func RevertPorts(replacementPortsMap, originalPortsMap map[netutils.LocalPort]ne
 			klog.V(2).InfoS("Closing local port", "port", k.String())
 			v.Close()
 		}
+	}
+}
+
+func IsPortOverlapWithEphemeralRange(port int, first int, last int) bool {
+	return port >= first && port <= last
+}
+
+func LogAndEmitPortOverlapEvent(recorder events.EventRecorder, port, first, last int, hostname, svcPortName string) {
+	warnMsg := fmt.Sprintf("service %q port %d overlaps with local port range [%d-%d]", svcPortName, port, first, last)
+	klog.ErrorS(nil, "Overlap with local port range", "service", svcPortName, "port", port, "first", first, "last", last)
+	if recorder != nil {
+		recorder.Eventf(
+			&v1.ObjectReference{
+				Kind:      "Node",
+				Name:      hostname,
+				Namespace: "",
+				UID:       types.UID(hostname),
+			}, nil, v1.EventTypeWarning, "KubeProxyServicePortOverlap", "SyncServicePort", warnMsg)
+	}
+}
+
+func CheckPortOverlapWithEphemeralRange(recorder events.EventRecorder, client coordinationv1client.LeasesGetter, np, hcnp int, hostname, svcPortName string) {
+	now := metav1.NowMicro()
+	leaseTransitions := int32(0)
+	leaseDurationSeconds := int32(time.Minute / time.Second)
+
+	lease := coordinationv1.Lease{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kube-proxy",
+			Namespace: "kube-system",
+		},
+		Spec: coordinationv1.LeaseSpec{
+			HolderIdentity:       &hostname,
+			LeaseDurationSeconds: &leaseDurationSeconds,
+			AcquireTime:          &now,
+			RenewTime:            &now,
+			LeaseTransitions:     &leaseTransitions,
+		},
+	}
+
+	// Obtain the lease
+	oldLease, err := client.Leases(lease.Namespace).Get(context.TODO(), lease.Name, metav1.GetOptions{})
+	if err == nil {
+		// Lease obtained, check the Identity & Time
+		if len(*oldLease.Spec.HolderIdentity) > 0 &&
+			*oldLease.Spec.HolderIdentity != *lease.Spec.HolderIdentity &&
+			oldLease.Spec.AcquireTime.Add(time.Duration(*oldLease.Spec.LeaseDurationSeconds)).After(now.Time) {
+			klog.V(4).InfoS("Lock is held and has not yet expired", "holder", *oldLease.Spec.HolderIdentity)
+			return
+		}
+
+		// We're going to try to update
+		oldLease.Spec.RenewTime = lease.Spec.RenewTime
+		if *oldLease.Spec.HolderIdentity != *lease.Spec.HolderIdentity {
+			oldLease.Spec.HolderIdentity = lease.Spec.HolderIdentity
+			oldLease.Spec.AcquireTime = lease.Spec.AcquireTime
+			*oldLease.Spec.LeaseTransitions += 1
+		}
+
+		_, err := client.Leases(lease.Namespace).Update(context.TODO(), oldLease, metav1.UpdateOptions{})
+		if err != nil {
+			klog.ErrorS(err, "Failed to update lease", "lease", klog.KRef(lease.Namespace, lease.Name))
+			return
+		}
+	} else {
+		if !apierrors.IsNotFound(err) {
+			klog.ErrorS(err, "Failed to retrieve lease", "lease", klog.KRef(lease.Namespace, lease.Name))
+			return
+		}
+
+		// Create a new lease
+		_, err = client.Leases(lease.Namespace).Create(context.TODO(), &lease, metav1.CreateOptions{})
+		if err != nil {
+			klog.ErrorS(err, "Failed to initially create lease", "lease", klog.KRef(lease.Namespace, lease.Name))
+			return
+		}
+	}
+
+	first, last, err := utilsysctl.New().GetSysctlTwo(ipLocalPortRangeFile)
+	if err != nil {
+		return
+	}
+
+	if np != 0 && IsPortOverlapWithEphemeralRange(np, first, last) {
+		LogAndEmitPortOverlapEvent(recorder, np, first, last, hostname, svcPortName)
+	}
+	if hcnp != 0 && hcnp != np && IsPortOverlapWithEphemeralRange(hcnp, first, last) {
+		LogAndEmitPortOverlapEvent(recorder, hcnp, first, last, hostname, svcPortName)
 	}
 }

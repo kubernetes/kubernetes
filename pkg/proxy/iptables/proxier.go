@@ -39,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
+	coordinationv1client "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/client-go/tools/events"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
@@ -216,6 +218,8 @@ type Proxier struct {
 	// networkInterfacer defines an interface for several net library functions.
 	// Inject for test purpose.
 	networkInterfacer utilproxy.NetworkInterfacer
+
+	leaseClient coordinationv1client.LeasesGetter
 }
 
 // Proxier implements proxy.Provider
@@ -230,6 +234,7 @@ func NewProxier(ipFamily v1.IPFamily,
 	ipt utiliptables.Interface,
 	sysctl utilsysctl.Interface,
 	exec utilexec.Interface,
+	client clientset.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
@@ -276,6 +281,7 @@ func NewProxier(ipFamily v1.IPFamily,
 		endpointsMap:             make(proxy.EndpointsMap),
 		endpointsChanges:         proxy.NewEndpointChangeTracker(hostname, newEndpointInfo, ipFamily, recorder, nil),
 		needFullSync:             true,
+		leaseClient:              client.CoordinationV1(),
 		syncPeriod:               syncPeriod,
 		iptables:                 ipt,
 		masqueradeAll:            masqueradeAll,
@@ -323,6 +329,7 @@ func NewDualStackProxier(
 	ipt [2]utiliptables.Interface,
 	sysctl utilsysctl.Interface,
 	exec utilexec.Interface,
+	client clientset.Interface,
 	syncPeriod time.Duration,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
@@ -338,14 +345,14 @@ func NewDualStackProxier(
 	// Create an ipv4 instance of the single-stack proxier
 	ipFamilyMap := utilproxy.MapCIDRsByIPFamily(nodePortAddresses)
 	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, ipt[0], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit, localDetectors[0], hostname,
+		exec, client, syncPeriod, minSyncPeriod, masqueradeAll, localhostNodePorts, masqueradeBit, localDetectors[0], hostname,
 		nodeIP[0], recorder, healthzServer, ipFamilyMap[v1.IPv4Protocol])
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, ipt[1], sysctl,
-		exec, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit, localDetectors[1], hostname,
+		exec, client, syncPeriod, minSyncPeriod, masqueradeAll, false, masqueradeBit, localDetectors[1], hostname,
 		nodeIP[1], recorder, healthzServer, ipFamilyMap[v1.IPv6Protocol])
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
@@ -1243,6 +1250,13 @@ func (proxier *Proxier) syncProxyRules() {
 				"-j", "ACCEPT",
 			)
 		}
+
+		// Check if NodePort and HCNP overlaps with on-node ephemeral range
+		utilproxy.CheckPortOverlapWithEphemeralRange(proxier.recorder,
+			proxier.leaseClient,
+			svcInfo.NodePort(),
+			svcInfo.HealthCheckNodePort(),
+			proxier.hostname, svcPortNameString)
 
 		// If the SVC/SVL/EXT/FW/SEP chains have not changed since the last sync
 		// then we can omit them from the restore input. (We have already marked
