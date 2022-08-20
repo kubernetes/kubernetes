@@ -87,6 +87,11 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
+	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
+	serviceallocator "k8s.io/kubernetes/pkg/registry/core/service/allocator/storage"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/utils/clock"
@@ -553,23 +558,107 @@ func labelAPIServerHeartbeat(lease *coordinationapiv1.Lease) error {
 	return nil
 }
 
+// LegacyRESTStorage returns stateful information about particular instances of REST storage to
+// master.go for wiring controllers.
+// TODO remove this by running the controller as a poststarthook
+type LegacyRESTStorage struct {
+	ServiceClusterIPAllocator          rangeallocation.RangeRegistry
+	SecondaryServiceClusterIPAllocator rangeallocation.RangeRegistry
+	ServiceNodePortAllocator           rangeallocation.RangeRegistry
+}
+
 // InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
 func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter) error {
+
+	restStorage := LegacyRESTStorage{}
+	var serviceClusterIPRegistry rangeallocation.RangeRegistry
+	serviceClusterIPRange := c.ExtraConfig.ServiceIPRange
+	if serviceClusterIPRange.IP == nil {
+		return fmt.Errorf("service clusterIPRange is missing")
+	}
+
+	serviceStorageConfig, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("services"))
+	if err != nil {
+		return err
+	}
+
+	serviceClusterIPAllocator, err := ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+		var mem allocator.Snapshottable
+		mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
+		// TODO etcdallocator package to return a storage interface via the storageFactory
+		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
+		if err != nil {
+			return nil, err
+		}
+		serviceClusterIPRegistry = etcd
+		return etcd, nil
+	})
+	if err != nil {
+		return fmt.Errorf("cannot create cluster IP allocator: %v", err)
+	}
+	serviceClusterIPAllocator.EnableMetrics()
+	restStorage.ServiceClusterIPAllocator = serviceClusterIPRegistry
+
+	// allocator for secondary service ip range
+	var secondaryServiceClusterIPAllocator ipallocator.Interface
+	if c.ExtraConfig.SecondaryServiceIPRange.IP != nil {
+		var secondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
+		secondaryServiceClusterIPAllocator, err = ipallocator.New(&c.ExtraConfig.SecondaryServiceIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
+			var mem allocator.Snapshottable
+			mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
+			// TODO etcdallocator package to return a storage interface via the storageFactory
+			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
+			if err != nil {
+				return nil, err
+			}
+			secondaryServiceClusterIPRegistry = etcd
+			return etcd, nil
+		})
+		if err != nil {
+			return fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
+		}
+		secondaryServiceClusterIPAllocator.EnableMetrics()
+		restStorage.SecondaryServiceClusterIPAllocator = secondaryServiceClusterIPRegistry
+	}
+
+	var serviceNodePortRegistry rangeallocation.RangeRegistry
+	serviceNodePortAllocator, err := portallocator.New(c.ExtraConfig.ServiceNodePortRange, func(max int, rangeSpec string) (allocator.Interface, error) {
+		mem := allocator.NewAllocationMap(max, rangeSpec)
+		// TODO etcdallocator package to return a storage interface via the storageFactory
+		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/servicenodeports", serviceStorageConfig.ForResource(api.Resource("servicenodeportallocations")))
+		if err != nil {
+			return nil, err
+		}
+		serviceNodePortRegistry = etcd
+		return etcd, nil
+	})
+	if err != nil {
+		return fmt.Errorf("cannot create cluster port allocator: %v", err)
+	}
+	restStorage.ServiceNodePortAllocator = serviceNodePortRegistry
+
+	serviceIPAllocators := map[api.IPFamily]ipallocator.Interface{
+		serviceClusterIPAllocator.IPFamily(): serviceClusterIPAllocator,
+	}
+	if secondaryServiceClusterIPAllocator != nil {
+		serviceIPAllocators[secondaryServiceClusterIPAllocator.IPFamily()] = secondaryServiceClusterIPAllocator
+	}
+
 	legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
 		StorageFactory:              c.ExtraConfig.StorageFactory,
 		ProxyTransport:              c.ExtraConfig.ProxyTransport,
 		KubeletClientConfig:         c.ExtraConfig.KubeletClientConfig,
 		EventTTL:                    c.ExtraConfig.EventTTL,
-		ServiceIPRange:              c.ExtraConfig.ServiceIPRange,
-		SecondaryServiceIPRange:     c.ExtraConfig.SecondaryServiceIPRange,
-		ServiceNodePortRange:        c.ExtraConfig.ServiceNodePortRange,
+		DefaultIPFamily:             serviceClusterIPAllocator.IPFamily(),
+		ServiceIPAllocators:         serviceIPAllocators,
+		NodePortAllocator:           serviceNodePortAllocator,
 		LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
 		ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
 		ExtendExpiration:            c.ExtraConfig.ExtendExpiration,
 		ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
 		APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
 	}
-	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(c.ExtraConfig.APIResourceConfigSource, restOptionsGetter)
+	apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(c.ExtraConfig.APIResourceConfigSource, restOptionsGetter)
 	if err != nil {
 		return fmt.Errorf("error building core storage: %v", err)
 	}
@@ -579,7 +668,7 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 
 	controllerName := "bootstrap-controller"
 	client := kubernetes.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	bootstrapController, err := c.NewBootstrapController(legacyRESTStorage, client)
+	bootstrapController, err := c.NewBootstrapController(restStorage, client)
 	if err != nil {
 		return fmt.Errorf("error creating bootstrap controller: %v", err)
 	}

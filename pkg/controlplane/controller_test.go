@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
-	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	netutils "k8s.io/utils/net"
 )
 
@@ -455,7 +454,7 @@ func Test_completedConfig_NewBootstrapController(t *testing.T) {
 	ipv6address := netutils.ParseIPSloppy("2001:db8::1")
 
 	type args struct {
-		legacyRESTStorage corerest.LegacyRESTStorage
+		legacyRESTStorage LegacyRESTStorage
 		client            kubernetes.Interface
 	}
 	tests := []struct {

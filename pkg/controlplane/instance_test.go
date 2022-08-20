@@ -151,12 +151,10 @@ func TestLegacyRestStorageStrategies(t *testing.T) {
 		ProxyTransport:       apiserverCfg.ExtraConfig.ProxyTransport,
 		KubeletClientConfig:  apiserverCfg.ExtraConfig.KubeletClientConfig,
 		EventTTL:             apiserverCfg.ExtraConfig.EventTTL,
-		ServiceIPRange:       apiserverCfg.ExtraConfig.ServiceIPRange,
-		ServiceNodePortRange: apiserverCfg.ExtraConfig.ServiceNodePortRange,
 		LoopbackClientConfig: apiserverCfg.GenericConfig.LoopbackClientConfig,
 	}
 
-	_, apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
+	apiGroupInfo, err := storageProvider.NewLegacyRESTStorage(serverstorage.NewResourceConfig(), apiserverCfg.GenericConfig.RESTOptionsGetter)
 	if err != nil {
 		t.Errorf("failed to create legacy REST storage: %v", err)
 	}
