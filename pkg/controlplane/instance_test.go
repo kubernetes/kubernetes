@@ -32,7 +32,6 @@ import (
 	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
-	apiv1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
@@ -52,7 +51,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	kubeversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -215,58 +213,6 @@ func TestVersion(t *testing.T) {
 	if !reflect.DeepEqual(kubeversion.Get(), info) {
 		t.Errorf("Expected %#v, Got %#v", kubeversion.Get(), info)
 	}
-}
-
-func makeNodeList(nodes []string, nodeResources apiv1.NodeResources) *apiv1.NodeList {
-	list := apiv1.NodeList{
-		Items: make([]apiv1.Node, len(nodes)),
-	}
-	for i := range nodes {
-		list.Items[i].Name = nodes[i]
-		list.Items[i].Status.Capacity = nodeResources.Capacity
-	}
-	return &list
-}
-
-// TestGetNodeAddresses verifies that proper results are returned
-// when requesting node addresses.
-func TestGetNodeAddresses(t *testing.T) {
-	assert := assert.New(t)
-
-	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2"}, apiv1.NodeResources{})).CoreV1().Nodes()
-	addressProvider := nodeAddressProvider{fakeNodeClient}
-
-	// Fail case (no addresses associated with nodes)
-	addrs, err := addressProvider.externalAddresses()
-
-	assert.Error(err, "addresses should have caused an error as there are no addresses.")
-	assert.Equal([]string(nil), addrs)
-
-	// Pass case with External type IP
-	nodes, _ := fakeNodeClient.List(context.TODO(), metav1.ListOptions{})
-	for index := range nodes.Items {
-		nodes.Items[index].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
-		fakeNodeClient.Update(context.TODO(), &nodes.Items[index], metav1.UpdateOptions{})
-	}
-	addrs, err = addressProvider.externalAddresses()
-	assert.NoError(err, "addresses should not have returned an error.")
-	assert.Equal([]string{"127.0.0.1", "127.0.0.1"}, addrs)
-}
-
-func TestGetNodeAddressesWithOnlySomeExternalIP(t *testing.T) {
-	assert := assert.New(t)
-
-	fakeNodeClient := fake.NewSimpleClientset(makeNodeList([]string{"node1", "node2", "node3"}, apiv1.NodeResources{})).CoreV1().Nodes()
-	addressProvider := nodeAddressProvider{fakeNodeClient}
-
-	// Pass case with 1 External type IP (index == 1) and nodes (indexes 0 & 2) have no External IP.
-	nodes, _ := fakeNodeClient.List(context.TODO(), metav1.ListOptions{})
-	nodes.Items[1].Status.Addresses = []apiv1.NodeAddress{{Type: apiv1.NodeExternalIP, Address: "127.0.0.1"}}
-	fakeNodeClient.Update(context.TODO(), &nodes.Items[1], metav1.UpdateOptions{})
-
-	addrs, err := addressProvider.externalAddresses()
-	assert.NoError(err, "addresses should not have returned an error.")
-	assert.Equal([]string{"127.0.0.1"}, addrs)
 }
 
 func decodeResponse(resp *http.Response, obj interface{}) error {
