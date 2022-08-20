@@ -35,15 +35,16 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/controller"
-	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsfake "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 	emfake "k8s.io/metrics/pkg/client/external_metrics/fake"
+
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/controller"
+	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,6 +58,7 @@ type resourceInfo struct {
 	podNames []string
 
 	targetUtilization   int32
+	targetValue         int64
 	expectedUtilization int32
 	expectedValue       int64
 }
@@ -160,15 +162,12 @@ func (tc *replicaCalcTestCase) prepareTestClientSet() *fake.Clientset {
 			}
 
 			if tc.resource != nil && i < len(tc.resource.requests) {
-				pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						tc.resource.name: tc.resource.requests[i],
-					},
-				}
-				pod.Spec.Containers[1].Resources = v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						tc.resource.name: tc.resource.requests[i],
-					},
+				for ci := 0; ci < numContainersPerPod; ci++ {
+					pod.Spec.Containers[ci].Resources = v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							tc.resource.name: tc.resource.requests[i],
+						},
+					}
 				}
 			}
 			obj.Items = append(obj.Items, pod)
@@ -360,6 +359,21 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	}
 
 	if tc.resource != nil {
+		if tc.resource.targetValue != 0 {
+			outReplicas, outUtilization, outTimestamp, err := replicaCalc.GetRawResourceReplicas(context.TODO(), tc.currentReplicas, tc.resource.targetValue, tc.resource.name, testNamespace, selector, tc.container)
+			if tc.expectedError != nil {
+				require.Error(t, err, "there should be an error calculating the replica count")
+				assert.Contains(t, err.Error(), tc.expectedError.Error(), "the error message should have contained the expected error message")
+				return
+			}
+
+			require.NoError(t, err, "there should not have been an error calculating the replica count")
+			assert.Equal(t, tc.expectedReplicas, outReplicas, "replicas should be as expected")
+			assert.Equal(t, tc.resource.expectedValue, outUtilization, "value should be as expected")
+			assert.True(t, tc.timestamp.Equal(outTimestamp), "timestamp should be as expected")
+			return
+		}
+
 		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(context.TODO(), tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, testNamespace, selector, tc.container)
 
 		if tc.expectedError != nil {
@@ -570,11 +584,10 @@ func TestReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleHotCpuNoScale(t *testing.T) {
+func TestReplicaCalcScaleUpHotCpuNoScale(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
 		expectedReplicas: 3,
-		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
 		podStartTime:     []metav1.Time{coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
 		resource: &resourceInfo{
 			name:     v1.ResourceCPU,
@@ -663,6 +676,173 @@ func TestReplicaCalcScaleUpContainerIgnoresDeletionPods(t *testing.T) {
 			targetUtilization:   30,
 			expectedUtilization: 60,
 			expectedValue:       600,
+		},
+		container: "container1",
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpRaw(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 5,
+		resource: &resourceInfo{
+			name:          v1.ResourceCPU,
+			levels:        makePodMetricLevels(300, 500, 700),
+			targetValue:   600,
+			expectedValue: 1000,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcContainerScaleUpRaw(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 5,
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: [][]int64{{1000, 300}, {1000, 500}, {1000, 700}},
+
+			targetValue:   300,
+			expectedValue: 500,
+		},
+		container: "container2",
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpRawUnreadyLessScale(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 4,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionTrue, v1.ConditionTrue},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(300, 500, 700),
+
+			targetValue:   600,
+			expectedValue: 1200,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpRawContainerHotCpuLessScale(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 4,
+		podStartTime:     []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime()},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: [][]int64{{1000, 300}, {1000, 500}, {1000, 700}},
+
+			targetValue:   300,
+			expectedValue: 600,
+		},
+		container: "container2",
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpRawUnreadyNoScale(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 3,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(400, 500, 700),
+
+			targetValue:   600,
+			expectedValue: 800,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpRawHotCpuNoScale(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 3,
+		podStartTime:     []metav1.Time{coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(400, 500, 700),
+
+			targetValue:   600,
+			expectedValue: 800,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpRawIgnoresFailedPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  2,
+		expectedReplicas: 4,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:         []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(500, 700),
+
+			targetValue:   600,
+			expectedValue: 1200,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpRawContainerIgnoresFailedPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  2,
+		expectedReplicas: 4,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:         []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: [][]int64{{500, 500}, {700, 700}},
+
+			targetValue:   300,
+			expectedValue: 600,
+		},
+		container: "container2",
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpRawIgnoresDeletionPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:      2,
+		expectedReplicas:     4,
+		podReadiness:         []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:             []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning},
+		podDeletionTimestamp: []bool{false, false, true, true},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(500, 700),
+
+			targetValue:   600,
+			expectedValue: 1200,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleUpRawContainerIgnoresDeletionPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:      2,
+		expectedReplicas:     4,
+		podReadiness:         []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:             []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning},
+		podDeletionTimestamp: []bool{false, false, true, true},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(500, 700),
+
+			targetValue:   300,
+			expectedValue: 600,
 		},
 		container: "container1",
 	}
@@ -876,92 +1056,6 @@ func TestReplicaCalcContainerScaleDown(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleDownCM(t *testing.T) {
-	tc := replicaCalcTestCase{
-		currentReplicas:  5,
-		expectedReplicas: 3,
-		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{12000, 12000, 12000, 12000, 12000},
-			targetUtilization:   20000,
-			expectedUtilization: 12000,
-			metricType:          podMetric,
-		},
-	}
-	tc.runTest(t)
-}
-
-func TestReplicaCalcScaleDownPerPodCMObject(t *testing.T) {
-	tc := replicaCalcTestCase{
-		currentReplicas:  5,
-		expectedReplicas: 3,
-		metric: &metricInfo{
-			name:                    "qps",
-			levels:                  []int64{6000},
-			perPodTargetUtilization: 2000,
-			expectedUtilization:     1200,
-			singleObject: &autoscalingv2.CrossVersionObjectReference{
-				Kind:       "Deployment",
-				APIVersion: "apps/v1",
-				Name:       "some-deployment",
-			},
-			metricType: objectPerPodMetric,
-		},
-	}
-	tc.runTest(t)
-}
-
-func TestReplicaCalcScaleDownCMObject(t *testing.T) {
-	tc := replicaCalcTestCase{
-		currentReplicas:  5,
-		expectedReplicas: 3,
-		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{12000},
-			targetUtilization:   20000,
-			expectedUtilization: 12000,
-			singleObject: &autoscalingv2.CrossVersionObjectReference{
-				Kind:       "Deployment",
-				APIVersion: "apps/v1",
-				Name:       "some-deployment",
-			},
-		},
-	}
-	tc.runTest(t)
-}
-
-func TestReplicaCalcScaleDownCMExternal(t *testing.T) {
-	tc := replicaCalcTestCase{
-		currentReplicas:  5,
-		expectedReplicas: 3,
-		metric: &metricInfo{
-			name:                "qps",
-			levels:              []int64{8600},
-			targetUtilization:   14334,
-			expectedUtilization: 8600,
-			selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-			metricType:          externalMetric,
-		},
-	}
-	tc.runTest(t)
-}
-
-func TestReplicaCalcScaleDownPerPodCMExternal(t *testing.T) {
-	tc := replicaCalcTestCase{
-		currentReplicas:  5,
-		expectedReplicas: 3,
-		metric: &metricInfo{
-			name:                    "qps",
-			levels:                  []int64{8600},
-			perPodTargetUtilization: 2867,
-			expectedUtilization:     1720,
-			selector:                &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-			metricType:              externalPerPodMetric,
-		},
-	}
-	tc.runTest(t)
-}
-
 func TestReplicaCalcScaleDownExcludeUnreadyPods(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  5,
@@ -1156,6 +1250,242 @@ func TestReplicaCalcScaleDownIgnoresDeletionPods_StillRunning(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcScaleDownRaw(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 3,
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(100, 300, 500, 300, 300),
+
+			targetValue:   1000,
+			expectedValue: 600,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcContainerScaleDownRaw(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 3,
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: [][]int64{{1000, 100}, {1000, 300}, {1000, 500}, {1000, 350}, {1000, 250}},
+
+			targetValue:   500,
+			expectedValue: 300,
+		},
+		container: "container2",
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownRawExcludeUnreadyPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 2,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(100, 300, 500, 300, 300),
+
+			targetValue:   1000,
+			expectedValue: 600,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownRawContainerExcludeUnreadyPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 2,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: [][]int64{{1000, 100}, {1000, 300}, {1000, 500}, {1000, 350}, {1000, 250}},
+
+			targetValue:   500,
+			expectedValue: 300,
+		},
+		container: "container2",
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownRawIgnoreHotCpuPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 2,
+		podStartTime:     []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(100, 300, 500, 300, 300),
+
+			targetValue:   1000,
+			expectedValue: 600,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownRawContainerIgnoreHotCpuPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 2,
+		podStartTime:     []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime(), hotCPUCreationTime()},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: [][]int64{{1000, 100}, {1000, 300}, {1000, 500}, {1000, 350}, {1000, 250}},
+
+			targetValue:   500,
+			expectedValue: 300,
+		},
+		container: "container2",
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownRawIgnoresFailedPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 3,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:         []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(100, 300, 500, 300, 300),
+
+			targetValue:   1000,
+			expectedValue: 600,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownRawContainerIgnoresFailedPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 3,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:         []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodFailed, v1.PodFailed},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: [][]int64{{1000, 100}, {1000, 300}, {1000, 500}, {1000, 350}, {1000, 250}},
+
+			targetValue:   500,
+			expectedValue: 300,
+		},
+		container: "container2",
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownRawIgnoresDeletionPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:      5,
+		expectedReplicas:     3,
+		podReadiness:         []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue, v1.ConditionFalse, v1.ConditionFalse},
+		podPhase:             []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning, v1.PodRunning},
+		podDeletionTimestamp: []bool{false, false, false, false, false, true, true},
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(100, 300, 500, 300, 300),
+
+			targetValue:   1000,
+			expectedValue: 600,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownCM(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 3,
+		metric: &metricInfo{
+			name:                "qps",
+			levels:              []int64{12000, 12000, 12000, 12000, 12000},
+			targetUtilization:   20000,
+			expectedUtilization: 12000,
+			metricType:          podMetric,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownPerPodCMObject(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 3,
+		metric: &metricInfo{
+			name:                    "qps",
+			levels:                  []int64{6000},
+			perPodTargetUtilization: 2000,
+			expectedUtilization:     1200,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+				Name:       "some-deployment",
+			},
+			metricType: objectPerPodMetric,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownCMObject(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 3,
+		metric: &metricInfo{
+			name:                "qps",
+			levels:              []int64{12000},
+			targetUtilization:   20000,
+			expectedUtilization: 12000,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+				Name:       "some-deployment",
+			},
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownCMExternal(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 3,
+		metric: &metricInfo{
+			name:                "qps",
+			levels:              []int64{8600},
+			targetUtilization:   14334,
+			expectedUtilization: 8600,
+			selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			metricType:          externalMetric,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownPerPodCMExternal(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  5,
+		expectedReplicas: 3,
+		metric: &metricInfo{
+			name:                    "qps",
+			levels:                  []int64{8600},
+			perPodTargetUtilization: 2867,
+			expectedUtilization:     1720,
+			selector:                &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			metricType:              externalPerPodMetric,
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcTolerance(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
@@ -1168,6 +1498,21 @@ func TestReplicaCalcTolerance(t *testing.T) {
 			targetUtilization:   100,
 			expectedUtilization: 102,
 			expectedValue:       numContainersPerPod * 1020,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcRawTolerance(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 3,
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(553, 549, 547),
+
+			targetValue:   1000,
+			expectedValue: 1099,
 		},
 	}
 	tc.runTest(t)
@@ -1477,6 +1822,50 @@ func TestReplicaCalcDuringRollingUpdateWithMaxSurge(t *testing.T) {
 			targetUtilization:   50,
 			expectedUtilization: 10,
 			expectedValue:       numContainersPerPod * 100,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcRawMissingMetricsScaleUp(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  4,
+		expectedReplicas: 5,
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(600, 1000),
+
+			targetValue:   640,
+			expectedValue: 1600,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcRawMissingMetricsScaleDown(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  4,
+		expectedReplicas: 3,
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(400, 95),
+
+			targetValue:   990,
+			expectedValue: 495,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcRawEmptyMetrics(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas: 4,
+		expectedError:   fmt.Errorf("unable to get metrics for resource cpu: no metrics returned from resource metrics API"),
+		resource: &resourceInfo{
+			name:   v1.ResourceCPU,
+			levels: makePodMetricLevels(),
+
+			targetValue: 100,
 		},
 	}
 	tc.runTest(t)
