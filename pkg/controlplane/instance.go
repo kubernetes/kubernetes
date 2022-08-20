@@ -829,6 +829,7 @@ var (
 		rbacv1.SchemeGroupVersion,
 		storageapiv1.SchemeGroupVersion,
 		schedulingapiv1.SchemeGroupVersion,
+		networkingapiv1alpha1.SchemeGroupVersion,
 	}
 
 	// legacyBetaEnabledByDefaultResources is the list of beta resources we enable.  You may only add to this list
@@ -863,7 +864,6 @@ var (
 		apiserverinternalv1alpha1.SchemeGroupVersion,
 		authenticationv1alpha1.SchemeGroupVersion,
 		resourcev1alpha1.SchemeGroupVersion,
-		networkingapiv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 		flowcontrolv1alpha1.SchemeGroupVersion,
 	}
