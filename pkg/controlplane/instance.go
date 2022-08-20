@@ -82,7 +82,6 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/utils/clock"
 
 	// RESTStorage installers
@@ -601,41 +600,6 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 		return fmt.Errorf("error in registering group versions: %v", err)
 	}
 	return nil
-}
-
-type nodeAddressProvider struct {
-	nodeClient corev1client.NodeInterface
-}
-
-func (n nodeAddressProvider) externalAddresses() ([]string, error) {
-	preferredAddressTypes := []apiv1.NodeAddressType{
-		apiv1.NodeExternalIP,
-	}
-	nodes, err := n.nodeClient.List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	var matchErr error
-	addrs := []string{}
-	for ix := range nodes.Items {
-		node := &nodes.Items[ix]
-		addr, err := nodeutil.GetPreferredNodeAddress(node, preferredAddressTypes)
-		if err != nil {
-			if _, ok := err.(*nodeutil.NoMatchError); ok {
-				matchErr = err
-				continue
-			}
-			return nil, err
-		}
-		addrs = append(addrs, addr)
-	}
-	if len(addrs) == 0 && matchErr != nil {
-		// We only return an error if we have items.
-		// Currently we return empty list/no error if Items is empty.
-		// We do this for backward compatibility reasons.
-		return nil, matchErr
-	}
-	return addrs, nil
 }
 
 var (
