@@ -478,6 +478,9 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		controllers["resource-claim-controller"] = startResourceClaimController
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MultiCIDRServiceAllocator) {
+		controllers["service-cidrs"] = startServiceCIDRsController
+	}
 
 	return controllers
 }
