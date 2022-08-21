@@ -95,6 +95,7 @@ import (
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/utils/clock"
+	netutils "k8s.io/utils/net"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
@@ -567,19 +568,17 @@ type LegacyRESTStorage struct {
 	ServiceNodePortAllocator           rangeallocation.RangeRegistry
 }
 
-// InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
-func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter) error {
-
+func newServiceAllocators(c *completedConfig) (LegacyRESTStorage, map[api.IPFamily]ipallocator.Interface, portallocator.Interface, error) {
 	restStorage := LegacyRESTStorage{}
 	var serviceClusterIPRegistry rangeallocation.RangeRegistry
 	serviceClusterIPRange := c.ExtraConfig.ServiceIPRange
 	if serviceClusterIPRange.IP == nil {
-		return fmt.Errorf("service clusterIPRange is missing")
+		return LegacyRESTStorage{}, nil, nil, fmt.Errorf("service clusterIPRange is missing")
 	}
 
 	serviceStorageConfig, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("services"))
 	if err != nil {
-		return err
+		return LegacyRESTStorage{}, nil, nil, err
 	}
 
 	serviceClusterIPAllocator, err := ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
@@ -594,7 +593,7 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 		return etcd, nil
 	})
 	if err != nil {
-		return fmt.Errorf("cannot create cluster IP allocator: %v", err)
+		return LegacyRESTStorage{}, nil, nil, fmt.Errorf("cannot create cluster IP allocator: %v", err)
 	}
 	serviceClusterIPAllocator.EnableMetrics()
 	restStorage.ServiceClusterIPAllocator = serviceClusterIPRegistry
@@ -615,7 +614,7 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 			return etcd, nil
 		})
 		if err != nil {
-			return fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
+			return LegacyRESTStorage{}, nil, nil, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
 		}
 		secondaryServiceClusterIPAllocator.EnableMetrics()
 		restStorage.SecondaryServiceClusterIPAllocator = secondaryServiceClusterIPRegistry
@@ -633,7 +632,7 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 		return etcd, nil
 	})
 	if err != nil {
-		return fmt.Errorf("cannot create cluster port allocator: %v", err)
+		return LegacyRESTStorage{}, nil, nil, fmt.Errorf("cannot create cluster port allocator: %v", err)
 	}
 	restStorage.ServiceNodePortAllocator = serviceNodePortRegistry
 
@@ -643,13 +642,27 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 	if secondaryServiceClusterIPAllocator != nil {
 		serviceIPAllocators[secondaryServiceClusterIPAllocator.IPFamily()] = secondaryServiceClusterIPAllocator
 	}
+	return restStorage, serviceIPAllocators, serviceNodePortAllocator, nil
+}
+
+// InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
+func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter) error {
+	restStorage, serviceIPAllocators, serviceNodePortAllocator, err := newServiceAllocators(c)
+	if err != nil {
+		return fmt.Errorf("error creating service allocators: %v", err)
+	}
+
+	defaultIPFamily := api.IPv4Protocol
+	if netutils.IsIPv6(c.ExtraConfig.ServiceIPRange.IP) {
+		defaultIPFamily = api.IPv6Protocol
+	}
 
 	legacyRESTStorageProvider := corerest.LegacyRESTStorageProvider{
 		StorageFactory:              c.ExtraConfig.StorageFactory,
 		ProxyTransport:              c.ExtraConfig.ProxyTransport,
 		KubeletClientConfig:         c.ExtraConfig.KubeletClientConfig,
 		EventTTL:                    c.ExtraConfig.EventTTL,
-		DefaultIPFamily:             serviceClusterIPAllocator.IPFamily(),
+		DefaultIPFamily:             defaultIPFamily,
 		ServiceIPAllocators:         serviceIPAllocators,
 		NodePortAllocator:           serviceNodePortAllocator,
 		LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
