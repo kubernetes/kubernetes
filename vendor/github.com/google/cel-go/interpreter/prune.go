@@ -41,17 +41,23 @@ type astPruner struct {
 // A)
 // 1) Evaluate expr with some unknowns,
 // 2) If result is unknown:
-//   a) PruneAst
-//   b) Goto 1
+//
+//	a) PruneAst
+//	b) Goto 1
+//
 // Functional call results which are known would be effectively cached across
 // iterations.
 //
 // B)
 // 1) Compile the expression (maybe via a service and maybe after checking a
-//    compiled expression does not exists in local cache)
+//
+//	compiled expression does not exists in local cache)
+//
 // 2) Prepare the environment and the interpreter. Activation might be empty.
 // 3) Eval the expression. This might return unknown or error or a concrete
-//    value.
+//
+//	value.
+//
 // 4) PruneAst
 // 4) Maybe cache the expression
 // This is effectively constant folding the expression. How the environment is
@@ -232,9 +238,9 @@ func (p *astPruner) prune(node *exprpb.Expr) (*exprpb.Expr, bool) {
 	// transform, or expression was not evaluated. If possible, drill down
 	// more.
 
-	switch node.ExprKind.(type) {
+	switch node.GetExprKind().(type) {
 	case *exprpb.Expr_SelectExpr:
-		if operand, pruned := p.prune(node.GetSelectExpr().Operand); pruned {
+		if operand, pruned := p.prune(node.GetSelectExpr().GetOperand()); pruned {
 			return &exprpb.Expr{
 				Id: node.GetId(),
 				ExprKind: &exprpb.Expr_SelectExpr{
