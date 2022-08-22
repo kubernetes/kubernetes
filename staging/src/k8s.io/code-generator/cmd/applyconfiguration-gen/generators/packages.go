@@ -30,6 +30,7 @@ import (
 	"k8s.io/klog/v2"
 
 	applygenargs "k8s.io/code-generator/cmd/applyconfiguration-gen/args"
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 )
 
@@ -236,8 +237,10 @@ func packageTypesForInputDirs(context *generator.Context, inputDirs []string, ou
 			klog.Warningf("Skipping internal package: %s", p.Path)
 			continue
 		}
-		gv := groupVersion(p)
-		pkg := filepath.Join(outputPath, gv.Group.PackageName(), strings.ToLower(gv.Version.NonEmpty()))
+		// this is how the client generator finds the package we are creating. It uses the API package name, not the group name.
+		_, gvPackageString := util.ParsePathGroupVersion(p.Path)
+
+		pkg := filepath.Join(outputPath, strings.ToLower(gvPackageString))
 		pkgTypes[pkg] = p
 	}
 	return pkgTypes
