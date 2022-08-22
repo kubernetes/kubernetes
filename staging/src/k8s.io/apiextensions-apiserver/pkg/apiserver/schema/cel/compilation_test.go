@@ -1593,6 +1593,27 @@ func TestCostEstimation(t *testing.T) {
 			setMaxElements:   10,
 			expectedSetCost:  6,
 		},
+		{
+			name:             "check cost of size call",
+			schemaGenerator:  genMapWithRule("integer", "oldSelf.size() == self.size()"),
+			expectedCalcCost: 5,
+			setMaxElements:   10,
+			expectedSetCost:  5,
+		},
+		{
+			name:             "check cost of timestamp comparison",
+			schemaGenerator:  genMapWithRule("date-time", `self["a"] == self["b"]`),
+			expectedCalcCost: 8,
+			setMaxElements:   7,
+			expectedSetCost:  8,
+		},
+		{
+			name:             "check cost of duration comparison",
+			schemaGenerator:  genMapWithRule("duration", `self["c"] == self["d"]`),
+			expectedCalcCost: 8,
+			setMaxElements:   42,
+			expectedSetCost:  8,
+		},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
