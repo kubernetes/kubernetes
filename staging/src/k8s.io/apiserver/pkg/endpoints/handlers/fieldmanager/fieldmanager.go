@@ -123,6 +123,14 @@ func newDefaultFieldManager(f Manager, typeConverter TypeConverter, objectConver
 	)
 }
 
+func BuildManagerIdentifier(encodedManager *metav1.ManagedFieldsEntry) (manager string, err error) {
+	return internal.BuildManagerIdentifier(encodedManager)
+}
+
+func EncodeObjectManagedFields(obj runtime.Object, managed Managed) error {
+	return internal.EncodeObjectManagedFields(obj, managed)
+}
+
 // DecodeManagedFields converts ManagedFields from the wire format (api format)
 // to the format used by sigs.k8s.io/structured-merge-diff
 func DecodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (Managed, error) {
