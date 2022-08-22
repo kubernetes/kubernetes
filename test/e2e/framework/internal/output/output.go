@@ -44,7 +44,7 @@ func TestGinkgoOutput(t *testing.T, expected SuiteResults) {
 	// Now check the output.
 	actual := normalizeReport(report)
 
-	if assert.Equal(t, len(expected), len(actual), "Should have %d test results, got: %v", actual) {
+	if assert.Equal(t, len(expected), len(actual), "Should have %d test results, got: %v", len(expected), actual) {
 		for i := 0; i < len(expected); i++ {
 			assert.Equal(t, expected[i].Name, actual[i].Name, "name from test #%d", i)
 			output := actual[i].Output
