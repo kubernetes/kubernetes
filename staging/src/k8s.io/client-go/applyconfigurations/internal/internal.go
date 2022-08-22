@@ -8643,6 +8643,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         namedType: io.k8s.api.flowcontrol.v1alpha1.UserSubject
+    - name: userAgent
+      type:
+        namedType: io.k8s.api.flowcontrol.v1alpha1.UserAgentSubject
     unions:
     - discriminator: kind
       fields:
@@ -8652,6 +8655,15 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: ServiceAccount
       - fieldName: user
         discriminatorValue: User
+      - fieldName: userAgent
+        discriminatorValue: UserAgent
+- name: io.k8s.api.flowcontrol.v1alpha1.UserAgentSubject
+  map:
+    fields:
+    - name: nameRegexp
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.flowcontrol.v1alpha1.UserSubject
   map:
     fields:
@@ -8957,6 +8969,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         namedType: io.k8s.api.flowcontrol.v1beta1.UserSubject
+    - name: userAgent
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta1.UserAgentSubject
     unions:
     - discriminator: kind
       fields:
@@ -8966,6 +8981,15 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: ServiceAccount
       - fieldName: user
         discriminatorValue: User
+      - fieldName: userAgent
+        discriminatorValue: UserAgent
+- name: io.k8s.api.flowcontrol.v1beta1.UserAgentSubject
+  map:
+    fields:
+    - name: nameRegexp
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.flowcontrol.v1beta1.UserSubject
   map:
     fields:
@@ -9271,6 +9295,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         namedType: io.k8s.api.flowcontrol.v1beta2.UserSubject
+    - name: userAgent
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta2.UserAgentSubject
     unions:
     - discriminator: kind
       fields:
@@ -9280,6 +9307,15 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: ServiceAccount
       - fieldName: user
         discriminatorValue: User
+      - fieldName: userAgent
+        discriminatorValue: UserAgent
+- name: io.k8s.api.flowcontrol.v1beta2.UserAgentSubject
+  map:
+    fields:
+    - name: nameRegexp
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.flowcontrol.v1beta2.UserSubject
   map:
     fields:
@@ -9585,6 +9621,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: user
       type:
         namedType: io.k8s.api.flowcontrol.v1beta3.UserSubject
+    - name: userAgent
+      type:
+        namedType: io.k8s.api.flowcontrol.v1beta3.UserAgentSubject
     unions:
     - discriminator: kind
       fields:
@@ -9594,6 +9633,15 @@ var schemaYAML = typed.YAMLObject(`types:
         discriminatorValue: ServiceAccount
       - fieldName: user
         discriminatorValue: User
+      - fieldName: userAgent
+        discriminatorValue: UserAgent
+- name: io.k8s.api.flowcontrol.v1beta3.UserAgentSubject
+  map:
+    fields:
+    - name: nameRegexp
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.flowcontrol.v1beta3.UserSubject
   map:
     fields:

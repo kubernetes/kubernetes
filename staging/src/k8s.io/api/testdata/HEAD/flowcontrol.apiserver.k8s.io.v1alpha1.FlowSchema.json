@@ -65,6 +65,9 @@
             "serviceAccount": {
               "namespace": "namespaceValue",
               "name": "nameValue"
+            },
+            "userAgent": {
+              "nameRegexp": "nameRegexpValue"
             }
           }
         ],

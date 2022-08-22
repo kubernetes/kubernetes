@@ -626,6 +626,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/flowcontrol/v1alpha1.ResourcePolicyRule":                                              schema_k8sio_api_flowcontrol_v1alpha1_ResourcePolicyRule(ref),
 		"k8s.io/api/flowcontrol/v1alpha1.ServiceAccountSubject":                                           schema_k8sio_api_flowcontrol_v1alpha1_ServiceAccountSubject(ref),
 		"k8s.io/api/flowcontrol/v1alpha1.Subject":                                                         schema_k8sio_api_flowcontrol_v1alpha1_Subject(ref),
+		"k8s.io/api/flowcontrol/v1alpha1.UserAgentSubject":                                                schema_k8sio_api_flowcontrol_v1alpha1_UserAgentSubject(ref),
 		"k8s.io/api/flowcontrol/v1alpha1.UserSubject":                                                     schema_k8sio_api_flowcontrol_v1alpha1_UserSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta1.FlowDistinguisherMethod":                                          schema_k8sio_api_flowcontrol_v1beta1_FlowDistinguisherMethod(ref),
 		"k8s.io/api/flowcontrol/v1beta1.FlowSchema":                                                       schema_k8sio_api_flowcontrol_v1beta1_FlowSchema(ref),
@@ -648,6 +649,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/flowcontrol/v1beta1.ResourcePolicyRule":                                               schema_k8sio_api_flowcontrol_v1beta1_ResourcePolicyRule(ref),
 		"k8s.io/api/flowcontrol/v1beta1.ServiceAccountSubject":                                            schema_k8sio_api_flowcontrol_v1beta1_ServiceAccountSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta1.Subject":                                                          schema_k8sio_api_flowcontrol_v1beta1_Subject(ref),
+		"k8s.io/api/flowcontrol/v1beta1.UserAgentSubject":                                                 schema_k8sio_api_flowcontrol_v1beta1_UserAgentSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta1.UserSubject":                                                      schema_k8sio_api_flowcontrol_v1beta1_UserSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta2.FlowDistinguisherMethod":                                          schema_k8sio_api_flowcontrol_v1beta2_FlowDistinguisherMethod(ref),
 		"k8s.io/api/flowcontrol/v1beta2.FlowSchema":                                                       schema_k8sio_api_flowcontrol_v1beta2_FlowSchema(ref),
@@ -670,6 +672,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/flowcontrol/v1beta2.ResourcePolicyRule":                                               schema_k8sio_api_flowcontrol_v1beta2_ResourcePolicyRule(ref),
 		"k8s.io/api/flowcontrol/v1beta2.ServiceAccountSubject":                                            schema_k8sio_api_flowcontrol_v1beta2_ServiceAccountSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta2.Subject":                                                          schema_k8sio_api_flowcontrol_v1beta2_Subject(ref),
+		"k8s.io/api/flowcontrol/v1beta2.UserAgentSubject":                                                 schema_k8sio_api_flowcontrol_v1beta2_UserAgentSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta2.UserSubject":                                                      schema_k8sio_api_flowcontrol_v1beta2_UserSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta3.FlowDistinguisherMethod":                                          schema_k8sio_api_flowcontrol_v1beta3_FlowDistinguisherMethod(ref),
 		"k8s.io/api/flowcontrol/v1beta3.FlowSchema":                                                       schema_k8sio_api_flowcontrol_v1beta3_FlowSchema(ref),
@@ -692,6 +695,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/flowcontrol/v1beta3.ResourcePolicyRule":                                               schema_k8sio_api_flowcontrol_v1beta3_ResourcePolicyRule(ref),
 		"k8s.io/api/flowcontrol/v1beta3.ServiceAccountSubject":                                            schema_k8sio_api_flowcontrol_v1beta3_ServiceAccountSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta3.Subject":                                                          schema_k8sio_api_flowcontrol_v1beta3_Subject(ref),
+		"k8s.io/api/flowcontrol/v1beta3.UserAgentSubject":                                                 schema_k8sio_api_flowcontrol_v1beta3_UserAgentSubject(ref),
 		"k8s.io/api/flowcontrol/v1beta3.UserSubject":                                                      schema_k8sio_api_flowcontrol_v1beta3_UserSubject(ref),
 		"k8s.io/api/imagepolicy/v1alpha1.ImageReview":                                                     schema_k8sio_api_imagepolicy_v1alpha1_ImageReview(ref),
 		"k8s.io/api/imagepolicy/v1alpha1.ImageReviewContainerSpec":                                        schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewContainerSpec(ref),
@@ -31901,6 +31905,12 @@ func schema_k8sio_api_flowcontrol_v1alpha1_Subject(ref common.ReferenceCallback)
 							Ref:         ref("k8s.io/api/flowcontrol/v1alpha1.ServiceAccountSubject"),
 						},
 					},
+					"userAgent": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`userAgent` matches based on user-agent.",
+							Ref:         ref("k8s.io/api/flowcontrol/v1alpha1.UserAgentSubject"),
+						},
+					},
 				},
 				Required: []string{"kind"},
 			},
@@ -31913,6 +31923,7 @@ func schema_k8sio_api_flowcontrol_v1alpha1_Subject(ref common.ReferenceCallback)
 								"group":          "Group",
 								"serviceAccount": "ServiceAccount",
 								"user":           "User",
+								"userAgent":      "UserAgent",
 							},
 						},
 					},
@@ -31920,7 +31931,29 @@ func schema_k8sio_api_flowcontrol_v1alpha1_Subject(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/flowcontrol/v1alpha1.GroupSubject", "k8s.io/api/flowcontrol/v1alpha1.ServiceAccountSubject", "k8s.io/api/flowcontrol/v1alpha1.UserSubject"},
+			"k8s.io/api/flowcontrol/v1alpha1.GroupSubject", "k8s.io/api/flowcontrol/v1alpha1.ServiceAccountSubject", "k8s.io/api/flowcontrol/v1alpha1.UserAgentSubject", "k8s.io/api/flowcontrol/v1alpha1.UserSubject"},
+	}
+}
+
+func schema_k8sio_api_flowcontrol_v1alpha1_UserAgentSubject(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UserAgentSubject holds detailed information for user-agent-kind subject.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nameRegexp": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`nameRegexp` is the agent name regular expression that matches. Required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"nameRegexp"},
+			},
+		},
 	}
 }
 
@@ -32900,6 +32933,12 @@ func schema_k8sio_api_flowcontrol_v1beta1_Subject(ref common.ReferenceCallback) 
 							Ref:         ref("k8s.io/api/flowcontrol/v1beta1.ServiceAccountSubject"),
 						},
 					},
+					"userAgent": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`userAgent` matches based on user-agent.",
+							Ref:         ref("k8s.io/api/flowcontrol/v1beta1.UserAgentSubject"),
+						},
+					},
 				},
 				Required: []string{"kind"},
 			},
@@ -32912,6 +32951,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_Subject(ref common.ReferenceCallback) 
 								"group":          "Group",
 								"serviceAccount": "ServiceAccount",
 								"user":           "User",
+								"userAgent":      "UserAgent",
 							},
 						},
 					},
@@ -32919,7 +32959,29 @@ func schema_k8sio_api_flowcontrol_v1beta1_Subject(ref common.ReferenceCallback) 
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/flowcontrol/v1beta1.GroupSubject", "k8s.io/api/flowcontrol/v1beta1.ServiceAccountSubject", "k8s.io/api/flowcontrol/v1beta1.UserSubject"},
+			"k8s.io/api/flowcontrol/v1beta1.GroupSubject", "k8s.io/api/flowcontrol/v1beta1.ServiceAccountSubject", "k8s.io/api/flowcontrol/v1beta1.UserAgentSubject", "k8s.io/api/flowcontrol/v1beta1.UserSubject"},
+	}
+}
+
+func schema_k8sio_api_flowcontrol_v1beta1_UserAgentSubject(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UserAgentSubject holds detailed information for user-agent-kind subject.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nameRegexp": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`nameRegexp` is the agent name regular expression that matches. Required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"nameRegexp"},
+			},
+		},
 	}
 }
 
@@ -33899,6 +33961,12 @@ func schema_k8sio_api_flowcontrol_v1beta2_Subject(ref common.ReferenceCallback) 
 							Ref:         ref("k8s.io/api/flowcontrol/v1beta2.ServiceAccountSubject"),
 						},
 					},
+					"userAgent": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`userAgent` matches based on user-agent.",
+							Ref:         ref("k8s.io/api/flowcontrol/v1beta2.UserAgentSubject"),
+						},
+					},
 				},
 				Required: []string{"kind"},
 			},
@@ -33911,6 +33979,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_Subject(ref common.ReferenceCallback) 
 								"group":          "Group",
 								"serviceAccount": "ServiceAccount",
 								"user":           "User",
+								"userAgent":      "UserAgent",
 							},
 						},
 					},
@@ -33918,7 +33987,29 @@ func schema_k8sio_api_flowcontrol_v1beta2_Subject(ref common.ReferenceCallback) 
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/flowcontrol/v1beta2.GroupSubject", "k8s.io/api/flowcontrol/v1beta2.ServiceAccountSubject", "k8s.io/api/flowcontrol/v1beta2.UserSubject"},
+			"k8s.io/api/flowcontrol/v1beta2.GroupSubject", "k8s.io/api/flowcontrol/v1beta2.ServiceAccountSubject", "k8s.io/api/flowcontrol/v1beta2.UserAgentSubject", "k8s.io/api/flowcontrol/v1beta2.UserSubject"},
+	}
+}
+
+func schema_k8sio_api_flowcontrol_v1beta2_UserAgentSubject(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UserAgentSubject holds detailed information for user-agent-kind subject.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nameRegexp": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`nameRegexp` is the agent name regular expression that matches. Required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"nameRegexp"},
+			},
+		},
 	}
 }
 
@@ -34902,6 +34993,12 @@ func schema_k8sio_api_flowcontrol_v1beta3_Subject(ref common.ReferenceCallback) 
 							Ref:         ref("k8s.io/api/flowcontrol/v1beta3.ServiceAccountSubject"),
 						},
 					},
+					"userAgent": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`userAgent` matches based on user-agent.",
+							Ref:         ref("k8s.io/api/flowcontrol/v1beta3.UserAgentSubject"),
+						},
+					},
 				},
 				Required: []string{"kind"},
 			},
@@ -34914,6 +35011,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_Subject(ref common.ReferenceCallback) 
 								"group":          "Group",
 								"serviceAccount": "ServiceAccount",
 								"user":           "User",
+								"userAgent":      "UserAgent",
 							},
 						},
 					},
@@ -34921,7 +35019,29 @@ func schema_k8sio_api_flowcontrol_v1beta3_Subject(ref common.ReferenceCallback) 
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/flowcontrol/v1beta3.GroupSubject", "k8s.io/api/flowcontrol/v1beta3.ServiceAccountSubject", "k8s.io/api/flowcontrol/v1beta3.UserSubject"},
+			"k8s.io/api/flowcontrol/v1beta3.GroupSubject", "k8s.io/api/flowcontrol/v1beta3.ServiceAccountSubject", "k8s.io/api/flowcontrol/v1beta3.UserAgentSubject", "k8s.io/api/flowcontrol/v1beta3.UserSubject"},
+	}
+}
+
+func schema_k8sio_api_flowcontrol_v1beta3_UserAgentSubject(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UserAgentSubject holds detailed information for user-agent-kind subject.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"nameRegexp": {
+						SchemaProps: spec.SchemaProps{
+							Description: "`nameRegexp` is the agent name regular expression that matches. Required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"nameRegexp"},
+			},
+		},
 	}
 }
 
