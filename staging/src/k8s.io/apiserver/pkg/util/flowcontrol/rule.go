@@ -17,6 +17,7 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"regexp"
 	"strings"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta3"
@@ -37,7 +38,7 @@ func matchesFlowSchema(digest RequestDigest, flowSchema *flowcontrol.FlowSchema)
 }
 
 func matchesPolicyRule(digest RequestDigest, policyRule *flowcontrol.PolicyRulesWithSubjects) bool {
-	if !matchesASubject(digest.User, policyRule.Subjects) {
+	if !matchesASubject(digest.User, policyRule.Subjects, digest.UserAgent) {
 		return false
 	}
 	if digest.RequestInfo.IsResourceRequest {
@@ -46,16 +47,16 @@ func matchesPolicyRule(digest RequestDigest, policyRule *flowcontrol.PolicyRules
 	return matchesANonResourceRule(digest.RequestInfo, policyRule.NonResourceRules)
 }
 
-func matchesASubject(user user.Info, subjects []flowcontrol.Subject) bool {
+func matchesASubject(user user.Info, subjects []flowcontrol.Subject, userAgent string) bool {
 	for _, subject := range subjects {
-		if matchesSubject(user, subject) {
+		if matchesSubject(user, subject, userAgent) {
 			return true
 		}
 	}
 	return false
 }
 
-func matchesSubject(user user.Info, subject flowcontrol.Subject) bool {
+func matchesSubject(user user.Info, subject flowcontrol.Subject, userAgent string) bool {
 	switch subject.Kind {
 	case flowcontrol.SubjectKindUser:
 		return subject.User != nil && (subject.User.Name == flowcontrol.NameAll || subject.User.Name == user.GetName())
@@ -81,6 +82,12 @@ func matchesSubject(user user.Info, subject flowcontrol.Subject) bool {
 			return serviceAccountMatchesNamespace(subject.ServiceAccount.Namespace, user.GetName())
 		}
 		return serviceaccount.MatchesUsername(subject.ServiceAccount.Namespace, subject.ServiceAccount.Name, user.GetName())
+	case flowcontrol.SubjectKindUserAgent:
+		if subject.UserAgent == nil {
+			return false
+		}
+		matched, _ := regexp.MatchString(subject.UserAgent.NameRegexp, userAgent)
+		return matched
 	default:
 		return false
 	}

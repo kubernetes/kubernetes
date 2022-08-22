@@ -106,6 +106,7 @@ type StartFunction func(ctx context.Context, hashValue uint64) (execute bool, af
 type RequestDigest struct {
 	RequestInfo *request.RequestInfo
 	User        user.Info
+	UserAgent   string
 }
 
 // `*configController` maintains eventual consistency with the API

@@ -63,6 +63,8 @@ spec:
         namespace: namespaceValue
       user:
         name: nameValue
+      userAgent:
+        nameRegexp: nameRegexpValue
 status:
   conditions:
   - lastTransitionTime: "2003-01-01T01:01:01Z"

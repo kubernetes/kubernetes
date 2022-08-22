@@ -677,6 +677,14 @@
               }
             ],
             "description": "`user` matches based on username."
+          },
+          "userAgent": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/io.k8s.api.flowcontrol.v1beta3.UserAgentSubject"
+              }
+            ],
+            "description": "`userAgent` matches based on user-agent."
           }
         },
         "required": [
@@ -689,10 +697,25 @@
             "fields-to-discriminateBy": {
               "group": "Group",
               "serviceAccount": "ServiceAccount",
-              "user": "User"
+              "user": "User",
+              "userAgent": "UserAgent"
             }
           }
         ]
+      },
+      "io.k8s.api.flowcontrol.v1beta3.UserAgentSubject": {
+        "description": "UserAgentSubject holds detailed information for user-agent-kind subject.",
+        "properties": {
+          "nameRegexp": {
+            "default": "",
+            "description": "`nameRegexp` is the agent name regular expression that matches. Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nameRegexp"
+        ],
+        "type": "object"
       },
       "io.k8s.api.flowcontrol.v1beta3.UserSubject": {
         "description": "UserSubject holds detailed information for user-kind subject.",

@@ -167,6 +167,7 @@ func WithPriorityAndFairness(
 		digest := utilflowcontrol.RequestDigest{
 			RequestInfo: requestInfo,
 			User:        user,
+			UserAgent:   r.UserAgent(),
 		}
 
 		if isWatchRequest {
