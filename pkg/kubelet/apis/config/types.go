@@ -472,7 +472,7 @@ const (
 	KubeletAuthorizationModeWebhook KubeletAuthorizationMode = "Webhook"
 )
 
-// KubeletAuthorization holds the state related to the authorization in the kublet.
+// KubeletAuthorization holds the state related to the authorization in the kubelet.
 type KubeletAuthorization struct {
 	// mode is the authorization mode to apply to requests to the kubelet server.
 	// Valid values are AlwaysAllow and Webhook.
