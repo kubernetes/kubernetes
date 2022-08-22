@@ -491,6 +491,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	fs.Set("logtostderr", "false")
 	fs.Set("alsologtostderr", "false")
 	fs.Set("one_output", "true")
+	fs.Set("stderrthreshold", "10" /* higher than any of the severities -> none pass the threshold */)
 	klog.SetOutput(ginkgo.GinkgoWriter)
 
 	// Only set a default host if one won't be supplied via kubeconfig

@@ -123,6 +123,9 @@ var stackLocation = regexp.MustCompile(`(?:/|vendor/|test/|GOROOT/).*/([[:^space
 // functionArgs matches "<function name>(...)".
 var functionArgs = regexp.MustCompile(`([[:alpha:]]+)\(.*\)`)
 
+// klogPrefix matches "I0822 16:10:39.343790  989127 "
+var klogPrefix = regexp.MustCompile(`(?m)^[IEF][[:digit:]]{4} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}\.[[:digit:]]{6}[[:space:]]+[[:digit:]]+ `)
+
 // testFailureOutput matches TestFailureOutput() and its source followed by additional stack entries:
 //
 // k8s.io/kubernetes/test/e2e/framework/pod/pod_test.TestFailureOutput(0xc000558800)
@@ -145,5 +148,6 @@ func normalizeLocation(in string) string {
 	out = stackLocation.ReplaceAllString(out, "$1")
 	out = functionArgs.ReplaceAllString(out, "$1()")
 	out = testFailureOutput.ReplaceAllString(out, "")
+	out = klogPrefix.ReplaceAllString(out, "<klog> ")
 	return out
 }
