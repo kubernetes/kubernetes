@@ -1,6 +1,21 @@
+/*
+Copyright 2022 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package v1
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // APIGroupDiscoveryList is a resource containing a list of APIGroupDiscoveries.
@@ -18,7 +33,6 @@ type APIGroupDiscoveryList struct {
 	Groups []APIGroupDiscovery `json:"groups" protobuf:"bytes,2,rep,name=groups"`
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // APIGroupDiscovery holds information about which resources are being served for all version of the API Group.
@@ -47,7 +61,7 @@ type APIVersionDiscovery struct {
 	// +listMapKey=resource
 	Resources []APIResourceDiscovery `json:"resources,omitempty" protobuf:"bytes,2,rep,name=resources"`
 	// Stale marks whether a group version's discovery document is up to date.
-	Stale string `json:"stale" protobuf:"bytes,1,opt,name=stale"`
+	Stale string `json:"stale" protobuf:"bytes,3,opt,name=stale"`
 }
 
 // APIResourceDiscovery provides information about an API resource for discovery.
@@ -103,18 +117,4 @@ type APISubresourceDiscovery struct {
 	// Verbs is a list of supported kube verbs: get, list, watch, create,
 	// update, patch, delete
 	Verbs Verbs `json:"verbs" protobuf:"bytes,4,opt,name=verbs"`
-}
-
-// APIGroupDiscoveryStatus contains the observations of an APIGroupDiscovery
-type APIGroupDiscoveryStatus struct {
-	// StaleVersions represent the observations of a APIGroupDiscovery's current state.
-	// +listType=set
-	StaleVersions []string `json:"staleVersions" protobuf:"bytes,1,name=staleVersions"`
-	// Represents the observations of a APIGroupDiscovery's current state.
-	// Known .status.conditions.type are: "Stale"
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=type
-	Conditions []Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 }
