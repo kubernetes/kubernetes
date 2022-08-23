@@ -38,7 +38,7 @@ type IPPermissionPredicate interface {
 
 // NewIPPermissionSet creates a new IPPermissionSet
 func NewIPPermissionSet(items ...*ec2.IpPermission) IPPermissionSet {
-	s := make(IPPermissionSet)
+	s := make(IPPermissionSet, len(items))
 	s.Insert(items...)
 	return s
 }
