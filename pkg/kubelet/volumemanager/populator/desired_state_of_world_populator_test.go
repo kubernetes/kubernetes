@@ -1509,7 +1509,6 @@ func createDswpWithVolumeWithCustomPluginMgr(t *testing.T, pv *v1.PersistentVolu
 	dswp := &desiredStateOfWorldPopulator{
 		kubeClient:                fakeClient,
 		loopSleepDuration:         100 * time.Millisecond,
-		getPodStatusRetryDuration: 2 * time.Second,
 		podManager:                fakePodManager,
 		podStateProvider:          fakeStateProvider,
 		desiredStateOfWorld:       fakesDSW,

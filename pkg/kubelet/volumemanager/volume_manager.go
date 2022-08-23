@@ -61,12 +61,6 @@ const (
 	// DesiredStateOfWorldPopulator loop waits between successive executions
 	desiredStateOfWorldPopulatorLoopSleepPeriod = 100 * time.Millisecond
 
-	// desiredStateOfWorldPopulatorGetPodStatusRetryDuration is the amount of
-	// time the DesiredStateOfWorldPopulator loop waits between successive pod
-	// cleanup calls (to prevent calling containerruntime.GetPodStatus too
-	// frequently).
-	desiredStateOfWorldPopulatorGetPodStatusRetryDuration = 2 * time.Second
-
 	// podAttachAndMountTimeout is the maximum amount of time the
 	// WaitForAttachAndMount call will wait for all volumes in the specified pod
 	// to be attached and mounted. Even though cloud operations can take several
@@ -207,7 +201,6 @@ func NewVolumeManager(
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		kubeClient,
 		desiredStateOfWorldPopulatorLoopSleepPeriod,
-		desiredStateOfWorldPopulatorGetPodStatusRetryDuration,
 		podManager,
 		podStateProvider,
 		vm.desiredStateOfWorld,
