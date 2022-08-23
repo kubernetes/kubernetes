@@ -62,7 +62,8 @@ const (
 var (
 	deprecatedRequestGauge = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_requested_deprecated_apis",
+			Subsystem:      APIServerComponent,
+			Name:           "requested_deprecated_apis",
 			Help:           "Gauge of deprecated APIs that have been requested, broken out by API group, version, resource, subresource, and removed_release.",
 			StabilityLevel: compbasemetrics.STABLE,
 		},
@@ -73,7 +74,8 @@ var (
 	// the upstream library supports it.
 	requestCounter = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_request_total",
+			Subsystem:      APIServerComponent,
+			Name:           "request_total",
 			Help:           "Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.",
 			StabilityLevel: compbasemetrics.STABLE,
 		},
@@ -81,7 +83,8 @@ var (
 	)
 	longRunningRequestsGauge = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_longrunning_requests",
+			Subsystem:      APIServerComponent,
+			Name:           "longrunning_requests",
 			Help:           "Gauge of all active long-running apiserver requests broken out by verb, group, version, resource, scope and component. Not all requests are tracked this way.",
 			StabilityLevel: compbasemetrics.STABLE,
 		},
@@ -89,8 +92,9 @@ var (
 	)
 	requestLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Name: "apiserver_request_duration_seconds",
-			Help: "Response latency distribution in seconds for each verb, dry run value, group, version, resource, subresource, scope and component.",
+			Subsystem: APIServerComponent,
+			Name:      "request_duration_seconds",
+			Help:      "Response latency distribution in seconds for each verb, dry run value, group, version, resource, subresource, scope and component.",
 			// This metric is used for verifying api call latencies SLO,
 			// as well as tracking regressions in this aspects.
 			// Thus we customize buckets significantly, to empower both usecases.
@@ -102,8 +106,9 @@ var (
 	)
 	requestSloLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Name: "apiserver_request_slo_duration_seconds",
-			Help: "Response latency distribution (not counting webhook duration) in seconds for each verb, group, version, resource, subresource, scope and component.",
+			Subsystem: APIServerComponent,
+			Name:      "request_slo_duration_seconds",
+			Help:      "Response latency distribution (not counting webhook duration) in seconds for each verb, group, version, resource, subresource, scope and component.",
 			// This metric is supplementary to the requestLatencies metric.
 			// It measures request duration excluding webhooks as they are mostly
 			// dependant on user configuration.
@@ -128,8 +133,9 @@ var (
 	)
 	responseSizes = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Name: "apiserver_response_sizes",
-			Help: "Response size distribution in bytes for each group, version, verb, resource, subresource, scope and component.",
+			Subsystem: APIServerComponent,
+			Name:      "response_sizes",
+			Help:      "Response size distribution in bytes for each group, version, verb, resource, subresource, scope and component.",
 			// Use buckets ranging from 1000 bytes (1KB) to 10^9 bytes (1GB).
 			Buckets:        compbasemetrics.ExponentialBuckets(1000, 10.0, 7),
 			StabilityLevel: compbasemetrics.STABLE,
@@ -139,14 +145,16 @@ var (
 	// TLSHandshakeErrors is a number of requests dropped with 'TLS handshake error from' error
 	TLSHandshakeErrors = compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_tls_handshake_errors_total",
+			Subsystem:      APIServerComponent,
+			Name:           "tls_handshake_errors_total",
 			Help:           "Number of requests dropped with 'TLS handshake error from' error",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 	)
 	WatchEvents = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_watch_events_total",
+			Subsystem:      APIServerComponent,
+			Name:           "watch_events_total",
 			Help:           "Number of events sent in watch clients",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
@@ -154,7 +162,8 @@ var (
 	)
 	WatchEventsSizes = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Name:           "apiserver_watch_events_sizes",
+			Subsystem:      APIServerComponent,
+			Name:           "watch_events_sizes",
 			Help:           "Watch event size distribution in bytes",
 			Buckets:        compbasemetrics.ExponentialBuckets(1024, 2.0, 8), // 1K, 2K, 4K, 8K, ..., 128K.
 			StabilityLevel: compbasemetrics.ALPHA,
@@ -165,7 +174,8 @@ var (
 	// it reports maximal usage during the last second.
 	currentInflightRequests = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_current_inflight_requests",
+			Subsystem:      APIServerComponent,
+			Name:           "current_inflight_requests",
 			Help:           "Maximal number of currently used inflight request limit of this apiserver per request kind in last second.",
 			StabilityLevel: compbasemetrics.STABLE,
 		},
@@ -173,7 +183,8 @@ var (
 	)
 	currentInqueueRequests = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Name:           "apiserver_current_inqueue_requests",
+			Subsystem:      APIServerComponent,
+			Name:           "current_inqueue_requests",
 			Help:           "Maximal number of queued requests in this apiserver per request kind in last second.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
@@ -182,7 +193,8 @@ var (
 
 	requestTerminationsTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_request_terminations_total",
+			Subsystem:      APIServerComponent,
+			Name:           "request_terminations_total",
 			Help:           "Number of requests which apiserver terminated in self-defense.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
@@ -191,7 +203,8 @@ var (
 
 	apiSelfRequestCounter = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_selfrequest_total",
+			Subsystem:      APIServerComponent,
+			Name:           "selfrequest_total",
 			Help:           "Counter of apiserver self-requests broken out for each verb, API resource and subresource.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
@@ -200,7 +213,8 @@ var (
 
 	requestFilterDuration = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Name:           "apiserver_request_filter_duration_seconds",
+			Subsystem:      APIServerComponent,
+			Name:           "request_filter_duration_seconds",
 			Help:           "Request filter latency distribution in seconds, for each filter type",
 			Buckets:        []float64{0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 5.0},
 			StabilityLevel: compbasemetrics.ALPHA,
@@ -211,7 +225,8 @@ var (
 	// requestAbortsTotal is a number of aborted requests with http.ErrAbortHandler
 	requestAbortsTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_request_aborts_total",
+			Subsystem:      APIServerComponent,
+			Name:           "request_aborts_total",
 			Help:           "Number of requests which apiserver aborted possibly due to a timeout, for each group, version, verb, resource, subresource and scope",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
@@ -231,7 +246,8 @@ var (
 	//    within the wait threshold.
 	requestPostTimeoutTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_request_post_timeout_total",
+			Subsystem:      APIServerComponent,
+			Name:           "request_post_timeout_total",
 			Help:           "Tracks the activity of the request handlers after the associated requests have been timed out by the apiserver",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
@@ -240,7 +256,8 @@ var (
 
 	requestTimestampComparisonDuration = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
-			Name:           "apiserver_request_timestamp_comparison_time",
+			Subsystem:      APIServerComponent,
+			Name:           "request_timestamp_comparison_time",
 			Help:           "Time taken for comparison of old vs new objects in UPDATE or PATCH requests",
 			Buckets:        []float64{0.0001, 0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 5.0},
 			StabilityLevel: compbasemetrics.ALPHA,
