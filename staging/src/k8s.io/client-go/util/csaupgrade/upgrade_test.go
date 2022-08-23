@@ -5,33 +5,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/apimachinery/pkg/api/equality"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/util/csaupgrade"
 )
-
-var avoidTimestampEqualities = func() conversion.Equalities {
-	var eqs = equality.Semantic.Copy()
-
-	err := eqs.AddFunc(
-		func(a, b metav1.ManagedFieldsEntry) bool {
-			// Two objects' managed fields are equivalent if, ignoring timestamp,
-			//	the objects are deeply equal.
-			a.Time = nil
-			b.Time = nil
-			return reflect.DeepEqual(a, b)
-		},
-	)
-
-	if err != nil {
-		panic(err)
-	}
-
-	return eqs
-}()
 
 func TestUpgradeCSA(t *testing.T) {
 	// Initial object has managed fields from using CSA
