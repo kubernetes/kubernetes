@@ -290,13 +290,13 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 	// Currently they are all in iptablesInit()
 	// Delete Rules first, then Flush and Delete Chains
 	args := []string{"-m", "comment", "--comment", "handle ClusterIPs; NOTE: this must be before the NodePort rules"}
-	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(iptablesHostPortalChain))...); err != nil {
+	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(IptablesHostPortalChain))...); err != nil {
 		if !iptables.IsNotFoundError(err) {
 			klog.ErrorS(err, "Error removing userspace rule")
 			encounteredError = true
 		}
 	}
-	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(iptablesContainerPortalChain))...); err != nil {
+	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(IptablesContainerPortalChain))...); err != nil {
 		if !iptables.IsNotFoundError(err) {
 			klog.ErrorS(err, "Error removing userspace rule")
 			encounteredError = true
@@ -304,20 +304,20 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 	}
 	args = []string{"-m", "addrtype", "--dst-type", "LOCAL"}
 	args = append(args, "-m", "comment", "--comment", "handle service NodePorts; NOTE: this must be the last rule in the chain")
-	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(iptablesHostNodePortChain))...); err != nil {
+	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(IptablesHostNodePortChain))...); err != nil {
 		if !iptables.IsNotFoundError(err) {
 			klog.ErrorS(err, "Error removing userspace rule")
 			encounteredError = true
 		}
 	}
-	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(iptablesContainerNodePortChain))...); err != nil {
+	if err := ipt.DeleteRule(iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(IptablesContainerNodePortChain))...); err != nil {
 		if !iptables.IsNotFoundError(err) {
 			klog.ErrorS(err, "Error removing userspace rule")
 			encounteredError = true
 		}
 	}
 	args = []string{"-m", "comment", "--comment", "Ensure that non-local NodePort traffic can flow"}
-	if err := ipt.DeleteRule(iptables.TableFilter, iptables.ChainInput, append(args, "-j", string(iptablesNonLocalNodePortChain))...); err != nil {
+	if err := ipt.DeleteRule(iptables.TableFilter, iptables.ChainInput, append(args, "-j", string(IptablesNonLocalNodePortChain))...); err != nil {
 		if !iptables.IsNotFoundError(err) {
 			klog.ErrorS(err, "Error removing userspace rule")
 			encounteredError = true
@@ -326,8 +326,8 @@ func CleanupLeftovers(ipt iptables.Interface) (encounteredError bool) {
 
 	// flush and delete chains.
 	tableChains := map[iptables.Table][]iptables.Chain{
-		iptables.TableNAT:    {iptablesContainerPortalChain, iptablesHostPortalChain, iptablesHostNodePortChain, iptablesContainerNodePortChain},
-		iptables.TableFilter: {iptablesNonLocalNodePortChain},
+		iptables.TableNAT:    {IptablesContainerPortalChain, IptablesHostPortalChain, IptablesHostNodePortChain, IptablesContainerNodePortChain},
+		iptables.TableFilter: {IptablesNonLocalNodePortChain},
 	}
 	for table, chains := range tableChains {
 		for _, c := range chains {
@@ -777,9 +777,9 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol v1.Protocol, proxy
 	// Handle traffic from containers.
 	args := proxier.iptablesContainerPortalArgs(portal.ip, portal.isExternal, false, portal.port, protocol, proxyIP, proxyPort, name)
 	portalAddress := net.JoinHostPort(portal.ip.String(), strconv.Itoa(portal.port))
-	existed, err := proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesContainerPortalChain, args...)
+	existed, err := proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, IptablesContainerPortalChain, args...)
 	if err != nil {
-		klog.ErrorS(err, "Failed to install iptables rule for service", "chain", iptablesContainerPortalChain, "servicePortName", name, "args", args)
+		klog.ErrorS(err, "Failed to install iptables rule for service", "chain", IptablesContainerPortalChain, "servicePortName", name, "args", args)
 		return err
 	}
 	if !existed {
@@ -787,9 +787,9 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol v1.Protocol, proxy
 	}
 	if portal.isExternal {
 		args := proxier.iptablesContainerPortalArgs(portal.ip, false, true, portal.port, protocol, proxyIP, proxyPort, name)
-		existed, err := proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesContainerPortalChain, args...)
+		existed, err := proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, IptablesContainerPortalChain, args...)
 		if err != nil {
-			klog.ErrorS(err, "Failed to install iptables rule that opens service for local traffic", "chain", iptablesContainerPortalChain, "servicePortName", name, "args", args)
+			klog.ErrorS(err, "Failed to install iptables rule that opens service for local traffic", "chain", IptablesContainerPortalChain, "servicePortName", name, "args", args)
 			return err
 		}
 		if !existed {
@@ -797,9 +797,9 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol v1.Protocol, proxy
 		}
 
 		args = proxier.iptablesHostPortalArgs(portal.ip, true, portal.port, protocol, proxyIP, proxyPort, name)
-		existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesHostPortalChain, args...)
+		existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, IptablesHostPortalChain, args...)
 		if err != nil {
-			klog.ErrorS(err, "Failed to install iptables rule for service for dst-local traffic", "chain", iptablesHostPortalChain, "servicePortName", name)
+			klog.ErrorS(err, "Failed to install iptables rule for service for dst-local traffic", "chain", IptablesHostPortalChain, "servicePortName", name)
 			return err
 		}
 		if !existed {
@@ -810,9 +810,9 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol v1.Protocol, proxy
 
 	// Handle traffic from the host.
 	args = proxier.iptablesHostPortalArgs(portal.ip, false, portal.port, protocol, proxyIP, proxyPort, name)
-	existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesHostPortalChain, args...)
+	existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, IptablesHostPortalChain, args...)
 	if err != nil {
-		klog.ErrorS(err, "Failed to install iptables rule for service", "chain", iptablesHostPortalChain, "servicePortName", name)
+		klog.ErrorS(err, "Failed to install iptables rule for service", "chain", IptablesHostPortalChain, "servicePortName", name)
 		return err
 	}
 	if !existed {
@@ -886,9 +886,9 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol v1.Protocol, proxyIP
 
 	// Handle traffic from containers.
 	args := proxier.iptablesContainerPortalArgs(nil, false, false, nodePort, protocol, proxyIP, proxyPort, name)
-	existed, err := proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesContainerNodePortChain, args...)
+	existed, err := proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, IptablesContainerNodePortChain, args...)
 	if err != nil {
-		klog.ErrorS(err, "Failed to install iptables rule for service", "chain", iptablesContainerNodePortChain, "servicePortName", name)
+		klog.ErrorS(err, "Failed to install iptables rule for service", "chain", IptablesContainerNodePortChain, "servicePortName", name)
 		return err
 	}
 	if !existed {
@@ -897,9 +897,9 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol v1.Protocol, proxyIP
 
 	// Handle traffic from the host.
 	args = proxier.iptablesHostNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
-	existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesHostNodePortChain, args...)
+	existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, IptablesHostNodePortChain, args...)
 	if err != nil {
-		klog.ErrorS(err, "Failed to install iptables rule for service", "chain", iptablesHostNodePortChain, "servicePortName", name)
+		klog.ErrorS(err, "Failed to install iptables rule for service", "chain", IptablesHostNodePortChain, "servicePortName", name)
 		return err
 	}
 	if !existed {
@@ -907,9 +907,9 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol v1.Protocol, proxyIP
 	}
 
 	args = proxier.iptablesNonLocalNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
-	existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableFilter, iptablesNonLocalNodePortChain, args...)
+	existed, err = proxier.iptables.EnsureRule(iptables.Append, iptables.TableFilter, IptablesNonLocalNodePortChain, args...)
 	if err != nil {
-		klog.ErrorS(err, "Failed to install iptables rule for service", "chain", iptablesNonLocalNodePortChain, "servicePortName", name)
+		klog.ErrorS(err, "Failed to install iptables rule for service", "chain", IptablesNonLocalNodePortChain, "servicePortName", name)
 		return err
 	}
 	if !existed {
@@ -951,21 +951,21 @@ func (proxier *Proxier) closeOnePortal(portal portal, protocol v1.Protocol, prox
 
 	// Handle traffic from containers.
 	args := proxier.iptablesContainerPortalArgs(portal.ip, portal.isExternal, false, portal.port, protocol, proxyIP, proxyPort, name)
-	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesContainerPortalChain, args...); err != nil {
-		klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", iptablesContainerPortalChain, "servicePortName", name)
+	if err := proxier.iptables.DeleteRule(iptables.TableNAT, IptablesContainerPortalChain, args...); err != nil {
+		klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", IptablesContainerPortalChain, "servicePortName", name)
 		el = append(el, err)
 	}
 
 	if portal.isExternal {
 		args := proxier.iptablesContainerPortalArgs(portal.ip, false, true, portal.port, protocol, proxyIP, proxyPort, name)
-		if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesContainerPortalChain, args...); err != nil {
-			klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", iptablesContainerPortalChain, "servicePortName", name)
+		if err := proxier.iptables.DeleteRule(iptables.TableNAT, IptablesContainerPortalChain, args...); err != nil {
+			klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", IptablesContainerPortalChain, "servicePortName", name)
 			el = append(el, err)
 		}
 
 		args = proxier.iptablesHostPortalArgs(portal.ip, true, portal.port, protocol, proxyIP, proxyPort, name)
-		if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesHostPortalChain, args...); err != nil {
-			klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", iptablesHostPortalChain, "servicePortName", name)
+		if err := proxier.iptables.DeleteRule(iptables.TableNAT, IptablesHostPortalChain, args...); err != nil {
+			klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", IptablesHostPortalChain, "servicePortName", name)
 			el = append(el, err)
 		}
 		return el
@@ -973,8 +973,8 @@ func (proxier *Proxier) closeOnePortal(portal portal, protocol v1.Protocol, prox
 
 	// Handle traffic from the host (portalIP is not external).
 	args = proxier.iptablesHostPortalArgs(portal.ip, false, portal.port, protocol, proxyIP, proxyPort, name)
-	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesHostPortalChain, args...); err != nil {
-		klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", iptablesHostPortalChain, "servicePortName", name)
+	if err := proxier.iptables.DeleteRule(iptables.TableNAT, IptablesHostPortalChain, args...); err != nil {
+		klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", IptablesHostPortalChain, "servicePortName", name)
 		el = append(el, err)
 	}
 
@@ -986,22 +986,22 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol v1.Protocol, proxyI
 
 	// Handle traffic from containers.
 	args := proxier.iptablesContainerPortalArgs(nil, false, false, nodePort, protocol, proxyIP, proxyPort, name)
-	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesContainerNodePortChain, args...); err != nil {
-		klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", iptablesContainerNodePortChain, "servicePortName", name)
+	if err := proxier.iptables.DeleteRule(iptables.TableNAT, IptablesContainerNodePortChain, args...); err != nil {
+		klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", IptablesContainerNodePortChain, "servicePortName", name)
 		el = append(el, err)
 	}
 
 	// Handle traffic from the host.
 	args = proxier.iptablesHostNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
-	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesHostNodePortChain, args...); err != nil {
-		klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", iptablesHostNodePortChain, "servicePortName", name)
+	if err := proxier.iptables.DeleteRule(iptables.TableNAT, IptablesHostNodePortChain, args...); err != nil {
+		klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", IptablesHostNodePortChain, "servicePortName", name)
 		el = append(el, err)
 	}
 
 	// Handle traffic not local to the host
 	args = proxier.iptablesNonLocalNodePortArgs(nodePort, protocol, proxyIP, proxyPort, name)
-	if err := proxier.iptables.DeleteRule(iptables.TableFilter, iptablesNonLocalNodePortChain, args...); err != nil {
-		klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", iptablesNonLocalNodePortChain, "servicePortName", name)
+	if err := proxier.iptables.DeleteRule(iptables.TableFilter, IptablesNonLocalNodePortChain, args...); err != nil {
+		klog.ErrorS(err, "Failed to delete iptables rule for service", "chain", IptablesNonLocalNodePortChain, "servicePortName", name)
 		el = append(el, err)
 	}
 
@@ -1014,13 +1014,13 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol v1.Protocol, proxyI
 
 // See comments in the *PortalArgs() functions for some details about why we
 // use two chains for portals.
-var iptablesContainerPortalChain iptables.Chain = "KUBE-PORTALS-CONTAINER"
-var iptablesHostPortalChain iptables.Chain = "KUBE-PORTALS-HOST"
+var IptablesContainerPortalChain iptables.Chain = "KUBE-PORTALS-CONTAINER"
+var IptablesHostPortalChain iptables.Chain = "KUBE-PORTALS-HOST"
 
 // Chains for NodePort services
-var iptablesContainerNodePortChain iptables.Chain = "KUBE-NODEPORT-CONTAINER"
-var iptablesHostNodePortChain iptables.Chain = "KUBE-NODEPORT-HOST"
-var iptablesNonLocalNodePortChain iptables.Chain = "KUBE-NODEPORT-NON-LOCAL"
+var IptablesContainerNodePortChain iptables.Chain = "KUBE-NODEPORT-CONTAINER"
+var IptablesHostNodePortChain iptables.Chain = "KUBE-NODEPORT-HOST"
+var IptablesNonLocalNodePortChain iptables.Chain = "KUBE-NODEPORT-NON-LOCAL"
 
 // Ensure that the iptables infrastructure we use is set up.  This can safely be called periodically.
 func iptablesInit(ipt iptables.Interface) error {
@@ -1047,32 +1047,32 @@ func iptablesInit(ipt iptables.Interface) error {
 	// doubly-unlikely), but we need to be careful to keep the rules in the right order.
 	args := []string{ /* service-cluster-ip-range matching could go here */ }
 	args = append(args, "-m", "comment", "--comment", "handle ClusterIPs; NOTE: this must be before the NodePort rules")
-	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesContainerPortalChain); err != nil {
+	if _, err := ipt.EnsureChain(iptables.TableNAT, IptablesContainerPortalChain); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureRule(iptables.Prepend, iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(iptablesContainerPortalChain))...); err != nil {
+	if _, err := ipt.EnsureRule(iptables.Prepend, iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(IptablesContainerPortalChain))...); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesHostPortalChain); err != nil {
+	if _, err := ipt.EnsureChain(iptables.TableNAT, IptablesHostPortalChain); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureRule(iptables.Prepend, iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(iptablesHostPortalChain))...); err != nil {
+	if _, err := ipt.EnsureRule(iptables.Prepend, iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(IptablesHostPortalChain))...); err != nil {
 		return err
 	}
 
 	// This set of rules matches broadly (addrtype & destination port), and therefore must come after the portal rules
 	args = []string{"-m", "addrtype", "--dst-type", "LOCAL"}
 	args = append(args, "-m", "comment", "--comment", "handle service NodePorts; NOTE: this must be the last rule in the chain")
-	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesContainerNodePortChain); err != nil {
+	if _, err := ipt.EnsureChain(iptables.TableNAT, IptablesContainerNodePortChain); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureRule(iptables.Append, iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(iptablesContainerNodePortChain))...); err != nil {
+	if _, err := ipt.EnsureRule(iptables.Append, iptables.TableNAT, iptables.ChainPrerouting, append(args, "-j", string(IptablesContainerNodePortChain))...); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesHostNodePortChain); err != nil {
+	if _, err := ipt.EnsureChain(iptables.TableNAT, IptablesHostNodePortChain); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureRule(iptables.Append, iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(iptablesHostNodePortChain))...); err != nil {
+	if _, err := ipt.EnsureRule(iptables.Append, iptables.TableNAT, iptables.ChainOutput, append(args, "-j", string(IptablesHostNodePortChain))...); err != nil {
 		return err
 	}
 
@@ -1080,10 +1080,10 @@ func iptablesInit(ipt iptables.Interface) error {
 	// traffic to work around default-deny iptables configurations
 	// that would otherwise reject such traffic.
 	args = []string{"-m", "comment", "--comment", "Ensure that non-local NodePort traffic can flow"}
-	if _, err := ipt.EnsureChain(iptables.TableFilter, iptablesNonLocalNodePortChain); err != nil {
+	if _, err := ipt.EnsureChain(iptables.TableFilter, IptablesNonLocalNodePortChain); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureRule(iptables.Prepend, iptables.TableFilter, iptables.ChainInput, append(args, "-j", string(iptablesNonLocalNodePortChain))...); err != nil {
+	if _, err := ipt.EnsureRule(iptables.Prepend, iptables.TableFilter, iptables.ChainInput, append(args, "-j", string(IptablesNonLocalNodePortChain))...); err != nil {
 		return err
 	}
 
@@ -1094,19 +1094,19 @@ func iptablesInit(ipt iptables.Interface) error {
 // Flush all of our custom iptables rules.
 func iptablesFlush(ipt iptables.Interface) error {
 	el := []error{}
-	if err := ipt.FlushChain(iptables.TableNAT, iptablesContainerPortalChain); err != nil {
+	if err := ipt.FlushChain(iptables.TableNAT, IptablesContainerPortalChain); err != nil {
 		el = append(el, err)
 	}
-	if err := ipt.FlushChain(iptables.TableNAT, iptablesHostPortalChain); err != nil {
+	if err := ipt.FlushChain(iptables.TableNAT, IptablesHostPortalChain); err != nil {
 		el = append(el, err)
 	}
-	if err := ipt.FlushChain(iptables.TableNAT, iptablesContainerNodePortChain); err != nil {
+	if err := ipt.FlushChain(iptables.TableNAT, IptablesContainerNodePortChain); err != nil {
 		el = append(el, err)
 	}
-	if err := ipt.FlushChain(iptables.TableNAT, iptablesHostNodePortChain); err != nil {
+	if err := ipt.FlushChain(iptables.TableNAT, IptablesHostNodePortChain); err != nil {
 		el = append(el, err)
 	}
-	if err := ipt.FlushChain(iptables.TableFilter, iptablesNonLocalNodePortChain); err != nil {
+	if err := ipt.FlushChain(iptables.TableFilter, IptablesNonLocalNodePortChain); err != nil {
 		el = append(el, err)
 	}
 	if len(el) != 0 {
