@@ -195,6 +195,62 @@ func writeHostsFile(filename string, cfg string) (string, error) {
 	return tmpdir, os.WriteFile(filepath.Join(tmpdir, filename), []byte(cfg), 0644)
 }
 
+func TestEnsureHostsFile(t *testing.T) {
+	testCases := []struct {
+		description    string
+		hostIPs        []string
+		hostName       string
+		hostDomainName string
+		hostAliases    []v1.HostAlias
+		useHostNetwork bool
+	}{
+		{
+			description:    "multi-containers in one pod call ensureHostsFile with useHostNetwork false",
+			hostIPs:        []string{"1.1.1.1"},
+			hostName:       "podFoo1",
+			hostDomainName: "domainFoo1",
+			hostAliases:    []v1.HostAlias{{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}}},
+			useHostNetwork: false,
+		},
+		{
+			description:    "multi-containers in one pod call ensureHostsFile with useHostNetwork true",
+			hostIPs:        []string{"1.1.1.1"},
+			hostName:       "podFoo2",
+			hostDomainName: "domainFoo2",
+			hostAliases:    []v1.HostAlias{{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}}},
+			useHostNetwork: true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			if testCase.useHostNetwork {
+				etcHostFile, err := os.CreateTemp(os.TempDir(), "etc-host-file-for-host")
+				require.NoError(t, err, "could not create a temp etc-hosts file for hostNetwork")
+				originEtcHostPath := etcHostsPath
+				etcHostsPath = etcHostFile.Name()
+				defer func() {
+					// reset global variable
+					etcHostsPath = originEtcHostPath
+					os.Remove(etcHostFile.Name())
+				}()
+			}
+			hostFile, err := os.CreateTemp(os.TempDir(), "etc-host-file-"+testCase.hostName)
+			require.NoError(t, err, "could not create a temp hosts file")
+			defer os.Remove(hostFile.Name())
+			// simulate first container creation with calling ensureHostsFile
+			ensureHostsFile(hostFile.Name(), testCase.hostIPs, testCase.hostName, testCase.hostDomainName, testCase.hostAliases, testCase.useHostNetwork)
+			fileInfoOrigin, err := hostFile.Stat()
+			require.NoError(t, err, "could not stat a temp hosts file")
+			// // simulate second container creation with calling ensureHostsFile
+			ensureHostsFile(hostFile.Name(), testCase.hostIPs, testCase.hostName, testCase.hostDomainName, testCase.hostAliases, testCase.useHostNetwork)
+			fileInfoCurrent, err := hostFile.Stat()
+			require.NoError(t, err, "could not stat a temp hosts file")
+			// compare file modTime
+			require.Equal(t, fileInfoOrigin.ModTime(), fileInfoCurrent.ModTime(), "etc-hosts file should not be rewritten as no changes")
+		})
+	}
+}
+
 func TestManagedHostsFileContent(t *testing.T) {
 	testCases := []struct {
 		hostIPs         []string

@@ -342,7 +342,12 @@ func ensureHostsFile(fileName string, hostIPs []string, hostName, hostDomainName
 		// if Pod is not using host network, create a managed hosts file with Pod IP and other information.
 		hostsFileContent = managedHostsFileContent(hostIPs, hostName, hostDomainName, hostAliases)
 	}
-
+	readContent, err := os.ReadFile(fileName)
+	if err == nil {
+		if bytes.Equal(readContent, hostsFileContent) {
+			return nil
+		}
+	}
 	return os.WriteFile(fileName, hostsFileContent, 0644)
 }
 
