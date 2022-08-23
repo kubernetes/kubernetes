@@ -290,6 +290,13 @@ rules:
       branch: release-1.25
       dir: staging/src/k8s.io/component-helpers
   library: true
+- destination: kms
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/kms
+    name: master
 - destination: apiserver
   branches:
   - name: master
@@ -301,6 +308,8 @@ rules:
     - repository: client-go
       branch: master
     - repository: component-base
+      branch: master
+    - repository: kms
       branch: master
     source:
       branch: master
@@ -375,6 +384,8 @@ rules:
     - repository: apiserver
       branch: master
     - repository: component-base
+      branch: master
+    - repository: kms
       branch: master
     - repository: code-generator
       branch: master
@@ -466,6 +477,8 @@ rules:
     - repository: apiserver
       branch: master
     - repository: code-generator
+      branch: master
+    - repository: kms
       branch: master
     - repository: component-base
       branch: master
@@ -680,6 +693,8 @@ rules:
     - repository: code-generator
       branch: master
     - repository: component-base
+      branch: master
+    - repository: kms
       branch: master
     source:
       branch: master
@@ -1201,6 +1216,8 @@ rules:
       branch: master
     - repository: apiserver
       branch: master
+    - repository: kms
+      branch: master
     source:
       branch: master
       dir: staging/src/k8s.io/controller-manager
@@ -1286,6 +1303,8 @@ rules:
     - repository: controller-manager
       branch: master
     - repository: component-helpers
+      branch: master
+    - repository: kms
       branch: master
     source:
       branch: master
@@ -1390,6 +1409,8 @@ rules:
     - repository: cloud-provider
       branch: master
     - repository: component-helpers
+      branch: master
+    - repository: kms
       branch: master
     source:
       branch: master
@@ -1635,6 +1656,8 @@ rules:
     - repository: controller-manager
       branch: master
     - repository: component-helpers
+      branch: master
+    - repository: kms
       branch: master
     source:
       branch: master
@@ -1896,6 +1919,8 @@ rules:
     - repository: client-go
       branch: master
     - repository: component-base
+      branch: master
+    - repository: kms
       branch: master
     source:
       branch: master
