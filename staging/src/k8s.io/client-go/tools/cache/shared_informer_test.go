@@ -739,7 +739,7 @@ func TestSharedInformerHandlerAbuse(t *testing.T) {
 		}
 	}
 
-	// sotp informer which stops workers. stopping informer first to excercise
+	// sotp informer which stops workers. stopping informer first to exercise
 	// contention for informer while it is closing
 	informerCancel()
 
