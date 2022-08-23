@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"sync"
 	"testing"
@@ -53,7 +52,7 @@ func mustReadConfig(t *testing.T, path string) []byte {
 	}
 	defer f.Close()
 
-	configFileContents, err := ioutil.ReadAll(f)
+	configFileContents, err := io.ReadAll(f)
 	if err != nil {
 		t.Fatalf("could not read contents of encryption config: %v", err)
 	}

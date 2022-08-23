@@ -181,9 +181,7 @@ func TestEnvelopeCacheLimit(t *testing.T) {
 }
 
 func TestEncodeDecode(t *testing.T) {
-	envelopeTransformer := &envelopeTransformer{
-		pluginName: "testplugin",
-	}
+	envelopeTransformer := &envelopeTransformer{}
 
 	obj := &kmstypes.EncryptedObject{
 		EncryptedData: []byte{0x01, 0x02, 0x03},
@@ -207,9 +205,7 @@ func TestEncodeDecode(t *testing.T) {
 }
 
 func TestDecodeError(t *testing.T) {
-	et := &envelopeTransformer{
-		pluginName: "testplugin",
-	}
+	et := &envelopeTransformer{}
 
 	testCases := []struct {
 		desc          string
