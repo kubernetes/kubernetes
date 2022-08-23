@@ -1,13 +1,12 @@
 package csaupgrade
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -20,8 +19,8 @@ import (
 // subResource - Name of subresource used for api calls or empty string for main resource
 func UpgradeManagedFields(
 	obj runtime.Object,
-	csaManager string,
-	ssaManager string,
+	csaManagerName string,
+	ssaManagerName string,
 	subResource string,
 ) (runtime.Object, error) {
 	accessor, err := meta.Accessor(obj)
@@ -29,106 +28,130 @@ func UpgradeManagedFields(
 		return nil, fmt.Errorf("error accessing object metadata: %w", err)
 	}
 
-	managed, error := fieldmanager.DecodeManagedFields(accessor.GetManagedFields())
-	if error != nil {
-		return nil, fmt.Errorf("failed to decode managed fields: %w", error)
-	}
-	// If SSA manager  exists:
-	//		find CSA manager of same version, union. discard the rest
-	// Else SSA manager does not exist:
-	//		find most recent CSA manager. convert to Apply operation
+	// Create managed fields clone since we modify the values
+	var managedFields []metav1.ManagedFieldsEntry
+	managedFields = append(managedFields, accessor.GetManagedFields()...)
 
-	ssaIdentifier, err := fieldmanager.BuildManagerIdentifier(&metav1.ManagedFieldsEntry{
-		Manager:     ssaManager,
-		Operation:   metav1.ManagedFieldsOperationApply,
-		Subresource: subResource,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to build manager identifier for ssa manager")
-	}
+	// Locate SSA manager
+	ssaManagerIndex, ssaManagerExists := findFirstIndex(managedFields,
+		func(entry metav1.ManagedFieldsEntry) bool {
+			return entry.Manager == ssaManagerName &&
+				entry.Operation == metav1.ManagedFieldsOperationApply &&
+				entry.Subresource == ""
+		})
 
-	ssaMan, ssaExists := managed.Fields()[ssaIdentifier]
+	if ssaManagerExists {
+		ssaManager := managedFields[ssaManagerIndex]
 
-	// Collect all relevant CSA managers before operating on them
-	csaManagers := map[string]fieldpath.VersionedSet{}
-	for name, entry := range managed.Fields() {
-		if entry.Applied() {
-			// Not interested in SSA managed fields entries
-			continue
-		}
+		// find Update manager of same APIVersion, union ssa fields with it.
+		// discard all other Update managers of the same name
+		csaManagerIndex, csaManagerExists := findFirstIndex(managedFields,
+			func(entry metav1.ManagedFieldsEntry) bool {
+				return entry.Manager == csaManagerName &&
+					entry.Operation == metav1.ManagedFieldsOperationUpdate &&
+					entry.Subresource == "" &&
+					entry.APIVersion == ssaManager.APIVersion
+			})
 
-		// Manager string is a JSON representation of encoded entry
-		// Pull manager name and subresource from it
-		encodedVersionedSet := &metav1.ManagedFieldsEntry{}
-		err = json.Unmarshal([]byte(name), encodedVersionedSet)
-		if err != nil {
-			return nil, fmt.Errorf("error unmarshalling manager identifier %v: %v", name, err)
-		}
+		if csaManagerExists {
+			csaManager := managedFields[csaManagerIndex]
 
-		if encodedVersionedSet.Manager != csaManager ||
-			encodedVersionedSet.Subresource != subResource {
-			continue
-		}
-
-		csaManagers[name] = entry
-	}
-
-	if len(csaManagers) == 0 {
-		return obj, nil
-	}
-
-	if ssaExists {
-		for name, entry := range csaManagers {
-			if entry.APIVersion() == ssaMan.APIVersion() {
-				// Merge entries if they are compatible versions
-				ssaMan = fieldpath.NewVersionedSet(
-					ssaMan.Set().Union(entry.Set()),
-					entry.APIVersion(),
-					true,
-				)
-				managed.Fields()[ssaIdentifier] = ssaMan
+			// Union the csa manager with the existing SSA manager
+			ssaFieldSet, err := fieldsToSet(*ssaManager.FieldsV1)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert fields to set: %w", err)
 			}
 
-			// Discard entry in all cases:
-			//	if it has the wrong version we discard since managed fields versions
-			//		cannot be converted
-			//	if it has the correct version its fields were moved into the
-			//		ssaManager's fieldSet
-			delete(managed.Fields(), name)
+			csaFieldSet, err := fieldsToSet(*csaManager.FieldsV1)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert fields to set: %w", err)
+			}
+
+			combinedFieldSet := ssaFieldSet.Union(&csaFieldSet)
+			combinedFieldSetEncoded, err := setToFields(*combinedFieldSet)
+			if err != nil {
+				return nil, fmt.Errorf("failed to encode field set: %w", err)
+			}
+
+			managedFields[ssaManagerIndex].FieldsV1 = &combinedFieldSetEncoded
 		}
 	} else {
-		// Loop through sorted CSA managers. Take the first one we care about
-		firstName := ""
-		for _, entry := range accessor.GetManagedFields() {
-			if entry.Manager == csaManager &&
-				entry.Subresource == subResource &&
-				entry.Operation == metav1.ManagedFieldsOperationUpdate {
+		// SSA manager does not exist. Find the most recent matching CSA manager,
+		// convert it to an SSA manager.
+		//
+		// (find first index, since managed fields are sorted so that most recent is
+		//  first in the list)
+		csaManagerIndex, csaManagerExists := findFirstIndex(managedFields, func(entry metav1.ManagedFieldsEntry) bool {
+			return entry.Manager == csaManagerName && entry.Operation == metav1.ManagedFieldsOperationUpdate && entry.Subresource == ""
+		})
 
-				if len(firstName) == 0 {
-					ident, err := fieldmanager.BuildManagerIdentifier(&entry)
-					if err != nil {
-						return nil, fmt.Errorf("failed to build manager identifier: %w", err)
-					}
-
-					firstName = ident
-					break
-				}
-			}
+		if !csaManagerExists {
+			// There are no CSA managers that need to be converted. Nothing to do
+			// Return early
+			return obj, nil
 		}
 
-		managed.Fields()[ssaIdentifier] = csaManagers[firstName]
-
-		for name := range csaManagers {
-			delete(managed.Fields(), name)
-		}
+		// Convert the entry to apply operation
+		managedFields[csaManagerIndex].Operation = metav1.ManagedFieldsOperationApply
+		managedFields[csaManagerIndex].Manager = ssaManagerName
 	}
 
-	now := metav1.Now()
-	managed.Times()[ssaIdentifier] = &now
+	// Create version of managed fields which has no CSA managers with the given name
+	filteredManagers := filter(managedFields, func(entry metav1.ManagedFieldsEntry) bool {
+		return !(entry.Manager == csaManagerName &&
+			entry.Operation == metav1.ManagedFieldsOperationUpdate &&
+			entry.Subresource == "")
+	})
 
 	copied := obj.DeepCopyObject()
-	if err := fieldmanager.EncodeObjectManagedFields(copied, managed); err != nil {
-		return nil, err
+	copiedAccessor, err := meta.Accessor(copied)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get meta accessor for copied object: %w", err)
 	}
+	copiedAccessor.SetManagedFields(filteredManagers)
 	return copied, nil
+}
+
+func findFirstIndex[T any](
+	collection []T,
+	predicate func(T) bool,
+) (int, bool) {
+	for idx, entry := range collection {
+		if predicate(entry) {
+			return idx, true
+		}
+	}
+
+	return -1, false
+}
+
+func filter[T any](
+	collection []T,
+	predicate func(T) bool,
+) []T {
+	result := make([]T, 0, len(collection))
+
+	for _, value := range collection {
+		if predicate(value) {
+			result = append(result, value)
+		}
+	}
+
+	if len(result) == 0 {
+		return nil
+	}
+
+	return result
+}
+
+// FieldsToSet creates a set paths from an input trie of fields
+func fieldsToSet(f metav1.FieldsV1) (s fieldpath.Set, err error) {
+	err = s.FromJSON(bytes.NewReader(f.Raw))
+	return s, err
+}
+
+// SetToFields creates a trie of fields from an input set of paths
+func setToFields(s fieldpath.Set) (f metav1.FieldsV1, err error) {
+	f.Raw, err = s.ToJSON()
+	return f, err
 }
