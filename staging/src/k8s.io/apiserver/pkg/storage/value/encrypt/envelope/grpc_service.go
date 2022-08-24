@@ -24,13 +24,13 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/util"
 	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -52,7 +52,7 @@ type gRPCService struct {
 }
 
 // NewGRPCService returns an envelope.Service which use gRPC to communicate the remote KMS provider.
-func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error) {
+func NewGRPCService(ctx context.Context, endpoint string, callTimeout time.Duration) (Service, error) {
 	klog.V(4).Infof("Configure KMS provider with endpoint: %s", endpoint)
 
 	addr, err := util.ParseEndpoint(endpoint)
@@ -84,6 +84,14 @@ func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error)
 	}
 
 	s.kmsClient = kmsapi.NewKeyManagementServiceClient(s.connection)
+
+	go func() {
+		defer utilruntime.HandleCrash()
+
+		<-ctx.Done()
+		_ = s.connection.Close()
+	}()
+
 	return s, nil
 }
 
