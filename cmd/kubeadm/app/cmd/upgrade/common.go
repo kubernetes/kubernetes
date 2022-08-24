@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -34,13 +33,11 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -222,29 +219,6 @@ func enforceRequirements(flags *applyPlanFlags, args []string, dryRun bool, upgr
 	// If the user told us to print this information out; do it!
 	if flags.printConfig {
 		printConfiguration(&cfg.ClusterConfiguration, os.Stdout, printer)
-	}
-
-	// Handle a dupliate prefix URL scheme in the Node CRI socket.
-	// Older versions of kubeadm(v1.24.0~2) upgrade may add one or two extra prefix `unix://`
-	// TODO: this fix can be removed in 1.26 once all user node sockets have a correct URL scheme:
-	// https://github.com/kubernetes/kubeadm/issues/2426
-	dupURLScheme := strings.HasPrefix(cfg.NodeRegistration.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://"+kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://")
-	if dupURLScheme {
-		socket := strings.ReplaceAll(cfg.NodeRegistration.CRISocket, kubeadmapiv1.DefaultContainerRuntimeURLScheme+"://", "")
-		cfg.NodeRegistration.CRISocket = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://" + socket
-		var hostname string
-		if len(cfg.NodeRegistration.Name) > 0 {
-			hostname = cfg.NodeRegistration.Name
-		} else {
-			hostname, err = os.Hostname()
-			if err != nil {
-				return nil, nil, nil, errors.Wrapf(err, "failed to get hostname")
-			}
-		}
-		klog.V(2).Infof("ensuring that Node %q has a CRI socket annotation with correct URL scheme %q", hostname, cfg.NodeRegistration.CRISocket)
-		if err := patchnodephase.AnnotateCRISocket(client, hostname, cfg.NodeRegistration.CRISocket); err != nil {
-			return nil, nil, nil, errors.Wrapf(err, "error updating the CRI socket for Node %q", cfg.NodeRegistration.CRISocket)
-		}
 	}
 
 	// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
