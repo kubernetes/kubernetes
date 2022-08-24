@@ -1,5 +1,0 @@
-inverseRules:
-  # Allow use of this package in all k8s.io packages.
-  - selectorRegexp: k8s[.]io
-    allowedPrefixes:
-      - ''

@@ -1484,7 +1484,7 @@ var (
 		newPod.Labels = map[string]string{"queueable": ""}
 		queue.Update(logger, pInfo.Pod, newPod)
 	}
-	addPodBackoffQ = func(logger klog.Logger,queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
+	addPodBackoffQ = func(logger klog.Logger, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		queue.podBackoffQ.Add(pInfo)
 	}
 	moveAllToActiveOrBackoffQ = func(logger klog.Logger, queue *PriorityQueue, _ *framework.QueuedPodInfo) {

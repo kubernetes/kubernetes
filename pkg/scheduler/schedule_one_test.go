@@ -549,7 +549,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
-			_ , ctx := ktesting.NewTestContext(t)
+			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
@@ -643,7 +643,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 
 func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
+	_, cancel := context.WithCancel(ctx)
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	scache := internalcache.New(ctx, 100*time.Millisecond)
@@ -709,7 +709,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 
 func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
+	_, cancel := context.WithCancel(ctx)
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	scache := internalcache.New(ctx, 10*time.Minute)
@@ -779,7 +779,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 
 func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
+	_, cancel := context.WithCancel(ctx)
 	defer cancel()
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	scache := internalcache.New(ctx, 10*time.Minute)
@@ -1047,7 +1047,7 @@ func TestSchedulerBinding(t *testing.T) {
 	for _, test := range table {
 		t.Run(test.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
+			_, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			pod := st.MakePod().Name(test.podName).Obj()
@@ -2043,7 +2043,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
+			_, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			cache := internalcache.New(ctx, time.Duration(0))
@@ -2230,7 +2230,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
+			_, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			nodes := makeNodeList([]string{"1"})
@@ -2261,7 +2261,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			if err := scheduler.Cache.UpdateSnapshot(logger, scheduler.nodeInfoSnapshot); err != nil {
 				t.Fatal(err)
 			}
-			podinfo , err := framework.NewPodInfo(st.MakePod().UID("nominated").Priority(midPriority).Obj())
+			podinfo, err := framework.NewPodInfo(st.MakePod().UID("nominated").Priority(midPriority).Obj())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2805,7 +2805,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
+			_, cancel := context.WithCancel(ctx)
 			defer cancel()
 
 			// create three nodes in the cluster.
@@ -3006,7 +3006,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 	}
 
 	sched.SchedulePod = sched.schedulePod
-	sched.FailureHandler = func(_ klog.Logger, _ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, status *framework.Status, _ *framework.NominatingInfo, _ time.Time) {
+	sched.FailureHandler = func(_ context.Context, _ framework.Framework, p *framework.QueuedPodInfo, status *framework.Status, _ *framework.NominatingInfo, _ time.Time) {
 		err := status.AsError()
 		errChan <- err
 
