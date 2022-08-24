@@ -75,6 +75,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
+	networkingv1alpha1client "k8s.io/client-go/kubernetes/typed/networking/v1alpha1"
+
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -579,12 +581,12 @@ func newServiceAllocators(c *completedConfig) (LegacyRESTStorage, map[api.IPFami
 		return LegacyRESTStorage{}, nil, nil, fmt.Errorf("service clusterIPRange is missing")
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceCIDR) {
-		serviceStorageConfig, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("services"))
-		if err != nil {
-			return LegacyRESTStorage{}, nil, nil, err
-		}
+	serviceStorageConfig, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("services"))
+	if err != nil {
+		return LegacyRESTStorage{}, nil, nil, err
+	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceCIDR) {
 		serviceClusterIPAllocator, err := ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 			var mem allocator.Snapshottable
 			mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
@@ -624,18 +626,29 @@ func newServiceAllocators(c *completedConfig) (LegacyRESTStorage, map[api.IPFami
 			restStorage.SecondaryServiceClusterIPAllocator = secondaryServiceClusterIPRegistry
 		}
 	} else {
-		networkingClient, err := networkingv1alpha1.NewForConfig(c.LoopbackClientConfig)
+		networkingClient, err := networkingv1alpha1client.NewForConfig(c.GenericConfig.LoopbackClientConfig)
 		if err != nil {
 			return LegacyRESTStorage{}, nil, nil, err
 		}
-		serviceClusterIPAllocator, err = networkingstore.NewAllocator(&serviceClusterIPRange, "default", networkingClient)
+		serviceClusterIPAllocator, err = ipallocator.NewServiceCIDRAllocator(
+			netutils.IsIPv6CIDR(&serviceClusterIPRange),
+			networkingClient,
+			c.ExtraConfig.VersionedInformers.Networking().V1alpha1().ServiceCIDRs(),
+			c.ExtraConfig.VersionedInformers.Networking().V1alpha1().IPAddresses(),
+		)
+
 		if err != nil {
 			return LegacyRESTStorage{}, nil, nil, err
 		}
-		if c.SecondaryServiceIPRange.IP != nil {
-			secondaryServiceClusterIPAllocator, err = networkingstore.NewAllocator(&c.SecondaryServiceIPRange, "default", networkingClient)
+		if c.ExtraConfig.SecondaryServiceIPRange.IP != nil {
+			secondaryServiceClusterIPAllocator, err = ipallocator.NewServiceCIDRAllocator(
+				netutils.IsIPv6CIDR(&c.ExtraConfig.SecondaryServiceIPRange),
+				networkingClient,
+				c.ExtraConfig.VersionedInformers.Networking().V1alpha1().ServiceCIDRs(),
+				c.ExtraConfig.VersionedInformers.Networking().V1alpha1().IPAddresses(),
+			)
 			if err != nil {
-				return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+				return LegacyRESTStorage{}, nil, nil, err
 			}
 		}
 	}
