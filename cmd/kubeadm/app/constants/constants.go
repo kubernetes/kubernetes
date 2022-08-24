@@ -254,10 +254,6 @@ const (
 	// CertificateKeySize specifies the size of the key used to encrypt certificates on uploadcerts phase
 	CertificateKeySize = 32
 
-	// LabelNodeRoleOldControlPlane specifies that a node hosts control-plane components
-	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
-	LabelNodeRoleOldControlPlane = "node-role.kubernetes.io/master"
-
 	// LabelNodeRoleControlPlane specifies that a node hosts control-plane components
 	LabelNodeRoleControlPlane = "node-role.kubernetes.io/control-plane"
 
@@ -439,20 +435,6 @@ const (
 )
 
 var (
-	// OldControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
-	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
-	OldControlPlaneTaint = v1.Taint{
-		Key:    LabelNodeRoleOldControlPlane,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-
-	// OldControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
-	// DEPRECATED: https://github.com/kubernetes/kubeadm/issues/2200
-	OldControlPlaneToleration = v1.Toleration{
-		Key:    LabelNodeRoleOldControlPlane,
-		Effect: v1.TaintEffectNoSchedule,
-	}
-
 	// ControlPlaneTaint is the taint to apply on the PodSpec for being able to run that Pod on the control-plane
 	ControlPlaneTaint = v1.Taint{
 		Key:    LabelNodeRoleControlPlane,

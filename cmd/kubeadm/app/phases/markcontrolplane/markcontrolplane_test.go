@@ -89,7 +89,6 @@ func TestMarkControlPlane(t *testing.T) {
 		{
 			name: "has taint and should merge with wanted taint",
 			existingLabels: []string{
-				kubeadmconstants.LabelNodeRoleOldControlPlane,
 				kubeadmconstants.LabelNodeRoleControlPlane,
 				kubeadmconstants.LabelExcludeFromExternalLB,
 			},
