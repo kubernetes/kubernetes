@@ -54,11 +54,6 @@ type resizeProcessStatus struct {
 	processed bool
 }
 
-// ClaimToClaimKey return namespace/name string for pvc
-func ClaimToClaimKey(claim *v1.PersistentVolumeClaim) string {
-	return fmt.Sprintf("%s/%s", claim.Namespace, claim.Name)
-}
-
 // UpdatePVSize updates just pv size after cloudprovider resizing is successful
 func UpdatePVSize(
 	pv *v1.PersistentVolume,
