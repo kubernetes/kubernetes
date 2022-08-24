@@ -17,6 +17,7 @@ limitations under the License.
 package attach
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
@@ -159,7 +160,7 @@ func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclie
 	if err != nil {
 		return err
 	}
-	return exec.Stream(remotecommand.StreamOptions{
+	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdin:             stdin,
 		Stdout:            stdout,
 		Stderr:            stderr,

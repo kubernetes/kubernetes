@@ -18,6 +18,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -252,7 +253,7 @@ func TestStream(t *testing.T) {
 				if err != nil {
 					t.Fatalf("%s: unexpected error: %v", name, err)
 				}
-				err = e.Stream(remoteclient.StreamOptions{
+				err = e.StreamWithContext(context.Background(), remoteclient.StreamOptions{
 					Stdin:  streamIn,
 					Stdout: streamOut,
 					Stderr: streamErr,
