@@ -17,7 +17,17 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"k8s.io/component-base/metrics"
+)
+
+type RequestBodyVerb string
+
+const (
+	Patch  RequestBodyVerb = "patch"
+	Delete RequestBodyVerb = "delete"
+	Update RequestBodyVerb = "update"
+	Create RequestBodyVerb = "create"
 )
 
 var (
@@ -34,3 +44,7 @@ var (
 		[]string{"resource", "verb"},
 	)
 )
+
+func RecordRequestBodySize(ctx context.Context, resource string, verb RequestBodyVerb, size int) {
+	RequestBodySizes.WithContext(ctx).WithLabelValues(resource, string(verb)).Observe(float64(size))
+}
