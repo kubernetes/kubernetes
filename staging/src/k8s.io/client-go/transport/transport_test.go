@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"testing"
 )
@@ -94,6 +95,13 @@ stR0Yiw0buV6DL/moUO0HIM9Bjh96HJp+LxiIS6UCdIhMPp5HoQa
 )
 
 func TestNew(t *testing.T) {
+	globalGetCert := &GetCertHolder{
+		GetCert: func() (*tls.Certificate, error) { return nil, nil },
+	}
+	globalDial := &DialHolder{
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil },
+	}
+
 	testCases := map[string]struct {
 		Config       *Config
 		Err          bool
@@ -254,6 +262,144 @@ func TestNew(t *testing.T) {
 					},
 				},
 			},
+		},
+		"nil holders and nil regular": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCert:       nil,
+					GetCertHolder: nil,
+				},
+				Dial:       nil,
+				DialHolder: nil,
+			},
+			Err:          false,
+			TLS:          false,
+			TLSCert:      false,
+			TLSErr:       false,
+			Default:      true,
+			Insecure:     false,
+			DefaultRoots: false,
+		},
+		"nil holders and non-nil regular get cert": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCert:       func() (*tls.Certificate, error) { return nil, nil },
+					GetCertHolder: nil,
+				},
+				Dial:       nil,
+				DialHolder: nil,
+			},
+			Err:          false,
+			TLS:          true,
+			TLSCert:      true,
+			TLSErr:       false,
+			Default:      false,
+			Insecure:     false,
+			DefaultRoots: true,
+		},
+		"nil holders and non-nil regular dial": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCert:       nil,
+					GetCertHolder: nil,
+				},
+				Dial:       func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil },
+				DialHolder: nil,
+			},
+			Err:          false,
+			TLS:          true,
+			TLSCert:      false,
+			TLSErr:       false,
+			Default:      false,
+			Insecure:     false,
+			DefaultRoots: true,
+		},
+		"non-nil dial holder and nil regular": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCert:       nil,
+					GetCertHolder: nil,
+				},
+				Dial:       nil,
+				DialHolder: &DialHolder{},
+			},
+			Err: true,
+		},
+		"non-nil cert holder and nil regular": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCert:       nil,
+					GetCertHolder: &GetCertHolder{},
+				},
+				Dial:       nil,
+				DialHolder: nil,
+			},
+			Err: true,
+		},
+		"non-nil dial holder and non-nil regular": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCert:       nil,
+					GetCertHolder: nil,
+				},
+				Dial:       func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil },
+				DialHolder: &DialHolder{},
+			},
+			Err: true,
+		},
+		"non-nil cert holder and non-nil regular": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCert:       func() (*tls.Certificate, error) { return nil, nil },
+					GetCertHolder: &GetCertHolder{},
+				},
+				Dial:       nil,
+				DialHolder: nil,
+			},
+			Err: true,
+		},
+		"non-nil dial holder+internal and non-nil regular": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCert:       nil,
+					GetCertHolder: nil,
+				},
+				Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil },
+				DialHolder: &DialHolder{
+					Dial: func(ctx context.Context, network, address string) (net.Conn, error) { return nil, nil },
+				},
+			},
+			Err: true,
+		},
+		"non-nil cert holder+internal and non-nil regular": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCert: func() (*tls.Certificate, error) { return nil, nil },
+					GetCertHolder: &GetCertHolder{
+						GetCert: func() (*tls.Certificate, error) { return nil, nil },
+					},
+				},
+				Dial:       nil,
+				DialHolder: nil,
+			},
+			Err: true,
+		},
+		"non-nil holders+internal and non-nil regular with correct address": {
+			Config: &Config{
+				TLS: TLSConfig{
+					GetCert:       globalGetCert.GetCert,
+					GetCertHolder: globalGetCert,
+				},
+				Dial:       globalDial.Dial,
+				DialHolder: globalDial,
+			},
+			Err:          false,
+			TLS:          true,
+			TLSCert:      true,
+			TLSErr:       false,
+			Default:      false,
+			Insecure:     false,
+			DefaultRoots: true,
 		},
 	}
 	for k, testCase := range testCases {
