@@ -2429,6 +2429,12 @@ function create-network() {
         --allow "tcp:3389" &
     fi
   fi
+
+  kube::util::wait-for-jobs || {
+    code=$?
+    echo -e "${color_red}Failed to create firewall rules.${color_norm}" >&2
+    exit $code
+  }
 }
 
 function expand-default-subnetwork() {
@@ -3099,7 +3105,9 @@ function create-nodes-firewall() {
 
   # Wait for last batch of jobs
   kube::util::wait-for-jobs || {
-    echo -e "${color_red}Some commands failed.${color_norm}" >&2
+    code=$?
+    echo -e "${color_red}Failed to create firewall rule.${color_norm}" >&2
+    exit $code
   }
 }
 
