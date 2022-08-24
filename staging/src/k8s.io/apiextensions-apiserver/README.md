@@ -1,6 +1,6 @@
 # apiextensions-apiserver
 
-Implements: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/thirdpartyresources.md
+Implements: https://git.k8s.io/design-proposals-archive/api-machinery/thirdpartyresources.md
 
 It provides an API for registering `CustomResourceDefinitions`.
 

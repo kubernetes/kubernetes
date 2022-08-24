@@ -11,7 +11,7 @@ import (
 )
 
 // Gvk identifies a Kubernetes API type.
-// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/api-group.md
+// https://git.k8s.io/design-proposals-archive/api-machinery/api-group.md
 type Gvk struct {
 	Group   string `json:"group,omitempty" yaml:"group,omitempty"`
 	Version string `json:"version,omitempty" yaml:"version,omitempty"`

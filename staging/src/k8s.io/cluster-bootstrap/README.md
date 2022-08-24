@@ -1,7 +1,7 @@
 # cluster-bootstrap
 
 Set of constants and helpers in support of
-https://github.com/kubernetes/community/blob/master/contributors/design-proposals/cluster-lifecycle/bootstrap-discovery.md
+https://git.k8s.io/design-proposals-archive/cluster-lifecycle/bootstrap-discovery.md
 
 
 ## Purpose

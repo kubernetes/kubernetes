@@ -30,7 +30,7 @@ import (
 
 // These tests exercise the Kubernetes expansion syntax $(VAR).
 // For more information, see:
-// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/expansion.md
+// https://git.k8s.io/design-proposals-archive/node/expansion.md
 var _ = SIGDescribe("Variable Expansion", func() {
 	f := framework.NewDefaultFramework("var-expansion")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
