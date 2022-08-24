@@ -27,6 +27,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/ginkgo/v2/formatter"
 	"github.com/onsi/ginkgo/v2/types"
+	"github.com/onsi/gomega"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
@@ -116,6 +117,70 @@ func By(text string, callback func(), threshold ...time.Duration) {
 	if value.Duration >= threshold[0] {
 		ginkgo.GinkgoWriter.Println(formatter.F("{{bold}}STEP duration:{{/}} %s {{gray}}%s{{/}}", text, value.Duration))
 	}
+}
+
+// SucceedEventually is a replacement for
+// gomega.Eventually(callback, intervals...).Should(gomega.Succeed(), extra...).
+//
+// In contrast to gomega, it prints intermediate failures at regular intervals
+// to provide early feedback that a test is stuck. The length of that interval
+// can be given as third parameter after the timeout and poll interval. It
+// defaults to 3 * TestContext.SlowStepThreshold.
+//
+// To get timing information for a long running SucceedEventually, wrap it in
+// By.
+func SucceedEventually(callback func(g gomega.Gomega), extra []interface{}, intervals ...interface{}) {
+	SucceedEventuallyWithOffset(1, callback, extra, intervals...)
+}
+
+// SucceedEventuallyWithOffset is the same as SucceedEventually except that it can skip
+// additional stackframes. With offset = 0 the direct caller is reported, just as in
+// SucceedEventually.
+func SucceedEventuallyWithOffset(offset int, callback func(g gomega.Gomega), extra []interface{}, intervals ...interface{}) {
+	lastReport := time.Now()
+	if len(intervals) > 3 {
+		Fail("SucceedEventually only takes at most three duration values.", 1)
+	}
+	reportInterval := 3 * TestContext.SlowStepThreshold
+	if len(intervals) == 3 {
+		switch interval := intervals[2].(type) {
+		case string:
+			duration, err := time.ParseDuration(interval)
+			if err != nil {
+				Fail(fmt.Sprintf("SucceedEventually called with invalid report interval: %v", err), 1)
+			}
+			reportInterval = duration
+		case time.Duration:
+			reportInterval = interval
+		default:
+			Fail(fmt.Sprintf("SucceedEventually called with invalid report interval, need string or time.Duration: %v", interval), 1)
+		}
+		intervals = intervals[0:2]
+	}
+
+	gomega.EventuallyWithOffset(offset+1, func() string {
+		failures := ""
+		g := gomega.NewGomega(func(message string, callerSkip ...int) {
+			failures = message
+		})
+		callback(g)
+		if failures != "" {
+			now := time.Now()
+			if now.Sub(lastReport) >= reportInterval {
+				header := ""
+				if len(extra) > 0 {
+					if format, ok := extra[0].(string); ok {
+						header = fmt.Sprintf(format+"\n", extra[1:]...)
+					} else {
+						header = fmt.Sprintf("unexpected extra parameters: %v\n", extra)
+					}
+				}
+				Logf("%s%s", header, failures)
+				lastReport = now
+			}
+		}
+		return failures
+	}, intervals...).Should(gomega.BeEmpty(), extra...)
 }
 
 var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/v2/`)
