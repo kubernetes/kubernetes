@@ -1,13 +1,12 @@
 package csaupgrade
 
 import (
-	"bytes"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 )
 
 // Upgrades the Manager information for fields managed with CSA
@@ -57,18 +56,18 @@ func UpgradeManagedFields(
 			csaManager := managedFields[csaManagerIndex]
 
 			// Union the csa manager with the existing SSA manager
-			ssaFieldSet, err := fieldsToSet(*ssaManager.FieldsV1)
+			ssaFieldSet, err := fieldmanager.FieldsToSet(*ssaManager.FieldsV1)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert fields to set: %w", err)
 			}
 
-			csaFieldSet, err := fieldsToSet(*csaManager.FieldsV1)
+			csaFieldSet, err := fieldmanager.FieldsToSet(*csaManager.FieldsV1)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert fields to set: %w", err)
 			}
 
 			combinedFieldSet := ssaFieldSet.Union(&csaFieldSet)
-			combinedFieldSetEncoded, err := setToFields(*combinedFieldSet)
+			combinedFieldSetEncoded, err := fieldmanager.SetToFields(*combinedFieldSet)
 			if err != nil {
 				return nil, fmt.Errorf("failed to encode field set: %w", err)
 			}
@@ -142,16 +141,4 @@ func filter[T any](
 	}
 
 	return result
-}
-
-// FieldsToSet creates a set paths from an input trie of fields
-func fieldsToSet(f metav1.FieldsV1) (s fieldpath.Set, err error) {
-	err = s.FromJSON(bytes.NewReader(f.Raw))
-	return s, err
-}
-
-// SetToFields creates a trie of fields from an input set of paths
-func setToFields(s fieldpath.Set) (f metav1.FieldsV1, err error) {
-	f.Raw, err = s.ToJSON()
-	return f, err
 }

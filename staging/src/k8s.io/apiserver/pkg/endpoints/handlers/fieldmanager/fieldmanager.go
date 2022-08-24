@@ -123,6 +123,15 @@ func newDefaultFieldManager(f Manager, typeConverter TypeConverter, objectConver
 	)
 }
 
+func FieldsToSet(f metav1.FieldsV1) (s fieldpath.Set, err error) {
+	return internal.FieldsToSet(f)
+}
+
+// SetToFields creates a trie of fields from an input set of paths
+func SetToFields(s fieldpath.Set) (f metav1.FieldsV1, err error) {
+	return internal.SetToFields(s)
+}
+
 // DecodeManagedFields converts ManagedFields from the wire format (api format)
 // to the format used by sigs.k8s.io/structured-merge-diff
 func DecodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (Managed, error) {
