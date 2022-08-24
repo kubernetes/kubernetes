@@ -19,12 +19,10 @@ package uploadconfig
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -121,26 +119,4 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 			},
 		},
 	})
-}
-
-// MutateImageRepository mutates the imageRepository field in the ClusterConfiguration
-// to 'registry.k8s.io' in case it was the legacy default 'k8s.gcr.io'
-// TODO: Remove this in 1.26
-// https://github.com/kubernetes/kubeadm/issues/2671
-func MutateImageRepository(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
-	if cfg.ImageRepository != "k8s.gcr.io" {
-		return nil
-	}
-	cfg.ImageRepository = "registry.k8s.io"
-	// If the client is nil assume that we don't want to mutate the in-cluster config
-	if client == nil {
-		return nil
-	}
-	klog.V(1).Info("updating the ClusterConfiguration.ImageRepository field in the kube-system/kubeadm-config " +
-		"ConfigMap to be 'registry.k8s.io' instead of the legacy default of 'k8s.gcr.io'")
-	if err := UploadConfiguration(cfg, client); err != nil {
-		return errors.Wrap(err, "could not mutate the ClusterConfiguration.ImageRepository field in "+
-			"the kube-system/kubeadm-config ConfigMap")
-	}
-	return nil
 }
