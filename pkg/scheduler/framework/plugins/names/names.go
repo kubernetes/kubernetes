@@ -30,7 +30,6 @@ const (
 	NodeUnschedulable               = "NodeUnschedulable"
 	NodeVolumeLimits                = "NodeVolumeLimits"
 	AzureDiskLimits                 = "AzureDiskLimits"
-	CinderLimits                    = "CinderLimits"
 	EBSLimits                       = "EBSLimits"
 	GCEPDLimits                     = "GCEPDLimits"
 	PodTopologySpread               = "PodTopologySpread"

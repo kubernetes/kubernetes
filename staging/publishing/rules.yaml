@@ -1634,8 +1634,6 @@ rules:
       branch: master
     - repository: controller-manager
       branch: master
-    - repository: mount-utils
-      branch: master
     - repository: component-helpers
       branch: master
     source:

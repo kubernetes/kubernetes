@@ -31,8 +31,8 @@ limitations under the License.
  * Note that the server containers are for testing purposes only and should not
  * be used in production.
  *
- * 2) With server outside of Kubernetes (Cinder, ...)
- * Appropriate server (e.g. OpenStack Cinder) must exist somewhere outside
+ * 2) With server outside of Kubernetes
+ * Appropriate server exist somewhere outside
  * the tested Kubernetes cluster. The test itself creates a new volume,
  * and checks, that Kubernetes can use it as a volume.
  */

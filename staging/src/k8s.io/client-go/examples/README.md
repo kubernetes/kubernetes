@@ -19,7 +19,6 @@ Or you can load specific auth plugins:
 import _ "k8s.io/client-go/plugin/pkg/client/auth/azure"
 import _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 import _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
-import _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 ```
 
 ### Configuration

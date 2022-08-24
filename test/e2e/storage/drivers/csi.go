@@ -27,7 +27,7 @@ limitations under the License.
  * Note that the server containers are for testing purposes only and should not
  * be used in production.
  *
- * 2) With server or cloud provider outside of Kubernetes (Cinder, GCE, AWS, Azure, ...)
+ * 2) With server or cloud provider outside of Kubernetes (GCE, AWS, Azure, ...)
  * Appropriate server or cloud provider must exist somewhere outside
  * the tested Kubernetes cluster. CreateVolume will create a new volume to be
  * used in the TestSuites for inlineVolume or DynamicPV tests.
