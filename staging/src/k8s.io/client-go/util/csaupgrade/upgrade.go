@@ -20,7 +20,7 @@ import (
 //  3. Client-side apply tends to own more fields (including fields that are defaulted),
 //     this will possibly remove this defaults, they will be re-defaulted, that's fine.
 //  4. Care must be taken to not overwrite the managed fields on the server if they
-//     have changed during the RMW operation.
+//     have changed before sending a patch.
 //
 // csaManager - Name of FieldManager formerly used for `Update` operations
 // ssaManager - Name of FieldManager formerly used for `Apply` operations
@@ -29,7 +29,6 @@ func UpgradeManagedFields(
 	obj runtime.Object,
 	csaManagerName string,
 	ssaManagerName string,
-	subResource string,
 ) (runtime.Object, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {

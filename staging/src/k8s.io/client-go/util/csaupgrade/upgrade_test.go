@@ -11,12 +11,19 @@ import (
 )
 
 func TestUpgradeCSA(t *testing.T) {
-	// Initial object has managed fields from using CSA
-	originalYAML := []byte(`
+
+	cases := []struct {
+		CSAManager     string
+		SSAManager     string
+		OriginalObject []byte
+		ExpectedObject []byte
+	}{
+		{
+			CSAManager: "kubectl-client-side-apply",
+			SSAManager: "kubectl",
+			OriginalObject: []byte(`
 apiVersion: v1
-data:
-  key: value
-  legacy: unused
+data: {}
 kind: ConfigMap
 metadata:
   annotations:
@@ -40,25 +47,10 @@ metadata:
     time: "2022-08-22T23:08:23Z"
   name: test
   namespace: default
-  resourceVersion: "12502"
-  uid: 1f186675-58e6-4d7b-8bc5-7ece581e3013
-`)
-	initialObject := unstructured.Unstructured{}
-	err := yaml.Unmarshal(originalYAML, &initialObject)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	upgraded, err := csaupgrade.UpgradeManagedFields(&initialObject, "kubectl-client-side-apply", "kubectl", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	expectedYAML := []byte(`
+`),
+			ExpectedObject: []byte(`
 apiVersion: v1
-data:
-  key: value
-  legacy: unused
+data: {}
 kind: ConfigMap
 metadata:
   annotations:
@@ -81,18 +73,36 @@ metadata:
     operation: Apply
     time: "2022-08-22T23:08:23Z"
   name: test
-  namespace: default
-  resourceVersion: "12502"
-  uid: 1f186675-58e6-4d7b-8bc5-7ece581e3013
-`)
-
-	expectedObject := unstructured.Unstructured{}
-	err = yaml.Unmarshal(expectedYAML, &expectedObject)
-	if err != nil {
-		t.Fatal(err)
+  namespace: default  
+`),
+		},
 	}
 
-	if !reflect.DeepEqual(&expectedObject, upgraded) {
-		t.Fatal(cmp.Diff(&expectedObject, upgraded))
+	for _, testCase := range cases {
+		initialObject := unstructured.Unstructured{}
+		err := yaml.Unmarshal(testCase.OriginalObject, &initialObject)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		upgraded, err := csaupgrade.UpgradeManagedFields(
+			&initialObject,
+			testCase.CSAManager,
+			testCase.SSAManager,
+		)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expectedObject := unstructured.Unstructured{}
+		err = yaml.Unmarshal(testCase.ExpectedObject, &expectedObject)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !reflect.DeepEqual(&expectedObject, upgraded) {
+			t.Fatal(cmp.Diff(&expectedObject, upgraded))
+		}
 	}
 }
