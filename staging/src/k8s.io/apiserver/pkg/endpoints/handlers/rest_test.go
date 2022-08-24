@@ -168,7 +168,7 @@ func TestLimitedReadBody(t *testing.T) {
         apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="2.95e+06"} 1
         apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="3.05e+06"} 1
         apiserver_request_body_sizes_bucket{resource="resource.group",verb="create",le="+Inf"} 1
-        apiserver_request_body_sizes_sum{resource="resource.group",verb="create"} 3
+        apiserver_request_body_sizes_sum{resource="resource.group",verb="create"} 4
         apiserver_request_body_sizes_count{resource="resource.group",verb="create"} 1
 `,
 			expectedErr: false,
@@ -185,7 +185,7 @@ func TestLimitedReadBody(t *testing.T) {
 			if err != nil {
 				t.Errorf("err not expected: got %v", err)
 			}
-			_, err = limitedReadBody(context.Background(), req, tc.limit, "resource.group", "create")
+			_, err = limitedReadBodyWithRecordMetric(context.Background(), req, tc.limit, "resource.group", metrics.Create)
 			if tc.expectedErr {
 				if err == nil {
 					t.Errorf("err expected: got nil")
