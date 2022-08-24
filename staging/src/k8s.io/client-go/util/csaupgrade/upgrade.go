@@ -11,7 +11,16 @@ import (
 
 // Upgrades the Manager information for fields managed with CSA
 // Prepares fields owned by `csaManager` for 'Update' operations for use now
-// with the given `ssaManager` for `Apply` operations
+// with the given `ssaManager` for `Apply` operations.
+//
+// Caveats:
+//  1. This operation is not reversible. Information about which fields the client
+//     owned will be lost in this operation.
+//  2. Supports being performed either before or after initial server-side apply.
+//  3. Client-side apply tends to own more fields (including fields that are defaulted),
+//     this will possibly remove this defaults, they will be re-defaulted, that's fine.
+//  4. Care must be taken to not overwrite the managed fields on the server if they
+//     have changed during the RMW operation.
 //
 // csaManager - Name of FieldManager formerly used for `Update` operations
 // ssaManager - Name of FieldManager formerly used for `Apply` operations
