@@ -5939,7 +5939,7 @@
           },
           "replicas": {
             "default": 0,
-            "description": "Replicas is the most recently oberved number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller",
+            "description": "Replicas is the most recently observed number of replicas. More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller",
             "format": "int32",
             "type": "integer"
           }
