@@ -56,6 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fieldpath"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -77,7 +78,6 @@ import (
 	"k8s.io/kubectl/pkg/util/certificate"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/event"
-	"k8s.io/kubectl/pkg/util/fieldpath"
 	"k8s.io/kubectl/pkg/util/qos"
 	"k8s.io/kubectl/pkg/util/rbac"
 	resourcehelper "k8s.io/kubectl/pkg/util/resource"
@@ -1966,19 +1966,9 @@ type EnvVarResolverFunc func(e corev1.EnvVar) string
 // EnvValueFrom is exported for use by describers in other packages
 func EnvValueRetriever(pod *corev1.Pod) EnvVarResolverFunc {
 	return func(e corev1.EnvVar) string {
-		gv, err := schema.ParseGroupVersion(e.ValueFrom.FieldRef.APIVersion)
+		valueFrom, err := fieldpath.ExtractFieldPathAsString(pod, e.ValueFrom.FieldRef.FieldPath)
 		if err != nil {
-			return ""
-		}
-		gvk := gv.WithKind("Pod")
-		internalFieldPath, _, err := scheme.Scheme.ConvertFieldLabel(gvk, e.ValueFrom.FieldRef.FieldPath, "")
-		if err != nil {
-			return "" // pod validation should catch this on create
-		}
-
-		valueFrom, err := fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
-		if err != nil {
-			return "" // pod validation should catch this on create
+			return "<unresolved>"
 		}
 
 		return valueFrom

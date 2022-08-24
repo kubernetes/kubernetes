@@ -19,9 +19,9 @@ package pods
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/fieldpath"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/fieldpath"
 )
 
 // ContainerVisitorWithPath is called with each container and the field.Path to that container,

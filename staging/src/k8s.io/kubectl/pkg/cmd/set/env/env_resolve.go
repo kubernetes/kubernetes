@@ -24,12 +24,11 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fieldpath"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -84,49 +83,7 @@ func getConfigMapRefValue(client kubernetes.Interface, namespace string, store *
 
 // getFieldRef returns the value of the supplied path in the given object
 func getFieldRef(obj runtime.Object, from *corev1.EnvVarSource) (string, error) {
-	return extractFieldPathAsString(obj, from.FieldRef.FieldPath)
-}
-
-// extractFieldPathAsString extracts the field from the given object
-// and returns it as a string.  The object must be a pointer to an
-// API type.
-func extractFieldPathAsString(obj interface{}, fieldPath string) (string, error) {
-	accessor, err := meta.Accessor(obj)
-	if err != nil {
-		return "", nil
-	}
-
-	if path, subscript, ok := splitMaybeSubscriptedPath(fieldPath); ok {
-		switch path {
-		case "metadata.annotations":
-			if errs := validation.IsQualifiedName(strings.ToLower(subscript)); len(errs) != 0 {
-				return "", fmt.Errorf("invalid key subscript in %s: %s", fieldPath, strings.Join(errs, ";"))
-			}
-			return accessor.GetAnnotations()[subscript], nil
-		case "metadata.labels":
-			if errs := validation.IsQualifiedName(subscript); len(errs) != 0 {
-				return "", fmt.Errorf("invalid key subscript in %s: %s", fieldPath, strings.Join(errs, ";"))
-			}
-			return accessor.GetLabels()[subscript], nil
-		default:
-			return "", fmt.Errorf("fieldPath %q does not support subscript", fieldPath)
-		}
-	}
-
-	switch fieldPath {
-	case "metadata.annotations":
-		return formatMap(accessor.GetAnnotations()), nil
-	case "metadata.labels":
-		return formatMap(accessor.GetLabels()), nil
-	case "metadata.name":
-		return accessor.GetName(), nil
-	case "metadata.namespace":
-		return accessor.GetNamespace(), nil
-	case "metadata.uid":
-		return string(accessor.GetUID()), nil
-	}
-
-	return "", fmt.Errorf("unsupported fieldPath: %v", fieldPath)
+	return fieldpath.ExtractFieldPathAsString(obj, from.FieldRef.FieldPath)
 }
 
 // splitMaybeSubscriptedPath checks whether the specified fieldPath is

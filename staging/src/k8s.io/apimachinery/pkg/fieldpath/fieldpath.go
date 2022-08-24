@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -79,6 +80,11 @@ func ExtractFieldPathAsString(obj interface{}, fieldPath string) (string, error)
 		return string(accessor.GetUID()), nil
 	}
 
+	switch t := obj.(type) {
+	case *v1.Pod:
+		return extractPodFieldPathAsString(t, fieldPath)
+	}
+
 	return "", fmt.Errorf("unsupported fieldPath: %v", fieldPath)
 }
 
@@ -107,4 +113,24 @@ func SplitMaybeSubscriptedPath(fieldPath string) (string, string, bool) {
 		return fieldPath, "", false
 	}
 	return parts[0], parts[1], true
+}
+
+func extractPodFieldPathAsString(pod *v1.Pod, fieldPath string) (string, error) {
+	switch fieldPath {
+	case "spec.nodeName":
+		return pod.Spec.NodeName, nil
+	case "spec.serviceAccountName":
+		return pod.Spec.ServiceAccountName, nil
+	case "status.hostIP":
+		return pod.Status.HostIP, nil
+	case "status.podIP":
+		return pod.Status.PodIP, nil
+	case "status.podIPs":
+		podIPs := make([]string, 0, len(pod.Status.PodIPs))
+		for _, podIP := range pod.Status.PodIPs {
+			podIPs = append(podIPs, podIP.IP)
+		}
+		return strings.Join(podIPs, ","), nil
+	}
+	return "", fmt.Errorf("unsupported fieldPath: %v", fieldPath)
 }
