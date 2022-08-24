@@ -2013,7 +2013,7 @@ func BenchmarkFilter(b *testing.B) {
 					n, _ := p.sharedLister.NodeInfos().Get(allNodes[i].Name)
 					p.Filter(ctx, state, tt.pod, n)
 				}
-				p.parallelizer.Until(ctx, len(allNodes), filterNode)
+				p.parallelizer.Until(ctx, len(allNodes), filterNode, "")
 			}
 		})
 		b.Run(tt.name+"/Clone", func(b *testing.B) {

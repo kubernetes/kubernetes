@@ -304,7 +304,7 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod)
 		}
 		tpCountsByNode[i] = tpCounts
 	}
-	pl.parallelizer.Until(ctx, len(allNodes), processNode)
+	pl.parallelizer.Until(ctx, len(allNodes), processNode, pl.Name())
 
 	for _, tpCounts := range tpCountsByNode {
 		for tp, count := range tpCounts {
