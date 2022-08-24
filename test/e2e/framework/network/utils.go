@@ -155,7 +155,7 @@ func getServiceSelector() map[string]string {
 // NetworkingTestConfig is a convenience class around some utility methods
 // for testing kubeproxy/networking/services/endpoints.
 type NetworkingTestConfig struct {
-	// TestContaienrPod is a test pod running the netexec image. It is capable
+	// TestContainerPod is a test pod running the netexec image. It is capable
 	// of executing tcp/udp requests against ip:port.
 	TestContainerPod *v1.Pod
 	// HostTestContainerPod is a pod running using the hostexec image.
