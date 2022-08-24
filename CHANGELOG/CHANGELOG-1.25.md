@@ -278,7 +278,7 @@ Introduce KMS v2alpha1 API to add performance, rotation, and observability impro
 
 ### Kube-proxy images are now based in distroless
 
-In previous releases, kube-proxy docker images were built using Debian as the base image. Starting with this release the images are now built using [distroless](https://github.com/GoogleContainerTools/distroless). This change reduced image size by almost 50% and reduced the number of installed packages and files to only the strict required to kube-proxy do its job.
+In previous releases, kube-proxy docker images were built using Debian as the base image. Starting with this release the images are now built using [distroless](https://github.com/GoogleContainerTools/distroless). This change reduced image size by almost 50% and reduced the number of installed packages and files to only to those strictly required for kube-proxy do its job.
 
 ## Urgent Upgrade Notes 
 
