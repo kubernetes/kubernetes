@@ -1713,9 +1713,9 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 				t.Errorf("Pod %v was not scheduled: %v", pod.Name, err)
 			}
 			// Make sure pending queue is empty.
-			pendingPods := len(testCtx.Scheduler.SchedulingQueue.PendingPods())
-			if pendingPods != 0 {
-				t.Errorf("pending pods queue is not empty, size is: %d", pendingPods)
+			pendingPods, s := testCtx.Scheduler.SchedulingQueue.PendingPods()
+			if len(pendingPods) != 0 {
+				t.Errorf("pending pods queue is not empty, size is: %d, summary is: %s", len(pendingPods), s)
 			}
 		})
 	}
