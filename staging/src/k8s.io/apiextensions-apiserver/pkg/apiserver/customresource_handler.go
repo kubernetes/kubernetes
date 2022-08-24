@@ -810,7 +810,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensionsv1.CustomResour
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("error building openapi models for %s: %v", crd.Name, err))
 		openAPIModels = nil
-	} else {
+	} else if openAPIModels != nil {
 		modelsByGKV, err = openapi.GetModelsByGKV(openAPIModels)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("error gathering openapi models by GKV for %s: %v", crd.Name, err))
