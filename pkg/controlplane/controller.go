@@ -33,9 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	servicecontroller "k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller"
 	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller"
@@ -158,7 +160,6 @@ func (c *Controller) Start() {
 		klog.Errorf("Error removing old endpoints from kubernetes service: %v", err)
 	}
 
-	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.client.CoreV1(), c.client.EventsV1(), &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry, &c.SecondaryServiceClusterIPRange, c.SecondaryServiceClusterIPRegistry)
 	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.client.CoreV1(), c.client.EventsV1(), c.ServiceNodePortRange, c.ServiceNodePortRegistry)
 
 	// We start both repairClusterIPs and repairNodePorts to ensure repair
@@ -171,16 +172,23 @@ func (c *Controller) Start() {
 	// than 1 minute for backward compatibility of failing the whole
 	// apiserver if we can't repair them.
 	wg := sync.WaitGroup{}
-	wg.Add(2)
 
-	runRepairClusterIPs := func(stopCh chan struct{}) {
-		repairClusterIPs.RunUntil(wg.Done, stopCh)
-	}
+	wg.Add(1)
 	runRepairNodePorts := func(stopCh chan struct{}) {
 		repairNodePorts.RunUntil(wg.Done, stopCh)
 	}
 
-	c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, runRepairClusterIPs, runRepairNodePorts)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		wg.Add(1)
+		repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.client.CoreV1(), c.client.EventsV1(), &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry, &c.SecondaryServiceClusterIPRange, c.SecondaryServiceClusterIPRegistry)
+		runRepairClusterIPs := func(stopCh chan struct{}) {
+			repairClusterIPs.RunUntil(wg.Done, stopCh)
+		}
+		c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, runRepairNodePorts, runRepairClusterIPs)
+	} else {
+		c.runner = async.NewRunner(c.RunKubernetesNamespaces, runRepairNodePorts)
+	}
+
 	c.runner.Start()
 
 	// For backward compatibility, we ensure that if we never are able

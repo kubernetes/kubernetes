@@ -86,6 +86,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/controller/legacytokentracking"
+	"k8s.io/kubernetes/pkg/controlplane/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
@@ -586,7 +587,7 @@ func newServiceAllocators(c *completedConfig) (LegacyRESTStorage, map[api.IPFami
 		return LegacyRESTStorage{}, nil, nil, err
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceCIDR) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
 		serviceClusterIPAllocator, err := ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string, offset int) (allocator.Interface, error) {
 			var mem allocator.Snapshottable
 			mem = allocator.NewAllocationMapWithOffset(max, rangeSpec, offset)
@@ -712,8 +713,31 @@ func (m *Instance) InstallLegacyAPI(c *completedConfig, restOptionsGetter generi
 		return nil
 	}
 
-	controllerName := "bootstrap-controller"
 	client := kubernetes.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+
+	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
+	if err != nil {
+		return fmt.Errorf("failed to get listener address: %w", err)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.MultiCIDRServiceAllocator) {
+		m.GenericAPIServer.AddPostStartHookOrDie("bootstrap-service-cidrs-controller", func(hookContext genericapiserver.PostStartHookContext) error {
+			controller := servicecidrs.NewController(
+				c.ExtraConfig.ServiceIPRange,
+				c.ExtraConfig.SecondaryServiceIPRange,
+				// apiserver endpoints data
+				c.GenericConfig.PublicAddress,
+				c.ExtraConfig.APIServerServicePort,
+				publicServicePort,
+				c.ExtraConfig.KubernetesServiceNodePort,
+				c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
+				client,
+			)
+			go controller.Run(hookContext.StopCh)
+			return nil
+		})
+	}
+
+	controllerName := "bootstrap-controller"
 	bootstrapController, err := c.NewBootstrapController(restStorage, client)
 	if err != nil {
 		return fmt.Errorf("error creating bootstrap controller: %v", err)
