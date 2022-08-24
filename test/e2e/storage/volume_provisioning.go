@@ -19,7 +19,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
@@ -51,7 +50,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -680,37 +678,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		})
 	})
 
-	ginkgo.Describe("GlusterDynamicProvisioner", func() {
-		ginkgo.It("should create and delete persistent volumes [fast]", func() {
-			e2eskipper.SkipIfProviderIs("gke")
-			ginkgo.By("creating a Gluster DP server Pod")
-			pod := startGlusterDpServerPod(c, ns)
-			serverURL := "http://" + net.JoinHostPort(pod.Status.PodIP, "8081")
-			ginkgo.By("creating a StorageClass")
-			test := testsuites.StorageClassTest{
-				Client:       c,
-				Name:         "Gluster Dynamic provisioner test",
-				Provisioner:  "kubernetes.io/glusterfs",
-				Timeouts:     f.Timeouts,
-				ClaimSize:    "2Gi",
-				ExpectedSize: "2Gi",
-				Parameters:   map[string]string{"resturl": serverURL},
-			}
-			storageClass, clearStorageClass := testsuites.SetupStorageClass(test.Client, newStorageClass(test, ns, "glusterdptest"))
-			defer clearStorageClass()
-			test.Class = storageClass
-
-			ginkgo.By("creating a claim object with a suffix for gluster dynamic provisioner")
-			test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
-				ClaimSize:        test.ClaimSize,
-				StorageClassName: &test.Class.Name,
-				VolumeMode:       &test.VolumeMode,
-			}, ns)
-
-			test.TestDynamicProvisioning()
-		})
-	})
-
 	ginkgo.Describe("Invalid AWS KMS key", func() {
 		ginkgo.It("should report an error and create no PV", func() {
 			e2eskipper.SkipUnlessProviderIs("aws")
@@ -878,55 +845,6 @@ func getStorageClass(
 		Parameters:        parameters,
 		VolumeBindingMode: bindingMode,
 	}
-}
-
-func startGlusterDpServerPod(c clientset.Interface, ns string) *v1.Pod {
-	podClient := c.CoreV1().Pods(ns)
-
-	provisionerPod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "glusterdynamic-provisioner-",
-		},
-
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "glusterdynamic-provisioner",
-					Image: imageutils.GetE2EImage(imageutils.GlusterDynamicProvisioner),
-					Args: []string{
-						"-config=" + "/etc/heketi/heketi.json",
-					},
-					Ports: []v1.ContainerPort{
-						{Name: "heketi", ContainerPort: 8081},
-					},
-					Env: []v1.EnvVar{
-						{
-							Name: "POD_IP",
-							ValueFrom: &v1.EnvVarSource{
-								FieldRef: &v1.ObjectFieldSelector{
-									FieldPath: "status.podIP",
-								},
-							},
-						},
-					},
-					ImagePullPolicy: v1.PullIfNotPresent,
-				},
-			},
-		},
-	}
-	provisionerPod, err := podClient.Create(context.TODO(), provisionerPod, metav1.CreateOptions{})
-	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
-
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, provisionerPod))
-
-	ginkgo.By("locating the provisioner pod")
-	pod, err := podClient.Get(context.TODO(), provisionerPod.Name, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Cannot locate the provisioner pod %v: %v", provisionerPod.Name, err)
-	return pod
 }
 
 // waitForProvisionedVolumesDelete is a polling wrapper to scan all PersistentVolumes for any associated to the test's
