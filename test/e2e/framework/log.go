@@ -18,12 +18,15 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"regexp"
 	"runtime/debug"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/formatter"
+	"github.com/onsi/ginkgo/v2/types"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2eginkgowrapper "k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
@@ -61,6 +64,58 @@ func Fail(msg string, callerSkip ...int) {
 	}
 	log("FAIL", "%s\n\nFull Stack Trace\n%s", msg, PrunedStack(skip))
 	e2eginkgowrapper.Fail(nowStamp()+": "+msg, skip)
+}
+
+// By is a replacement for ginkgo.By which better supports long-running
+// operations: it will print reminders that the step is still running at
+// regular intervals. The length of that interval is configurable and defaults
+// to TestContext.SlowStepThreshold, which itself defaults to 10 seconds. In
+// addition, it will print the total runtime at the end of the operation if it
+// exceeded the threshold.
+func By(text string, callback func(), threshold ...time.Duration) {
+	// TODO (?): add this functionality to ginkgo itself, see
+	// https://github.com/onsi/gomega/issues/574. As it stands now, this
+	// code was copied from ginkgo.By and modified. What had to be dropped
+	// was the check that the suite is running because there's no API for it:
+	// https://github.com/onsi/ginkgo/blob/4fbf0425aaa1e6242b73800b71fca772ee9ba2dc/core_dsl.go#L497-L499
+	value := struct {
+		Text     string
+		Duration time.Duration
+	}{
+		Text: text,
+	}
+	_, config := ginkgo.GinkgoConfiguration()
+	formatter := formatter.NewWithNoColorBool(config.NoColor)
+	t := time.Now()
+	ginkgo.GinkgoWriter.Println(formatter.F("{{bold}}STEP:{{/}} %s {{gray}}%s{{/}}", text, t.Format(types.GINKGO_TIME_FORMAT)))
+	if len(threshold) > 1 {
+		Fail("By takes at most one duration parameter", 1)
+	}
+	if len(threshold) == 0 {
+		threshold = []time.Duration{TestContext.SlowStepThreshold}
+	}
+
+	ticker := time.NewTicker(threshold[0])
+	defer ticker.Stop()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				ginkgo.GinkgoWriter.Println(formatter.F("{{bold}}STEP still running:{{/}} %s {{gray}}%s{{/}}", text, time.Now().Format(types.GINKGO_TIME_FORMAT)))
+			}
+		}
+	}()
+
+	ginkgo.AddReportEntry("By Step", ginkgo.ReportEntryVisibilityNever, ginkgo.Offset(1), &value, t)
+	callback()
+	value.Duration = time.Since(t)
+	if value.Duration >= threshold[0] {
+		ginkgo.GinkgoWriter.Println(formatter.F("{{bold}}STEP duration:{{/}} %s {{gray}}%s{{/}}", text, value.Duration))
+	}
 }
 
 var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/v2/`)

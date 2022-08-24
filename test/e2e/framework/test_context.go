@@ -144,6 +144,11 @@ type TestContextType struct {
 	NodeSchedulableTimeout time.Duration
 	// SystemDaemonsetStartupTimeout is the timeout for waiting for all system daemonsets to be ready.
 	SystemDaemonsetStartupTimeout time.Duration
+
+	// SlowStepThreshold is the default interval at which By reports steps
+	// that are still running.
+	SlowStepThreshold time.Duration
+
 	// CreateTestingNS is responsible for creating namespace used for executing e2e tests.
 	// It accepts namespace base name, which will be prepended with e2e prefix, kube client
 	// and labels to be applied to a namespace.
@@ -411,6 +416,7 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.DurationVar(&TestContext.SystemPodsStartupTimeout, "system-pods-startup-timeout", 10*time.Minute, "Timeout for waiting for all system pods to be running before starting tests.")
 	flags.DurationVar(&TestContext.NodeSchedulableTimeout, "node-schedulable-timeout", 30*time.Minute, "Timeout for waiting for all nodes to be schedulable.")
 	flags.DurationVar(&TestContext.SystemDaemonsetStartupTimeout, "system-daemonsets-startup-timeout", 5*time.Minute, "Timeout for waiting for all system daemonsets to be ready.")
+	flags.DurationVar(&TestContext.SlowStepThreshold, "slow-step-threshold", 10*time.Second, "Interval at which slow steps are reported, similar to ginkgo's --slow-spec-threshold.")
 	flags.StringVar(&TestContext.EtcdUpgradeStorage, "etcd-upgrade-storage", "", "The storage version to upgrade to (either 'etcdv2' or 'etcdv3') if doing an etcd upgrade test.")
 	flags.StringVar(&TestContext.EtcdUpgradeVersion, "etcd-upgrade-version", "", "The etcd binary version to upgrade to (e.g., '3.0.14', '2.3.7') if doing an etcd upgrade test.")
 	flags.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
