@@ -233,6 +233,9 @@ func (c *Controller) RunKubernetesNamespaces(ch chan struct{}) {
 				runtime.HandleError(fmt.Errorf("unable to create required kubernetes system namespace %s: %v", ns, err))
 			}
 		}
+		if err := createNamespaceIfNeeded(c.client.CoreV1(), metav1.NamespaceDefault); err != nil {
+			runtime.HandleError(err)
+		}
 	}, c.SystemNamespacesInterval, ch)
 }
 
