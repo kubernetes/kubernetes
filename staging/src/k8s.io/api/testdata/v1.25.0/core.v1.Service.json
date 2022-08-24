@@ -1,0 +1,117 @@
+{
+  "kind": "Service",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "nameValue",
+    "generateName": "generateNameValue",
+    "namespace": "namespaceValue",
+    "selfLink": "selfLinkValue",
+    "uid": "uidValue",
+    "resourceVersion": "resourceVersionValue",
+    "generation": 7,
+    "creationTimestamp": "2008-01-01T01:01:01Z",
+    "deletionTimestamp": "2009-01-01T01:01:01Z",
+    "deletionGracePeriodSeconds": 10,
+    "labels": {
+      "labelsKey": "labelsValue"
+    },
+    "annotations": {
+      "annotationsKey": "annotationsValue"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "apiVersionValue",
+        "kind": "kindValue",
+        "name": "nameValue",
+        "uid": "uidValue",
+        "controller": true,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "finalizers": [
+      "finalizersValue"
+    ],
+    "managedFields": [
+      {
+        "manager": "managerValue",
+        "operation": "operationValue",
+        "apiVersion": "apiVersionValue",
+        "time": "2004-01-01T01:01:01Z",
+        "fieldsType": "fieldsTypeValue",
+        "fieldsV1": {},
+        "subresource": "subresourceValue"
+      }
+    ]
+  },
+  "spec": {
+    "ports": [
+      {
+        "name": "nameValue",
+        "protocol": "protocolValue",
+        "appProtocol": "appProtocolValue",
+        "port": 3,
+        "targetPort": "targetPortValue",
+        "nodePort": 5
+      }
+    ],
+    "selector": {
+      "selectorKey": "selectorValue"
+    },
+    "clusterIP": "clusterIPValue",
+    "clusterIPs": [
+      "clusterIPsValue"
+    ],
+    "type": "typeValue",
+    "externalIPs": [
+      "externalIPsValue"
+    ],
+    "sessionAffinity": "sessionAffinityValue",
+    "loadBalancerIP": "loadBalancerIPValue",
+    "loadBalancerSourceRanges": [
+      "loadBalancerSourceRangesValue"
+    ],
+    "externalName": "externalNameValue",
+    "externalTrafficPolicy": "externalTrafficPolicyValue",
+    "healthCheckNodePort": 12,
+    "publishNotReadyAddresses": true,
+    "sessionAffinityConfig": {
+      "clientIP": {
+        "timeoutSeconds": 1
+      }
+    },
+    "ipFamilies": [
+      "ipFamiliesValue"
+    ],
+    "ipFamilyPolicy": "ipFamilyPolicyValue",
+    "allocateLoadBalancerNodePorts": true,
+    "loadBalancerClass": "loadBalancerClassValue",
+    "internalTrafficPolicy": "internalTrafficPolicyValue"
+  },
+  "status": {
+    "loadBalancer": {
+      "ingress": [
+        {
+          "ip": "ipValue",
+          "hostname": "hostnameValue",
+          "ports": [
+            {
+              "port": 1,
+              "protocol": "protocolValue",
+              "error": "errorValue"
+            }
+          ]
+        }
+      ]
+    },
+    "conditions": [
+      {
+        "type": "typeValue",
+        "status": "statusValue",
+        "observedGeneration": 3,
+        "lastTransitionTime": "2004-01-01T01:01:01Z",
+        "reason": "reasonValue",
+        "message": "messageValue"
+      }
+    ]
+  }
+}
