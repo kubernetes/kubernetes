@@ -7,7 +7,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
+
+const csaAnnotationName = "kubectl.kubernetes.io/last-applied-configuration"
+
+var csaAnnotationFieldSet = fieldpath.NewSet(fieldpath.MakePathOrDie("metadata", "annotations", csaAnnotationName))
 
 // Upgrades the Manager information for fields managed with CSA
 // Prepares fields owned by `csaManager` for 'Update' operations for use now
@@ -60,37 +65,48 @@ func UpgradeManagedFields(
 					entry.APIVersion == ssaManager.APIVersion
 			})
 
+		ssaFieldSet, err := fieldmanager.FieldsToSet(*ssaManager.FieldsV1)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert fields to set: %w", err)
+		}
+
+		combinedFieldSet := &ssaFieldSet
+
+		// Union the csa manager with the existing SSA manager
 		if csaManagerExists {
 			csaManager := managedFields[csaManagerIndex]
-
-			// Union the csa manager with the existing SSA manager
-			ssaFieldSet, err := fieldmanager.FieldsToSet(*ssaManager.FieldsV1)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert fields to set: %w", err)
-			}
 
 			csaFieldSet, err := fieldmanager.FieldsToSet(*csaManager.FieldsV1)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert fields to set: %w", err)
 			}
 
-			combinedFieldSet := ssaFieldSet.Union(&csaFieldSet)
-			combinedFieldSetEncoded, err := fieldmanager.SetToFields(*combinedFieldSet)
-			if err != nil {
-				return nil, fmt.Errorf("failed to encode field set: %w", err)
-			}
-
-			managedFields[ssaManagerIndex].FieldsV1 = &combinedFieldSetEncoded
+			combinedFieldSet = combinedFieldSet.Union(&csaFieldSet)
 		}
+
+		// Ensure that the resultant fieldset does not include the
+		// last applied annotation
+		combinedFieldSet = combinedFieldSet.Difference(csaAnnotationFieldSet)
+
+		combinedFieldSetEncoded, err := fieldmanager.SetToFields(*combinedFieldSet)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode field set: %w", err)
+		}
+
+		managedFields[ssaManagerIndex].FieldsV1 = &combinedFieldSetEncoded
+
 	} else {
 		// SSA manager does not exist. Find the most recent matching CSA manager,
 		// convert it to an SSA manager.
 		//
 		// (find first index, since managed fields are sorted so that most recent is
 		//  first in the list)
-		csaManagerIndex, csaManagerExists := findFirstIndex(managedFields, func(entry metav1.ManagedFieldsEntry) bool {
-			return entry.Manager == csaManagerName && entry.Operation == metav1.ManagedFieldsOperationUpdate && entry.Subresource == ""
-		})
+		csaManagerIndex, csaManagerExists := findFirstIndex(managedFields,
+			func(entry metav1.ManagedFieldsEntry) bool {
+				return entry.Manager == csaManagerName &&
+					entry.Operation == metav1.ManagedFieldsOperationUpdate &&
+					entry.Subresource == ""
+			})
 
 		if !csaManagerExists {
 			// There are no CSA managers that need to be converted. Nothing to do
@@ -98,7 +114,22 @@ func UpgradeManagedFields(
 			return obj, nil
 		}
 
+		csaManager := managedFields[csaManagerIndex]
+		csaFieldSet, err := fieldmanager.FieldsToSet(*csaManager.FieldsV1)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert fields to set: %w", err)
+		}
+
+		// Remove last applied configuration from owned fields, if necessary
+		csaFieldSet = *csaFieldSet.Difference(csaAnnotationFieldSet)
+
+		csaFieldSetEncoded, err := fieldmanager.SetToFields(csaFieldSet)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode field set: %w", err)
+		}
+
 		// Convert the entry to apply operation
+		managedFields[csaManagerIndex].FieldsV1 = &csaFieldSetEncoded
 		managedFields[csaManagerIndex].Operation = metav1.ManagedFieldsOperationApply
 		managedFields[csaManagerIndex].Manager = ssaManagerName
 	}
@@ -116,6 +147,12 @@ func UpgradeManagedFields(
 		return nil, fmt.Errorf("failed to get meta accessor for copied object: %w", err)
 	}
 	copiedAccessor.SetManagedFields(filteredManagers)
+
+	// Wipe out CSA annotation if it exists
+	annotations := copiedAccessor.GetAnnotations()
+	delete(annotations, csaAnnotationName)
+	copiedAccessor.SetAnnotations(annotations)
+
 	return copied, nil
 }
 

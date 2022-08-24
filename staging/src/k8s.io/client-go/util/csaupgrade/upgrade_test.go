@@ -58,9 +58,7 @@ apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
-  annotations:
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
+  annotations: {}
   creationTimestamp: "2022-08-22T23:08:23Z"
   managedFields:
   - apiVersion: v1
@@ -71,9 +69,7 @@ metadata:
         f:key: {}
         f:legacy: {}
       f:metadata:
-        f:annotations:
-          .: {}
-          f:kubectl.kubernetes.io/last-applied-configuration: {}
+        f:annotations: {}
     manager: kubectl
     operation: Apply
     time: "2022-08-22T23:08:23Z"
@@ -135,9 +131,7 @@ apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
-  annotations:
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
+  annotations: {}
   creationTimestamp: "2022-08-22T23:08:23Z"
   managedFields:
   - apiVersion: v1
@@ -148,9 +142,7 @@ metadata:
         f:key: {}
         f:legacy: {}
       f:metadata:
-        f:annotations:
-          .: {}
-          f:kubectl.kubernetes.io/last-applied-configuration: {}
+        f:annotations: {}
     manager: kubectl
     operation: Apply
     time: "2022-08-23T23:08:23Z"
@@ -164,7 +156,7 @@ metadata:
 			// CSA entry but no longer present in SSA entry, so it would not be pruned.
 			// This shows that upgrading such an object results in correct behavior next
 			// time SSA applier
-			// Expect final object to have all keys from both entries
+			// Expect final object to have unioned keys from both entries
 			Name:       "csa-combine-with-ssa-additional-keys",
 			CSAManager: "kubectl-client-side-apply",
 			SSAManager: "kubectl",
@@ -213,9 +205,7 @@ apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
-  annotations:
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
+  annotations: {}
   creationTimestamp: "2022-08-22T23:08:23Z"
   managedFields:
   - apiVersion: v1
@@ -226,9 +216,7 @@ metadata:
         f:key: {}
         f:legacy: {}
       f:metadata:
-        f:annotations:
-          .: {}
-          f:kubectl.kubernetes.io/last-applied-configuration: {}
+        f:annotations: {}
     manager: kubectl
     operation: Apply
     time: "2022-08-23T23:08:23Z"
@@ -319,9 +307,7 @@ apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
-  annotations:
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
+  annotations: {}
   creationTimestamp: "2022-08-22T23:08:23Z"
   managedFields:
   - apiVersion: v5
@@ -332,9 +318,7 @@ metadata:
         f:key: {}
         f:legacy: {}
       f:metadata:
-        f:annotations:
-          .: {}
-          f:kubectl.kubernetes.io/last-applied-configuration: {}
+        f:annotations: {}
     manager: kubectl
     operation: Apply
     time: "2022-08-23T23:08:23Z"
@@ -425,9 +409,7 @@ apiVersion: v1
 data: {}
 kind: ConfigMap
 metadata:
-  annotations:
-    kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"v1","data":{"key":"value","legacy":"unused"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"test","namespace":"default"}}
+  annotations: {}
   creationTimestamp: "2022-08-22T23:08:23Z"
   managedFields:
   - apiVersion: v5
@@ -442,7 +424,6 @@ metadata:
         f:annotations:
           .: {}
           f:hello2: {}
-          f:kubectl.kubernetes.io/last-applied-configuration: {}
     manager: kubectl
     operation: Apply
     time: "2022-08-23T23:08:23Z"
