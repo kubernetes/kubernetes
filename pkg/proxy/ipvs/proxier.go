@@ -706,25 +706,25 @@ func (handle *LinuxKernelHandler) GetKernelVersion() (string, error) {
 	return strings.TrimSpace(string(fileContent)), nil
 }
 
-// CanUseIPVSProxier returns true if we can use the ipvs Proxier.
+// CanUseIPVSProxier checks if we can use the ipvs Proxier.
 // This is determined by checking if all the required kernel modules can be loaded. It may
 // return an error if it fails to get the kernel modules information without error, in which
 // case it will also return false.
-func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler string) (bool, error) {
+func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler string) error {
 	mods, err := handle.GetModules()
 	if err != nil {
-		return false, fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
+		return fmt.Errorf("error getting installed ipvs required kernel modules: %v", err)
 	}
 	loadModules := sets.NewString()
 	loadModules.Insert(mods...)
 
 	kernelVersionStr, err := handle.GetKernelVersion()
 	if err != nil {
-		return false, fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
+		return fmt.Errorf("error determining kernel version to find required kernel modules for ipvs support: %v", err)
 	}
 	kernelVersion, err := version.ParseGeneric(kernelVersionStr)
 	if err != nil {
-		return false, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
+		return fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
 	}
 	mods = utilipvs.GetRequiredIPVSModules(kernelVersion)
 	wantModules := sets.NewString()
@@ -751,18 +751,18 @@ func CanUseIPVSProxier(handle KernelHandler, ipsetver IPSetVersioner, scheduler 
 	}
 
 	if len(missingMods) != 0 {
-		return false, fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", missingMods)
+		return fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", missingMods)
 	}
 
 	// Check ipset version
 	versionString, err := ipsetver.GetVersion()
 	if err != nil {
-		return false, fmt.Errorf("error getting ipset version, error: %v", err)
+		return fmt.Errorf("error getting ipset version, error: %v", err)
 	}
 	if !checkMinVersion(versionString) {
-		return false, fmt.Errorf("ipset version: %s is less than min required version: %s", versionString, MinIPSetCheckVersion)
+		return fmt.Errorf("ipset version: %s is less than min required version: %s", versionString, MinIPSetCheckVersion)
 	}
-	return true, nil
+	return nil
 }
 
 // CleanupIptablesLeftovers removes all iptables rules and chains created by the Proxier
