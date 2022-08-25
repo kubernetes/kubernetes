@@ -28,6 +28,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
@@ -69,12 +70,13 @@ func TestOnlySetFatalOnDecodeError(b bool) {
 }
 
 type watcher struct {
-	client      *clientv3.Client
-	codec       runtime.Codec
-	newFunc     func() runtime.Object
-	objectType  string
-	versioner   storage.Versioner
-	transformer value.Transformer
+	client        *clientv3.Client
+	codec         runtime.Codec
+	newFunc       func() runtime.Object
+	objectType    string
+	groupResource schema.GroupResource
+	versioner     storage.Versioner
+	transformer   value.Transformer
 }
 
 // watchChan implements watch.Interface.
@@ -92,13 +94,14 @@ type watchChan struct {
 	errChan           chan error
 }
 
-func newWatcher(client *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, versioner storage.Versioner, transformer value.Transformer) *watcher {
+func newWatcher(client *clientv3.Client, codec runtime.Codec, groupResource schema.GroupResource, newFunc func() runtime.Object, versioner storage.Versioner, transformer value.Transformer) *watcher {
 	res := &watcher{
-		client:      client,
-		codec:       codec,
-		newFunc:     newFunc,
-		versioner:   versioner,
-		transformer: transformer,
+		client:        client,
+		codec:         codec,
+		groupResource: groupResource,
+		newFunc:       newFunc,
+		versioner:     versioner,
+		transformer:   transformer,
 	}
 	if newFunc == nil {
 		res.objectType = "<unknown>"
@@ -259,7 +262,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 		}
 		if wres.IsProgressNotify() {
 			wc.sendEvent(progressNotifyEvent(wres.Header.GetRevision()))
-			metrics.RecordEtcdBookmark(wc.watcher.objectType)
+			metrics.RecordEtcdBookmark(wc.watcher.groupResource.String())
 			continue
 		}
 
@@ -292,7 +295,7 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 				continue
 			}
 			if len(wc.resultChan) == outgoingBufSize {
-				klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", "outgoingEvents", outgoingBufSize, "objectType", wc.watcher.objectType)
+				klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", "outgoingEvents", outgoingBufSize, "objectType", wc.watcher.objectType, "groupResource", wc.watcher.groupResource)
 			}
 			// If user couldn't receive results fast enough, we also block incoming events from watcher.
 			// Because storing events in local will cause more memory usage.
@@ -411,7 +414,7 @@ func (wc *watchChan) sendError(err error) {
 
 func (wc *watchChan) sendEvent(e *event) {
 	if len(wc.incomingEventChan) == incomingBufSize {
-		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", "incomingEvents", incomingBufSize, "objectType", wc.watcher.objectType)
+		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", "incomingEvents", incomingBufSize, "objectType", wc.watcher.objectType, "groupResource", wc.watcher.groupResource)
 	}
 	select {
 	case wc.incomingEventChan <- e:
