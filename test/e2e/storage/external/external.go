@@ -34,7 +34,6 @@ import (
 	klog "k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
@@ -162,7 +161,7 @@ func (t testDriverParameter) Set(filename string) error {
 // to define the tests.
 func AddDriverDefinition(filename string) error {
 	driver, err := loadDriverDefinition(filename)
-	e2elog.Logf("Driver loaded from path [%s]: %+v", filename, driver)
+	framework.Logf("Driver loaded from path [%s]: %+v", filename, driver)
 	if err != nil {
 		return err
 	}

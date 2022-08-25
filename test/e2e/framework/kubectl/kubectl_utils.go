@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -109,7 +109,7 @@ func LogFailedContainers(c clientset.Interface, ns string, logFunc func(ftm stri
 	logFunc("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
 		if res, err := testutils.PodRunningReady(&pod); !res || err != nil {
-			kubectlLogPod(c, pod, "", e2elog.Logf)
+			kubectlLogPod(c, pod, "", framework.Logf)
 		}
 	}
 }
@@ -144,7 +144,7 @@ func (tk *TestKubeconfig) WriteFileViaContainer(podName, containerName string, p
 	command := fmt.Sprintf("echo '%s' > '%s'; sync", contents, path)
 	stdout, stderr, err := tk.kubectlExecWithRetry(tk.Namespace, podName, containerName, "--", "/bin/sh", "-c", command)
 	if err != nil {
-		e2elog.Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+		framework.Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
 	return err
 }
@@ -155,7 +155,7 @@ func (tk *TestKubeconfig) ReadFileViaContainer(podName, containerName string, pa
 
 	stdout, stderr, err := tk.kubectlExecWithRetry(tk.Namespace, podName, containerName, "--", "cat", path)
 	if err != nil {
-		e2elog.Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
+		framework.Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
 	}
 	return string(stdout), err
 }
@@ -163,19 +163,19 @@ func (tk *TestKubeconfig) ReadFileViaContainer(podName, containerName string, pa
 func (tk *TestKubeconfig) kubectlExecWithRetry(namespace string, podName, containerName string, args ...string) ([]byte, []byte, error) {
 	for numRetries := 0; numRetries < maxKubectlExecRetries; numRetries++ {
 		if numRetries > 0 {
-			e2elog.Logf("Retrying kubectl exec (retry count=%v/%v)", numRetries+1, maxKubectlExecRetries)
+			framework.Logf("Retrying kubectl exec (retry count=%v/%v)", numRetries+1, maxKubectlExecRetries)
 		}
 
 		stdOutBytes, stdErrBytes, err := tk.kubectlExec(namespace, podName, containerName, args...)
 		if err != nil {
 			if strings.Contains(strings.ToLower(string(stdErrBytes)), "i/o timeout") {
 				// Retry on "i/o timeout" errors
-				e2elog.Logf("Warning: kubectl exec encountered i/o timeout.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
+				framework.Logf("Warning: kubectl exec encountered i/o timeout.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
 				continue
 			}
 			if strings.Contains(strings.ToLower(string(stdErrBytes)), "container not found") {
 				// Retry on "container not found" errors
-				e2elog.Logf("Warning: kubectl exec encountered container not found.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
+				framework.Logf("Warning: kubectl exec encountered container not found.\nerr=%v\nstdout=%v\nstderr=%v)", err, string(stdOutBytes), string(stdErrBytes))
 				time.Sleep(2 * time.Second)
 				continue
 			}
@@ -200,7 +200,7 @@ func (tk *TestKubeconfig) kubectlExec(namespace string, podName, containerName s
 	cmd := tk.KubectlCmd(cmdArgs...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
-	e2elog.Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))
+	framework.Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))
 	err := cmd.Run()
 	return stdout.Bytes(), stderr.Bytes(), err
 }

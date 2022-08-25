@@ -20,13 +20,13 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 	e2etodokubectl "k8s.io/kubernetes/test/e2e/framework/todo/kubectl"
 )
 
 // WaitForSSHTunnels waits for establishing SSH tunnel to busybox pod.
 func WaitForSSHTunnels(namespace string) {
-	e2elog.Logf("Waiting for SSH tunnels to establish")
+	framework.Logf("Waiting for SSH tunnels to establish")
 	e2etodokubectl.RunKubectl(namespace, "run", "ssh-tunnel-test",
 		"--image=busybox",
 		"--restart=Never",
