@@ -563,6 +563,9 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 			panic(fmt.Sprintf("alias %q conflicts with a controller name", alias))
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MultiCIDRServiceAllocator) {
+		register(names.ServiceCIDRController, startServiceCIDRsController)
+	}
 
 	return controllers
 }
