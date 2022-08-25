@@ -81,9 +81,12 @@ kubensenter() {
         # - If $@ is non-empty, nsenter effectively runs `exec "$@"`
         # - If $@ is empty, nsenter spawns a new shell
     fi
+    # Using 'exec' is important here; Without it, systemd may have trouble
+    # seeing the underlying process especially if it's using 'Type=notify'
+    # semantics.
     # shellcheck disable=SC2086
     # ^- Intentionally collapse $nsarg if not set (and we've already shell-quoted it above if we did set it)
-    nsenter $nsarg "$@"
+    exec nsenter $nsarg "$@"
 }
 
 main() {
