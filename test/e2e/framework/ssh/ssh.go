@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -125,7 +125,7 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 	hosts := nodeAddresses(nodelist, v1.NodeExternalIP)
 	// If  ExternalIPs aren't available for all nodes, try falling back to the InternalIPs.
 	if len(hosts) < len(nodelist.Items) {
-		e2elog.Logf("No external IP address on nodes, falling back to internal IPs")
+		framework.Logf("No external IP address on nodes, falling back to internal IPs")
 		hosts = nodeAddresses(nodelist, v1.NodeInternalIP)
 	}
 
@@ -146,12 +146,12 @@ func NodeSSHHosts(c clientset.Interface) ([]string, error) {
 		go func(host string) {
 			defer wg.Done()
 			if canConnect(host) {
-				e2elog.Logf("Assuming SSH on host %s", host)
+				framework.Logf("Assuming SSH on host %s", host)
 				sshHostsLock.Lock()
 				sshHosts = append(sshHosts, net.JoinHostPort(host, SSHPort))
 				sshHostsLock.Unlock()
 			} else {
-				e2elog.Logf("Skipping host %s because it does not run anything on port %s", host, SSHPort)
+				framework.Logf("Skipping host %s because it does not run anything on port %s", host, SSHPort)
 			}
 		}(host)
 	}
@@ -168,7 +168,7 @@ func canConnect(host string) bool {
 	hostPort := net.JoinHostPort(host, SSHPort)
 	conn, err := net.DialTimeout("tcp", hostPort, 3*time.Second)
 	if err != nil {
-		e2elog.Logf("cannot dial %s: %v", hostPort, err)
+		framework.Logf("cannot dial %s: %v", hostPort, err)
 		return false
 	}
 	conn.Close()
@@ -352,15 +352,15 @@ func runSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer)
 // LogResult records result log
 func LogResult(result Result) {
 	remote := fmt.Sprintf("%s@%s", result.User, result.Host)
-	e2elog.Logf("ssh %s: command:   %s", remote, result.Cmd)
-	e2elog.Logf("ssh %s: stdout:    %q", remote, result.Stdout)
-	e2elog.Logf("ssh %s: stderr:    %q", remote, result.Stderr)
-	e2elog.Logf("ssh %s: exit code: %d", remote, result.Code)
+	framework.Logf("ssh %s: command:   %s", remote, result.Cmd)
+	framework.Logf("ssh %s: stdout:    %q", remote, result.Stdout)
+	framework.Logf("ssh %s: stderr:    %q", remote, result.Stderr)
+	framework.Logf("ssh %s: exit code: %d", remote, result.Code)
 }
 
 // IssueSSHCommandWithResult tries to execute a SSH command and returns the execution result
 func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, error) {
-	e2elog.Logf("Getting external IP address for %s", node.Name)
+	framework.Logf("Getting external IP address for %s", node.Name)
 	host := ""
 	for _, a := range node.Status.Addresses {
 		if a.Type == v1.NodeExternalIP && a.Address != "" {
@@ -383,7 +383,7 @@ func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, er
 		return nil, fmt.Errorf("couldn't find any IP address for node %s", node.Name)
 	}
 
-	e2elog.Logf("SSH %q on %s(%s)", cmd, node.Name, host)
+	framework.Logf("SSH %q on %s(%s)", cmd, node.Name, host)
 	result, err := SSH(cmd, host, provider)
 	LogResult(result)
 
@@ -454,7 +454,7 @@ func expectNoError(err error, explain ...interface{}) {
 // (for example, for call chain f -> g -> ExpectNoErrorWithOffset(1, ...) error would be logged for "f").
 func expectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	if err != nil {
-		e2elog.Logf("Unexpected error occurred: %v", err)
+		framework.Logf("Unexpected error occurred: %v", err)
 	}
 	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
 }
