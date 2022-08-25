@@ -83,7 +83,7 @@ func DecodeContinue(continueValue, keyPrefix string) (fromKey string, rv int64, 
 func EncodeContinue(key, keyPrefix string, resourceVersion int64) (string, error) {
 	nextKey := strings.TrimPrefix(key, keyPrefix)
 	if nextKey == key {
-		return "", fmt.Errorf("unable to encode next field: the key and key prefix do not match")
+		return "", fmt.Errorf("unable to encode next field: the key and key prefix do not match %s %s", keyPrefix, key)
 	}
 	out, err := json.Marshal(&continueToken{APIVersion: "meta.k8s.io/v1", ResourceVersion: resourceVersion, StartKey: nextKey})
 	if err != nil {

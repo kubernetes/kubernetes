@@ -387,7 +387,8 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}()
 
 	// list by empty MatchValues.
-	list, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(5, "prefix/ns/", storage.ListOptions{}, nil, nil)
+	listResp, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(5, "prefix/ns/", storage.ListOptions{}, nil, nil)
+	list := listResp.objs
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -406,7 +407,8 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 		{IndexName: "l:label", Value: "value1"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
-	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, "prefix/ns/", storage.ListOptions{}, matchValues, nil)
+	listResp, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, "prefix/ns/", storage.ListOptions{}, matchValues, nil)
+	list = listResp.objs
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -425,7 +427,8 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
-	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, "prefix/ns/", storage.ListOptions{}, matchValues, nil)
+	listResp, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, "prefix/ns/", storage.ListOptions{}, matchValues, nil)
+	list = listResp.objs
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -443,7 +446,8 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	matchValues = []storage.MatchValue{
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 	}
-	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, "prefix/ns/", storage.ListOptions{}, matchValues, nil)
+	listResp, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, "prefix/ns/", storage.ListOptions{}, matchValues, nil)
+	list = listResp.objs
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -490,6 +490,18 @@ func TestListOptions(t *testing.T) {
 func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watchCacheEnabled bool, opts metav1.ListOptions, compactedRv string) {
 	listObj, err := rsClient.List(context.Background(), opts)
 
+	// Check for too old errors
+	isExact := opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
+	// Legacy corner cases that can be avoided by using an explicit resourceVersionMatch value
+	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#the-resourceversion-parameter
+	isLegacyExact := opts.Limit > 0 && opts.ResourceVersionMatch == ""
+
+	// Cacher.GetList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
+	// the limit is respected when testing here.
+	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
+	hasLimit := pagingEnabled && opts.Limit > 0 && opts.ResourceVersion != "0"
+	hasContinuation := pagingEnabled && len(opts.Continue) > 0
+
 	// check for expected validation errors
 	if opts.ResourceVersion == "" && opts.ResourceVersionMatch != "" {
 		if err == nil || !strings.Contains(err.Error(), "resourceVersionMatch is forbidden unless resourceVersion is provided") {
@@ -515,6 +527,22 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 		}
 		return
 	}
+	// If the test case is such that both resource version and continue token are invalid, the error
+	// is dependent on whether the watch cache is enabled or not, and if it is, it depends on if
+	// the request specifies the limit and continuation parameters. This is taken from the control
+	// flow in the (*Cacher).`shouldDelegateList` function.
+	if opts.ResourceVersion == invalidResourceVersion && opts.Continue == invalidContinueToken {
+		if watchCacheEnabled && hasLimit && hasContinuation {
+			if err == nil || !strings.Contains(err.Error(), "continue key is not valid") {
+				t.Fatalf("expected continue key not valid error, but got: %v", err)
+			}
+			return
+		}
+		if err == nil || !strings.Contains(err.Error(), "Invalid value") {
+			t.Fatalf("expecting invalid value error, but got: %v", err)
+		}
+		return
+	}
 	if opts.ResourceVersion == invalidResourceVersion {
 		if err == nil || !strings.Contains(err.Error(), "Invalid value") {
 			t.Fatalf("expecting invalid value error, but got: %v", err)
@@ -535,13 +563,31 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 		return
 	}
 
-	// Check for too old errors
-	isExact := opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
-	// Legacy corner cases that can be avoided by using an explicit resourceVersionMatch value
-	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#the-resourceversion-parameter
-	isLegacyExact := opts.Limit > 0 && opts.ResourceVersionMatch == ""
+	var skipWatchCache bool
+	switch {
+	case opts.ResourceVersion == "":
+		skipWatchCache = true
+	case hasLimit:
+		// In the case of having a limit, in reality, the exhaustive check is as follows:
+		// 1. Check if it is a continuation request.
+		//    a. If it is, decode the continue token, and error out if there is an error
+		//       decoding it.
+		//    b. After this, check if the rv present in the token is still present in the
+		//       watch cache or not, if it is NOT present, we skip the watch cache and then
+		//       delegate the request to etcd.
+		// 2. If it does not have a continue request, do not skip.
+		//
+		// Here, we check only if it has Limit because in case of continue being present (1)
+		// point a. won't matter since we error out if it is an invalid continue token and
+		// point b. is irrelevant for this test since it is possible for a rv to NOT be present
+		// iff the object is popped out from the watchCache on account of it being full. Here
+		// we only populate it with 10 rs objects.
+	case opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact:
+		skipWatchCache = true
+	}
+	usingWatchCache := watchCacheEnabled && !skipWatchCache
 
-	if opts.ResourceVersion == compactedRv && (isExact || isLegacyExact) {
+	if opts.ResourceVersion == compactedRv && !usingWatchCache && (isExact || isLegacyExact) {
 		if err == nil || !strings.Contains(err.Error(), "The resourceVersion for the provided list is too old") {
 			t.Fatalf("expected too old error, but got: %v", err)
 		}
@@ -557,21 +603,6 @@ func testListOptionsCase(t *testing.T, rsClient appsv1.ReplicaSetInterface, watc
 		t.Fatalf("Failed to extract list from %v", listObj)
 	}
 	count := int64(len(items))
-
-	// Cacher.GetList defines this for logic to decide if the watch cache is skipped. We need to know it to know if
-	// the limit is respected when testing here.
-	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	hasContinuation := pagingEnabled && len(opts.Continue) > 0
-	hasLimit := pagingEnabled && opts.Limit > 0 && opts.ResourceVersion != "0"
-	skipWatchCache := opts.ResourceVersion == "" || hasContinuation || hasLimit || isExact
-	usingWatchCache := watchCacheEnabled && !skipWatchCache
-
-	if usingWatchCache { // watch cache does not respect limit and is not used for continue
-		if count != 10 {
-			t.Errorf("Expected list size to be 10 but got %d", count) // limit is ignored if watch cache is hit
-		}
-		return
-	}
 
 	if opts.Continue != "" {
 		if count != 4 {

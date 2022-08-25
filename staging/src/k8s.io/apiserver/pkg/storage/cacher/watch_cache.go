@@ -17,11 +17,8 @@ limitations under the License.
 package cacher
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"math"
-	"path"
 	"sort"
 	"strings"
 	"sync"
@@ -29,7 +26,6 @@ import (
 
 	"github.com/google/btree"
 	"k8s.io/apimachinery/pkg/api/errors"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -253,7 +249,9 @@ func (w *watchCache) Add(obj interface{}) error {
 	}
 	event := watch.Event{Type: watch.Added, Object: object}
 
-	f := func(elem *storeElement) error { return w.store.Add(elem) }
+	f := func(elem *storeElement) error {
+		return w.store.Add(elem)
+	}
 	return w.processEvent(event, resourceVersion, f)
 }
 
@@ -484,19 +482,28 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 	return nil
 }
 
+type ListResp struct {
+	objs    []interface{}
+	hasMore bool
+}
+
 // WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
 // with their ResourceVersion and the name of the index, if any, that was used.
-func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, key string, listOpts storage.ListOptions, matchValues []storage.MatchValue, trace *utiltrace.Trace) ([]interface{}, uint64, string, error) {
+func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, key string, listOpts storage.ListOptions, matchValues []storage.MatchValue, trace *utiltrace.Trace) (ListResp, uint64, string, error) {
 	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
 	defer w.RUnlock()
 
 	if err != nil {
-		return nil, 0, "", err
+		return ListResp{}, 0, "", err
+	}
+
+	if !strings.HasSuffix(key, "/") {
+		key += "/"
 	}
 
 	pred := listOpts.Predicate
 	hasContinuation := len(pred.Continue) > 0
-	// hasLimit := pred.Limit > 0
+	var continueKey string
 
 	// Perform a clone under the lock, this should be a relatively
 	// inexpensive operation since the implementation of clone uses
@@ -504,6 +511,17 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, key string, l
 	// cloned copy to avoid building the response under a lock.
 	var storeClone btreeIndexer
 	if hasContinuation {
+		continueKey, _, err = storage.DecodeContinue(pred.Continue, key)
+		if err != nil {
+			return ListResp{}, 0, "", errors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
+		}
+		if !strings.HasSuffix(continueKey, "/") {
+			continueKey += "/"
+		}
+
+		if len(listOpts.ResourceVersion) > 0 && listOpts.ResourceVersion != "0" {
+			return ListResp{}, 0, "", errors.NewBadRequest("specifying resource version is not allowed when using continue")
+		}
 		if _, ok := w.continueCache.cache[resourceVersion]; !ok {
 			// We return a 410 Gone here for the following reason:
 			//
@@ -525,9 +543,7 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, key string, l
 			// and on this retry, the check for delegation will route
 			// the request to etcd and things proceed accordingly.
 			err = errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
-			if err != nil {
-				return nil, 0, "", err
-			}
+			return ListResp{}, 0, "", err
 		}
 		storeClone = w.continueCache.cache[resourceVersion]
 	} else {
@@ -535,25 +551,22 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, key string, l
 		w.continueCache.cache[resourceVersion] = storeClone
 	}
 
-	if !strings.HasSuffix(key, "/") {
-		key += "/"
-	}
-
-	if hasContinuation {
-		continueKey, _, err := decodeContinue(pred.Continue, key)
-		if err != nil {
-			return nil, 0, "", apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
-		}
-		key = continueKey
-	}
-
+	res := ListResp{objs: []interface{}{}}
 	for _, matchValue := range matchValues {
-		if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
-			return result, w.resourceVersion, matchValue.IndexName, nil
+		if result, err := storeClone.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
+			limit := listOpts.Predicate.Limit
+			if limit > 0 && limit < int64(len(result)) {
+				res.objs = result[:limit]
+				res.hasMore = true
+			} else {
+				res.objs = result
+			}
+			return res, w.resourceVersion, matchValue.IndexName, nil
 		}
 	}
 
-	return storeClone.LimitPrefixRead(listOpts.Predicate.Limit, key), w.resourceVersion, "", nil
+	res.objs, res.hasMore = storeClone.LimitPrefixRead(listOpts.Predicate.Limit, key, continueKey)
+	return res, w.resourceVersion, "", nil
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.
@@ -762,7 +775,7 @@ func (w *watchCache) getAllEventsSinceLocked(resourceVersion uint64) (*watchCach
 // isRVValid checks if rv is still in the watchCache.
 func (w *watchCache) isRVValid(rv uint64) bool {
 	w.RLock()
-	defer w.Unlock()
+	defer w.RUnlock()
 
 	// Binary search if the rv is present in the watchCache.
 	f := func(i int) bool {
@@ -770,65 +783,4 @@ func (w *watchCache) isRVValid(rv uint64) bool {
 	}
 	size := w.endIndex - w.startIndex
 	return sort.Search(size, f) != size
-}
-
-type continueToken struct {
-	APIVersion      string `json:"v"`
-	ResourceVersion int64  `json:"rv"`
-	StartKey        string `json:"start"`
-}
-
-// parseFrom transforms an encoded predicate from into a versioned struct.
-// TODO: return a typed error that instructs clients that they must relist
-func decodeContinue(continueValue, keyPrefix string) (fromKey string, rv int64, err error) {
-	data, err := base64.RawURLEncoding.DecodeString(continueValue)
-	if err != nil {
-		return "", 0, fmt.Errorf("continue key is not valid: %v", err)
-	}
-	var c continueToken
-	if err := json.Unmarshal(data, &c); err != nil {
-		return "", 0, fmt.Errorf("continue key is not valid: %v", err)
-	}
-	switch c.APIVersion {
-	case "meta.k8s.io/v1":
-		if c.ResourceVersion == 0 {
-			return "", 0, fmt.Errorf("continue key is not valid: incorrect encoded start resourceVersion (version meta.k8s.io/v1)")
-		}
-		if len(c.StartKey) == 0 {
-			return "", 0, fmt.Errorf("continue key is not valid: encoded start key empty (version meta.k8s.io/v1)")
-		}
-		// defend against path traversal attacks by clients - path.Clean will ensure that startKey cannot
-		// be at a higher level of the hierarchy, and so when we append the key prefix we will end up with
-		// continue start key that is fully qualified and cannot range over anything less specific than
-		// keyPrefix.
-		key := c.StartKey
-		if !strings.HasPrefix(key, "/") {
-			key = "/" + key
-		}
-		cleaned := path.Clean(key)
-		if cleaned != key {
-			return "", 0, fmt.Errorf("continue key is not valid: %s", c.StartKey)
-		}
-		return keyPrefix + cleaned[1:], c.ResourceVersion, nil
-	default:
-		return "", 0, fmt.Errorf("continue key is not valid: server does not recognize this encoded version %q", c.APIVersion)
-	}
-}
-
-func getRVFromContinue(continueValue string) (uint64, error) {
-	data, err := base64.RawURLEncoding.DecodeString(continueValue)
-	if err != nil {
-		return 0, fmt.Errorf("continue key is not valid: %v", err)
-	}
-
-	var c continueToken
-	if err := json.Unmarshal(data, &c); err != nil {
-		return 0, fmt.Errorf("continue key is not valid: %v", err)
-	}
-
-	if c.APIVersion != "meta.k8s.io/v1" {
-		return 0, fmt.Errorf("continue key is not valid: server does not recognize this encoded version %q", c.APIVersion)
-	}
-
-	return uint64(c.ResourceVersion), nil
 }

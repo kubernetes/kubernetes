@@ -30,7 +30,7 @@ type btreeIndexer interface {
 	cache.Store
 	ByIndex(indexName, indexValue string) ([]interface{}, error)
 	Clone() btreeIndexer
-	LimitPrefixRead(limit int64, key string) []interface{}
+	LimitPrefixRead(limit int64, prefixKey, continueKey string) ([]interface{}, bool)
 }
 
 type btreeStore struct {
@@ -163,7 +163,12 @@ func (t *btreeStore) Clone() btreeIndexer {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	return &btreeStore{tree: t.tree.Clone()}
+	return &btreeStore{
+		tree:     t.tree.Clone(),
+		indices:  t.indices,
+		indexers: t.indexers,
+		keyFunc:  t.keyFunc,
+	}
 }
 
 // addOrUpdateLocked assumes a lock is held and is used for Add
@@ -272,26 +277,50 @@ func (t *btreeStore) deleteKeyFromIndexLocked(key, value string, index cache.Ind
 	}
 }
 
-func (t *btreeStore) LimitPrefixRead(limit int64, key string) []interface{} {
+func (t *btreeStore) LimitPrefixRead(limit int64, prefixKey, continueKey string) ([]interface{}, bool) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
+	if limit < 0 {
+		return nil, false
+	}
+
+	if len(continueKey) > 0 {
+		return t.limitPrefixReadLocked(limit, continueKey, prefixKey)
+	}
+
+	return t.limitPrefixReadLocked(limit, prefixKey, prefixKey)
+}
+
+func (t *btreeStore) limitPrefixReadLocked(limit int64, pivotKey, prefixKey string) ([]interface{}, bool) {
+	if limit < 0 {
+		return nil, false
+	}
 	var result []interface{}
 	var elementsRetrieved int64
-	t.tree.AscendGreaterOrEqual(&storeElement{Key: key}, func(i btree.Item) bool {
+	var hasMore bool
+
+	t.tree.AscendGreaterOrEqual(&storeElement{Key: pivotKey}, func(i btree.Item) bool {
 		elementKey := i.(*storeElement).Key
-		if limit > 0 && elementsRetrieved == limit {
+		if !strings.HasPrefix(elementKey, prefixKey) {
 			return false
 		}
-		if !strings.HasPrefix(elementKey, key) {
+		if limit == 0 {
+			result = append(result, i.(interface{}))
+			return true
+		}
+		if elementsRetrieved-1 == limit {
+			hasMore = true
 			return false
+		}
+		if elementsRetrieved < limit {
+			result = append(result, i.(interface{}))
 		}
 		elementsRetrieved++
-		result = append(result, i.(interface{}))
 		return true
 	})
 
-	return result
+	return result, hasMore
 }
 
 func (t *btreeStore) ByIndex(indexName, indexValue string) ([]interface{}, error) {
@@ -325,7 +354,7 @@ var _ btreeIndexer = (*btreeStore)(nil)
 
 // continueCache caches roots of trees that were created as
 // clones to serve LIST requests. When a continue request is
-// meant to be served for a certain LIST request, we retreive
+// meant to be served for a certain LIST request, we retrieve
 // the tree that served the LIST request and serve the continue
 // request from there.
 //

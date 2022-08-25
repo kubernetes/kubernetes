@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -614,28 +615,29 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 }
 
 // NOTICE: Keep in sync with shouldListFromStorage function in
-//  staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
+//
+//	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
 func (c *Cacher) shouldDelegateList(opts storage.ListOptions) (bool, error) {
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(pred.Continue) > 0
-	hasLimit := pagingEnabled && pred.Limit > 0
+	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
 
 	// If resourceVersion is not specified, serve it from underlying
 	// storage (for backward compatibility). If a limit or a continuation
-	// is requested, serve from watch cache. In all other cases, serve it
-	// from underlying storage.
+	// is requested, serve from watch cache. In all other cases, try serving
+	// it from the watch cache.
 	switch {
 	case resourceVersion == "":
 		return true, nil
 	case hasLimit:
 		if hasContinuation {
-			rv, err := getRVFromContinue(pred.Continue)
+			_, rv, err := storage.DecodeContinue(pred.Continue, "")
 			if err != nil {
 				return false, err
 			}
-			if !c.watchCache.isRVValid(rv) {
+			if !c.watchCache.isRVValid(uint64(rv)) {
 				return true, nil
 			}
 		}
@@ -644,19 +646,19 @@ func (c *Cacher) shouldDelegateList(opts storage.ListOptions) (bool, error) {
 		return true, nil
 	}
 
-	return true, nil
+	return false, nil
 }
 
-func (c *Cacher) listItems(listRV uint64, key string, pred storage.SelectionPredicate, listOpts storage.ListOptions, trace *utiltrace.Trace, recursive bool) ([]interface{}, uint64, string, error) {
+func (c *Cacher) listItems(listRV uint64, key string, pred storage.SelectionPredicate, listOpts storage.ListOptions, trace *utiltrace.Trace, recursive bool) (ListResp, uint64, string, error) {
 	if !recursive {
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(listRV, key, trace)
 		if err != nil {
-			return nil, 0, "", err
+			return ListResp{}, 0, "", err
 		}
 		if exists {
-			return []interface{}{obj}, readResourceVersion, "", nil
+			return ListResp{objs: []interface{}{obj}}, readResourceVersion, "", nil
 		}
-		return nil, readResourceVersion, "", nil
+		return ListResp{}, readResourceVersion, "", nil
 	}
 	return c.watchCache.WaitUntilFreshAndList(listRV, key, listOpts, pred.MatcherIndex(), trace)
 }
@@ -680,7 +682,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	// fresh as the given resourceVersion.
 	listRV, err := c.versioner.ParseResourceVersion(resourceVersion)
 	if err != nil {
-		return err
+		return errors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 	}
 
 	if listRV == 0 && !c.ready.check() {
@@ -713,10 +715,11 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	}
 	filter := filterWithAttrsFunction(key, pred)
 
-	objs, readResourceVersion, indexUsed, err := c.listItems(listRV, key, pred, opts, trace, recursive)
+	listResp, readResourceVersion, indexUsed, err := c.listItems(listRV, key, pred, opts, trace, recursive)
 	if err != nil {
 		return err
 	}
+	objs := listResp.objs
 	trace.Step("Listed items from cache", utiltrace.Field{Key: "count", Value: len(objs)})
 	if len(objs) > listVal.Cap() && pred.Label.Empty() && pred.Field.Empty() {
 		// Resize the slice appropriately, since we already know that none
@@ -724,6 +727,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		listVal.Set(reflect.MakeSlice(reflect.SliceOf(c.objectType.Elem()), 0, len(objs)))
 		trace.Step("Resized result")
 	}
+	var lastKey string
 	for _, obj := range objs {
 		elem, ok := obj.(*storeElement)
 		if !ok {
@@ -732,10 +736,22 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		if filter(elem.Key, elem.Labels, elem.Fields) {
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(elem.Object).Elem()))
 		}
+		lastKey = elem.Key
+	}
+	var keyPrefix string
+	if listResp.hasMore && !strings.HasSuffix(key, "/") {
+		keyPrefix = key + "/"
 	}
 	trace.Step("Filtered items", utiltrace.Field{Key: "count", Value: listVal.Len()})
 	if c.versioner != nil {
-		if err := c.versioner.UpdateList(listObj, readResourceVersion, "", nil); err != nil {
+		var next string
+		if listResp.hasMore {
+			next, err = storage.EncodeContinue(lastKey+"\x00", keyPrefix, int64(readResourceVersion))
+			if err != nil {
+				return err
+			}
+		}
+		if err := c.versioner.UpdateList(listObj, readResourceVersion, next, nil); err != nil {
 			return err
 		}
 	}
