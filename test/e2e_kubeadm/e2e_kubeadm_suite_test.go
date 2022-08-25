@@ -30,6 +30,7 @@ import (
 
 	// reconfigure framework
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
+	_ "k8s.io/kubernetes/test/e2e/framework/todo/node/init"
 )
 
 func TestMain(m *testing.M) {

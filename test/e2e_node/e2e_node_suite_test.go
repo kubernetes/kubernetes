@@ -55,6 +55,7 @@ import (
 
 	// reconfigure framework
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
+	_ "k8s.io/kubernetes/test/e2e/framework/todo/node/init"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
