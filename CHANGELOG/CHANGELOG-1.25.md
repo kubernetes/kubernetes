@@ -21,6 +21,7 @@
     - [Promoted CSI Ephemeral Volume to Stable](#promoted-csi-ephemeral-volume-to-stable)
     - [Promoted CRD Validation Expression Language to Beta](#promoted-crd-validation-expression-language-to-beta)
     - [Promoted Server Side Unknown Field Validation to Beta](#promoted-server-side-unknown-field-validation-to-beta)
+    - [Kube-proxy images are now based in distroless](#kube-proxy-images-are-now-based-in-distroless)
     - [Introduced KMS v2](#introduced-kms-v2)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
@@ -274,6 +275,10 @@ Promoted the `ServerSideFieldValidation` feature gate to beta (on by default). T
 ###  Introduced KMS v2
 
 Introduce KMS v2alpha1 API to add performance, rotation, and observability improvements. Encrypt data at rest (ie Kubernetes `Secrets`) with DEK using AES-GCM instead of AES-CBC for kms data encryption. No user action is required. Reads with AES-GCM and AES-CBC will continue to be allowed. See the guide [Using a KMS provider for data encryption](https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/) for more information.
+
+### Kube-proxy images are now based in distroless
+
+In previous releases, kube-proxy docker images were built using Debian as the base image. Starting with this release the images are now built using [distroless](https://github.com/GoogleContainerTools/distroless). This change reduced image size by almost 50% and reduced the number of installed packages and files to only to those strictly required for kube-proxy do its job.
 
 ## Urgent Upgrade Notes 
 
