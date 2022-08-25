@@ -238,16 +238,23 @@ func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Se
 	return
 }
 
-func (f *FakeRuntime) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+func (f *FakeRuntime) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) kubecontainer.PodSyncResult {
 	f.Lock()
 	defer f.Unlock()
-
+	var syncResults []*kubecontainer.SyncResult
 	f.CalledFunctions = append(f.CalledFunctions, "KillPod")
 	f.KilledPods = append(f.KilledPods, string(runningPod.ID))
 	for _, c := range runningPod.Containers {
 		f.KilledContainers = append(f.KilledContainers, c.Name)
+		syncResults = append(syncResults, &kubecontainer.SyncResult{
+			Action: kubecontainer.KillContainer,
+			Target: c.Name,
+		})
 	}
-	return f.Err
+	return kubecontainer.PodSyncResult{
+		SyncResults: syncResults,
+		SyncError:   f.Err,
+	}
 }
 
 func (f *FakeRuntime) RunContainerInPod(container v1.Container, pod *v1.Pod, volumeMap map[string]volume.VolumePlugin) error {

@@ -243,10 +243,10 @@ func (mr *MockRuntimeMockRecorder) ImageStats() *gomock.Call {
 }
 
 // KillPod mocks base method.
-func (m *MockRuntime) KillPod(pod *v1.Pod, runningPod container.Pod, gracePeriodOverride *int64) error {
+func (m *MockRuntime) KillPod(pod *v1.Pod, runningPod container.Pod, gracePeriodOverride *int64) container.PodSyncResult {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "KillPod", pod, runningPod, gracePeriodOverride)
-	ret0, _ := ret[0].(error)
+	ret0, _ := ret[0].(container.PodSyncResult)
 	return ret0
 }
 
