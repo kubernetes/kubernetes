@@ -283,11 +283,11 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 		}
 
 		ginkgo.By("Creating Pod")
-		f.PodClient().Create(pod)
+		e2etodopod.NewPodClient(f).Create(pod)
 		e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 
 		ginkgo.By("Reading file content from the nginx-container")
-		result := f.ExecShellInContainer(pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))
+		result := e2etodopod.ExecShellInContainer(f, pod.Name, busyBoxMainContainerName, fmt.Sprintf("cat %s", busyBoxMainVolumeFilePath))
 		framework.ExpectEqual(result, message, "failed to match expected string %s with %s", message, resultString)
 	})
 
@@ -343,18 +343,18 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 
 		var err error
 		ginkgo.By("Creating Pod")
-		pod = f.PodClient().CreateSync(pod)
+		pod = e2etodopod.NewPodClient(f).CreateSync(pod)
 
 		ginkgo.By("Waiting for the pod running")
 		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err, "failed to deploy pod %s", pod.Name)
 
 		ginkgo.By("Getting the pod")
-		pod, err = f.PodClient().Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		pod, err = e2etodopod.NewPodClient(f).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to get pod %s", pod.Name)
 
 		ginkgo.By("Reading empty dir size")
-		result := f.ExecShellInContainer(pod.Name, busyBoxMainContainerName, fmt.Sprintf("df | grep %s | awk '{print $2}'", busyBoxMainVolumeMountPath))
+		result := e2etodopod.ExecShellInContainer(f, pod.Name, busyBoxMainContainerName, fmt.Sprintf("df | grep %s | awk '{print $2}'", busyBoxMainVolumeMountPath))
 		framework.ExpectEqual(result, expectedResult, "failed to match expected string %s with %s", expectedResult, result)
 	})
 })

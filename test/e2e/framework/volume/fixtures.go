@@ -551,7 +551,7 @@ func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 	}
 	ec.Resources = v1.ResourceRequirements{}
 	ec.Name = "volume-ephemeral-container"
-	err = f.PodClient().AddEphemeralContainerSync(clientPod, ec, timeouts.PodStart)
+	err = e2etodopod.NewPodClient(f).AddEphemeralContainerSync(clientPod, ec, timeouts.PodStart)
 	// The API server will return NotFound for the subresource when the feature is disabled
 	framework.ExpectNoError(err, "failed to add ephemeral container for re-test")
 	testVolumeContent(f, clientPod, ec.Name, fsGroup, fsType, tests)
@@ -650,7 +650,7 @@ func CheckVolumeModeOfPath(f *framework.Framework, pod *v1.Pod, volMode v1.Persi
 // TODO: put this under e2epod once https://github.com/kubernetes/kubernetes/issues/81245
 // is resolved. Otherwise there will be dependency issue.
 func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string, error) {
-	return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
+	return e2etodopod.ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
 }
 
 // VerifyExecInPodSucceed verifies shell cmd in target pod succeed

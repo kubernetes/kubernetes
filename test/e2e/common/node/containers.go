@@ -39,7 +39,7 @@ var _ = SIGDescribe("Containers", func() {
 	framework.ConformanceIt("should use the image defaults if command and args are blank [NodeConformance]", func() {
 		pod := entrypointTestPod(f.Namespace.Name)
 		pod.Spec.Containers[0].Args = nil
-		pod = f.PodClient().Create(pod)
+		pod = e2etodopod.NewPodClient(f).Create(pod)
 		err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err, "Expected pod %q to be running, got error: %v", pod.Name, err)
 		pollLogs := func() (string, error) {

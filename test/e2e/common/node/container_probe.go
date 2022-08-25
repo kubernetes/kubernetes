@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -57,11 +58,11 @@ const (
 var _ = SIGDescribe("Probing container", func() {
 	f := framework.NewDefaultFramework("container-probe")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	var podClient *framework.PodClient
+	var podClient *e2etodopod.PodClient
 	probe := webserverProbeBuilder{}
 
 	ginkgo.BeforeEach(func() {
-		podClient = f.PodClient()
+		podClient = e2etodopod.NewPodClient(f)
 	})
 
 	/*
@@ -561,7 +562,7 @@ var _ = SIGDescribe("Probing container", func() {
 
 	ginkgo.It("should mark readiness on pods to false while pod is in progress of terminating when a pod has a readiness probe", func() {
 		podName := "probe-test-" + string(uuid.NewUUID())
-		podClient := f.PodClient()
+		podClient := e2etodopod.NewPodClient(f)
 		terminationGracePeriod := int64(30)
 		script := `
 _term() {
@@ -625,7 +626,7 @@ done
 
 	ginkgo.It("should mark readiness on pods to false and disable liveness probes while pod is in progress of terminating", func() {
 		podName := "probe-test-" + string(uuid.NewUUID())
-		podClient := f.PodClient()
+		podClient := e2etodopod.NewPodClient(f)
 		terminationGracePeriod := int64(30)
 		script := `
 _term() { 
@@ -937,7 +938,7 @@ func (b webserverProbeBuilder) build() *v1.Probe {
 
 // RunLivenessTest verifies the number of restarts for pod with given expected number of restarts
 func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int, timeout time.Duration) {
-	podClient := f.PodClient()
+	podClient := e2etodopod.NewPodClient(f)
 	ns := f.Namespace.Name
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	containerName := pod.Spec.Containers[0].Name
@@ -997,7 +998,7 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 }
 
 func runReadinessFailTest(f *framework.Framework, pod *v1.Pod, notReadyUntil time.Duration) {
-	podClient := f.PodClient()
+	podClient := e2etodopod.NewPodClient(f)
 	ns := f.Namespace.Name
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 
