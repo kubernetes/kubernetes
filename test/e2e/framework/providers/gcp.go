@@ -22,7 +22,7 @@ import (
 	"path"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2etodonode "k8s.io/kubernetes/test/e2e/framework/todo/node"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
 const etcdImage = "3.5.5-0"
@@ -76,7 +76,7 @@ func MasterUpgradeGKE(namespace string, v string) error {
 		return err
 	}
 
-	e2etodonode.WaitForSSHTunnels(namespace)
+	e2enode.WaitForSSHTunnels(namespace)
 
 	return nil
 }

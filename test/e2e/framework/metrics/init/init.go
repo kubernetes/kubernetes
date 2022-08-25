@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,23 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package init registers node.AllNodesReady.
+// Package init installs GrabBeforeEach and GrabAfterEach as callbacks
+// for gathering data before and after a test.
 package init
 
 import (
-	"time"
-
 	"github.com/onsi/ginkgo/v2"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/todo/node"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
 
 func init() {
 	framework.NewFrameworkExtensions = append(framework.NewFrameworkExtensions,
 		func(f *framework.Framework) {
-			ginkgo.AfterEach(func() {
-				node.AllNodesReady(f.ClientSet, 3*time.Minute)
+			ginkgo.BeforeEach(func() {
+				metrics := e2emetrics.GrabBeforeEach(f)
+				ginkgo.DeferCleanup(func() {
+					e2emetrics.GrabAfterEach(f, metrics)
+				})
 			})
 		},
 	)

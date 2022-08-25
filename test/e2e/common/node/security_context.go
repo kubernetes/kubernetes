@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
@@ -46,9 +46,9 @@ var (
 var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	var podClient *e2etodopod.PodClient
+	var podClient *e2epod.PodClient
 	ginkgo.BeforeEach(func() {
-		podClient = e2etodopod.NewPodClient(f)
+		podClient = e2epod.NewPodClient(f)
 	})
 
 	ginkgo.Context("When creating a pod with HostUsers", func() {
@@ -74,14 +74,14 @@ var _ = SIGDescribe("Security Context", func() {
 
 		ginkgo.It("must create the user namespace if set to false [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func() {
 			// with hostUsers=false the pod must use a new user namespace
-			podClient := e2etodopod.PodClientNS(f, f.Namespace.Name)
+			podClient := e2epod.PodClientNS(f, f.Namespace.Name)
 
 			createdPod1 := podClient.Create(makePod(false))
 			createdPod2 := podClient.Create(makePod(false))
 			defer func() {
 				ginkgo.By("delete the pods")
-				podClient.DeleteSync(createdPod1.Name, metav1.DeleteOptions{}, e2etodopod.DefaultPodDeletionTimeout)
-				podClient.DeleteSync(createdPod2.Name, metav1.DeleteOptions{}, e2etodopod.DefaultPodDeletionTimeout)
+				podClient.DeleteSync(createdPod1.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
+				podClient.DeleteSync(createdPod2.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 			}()
 			getLogs := func(pod *v1.Pod) (string, error) {
 				err := e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, createdPod1.Name, f.Namespace.Name, f.Timeouts.PodStart)
@@ -116,7 +116,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// When running in the host's user namespace, the /proc/self/uid_map file content looks like:
 			// 0          0 4294967295
 			// Verify the value 4294967295 is present in the output.
-			e2etodopod.TestContainerOutput(f, "read namespace", pod, 0, []string{
+			e2epodoutput.TestContainerOutput(f, "read namespace", pod, 0, []string{
 				"4294967295",
 			})
 		})
@@ -240,7 +240,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// Each line should be "=0" that means root inside the container is the owner of the file.
 			downwardAPIVolFiles := 1
 			projectedFiles := len(secret.Data) + downwardAPIVolFiles
-			e2etodopod.TestContainerOutput(f, "check file permissions", pod, 0, []string{
+			e2epodoutput.TestContainerOutput(f, "check file permissions", pod, 0, []string{
 				strings.Repeat("=0\n", len(secret.Data)+len(configMap.Data)+downwardAPIVolFiles+projectedFiles),
 			})
 		})
@@ -300,7 +300,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// Expect one line for each file on all the volumes.
 			// Each line should be "=200" (fsGroup) that means it was mapped to the
 			// right user inside the container.
-			e2etodopod.TestContainerOutput(f, "check FSGroup is mapped correctly", pod, 0, []string{
+			e2epodoutput.TestContainerOutput(f, "check FSGroup is mapped correctly", pod, 0, []string{
 				strings.Repeat(fmt.Sprintf("=%v\n", fsGroup), len(configMap.Data)),
 			})
 		})

@@ -51,7 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2ewebsocket "k8s.io/kubernetes/test/e2e/framework/websocket"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -69,7 +69,7 @@ const (
 )
 
 // testHostIP tests that a pod gets a host IP
-func testHostIP(podClient *e2etodopod.PodClient, pod *v1.Pod) {
+func testHostIP(podClient *e2epod.PodClient, pod *v1.Pod) {
 	ginkgo.By("creating pod")
 	podClient.CreateSync(pod)
 
@@ -92,7 +92,7 @@ func testHostIP(podClient *e2etodopod.PodClient, pod *v1.Pod) {
 	}
 }
 
-func startPodAndGetBackOffs(podClient *e2etodopod.PodClient, pod *v1.Pod, sleepAmount time.Duration) (time.Duration, time.Duration) {
+func startPodAndGetBackOffs(podClient *e2epod.PodClient, pod *v1.Pod, sleepAmount time.Duration) (time.Duration, time.Duration) {
 	podClient.CreateSync(pod)
 	time.Sleep(sleepAmount)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
@@ -119,7 +119,7 @@ func startPodAndGetBackOffs(podClient *e2etodopod.PodClient, pod *v1.Pod, sleepA
 	return delay1, delay2
 }
 
-func getRestartDelay(podClient *e2etodopod.PodClient, podName string, containerName string) (time.Duration, error) {
+func getRestartDelay(podClient *e2epod.PodClient, podName string, containerName string) (time.Duration, error) {
 	beginTime := time.Now()
 	var previousRestartCount int32 = -1
 	var previousFinishedAt time.Time
@@ -188,11 +188,11 @@ func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 var _ = SIGDescribe("Pods", func() {
 	f := framework.NewDefaultFramework("pods")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelRestricted
-	var podClient *e2etodopod.PodClient
+	var podClient *e2epod.PodClient
 	var dc dynamic.Interface
 
 	ginkgo.BeforeEach(func() {
-		podClient = e2etodopod.NewPodClient(f)
+		podClient = e2epod.NewPodClient(f)
 		dc = f.DynamicClient
 	})
 
@@ -306,7 +306,7 @@ var _ = SIGDescribe("Pods", func() {
 		ginkgo.By("verifying pod deletion was observed")
 		deleted := false
 		var lastPod *v1.Pod
-		timer := time.After(e2etodopod.DefaultPodDeletionTimeout)
+		timer := time.After(e2epod.DefaultPodDeletionTimeout)
 		for !deleted {
 			select {
 			case event := <-w.ResultChan():
@@ -523,7 +523,7 @@ var _ = SIGDescribe("Pods", func() {
 			"FOOSERVICE_PORT_8765_TCP_ADDR=",
 		}
 		expectNoErrorWithRetries(func() error {
-			return e2etodopod.MatchContainerOutput(f, pod, containerName, expectedVars, gomega.ContainSubstring)
+			return e2epodoutput.MatchContainerOutput(f, pod, containerName, expectedVars, gomega.ContainSubstring)
 		}, maxRetries, "Container should have service environment variables set")
 	})
 
@@ -808,7 +808,7 @@ var _ = SIGDescribe("Pods", func() {
 		}
 
 		ginkgo.By("submitting the pod to kubernetes")
-		e2etodopod.NewPodClient(f).Create(pod)
+		e2epod.NewPodClient(f).Create(pod)
 		e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 		if podClient.PodIsReady(podName) {
 			framework.Failf("Expect pod(%s/%s)'s Ready condition to be false initially.", f.Namespace.Name, pod.Name)

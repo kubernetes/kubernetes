@@ -30,7 +30,6 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
 const (
@@ -49,7 +48,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 	return wait.PollImmediate(
 		30*time.Second,
 		timeout,
-		e2enode.CheckReadyForTests(c, framework.TestContext.NonblockingTaints, framework.TestContext.AllowedNotReadyNodes, largeClusterThreshold),
+		CheckReadyForTests(c, framework.TestContext.NonblockingTaints, framework.TestContext.AllowedNotReadyNodes, largeClusterThreshold),
 	)
 }
 
@@ -129,7 +128,7 @@ func allNodesReady(c clientset.Interface, timeout time.Duration) error {
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			if !e2enode.IsConditionSetAsExpected(node, v1.NodeReady, true) {
+			if !IsConditionSetAsExpected(node, v1.NodeReady, true) {
 				notReady = append(notReady, node)
 			}
 		}

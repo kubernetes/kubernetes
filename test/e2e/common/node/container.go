@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
 const (
@@ -44,7 +44,7 @@ type ConformanceContainer struct {
 	Volumes          []v1.Volume
 	ImagePullSecrets []string
 
-	PodClient          *e2etodopod.PodClient
+	PodClient          *e2epod.PodClient
 	podName            string
 	PodSecurityContext *v1.PodSecurityContext
 }

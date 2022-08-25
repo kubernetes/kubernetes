@@ -26,7 +26,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -48,7 +47,7 @@ func LoadAppArmorProfiles(nsName string, clientset clientset.Interface) {
 // CreateAppArmorTestPod creates a pod that tests apparmor profile enforcement. The pod exits with
 // an error code if the profile is incorrectly enforced. If runOnce is true the pod will exit after
 // a single test, otherwise it will repeat the test every 1 second until failure.
-func CreateAppArmorTestPod(nsName string, clientset clientset.Interface, podClient *e2etodopod.PodClient, unconfined bool, runOnce bool) *v1.Pod {
+func CreateAppArmorTestPod(nsName string, clientset clientset.Interface, podClient *e2epod.PodClient, unconfined bool, runOnce bool) *v1.Pod {
 	profile := "localhost/" + appArmorProfilePrefix + nsName
 	testCmd := fmt.Sprintf(`
 if touch %[1]s; then

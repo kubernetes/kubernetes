@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -99,7 +99,7 @@ while true; do sleep 1; done
 					testContainer.Name = testCase.Name
 					testContainer.Command = []string{"sh", "-c", tmpCmd}
 					terminateContainer := ConformanceContainer{
-						PodClient:     e2etodopod.NewPodClient(f),
+						PodClient:     e2epod.NewPodClient(f),
 						Container:     testContainer,
 						RestartPolicy: testCase.RestartPolicy,
 						Volumes:       testVolumes,
@@ -144,7 +144,7 @@ while true; do sleep 1; done
 			matchTerminationMessage := func(container v1.Container, expectedPhase v1.PodPhase, expectedMsg gomegatypes.GomegaMatcher) {
 				container.Name = "termination-message-container"
 				c := ConformanceContainer{
-					PodClient:     e2etodopod.NewPodClient(f),
+					PodClient:     e2epod.NewPodClient(f),
 					Container:     container,
 					RestartPolicy: v1.RestartPolicyNever,
 				}
@@ -269,7 +269,7 @@ while true; do sleep 1; done
 					command = []string{"ping", "-t", "localhost"}
 				}
 				container := ConformanceContainer{
-					PodClient: e2etodopod.NewPodClient(f),
+					PodClient: e2epod.NewPodClient(f),
 					Container: v1.Container{
 						Name:            "image-pull-test",
 						Image:           image,
