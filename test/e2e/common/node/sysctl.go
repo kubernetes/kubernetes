@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -42,7 +41,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 
 	f := framework.NewDefaultFramework("sysctl")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	var podClient *e2etodopod.PodClient
+	var podClient *e2epod.PodClient
 
 	testPod := func() *v1.Pod {
 		podName := "sysctl-" + string(uuid.NewUUID())
@@ -66,7 +65,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 	}
 
 	ginkgo.BeforeEach(func() {
-		podClient = e2etodopod.NewPodClient(f)
+		podClient = e2epod.NewPodClient(f)
 	})
 
 	/*
@@ -94,7 +93,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 		// watch for events instead of termination of pod because the kubelet deletes
 		// failed pods without running containers. This would create a race as the pod
 		// might have already been deleted here.
-		ev, err := e2etodopod.NewPodClient(f).WaitForErrorEventOrSuccess(pod)
+		ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(pod)
 		framework.ExpectNoError(err)
 		gomega.Expect(ev).To(gomega.BeNil())
 
@@ -202,7 +201,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeConformance]", func() {
 		// watch for events instead of termination of pod because the kubelet deletes
 		// failed pods without running containers. This would create a race as the pod
 		// might have already been deleted here.
-		ev, err := e2etodopod.NewPodClient(f).WaitForErrorEventOrSuccess(pod)
+		ev, err := e2epod.NewPodClient(f).WaitForErrorEventOrSuccess(pod)
 		framework.ExpectNoError(err)
 		gomega.Expect(ev).To(gomega.BeNil())
 

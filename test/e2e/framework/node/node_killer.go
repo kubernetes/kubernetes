@@ -27,7 +27,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
@@ -55,11 +54,11 @@ func (k *NodeKiller) Run(stopCh <-chan struct{}) {
 }
 
 func (k *NodeKiller) pickNodes() []v1.Node {
-	nodes, err := e2enode.GetReadySchedulableNodes(k.client)
+	nodes, err := GetReadySchedulableNodes(k.client)
 	framework.ExpectNoError(err)
 	numNodes := int(k.config.FailureRatio * float64(len(nodes.Items)))
 
-	nodes, err = e2enode.GetBoundedReadySchedulableNodes(k.client, numNodes)
+	nodes, err = GetBoundedReadySchedulableNodes(k.client, numNodes)
 	framework.ExpectNoError(err)
 	return nodes.Items
 }

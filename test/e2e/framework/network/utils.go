@@ -41,13 +41,12 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
-	e2etodokubectl "k8s.io/kubernetes/test/e2e/framework/todo/kubectl"
-	e2etodonode "k8s.io/kubernetes/test/e2e/framework/todo/node"
-	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 )
@@ -177,7 +176,7 @@ type NetworkingTestConfig struct {
 	// 1 pod per node running the netexecImage.
 	EndpointPods []*v1.Pod
 	f            *framework.Framework
-	podClient    *e2etodopod.PodClient
+	podClient    *e2epod.PodClient
 	// NodePortService is a Service with Type=NodePort spanning over all
 	// endpointPods.
 	NodePortService *v1.Service
@@ -251,7 +250,7 @@ func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets
 			continue
 		}
 		framework.Logf("\nOutput of kubectl describe pod %v/%v:\n", e.Namespace, e.Name)
-		desc, _ := e2etodokubectl.RunKubectl(
+		desc, _ := e2ekubectl.RunKubectl(
 			e.Namespace, "describe", "pod", e.Name, fmt.Sprintf("--namespace=%v", e.Namespace))
 		framework.Logf(desc)
 	}
@@ -359,7 +358,7 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 	eps := sets.NewString()
 
 	for i := 0; i < tries; i++ {
-		stdout, stderr, err := e2etodopod.ExecShellInPodWithFullOutput(config.f, config.TestContainerPod.Name, cmd)
+		stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(config.f, config.TestContainerPod.Name, cmd)
 		if err != nil {
 			// A failure to kubectl exec counts as a try, not a hard fail.
 			// Also note that we will keep failing for maxTries in tests where
@@ -394,7 +393,7 @@ func (config *NetworkingTestConfig) GetResponseFromContainer(protocol, dialComma
 	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
 	cmd := makeCURLDialCommand(ipPort, dialCommand, protocol, targetIP, targetPort)
 
-	stdout, stderr, err := e2etodopod.ExecShellInPodWithFullOutput(config.f, config.TestContainerPod.Name, cmd)
+	stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(config.f, config.TestContainerPod.Name, cmd)
 	if err != nil {
 		return NetexecDialResponse{}, fmt.Errorf("failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
 	}
@@ -418,7 +417,7 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(path, targetIP 
 		targetIP,
 		targetPort,
 		path)
-	stdout, stderr, err := e2etodopod.ExecShellInPodWithFullOutput(config.f, config.TestContainerPod.Name, cmd)
+	stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(config.f, config.TestContainerPod.Name, cmd)
 	// We only care about the status code reported by curl,
 	// and want to return any other errors, such as cannot execute command in the Pod.
 	// If curl failed to connect to host, it would exit with code 7, which makes `ExecShellInPodWithFullOutput`
@@ -466,7 +465,7 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 	filterCmd := fmt.Sprintf("%s | grep -v '^\\s*$'", cmd)
 	framework.Logf("Going to poll %v on port %v at least %v times, with a maximum of %v tries before failing", targetIP, targetPort, minTries, maxTries)
 	for i := 0; i < maxTries; i++ {
-		stdout, stderr, err := e2etodopod.ExecShellInPodWithFullOutput(config.f, config.HostTestContainerPod.Name, filterCmd)
+		stdout, stderr, err := e2epod.ExecShellInPodWithFullOutput(config.f, config.HostTestContainerPod.Name, filterCmd)
 		if err != nil || len(stderr) > 0 {
 			// A failure to exec command counts as a try, not a hard fail.
 			// Also note that we will keep failing for maxTries in tests where
@@ -522,7 +521,7 @@ func (config *NetworkingTestConfig) executeCurlCmd(cmd string, expected string) 
 	podName := config.HostTestContainerPod.Name
 	var msg string
 	if pollErr := wait.PollImmediate(retryInterval, retryTimeout, func() (bool, error) {
-		stdout, err := e2etodopod.RunHostCmd(config.Namespace, podName, cmd)
+		stdout, err := e2epodoutput.RunHostCmd(config.Namespace, podName, cmd)
 		if err != nil {
 			msg = fmt.Sprintf("failed executing cmd %v in %v/%v: %v", cmd, config.Namespace, podName, err)
 			framework.Logf(msg)
@@ -536,7 +535,7 @@ func (config *NetworkingTestConfig) executeCurlCmd(cmd string, expected string) 
 		return true, nil
 	}); pollErr != nil {
 		framework.Logf("\nOutput of kubectl describe pod %v/%v:\n", config.Namespace, podName)
-		desc, _ := e2etodokubectl.RunKubectl(
+		desc, _ := e2ekubectl.RunKubectl(
 			config.Namespace, "describe", "pod", podName, fmt.Sprintf("--namespace=%v", config.Namespace))
 		framework.Logf("%s", desc)
 		framework.Failf("Timed out in %v: %v", retryTimeout, msg)
@@ -779,7 +778,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	config.setupCore(selector)
 
 	ginkgo.By("Getting node addresses")
-	framework.ExpectNoError(e2etodonode.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
+	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList, err := e2enode.GetReadySchedulableNodes(config.f.ClientSet)
 	framework.ExpectNoError(err)
 
@@ -839,7 +838,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 }
 
 func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*v1.Pod {
-	framework.ExpectNoError(e2etodonode.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
+	framework.ExpectNoError(e2enode.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList, err := e2enode.GetBoundedReadySchedulableNodes(config.f.ClientSet, maxNetProxyPodsCount)
 	framework.ExpectNoError(err)
 	nodes := nodeList.Items
@@ -896,9 +895,9 @@ func (config *NetworkingTestConfig) createPod(pod *v1.Pod) *v1.Pod {
 	return config.getPodClient().Create(pod)
 }
 
-func (config *NetworkingTestConfig) getPodClient() *e2etodopod.PodClient {
+func (config *NetworkingTestConfig) getPodClient() *e2epod.PodClient {
 	if config.podClient == nil {
-		config.podClient = e2etodopod.NewPodClient(config.f)
+		config.podClient = e2epod.NewPodClient(config.f)
 	}
 	return config.podClient
 }

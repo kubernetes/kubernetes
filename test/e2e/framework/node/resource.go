@@ -887,13 +887,3 @@ func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Tai
 		framework.Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
 }
-
-// taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
-func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
-	for _, taint := range taints {
-		if taint.MatchTaint(taintToFind) {
-			return true
-		}
-	}
-	return false
-}

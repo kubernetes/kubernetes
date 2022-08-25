@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pod
+package output
 
 import (
 	"context"
@@ -32,8 +32,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	apiv1pod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2etodokubectl "k8s.io/kubernetes/test/e2e/framework/todo/kubectl"
 )
 
 // DEPRECATED constants. Use the timeouts in framework.Framework instead.
@@ -58,7 +58,7 @@ func LookForStringInPodExecToContainer(ns, podName, containerName string, comman
 		}
 		args = append(args, "--")
 		args = append(args, command...)
-		return e2etodokubectl.RunKubectlOrDie(ns, args...)
+		return e2ekubectl.RunKubectlOrDie(ns, args...)
 	})
 }
 
@@ -79,13 +79,13 @@ func lookForString(expectedString string, timeout time.Duration, fn func() strin
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) (string, error) {
-	return e2etodokubectl.RunKubectl(ns, "exec", name, "--", "/bin/sh", "-x", "-c", cmd)
+	return e2ekubectl.RunKubectl(ns, "exec", name, "--", "/bin/sh", "-x", "-c", cmd)
 }
 
 // RunHostCmdWithFullOutput runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell. It will also return the command's stderr.
 func RunHostCmdWithFullOutput(ns, name, cmd string) (string, string, error) {
-	return e2etodokubectl.RunKubectlWithFullOutput(ns, "exec", name, "--", "/bin/sh", "-x", "-c", cmd)
+	return e2ekubectl.RunKubectlWithFullOutput(ns, "exec", name, "--", "/bin/sh", "-x", "-c", cmd)
 }
 
 // RunHostCmdOrDie calls RunHostCmd and dies on error.
@@ -117,13 +117,13 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 // LookForStringInLog looks for the given string in the log of a specific pod container
 func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
 	return lookForString(expectedString, timeout, func() string {
-		return e2etodokubectl.RunKubectlOrDie(ns, "logs", podName, container)
+		return e2ekubectl.RunKubectlOrDie(ns, "logs", podName, container)
 	})
 }
 
 // CreateEmptyFileOnPod creates empty file at given path on the pod.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
-	_, err := e2etodokubectl.RunKubectl(namespace, "exec", podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
+	_, err := e2ekubectl.RunKubectl(namespace, "exec", podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
 	return err
 }
 
@@ -131,10 +131,10 @@ func CreateEmptyFileOnPod(namespace string, podName string, filePath string) err
 func DumpDebugInfo(c clientset.Interface, ns string) {
 	sl, _ := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	for _, s := range sl.Items {
-		desc, _ := e2etodokubectl.RunKubectl(ns, "describe", "po", s.Name)
+		desc, _ := e2ekubectl.RunKubectl(ns, "describe", "po", s.Name)
 		framework.Logf("\nOutput of kubectl describe %v:\n%v", s.Name, desc)
 
-		l, _ := e2etodokubectl.RunKubectl(ns, "logs", s.Name, "--tail=100")
+		l, _ := e2ekubectl.RunKubectl(ns, "logs", s.Name, "--tail=100")
 		framework.Logf("\nLast 100 log lines of %v:\n%v", s.Name, l)
 	}
 }
@@ -151,12 +151,12 @@ func MatchContainerOutput(
 	if ns == "" {
 		ns = f.Namespace.Name
 	}
-	podClient := PodClientNS(f, ns)
+	podClient := e2epod.PodClientNS(f, ns)
 
 	createdPod := podClient.Create(pod)
 	defer func() {
 		ginkgo.By("delete the pod")
-		podClient.DeleteSync(createdPod.Name, metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
+		podClient.DeleteSync(createdPod.Name, metav1.DeleteOptions{}, e2epod.DefaultPodDeletionTimeout)
 	}()
 
 	// Wait for client pod to complete.

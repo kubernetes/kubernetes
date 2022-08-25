@@ -20,17 +20,16 @@ import (
 	"github.com/onsi/ginkgo/v2"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
 
-func GrabBeforeEach(f *framework.Framework) (result *e2emetrics.Collection) {
+func GrabBeforeEach(f *framework.Framework) (result *Collection) {
 	gatherMetricsAfterTest := framework.TestContext.GatherMetricsAfterTest == "true" || framework.TestContext.GatherMetricsAfterTest == "master"
 	if !gatherMetricsAfterTest || !framework.TestContext.IncludeClusterAutoscalerMetrics {
 		return nil
 	}
 
 	ginkgo.By("Gathering metrics before test", func() {
-		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), !framework.ProviderIs("kubemark"), false, false, false, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
+		grabber, err := NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), !framework.ProviderIs("kubemark"), false, false, false, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
 		if err != nil {
 			framework.Logf("Failed to create MetricsGrabber (skipping ClusterAutoscaler metrics gathering before test): %v", err)
 			return
@@ -47,7 +46,7 @@ func GrabBeforeEach(f *framework.Framework) (result *e2emetrics.Collection) {
 	return
 }
 
-func GrabAfterEach(f *framework.Framework, before *e2emetrics.Collection) {
+func GrabAfterEach(f *framework.Framework, before *Collection) {
 	if framework.TestContext.GatherMetricsAfterTest == "false" {
 		return
 	}
@@ -55,7 +54,7 @@ func GrabAfterEach(f *framework.Framework, before *e2emetrics.Collection) {
 	ginkgo.By("Gathering metrics after test", func() {
 		// Grab apiserver, scheduler, controller-manager metrics and (optionally) nodes' kubelet metrics.
 		grabMetricsFromKubelets := framework.TestContext.GatherMetricsAfterTest != "master" && !framework.ProviderIs("kubemark")
-		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), grabMetricsFromKubelets, true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
+		grabber, err := NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), grabMetricsFromKubelets, true, true, true, framework.TestContext.IncludeClusterAutoscalerMetrics, false)
 		if err != nil {
 			framework.Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
 			return
@@ -66,9 +65,9 @@ func GrabAfterEach(f *framework.Framework, before *e2emetrics.Collection) {
 			return
 		}
 		if before == nil {
-			before = &e2emetrics.Collection{}
+			before = &Collection{}
 		}
-		(*e2emetrics.ComponentCollection)(&received).ComputeClusterAutoscalerMetricsDelta(*before)
-		f.TestSummaries = append(f.TestSummaries, (*e2emetrics.ComponentCollection)(&received))
+		(*ComponentCollection)(&received).ComputeClusterAutoscalerMetricsDelta(*before)
+		f.TestSummaries = append(f.TestSummaries, (*ComponentCollection)(&received))
 	})
 }

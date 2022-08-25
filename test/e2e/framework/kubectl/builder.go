@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pod
+package kubectl
 
 import (
 	"bytes"
@@ -31,7 +31,6 @@ import (
 	uexec "k8s.io/utils/exec"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 )
 
 // KubectlBuilder is used to build, customize and execute a kubectl Command.
@@ -44,7 +43,7 @@ type KubectlBuilder struct {
 // NewKubectlCommand returns a KubectlBuilder for running kubectl.
 func NewKubectlCommand(namespace string, args ...string) *KubectlBuilder {
 	b := new(KubectlBuilder)
-	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
+	tk := NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, namespace)
 	b.cmd = tk.KubectlCmd(args...)
 	return b
 }

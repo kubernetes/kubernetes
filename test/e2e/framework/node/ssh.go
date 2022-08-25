@@ -21,22 +21,22 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2etodokubectl "k8s.io/kubernetes/test/e2e/framework/todo/kubectl"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 )
 
 // WaitForSSHTunnels waits for establishing SSH tunnel to busybox pod.
 func WaitForSSHTunnels(namespace string) {
 	framework.Logf("Waiting for SSH tunnels to establish")
-	e2etodokubectl.RunKubectl(namespace, "run", "ssh-tunnel-test",
+	e2ekubectl.RunKubectl(namespace, "run", "ssh-tunnel-test",
 		"--image=busybox",
 		"--restart=Never",
 		"--command", "--",
 		"echo", "Hello")
-	defer e2etodokubectl.RunKubectl(namespace, "delete", "pod", "ssh-tunnel-test")
+	defer e2ekubectl.RunKubectl(namespace, "delete", "pod", "ssh-tunnel-test")
 
 	// allow up to a minute for new ssh tunnels to establish
 	wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
-		_, err := e2etodokubectl.RunKubectl(namespace, "logs", "ssh-tunnel-test")
+		_, err := e2ekubectl.RunKubectl(namespace, "logs", "ssh-tunnel-test")
 		return err == nil, nil
 	})
 }
