@@ -471,13 +471,6 @@ func (f *Framework) AfterEach() {
 	}
 
 	printSummaries(f.TestSummaries, f.BaseName)
-
-	// Check whether all nodes are ready after the test.
-	// This is explicitly done at the very end of the test, to avoid
-	// e.g. not removing namespace in case of this failure.
-	if err := AllNodesReady(f.ClientSet, 3*time.Minute); err != nil {
-		Failf("All nodes should be ready after test, %v", err)
-	}
 }
 
 // DeleteNamespace can be used to delete a namespace. Additionally it can be used to

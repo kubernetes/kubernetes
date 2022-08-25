@@ -52,19 +52,11 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
-	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
-
-	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
-
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
 const (
-	// Minimal number of nodes for the cluster to be considered large.
-	largeClusterThreshold = 100
-
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
 )
@@ -553,116 +545,6 @@ func TryKill(cmd *exec.Cmd) {
 	}
 }
 
-// WaitForAllNodesSchedulable waits up to timeout for all
-// (but TestContext.AllowedNotReadyNodes) to become schedulable.
-func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
-	if TestContext.AllowedNotReadyNodes == -1 {
-		return nil
-	}
-
-	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
-	return wait.PollImmediate(
-		30*time.Second,
-		timeout,
-		e2enode.CheckReadyForTests(c, TestContext.NonblockingTaints, TestContext.AllowedNotReadyNodes, largeClusterThreshold),
-	)
-}
-
-// AddOrUpdateLabelOnNode adds the given label key and value to the given node or updates value.
-func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, labelValue string) {
-	ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
-}
-
-// ExpectNodeHasLabel expects that the given node has the given label pair.
-func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string, labelValue string) {
-	ginkgo.By("verifying the node has the label " + labelKey + " " + labelValue)
-	node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	ExpectNoError(err)
-	ExpectEqual(node.Labels[labelKey], labelValue)
-}
-
-// RemoveLabelOffNode is for cleaning up labels temporarily added to node,
-// won't fail if target label doesn't exist or has been removed.
-func RemoveLabelOffNode(c clientset.Interface, nodeName string, labelKey string) {
-	ginkgo.By("removing the label " + labelKey + " off the node " + nodeName)
-	ExpectNoError(testutils.RemoveLabelOffNode(c, nodeName, []string{labelKey}))
-
-	ginkgo.By("verifying the node doesn't have the label " + labelKey)
-	ExpectNoError(testutils.VerifyLabelsRemoved(c, nodeName, []string{labelKey}))
-}
-
-// ExpectNodeHasTaint expects that the node has the given taint.
-func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) {
-	ginkgo.By("verifying the node has the taint " + taint.ToString())
-	if has, err := NodeHasTaint(c, nodeName, taint); !has {
-		ExpectNoError(err)
-		Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
-	}
-}
-
-// NodeHasTaint returns true if the node has the given taint, else returns false.
-func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool, error) {
-	node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-	if err != nil {
-		return false, err
-	}
-
-	nodeTaints := node.Spec.Taints
-
-	if len(nodeTaints) == 0 || !taintExists(nodeTaints, taint) {
-		return false, nil
-	}
-	return true, nil
-}
-
-// AllNodesReady checks whether all registered nodes are ready. Setting -1 on
-// TestContext.AllowedNotReadyNodes will bypass the post test node readiness check.
-// TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
-// and figure out how to do it in a configurable way, as we can't expect all setups to run
-// default test add-ons.
-func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
-	if TestContext.AllowedNotReadyNodes == -1 {
-		return nil
-	}
-
-	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, TestContext.AllowedNotReadyNodes)
-
-	var notReady []*v1.Node
-	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		notReady = nil
-		// It should be OK to list unschedulable Nodes here.
-		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-		for i := range nodes.Items {
-			node := &nodes.Items[i]
-			if !e2enode.IsConditionSetAsExpected(node, v1.NodeReady, true) {
-				notReady = append(notReady, node)
-			}
-		}
-		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
-		// to make it possible e.g. for incorrect deployment of some small percentage
-		// of nodes (which we allow in cluster validation). Some nodes that are not
-		// provisioned correctly at startup will never become ready (e.g. when something
-		// won't install correctly), so we can't expect them to be ready at any point.
-		return len(notReady) <= TestContext.AllowedNotReadyNodes, nil
-	})
-
-	if err != nil && err != wait.ErrWaitTimeout {
-		return err
-	}
-
-	if len(notReady) > TestContext.AllowedNotReadyNodes {
-		msg := ""
-		for _, node := range notReady {
-			msg = fmt.Sprintf("%s, %s", msg, node.Name)
-		}
-		return fmt.Errorf("Not ready nodes: %#v", msg)
-	}
-	return nil
-}
-
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
 // are actually cleaned up.  Currently only implemented for GCE/GKE.
 func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
@@ -798,16 +680,6 @@ func PrettyPrintJSON(metrics interface{}) string {
 		return ""
 	}
 	return formatted.String()
-}
-
-// taintExists checks if the given taint exists in list of taints. Returns true if exists false otherwise.
-func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
-	for _, taint := range taints {
-		if taint.MatchTaint(taintToFind) {
-			return true
-		}
-	}
-	return false
 }
 
 // WatchEventSequenceVerifier ...
