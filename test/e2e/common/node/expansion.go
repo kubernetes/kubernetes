@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -57,7 +58,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		}
 		pod := newPod([]string{"sh", "-c", "env"}, envVars, nil, nil)
 
-		f.TestContainerOutput("env composition", pod, 0, []string{
+		e2etodopod.TestContainerOutput(f, "env composition", pod, 0, []string{
 			"FOO=foo-value",
 			"BAR=bar-value",
 			"FOOBAR=foo-value;;bar-value",
@@ -78,7 +79,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		}
 		pod := newPod([]string{"sh", "-c", "TEST_VAR=wrong echo \"$(TEST_VAR)\""}, envVars, nil, nil)
 
-		f.TestContainerOutput("substitution in container's command", pod, 0, []string{
+		e2etodopod.TestContainerOutput(f, "substitution in container's command", pod, 0, []string{
 			"test-value",
 		})
 	})
@@ -98,7 +99,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		pod := newPod([]string{"sh", "-c"}, envVars, nil, nil)
 		pod.Spec.Containers[0].Args = []string{"TEST_VAR=wrong echo \"$(TEST_VAR)\""}
 
-		f.TestContainerOutput("substitution in container's args", pod, 0, []string{
+		e2etodopod.TestContainerOutput(f, "substitution in container's args", pod, 0, []string{
 			"test-value",
 		})
 	})
@@ -138,7 +139,7 @@ var _ = SIGDescribe("Variable Expansion", func() {
 		envVars[0].Value = pod.ObjectMeta.Name
 		pod.Spec.Containers[0].Command = []string{"sh", "-c", "test -d /testcontainer/" + pod.ObjectMeta.Name + ";echo $?"}
 
-		f.TestContainerOutput("substitution in volume subpath", pod, 0, []string{
+		e2etodopod.TestContainerOutput(f, "substitution in volume subpath", pod, 0, []string{
 			"0",
 		})
 	})

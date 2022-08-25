@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -57,7 +58,7 @@ var _ = SIGDescribe("Containers", func() {
 	*/
 	framework.ConformanceIt("should be able to override the image's default arguments (container cmd) [NodeConformance]", func() {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester", "override", "arguments")
-		f.TestContainerOutput("override arguments", pod, 0, []string{
+		e2etodopod.TestContainerOutput(f, "override arguments", pod, 0, []string{
 			"[/agnhost entrypoint-tester override arguments]",
 		})
 	})
@@ -73,7 +74,7 @@ var _ = SIGDescribe("Containers", func() {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester")
 		pod.Spec.Containers[0].Command = []string{"/agnhost-2"}
 
-		f.TestContainerOutput("override command", pod, 0, []string{
+		e2etodopod.TestContainerOutput(f, "override command", pod, 0, []string{
 			"[/agnhost-2 entrypoint-tester]",
 		})
 	})
@@ -87,7 +88,7 @@ var _ = SIGDescribe("Containers", func() {
 		pod := entrypointTestPod(f.Namespace.Name, "entrypoint-tester", "override", "arguments")
 		pod.Spec.Containers[0].Command = []string{"/agnhost-2"}
 
-		f.TestContainerOutput("override all", pod, 0, []string{
+		e2etodopod.TestContainerOutput(f, "override all", pod, 0, []string{
 			"[/agnhost-2 entrypoint-tester override arguments]",
 		})
 	})

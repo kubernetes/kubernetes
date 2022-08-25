@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"net"
 	"net/url"
 	"os"
 	"os/exec"
@@ -32,18 +31,15 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	gomegatypes "github.com/onsi/gomega/types"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -59,11 +55,10 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	uexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
-	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -75,10 +70,6 @@ const (
 
 	// TODO(justinsb): Avoid hardcoding this.
 	awsMasterIP = "172.20.0.9"
-
-	// AllContainers specifies that all containers be visited
-	// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
-	AllContainers = InitContainers | Containers | EphemeralContainers
 )
 
 // DEPRECATED constants. Use the timeouts in framework.Framework instead.
@@ -543,199 +534,6 @@ func RandomSuffix() string {
 	return strconv.Itoa(rand.Intn(10000))
 }
 
-// LookForStringInPodExec looks for the given string in the output of a command
-// executed in the first container of specified pod.
-// TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
-func LookForStringInPodExec(ns, podName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
-	return LookForStringInPodExecToContainer(ns, podName, "", command, expectedString, timeout)
-}
-
-// LookForStringInPodExecToContainer looks for the given string in the output of a
-// command executed in specified pod container, or first container if not specified.
-func LookForStringInPodExecToContainer(ns, podName, containerName string, command []string, expectedString string, timeout time.Duration) (result string, err error) {
-	return lookForString(expectedString, timeout, func() string {
-		args := []string{"exec", podName, fmt.Sprintf("--namespace=%v", ns)}
-		if len(containerName) > 0 {
-			args = append(args, fmt.Sprintf("--container=%s", containerName))
-		}
-		args = append(args, "--")
-		args = append(args, command...)
-		return RunKubectlOrDie(ns, args...)
-	})
-}
-
-// lookForString looks for the given string in the output of fn, repeatedly calling fn until
-// the timeout is reached or the string is found. Returns last log and possibly
-// error if the string was not found.
-// TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
-func lookForString(expectedString string, timeout time.Duration, fn func() string) (result string, err error) {
-	for t := time.Now(); time.Since(t) < timeout; time.Sleep(Poll) {
-		result = fn()
-		if strings.Contains(result, expectedString) {
-			return
-		}
-	}
-	err = fmt.Errorf("Failed to find \"%s\", last result: \"%s\"", expectedString, result)
-	return
-}
-
-// KubectlBuilder is used to build, customize and execute a kubectl Command.
-// Add more functions to customize the builder as needed.
-type KubectlBuilder struct {
-	cmd     *exec.Cmd
-	timeout <-chan time.Time
-}
-
-// NewKubectlCommand returns a KubectlBuilder for running kubectl.
-func NewKubectlCommand(namespace string, args ...string) *KubectlBuilder {
-	b := new(KubectlBuilder)
-	tk := e2ekubectl.NewTestKubeconfig(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, namespace)
-	b.cmd = tk.KubectlCmd(args...)
-	return b
-}
-
-// WithEnv sets the given environment and returns itself.
-func (b *KubectlBuilder) WithEnv(env []string) *KubectlBuilder {
-	b.cmd.Env = env
-	return b
-}
-
-// WithTimeout sets the given timeout and returns itself.
-func (b *KubectlBuilder) WithTimeout(t <-chan time.Time) *KubectlBuilder {
-	b.timeout = t
-	return b
-}
-
-// WithStdinData sets the given data to stdin and returns itself.
-func (b KubectlBuilder) WithStdinData(data string) *KubectlBuilder {
-	b.cmd.Stdin = strings.NewReader(data)
-	return &b
-}
-
-// WithStdinReader sets the given reader and returns itself.
-func (b KubectlBuilder) WithStdinReader(reader io.Reader) *KubectlBuilder {
-	b.cmd.Stdin = reader
-	return &b
-}
-
-// ExecOrDie runs the kubectl executable or dies if error occurs.
-func (b KubectlBuilder) ExecOrDie(namespace string) string {
-	str, err := b.Exec()
-	// In case of i/o timeout error, try talking to the apiserver again after 2s before dying.
-	// Note that we're still dying after retrying so that we can get visibility to triage it further.
-	if isTimeout(err) {
-		Logf("Hit i/o timeout error, talking to the server 2s later to see if it's temporary.")
-		time.Sleep(2 * time.Second)
-		retryStr, retryErr := RunKubectl(namespace, "version")
-		Logf("stdout: %q", retryStr)
-		Logf("err: %v", retryErr)
-	}
-	ExpectNoError(err)
-	return str
-}
-
-func isTimeout(err error) bool {
-	switch err := err.(type) {
-	case *url.Error:
-		if err, ok := err.Err.(net.Error); ok && err.Timeout() {
-			return true
-		}
-	case net.Error:
-		if err.Timeout() {
-			return true
-		}
-	}
-	return false
-}
-
-// Exec runs the kubectl executable.
-func (b KubectlBuilder) Exec() (string, error) {
-	stdout, _, err := b.ExecWithFullOutput()
-	return stdout, err
-}
-
-// ExecWithFullOutput runs the kubectl executable, and returns the stdout and stderr.
-func (b KubectlBuilder) ExecWithFullOutput() (string, string, error) {
-	var stdout, stderr bytes.Buffer
-	cmd := b.cmd
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-
-	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
-	if err := cmd.Start(); err != nil {
-		return "", "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err)
-	}
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- cmd.Wait()
-	}()
-	select {
-	case err := <-errCh:
-		if err != nil {
-			var rc = 127
-			if ee, ok := err.(*exec.ExitError); ok {
-				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
-				Logf("rc: %d", rc)
-			}
-			return stdout.String(), stderr.String(), uexec.CodeExitError{
-				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err),
-				Code: rc,
-			}
-		}
-	case <-b.timeout:
-		b.cmd.Process.Kill()
-		return "", "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v", cmd, cmd.Stdout, cmd.Stderr)
-	}
-	Logf("stderr: %q", stderr.String())
-	Logf("stdout: %q", stdout.String())
-	return stdout.String(), stderr.String(), nil
-}
-
-// RunKubectlOrDie is a convenience wrapper over kubectlBuilder
-func RunKubectlOrDie(namespace string, args ...string) string {
-	return NewKubectlCommand(namespace, args...).ExecOrDie(namespace)
-}
-
-// RunKubectl is a convenience wrapper over kubectlBuilder
-func RunKubectl(namespace string, args ...string) (string, error) {
-	return NewKubectlCommand(namespace, args...).Exec()
-}
-
-// RunKubectlWithFullOutput is a convenience wrapper over kubectlBuilder
-// It will also return the command's stderr.
-func RunKubectlWithFullOutput(namespace string, args ...string) (string, string, error) {
-	return NewKubectlCommand(namespace, args...).ExecWithFullOutput()
-}
-
-// RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
-func RunKubectlOrDieInput(namespace string, data string, args ...string) string {
-	return NewKubectlCommand(namespace, args...).WithStdinData(data).ExecOrDie(namespace)
-}
-
-// RunKubectlInput is a convenience wrapper over kubectlBuilder that takes input to stdin
-func RunKubectlInput(namespace string, data string, args ...string) (string, error) {
-	return NewKubectlCommand(namespace, args...).WithStdinData(data).Exec()
-}
-
-// RunKubemciWithKubeconfig is a convenience wrapper over RunKubemciCmd
-func RunKubemciWithKubeconfig(args ...string) (string, error) {
-	if TestContext.KubeConfig != "" {
-		args = append(args, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
-	}
-	return RunKubemciCmd(args...)
-}
-
-// RunKubemciCmd is a convenience wrapper over kubectlBuilder to run kubemci.
-// It assumes that kubemci exists in PATH.
-func RunKubemciCmd(args ...string) (string, error) {
-	// kubemci is assumed to be in PATH.
-	kubemci := "kubemci"
-	b := new(KubectlBuilder)
-	args = append(args, "--gcp-project="+TestContext.CloudConfig.ProjectID)
-
-	b.cmd = exec.Command(kubemci, args...)
-	return b.Exec()
-}
-
 // StartCmdAndStreamOutput returns stdout and stderr after starting the given cmd.
 func StartCmdAndStreamOutput(cmd *exec.Cmd) (stdout, stderr io.ReadCloser, err error) {
 	stdout, err = cmd.StdoutPipe()
@@ -756,142 +554,6 @@ func TryKill(cmd *exec.Cmd) {
 	if err := cmd.Process.Kill(); err != nil {
 		Logf("ERROR failed to kill command %v! The process may leak", cmd)
 	}
-}
-
-// testContainerOutputMatcher runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status, and tests
-// the specified container log against the given expected output using the given matcher.
-func (f *Framework) testContainerOutputMatcher(scenarioName string,
-	pod *v1.Pod,
-	containerIndex int,
-	expectedOutput []string,
-	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) {
-	ginkgo.By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
-	if containerIndex < 0 || containerIndex >= len(pod.Spec.Containers) {
-		Failf("Invalid container index: %d", containerIndex)
-	}
-	ExpectNoError(f.MatchContainerOutput(pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher))
-}
-
-// ContainerType signifies container type
-type ContainerType int
-
-const (
-	// Containers is for normal containers
-	Containers ContainerType = 1 << iota
-	// InitContainers is for init containers
-	InitContainers
-	// EphemeralContainers is for ephemeral containers
-	EphemeralContainers
-)
-
-// allFeatureEnabledContainers returns a ContainerType mask which includes all container
-// types except for the ones guarded by feature gate.
-// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
-func allFeatureEnabledContainers() ContainerType {
-	return AllContainers
-}
-
-// ContainerVisitor is called with each container spec, and returns true
-// if visiting should continue.
-// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
-type ContainerVisitor func(container *v1.Container, containerType ContainerType) (shouldContinue bool)
-
-// visitContainers invokes the visitor function with a pointer to every container
-// spec in the given pod spec with type set in mask. If visitor returns false,
-// visiting is short-circuited. visitContainers returns true if visiting completes,
-// false if visiting was short-circuited.
-// Copied from pkg/api/v1/pod to avoid pulling extra dependencies
-func visitContainers(podSpec *v1.PodSpec, mask ContainerType, visitor ContainerVisitor) bool {
-	if mask&InitContainers != 0 {
-		for i := range podSpec.InitContainers {
-			if !visitor(&podSpec.InitContainers[i], InitContainers) {
-				return false
-			}
-		}
-	}
-	if mask&Containers != 0 {
-		for i := range podSpec.Containers {
-			if !visitor(&podSpec.Containers[i], Containers) {
-				return false
-			}
-		}
-	}
-	if mask&EphemeralContainers != 0 {
-		for i := range podSpec.EphemeralContainers {
-			if !visitor((*v1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// MatchContainerOutput creates a pod and waits for all it's containers to exit with success.
-// It then tests that the matcher with each expectedOutput matches the output of the specified container.
-func (f *Framework) MatchContainerOutput(
-	pod *v1.Pod,
-	containerName string,
-	expectedOutput []string,
-	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) error {
-	ns := pod.ObjectMeta.Namespace
-	if ns == "" {
-		ns = f.Namespace.Name
-	}
-	podClient := f.PodClientNS(ns)
-
-	createdPod := podClient.Create(pod)
-	defer func() {
-		ginkgo.By("delete the pod")
-		podClient.DeleteSync(createdPod.Name, metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
-	}()
-
-	// Wait for client pod to complete.
-	podErr := e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, createdPod.Name, ns, f.Timeouts.PodStart)
-
-	// Grab its logs.  Get host first.
-	podStatus, err := podClient.Get(context.TODO(), createdPod.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get pod status: %v", err)
-	}
-
-	if podErr != nil {
-		// Pod failed. Dump all logs from all containers to see what's wrong
-		_ = visitContainers(&podStatus.Spec, allFeatureEnabledContainers(), func(c *v1.Container, containerType ContainerType) bool {
-			logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, c.Name)
-			if err != nil {
-				Logf("Failed to get logs from node %q pod %q container %q: %v",
-					podStatus.Spec.NodeName, podStatus.Name, c.Name, err)
-			} else {
-				Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, c.Name, logs)
-			}
-			return true
-		})
-		return fmt.Errorf("expected pod %q success: %v", createdPod.Name, podErr)
-	}
-
-	Logf("Trying to get logs from node %s pod %s container %s: %v",
-		podStatus.Spec.NodeName, podStatus.Name, containerName, err)
-
-	// Sometimes the actual containers take a second to get started, try to get logs for 60s
-	logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, containerName)
-	if err != nil {
-		Logf("Failed to get logs from node %q pod %q container %q. %v",
-			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
-		return fmt.Errorf("failed to get logs from %s for %s: %v", podStatus.Name, containerName, err)
-	}
-
-	for _, expected := range expectedOutput {
-		m := matcher(expected)
-		matches, err := m.Match(logs)
-		if err != nil {
-			return fmt.Errorf("expected %q in container output: %v", expected, err)
-		} else if !matches {
-			return fmt.Errorf("expected %q in container output: %s", expected, m.FailureMessage(logs))
-		}
-	}
-
-	return nil
 }
 
 // EventsLister is a func that lists events.
@@ -1108,44 +770,6 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 	return true, nil
 }
 
-// RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
-// inside of a shell.
-func RunHostCmd(ns, name, cmd string) (string, error) {
-	return RunKubectl(ns, "exec", name, "--", "/bin/sh", "-x", "-c", cmd)
-}
-
-// RunHostCmdWithFullOutput runs the given cmd in the context of the given pod using `kubectl exec`
-// inside of a shell. It will also return the command's stderr.
-func RunHostCmdWithFullOutput(ns, name, cmd string) (string, string, error) {
-	return RunKubectlWithFullOutput(ns, "exec", name, "--", "/bin/sh", "-x", "-c", cmd)
-}
-
-// RunHostCmdOrDie calls RunHostCmd and dies on error.
-func RunHostCmdOrDie(ns, name, cmd string) string {
-	stdout, err := RunHostCmd(ns, name, cmd)
-	Logf("stdout: %v", stdout)
-	ExpectNoError(err)
-	return stdout
-}
-
-// RunHostCmdWithRetries calls RunHostCmd and retries all errors
-// until it succeeds or the specified timeout expires.
-// This can be used with idempotent commands to deflake transient Node issues.
-func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration) (string, error) {
-	start := time.Now()
-	for {
-		out, err := RunHostCmd(ns, name, cmd)
-		if err == nil {
-			return out, nil
-		}
-		if elapsed := time.Since(start); elapsed > timeout {
-			return out, fmt.Errorf("RunHostCmd still failed after %v: %v", elapsed, err)
-		}
-		Logf("Waiting %v to retry failed RunHostCmd: %v", interval, err)
-		time.Sleep(interval)
-	}
-}
-
 // AllNodesReady checks whether all registered nodes are ready. Setting -1 on
 // TestContext.AllowedNotReadyNodes will bypass the post test node readiness check.
 // TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
@@ -1192,13 +816,6 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		return fmt.Errorf("Not ready nodes: %#v", msg)
 	}
 	return nil
-}
-
-// LookForStringInLog looks for the given string in the log of a specific pod container
-func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
-	return lookForString(expectedString, timeout, func() string {
-		return RunKubectlOrDie(ns, "logs", podName, container)
-	})
 }
 
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
@@ -1321,25 +938,6 @@ func GetControlPlaneAddresses(c clientset.Interface) []string {
 		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
 	}
 	return ips.List()
-}
-
-// CreateEmptyFileOnPod creates empty file at given path on the pod.
-// TODO(alejandrox1): move to subpkg pod once kubectl methods have been refactored.
-func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
-	_, err := RunKubectl(namespace, "exec", podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
-	return err
-}
-
-// DumpDebugInfo dumps debug info of tests.
-func DumpDebugInfo(c clientset.Interface, ns string) {
-	sl, _ := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
-	for _, s := range sl.Items {
-		desc, _ := RunKubectl(ns, "describe", "po", s.Name)
-		Logf("\nOutput of kubectl describe %v:\n%v", s.Name, desc)
-
-		l, _ := RunKubectl(ns, "logs", s.Name, "--tail=100")
-		Logf("\nLast 100 log lines of %v:\n%v", s.Name, l)
-	}
 }
 
 // PrettyPrintJSON converts metrics to JSON format.

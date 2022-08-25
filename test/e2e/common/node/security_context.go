@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
@@ -115,7 +116,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// When running in the host's user namespace, the /proc/self/uid_map file content looks like:
 			// 0          0 4294967295
 			// Verify the value 4294967295 is present in the output.
-			f.TestContainerOutput("read namespace", pod, 0, []string{
+			e2etodopod.TestContainerOutput(f, "read namespace", pod, 0, []string{
 				"4294967295",
 			})
 		})
@@ -239,7 +240,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// Each line should be "=0" that means root inside the container is the owner of the file.
 			downwardAPIVolFiles := 1
 			projectedFiles := len(secret.Data) + downwardAPIVolFiles
-			f.TestContainerOutput("check file permissions", pod, 0, []string{
+			e2etodopod.TestContainerOutput(f, "check file permissions", pod, 0, []string{
 				strings.Repeat("=0\n", len(secret.Data)+len(configMap.Data)+downwardAPIVolFiles+projectedFiles),
 			})
 		})
@@ -299,7 +300,7 @@ var _ = SIGDescribe("Security Context", func() {
 			// Expect one line for each file on all the volumes.
 			// Each line should be "=200" (fsGroup) that means it was mapped to the
 			// right user inside the container.
-			f.TestContainerOutput("check FSGroup is mapped correctly", pod, 0, []string{
+			e2etodopod.TestContainerOutput(f, "check FSGroup is mapped correctly", pod, 0, []string{
 				strings.Repeat(fmt.Sprintf("=%v\n", fsGroup), len(configMap.Data)),
 			})
 		})

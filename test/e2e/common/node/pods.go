@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	e2ewebsocket "k8s.io/kubernetes/test/e2e/framework/websocket"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -522,7 +523,7 @@ var _ = SIGDescribe("Pods", func() {
 			"FOOSERVICE_PORT_8765_TCP_ADDR=",
 		}
 		expectNoErrorWithRetries(func() error {
-			return f.MatchContainerOutput(pod, containerName, expectedVars, gomega.ContainSubstring)
+			return e2etodopod.MatchContainerOutput(f, pod, containerName, expectedVars, gomega.ContainSubstring)
 		}, maxRetries, "Container should have service environment variables set")
 	})
 

@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
+	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 )
 
 // CreateStatefulSet creates a StatefulSet from the manifest at manifestPath in the Namespace ns using kubectl create.
@@ -192,7 +193,7 @@ func CheckHostname(c clientset.Interface, ss *appsv1.StatefulSet) error {
 	cmd := "printf $(hostname)"
 	podList := GetPodList(c, ss)
 	for _, statefulPod := range podList.Items {
-		hostname, err := framework.RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
+		hostname, err := e2etodopod.RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 		if err != nil {
 			return err
 		}
@@ -236,7 +237,7 @@ func CheckServiceName(ss *appsv1.StatefulSet, expectedServiceName string) error 
 func ExecInStatefulPods(c clientset.Interface, ss *appsv1.StatefulSet, cmd string) error {
 	podList := GetPodList(c, ss)
 	for _, statefulPod := range podList.Items {
-		stdout, err := framework.RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
+		stdout, err := e2etodopod.RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 		framework.Logf("stdout of %v on %v: %v", cmd, statefulPod.Name, stdout)
 		if err != nil {
 			return err
