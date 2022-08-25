@@ -471,11 +471,7 @@ func createKeyAndCSR(kubeadmConfig *kubeadmapi.InitConfiguration, cert *KubeadmC
 	if err != nil {
 		return err
 	}
-	err = pkiutil.WriteCSR(certDir, name, csr)
-	if err != nil {
-		return err
-	}
-	return nil
+	return pkiutil.WriteCSR(certDir, name, csr)
 }
 
 // CreateDefaultKeysAndCSRFiles is used in ExternalCA mode to create key files

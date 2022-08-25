@@ -486,10 +486,7 @@ func validateSignedCertWithCA(l certKeyLocation, caCert *x509.Certificate) error
 func validatePrivatePublicKey(l certKeyLocation) error {
 	// Try to load key
 	_, _, err := pkiutil.TryLoadPrivatePublicKeyFromDisk(l.pkiDir, l.baseName)
-	if err != nil {
-		return errors.Wrapf(err, "failure loading key for %s", l.uxName)
-	}
-	return nil
+	return errors.Wrapf(err, "failure loading key for %s", l.uxName)
 }
 
 // validateCertificateWithConfig makes sure that a given certificate is valid at

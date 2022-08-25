@@ -571,10 +571,7 @@ func LoadTLSFiles(c *Config) error {
 	}
 
 	c.KeyData, err = dataFromSliceOrFile(c.KeyData, c.KeyFile)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // dataFromSliceOrFile returns data from the slice (if non-empty), or from the file,
