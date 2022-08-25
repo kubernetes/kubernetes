@@ -3,17 +3,18 @@
 approvers:
   - release-engineering-approvers
   - release-managers
+  - csantanapr # 1.25 Release Notes Lead
   - AuraSinis # 1.24 Release Notes Lead
   - cici37 # 1.23 Release Notes Lead
   - pmmalinov01 # 1.22 Release Notes Lead
   - wilsonehusin # 1.21 Release Notes Lead
 reviewers:
   - release-managers
-  - AuraSinis # 1.24 Release Notes Lead
-  - csantanapr # 1.24 Release Notes Shadow
-  - parul5sahoo # 1.24 Release Notes Shadow
-  - Lp-Francois # 1.24 Release Notes Shadow
-  - RinkiyaKeDad # 1.24 Release Notes Shadow
+  - csantanapr # 1.25 Release Notes Lead
+  - orsenthil # 1.25 Release Notes Shadow
+  - ramrodo # 1.25 Release Notes Shadow
+  - Divya063 # 1.25 Release Notes Shadow
+  - DiptoChakrabarty # 1.25 Release Notes Shadow
 labels:
   - sig/release
   - area/release-eng
