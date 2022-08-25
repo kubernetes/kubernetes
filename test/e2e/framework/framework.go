@@ -28,7 +28,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -105,10 +104,6 @@ type Framework struct {
 	// see if 99% of results are within acceptable bounds. It has to be injected in the test,
 	// as expectations vary greatly. Constraints are grouped by the container names.
 	AddonResourceConstraints map[string]ResourceConstraint
-
-	logsSizeWaitGroup    sync.WaitGroup
-	logsSizeCloseChannel chan bool
-	logsSizeVerifier     *LogsSizeVerifier
 
 	// Flaky operation failures in an e2e test can be captured through this.
 	flakeReport *FlakeReport
@@ -287,17 +282,6 @@ func (f *Framework) BeforeEach() {
 		}
 	}
 
-	if TestContext.GatherLogsSizes {
-		f.logsSizeWaitGroup = sync.WaitGroup{}
-		f.logsSizeWaitGroup.Add(1)
-		f.logsSizeCloseChannel = make(chan bool)
-		f.logsSizeVerifier = NewLogsVerifier(f.ClientSet, f.logsSizeCloseChannel)
-		go func() {
-			f.logsSizeVerifier.Run()
-			f.logsSizeWaitGroup.Done()
-		}()
-	}
-
 	f.flakeReport = NewFlakeReport()
 }
 
@@ -414,13 +398,6 @@ func (f *Framework) AfterEach() {
 		summary, resourceViolationError := f.gatherer.StopAndSummarize([]int{90, 99, 100}, f.AddonResourceConstraints)
 		defer ExpectNoError(resourceViolationError)
 		f.TestSummaries = append(f.TestSummaries, summary)
-	}
-
-	if TestContext.GatherLogsSizes {
-		ginkgo.By("Gathering log sizes data")
-		close(f.logsSizeCloseChannel)
-		f.logsSizeWaitGroup.Wait()
-		f.TestSummaries = append(f.TestSummaries, f.logsSizeVerifier.GetSummary())
 	}
 
 	TestContext.CloudConfig.Provider.FrameworkAfterEach(f)
