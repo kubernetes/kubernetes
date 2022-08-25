@@ -2397,7 +2397,7 @@ k8s.io/sample-apiserver/pkg/generated/openapi
 k8s.io/sample-apiserver/pkg/registry
 k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 k8s.io/sample-apiserver/pkg/registry/wardle/flunder
-# k8s.io/system-validators v1.7.0 => k8s.io/system-validators v1.7.0
+# k8s.io/system-validators v1.8.0 => k8s.io/system-validators v1.8.0
 ## explicit; go 1.16
 k8s.io/system-validators/validators
 # k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed => k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
@@ -2857,7 +2857,7 @@ sigs.k8s.io/yaml
 # k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
 # k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 # k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
-# k8s.io/system-validators => k8s.io/system-validators v1.7.0
+# k8s.io/system-validators => k8s.io/system-validators v1.8.0
 # k8s.io/utils => k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
 # modernc.org/cc => modernc.org/cc v1.0.0
 # modernc.org/golex => modernc.org/golex v1.0.0
