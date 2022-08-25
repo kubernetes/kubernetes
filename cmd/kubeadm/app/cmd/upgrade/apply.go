@@ -32,7 +32,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
@@ -156,16 +155,6 @@ func runApply(flags *applyFlags, args []string) error {
 	// Now; perform the upgrade procedure
 	if err := PerformControlPlaneUpgrade(flags, client, waiter, cfg); err != nil {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
-	}
-
-	// Clean this up in 1.26
-	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-	fmt.Printf("[upgrade/postupgrade] Removing the old taint %s from all control plane Nodes. "+
-		"After this step only the %s taint will be present on control plane Nodes.\n",
-		kubeadmconstants.OldControlPlaneTaint.String(),
-		kubeadmconstants.ControlPlaneTaint.String())
-	if err := upgrade.RemoveOldControlPlaneTaint(client); err != nil {
-		return err
 	}
 
 	// Upgrade RBAC rules and addons.

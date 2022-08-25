@@ -27,10 +27,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -44,7 +42,6 @@ import (
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 )
 
@@ -213,45 +210,6 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 		}
 	}
 	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
-}
-
-// RemoveOldControlPlaneTaint finds all nodes with the new "control-plane" node-role label
-// and removes the old "control-plane" taint to them.
-// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-func RemoveOldControlPlaneTaint(client clientset.Interface) error {
-	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
-		kubeadmconstants.LabelNodeRoleControlPlane: "",
-	}))
-	nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: selectorControlPlane.String(),
-	})
-	if err != nil {
-		return errors.Wrapf(err, "could not list nodes labeled with %q", kubeadmconstants.LabelNodeRoleControlPlane)
-	}
-
-	for _, n := range nodes.Items {
-		// Check if the node has the old taint
-		hasOldTaint := false
-		taints := []v1.Taint{}
-		for _, t := range n.Spec.Taints {
-			if t.String() == kubeadmconstants.OldControlPlaneTaint.String() {
-				hasOldTaint = true
-				continue
-			}
-			// Collect all other taints
-			taints = append(taints, t)
-		}
-		// If the old taint is present remove it
-		if hasOldTaint {
-			err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
-				n.Spec.Taints = taints
-			})
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 // CleanupKubeletDynamicEnvFileContainerRuntime reads the kubelet dynamic environment file
