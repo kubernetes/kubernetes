@@ -18,6 +18,7 @@ package testing
 
 import (
 	"context"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"os"
@@ -35,17 +36,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
+	serveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storageversion"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/test/utils"
-
-	"k8s.io/klog/v2"
 )
 
 // This key is for testing purposes only and is not considered secure.
@@ -144,6 +146,10 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	s.SecureServing.ServerCert.CertDirectory = result.TmpDir
 
 	if instanceOptions.EnableCertAuth {
+		// set up default headers for request header auth
+		reqHeaders := serveroptions.NewDelegatingAuthenticationOptions()
+		s.Authentication.RequestHeader = &reqHeaders.RequestHeader
+
 		// create certificates for aggregation and client-cert auth
 		proxySigningKey, err := testutil.NewPrivateKey()
 		if err != nil {
@@ -158,6 +164,31 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 			return result, err
 		}
 		s.Authentication.RequestHeader.ClientCAFile = proxyCACertFile
+
+		// give the kube api server an "identity" it can use to for request header auth
+		// so that aggregated api servers can understand who the calling user is
+		s.Authentication.RequestHeader.AllowedNames = []string{"ash", "misty", "brock"}
+		// make a client certificate for the api server - common name has to match one of our defined names above
+		tenThousandHoursLater := time.Now().Add(10_000 * time.Hour)
+		clientCrtOfAPIServer, signer, err := pkiutil.NewCertAndKey(proxySigningCert, proxySigningKey, &pkiutil.CertConfig{
+			Config: cert.Config{
+				CommonName: "misty",
+				Usages: []x509.ExtKeyUsage{
+					x509.ExtKeyUsageClientAuth,
+				},
+			},
+			NotAfter:           &tenThousandHoursLater,
+			PublicKeyAlgorithm: x509.ECDSA,
+		})
+		if err != nil {
+			return result, err
+		}
+		if err := pkiutil.WriteCertAndKey(s.SecureServing.ServerCert.CertDirectory, "misty-crt", clientCrtOfAPIServer, signer); err != nil {
+			return result, err
+		}
+		s.ProxyClientKeyFile = path.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.key")
+		s.ProxyClientCertFile = path.Join(s.SecureServing.ServerCert.CertDirectory, "misty-crt.crt")
+
 		clientSigningKey, err := testutil.NewPrivateKey()
 		if err != nil {
 			return result, err
