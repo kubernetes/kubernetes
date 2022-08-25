@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -190,7 +191,7 @@ var _ = SIGDescribe("Secrets", func() {
 		}
 
 		fileModeRegexp := getFileModeRegex("/etc/secret-volume/data-1", nil)
-		f.TestContainerOutputRegexp("consume secrets", pod, 0, []string{
+		e2etodopod.TestContainerOutputRegexp(f, "consume secrets", pod, 0, []string{
 			"content of file \"/etc/secret-volume/data-1\": value-1",
 			fileModeRegexp,
 		})
@@ -534,7 +535,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 		fileModeRegexp,
 	}
 
-	f.TestContainerOutputRegexp("consume secrets", pod, 0, expectedOutput)
+	e2etodopod.TestContainerOutputRegexp(f, "consume secrets", pod, 0, expectedOutput)
 }
 
 func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
@@ -602,7 +603,7 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 		fileModeRegexp,
 	}
 
-	f.TestContainerOutputRegexp("consume secrets", pod, 0, expectedOutput)
+	e2etodopod.TestContainerOutputRegexp(f, "consume secrets", pod, 0, expectedOutput)
 }
 
 func createNonOptionalSecretPod(f *framework.Framework, volumeMountPath, podName string) error {

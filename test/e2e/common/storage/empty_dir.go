@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
@@ -390,7 +391,7 @@ func doTestSetgidFSGroup(f *framework.Framework, uid int64, medium v1.StorageMed
 	if medium == v1.StorageMediumMemory {
 		out = append(out, "mount type of \"/test-volume\": tmpfs")
 	}
-	f.TestContainerOutput(msg, pod, 0, out)
+	e2etodopod.TestContainerOutput(f, msg, pod, 0, out)
 }
 
 func doTestSubPathFSGroup(f *framework.Framework, uid int64, medium v1.StorageMedium) {
@@ -423,7 +424,7 @@ func doTestSubPathFSGroup(f *framework.Framework, uid int64, medium v1.StorageMe
 	if medium == v1.StorageMediumMemory {
 		out = append(out, "mount type of \"/test-volume\": tmpfs")
 	}
-	f.TestContainerOutput(msg, pod, 0, out)
+	e2etodopod.TestContainerOutput(f, msg, pod, 0, out)
 }
 
 func doTestVolumeModeFSGroup(f *framework.Framework, uid int64, medium v1.StorageMedium) {
@@ -448,7 +449,7 @@ func doTestVolumeModeFSGroup(f *framework.Framework, uid int64, medium v1.Storag
 	if medium == v1.StorageMediumMemory {
 		out = append(out, "mount type of \"/test-volume\": tmpfs")
 	}
-	f.TestContainerOutput(msg, pod, 0, out)
+	e2etodopod.TestContainerOutput(f, msg, pod, 0, out)
 }
 
 func doTest0644FSGroup(f *framework.Framework, uid int64, medium v1.StorageMedium) {
@@ -476,7 +477,7 @@ func doTest0644FSGroup(f *framework.Framework, uid int64, medium v1.StorageMediu
 	if medium == v1.StorageMediumMemory {
 		out = append(out, "mount type of \"/test-volume\": tmpfs")
 	}
-	f.TestContainerOutput(msg, pod, 0, out)
+	e2etodopod.TestContainerOutput(f, msg, pod, 0, out)
 }
 
 func doTestVolumeMode(f *framework.Framework, uid int64, medium v1.StorageMedium) {
@@ -498,7 +499,7 @@ func doTestVolumeMode(f *framework.Framework, uid int64, medium v1.StorageMedium
 	if medium == v1.StorageMediumMemory {
 		out = append(out, "mount type of \"/test-volume\": tmpfs")
 	}
-	f.TestContainerOutput(msg, pod, 0, out)
+	e2etodopod.TestContainerOutput(f, msg, pod, 0, out)
 }
 
 func doTest0644(f *framework.Framework, uid int64, medium v1.StorageMedium) {
@@ -523,7 +524,7 @@ func doTest0644(f *framework.Framework, uid int64, medium v1.StorageMedium) {
 	if medium == v1.StorageMediumMemory {
 		out = append(out, "mount type of \"/test-volume\": tmpfs")
 	}
-	f.TestContainerOutput(msg, pod, 0, out)
+	e2etodopod.TestContainerOutput(f, msg, pod, 0, out)
 }
 
 func doTest0666(f *framework.Framework, uid int64, medium v1.StorageMedium) {
@@ -548,7 +549,7 @@ func doTest0666(f *framework.Framework, uid int64, medium v1.StorageMedium) {
 	if medium == v1.StorageMediumMemory {
 		out = append(out, "mount type of \"/test-volume\": tmpfs")
 	}
-	f.TestContainerOutput(msg, pod, 0, out)
+	e2etodopod.TestContainerOutput(f, msg, pod, 0, out)
 }
 
 func doTest0777(f *framework.Framework, uid int64, medium v1.StorageMedium) {
@@ -573,7 +574,7 @@ func doTest0777(f *framework.Framework, uid int64, medium v1.StorageMedium) {
 	if medium == v1.StorageMediumMemory {
 		out = append(out, "mount type of \"/test-volume\": tmpfs")
 	}
-	f.TestContainerOutput(msg, pod, 0, out)
+	e2etodopod.TestContainerOutput(f, msg, pod, 0, out)
 }
 
 func formatMedium(medium v1.StorageMedium) string {

@@ -50,7 +50,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -561,20 +560,6 @@ func (f *Framework) ClientConfig() *rest.Config {
 	ret.ContentType = runtime.ContentTypeJSON
 	ret.AcceptContentTypes = runtime.ContentTypeJSON
 	return ret
-}
-
-// TestContainerOutput runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status, and tests
-// the specified container log against the given expected output using a substring matcher.
-func (f *Framework) TestContainerOutput(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
-	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, gomega.ContainSubstring)
-}
-
-// TestContainerOutputRegexp runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status, and tests
-// the specified container log against the given expected output using a regexp matcher.
-func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *v1.Pod, containerIndex int, expectedOutput []string) {
-	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, gomega.MatchRegexp)
 }
 
 // KubeUser is a struct for managing kubernetes user info.

@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -450,7 +451,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 			},
 		}
 
-		f.TestContainerOutput("consume configMaps", pod, 0, []string{
+		e2etodopod.TestContainerOutput(f, "consume configMaps", pod, 0, []string{
 			"content of file \"/etc/projected-configmap-volume/data-1\": value-1",
 		})
 
@@ -512,7 +513,7 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool,
 		"content of file \"/etc/projected-configmap-volume/data-1\": value-1",
 		fileModeRegexp,
 	}
-	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
+	e2etodopod.TestContainerOutputRegexp(f, "consume configMaps", pod, 0, output)
 }
 
 func doProjectedConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fsGroup int64, itemMode *int32) {
@@ -563,7 +564,7 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fs
 		fileModeRegexp := getFileModeRegex("/etc/projected-configmap-volume/path/to/data-2", itemMode)
 		output = append(output, fileModeRegexp)
 	}
-	f.TestContainerOutputRegexp("consume configMaps", pod, 0, output)
+	e2etodopod.TestContainerOutputRegexp(f, "consume configMaps", pod, 0, output)
 }
 
 func createProjectedConfigMapMounttestPod(namespace, volumeName, referenceName, mountPath string, mounttestArgs ...string) *v1.Pod {

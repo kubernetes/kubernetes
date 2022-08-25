@@ -57,6 +57,8 @@ import (
 	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2etodokubectl "k8s.io/kubernetes/test/e2e/framework/todo/kubectl"
+	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
 
@@ -354,7 +356,7 @@ func startVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 		}
 	}
 	if config.ServerReadyMessage != "" {
-		_, err := framework.LookForStringInLog(pod.Namespace, pod.Name, serverPodName, config.ServerReadyMessage, VolumeServerPodStartupTimeout)
+		_, err := e2etodopod.LookForStringInLog(pod.Namespace, pod.Name, serverPodName, config.ServerReadyMessage, VolumeServerPodStartupTimeout)
 		framework.ExpectNoError(err, "Failed to find %q in pod logs: %s", config.ServerReadyMessage, err)
 	}
 	return pod
@@ -475,7 +477,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, containerName string
 			// Block: check content
 			deviceName := fmt.Sprintf("/opt/%d", i)
 			commands := GenerateReadBlockCmd(deviceName, len(test.ExpectedContent))
-			_, err := framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, commands, test.ExpectedContent, time.Minute)
+			_, err := e2etodopod.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
 			// Check that it's a real block device
@@ -484,7 +486,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, containerName string
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
 			commands := GenerateReadFileCmd(fileName)
-			_, err := framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, commands, test.ExpectedContent, time.Minute)
+			_, err := e2etodopod.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 
 			// Check that a directory has been mounted
@@ -495,14 +497,14 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, containerName string
 				// Filesystem: check fsgroup
 				if fsGroup != nil {
 					ginkgo.By("Checking fsGroup is correct.")
-					_, err = framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
+					_, err = e2etodopod.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
 					framework.ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
 				}
 
 				// Filesystem: check fsType
 				if fsType != "" {
 					ginkgo.By("Checking fsType is correct.")
-					_, err = framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
+					_, err = e2etodopod.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
 					framework.ExpectNoError(err, "failed: getting the right fsType %s", fsType)
 				}
 			}
@@ -587,7 +589,7 @@ func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fs
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
 			commands = append(commands, generateWriteFileCmd(test.ExpectedContent, fileName)...)
 		}
-		out, err := framework.RunKubectl(injectorPod.Namespace, commands...)
+		out, err := e2etodokubectl.RunKubectl(injectorPod.Namespace, commands...)
 		framework.ExpectNoError(err, "failed: writing the contents: %s", out)
 	}
 
