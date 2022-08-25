@@ -58,6 +58,7 @@ func StorageWithCacher() generic.StorageDecorator {
 		cacherConfig := cacherstorage.Config{
 			Storage:                 s,
 			Versioner:               etcd3.APIObjectVersioner{},
+			GroupResource:           storageConfig.GroupResource,
 			ResourcePrefix:          resourcePrefix,
 			KeyFunc:                 keyFunc,
 			NewFunc:                 newFunc,

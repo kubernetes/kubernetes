@@ -122,6 +122,7 @@ func newTestCacherWithClock(s storage.Interface, clock clock.Clock) (*cacherstor
 	config := cacherstorage.Config{
 		Storage:        s,
 		Versioner:      v,
+		GroupResource:  schema.GroupResource{Resource: "pods"},
 		ResourcePrefix: prefix,
 		KeyFunc: func(ctx context.Context, obj runtime.Object) (string, error) {
 			return storage.NamespaceKeyFunc(prefix, obj)
