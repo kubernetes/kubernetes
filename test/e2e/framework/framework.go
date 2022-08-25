@@ -50,9 +50,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
-
-	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
 
 const (
@@ -122,9 +119,6 @@ type Framework struct {
 	// Place where various additional data is stored during test run to be printed to ReportDir,
 	// or stdout if ReportDir is not set once test ends.
 	TestSummaries []TestDataSummary
-
-	// Place to keep ClusterAutoscaler metrics from before test in order to compute delta.
-	clusterAutoscalerMetricsBeforeTest e2emetrics.Collection
 
 	// Timeouts contains the custom timeouts used during the test execution.
 	Timeouts *TimeoutContext
@@ -304,22 +298,6 @@ func (f *Framework) BeforeEach() {
 		}()
 	}
 
-	gatherMetricsAfterTest := TestContext.GatherMetricsAfterTest == "true" || TestContext.GatherMetricsAfterTest == "master"
-	if gatherMetricsAfterTest && TestContext.IncludeClusterAutoscalerMetrics {
-		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), !ProviderIs("kubemark"), false, false, false, TestContext.IncludeClusterAutoscalerMetrics, false)
-		if err != nil {
-			Logf("Failed to create MetricsGrabber (skipping ClusterAutoscaler metrics gathering before test): %v", err)
-		} else {
-			f.clusterAutoscalerMetricsBeforeTest, err = grabber.Grab()
-			if err != nil {
-				Logf("MetricsGrabber failed to grab CA metrics before test (skipping metrics gathering): %v", err)
-			} else {
-				Logf("Gathered ClusterAutoscaler metrics before test")
-			}
-		}
-
-	}
-
 	f.flakeReport = NewFlakeReport()
 }
 
@@ -443,23 +421,6 @@ func (f *Framework) AfterEach() {
 		close(f.logsSizeCloseChannel)
 		f.logsSizeWaitGroup.Wait()
 		f.TestSummaries = append(f.TestSummaries, f.logsSizeVerifier.GetSummary())
-	}
-
-	if TestContext.GatherMetricsAfterTest != "false" {
-		ginkgo.By("Gathering metrics")
-		// Grab apiserver, scheduler, controller-manager metrics and (optionally) nodes' kubelet metrics.
-		grabMetricsFromKubelets := TestContext.GatherMetricsAfterTest != "master" && !ProviderIs("kubemark")
-		grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), grabMetricsFromKubelets, true, true, true, TestContext.IncludeClusterAutoscalerMetrics, false)
-		if err != nil {
-			Logf("Failed to create MetricsGrabber (skipping metrics gathering): %v", err)
-		} else {
-			received, err := grabber.Grab()
-			if err != nil {
-				Logf("MetricsGrabber failed to grab some of the metrics: %v", err)
-			}
-			(*e2emetrics.ComponentCollection)(&received).ComputeClusterAutoscalerMetricsDelta(f.clusterAutoscalerMetricsBeforeTest)
-			f.TestSummaries = append(f.TestSummaries, (*e2emetrics.ComponentCollection)(&received))
-		}
 	}
 
 	TestContext.CloudConfig.Provider.FrameworkAfterEach(f)
