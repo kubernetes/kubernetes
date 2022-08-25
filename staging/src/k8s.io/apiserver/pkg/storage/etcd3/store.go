@@ -114,7 +114,7 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		pathPrefix:          path.Join("/", prefix),
 		groupResource:       groupResource,
 		groupResourceString: groupResource.String(),
-		watcher:             newWatcher(c, codec, newFunc, versioner, transformer),
+		watcher:             newWatcher(c, codec, groupResource, newFunc, versioner, transformer),
 		leaseManager:        newDefaultLeaseManager(c, leaseManagerConfig),
 	}
 	return result
@@ -135,7 +135,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	key = path.Join(s.pathPrefix, key)
 	startTime := time.Now()
 	getResp, err := s.client.KV.Get(ctx, key)
-	metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
+	metrics.RecordEtcdRequestLatency("get", s.groupResourceString, startTime)
 	if err != nil {
 		return err
 	}
@@ -194,7 +194,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 	).Then(
 		clientv3.OpPut(key, string(newData), opts...),
 	).Commit()
-	metrics.RecordEtcdRequestLatency("create", getTypeName(obj), startTime)
+	metrics.RecordEtcdRequestLatency("create", s.groupResourceString, startTime)
 	if err != nil {
 		return err
 	}
@@ -234,7 +234,7 @@ func (s *store) conditionalDelete(
 	getCurrentState := func() (*objState, error) {
 		startTime := time.Now()
 		getResp, err := s.client.KV.Get(ctx, key)
-		metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
+		metrics.RecordEtcdRequestLatency("get", s.groupResourceString, startTime)
 		if err != nil {
 			return nil, err
 		}
@@ -315,7 +315,7 @@ func (s *store) conditionalDelete(
 		).Else(
 			clientv3.OpGet(key),
 		).Commit()
-		metrics.RecordEtcdRequestLatency("delete", getTypeName(out), startTime)
+		metrics.RecordEtcdRequestLatency("delete", s.groupResourceString, startTime)
 		if err != nil {
 			return err
 		}
@@ -337,7 +337,9 @@ func (s *store) conditionalDelete(
 func (s *store) GuaranteedUpdate(
 	ctx context.Context, key string, out runtime.Object, ignoreNotFound bool,
 	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
-	trace := utiltrace.New("GuaranteedUpdate etcd3", utiltrace.Field{"type", getTypeName(out)})
+	trace := utiltrace.New("GuaranteedUpdate etcd3",
+		utiltrace.Field{"type", getTypeName(out)},
+		utiltrace.Field{"resource", s.groupResourceString})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	clusterName, err := genericapirequest.ClusterNameFrom(ctx)
@@ -354,7 +356,7 @@ func (s *store) GuaranteedUpdate(
 	getCurrentState := func() (*objState, error) {
 		startTime := time.Now()
 		getResp, err := s.client.KV.Get(ctx, key)
-		metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
+		metrics.RecordEtcdRequestLatency("get", s.groupResourceString, startTime)
 		if err != nil {
 			return nil, err
 		}
@@ -465,7 +467,7 @@ func (s *store) GuaranteedUpdate(
 		).Else(
 			clientv3.OpGet(key),
 		).Commit()
-		metrics.RecordEtcdRequestLatency("update", getTypeName(out), startTime)
+		metrics.RecordEtcdRequestLatency("update", s.groupResourceString, startTime)
 		if err != nil {
 			return err
 		}
@@ -728,9 +730,9 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 		startTime := time.Now()
 		getResp, err = s.client.KV.Get(ctx, key, options...)
 		if recursive {
-			metrics.RecordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
+			metrics.RecordEtcdRequestLatency("list", s.groupResourceString, startTime)
 		} else {
-			metrics.RecordEtcdRequestLatency("get", getTypeName(listPtr), startTime)
+			metrics.RecordEtcdRequestLatency("get", s.groupResourceString, startTime)
 		}
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
