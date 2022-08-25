@@ -98,7 +98,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 		// the BestEffort QoS class has a statically configured minShares value
 		if qosClass == v1.PodQOSBestEffort {
 			minShares := uint64(MinShares)
-			resourceParameters.CpuShares = &minShares
+			resourceParameters.CPUShares = &minShares
 		}
 
 		// containerConfig object stores the cgroup specifications
@@ -184,11 +184,11 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 
 	// make sure best effort is always 2 shares
 	bestEffortCPUShares := uint64(MinShares)
-	configs[v1.PodQOSBestEffort].ResourceParameters.CpuShares = &bestEffortCPUShares
+	configs[v1.PodQOSBestEffort].ResourceParameters.CPUShares = &bestEffortCPUShares
 
 	// set burstable shares based on current observe state
 	burstableCPUShares := MilliCPUToShares(burstablePodCPURequest)
-	configs[v1.PodQOSBurstable].ResourceParameters.CpuShares = &burstableCPUShares
+	configs[v1.PodQOSBurstable].ResourceParameters.CPUShares = &burstableCPUShares
 	return nil
 }
 
