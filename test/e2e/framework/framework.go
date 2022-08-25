@@ -61,6 +61,25 @@ const (
 	DefaultNamespaceDeletionTimeout = 5 * time.Minute
 )
 
+var (
+	// NewFrameworkExtensions lists functions that get called by
+	// NewFramework after constructing a new framework and after
+	// calling ginkgo.BeforeEach for the framework.
+	//
+	// This can be used by extensions of the core framework to modify
+	// settings in the framework instance or to add additional callbacks
+	// with gingko.BeforeEach/AfterEach/DeferCleanup.
+	//
+	// When a test runs, functions will be invoked in this order:
+	// - f.BeforeEach
+	// - all BeforeEaches in the order in which they were defined (first-in-first-out)
+	// - It callback
+	// - all AfterEaches in the order in which they were defined
+	// - all DeferCleanups with the order reversed (first-in-last-out)
+	// - f.AfterEach
+	NewFrameworkExtensions []func(f *Framework)
+)
+
 // Framework supports common operations used by e2e tests; it will keep a client & a namespace for you.
 // Eventual goal is to merge this with integration test framework.
 type Framework struct {
@@ -155,7 +174,13 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 		Timeouts:                 NewTimeoutContextWithDefaults(),
 	}
 
+	// The order is important here: if the extension calls ginkgo.BeforeEach
+	// itself, then it can be sure that f.BeforeEach already ran when its
+	// own callback gets invoked.
 	ginkgo.BeforeEach(f.BeforeEach, AnnotatedLocation("set up framework"))
+	for _, extension := range NewFrameworkExtensions {
+		extension(f)
+	}
 
 	return f
 }
