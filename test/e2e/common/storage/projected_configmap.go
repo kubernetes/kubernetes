@@ -148,7 +148,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 			"--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volume/data-1")
 
 		ginkgo.By("Creating the pod")
-		f.PodClient().CreateSync(pod)
+		e2etodopod.NewPodClient(f).CreateSync(pod)
 
 		pollLogs := func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
@@ -327,7 +327,7 @@ var _ = SIGDescribe("Projected configMap", func() {
 			},
 		}
 		ginkgo.By("Creating the pod")
-		f.PodClient().CreateSync(pod)
+		e2etodopod.NewPodClient(f).CreateSync(pod)
 
 		pollCreateLogs := func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)

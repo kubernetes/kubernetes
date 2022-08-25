@@ -177,7 +177,7 @@ type NetworkingTestConfig struct {
 	// 1 pod per node running the netexecImage.
 	EndpointPods []*v1.Pod
 	f            *framework.Framework
-	podClient    *framework.PodClient
+	podClient    *e2etodopod.PodClient
 	// NodePortService is a Service with Type=NodePort spanning over all
 	// endpointPods.
 	NodePortService *v1.Service
@@ -359,7 +359,7 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 	eps := sets.NewString()
 
 	for i := 0; i < tries; i++ {
-		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.TestContainerPod.Name, cmd)
+		stdout, stderr, err := e2etodopod.ExecShellInPodWithFullOutput(config.f, config.TestContainerPod.Name, cmd)
 		if err != nil {
 			// A failure to kubectl exec counts as a try, not a hard fail.
 			// Also note that we will keep failing for maxTries in tests where
@@ -394,7 +394,7 @@ func (config *NetworkingTestConfig) GetResponseFromContainer(protocol, dialComma
 	ipPort := net.JoinHostPort(containerIP, strconv.Itoa(containerHTTPPort))
 	cmd := makeCURLDialCommand(ipPort, dialCommand, protocol, targetIP, targetPort)
 
-	stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.TestContainerPod.Name, cmd)
+	stdout, stderr, err := e2etodopod.ExecShellInPodWithFullOutput(config.f, config.TestContainerPod.Name, cmd)
 	if err != nil {
 		return NetexecDialResponse{}, fmt.Errorf("failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
 	}
@@ -418,7 +418,7 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(path, targetIP 
 		targetIP,
 		targetPort,
 		path)
-	stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.TestContainerPod.Name, cmd)
+	stdout, stderr, err := e2etodopod.ExecShellInPodWithFullOutput(config.f, config.TestContainerPod.Name, cmd)
 	// We only care about the status code reported by curl,
 	// and want to return any other errors, such as cannot execute command in the Pod.
 	// If curl failed to connect to host, it would exit with code 7, which makes `ExecShellInPodWithFullOutput`
@@ -466,7 +466,7 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 	filterCmd := fmt.Sprintf("%s | grep -v '^\\s*$'", cmd)
 	framework.Logf("Going to poll %v on port %v at least %v times, with a maximum of %v tries before failing", targetIP, targetPort, minTries, maxTries)
 	for i := 0; i < maxTries; i++ {
-		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, filterCmd)
+		stdout, stderr, err := e2etodopod.ExecShellInPodWithFullOutput(config.f, config.HostTestContainerPod.Name, filterCmd)
 		if err != nil || len(stderr) > 0 {
 			// A failure to exec command counts as a try, not a hard fail.
 			// Also note that we will keep failing for maxTries in tests where
@@ -896,9 +896,9 @@ func (config *NetworkingTestConfig) createPod(pod *v1.Pod) *v1.Pod {
 	return config.getPodClient().Create(pod)
 }
 
-func (config *NetworkingTestConfig) getPodClient() *framework.PodClient {
+func (config *NetworkingTestConfig) getPodClient() *e2etodopod.PodClient {
 	if config.podClient == nil {
-		config.podClient = config.f.PodClient()
+		config.podClient = e2etodopod.NewPodClient(config.f)
 	}
 	return config.podClient
 }

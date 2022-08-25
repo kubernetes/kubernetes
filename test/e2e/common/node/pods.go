@@ -69,7 +69,7 @@ const (
 )
 
 // testHostIP tests that a pod gets a host IP
-func testHostIP(podClient *framework.PodClient, pod *v1.Pod) {
+func testHostIP(podClient *e2etodopod.PodClient, pod *v1.Pod) {
 	ginkgo.By("creating pod")
 	podClient.CreateSync(pod)
 
@@ -92,7 +92,7 @@ func testHostIP(podClient *framework.PodClient, pod *v1.Pod) {
 	}
 }
 
-func startPodAndGetBackOffs(podClient *framework.PodClient, pod *v1.Pod, sleepAmount time.Duration) (time.Duration, time.Duration) {
+func startPodAndGetBackOffs(podClient *e2etodopod.PodClient, pod *v1.Pod, sleepAmount time.Duration) (time.Duration, time.Duration) {
 	podClient.CreateSync(pod)
 	time.Sleep(sleepAmount)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
@@ -119,7 +119,7 @@ func startPodAndGetBackOffs(podClient *framework.PodClient, pod *v1.Pod, sleepAm
 	return delay1, delay2
 }
 
-func getRestartDelay(podClient *framework.PodClient, podName string, containerName string) (time.Duration, error) {
+func getRestartDelay(podClient *e2etodopod.PodClient, podName string, containerName string) (time.Duration, error) {
 	beginTime := time.Now()
 	var previousRestartCount int32 = -1
 	var previousFinishedAt time.Time
@@ -188,11 +188,11 @@ func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 var _ = SIGDescribe("Pods", func() {
 	f := framework.NewDefaultFramework("pods")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelRestricted
-	var podClient *framework.PodClient
+	var podClient *e2etodopod.PodClient
 	var dc dynamic.Interface
 
 	ginkgo.BeforeEach(func() {
-		podClient = f.PodClient()
+		podClient = e2etodopod.NewPodClient(f)
 		dc = f.DynamicClient
 	})
 
@@ -306,7 +306,7 @@ var _ = SIGDescribe("Pods", func() {
 		ginkgo.By("verifying pod deletion was observed")
 		deleted := false
 		var lastPod *v1.Pod
-		timer := time.After(framework.DefaultPodDeletionTimeout)
+		timer := time.After(e2etodopod.DefaultPodDeletionTimeout)
 		for !deleted {
 			select {
 			case event := <-w.ResultChan():
@@ -808,7 +808,7 @@ var _ = SIGDescribe("Pods", func() {
 		}
 
 		ginkgo.By("submitting the pod to kubernetes")
-		f.PodClient().Create(pod)
+		e2etodopod.NewPodClient(f).Create(pod)
 		e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 		if podClient.PodIsReady(podName) {
 			framework.Failf("Expect pod(%s/%s)'s Ready condition to be false initially.", f.Namespace.Name, pod.Name)

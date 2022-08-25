@@ -334,7 +334,7 @@ var _ = SIGDescribe("Secrets", func() {
 			},
 		}
 		ginkgo.By("Creating the pod")
-		f.PodClient().CreateSync(pod)
+		e2etodopod.NewPodClient(f).CreateSync(pod)
 
 		pollCreateLogs := func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
@@ -650,7 +650,7 @@ func createNonOptionalSecretPod(f *framework.Framework, volumeMountPath, podName
 		},
 	}
 	ginkgo.By("Creating the pod")
-	pod = f.PodClient().Create(pod)
+	pod = e2etodopod.NewPodClient(f).Create(pod)
 	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }
 
@@ -711,6 +711,6 @@ func createNonOptionalSecretPodWithSecret(f *framework.Framework, volumeMountPat
 		},
 	}
 	ginkgo.By("Creating the pod")
-	pod = f.PodClient().Create(pod)
+	pod = e2etodopod.NewPodClient(f).Create(pod)
 	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }

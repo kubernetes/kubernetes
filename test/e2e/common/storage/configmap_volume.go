@@ -149,7 +149,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 			"--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1")
 
 		ginkgo.By("Creating the pod")
-		f.PodClient().CreateSync(pod)
+		e2etodopod.NewPodClient(f).CreateSync(pod)
 
 		pollLogs := func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
@@ -216,7 +216,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 		})
 
 		ginkgo.By("Creating the pod")
-		f.PodClient().Create(pod)
+		e2etodopod.NewPodClient(f).Create(pod)
 		e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 
 		pollLogs1 := func() (string, error) {
@@ -375,7 +375,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 			},
 		}
 		ginkgo.By("Creating the pod")
-		f.PodClient().CreateSync(pod)
+		e2etodopod.NewPodClient(f).CreateSync(pod)
 
 		pollCreateLogs := func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
@@ -691,7 +691,7 @@ func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath strin
 	pod.Spec.Volumes[0].VolumeSource.ConfigMap.Optional = &falseValue
 
 	ginkgo.By("Creating the pod")
-	pod = f.PodClient().Create(pod)
+	pod = e2etodopod.NewPodClient(f).Create(pod)
 	return pod, e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }
 
@@ -721,7 +721,7 @@ func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMount
 	}
 
 	ginkgo.By("Creating the pod")
-	pod = f.PodClient().Create(pod)
+	pod = e2etodopod.NewPodClient(f).Create(pod)
 	return pod, e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 }
 

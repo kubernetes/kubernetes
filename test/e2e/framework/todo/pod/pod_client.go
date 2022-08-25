@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package pod
 
 import (
 	"context"
@@ -39,8 +39,8 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
-	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
@@ -66,10 +66,10 @@ const (
 // node e2e test.
 var ImagePrePullList sets.String
 
-// PodClient is a convenience method for getting a pod client interface in the framework's namespace,
+// NewPodClient is a convenience method for getting a pod client interface in the framework's namespace,
 // possibly applying test-suite specific transformations to the pod spec, e.g. for
 // node e2e pod scheduling.
-func (f *Framework) PodClient() *PodClient {
+func NewPodClient(f *framework.Framework) *PodClient {
 	return &PodClient{
 		f:            f,
 		PodInterface: f.ClientSet.CoreV1().Pods(f.Namespace.Name),
@@ -79,7 +79,7 @@ func (f *Framework) PodClient() *PodClient {
 // PodClientNS is a convenience method for getting a pod client interface in an alternative namespace,
 // possibly applying test-suite specific transformations to the pod spec, e.g. for
 // node e2e pod scheduling.
-func (f *Framework) PodClientNS(namespace string) *PodClient {
+func PodClientNS(f *framework.Framework, namespace string) *PodClient {
 	return &PodClient{
 		f:            f,
 		PodInterface: f.ClientSet.CoreV1().Pods(namespace),
@@ -88,7 +88,7 @@ func (f *Framework) PodClientNS(namespace string) *PodClient {
 
 // PodClient is a struct for pod client.
 type PodClient struct {
-	f *Framework
+	f *framework.Framework
 	v1core.PodInterface
 }
 
@@ -96,7 +96,7 @@ type PodClient struct {
 func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 	c.mungeSpec(pod)
 	p, err := c.PodInterface.Create(context.TODO(), pod, metav1.CreateOptions{})
-	ExpectNoError(err, "Error creating Pod")
+	framework.ExpectNoError(err, "Error creating Pod")
 	return p
 }
 
@@ -104,10 +104,10 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
 	namespace := c.f.Namespace.Name
 	p := c.Create(pod)
-	ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(c.f.ClientSet, p.Name, namespace, PodStartTimeout))
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(c.f.ClientSet, p.Name, namespace, framework.PodStartTimeout))
 	// Get the newest pod after it becomes running and ready, some status may change after pod created, such as pod ip.
 	p, err := c.Get(context.TODO(), p.Name, metav1.GetOptions{})
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 	return p
 }
 
@@ -131,7 +131,7 @@ func (c *PodClient) CreateBatch(pods []*v1.Pod) []*v1.Pod {
 // there is any other apierrors. name is the pod name, updateFn is the function updating the
 // pod object.
 func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
-	ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
+	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
 		pod, err := c.PodInterface.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, fmt.Errorf("failed to get pod %q: %v", name, err)
@@ -139,11 +139,11 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 		updateFn(pod)
 		_, err = c.PodInterface.Update(context.TODO(), pod, metav1.UpdateOptions{})
 		if err == nil {
-			Logf("Successfully updated pod %q", name)
+			framework.Logf("Successfully updated pod %q", name)
 			return true, nil
 		}
 		if apierrors.IsConflict(err) {
-			Logf("Conflicting update to pod %q, re-get and re-update: %v", name, err)
+			framework.Logf("Conflicting update to pod %q, re-get and re-update: %v", name, err)
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to update pod %q: %v", name, err)
@@ -155,22 +155,22 @@ func (c *PodClient) AddEphemeralContainerSync(pod *v1.Pod, ec *v1.EphemeralConta
 	namespace := c.f.Namespace.Name
 
 	podJS, err := json.Marshal(pod)
-	ExpectNoError(err, "error creating JSON for pod %q", format.Pod(pod))
+	framework.ExpectNoError(err, "error creating JSON for pod %q", format.Pod(pod))
 
 	ecPod := pod.DeepCopy()
 	ecPod.Spec.EphemeralContainers = append(ecPod.Spec.EphemeralContainers, *ec)
 	ecJS, err := json.Marshal(ecPod)
-	ExpectNoError(err, "error creating JSON for pod with ephemeral container %q", format.Pod(pod))
+	framework.ExpectNoError(err, "error creating JSON for pod with ephemeral container %q", format.Pod(pod))
 
 	patch, err := strategicpatch.CreateTwoWayMergePatch(podJS, ecJS, pod)
-	ExpectNoError(err, "error creating patch to add ephemeral container %q", format.Pod(pod))
+	framework.ExpectNoError(err, "error creating patch to add ephemeral container %q", format.Pod(pod))
 
 	// Clients may optimistically attempt to add an ephemeral container to determine whether the EphemeralContainers feature is enabled.
 	if _, err := c.Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers"); err != nil {
 		return err
 	}
 
-	ExpectNoError(e2epod.WaitForContainerRunning(c.f.ClientSet, namespace, pod.Name, ec.Name, timeout))
+	framework.ExpectNoError(e2epod.WaitForContainerRunning(c.f.ClientSet, namespace, pod.Name, ec.Name, timeout))
 	return nil
 }
 
@@ -180,7 +180,7 @@ func (c *PodClient) DeleteSync(name string, options metav1.DeleteOptions, timeou
 	namespace := c.f.Namespace.Name
 	err := c.Delete(context.TODO(), name, options)
 	if err != nil && !apierrors.IsNotFound(err) {
-		Failf("Failed to delete pod %q: %v", name, err)
+		framework.Failf("Failed to delete pod %q: %v", name, err)
 	}
 	gomega.Expect(e2epod.WaitForPodToDisappear(c.f.ClientSet, namespace, name, labels.Everything(),
 		2*time.Second, timeout)).To(gomega.Succeed(), "wait for pod %q to disappear", name)
@@ -188,19 +188,19 @@ func (c *PodClient) DeleteSync(name string, options metav1.DeleteOptions, timeou
 
 // mungeSpec apply test-suite specific transformations to the pod spec.
 func (c *PodClient) mungeSpec(pod *v1.Pod) {
-	if !TestContext.NodeE2E {
+	if !framework.TestContext.NodeE2E {
 		return
 	}
 
-	gomega.Expect(pod.Spec.NodeName).To(gomega.Or(gomega.BeZero(), gomega.Equal(TestContext.NodeName)), "Test misconfigured")
-	pod.Spec.NodeName = TestContext.NodeName
+	gomega.Expect(pod.Spec.NodeName).To(gomega.Or(gomega.BeZero(), gomega.Equal(framework.TestContext.NodeName)), "Test misconfigured")
+	pod.Spec.NodeName = framework.TestContext.NodeName
 	// Node e2e does not support the default DNSClusterFirst policy. Set
 	// the policy to DNSDefault, which is configured per node.
 	pod.Spec.DNSPolicy = v1.DNSDefault
 
 	// PrepullImages only works for node e2e now. For cluster e2e, image prepull is not enforced,
 	// we should not munge ImagePullPolicy for cluster e2e pods.
-	if !TestContext.PrepullImages {
+	if !framework.TestContext.PrepullImages {
 		return
 	}
 	// If prepull is enabled, munge the container spec to make sure the images are not pulled
@@ -260,7 +260,7 @@ func (c *PodClient) WaitForFinish(name string, timeout time.Duration) {
 // WaitForErrorEventOrSuccess waits for pod to succeed or an error event for that pod.
 func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 	var ev *v1.Event
-	err := wait.Poll(Poll, PodStartTimeout, func() (bool, error) {
+	err := wait.Poll(Poll, framework.PodStartTimeout, func() (bool, error) {
 		evnts, err := c.f.ClientSet.CoreV1().Events(pod.Namespace).Search(scheme.Scheme, pod)
 		if err != nil {
 			return false, fmt.Errorf("error in listing events: %s", err)
@@ -301,6 +301,6 @@ func (c *PodClient) MatchContainerOutput(name string, containerName string, expe
 // PodIsReady returns true if the specified pod is ready. Otherwise false.
 func (c *PodClient) PodIsReady(name string) bool {
 	pod, err := c.Get(context.TODO(), name, metav1.GetOptions{})
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 	return podutils.IsPodReady(pod)
 }

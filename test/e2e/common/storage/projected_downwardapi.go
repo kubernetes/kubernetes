@@ -40,9 +40,9 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 
 	// How long to wait for a log pod to be displayed
 	const podLogTimeout = 2 * time.Minute
-	var podClient *framework.PodClient
+	var podClient *e2etodopod.PodClient
 	ginkgo.BeforeEach(func() {
-		podClient = f.PodClient()
+		podClient = e2etodopod.NewPodClient(f)
 	})
 
 	/*

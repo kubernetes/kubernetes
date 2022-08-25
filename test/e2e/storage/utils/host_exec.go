@@ -25,6 +25,7 @@ import (
 	"k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2etodopod "k8s.io/kubernetes/test/e2e/framework/todo/pod"
 )
 
 // Result holds the execution result of remote execution command.
@@ -149,7 +150,7 @@ func (h *hostExecutor) exec(cmd string, node *v1.Node) (Result, error) {
 	}
 	containerName := pod.Spec.Containers[0].Name
 	var err error
-	result.Stdout, result.Stderr, err = h.Framework.ExecWithOptions(framework.ExecOptions{
+	result.Stdout, result.Stderr, err = e2etodopod.ExecWithOptions(h.Framework, e2etodopod.ExecOptions{
 		Command:            args,
 		Namespace:          pod.Namespace,
 		PodName:            pod.Name,

@@ -40,9 +40,9 @@ var _ = SIGDescribe("Downward API volume", func() {
 	const podLogTimeout = 3 * time.Minute
 	f := framework.NewDefaultFramework("downward-api")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelBaseline
-	var podClient *framework.PodClient
+	var podClient *e2etodopod.PodClient
 	ginkgo.BeforeEach(func() {
-		podClient = f.PodClient()
+		podClient = e2etodopod.NewPodClient(f)
 	})
 
 	/*

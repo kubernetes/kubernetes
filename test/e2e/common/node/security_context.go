@@ -46,9 +46,9 @@ var (
 var _ = SIGDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	var podClient *framework.PodClient
+	var podClient *e2etodopod.PodClient
 	ginkgo.BeforeEach(func() {
-		podClient = f.PodClient()
+		podClient = e2etodopod.NewPodClient(f)
 	})
 
 	ginkgo.Context("When creating a pod with HostUsers", func() {
@@ -74,14 +74,14 @@ var _ = SIGDescribe("Security Context", func() {
 
 		ginkgo.It("must create the user namespace if set to false [LinuxOnly] [Feature:UserNamespacesStatelessPodsSupport]", func() {
 			// with hostUsers=false the pod must use a new user namespace
-			podClient := f.PodClientNS(f.Namespace.Name)
+			podClient := e2etodopod.PodClientNS(f, f.Namespace.Name)
 
 			createdPod1 := podClient.Create(makePod(false))
 			createdPod2 := podClient.Create(makePod(false))
 			defer func() {
 				ginkgo.By("delete the pods")
-				podClient.DeleteSync(createdPod1.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-				podClient.DeleteSync(createdPod2.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+				podClient.DeleteSync(createdPod1.Name, metav1.DeleteOptions{}, e2etodopod.DefaultPodDeletionTimeout)
+				podClient.DeleteSync(createdPod2.Name, metav1.DeleteOptions{}, e2etodopod.DefaultPodDeletionTimeout)
 			}()
 			getLogs := func(pod *v1.Pod) (string, error) {
 				err := e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, createdPod1.Name, f.Namespace.Name, f.Timeouts.PodStart)

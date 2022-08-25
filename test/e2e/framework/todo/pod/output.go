@@ -151,12 +151,12 @@ func MatchContainerOutput(
 	if ns == "" {
 		ns = f.Namespace.Name
 	}
-	podClient := f.PodClientNS(ns)
+	podClient := PodClientNS(f, ns)
 
 	createdPod := podClient.Create(pod)
 	defer func() {
 		ginkgo.By("delete the pod")
-		podClient.DeleteSync(createdPod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+		podClient.DeleteSync(createdPod.Name, metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
 	}()
 
 	// Wait for client pod to complete.

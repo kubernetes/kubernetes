@@ -368,7 +368,7 @@ var _ = SIGDescribe("Projected secret", func() {
 			},
 		}
 		ginkgo.By("Creating the pod")
-		f.PodClient().CreateSync(pod)
+		e2etodopod.NewPodClient(f).CreateSync(pod)
 
 		pollCreateLogs := func() (string, error) {
 			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
