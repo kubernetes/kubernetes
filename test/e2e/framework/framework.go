@@ -128,7 +128,15 @@ type Framework struct {
 
 	// Timeouts contains the custom timeouts used during the test execution.
 	Timeouts *TimeoutContext
+
+	// DumpAllNamespaceInfo is invoked by the framework to record
+	// information about a namespace after a test failure.
+	DumpAllNamespaceInfo DumpAllNamespaceInfoAction
 }
+
+// DumpAllNamespaceInfoAction is called after each failed test for namespaces
+// created for the test.
+type DumpAllNamespaceInfoAction func(f *Framework, namespace string)
 
 // TestDataSummary is an interface for managing test data.
 type TestDataSummary interface {
@@ -325,7 +333,7 @@ func (f *Framework) dumpNamespaceInfo() {
 	ginkgo.By("dump namespace information after failure", func() {
 		if !f.SkipNamespaceCreation {
 			for _, ns := range f.namespacesToDelete {
-				DumpAllNamespaceInfo(f.ClientSet, ns.Name)
+				f.DumpAllNamespaceInfo(f, ns.Name)
 			}
 		}
 	})
@@ -391,8 +399,8 @@ func (f *Framework) AfterEach() {
 						nsDeletionErrors[ns.Name] = err
 
 						// Dump namespace if we are unable to delete the namespace and the dump was not already performed.
-						if !ginkgo.CurrentSpecReport().Failed() && TestContext.DumpLogsOnFailure {
-							DumpAllNamespaceInfo(f.ClientSet, ns.Name)
+						if !ginkgo.CurrentSpecReport().Failed() && TestContext.DumpLogsOnFailure && f.DumpAllNamespaceInfo != nil {
+							f.DumpAllNamespaceInfo(f, ns.Name)
 						}
 					} else {
 						Logf("Namespace %v was already deleted", ns.Name)
@@ -498,8 +506,8 @@ func (f *Framework) DeleteNamespace(name string) {
 		}
 	}()
 	// if current test failed then we should dump namespace information
-	if !f.SkipNamespaceCreation && ginkgo.CurrentSpecReport().Failed() && TestContext.DumpLogsOnFailure {
-		DumpAllNamespaceInfo(f.ClientSet, name)
+	if !f.SkipNamespaceCreation && ginkgo.CurrentSpecReport().Failed() && TestContext.DumpLogsOnFailure && f.DumpAllNamespaceInfo != nil {
+		f.DumpAllNamespaceInfo(f, name)
 	}
 
 }

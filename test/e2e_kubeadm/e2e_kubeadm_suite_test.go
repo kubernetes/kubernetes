@@ -27,6 +27,9 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+
+	// reconfigure framework
+	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 )
 
 func TestMain(m *testing.M) {
