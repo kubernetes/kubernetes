@@ -14,10 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package init sets debug.DumpAllNamespaceInfo as implementation in the framework.
+// Package init sets debug.DumpAllNamespaceInfo as implementation in the framework
+// and enables log size verification.
 package init
 
 import (
+	"sync"
+
+	"github.com/onsi/ginkgo/v2"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/debug"
 )
@@ -27,6 +31,31 @@ func init() {
 		func(f *framework.Framework) {
 			f.DumpAllNamespaceInfo = func(f *framework.Framework, ns string) {
 				debug.DumpAllNamespaceInfo(f.ClientSet, ns)
+			}
+
+			if framework.TestContext.GatherLogsSizes {
+				var (
+					wg           sync.WaitGroup
+					closeChannel chan bool
+					verifier     *debug.LogsSizeVerifier
+				)
+
+				ginkgo.BeforeEach(func() {
+					wg.Add(1)
+					closeChannel = make(chan bool)
+					verifier = debug.NewLogsVerifier(f.ClientSet, closeChannel)
+					go func() {
+						defer wg.Done()
+						verifier.Run()
+					}()
+					ginkgo.DeferCleanup(func() {
+						ginkgo.By("Gathering log sizes data", func() {
+							close(closeChannel)
+							wg.Wait()
+							f.TestSummaries = append(f.TestSummaries, verifier.GetSummary())
+						})
+					})
+				})
 			}
 		},
 	)
