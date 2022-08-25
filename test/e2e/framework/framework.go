@@ -99,12 +99,6 @@ type Framework struct {
 	NamespaceDeletionTimeout         time.Duration
 	NamespacePodSecurityEnforceLevel admissionapi.Level // The pod security enforcement level for namespaces to be applied.
 
-	gatherer *ContainerResourceGatherer
-	// Constraints that passed to a check which is executed after data is gathered to
-	// see if 99% of results are within acceptable bounds. It has to be injected in the test,
-	// as expectations vary greatly. Constraints are grouped by the container names.
-	AddonResourceConstraints map[string]ResourceConstraint
-
 	// Flaky operation failures in an e2e test can be captured through this.
 	flakeReport *FlakeReport
 
@@ -163,11 +157,10 @@ func NewDefaultFramework(baseName string) *Framework {
 // NewFramework creates a test framework.
 func NewFramework(baseName string, options Options, client clientset.Interface) *Framework {
 	f := &Framework{
-		BaseName:                 baseName,
-		AddonResourceConstraints: make(map[string]ResourceConstraint),
-		Options:                  options,
-		ClientSet:                client,
-		Timeouts:                 NewTimeoutContextWithDefaults(),
+		BaseName:  baseName,
+		Options:   options,
+		ClientSet: client,
+		Timeouts:  NewTimeoutContextWithDefaults(),
 	}
 
 	// The order is important here: if the extension calls ginkgo.BeforeEach
@@ -254,32 +247,6 @@ func (f *Framework) BeforeEach() {
 	} else {
 		// not guaranteed to be unique, but very likely
 		f.UniqueName = fmt.Sprintf("%s-%08x", f.BaseName, rand.Int31())
-	}
-
-	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" {
-		var err error
-		var nodeMode NodesSet
-		switch TestContext.GatherKubeSystemResourceUsageData {
-		case "master":
-			nodeMode = MasterNodes
-		case "masteranddns":
-			nodeMode = MasterAndDNSNodes
-		default:
-			nodeMode = AllNodes
-		}
-
-		f.gatherer, err = NewResourceUsageGatherer(f.ClientSet, ResourceGathererOptions{
-			InKubemark:                  ProviderIs("kubemark"),
-			Nodes:                       nodeMode,
-			ResourceDataGatheringPeriod: 60 * time.Second,
-			ProbeDuration:               15 * time.Second,
-			PrintVerboseLogs:            false,
-		}, nil)
-		if err != nil {
-			Logf("Error while creating NewResourceUsageGatherer: %v", err)
-		} else {
-			go f.gatherer.StartGatheringData()
-		}
 	}
 
 	f.flakeReport = NewFlakeReport()
@@ -392,13 +359,6 @@ func (f *Framework) AfterEach() {
 			Failf(strings.Join(messages, ","))
 		}
 	}()
-
-	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
-		ginkgo.By("Collecting resource usage data")
-		summary, resourceViolationError := f.gatherer.StopAndSummarize([]int{90, 99, 100}, f.AddonResourceConstraints)
-		defer ExpectNoError(resourceViolationError)
-		f.TestSummaries = append(f.TestSummaries, summary)
-	}
 
 	TestContext.CloudConfig.Provider.FrameworkAfterEach(f)
 

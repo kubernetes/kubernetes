@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package debug
 
 import (
 	"bufio"
@@ -38,7 +38,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
-	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	"k8s.io/kubernetes/test/e2e/framework"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
@@ -91,7 +91,7 @@ func (s *ResourceUsageSummary) PrintHumanReadable() string {
 
 // PrintJSON prints resource usage summary in JSON.
 func (s *ResourceUsageSummary) PrintJSON() string {
-	return PrettyPrintJSON(*s)
+	return framework.PrettyPrintJSON(*s)
 }
 
 // SummaryKind returns string of ResourceUsageSummary
@@ -198,13 +198,13 @@ func (w *resourceGatherWorker) singleProbe() {
 	} else {
 		nodeUsage, err := getOneTimeResourceUsageOnNode(w.c, w.nodeName, w.probeDuration, func() []string { return w.containerIDs })
 		if err != nil {
-			Logf("Error while reading data from %v: %v", w.nodeName, err)
+			framework.Logf("Error while reading data from %v: %v", w.nodeName, err)
 			return
 		}
 		for k, v := range nodeUsage {
 			data[k] = v
 			if w.printVerboseLogs {
-				Logf("Get container %v usage on node %v. CPUUsageInCores: %v, MemoryUsageInBytes: %v, MemoryWorkingSetInBytes: %v", k, w.nodeName, v.CPUUsageInCores, v.MemoryUsageInBytes, v.MemoryWorkingSetInBytes)
+				framework.Logf("Get container %v usage on node %v. CPUUsageInCores: %v, MemoryUsageInBytes: %v, MemoryWorkingSetInBytes: %v", k, w.nodeName, v.CPUUsageInCores, v.MemoryUsageInBytes, v.MemoryWorkingSetInBytes)
 			}
 		}
 	}
@@ -290,13 +290,13 @@ func getOneTimeResourceUsageOnNode(
 
 // getStatsSummary contacts kubelet for the container information.
 func getStatsSummary(c clientset.Interface, nodeName string) (*kubeletstatsv1alpha1.Summary, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 	defer cancel()
 
 	data, err := c.CoreV1().RESTClient().Get().
 		Resource("nodes").
 		SubResource("proxy").
-		Name(fmt.Sprintf("%v:%v", nodeName, KubeletPort)).
+		Name(fmt.Sprintf("%v:%v", nodeName, framework.KubeletPort)).
 		Suffix("stats/summary").
 		Do(ctx).Raw()
 
@@ -322,7 +322,7 @@ func removeUint64Ptr(ptr *uint64) uint64 {
 func (w *resourceGatherWorker) gather(initialSleep time.Duration) {
 	defer utilruntime.HandleCrash()
 	defer w.wg.Done()
-	defer Logf("Closing worker for %v", w.nodeName)
+	defer framework.Logf("Closing worker for %v", w.nodeName)
 	defer func() { w.finished = true }()
 	select {
 	case <-time.After(initialSleep):
@@ -384,7 +384,7 @@ func nodeHasControlPlanePods(c clientset.Interface, nodeName string) (bool, erro
 		return false, err
 	}
 	if len(podList.Items) < 1 {
-		Logf("Can't find any pods in namespace %s to grab metrics from", metav1.NamespaceSystem)
+		framework.Logf("Can't find any pods in namespace %s to grab metrics from", metav1.NamespaceSystem)
 	}
 	for _, pod := range podList.Items {
 		if regKubeScheduler.MatchString(pod.Name) || regKubeControllerManager.MatchString(pod.Name) {
@@ -422,7 +422,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 	if pods == nil {
 		pods, err = c.CoreV1().Pods("kube-system").List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
-			Logf("Error while listing Pods: %v", err)
+			framework.Logf("Error while listing Pods: %v", err)
 			return nil, err
 		}
 	}
@@ -458,7 +458,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 	}
 	nodeList, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		Logf("Error while listing Nodes: %v", err)
+		framework.Logf("Error while listing Nodes: %v", err)
 		return nil, err
 	}
 
@@ -510,7 +510,7 @@ func (g *ContainerResourceGatherer) StartGatheringData() {
 // specified resource constraints.
 func (g *ContainerResourceGatherer) StopAndSummarize(percentiles []int, constraints map[string]ResourceConstraint) (*ResourceUsageSummary, error) {
 	close(g.stopCh)
-	Logf("Closed stop channel. Waiting for %v workers", len(g.workers))
+	framework.Logf("Closed stop channel. Waiting for %v workers", len(g.workers))
 	finished := make(chan struct{}, 1)
 	go func() {
 		g.workerWg.Wait()
@@ -518,7 +518,7 @@ func (g *ContainerResourceGatherer) StopAndSummarize(percentiles []int, constrai
 	}()
 	select {
 	case <-finished:
-		Logf("Waitgroup finished.")
+		framework.Logf("Waitgroup finished.")
 	case <-time.After(2 * time.Minute):
 		unfinished := make([]string, 0)
 		for i := range g.workers {
@@ -526,11 +526,11 @@ func (g *ContainerResourceGatherer) StopAndSummarize(percentiles []int, constrai
 				unfinished = append(unfinished, g.workers[i].nodeName)
 			}
 		}
-		Logf("Timed out while waiting for waitgroup, some workers failed to finish: %v", unfinished)
+		framework.Logf("Timed out while waiting for waitgroup, some workers failed to finish: %v", unfinished)
 	}
 
 	if len(percentiles) == 0 {
-		Logf("Warning! Empty percentile list for stopAndPrintData.")
+		framework.Logf("Warning! Empty percentile list for stopAndPrintData.")
 		return &ResourceUsageSummary{}, fmt.Errorf("Failed to get any resource usage data")
 	}
 	data := make(map[int]ResourceUsagePerContainer)
@@ -604,7 +604,7 @@ type kubemarkResourceUsage struct {
 }
 
 func getMasterUsageByPrefix(prefix string) (string, error) {
-	sshResult, err := e2essh.SSH(fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), APIAddress()+":22", TestContext.Provider)
+	sshResult, err := e2essh.SSH(fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), framework.APIAddress()+":22", framework.TestContext.Provider)
 	if err != nil {
 		return "", err
 	}
@@ -617,7 +617,7 @@ func getKubemarkMasterComponentsResourceUsage() map[string]*kubemarkResourceUsag
 	// Get kubernetes component resource usage
 	sshResult, err := getMasterUsageByPrefix("kube")
 	if err != nil {
-		Logf("Error when trying to SSH to master machine. Skipping probe. %v", err)
+		framework.Logf("Error when trying to SSH to master machine. Skipping probe. %v", err)
 		return nil
 	}
 	scanner := bufio.NewScanner(strings.NewReader(sshResult))
@@ -635,7 +635,7 @@ func getKubemarkMasterComponentsResourceUsage() map[string]*kubemarkResourceUsag
 	// Get etcd resource usage
 	sshResult, err = getMasterUsageByPrefix("bin/etcd")
 	if err != nil {
-		Logf("Error when trying to SSH to master machine. Skipping probe")
+		framework.Logf("Error when trying to SSH to master machine. Skipping probe")
 		return nil
 	}
 	scanner = bufio.NewScanner(strings.NewReader(sshResult))
