@@ -2345,6 +2345,13 @@ func TestValidateServiceCIDRUpdate(t *testing.T) {
 }
 
 func TestValidateIPAddress(t *testing.T) {
+	parentRef := &networking.ParentReference{
+		Group:     "",
+		Resource:  "Service",
+		Name:      "foo",
+		Namespace: "bar",
+	}
+
 	testCases := map[string]struct {
 		expectedErrors int
 		ipAddress      *networking.IPAddress
@@ -2355,6 +2362,9 @@ func TestValidateIPAddress(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-name",
 				},
+				Spec: networking.IPAddressSpec{
+					ParentRef: parentRef,
+				},
 			},
 		},
 
@@ -2364,6 +2374,9 @@ func TestValidateIPAddress(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "192.168.1.1",
 				},
+				Spec: networking.IPAddressSpec{
+					ParentRef: parentRef,
+				},
 			},
 		},
 		"good-ipv6address": {
@@ -2371,6 +2384,9 @@ func TestValidateIPAddress(t *testing.T) {
 			ipAddress: &networking.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "2001:4860:4860::8888",
+				},
+				Spec: networking.IPAddressSpec{
+					ParentRef: parentRef,
 				},
 			},
 		},
@@ -2380,21 +2396,16 @@ func TestValidateIPAddress(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "2001:4860:4860:0::8888",
 				},
+				Spec: networking.IPAddressSpec{
+					ParentRef: parentRef,
+				},
 			},
 		},
-		"good-ipaddress-reference": {
-			expectedErrors: 0,
+		"good-ipaddress-no-reference": {
+			expectedErrors: 1,
 			ipAddress: &networking.IPAddress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "192.168.1.1",
-				},
-				Spec: networking.IPAddressSpec{
-					ParentRef: &networking.ParentReference{
-						Group:     "",
-						Resource:  "Service",
-						Name:      "foo",
-						Namespace: "bar",
-					},
 				},
 			},
 		},

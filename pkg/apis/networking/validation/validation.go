@@ -806,6 +806,9 @@ func ValidateIPAddressName(name string, prefix bool) []string {
 	if prefix {
 		errs = append(errs, "prefix not allowed")
 	}
+	// The new API does not allow leading zeros and we force
+	// the IP should be represented as the canonical format.
+	// https://github.com/kubernetes/kubernetes/issues/108074
 	ip, err := netip.ParseAddr(name)
 	if err != nil {
 		errs = append(errs, err.Error())
@@ -829,9 +832,11 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 	allErrs := field.ErrorList{}
 
 	if params == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), "parentRef is required"))
 		return allErrs
 	}
 
+	fldPath = fldPath.Child("parentRef")
 	if params.Group != "" {
 		for _, msg := range validation.IsDNS1123Subdomain(params.Group) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), params.Group, msg))
