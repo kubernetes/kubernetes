@@ -25,7 +25,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
@@ -104,7 +103,7 @@ func TestRollbackFiles(t *testing.T) {
 	}
 }
 
-func TestUpdateKubeletDynamicEnvFileWithURLScheme(t *testing.T) {
+func TestCleanupKubeletDynamicEnvFileContainerRuntime(t *testing.T) {
 	tcases := []struct {
 		name     string
 		input    string
@@ -117,28 +116,28 @@ func TestUpdateKubeletDynamicEnvFileWithURLScheme(t *testing.T) {
 		},
 		{
 			name:     "add missing URL scheme",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint=/some/endpoint --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint=%s:///some/endpoint --bar=def\"", constants.KubeletEnvFileVariableName, kubeadmapiv1.DefaultContainerRuntimeURLScheme),
+			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime=remote --bar=def\"", constants.KubeletEnvFileVariableName),
+			expected: fmt.Sprintf("%s=\"--foo=abc --bar=def\"", constants.KubeletEnvFileVariableName),
 		},
 		{
 			name:     "add missing URL scheme if there is no '=' after the flag name",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint /some/endpoint --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint %s:///some/endpoint --bar=def\"", constants.KubeletEnvFileVariableName, kubeadmapiv1.DefaultContainerRuntimeURLScheme),
+			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime remote --bar=def\"", constants.KubeletEnvFileVariableName),
+			expected: fmt.Sprintf("%s=\"--foo=abc --bar=def\"", constants.KubeletEnvFileVariableName),
 		},
 		{
 			name:     "empty flag of interest value following '='",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint= --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint= --bar=def\"", constants.KubeletEnvFileVariableName),
+			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime= --bar=def\"", constants.KubeletEnvFileVariableName),
+			expected: fmt.Sprintf("%s=\"--foo=abc --bar=def\"", constants.KubeletEnvFileVariableName),
 		},
 		{
 			name:     "empty flag of interest value without '='",
-			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint --bar=def\"", constants.KubeletEnvFileVariableName),
-			expected: fmt.Sprintf("%s=\"--foo=abc --container-runtime-endpoint --bar=def\"", constants.KubeletEnvFileVariableName),
+			input:    fmt.Sprintf("%s=\"--foo=abc --container-runtime --bar=def\"", constants.KubeletEnvFileVariableName),
+			expected: fmt.Sprintf("%s=\"--foo=abc --bar=def\"", constants.KubeletEnvFileVariableName),
 		},
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			output := updateKubeletDynamicEnvFileWithURLScheme(tt.input)
+			output := cleanupKubeletDynamicEnvFileContainerRuntime(tt.input)
 			if output != tt.expected {
 				t.Errorf("expected output: %q, got: %q", tt.expected, output)
 			}
