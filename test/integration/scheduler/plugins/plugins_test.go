@@ -794,8 +794,8 @@ func TestScorePlugin(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = waitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
-					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
+				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
@@ -2014,8 +2014,8 @@ func TestFilterPlugin(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Didn't expect the pod to be scheduled.")
+				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 				if filterPlugin.numFilterCalled < 1 {
 					t.Errorf("Expected the filter plugin to be called at least 1 time, but got %v.", filterPlugin.numFilterCalled)
@@ -2072,8 +2072,8 @@ func TestPreScorePlugin(t *testing.T) {
 			}
 
 			if test.fail {
-				if err = waitForPodUnschedulable(testCtx.ClientSet, pod); err != nil {
-					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
+				if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+					t.Errorf("Expected a scheduling error, but got: %v", err)
 				}
 			} else {
 				if err = testutils.WaitForPodToSchedule(testCtx.ClientSet, pod); err != nil {
