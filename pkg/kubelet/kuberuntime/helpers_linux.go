@@ -22,7 +22,7 @@ package kuberuntime
 const (
 	milliCPUToCPU = 1000
 
-	// 100000 is equivalent to 100ms
+	// 100000 is equivalent to 100usec
 	quotaPeriod    = 100000
 	minQuotaPeriod = 1000
 )
@@ -30,8 +30,8 @@ const (
 // milliCPUToQuota converts milliCPU to CFS quota and period values
 func milliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 	// CFS quota is measured in two values:
-	//  - cfs_period_us=100ms (the amount of time to measure usage across)
-	//  - cfs_quota=20ms (the amount of cpu time allowed to be used across a period)
+	//  - cfs_period_us=100usec (the amount of time to measure usage across given by period)
+	//  - cfs_quota=20usec (the amount of cpu time allowed to be used across a period)
 	// so in the above example, you are limited to 20% of a single CPU
 	// for multi-cpu environments, you just scale equivalent amounts
 	// see https://www.kernel.org/doc/Documentation/scheduler/sched-bwc.txt for details
