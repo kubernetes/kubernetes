@@ -18,6 +18,8 @@ package scheduler
 
 import (
 	"fmt"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"reflect"
 	"strings"
 
@@ -414,7 +416,7 @@ func addAllEventHandlers(
 			gvr, _ := schema.ParseResourceArg(string(gvk))
 			dynInformer := dynInformerFactory.ForResource(*gvr).Informer()
 			dynInformer.AddEventHandler(
-				buildEvtResHandler(at, gvk, strings.Title(gvr.Resource)),
+				buildEvtResHandler(at, gvk, cases.Title(language.Und, cases.NoLower).String(gvr.Resource)),
 			)
 		}
 	}

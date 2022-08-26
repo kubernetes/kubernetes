@@ -23,6 +23,8 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"io"
 	"net"
 	"net/http"
@@ -122,7 +124,7 @@ func (sc ServiceCheck) Name() string {
 	if sc.Label != "" {
 		return sc.Label
 	}
-	return fmt.Sprintf("Service-%s", strings.Title(sc.Service))
+	return fmt.Sprintf("Service-%s", cases.Title(language.Und, cases.NoLower).String(sc.Service))
 }
 
 // Check validates if the service is enabled and active.

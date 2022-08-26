@@ -17,6 +17,8 @@ limitations under the License.
 package fake
 
 import (
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"io"
 	gopath "path"
 	"path/filepath"
@@ -319,7 +321,7 @@ func (g *genFakeForType) GenerateType(c *generator.Context, t *types.Type, w io.
 // TODO: Make the verbs in templates parametrized so the strings.Replace() is
 // not needed.
 func adjustTemplate(name, verbType, template string) string {
-	return strings.Replace(template, " "+strings.Title(verbType), " "+name, -1)
+	return strings.Replace(template, " "+cases.Title(language.Und, cases.NoLower).String(verbType), " "+name, -1)
 }
 
 // template for the struct that implements the type's interface

@@ -21,6 +21,8 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"io"
 	"net"
 	"net/url"
@@ -363,7 +365,7 @@ func smartLabelFor(field string) string {
 		if slice.ContainsString(commonAcronyms, strings.ToUpper(part), nil) {
 			part = strings.ToUpper(part)
 		} else {
-			part = strings.Title(part)
+			part = cases.Title(language.Und, cases.NoLower).String(part)
 		}
 		result = append(result, part)
 	}

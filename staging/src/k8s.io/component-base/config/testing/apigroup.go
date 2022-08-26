@@ -18,6 +18,8 @@ package testing
 
 import (
 	"fmt"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"reflect"
 	"regexp"
 	"strings"
@@ -201,7 +203,7 @@ func dashesToCapitalCase(str string) string {
 	segments := strings.Split(str, "-")
 	result := ""
 	for _, segment := range segments {
-		result += strings.Title(segment)
+		result += cases.Title(language.Und, cases.NoLower).String(segment)
 	}
 	return result
 }

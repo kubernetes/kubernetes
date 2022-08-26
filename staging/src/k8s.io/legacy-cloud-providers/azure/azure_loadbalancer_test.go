@@ -22,6 +22,8 @@ package azure
 import (
 	"context"
 	"fmt"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"net/http"
 	"reflect"
 	"sort"
@@ -1872,7 +1874,7 @@ func getTestLoadBalancer(name, rgName, clusterName, identifier *string, service 
 					Name: to.StringPtr(*identifier + "-" + string(service.Spec.Ports[0].Protocol) +
 						"-" + strconv.Itoa(int(service.Spec.Ports[0].Port))),
 					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
-						Protocol: network.TransportProtocol(strings.Title(
+						Protocol: network.TransportProtocol(cases.Title(language.Und, cases.NoLower).String(
 							strings.ToLower(string(service.Spec.Ports[0].Protocol)))),
 						FrontendIPConfiguration: &network.SubResource{
 							ID: to.StringPtr("/subscriptions/subscription/resourceGroups/" + *rgName + "/providers/" +
