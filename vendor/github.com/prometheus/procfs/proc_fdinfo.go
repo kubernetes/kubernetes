@@ -22,7 +22,6 @@ import (
 	"github.com/prometheus/procfs/internal/util"
 )
 
-// Regexp variables
 var (
 	rPos          = regexp.MustCompile(`^pos:\s+(\d+)$`)
 	rFlags        = regexp.MustCompile(`^flags:\s+(\d+)$`)
@@ -122,7 +121,7 @@ func (p ProcFDInfos) Len() int           { return len(p) }
 func (p ProcFDInfos) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p ProcFDInfos) Less(i, j int) bool { return p[i].FD < p[j].FD }
 
-// InotifyWatchLen returns the total number of inotify watches
+// InotifyWatchLen returns the total number of inotify watches.
 func (p ProcFDInfos) InotifyWatchLen() (int, error) {
 	length := 0
 	for _, f := range p {
