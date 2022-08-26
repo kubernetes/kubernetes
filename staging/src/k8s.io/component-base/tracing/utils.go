@@ -17,6 +17,7 @@ limitations under the License.
 package tracing
 
 import (
+	"fmt"
 	"context"
 	"net/http"
 
@@ -77,6 +78,7 @@ func NewProvider(ctx context.Context,
 func WithTracing(handler http.Handler, tp oteltrace.TracerProvider, serviceName string) http.Handler {
 	opts := []otelhttp.Option{
 		otelhttp.WithPropagators(Propagators()),
+		otelhttp.WithSpanNameFormatter(defaultTransportSpanFormatter),
 		otelhttp.WithTracerProvider(tp),
 	}
 	// With Noop TracerProvider, the otelhttp still handles context propagation.
@@ -105,4 +107,9 @@ func WrapperFor(tp oteltrace.TracerProvider) transport.WrapperFunc {
 // Propagators returns the recommended set of propagators.
 func Propagators() propagation.TextMapPropagator {
 	return propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
+}
+
+// Default span name formatter for http req
+func defaultTransportSpanFormatter(_ string, r *http.Request) string {
+	return fmt.Sprintf("%s %s", r.Method, r.URL.Host)
 }
