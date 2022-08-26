@@ -80,9 +80,9 @@ func WaitForSnapshotReady(c dynamic.Interface, ns string, snapshotName string, p
 
 // GetSnapshotContentFromSnapshot returns the VolumeSnapshotContent object Bound to a
 // given VolumeSnapshot
-func GetSnapshotContentFromSnapshot(dc dynamic.Interface, snapshot *unstructured.Unstructured) *unstructured.Unstructured {
+func GetSnapshotContentFromSnapshot(dc dynamic.Interface, snapshot *unstructured.Unstructured, timeout time.Duration) *unstructured.Unstructured {
 	defer ginkgo.GinkgoRecover()
-	err := WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
+	err := WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, timeout)
 	framework.ExpectNoError(err)
 
 	vs, err := dc.Resource(SnapshotGVR).Namespace(snapshot.GetNamespace()).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
