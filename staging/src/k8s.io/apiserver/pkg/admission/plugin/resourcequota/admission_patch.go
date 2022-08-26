@@ -16,10 +16,19 @@ limitations under the License.
 
 package resourcequota
 
-import corelisters "k8s.io/client-go/listers/core/v1"
+import (
+	"github.com/kcp-dev/logicalcluster/v2"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+)
 
-// SetResourceQuotaLister sets the ResourceQuotaLister on the quotaAccessor. This is used by kcp to inject a lister
-// that is scoped to a single logical cluster. This replaces the need to use a.SetExternalKubeInformerFactory().
-func (a *QuotaAdmission) SetResourceQuotaLister(lister corelisters.ResourceQuotaLister) {
-	a.quotaAccessor.lister = lister
+// SetResourceQuotaInformer sets the lister and indexer on the quotaAccessor. This is used by kcp to inject a lister and
+// indexer that are scoped to a single logical cluster. This replaces the need to use a.SetExternalKubeInformerFactory().
+func (a *QuotaAdmission) SetResourceQuotaInformer(informer coreinformers.ResourceQuotaInformer) {
+	a.quotaAccessor.lister = informer.Lister()
+	a.quotaAccessor.indexer = informer.Informer().GetIndexer()
+}
+
+// SetClusterName sets the logicalcluster.Name on the quotaAccessor.
+func (a *QuotaAdmission) SetClusterName(name logicalcluster.Name) {
+	a.quotaAccessor.clusterName = name
 }

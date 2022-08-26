@@ -19,14 +19,18 @@ package resourcequota
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/kcp-dev/logicalcluster/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/clusters"
 	"k8s.io/utils/lru"
 )
 
@@ -56,6 +60,10 @@ type quotaAccessor struct {
 	// back quota evaluations that touch the same quota doc.  This only works because we can compare etcd resourceVersions
 	// for the same resource as integers.  Before this change: 22 updates with 12 conflicts.  after this change: 15 updates with 0 conflicts
 	updatedQuotas *lru.Cache
+
+	// kcp
+	indexer     cache.Indexer
+	clusterName logicalcluster.Name
 }
 
 // newQuotaAccessor creates an object that conforms to the QuotaAccessor interface to be used to retrieve quota objects.
@@ -102,7 +110,43 @@ func (e *quotaAccessor) checkCache(quota *corev1.ResourceQuota) *corev1.Resource
 	return cachedQuota
 }
 
+const (
+	kcpByLogicalClusterAndNamespace                = "kcp-global-byLogicalClusterAndNamespace"
+	kcpClusterScopedQuotaNamespace                 = "admin"
+	kcpExperimentalClusterScopedQuotaAnnotationKey = "experimental.quota.kcp.dev/cluster-scoped"
+)
+
 func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, error) {
+	possibleClusterScopedQuotas, err := e.indexer.ByIndex(kcpByLogicalClusterAndNamespace, clusters.ToClusterAwareKey(e.clusterName, kcpClusterScopedQuotaNamespace))
+	if err != nil {
+		return nil, fmt.Errorf("error getting ResourceQuotas from namespace %q: %w", kcpClusterScopedQuotaNamespace, err)
+	}
+	// if there are no items held in our indexer, check our live-lookup LRU, if that misses, do the live lookup to prime it.
+	if len(possibleClusterScopedQuotas) == 0 {
+		lruItemObj, ok := e.liveLookupCache.Get(kcpClusterScopedQuotaNamespace)
+		if !ok || lruItemObj.(liveLookupEntry).expiry.Before(time.Now()) {
+			// TODO: If there are multiple operations at the same time and cache has just expired,
+			// this may cause multiple List operations being issued at the same time.
+			// If there is already in-flight List() for a given namespace, we should wait until
+			// it is finished and cache is updated instead of doing the same, also to avoid
+			// throttling - see #22422 for details.
+			liveList, err := e.client.CoreV1().ResourceQuotas(kcpClusterScopedQuotaNamespace).List(context.TODO(), metav1.ListOptions{})
+			if err != nil {
+				return nil, err
+			}
+			newEntry := liveLookupEntry{expiry: time.Now().Add(e.liveTTL)}
+			for i := range liveList.Items {
+				newEntry.items = append(newEntry.items, &liveList.Items[i])
+			}
+			e.liveLookupCache.Add(kcpClusterScopedQuotaNamespace, newEntry)
+			lruItemObj = newEntry
+		}
+		lruEntry := lruItemObj.(liveLookupEntry)
+		for i := range lruEntry.items {
+			possibleClusterScopedQuotas = append(possibleClusterScopedQuotas, lruEntry.items[i])
+		}
+	}
+
 	// determine if there are any quotas in this namespace
 	// if there are no quotas, we don't need to do anything
 	items, err := e.lister.ResourceQuotas(namespace).List(labels.Everything())
@@ -133,6 +177,19 @@ func (e *quotaAccessor) GetQuotas(namespace string) ([]corev1.ResourceQuota, err
 		lruEntry := lruItemObj.(liveLookupEntry)
 		for i := range lruEntry.items {
 			items = append(items, lruEntry.items[i])
+		}
+	}
+
+	for i := range possibleClusterScopedQuotas {
+		candidate := possibleClusterScopedQuotas[i].(*corev1.ResourceQuota)
+
+		a := candidate.Annotations[kcpExperimentalClusterScopedQuotaAnnotationKey]
+		if a == "" {
+			continue
+		}
+
+		if clusterScoped, _ := strconv.ParseBool(a); clusterScoped {
+			items = append(items, candidate)
 		}
 	}
 
