@@ -438,8 +438,8 @@ github.com/google/gnostic/extensions
 github.com/google/gnostic/jsonschema
 github.com/google/gnostic/openapiv2
 github.com/google/gnostic/openapiv3
-# github.com/google/go-cmp v0.5.6 => github.com/google/go-cmp v0.5.6
-## explicit; go 1.8
+# github.com/google/go-cmp v0.5.8 => github.com/google/go-cmp v0.5.8
+## explicit; go 1.13
 github.com/google/go-cmp/cmp
 github.com/google/go-cmp/cmp/cmpopts
 github.com/google/go-cmp/cmp/internal/diff
@@ -678,8 +678,8 @@ github.com/pmezard/go-difflib/difflib
 ## explicit; go 1.16
 github.com/pquerna/cachecontrol
 github.com/pquerna/cachecontrol/cacheobject
-# github.com/prometheus/client_golang v1.12.2 => github.com/prometheus/client_golang v1.12.2
-## explicit; go 1.13
+# github.com/prometheus/client_golang v1.13.0 => github.com/prometheus/client_golang v1.13.0
+## explicit; go 1.17
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
@@ -688,13 +688,13 @@ github.com/prometheus/client_golang/prometheus/testutil/promlint
 # github.com/prometheus/client_model v0.2.0 => github.com/prometheus/client_model v0.2.0
 ## explicit; go 1.9
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.32.1 => github.com/prometheus/common v0.32.1
-## explicit; go 1.13
+# github.com/prometheus/common v0.37.0 => github.com/prometheus/common v0.37.0
+## explicit; go 1.16
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
-# github.com/prometheus/procfs v0.7.3 => github.com/prometheus/procfs v0.7.3
-## explicit; go 1.13
+# github.com/prometheus/procfs v0.8.0 => github.com/prometheus/procfs v0.8.0
+## explicit; go 1.17
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
@@ -1050,7 +1050,7 @@ golang.org/x/net/internal/timeseries
 golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 => golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
+# golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b => golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
 ## explicit; go 1.11
 golang.org/x/oauth2
 golang.org/x/oauth2/authhandler
@@ -1125,10 +1125,6 @@ golang.org/x/tools/internal/imports
 golang.org/x/tools/internal/packagesinternal
 golang.org/x/tools/internal/typeparams
 golang.org/x/tools/internal/typesinternal
-# golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 => golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
-## explicit; go 1.11
-golang.org/x/xerrors
-golang.org/x/xerrors/internal
 # gonum.org/v1/gonum v0.6.2 => gonum.org/v1/gonum v0.6.2
 ## explicit; go 1.12
 gonum.org/v1/gonum/blas
@@ -1258,7 +1254,7 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.28.0 => google.golang.org/protobuf v1.28.0
+# google.golang.org/protobuf v1.28.1 => google.golang.org/protobuf v1.28.1
 ## explicit; go 1.11
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
@@ -2626,8 +2622,8 @@ sigs.k8s.io/yaml
 # github.com/go-errors/errors => github.com/go-errors/errors v1.0.1
 # github.com/go-gl/glfw/v3.3/glfw => github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4
 # github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
-# github.com/go-kit/log => github.com/go-kit/log v0.1.0
-# github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.5.0
+# github.com/go-kit/log => github.com/go-kit/log v0.2.0
+# github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.5.1
 # github.com/go-logr/logr => github.com/go-logr/logr v1.2.3
 # github.com/go-logr/zapr => github.com/go-logr/zapr v1.2.3
 # github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
@@ -2654,7 +2650,7 @@ sigs.k8s.io/yaml
 # github.com/google/cadvisor => github.com/google/cadvisor v0.45.0
 # github.com/google/cel-go => github.com/google/cel-go v0.12.4
 # github.com/google/gnostic => github.com/google/gnostic v0.5.7-v3refs
-# github.com/google/go-cmp => github.com/google/go-cmp v0.5.6
+# github.com/google/go-cmp => github.com/google/go-cmp v0.5.8
 # github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 # github.com/google/martian/v3 => github.com/google/martian/v3 v3.2.1
 # github.com/google/pprof => github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38
@@ -2679,6 +2675,7 @@ sigs.k8s.io/yaml
 # github.com/jmespath/go-jmespath/internal/testify => github.com/jmespath/go-jmespath/internal/testify v1.5.1
 # github.com/jonboulle/clockwork => github.com/jonboulle/clockwork v0.2.2
 # github.com/josharian/intern => github.com/josharian/intern v1.0.0
+# github.com/jpillora/backoff => github.com/jpillora/backoff v1.0.0
 # github.com/json-iterator/go => github.com/json-iterator/go v1.1.12
 # github.com/jtolds/gls => github.com/jtolds/gls v4.20.0+incompatible
 # github.com/julienschmidt/httprouter => github.com/julienschmidt/httprouter v1.3.0
@@ -2730,10 +2727,10 @@ sigs.k8s.io/yaml
 # github.com/pkg/sftp => github.com/pkg/sftp v1.10.1
 # github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 # github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.1.0
-# github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.12.2
+# github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.13.0
 # github.com/prometheus/client_model => github.com/prometheus/client_model v0.2.0
-# github.com/prometheus/common => github.com/prometheus/common v0.32.1
-# github.com/prometheus/procfs => github.com/prometheus/procfs v0.7.3
+# github.com/prometheus/common => github.com/prometheus/common v0.37.0
+# github.com/prometheus/procfs => github.com/prometheus/procfs v0.8.0
 # github.com/remyoudompheng/bigfft => github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446
 # github.com/robfig/cron/v3 => github.com/robfig/cron/v3 v3.0.1
 # github.com/rogpeppe/fastuuid => github.com/rogpeppe/fastuuid v1.2.0
@@ -2798,7 +2795,7 @@ sigs.k8s.io/yaml
 # golang.org/x/mobile => golang.org/x/mobile v0.0.0-20201217150744-e6ae53a27f4f
 # golang.org/x/mod => golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
 # golang.org/x/net => golang.org/x/net v0.0.0-20220722155237-a158d28d115b
-# golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
+# golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
 # golang.org/x/sync => golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 # golang.org/x/sys => golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
 # golang.org/x/term => golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
@@ -2814,7 +2811,7 @@ sigs.k8s.io/yaml
 # google.golang.org/genproto => google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21
 # google.golang.org/grpc => google.golang.org/grpc v1.47.0
 # google.golang.org/grpc/cmd/protoc-gen-go-grpc => google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0
-# google.golang.org/protobuf => google.golang.org/protobuf v1.28.0
+# google.golang.org/protobuf => google.golang.org/protobuf v1.28.1
 # gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
 # gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f
 # gopkg.in/errgo.v2 => gopkg.in/errgo.v2 v2.1.0
