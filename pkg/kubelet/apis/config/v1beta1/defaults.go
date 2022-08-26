@@ -188,7 +188,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.CPUCFSQuota = utilpointer.BoolPtr(true)
 	}
 	if obj.CPUCFSQuotaPeriod == nil {
-		obj.CPUCFSQuotaPeriod = &metav1.Duration{Duration: 100 * time.Microsecond}
+		obj.CPUCFSQuotaPeriod = &metav1.Duration{Duration: 100 * time.Millisecond}
 	}
 	if obj.NodeStatusMaxImages == nil {
 		obj.NodeStatusMaxImages = utilpointer.Int32Ptr(50)

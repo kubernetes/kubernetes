@@ -115,7 +115,7 @@ type kubeGenericRuntimeManager struct {
 	// If true, enforce container cpu limits with CFS quota support
 	cpuCFSQuota bool
 
-	// CPUCFSQuotaPeriod sets the CPU CFS quota period value, cpu.cfs_period_us, defaults to 100µs
+	// CPUCFSQuotaPeriod sets the CPU CFS quota period value, cpu.cfs_period_us, defaults to 100ms
 	cpuCFSQuotaPeriod metav1.Duration
 
 	// wrapped image puller.
@@ -152,7 +152,7 @@ type kubeGenericRuntimeManager struct {
 	// MemorySwapBehavior defines how swap is used
 	memorySwapBehavior string
 
-	// Function to get node allocatable resources
+	//Function to get node allocatable resources
 	getNodeAllocatable func() v1.ResourceList
 
 	// Memory throttling factor for MemoryQoS
