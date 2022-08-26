@@ -238,15 +238,22 @@ const (
 // to resource directories enforcing namespace rules.
 func NoNamespaceKeyRootFunc(ctx context.Context, prefix string) string {
 	key := prefix
+	shard := genericapirequest.ShardFrom(ctx)
+	if shard.Wildcard() {
+		return key
+	}
 	cluster, err := genericapirequest.ValidClusterFrom(ctx)
 	if err != nil {
 		klog.Errorf("invalid context cluster value: %v", err)
 		return key
 	}
-	if cluster.Wildcard {
-		return key
+	if !shard.Empty() {
+		key += "/" + shard.String()
 	}
-	return key + "/" + cluster.Name.String()
+	if !cluster.Wildcard {
+		key += "/" + cluster.Name.String()
+	}
+	return key
 }
 
 // NamespaceKeyRootFunc is the default function for constructing storage paths
