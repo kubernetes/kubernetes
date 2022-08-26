@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-
 	"github.com/onsi/ginkgo/v2"
 
 	v1 "k8s.io/api/core/v1"
@@ -129,7 +128,8 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 	}
 	f := framework.NewFramework("volume-lifecycle-performance", frameworkOptions, nil)
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-	f.AddAfterEach("cleanup", func(f *framework.Framework, failed bool) {
+
+	ginkgo.AfterEach(func() {
 		ginkgo.By("Closing informer channel")
 		close(l.stopCh)
 		ginkgo.By("Deleting all PVCs")

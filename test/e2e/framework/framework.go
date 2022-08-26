@@ -103,11 +103,6 @@ type Framework struct {
 	// should abort, the AfterSuite hook should run all Cleanup actions.
 	cleanupHandle CleanupActionHandle
 
-	// afterEaches is a map of name to function to be called after each test.  These are not
-	// cleared.  The call order is randomized so that no dependencies can grow between
-	// the various afterEaches
-	afterEaches map[string]AfterEachActionFunc
-
 	// configuration for framework's client
 	Options Options
 
@@ -121,9 +116,6 @@ type Framework struct {
 	// Timeouts contains the custom timeouts used during the test execution.
 	Timeouts *TimeoutContext
 }
-
-// AfterEachActionFunc is a function that can be called after each test
-type AfterEachActionFunc func(f *Framework, failed bool)
 
 // TestDataSummary is an interface for managing test data.
 type TestDataSummary interface {
@@ -168,20 +160,6 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 		Timeouts:                 NewTimeoutContextWithDefaults(),
 	}
 
-	f.AddAfterEach("dumpNamespaceInfo", func(f *Framework, failed bool) {
-		if !failed {
-			return
-		}
-		if !TestContext.DumpLogsOnFailure {
-			return
-		}
-		if !f.SkipNamespaceCreation {
-			for _, ns := range f.namespacesToDelete {
-				DumpAllNamespaceInfo(f.ClientSet, ns.Name)
-			}
-		}
-	})
-
 	ginkgo.BeforeEach(f.BeforeEach)
 
 	return f
@@ -195,6 +173,9 @@ func (f *Framework) BeforeEach() {
 	//
 	// In addition, AfterEach will not be called if a test never gets here.
 	ginkgo.DeferCleanup(f.AfterEach)
+
+	// Registered later and thus runs before deleting namespaces.
+	ginkgo.DeferCleanup(f.dumpNamespaceInfo)
 
 	// The fact that we need this feels like a bug in ginkgo.
 	// https://github.com/onsi/ginkgo/v2/issues/222
@@ -320,6 +301,22 @@ func (f *Framework) BeforeEach() {
 	f.flakeReport = NewFlakeReport()
 }
 
+func (f *Framework) dumpNamespaceInfo() {
+	if !ginkgo.CurrentSpecReport().Failed() {
+		return
+	}
+	if !TestContext.DumpLogsOnFailure {
+		return
+	}
+	ginkgo.By("dump namespace information after failure", func() {
+		if !f.SkipNamespaceCreation {
+			for _, ns := range f.namespacesToDelete {
+				DumpAllNamespaceInfo(f.ClientSet, ns.Name)
+			}
+		}
+	})
+}
+
 // printSummaries prints summaries of tests.
 func printSummaries(summaries []TestDataSummary, testBaseName string) {
 	now := time.Now()
@@ -355,19 +352,6 @@ func printSummaries(summaries []TestDataSummary, testBaseName string) {
 			}
 		}
 	}
-}
-
-// AddAfterEach is a way to add a function to be called after every test.  The execution order is intentionally random
-// to avoid growing dependencies.  If you register the same name twice, it is a coding error and will panic.
-func (f *Framework) AddAfterEach(name string, fn AfterEachActionFunc) {
-	if _, ok := f.afterEaches[name]; ok {
-		panic(fmt.Sprintf("%q is already registered", name))
-	}
-
-	if f.afterEaches == nil {
-		f.afterEaches = map[string]AfterEachActionFunc{}
-	}
-	f.afterEaches[name] = fn
 }
 
 // AfterEach deletes the namespace, after reading its events.
@@ -426,11 +410,6 @@ func (f *Framework) AfterEach() {
 			Failf(strings.Join(messages, ","))
 		}
 	}()
-
-	// run all aftereach functions in random order to ensure no dependencies grow
-	for _, afterEachFn := range f.afterEaches {
-		afterEachFn(f, ginkgo.CurrentSpecReport().Failed())
-	}
 
 	if TestContext.GatherKubeSystemResourceUsageData != "false" && TestContext.GatherKubeSystemResourceUsageData != "none" && f.gatherer != nil {
 		ginkgo.By("Collecting resource usage data")
