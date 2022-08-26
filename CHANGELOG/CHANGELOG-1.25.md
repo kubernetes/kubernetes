@@ -276,18 +276,18 @@ Promoted the `ServerSideFieldValidation` feature gate to beta (on by default). T
 
 Introduce KMS v2alpha1 API to add performance, rotation, and observability improvements. Encrypt data at rest (ie Kubernetes `Secrets`) with DEK using AES-GCM instead of AES-CBC for kms data encryption. No user action is required. Reads with AES-GCM and AES-CBC will continue to be allowed. See the guide [Using a KMS provider for data encryption](https://kubernetes.io/docs/tasks/administer-cluster/kms-provider/) for more information.
 
-### Kube-proxy images are now based in distroless
+### Kube-proxy images are now based on distroless images
 
-In previous releases, kube-proxy docker images were built using Debian as the base image. Starting with this release the images are now built using [distroless](https://github.com/GoogleContainerTools/distroless). This change reduced image size by almost 50% and reduced the number of installed packages and files to only to those strictly required for kube-proxy do its job.
+In previous releases, kube-proxy container images were built using Debian as the base image. Starting with this release, the images are now built using [distroless](https://github.com/GoogleContainerTools/distroless). This change reduced image size by almost 50% and decreased the number of installed packages and files to only those strictly required for kube-proxy to do its job.
 
-## Urgent Upgrade Notes 
+## Urgent Upgrade Notes
 
 ### (No, really, you MUST read this before you upgrade)
 
 - Deprecated beta APIs scheduled for removal in 1.25 are no longer served. See https://kubernetes.io/docs/reference/using-api/deprecation-guide/#v1-25 for more information. ([#108797](https://github.com/kubernetes/kubernetes/pull/108797), [@deads2k](https://github.com/deads2k)) [SIG API Machinery, Instrumentation and Testing]
  - Encrypted data with DEK using AES-GCM instead of AES-CBC for kms data encryption. No user action required. Reads with AES-GCM and AES-CBC will continue to be allowed. ([#111119](https://github.com/kubernetes/kubernetes/pull/111119), [@aramase](https://github.com/aramase))
  - End-to-end testing has been migrated from Ginkgo v1 to v2.
-  
+
   When running test/e2e via the Ginkgo CLI, the v2 CLI must be used and `-timeout=24h` (or some other, suitable value) must be passed because the default timeout was reduced from 24h to 1h. When running it via `go test`, the corresponding `-args` parameter is `-ginkgo.timeout=24h`. To build the CLI in the Kubernetes repo, use `make all WHAT=github.com/onsi/ginkgo/v2/ginkgo`.
   Ginkgo V2 doesn't accept go test's `-parallel` flags to parallelize Ginkgo specs, please switch to use `ginkgo -p` or `ginkgo -procs=N` instead. ([#109111](https://github.com/kubernetes/kubernetes/pull/109111), [@chendave](https://github.com/chendave)) [SIG API Machinery, Apps, Architecture, Auth, Autoscaling, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Network, Node, Release, Scheduling, Storage, Testing and Windows]
  - No action required; No API/CLI changed; Add new Windows Image Support ([#110333](https://github.com/kubernetes/kubernetes/pull/110333), [@liurupeng](https://github.com/liurupeng)) [SIG Cloud Provider and Windows]
@@ -295,7 +295,7 @@ In previous releases, kube-proxy docker images were built using Debian as the ba
  - The intree volume plugin quobyte support has been completely removed from Kubernetes. ([#111619](https://github.com/kubernetes/kubernetes/pull/111619), [@Jiawei0227](https://github.com/Jiawei0227))
  - The intree volume plugin storageos support has been completely removed from Kubernetes. ([#111620](https://github.com/kubernetes/kubernetes/pull/111620), [@Jiawei0227](https://github.com/Jiawei0227))
  - There is a new OCI image registry (`registry.k8s.io`) that can be used to pull Kubernetes images. The old registry (`k8s.gcr.io`) will continue to be supported for the foreseeable future, but the new name should perform better because it frontends equivalent mirrors in other clouds.  Please point your clusters to the new registry going forward. \n\nAdmission/Policy integrations that have an allowlist of registries need to include `registry.k8s.io` alongside `k8s.gcr.io`.\nAir-gapped environments and image garbage-collection configurations will need to update to pre-pull and preserve required images under `registry.k8s.io` as well as `k8s.gcr.io`. ([#109938](https://github.com/kubernetes/kubernetes/pull/109938), [@dims](https://github.com/dims))
- 
+
 ## Changes by Kind
 
 ### Deprecation
@@ -334,7 +334,7 @@ In previous releases, kube-proxy docker images were built using Debian as the ba
   - DeletionByTaintManager (Pod deleted by taint manager due to NoExecute taint)
   - EvictionByEvictionAPI (Pod evicted by Eviction API)
   - DeletionByPodGC (an orphaned Pod deleted by PodGC) ([#110959](https://github.com/kubernetes/kubernetes/pull/110959), [@mimowo](https://github.com/mimowo))
-- Kube-Scheduler ComponentConfig is graduated to GA, `kubescheduler.config.k8s.io/v1` is available now. 
+- Kube-Scheduler ComponentConfig is graduated to GA, `kubescheduler.config.k8s.io/v1` is available now.
   Plugin `SelectorSpread` is removed in v1. ([#110534](https://github.com/kubernetes/kubernetes/pull/110534), [@kerthcet](https://github.com/kerthcet))
 - Local Storage Capacity Isolation feature is GA in 1.25 release. For systems (rootless) that cannot check root file system, please use kubelet config --local-storage-capacity-isolation=false to disable this feature. Once disabled, pod cannot set local ephemeral storage request/limit, and emptyDir sizeLimit niether. ([#111513](https://github.com/kubernetes/kubernetes/pull/111513), [@jingxu97](https://github.com/jingxu97))
 - Make PodSpec.Ports' description clearer on how this information is only informational and how it can be incorrect. ([#110564](https://github.com/kubernetes/kubernetes/pull/110564), [@j4m3s-s](https://github.com/j4m3s-s)) [SIG API Machinery, Network and Node]
@@ -350,11 +350,11 @@ In previous releases, kube-proxy docker images were built using Debian as the ba
 - The `CSIInlineVolume` feature has moved from beta to GA. ([#111258](https://github.com/kubernetes/kubernetes/pull/111258), [@dobsonj](https://github.com/dobsonj))
 - The `PodSecurity` admission plugin has graduated to GA and is enabled by default. The admission configuration version has been promoted to `pod-security.admission.config.k8s.io/v1`. ([#110459](https://github.com/kubernetes/kubernetes/pull/110459), [@wangyysde](https://github.com/wangyysde))
 - The `endPort` field in Network Policy is now promoted to GA
-  
+
   Network Policy providers that support `endPort` field now can use it to specify a range of ports to apply a Network Policy.
-  
+
   Previously, each Network Policy could only target a single port.
-  
+
   Please be aware that `endPort` field MUST BE SUPPORTED by the Network Policy provider. In case your provider does not support `endPort` and this field is specified in a Network Policy, the Network Policy will be created covering only the port field (single port). ([#110868](https://github.com/kubernetes/kubernetes/pull/110868), [@rikatz](https://github.com/rikatz))
 - The `metadata.clusterName` field is completely removed. This should not have any user-visible impact. ([#109602](https://github.com/kubernetes/kubernetes/pull/109602), [@lavalamp](https://github.com/lavalamp))
 - The `minDomains` field in Pod Topology Spread is graduated to beta ([#110388](https://github.com/kubernetes/kubernetes/pull/110388), [@sanposhiho](https://github.com/sanposhiho)) [SIG API Machinery and Apps]
@@ -384,7 +384,7 @@ In previous releases, kube-proxy docker images were built using Debian as the ba
   before deleting them. This improves performance by not requiring it to
   check for stale rules on every sync. (In smaller clusters, it will still
   remove unused rules immediately once they are no longer used.)
-  
+
   (The threshold for "large" used here is currently "1000 endpoints" but
   this is subject to change.) ([#110334](https://github.com/kubernetes/kubernetes/pull/110334), [@danwinship](https://github.com/danwinship))
 - Kube-up now includes CoreDNS version v1.9.3. ([#110488](https://github.com/kubernetes/kubernetes/pull/110488), [@mzaian](https://github.com/mzaian))
@@ -429,7 +429,7 @@ In previous releases, kube-proxy docker images were built using Debian as the ba
    ([#111301](https://github.com/kubernetes/kubernetes/pull/111301), [@mattcary](https://github.com/mattcary))
 - `CSIMigrationvSphere` feature is now enabled by default.
    ([#103523](https://github.com/kubernetes/kubernetes/pull/103523), [@divyenpatel](https://github.com/divyenpatel))
-- `MaxUnavailable` for `StatefulSets`, allows faster `RollingUpdate` by taking down more than 1 pod at a time. 
+- `MaxUnavailable` for `StatefulSets`, allows faster `RollingUpdate` by taking down more than 1 pod at a time.
   The number of pods you want to take down during a `RollingUpdate` is configurable using `maxUnavailable` parameter.
    ([#109251](https://github.com/kubernetes/kubernetes/pull/109251), [@krmayankk](https://github.com/krmayankk))
 - The `gcp` and `azure` auth plugins have been restored to client-go and kubectl until https://issue.k8s.io/111911 is resolved in supported kubectl minor versions. ([#111918](https://github.com/kubernetes/kubernetes/pull/111918), [@liggitt](https://github.com/liggitt))
@@ -840,9 +840,9 @@ name | architectures
 
 - Introduces support for handling pod failures with respect to the configured pod failure policy rules ([#111113](https://github.com/kubernetes/kubernetes/pull/111113), [@mimowo](https://github.com/mimowo)) [SIG API Machinery, Apps, Auth, Scheduling and Testing]
 - NodeIPAM support for multiple ClusterCIDRs (https://github.com/kubernetes/enhancements/issues/2593) introduced as an alpha feature.
-  
+
   Setting feature gate MultiCIDRRangeAllocator=true, determines whether the MultiCIDRRangeAllocator controller can be used, while the kube-controller-manager flag below will pick the active controller.
-  
+
   Enable the MultiCIDRRangeAllocator by setting --cidr-allocator-type=MultiCIDRRangeAllocator flag in kube-controller-manager. ([#109090](https://github.com/kubernetes/kubernetes/pull/109090), [@sarveshr7](https://github.com/sarveshr7)) [SIG API Machinery, Apps, Auth, CLI, Cloud Provider, Instrumentation, Network and Testing]
 - The CSIInlineVolume feature has moved from beta to GA. ([#111258](https://github.com/kubernetes/kubernetes/pull/111258), [@dobsonj](https://github.com/dobsonj)) [SIG API Machinery, Apps, Auth, Instrumentation, Storage and Testing]
 
@@ -939,7 +939,7 @@ name | architectures
   - Intree volume plugin flocker support is been completely removed from Kubernetes. ([#111618](https://github.com/kubernetes/kubernetes/pull/111618), [@Jiawei0227](https://github.com/Jiawei0227)) [SIG API Machinery, Node, Scalability and Storage]
   - Intree volume plugin quobyte support is been completely removed from Kubernetes. ([#111619](https://github.com/kubernetes/kubernetes/pull/111619), [@Jiawei0227](https://github.com/Jiawei0227)) [SIG API Machinery, Node, Scalability and Storage]
   - Intree volume plugin storageos support is been completely removed from Kubernetes. ([#111620](https://github.com/kubernetes/kubernetes/pull/111620), [@Jiawei0227](https://github.com/Jiawei0227)) [SIG API Machinery, Node, Scalability and Storage]
- 
+
 ## Changes by Kind
 
 ### Deprecation
@@ -957,7 +957,7 @@ name | architectures
 - Changes ownership semantics of PersistentVolume's spec.claimRef from `atomic` to `granular`. ([#110495](https://github.com/kubernetes/kubernetes/pull/110495), [@alexzielenski](https://github.com/alexzielenski)) [SIG API Machinery, Architecture, Auth, CLI, Cloud Provider, Instrumentation and Testing]
 - Extends ContainerStatus CRI API to allow runtime response with container resource requests and limits that are in effect.
   - UpdateContainerResources CRI API now supports both Linux and Windows.
-  
+
   For details, see KEPs below. ([#111645](https://github.com/kubernetes/kubernetes/pull/111645), [@vinaykul](https://github.com/vinaykul)) [SIG Node]
 - For v1.25, Kubernetes will be using golang 1.19, In this PR we update to 1.19rc2 as GA is not yet available. ([#111254](https://github.com/kubernetes/kubernetes/pull/111254), [@dims](https://github.com/dims)) [SIG Apps, Architecture, Auth, Autoscaling, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Network, Node, Release, Scheduling, Storage and Testing]
 - Introduce PodHasNetwork condition for pods ([#111358](https://github.com/kubernetes/kubernetes/pull/111358), [@ddebroy](https://github.com/ddebroy)) [SIG Apps, Node and Testing]
@@ -966,7 +966,7 @@ name | architectures
   - DeletionByTaintManager (Pod deleted by taint manager due to NoExecute taint)
   - EvictionByEvictionAPI (Pod evicted by Eviction API)
   - DeletionByPodGC (an orphaned Pod deleted by PodGC) ([#110959](https://github.com/kubernetes/kubernetes/pull/110959), [@mimowo](https://github.com/mimowo)) [SIG Apps, Auth, Node, Scheduling and Testing]
-- Kube-Scheduler ComponentConfig is graduated to GA, `kubescheduler.config.k8s.io/v1` is available now. 
+- Kube-Scheduler ComponentConfig is graduated to GA, `kubescheduler.config.k8s.io/v1` is available now.
   Plugin `SelectorSpread` is removed in v1. ([#110534](https://github.com/kubernetes/kubernetes/pull/110534), [@kerthcet](https://github.com/kerthcet)) [SIG API Machinery, Scheduling and Testing]
 - Local Storage Capacity Isolation feature is GA in 1.25 release. For systems (rootless) that cannot check root file system, please use kubelet config --local-storage-capacity-isolation=false to disable this feature. Once disabled, pod cannot set local ephemeral storage request/limit, and emptyDir sizeLimit niether. ([#111513](https://github.com/kubernetes/kubernetes/pull/111513), [@jingxu97](https://github.com/jingxu97)) [SIG API Machinery, Node, Scalability and Scheduling]
 - PersistentVolumeClaim objects are no longer left with storage class set to `nil` forever, but will be updated retroactively once any StorageClass is set or created as default. ([#111467](https://github.com/kubernetes/kubernetes/pull/111467), [@RomanBednar](https://github.com/RomanBednar)) [SIG Apps, Storage and Testing]
@@ -1145,10 +1145,10 @@ name | architectures
 ### (No, really, you MUST read this before you upgrade)
 
  - End-to-end testing has been migrated from Ginkgo v1 to v2.
-  
+
   When running test/e2e via the Ginkgo CLI, the v2 CLI must be used and `-timeout=24h` (or some other, suitable value) must be passed because the default timeout was reduced from 24h to 1h. When running it via `go test`, the corresponding `-args` parameter is `-ginkgo.timeout=24h`. To build the CLI in the Kubernetes repo, use `make all WHAT=github.com/onsi/ginkgo/v2/ginkgo`.
   Ginkgo V2 doesn't accept go test's `-parallel` flags to parallelize Ginkgo specs, please switch to use `ginkgo -p` or `ginkgo -procs=N` instead. ([#109111](https://github.com/kubernetes/kubernetes/pull/109111), [@chendave](https://github.com/chendave)) [SIG API Machinery, Apps, Architecture, Auth, Autoscaling, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, Network, Node, Release, Scheduling, Storage, Testing and Windows]
- 
+
 ## Changes by Kind
 
 ### Deprecation
@@ -1159,11 +1159,11 @@ name | architectures
 
 - Added a new feature gate `CheckpointRestore` to enable support to checkpoint containers. If enabled it is possible to checkpoint a container using the newly kubelet API (/checkpoint/{podNamespace}/{podName}/{containerName}). ([#104907](https://github.com/kubernetes/kubernetes/pull/104907), [@adrianreber](https://github.com/adrianreber)) [SIG Node and Testing]
 - EndPort field in Network Policy is now promoted to GA
-  
+
   Network Policy providers that support endPort field now can use it to specify a range of ports to apply a Network Policy.
-  
+
   Previously, each Network Policy could only target a single port.
-  
+
   Please be aware that endPort field MUST BE SUPPORTED by the Network Policy provider. In case your provider does not support endPort and this field is specified in a Network Policy, the Network Policy will be created covering only the port field (single port). ([#110868](https://github.com/kubernetes/kubernetes/pull/110868), [@rikatz](https://github.com/rikatz)) [SIG API Machinery, Network and Testing]
 - Make PodSpec.Ports' description clearer on how this information is only informational and how it can be incorrect. ([#110564](https://github.com/kubernetes/kubernetes/pull/110564), [@j4m3s-s](https://github.com/j4m3s-s)) [SIG API Machinery, Network and Node]
 - On compatible systems, a mounter's Unmount implementation is changed to not return an error when the specified target can be detected as not a mount point. On Linux, the behavior of detecting a mount point depends on `umount` command is validated when the mounter is created. Additionally, mount point checks will be skipped in CleanupMountPoint/CleanupMountWithForce if the mounter's Unmount having the changed behavior of not returning error when target is not a mount point. ([#109676](https://github.com/kubernetes/kubernetes/pull/109676), [@cartermckinnon](https://github.com/cartermckinnon)) [SIG Storage]
@@ -1182,7 +1182,7 @@ name | architectures
   before deleting them. This improves performance by not requiring it to
   check for stale rules on every sync. (In smaller clusters, it will still
   remove unused rules immediately once they are no longer used.)
-  
+
   (The threshold for "large" used here is currently "1000 endpoints" but
   this is subject to change.) ([#110334](https://github.com/kubernetes/kubernetes/pull/110334), [@danwinship](https://github.com/danwinship)) [SIG Network]
 - Introduce new KUBECACHEDIR environment variable to override default discovery cache directory which is $HOME/.kube/cache ([#109479](https://github.com/kubernetes/kubernetes/pull/109479), [@ardaguclu](https://github.com/ardaguclu)) [SIG CLI]
@@ -1458,11 +1458,11 @@ name | architectures
 
  - Deprecated beta APIs scheduled for removal in 1.25 are no longer served. See https://kubernetes.io/docs/reference/using-api/deprecation-guide/#v1-25 for more information. ([#108797](https://github.com/kubernetes/kubernetes/pull/108797), [@deads2k](https://github.com/deads2k)) [SIG API Machinery, Instrumentation and Testing]
   - No action required; No API/CLI changed; Add new Windows Image Support ([#110333](https://github.com/kubernetes/kubernetes/pull/110333), [@liurupeng](https://github.com/liurupeng)) [SIG Cloud Provider and Windows]
-  - There is a new OCI image registry (registry.k8s.io) that can be used to pull kubernetes images. The old registry (k8s.gcr.io) will continue to be supported for the foreseeable future, but the new name should perform better because it frontends equivalent mirrors in other clouds.  Please point your clusters to the new registry going forward. 
-  
+  - There is a new OCI image registry (registry.k8s.io) that can be used to pull kubernetes images. The old registry (k8s.gcr.io) will continue to be supported for the foreseeable future, but the new name should perform better because it frontends equivalent mirrors in other clouds.  Please point your clusters to the new registry going forward.
+
   Admission/Policy integrations that have an allowlist of registries need to include "registry.k8s.io" alongside "k8s.gcr.io".
   Air-gapped environments and image garbage-collection configurations will need to update to pre-pull and preserve required images under "registry.k8s.io" as well as "k8s.gcr.io". ([#109938](https://github.com/kubernetes/kubernetes/pull/109938), [@dims](https://github.com/dims)) [SIG API Machinery, Architecture, Auth, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation, K8s Infra, Node, Release, Scalability, Storage and Testing]
- 
+
 ## Changes by Kind
 
 ### Deprecation
@@ -1520,7 +1520,7 @@ name | architectures
 - Fix JobTrackingWithFinalizers that:
   - was declaring a job finished before counting all the created pods in the status
   - was leaving pods with finalizers, blocking pod and job deletions
-  
+
   JobTrackingWithFinalizers is still disabled by default. ([#109486](https://github.com/kubernetes/kubernetes/pull/109486), [@alculquicondor](https://github.com/alculquicondor)) [SIG Apps and Testing]
 - Fix a bug where CRI implementations that use cAdvisor stats provider (CRI-O) don't evict pods when their logs exceed ephemeral storage limit. ([#108115](https://github.com/kubernetes/kubernetes/pull/108115), [@haircommander](https://github.com/haircommander)) [SIG Node]
 - Fix a bug where CSI migration doesn't count inline volumes for attach limit. ([#107787](https://github.com/kubernetes/kubernetes/pull/107787), [@Jiawei0227](https://github.com/Jiawei0227)) [SIG Scheduling and Storage]
