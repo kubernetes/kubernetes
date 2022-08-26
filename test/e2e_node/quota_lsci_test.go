@@ -63,7 +63,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 			if quotasRequested && !supportsQuotas("/var/lib/kubelet") {
 				// No point in running this as a positive test if quotas are not
 				// enabled on the underlying filesystem.
-				e2eskipper.Skipf("Cannot run LocalStorageCapacityIsolationFSQuotaMonitoring on filesystem without project quota enabled")
+				e2eskipper.Skipf("Cannot run LocalStorageCapacityIsolationQuotaMonitoring on filesystem without project quota enabled")
 			}
 			// setting a threshold to 0% disables; non-empty map overrides default value (necessary due to omitempty)
 			initialConfig.EvictionHard = map[string]string{"memory.available": "0%"}
@@ -90,7 +90,7 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool) {
 	})
 }
 
-// LocalStorageCapacityIsolationFSQuotaMonitoring tests that quotas are
+// LocalStorageCapacityIsolationQuotaMonitoring tests that quotas are
 // used for monitoring rather than du.  The mechanism is to create a
 // pod that creates a file, deletes it, and writes data to it.  If
 // quotas are used to monitor, it will detect this deleted-but-in-use
