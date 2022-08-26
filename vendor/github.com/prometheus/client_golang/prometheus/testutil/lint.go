@@ -26,7 +26,7 @@ import (
 func CollectAndLint(c prometheus.Collector, metricNames ...string) ([]promlint.Problem, error) {
 	reg := prometheus.NewPedanticRegistry()
 	if err := reg.Register(c); err != nil {
-		return nil, fmt.Errorf("registering collector failed: %w", err)
+		return nil, fmt.Errorf("registering collector failed: %s", err)
 	}
 	return GatherAndLint(reg, metricNames...)
 }
@@ -37,7 +37,7 @@ func CollectAndLint(c prometheus.Collector, metricNames ...string) ([]promlint.P
 func GatherAndLint(g prometheus.Gatherer, metricNames ...string) ([]promlint.Problem, error) {
 	got, err := g.Gather()
 	if err != nil {
-		return nil, fmt.Errorf("gathering metrics failed: %w", err)
+		return nil, fmt.Errorf("gathering metrics failed: %s", err)
 	}
 	if metricNames != nil {
 		got = filterMetrics(got, metricNames)

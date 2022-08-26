@@ -26,7 +26,7 @@ const (
 	// DefaultSysMountPoint is the common mount point of the sys filesystem.
 	DefaultSysMountPoint = "/sys"
 
-	// DefaultConfigfsMountPoint is the common mount point of the configfs.
+	// DefaultConfigfsMountPoint is the common mount point of the configfs
 	DefaultConfigfsMountPoint = "/sys/kernel/config"
 )
 

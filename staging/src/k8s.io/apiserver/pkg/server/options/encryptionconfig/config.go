@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"sync"
@@ -123,7 +124,7 @@ func GetKMSPluginHealthzCheckers(filepath string) ([]healthz.HealthChecker, erro
 func getKMSPluginProbes(reader io.Reader) ([]interface{}, error) {
 	var result []interface{}
 
-	configFileContents, err := io.ReadAll(reader)
+	configFileContents, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("could not read content of encryption provider configuration: %v", err)
 	}
@@ -269,7 +270,7 @@ func GetTransformerOverrides(filepath string) (map[schema.GroupResource]value.Tr
 }
 
 func parseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.Transformer, error) {
-	configFileContents, err := io.ReadAll(f)
+	configFileContents, err := ioutil.ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("could not read contents: %v", err)
 	}

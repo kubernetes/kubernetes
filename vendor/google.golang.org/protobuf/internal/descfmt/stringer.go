@@ -14,7 +14,7 @@ import (
 
 	"google.golang.org/protobuf/internal/detrand"
 	"google.golang.org/protobuf/internal/pragma"
-	"google.golang.org/protobuf/reflect/protoreflect"
+	pref "google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type list interface {
@@ -30,17 +30,17 @@ func formatListOpt(vs list, isRoot, allowMulti bool) string {
 	if isRoot {
 		var name string
 		switch vs.(type) {
-		case protoreflect.Names:
+		case pref.Names:
 			name = "Names"
-		case protoreflect.FieldNumbers:
+		case pref.FieldNumbers:
 			name = "FieldNumbers"
-		case protoreflect.FieldRanges:
+		case pref.FieldRanges:
 			name = "FieldRanges"
-		case protoreflect.EnumRanges:
+		case pref.EnumRanges:
 			name = "EnumRanges"
-		case protoreflect.FileImports:
+		case pref.FileImports:
 			name = "FileImports"
-		case protoreflect.Descriptor:
+		case pref.Descriptor:
 			name = reflect.ValueOf(vs).MethodByName("Get").Type().Out(0).Name() + "s"
 		default:
 			name = reflect.ValueOf(vs).Elem().Type().Name()
@@ -50,17 +50,17 @@ func formatListOpt(vs list, isRoot, allowMulti bool) string {
 
 	var ss []string
 	switch vs := vs.(type) {
-	case protoreflect.Names:
+	case pref.Names:
 		for i := 0; i < vs.Len(); i++ {
 			ss = append(ss, fmt.Sprint(vs.Get(i)))
 		}
 		return start + joinStrings(ss, false) + end
-	case protoreflect.FieldNumbers:
+	case pref.FieldNumbers:
 		for i := 0; i < vs.Len(); i++ {
 			ss = append(ss, fmt.Sprint(vs.Get(i)))
 		}
 		return start + joinStrings(ss, false) + end
-	case protoreflect.FieldRanges:
+	case pref.FieldRanges:
 		for i := 0; i < vs.Len(); i++ {
 			r := vs.Get(i)
 			if r[0]+1 == r[1] {
@@ -70,7 +70,7 @@ func formatListOpt(vs list, isRoot, allowMulti bool) string {
 			}
 		}
 		return start + joinStrings(ss, false) + end
-	case protoreflect.EnumRanges:
+	case pref.EnumRanges:
 		for i := 0; i < vs.Len(); i++ {
 			r := vs.Get(i)
 			if r[0] == r[1] {
@@ -80,7 +80,7 @@ func formatListOpt(vs list, isRoot, allowMulti bool) string {
 			}
 		}
 		return start + joinStrings(ss, false) + end
-	case protoreflect.FileImports:
+	case pref.FileImports:
 		for i := 0; i < vs.Len(); i++ {
 			var rs records
 			rs.Append(reflect.ValueOf(vs.Get(i)), "Path", "Package", "IsPublic", "IsWeak")
@@ -88,11 +88,11 @@ func formatListOpt(vs list, isRoot, allowMulti bool) string {
 		}
 		return start + joinStrings(ss, allowMulti) + end
 	default:
-		_, isEnumValue := vs.(protoreflect.EnumValueDescriptors)
+		_, isEnumValue := vs.(pref.EnumValueDescriptors)
 		for i := 0; i < vs.Len(); i++ {
 			m := reflect.ValueOf(vs).MethodByName("Get")
 			v := m.Call([]reflect.Value{reflect.ValueOf(i)})[0].Interface()
-			ss = append(ss, formatDescOpt(v.(protoreflect.Descriptor), false, allowMulti && !isEnumValue))
+			ss = append(ss, formatDescOpt(v.(pref.Descriptor), false, allowMulti && !isEnumValue))
 		}
 		return start + joinStrings(ss, allowMulti && isEnumValue) + end
 	}
@@ -106,20 +106,20 @@ func formatListOpt(vs list, isRoot, allowMulti bool) string {
 //
 // Using a list allows us to print the accessors in a sensible order.
 var descriptorAccessors = map[reflect.Type][]string{
-	reflect.TypeOf((*protoreflect.FileDescriptor)(nil)).Elem():      {"Path", "Package", "Imports", "Messages", "Enums", "Extensions", "Services"},
-	reflect.TypeOf((*protoreflect.MessageDescriptor)(nil)).Elem():   {"IsMapEntry", "Fields", "Oneofs", "ReservedNames", "ReservedRanges", "RequiredNumbers", "ExtensionRanges", "Messages", "Enums", "Extensions"},
-	reflect.TypeOf((*protoreflect.FieldDescriptor)(nil)).Elem():     {"Number", "Cardinality", "Kind", "HasJSONName", "JSONName", "HasPresence", "IsExtension", "IsPacked", "IsWeak", "IsList", "IsMap", "MapKey", "MapValue", "HasDefault", "Default", "ContainingOneof", "ContainingMessage", "Message", "Enum"},
-	reflect.TypeOf((*protoreflect.OneofDescriptor)(nil)).Elem():     {"Fields"}, // not directly used; must keep in sync with formatDescOpt
-	reflect.TypeOf((*protoreflect.EnumDescriptor)(nil)).Elem():      {"Values", "ReservedNames", "ReservedRanges"},
-	reflect.TypeOf((*protoreflect.EnumValueDescriptor)(nil)).Elem(): {"Number"},
-	reflect.TypeOf((*protoreflect.ServiceDescriptor)(nil)).Elem():   {"Methods"},
-	reflect.TypeOf((*protoreflect.MethodDescriptor)(nil)).Elem():    {"Input", "Output", "IsStreamingClient", "IsStreamingServer"},
+	reflect.TypeOf((*pref.FileDescriptor)(nil)).Elem():      {"Path", "Package", "Imports", "Messages", "Enums", "Extensions", "Services"},
+	reflect.TypeOf((*pref.MessageDescriptor)(nil)).Elem():   {"IsMapEntry", "Fields", "Oneofs", "ReservedNames", "ReservedRanges", "RequiredNumbers", "ExtensionRanges", "Messages", "Enums", "Extensions"},
+	reflect.TypeOf((*pref.FieldDescriptor)(nil)).Elem():     {"Number", "Cardinality", "Kind", "HasJSONName", "JSONName", "HasPresence", "IsExtension", "IsPacked", "IsWeak", "IsList", "IsMap", "MapKey", "MapValue", "HasDefault", "Default", "ContainingOneof", "ContainingMessage", "Message", "Enum"},
+	reflect.TypeOf((*pref.OneofDescriptor)(nil)).Elem():     {"Fields"}, // not directly used; must keep in sync with formatDescOpt
+	reflect.TypeOf((*pref.EnumDescriptor)(nil)).Elem():      {"Values", "ReservedNames", "ReservedRanges"},
+	reflect.TypeOf((*pref.EnumValueDescriptor)(nil)).Elem(): {"Number"},
+	reflect.TypeOf((*pref.ServiceDescriptor)(nil)).Elem():   {"Methods"},
+	reflect.TypeOf((*pref.MethodDescriptor)(nil)).Elem():    {"Input", "Output", "IsStreamingClient", "IsStreamingServer"},
 }
 
-func FormatDesc(s fmt.State, r rune, t protoreflect.Descriptor) {
+func FormatDesc(s fmt.State, r rune, t pref.Descriptor) {
 	io.WriteString(s, formatDescOpt(t, true, r == 'v' && (s.Flag('+') || s.Flag('#'))))
 }
-func formatDescOpt(t protoreflect.Descriptor, isRoot, allowMulti bool) string {
+func formatDescOpt(t pref.Descriptor, isRoot, allowMulti bool) string {
 	rv := reflect.ValueOf(t)
 	rt := rv.MethodByName("ProtoType").Type().In(0)
 
@@ -128,7 +128,7 @@ func formatDescOpt(t protoreflect.Descriptor, isRoot, allowMulti bool) string {
 		start = rt.Name() + "{"
 	}
 
-	_, isFile := t.(protoreflect.FileDescriptor)
+	_, isFile := t.(pref.FileDescriptor)
 	rs := records{allowMulti: allowMulti}
 	if t.IsPlaceholder() {
 		if isFile {
@@ -146,7 +146,7 @@ func formatDescOpt(t protoreflect.Descriptor, isRoot, allowMulti bool) string {
 			rs.Append(rv, "Name")
 		}
 		switch t := t.(type) {
-		case protoreflect.FieldDescriptor:
+		case pref.FieldDescriptor:
 			for _, s := range descriptorAccessors[rt] {
 				switch s {
 				case "MapKey":
@@ -156,9 +156,9 @@ func formatDescOpt(t protoreflect.Descriptor, isRoot, allowMulti bool) string {
 				case "MapValue":
 					if v := t.MapValue(); v != nil {
 						switch v.Kind() {
-						case protoreflect.EnumKind:
+						case pref.EnumKind:
 							rs.recs = append(rs.recs, [2]string{"MapValue", string(v.Enum().FullName())})
-						case protoreflect.MessageKind, protoreflect.GroupKind:
+						case pref.MessageKind, pref.GroupKind:
 							rs.recs = append(rs.recs, [2]string{"MapValue", string(v.Message().FullName())})
 						default:
 							rs.recs = append(rs.recs, [2]string{"MapValue", v.Kind().String()})
@@ -180,7 +180,7 @@ func formatDescOpt(t protoreflect.Descriptor, isRoot, allowMulti bool) string {
 					rs.Append(rv, s)
 				}
 			}
-		case protoreflect.OneofDescriptor:
+		case pref.OneofDescriptor:
 			var ss []string
 			fs := t.Fields()
 			for i := 0; i < fs.Len(); i++ {
@@ -216,7 +216,7 @@ func (rs *records) Append(v reflect.Value, accessors ...string) {
 		if !rv.IsValid() {
 			panic(fmt.Sprintf("unknown accessor: %v.%s", v.Type(), a))
 		}
-		if _, ok := rv.Interface().(protoreflect.Value); ok {
+		if _, ok := rv.Interface().(pref.Value); ok {
 			rv = rv.MethodByName("Interface").Call(nil)[0]
 			if !rv.IsNil() {
 				rv = rv.Elem()
@@ -250,9 +250,9 @@ func (rs *records) Append(v reflect.Value, accessors ...string) {
 		switch v := v.(type) {
 		case list:
 			s = formatListOpt(v, false, rs.allowMulti)
-		case protoreflect.FieldDescriptor, protoreflect.OneofDescriptor, protoreflect.EnumValueDescriptor, protoreflect.MethodDescriptor:
-			s = string(v.(protoreflect.Descriptor).Name())
-		case protoreflect.Descriptor:
+		case pref.FieldDescriptor, pref.OneofDescriptor, pref.EnumValueDescriptor, pref.MethodDescriptor:
+			s = string(v.(pref.Descriptor).Name())
+		case pref.Descriptor:
 			s = string(v.FullName())
 		case string:
 			s = strconv.Quote(v)

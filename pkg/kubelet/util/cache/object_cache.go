@@ -77,5 +77,9 @@ func (c *ObjectCache) Get(key string) (interface{}, error) {
 
 // Add adds objectEntry by using a unique string as the key.
 func (c *ObjectCache) Add(key string, obj interface{}) error {
-	return c.cache.Add(objectEntry{key: key, obj: obj})
+	err := c.cache.Add(objectEntry{key: key, obj: obj})
+	if err != nil {
+		return err
+	}
+	return nil
 }

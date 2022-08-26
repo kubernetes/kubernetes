@@ -115,7 +115,7 @@ func makePVC(name string, storageClassName string) pvcBuilder {
 			Namespace: v1.NamespaceDefault,
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
-			StorageClassName: pointer.String(storageClassName),
+			StorageClassName: pointer.StringPtr(storageClassName),
 		},
 	}}
 }

@@ -12,15 +12,15 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/order"
-	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/runtime/protoiface"
+	pref "google.golang.org/protobuf/reflect/protoreflect"
+	piface "google.golang.org/protobuf/runtime/protoiface"
 )
 
 // coderMessageInfo contains per-message information used by the fast-path functions.
 // This is a different type from MessageInfo to keep MessageInfo as general-purpose as
 // possible.
 type coderMessageInfo struct {
-	methods protoiface.Methods
+	methods piface.Methods
 
 	orderedCoderFields []*coderFieldInfo
 	denseCoderFields   []*coderFieldInfo
@@ -38,13 +38,13 @@ type coderFieldInfo struct {
 	funcs      pointerCoderFuncs // fast-path per-field functions
 	mi         *MessageInfo      // field's message
 	ft         reflect.Type
-	validation validationInfo           // information used by message validation
-	num        protoreflect.FieldNumber // field number
-	offset     offset                   // struct field offset
-	wiretag    uint64                   // field tag (number + wire type)
-	tagsize    int                      // size of the varint-encoded tag
-	isPointer  bool                     // true if IsNil may be called on the struct field
-	isRequired bool                     // true if field is required
+	validation validationInfo   // information used by message validation
+	num        pref.FieldNumber // field number
+	offset     offset           // struct field offset
+	wiretag    uint64           // field tag (number + wire type)
+	tagsize    int              // size of the varint-encoded tag
+	isPointer  bool             // true if IsNil may be called on the struct field
+	isRequired bool             // true if field is required
 }
 
 func (mi *MessageInfo) makeCoderMethods(t reflect.Type, si structInfo) {
@@ -125,8 +125,8 @@ func (mi *MessageInfo) makeCoderMethods(t reflect.Type, si structInfo) {
 			funcs:      funcs,
 			mi:         childMessage,
 			validation: newFieldValidationInfo(mi, si, fd, ft),
-			isPointer:  fd.Cardinality() == protoreflect.Repeated || fd.HasPresence(),
-			isRequired: fd.Cardinality() == protoreflect.Required,
+			isPointer:  fd.Cardinality() == pref.Repeated || fd.HasPresence(),
+			isRequired: fd.Cardinality() == pref.Required,
 		}
 		mi.orderedCoderFields = append(mi.orderedCoderFields, cf)
 		mi.coderFields[cf.num] = cf
@@ -149,7 +149,7 @@ func (mi *MessageInfo) makeCoderMethods(t reflect.Type, si structInfo) {
 		return mi.orderedCoderFields[i].num < mi.orderedCoderFields[j].num
 	})
 
-	var maxDense protoreflect.FieldNumber
+	var maxDense pref.FieldNumber
 	for _, cf := range mi.orderedCoderFields {
 		if cf.num >= 16 && cf.num >= 2*maxDense {
 			break
@@ -175,12 +175,12 @@ func (mi *MessageInfo) makeCoderMethods(t reflect.Type, si structInfo) {
 
 	mi.needsInitCheck = needsInitCheck(mi.Desc)
 	if mi.methods.Marshal == nil && mi.methods.Size == nil {
-		mi.methods.Flags |= protoiface.SupportMarshalDeterministic
+		mi.methods.Flags |= piface.SupportMarshalDeterministic
 		mi.methods.Marshal = mi.marshal
 		mi.methods.Size = mi.size
 	}
 	if mi.methods.Unmarshal == nil {
-		mi.methods.Flags |= protoiface.SupportUnmarshalDiscardUnknown
+		mi.methods.Flags |= piface.SupportUnmarshalDiscardUnknown
 		mi.methods.Unmarshal = mi.unmarshal
 	}
 	if mi.methods.CheckInitialized == nil {

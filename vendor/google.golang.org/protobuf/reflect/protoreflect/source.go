@@ -87,7 +87,6 @@ func (p1 SourcePath) Equal(p2 SourcePath) bool {
 // in a future version of this module.
 //
 // Example output:
-//
 //	.message_type[6].nested_type[15].field[3]
 func (p SourcePath) String() string {
 	b := p.appendFileDescriptorProto(nil)

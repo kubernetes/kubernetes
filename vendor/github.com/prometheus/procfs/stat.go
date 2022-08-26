@@ -41,7 +41,7 @@ type CPUStat struct {
 
 // SoftIRQStat represent the softirq statistics as exported in the procfs stat file.
 // A nice introduction can be found at https://0xax.gitbooks.io/linux-insides/content/interrupts/interrupts-9.html
-// It is possible to get per-cpu stats by reading `/proc/softirqs`.
+// It is possible to get per-cpu stats by reading /proc/softirqs
 type SoftIRQStat struct {
 	Hi          uint64
 	Timer       uint64
@@ -145,7 +145,7 @@ func parseSoftIRQStat(line string) (SoftIRQStat, uint64, error) {
 // NewStat returns information about current cpu/process statistics.
 // See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 //
-// Deprecated: Use fs.Stat() instead.
+// Deprecated: use fs.Stat() instead
 func NewStat() (Stat, error) {
 	fs, err := NewFS(fs.DefaultProcMountPoint)
 	if err != nil {
@@ -155,15 +155,15 @@ func NewStat() (Stat, error) {
 }
 
 // NewStat returns information about current cpu/process statistics.
-// See: https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+// See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 //
-// Deprecated: Use fs.Stat() instead.
+// Deprecated: use fs.Stat() instead
 func (fs FS) NewStat() (Stat, error) {
 	return fs.Stat()
 }
 
 // Stat returns information about current cpu/process statistics.
-// See: https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+// See https://www.kernel.org/doc/Documentation/filesystems/proc.txt
 func (fs FS) Stat() (Stat, error) {
 	fileName := fs.proc.Path("stat")
 	data, err := util.ReadFileNoStat(fileName)

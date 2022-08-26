@@ -249,7 +249,10 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 	if lastErr != nil {
 		return lastErr
 	}
-	return errors.Wrapf(err, "static Pod hash for component %s on Node %s did not change after %v", component, nodeName, w.timeout)
+	if err != nil {
+		return errors.Wrapf(err, "static Pod hash for component %s on Node %s did not change after %v", component, nodeName, w.timeout)
+	}
+	return nil
 }
 
 // getStaticPodSingleHash computes hashes for a single Static Pod resource

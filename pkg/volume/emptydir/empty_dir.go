@@ -524,7 +524,11 @@ func (ed *emptyDir) teardownDefault(dir string) error {
 	}
 	// Renaming the directory is not required anymore because the operation executor
 	// now handles duplicate operations on the same volume
-	return os.RemoveAll(dir)
+	err = os.RemoveAll(dir)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {

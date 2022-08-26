@@ -105,5 +105,9 @@ func (s *DryRunnableStorage) copyInto(in, out runtime.Object) error {
 		return err
 	}
 	_, _, err = s.Codec.Decode(data, nil, out)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
+
 }

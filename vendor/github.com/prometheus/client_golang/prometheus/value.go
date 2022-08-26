@@ -23,8 +23,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/prometheus/client_golang/prometheus/internal"
-
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -39,23 +37,6 @@ const (
 	GaugeValue
 	UntypedValue
 )
-
-var (
-	CounterMetricTypePtr = func() *dto.MetricType { d := dto.MetricType_COUNTER; return &d }()
-	GaugeMetricTypePtr   = func() *dto.MetricType { d := dto.MetricType_GAUGE; return &d }()
-	UntypedMetricTypePtr = func() *dto.MetricType { d := dto.MetricType_UNTYPED; return &d }()
-)
-
-func (v ValueType) ToDTO() *dto.MetricType {
-	switch v {
-	case CounterValue:
-		return CounterMetricTypePtr
-	case GaugeValue:
-		return GaugeMetricTypePtr
-	default:
-		return UntypedMetricTypePtr
-	}
-}
 
 // valueFunc is a generic metric for simple values retrieved on collect time
 // from a function. It implements Metric and Collector. Its effective type is
@@ -110,15 +91,11 @@ func NewConstMetric(desc *Desc, valueType ValueType, value float64, labelValues 
 	if err := validateLabelValues(labelValues, len(desc.variableLabels)); err != nil {
 		return nil, err
 	}
-
-	metric := &dto.Metric{}
-	if err := populateMetric(valueType, value, MakeLabelPairs(desc, labelValues), nil, metric); err != nil {
-		return nil, err
-	}
-
 	return &constMetric{
-		desc:   desc,
-		metric: metric,
+		desc:       desc,
+		valType:    valueType,
+		val:        value,
+		labelPairs: MakeLabelPairs(desc, labelValues),
 	}, nil
 }
 
@@ -133,8 +110,10 @@ func MustNewConstMetric(desc *Desc, valueType ValueType, value float64, labelVal
 }
 
 type constMetric struct {
-	desc   *Desc
-	metric *dto.Metric
+	desc       *Desc
+	valType    ValueType
+	val        float64
+	labelPairs []*dto.LabelPair
 }
 
 func (m *constMetric) Desc() *Desc {
@@ -142,11 +121,7 @@ func (m *constMetric) Desc() *Desc {
 }
 
 func (m *constMetric) Write(out *dto.Metric) error {
-	out.Label = m.metric.Label
-	out.Counter = m.metric.Counter
-	out.Gauge = m.metric.Gauge
-	out.Untyped = m.metric.Untyped
-	return nil
+	return populateMetric(m.valType, m.val, m.labelPairs, nil, out)
 }
 
 func populateMetric(
@@ -195,12 +170,12 @@ func MakeLabelPairs(desc *Desc, labelValues []string) []*dto.LabelPair {
 		})
 	}
 	labelPairs = append(labelPairs, desc.constLabelPairs...)
-	sort.Sort(internal.LabelPairSorter(labelPairs))
+	sort.Sort(labelPairSorter(labelPairs))
 	return labelPairs
 }
 
 // ExemplarMaxRunes is the max total number of runes allowed in exemplar labels.
-const ExemplarMaxRunes = 128
+const ExemplarMaxRunes = 64
 
 // newExemplar creates a new dto.Exemplar from the provided values. An error is
 // returned if any of the label names or values are invalid or if the total

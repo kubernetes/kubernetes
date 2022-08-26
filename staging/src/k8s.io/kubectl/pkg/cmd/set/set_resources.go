@@ -199,7 +199,10 @@ func (o *SetResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, ar
 	}
 
 	o.Infos, err = builder.Do().Infos()
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Validate makes sure that provided values in ResourcesOptions are valid

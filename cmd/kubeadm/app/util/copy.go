@@ -23,5 +23,9 @@ import (
 // CopyDir copies the content of a folder
 func CopyDir(src string, dst string) error {
 	cmd := exec.Command("cp", "-r", src, dst)
-	return cmd.Run()
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+	return nil
 }

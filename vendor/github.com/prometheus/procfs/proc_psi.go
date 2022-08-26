@@ -35,10 +35,9 @@ import (
 
 const lineFormat = "avg10=%f avg60=%f avg300=%f total=%d"
 
-// PSILine is a single line of values as returned by `/proc/pressure/*`.
-//
-// The Avg entries are averages over n seconds, as a percentage.
-// The Total line is in microseconds.
+// PSILine is a single line of values as returned by /proc/pressure/*
+// The Avg entries are averages over n seconds, as a percentage
+// The Total line is in microseconds
 type PSILine struct {
 	Avg10  float64
 	Avg60  float64
@@ -47,9 +46,8 @@ type PSILine struct {
 }
 
 // PSIStats represent pressure stall information from /proc/pressure/*
-//
-// "Some" indicates the share of time in which at least some tasks are stalled.
-// "Full" indicates the share of time in which all non-idle tasks are stalled simultaneously.
+// Some indicates the share of time in which at least some tasks are stalled
+// Full indicates the share of time in which all non-idle tasks are stalled simultaneously
 type PSIStats struct {
 	Some *PSILine
 	Full *PSILine
@@ -67,7 +65,7 @@ func (fs FS) PSIStatsForResource(resource string) (PSIStats, error) {
 	return parsePSIStats(resource, bytes.NewReader(data))
 }
 
-// parsePSIStats parses the specified file for pressure stall information.
+// parsePSIStats parses the specified file for pressure stall information
 func parsePSIStats(resource string, r io.Reader) (PSIStats, error) {
 	psiStats := PSIStats{}
 

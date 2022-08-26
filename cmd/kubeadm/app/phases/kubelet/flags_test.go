@@ -42,6 +42,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				},
 			},
 			expected: map[string]string{
+				"container-runtime":          "remote",
 				"container-runtime-endpoint": "unix:///var/run/containerd/containerd.sock",
 				"hostname-override":          "override-name",
 			},
@@ -67,6 +68,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				registerTaintsUsingFlags: true,
 			},
 			expected: map[string]string{
+				"container-runtime":          "remote",
 				"container-runtime-endpoint": "unix:///var/run/containerd/containerd.sock",
 				"register-with-taints":       "foo=bar:baz,key=val:eff",
 			},
@@ -80,6 +82,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				pauseImage: "registry.k8s.io/pause:3.8",
 			},
 			expected: map[string]string{
+				"container-runtime":          "remote",
 				"container-runtime-endpoint": "unix:///var/run/containerd/containerd.sock",
 				"pod-infra-container-image":  "registry.k8s.io/pause:3.8",
 			},

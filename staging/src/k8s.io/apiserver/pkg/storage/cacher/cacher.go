@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -69,10 +68,6 @@ type Config struct {
 
 	// An underlying storage.Versioner.
 	Versioner storage.Versioner
-
-	// The GroupResource the cacher is caching. Used for disambiguating *unstructured.Unstructured (CRDs) in logging
-	// and metrics.
-	GroupResource schema.GroupResource
 
 	// The Cache will be caching objects of a given Type and assumes that they
 	// are all stored under ResourcePrefix directory in the underlying database.
@@ -151,13 +146,13 @@ func (i *indexedWatchers) deleteWatcher(number int, value string, supported bool
 	}
 }
 
-func (i *indexedWatchers) terminateAll(groupResource schema.GroupResource, done func(*cacheWatcher)) {
+func (i *indexedWatchers) terminateAll(objectType reflect.Type, done func(*cacheWatcher)) {
 	// note that we don't have to call setDrainInputBufferLocked method on the watchers
 	// because we take advantage of the default value - stop immediately
 	// also watchers that have had already its draining strategy set
 	// are no longer available (they were removed from the allWatchers and the valueWatchers maps)
 	if len(i.allWatchers) > 0 || len(i.valueWatchers) > 0 {
-		klog.Warningf("Terminating all watchers from cacher %v", groupResource)
+		klog.Warningf("Terminating all watchers from cacher %v", objectType)
 	}
 	i.allWatchers.terminateAll(done)
 	for _, watchers := range i.valueWatchers {
@@ -263,8 +258,6 @@ type Cacher struct {
 
 	// Expected type of objects in the underlying cache.
 	objectType reflect.Type
-	// Used for logging, to disambiguate *unstructured.Unstructured (CRDs)
-	groupResource schema.GroupResource
 
 	// "sliding window" of recent changes of objects and the current state.
 	watchCache *watchCache
@@ -354,7 +347,6 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		ready:          newReady(),
 		storage:        config.Storage,
 		objectType:     objType,
-		groupResource:  config.GroupResource,
 		versioner:      config.Versioner,
 		newFunc:        config.NewFunc,
 		indexedTrigger: indexedTrigger,
@@ -385,7 +377,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	watchCache := newWatchCache(
-		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, config.GroupResource)
+		config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers, config.Clock, objType)
 	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
@@ -430,8 +422,8 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	c.watchCache.SetOnReplace(func() {
 		successfulList = true
 		c.ready.set(true)
-		klog.V(1).Infof("cacher (%v): initialized", c.groupResource.String())
-		metrics.WatchCacheInitializations.WithLabelValues(c.groupResource.String()).Inc()
+		klog.V(1).Infof("cacher (%v): initialized", c.objectType.String())
+		metrics.WatchCacheInitializations.WithLabelValues(c.objectType.String()).Inc()
 	})
 	defer func() {
 		if successfulList {
@@ -445,7 +437,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	// Also note that startCaching is called in a loop, so there's no need
 	// to have another loop here.
 	if err := c.reflector.ListAndWatch(stopChannel); err != nil {
-		klog.Errorf("cacher (%v): unexpected ListAndWatch error: %v; reinitializing...", c.groupResource.String(), err)
+		klog.Errorf("cacher (%v): unexpected ListAndWatch error: %v; reinitializing...", c.objectType.String(), err)
 	}
 }
 
@@ -516,16 +508,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// given that memory allocation may trigger GC and block the thread.
 	// Also note that emptyFunc is a placeholder, until we will be able
 	// to compute watcher.forget function (which has to happen under lock).
-	watcher := newCacheWatcher(
-		chanSize,
-		filterWithAttrsFunction(key, pred),
-		emptyFunc,
-		c.versioner,
-		deadline,
-		pred.AllowWatchBookmarks,
-		c.groupResource,
-		identifier,
-	)
+	watcher := newCacheWatcher(chanSize, filterWithAttrsFunction(key, pred), emptyFunc, c.versioner, deadline, pred.AllowWatchBookmarks, c.objectType, identifier)
 
 	// We explicitly use thread unsafe version and do locking ourself to ensure that
 	// no new events will be processed in the meantime. The watchCache will be unlocked
@@ -671,7 +654,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 
 	trace := utiltrace.New("cacher list",
 		utiltrace.Field{"audit-id", endpointsrequest.GetAuditIDTruncated(ctx)},
-		utiltrace.Field{Key: "type", Value: c.groupResource.String()})
+		utiltrace.Field{Key: "type", Value: c.objectType.String()})
 	defer trace.LogIfLong(500 * time.Millisecond)
 
 	if err := c.ready.wait(); err != nil {
@@ -774,7 +757,7 @@ func (c *Cacher) triggerValuesThreadUnsafe(event *watchCacheEvent) ([]string, bo
 func (c *Cacher) processEvent(event *watchCacheEvent) {
 	if curLen := int64(len(c.incoming)); c.incomingHWM.Update(curLen) {
 		// Monitor if this gets backed up, and how much.
-		klog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.groupResource.String(), curLen)
+		klog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.objectType.String(), curLen)
 	}
 	c.incoming <- *event
 }
@@ -805,7 +788,7 @@ func (c *Cacher) dispatchEvents() {
 				c.dispatchEvent(&event)
 			}
 			lastProcessedResourceVersion = event.ResourceVersion
-			metrics.EventsCounter.WithLabelValues(c.groupResource.String()).Inc()
+			metrics.EventsCounter.WithLabelValues(c.objectType.String()).Inc()
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
 			// Never send a bookmark event if we did not see an event here, this is fine
@@ -1025,7 +1008,7 @@ func (c *Cacher) finishDispatching() {
 func (c *Cacher) terminateAllWatchers() {
 	c.Lock()
 	defer c.Unlock()
-	c.watchers.terminateAll(c.groupResource, c.stopWatcherLocked)
+	c.watchers.terminateAll(c.objectType, c.stopWatcherLocked)
 }
 
 func (c *Cacher) stopWatcherLocked(watcher *cacheWatcher) {
@@ -1193,7 +1176,8 @@ type cacheWatcher struct {
 	// save it here to send bookmark events before that.
 	deadline            time.Time
 	allowWatchBookmarks bool
-	groupResource       schema.GroupResource
+	// Object type of the cache watcher interests
+	objectType reflect.Type
 
 	// human readable identifier that helps assigning cacheWatcher
 	// instance with request
@@ -1204,16 +1188,7 @@ type cacheWatcher struct {
 	drainInputBuffer bool
 }
 
-func newCacheWatcher(
-	chanSize int,
-	filter filterWithAttrsFunc,
-	forget func(bool),
-	versioner storage.Versioner,
-	deadline time.Time,
-	allowWatchBookmarks bool,
-	groupResource schema.GroupResource,
-	identifier string,
-) *cacheWatcher {
+func newCacheWatcher(chanSize int, filter filterWithAttrsFunc, forget func(bool), versioner storage.Versioner, deadline time.Time, allowWatchBookmarks bool, objectType reflect.Type, identifier string) *cacheWatcher {
 	return &cacheWatcher{
 		input:               make(chan *watchCacheEvent, chanSize),
 		result:              make(chan watch.Event, chanSize),
@@ -1224,7 +1199,7 @@ func newCacheWatcher(
 		versioner:           versioner,
 		deadline:            deadline,
 		allowWatchBookmarks: allowWatchBookmarks,
-		groupResource:       groupResource,
+		objectType:          objectType,
 		identifier:          identifier,
 	}
 }
@@ -1281,8 +1256,8 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
-		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v", c.groupResource.String(), c.identifier, len(c.input), len(c.result))
-		metrics.TerminatedWatchersCounter.WithLabelValues(c.groupResource.String()).Inc()
+		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v", c.objectType.String(), c.identifier, len(c.input), len(c.result))
+		metrics.TerminatedWatchersCounter.WithLabelValues(c.objectType.String()).Inc()
 		c.forget(false)
 	}
 
@@ -1480,12 +1455,13 @@ func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watch
 		initEventCount++
 	}
 
+	objType := c.objectType.String()
 	if initEventCount > 0 {
-		metrics.InitCounter.WithLabelValues(c.groupResource.String()).Add(float64(initEventCount))
+		metrics.InitCounter.WithLabelValues(objType).Add(float64(initEventCount))
 	}
 	processingTime := time.Since(startTime)
 	if processingTime > initProcessThreshold {
-		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, c.groupResource, c.identifier, processingTime)
+		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", initEventCount, objType, c.identifier, processingTime)
 	}
 
 	c.process(ctx, resourceVersion)

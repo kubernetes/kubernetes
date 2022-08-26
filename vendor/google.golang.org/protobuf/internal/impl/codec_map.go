@@ -10,7 +10,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/genid"
-	"google.golang.org/protobuf/reflect/protoreflect"
+	pref "google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type mapInfo struct {
@@ -19,12 +19,12 @@ type mapInfo struct {
 	valWiretag uint64
 	keyFuncs   valueCoderFuncs
 	valFuncs   valueCoderFuncs
-	keyZero    protoreflect.Value
-	keyKind    protoreflect.Kind
+	keyZero    pref.Value
+	keyKind    pref.Kind
 	conv       *mapConverter
 }
 
-func encoderFuncsForMap(fd protoreflect.FieldDescriptor, ft reflect.Type) (valueMessage *MessageInfo, funcs pointerCoderFuncs) {
+func encoderFuncsForMap(fd pref.FieldDescriptor, ft reflect.Type) (valueMessage *MessageInfo, funcs pointerCoderFuncs) {
 	// TODO: Consider generating specialized map coders.
 	keyField := fd.MapKey()
 	valField := fd.MapValue()
@@ -44,7 +44,7 @@ func encoderFuncsForMap(fd protoreflect.FieldDescriptor, ft reflect.Type) (value
 		keyKind:    keyField.Kind(),
 		conv:       conv,
 	}
-	if valField.Kind() == protoreflect.MessageKind {
+	if valField.Kind() == pref.MessageKind {
 		valueMessage = getMessageInfo(ft.Elem())
 	}
 
@@ -68,9 +68,9 @@ func encoderFuncsForMap(fd protoreflect.FieldDescriptor, ft reflect.Type) (value
 		},
 	}
 	switch valField.Kind() {
-	case protoreflect.MessageKind:
+	case pref.MessageKind:
 		funcs.merge = mergeMapOfMessage
-	case protoreflect.BytesKind:
+	case pref.BytesKind:
 		funcs.merge = mergeMapOfBytes
 	default:
 		funcs.merge = mergeMap
@@ -135,7 +135,7 @@ func consumeMap(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi *mapInfo
 		err := errUnknown
 		switch num {
 		case genid.MapEntry_Key_field_number:
-			var v protoreflect.Value
+			var v pref.Value
 			var o unmarshalOutput
 			v, o, err = mapi.keyFuncs.unmarshal(b, key, num, wtyp, opts)
 			if err != nil {
@@ -144,7 +144,7 @@ func consumeMap(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi *mapInfo
 			key = v
 			n = o.n
 		case genid.MapEntry_Value_field_number:
-			var v protoreflect.Value
+			var v pref.Value
 			var o unmarshalOutput
 			v, o, err = mapi.valFuncs.unmarshal(b, val, num, wtyp, opts)
 			if err != nil {
@@ -192,7 +192,7 @@ func consumeMapOfMessage(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi
 		err := errUnknown
 		switch num {
 		case 1:
-			var v protoreflect.Value
+			var v pref.Value
 			var o unmarshalOutput
 			v, o, err = mapi.keyFuncs.unmarshal(b, key, num, wtyp, opts)
 			if err != nil {

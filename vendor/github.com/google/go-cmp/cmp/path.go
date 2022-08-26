@@ -178,7 +178,7 @@ type structField struct {
 	unexported bool
 	mayForce   bool                // Forcibly allow visibility
 	paddr      bool                // Was parent addressable?
-	pvx, pvy   reflect.Value       // Parent values (always addressable)
+	pvx, pvy   reflect.Value       // Parent values (always addressible)
 	field      reflect.StructField // Field information
 }
 

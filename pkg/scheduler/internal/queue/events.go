@@ -30,8 +30,6 @@ const (
 	// ForceActivate is the event when a pod is moved from unschedulablePods/backoffQ
 	// to activeQ. Usually it's triggered by plugin implementations.
 	ForceActivate = "ForceActivate"
-	// PodUpdate is the event when a pod is updated
-	PodUpdate = "PodUpdate"
 )
 
 var (

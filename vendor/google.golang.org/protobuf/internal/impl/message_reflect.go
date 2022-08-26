@@ -10,17 +10,17 @@ import (
 
 	"google.golang.org/protobuf/internal/detrand"
 	"google.golang.org/protobuf/internal/pragma"
-	"google.golang.org/protobuf/reflect/protoreflect"
+	pref "google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type reflectMessageInfo struct {
-	fields map[protoreflect.FieldNumber]*fieldInfo
-	oneofs map[protoreflect.Name]*oneofInfo
+	fields map[pref.FieldNumber]*fieldInfo
+	oneofs map[pref.Name]*oneofInfo
 
 	// fieldTypes contains the zero value of an enum or message field.
 	// For lists, it contains the element type.
 	// For maps, it contains the entry value type.
-	fieldTypes map[protoreflect.FieldNumber]interface{}
+	fieldTypes map[pref.FieldNumber]interface{}
 
 	// denseFields is a subset of fields where:
 	//	0 < fieldDesc.Number() < len(denseFields)
@@ -30,8 +30,8 @@ type reflectMessageInfo struct {
 	// rangeInfos is a list of all fields (not belonging to a oneof) and oneofs.
 	rangeInfos []interface{} // either *fieldInfo or *oneofInfo
 
-	getUnknown   func(pointer) protoreflect.RawFields
-	setUnknown   func(pointer, protoreflect.RawFields)
+	getUnknown   func(pointer) pref.RawFields
+	setUnknown   func(pointer, pref.RawFields)
 	extensionMap func(pointer) *extensionMap
 
 	nilMessage atomicNilMessage
@@ -52,7 +52,7 @@ func (mi *MessageInfo) makeReflectFuncs(t reflect.Type, si structInfo) {
 // This code assumes that the struct is well-formed and panics if there are
 // any discrepancies.
 func (mi *MessageInfo) makeKnownFieldsFunc(si structInfo) {
-	mi.fields = map[protoreflect.FieldNumber]*fieldInfo{}
+	mi.fields = map[pref.FieldNumber]*fieldInfo{}
 	md := mi.Desc
 	fds := md.Fields()
 	for i := 0; i < fds.Len(); i++ {
@@ -82,7 +82,7 @@ func (mi *MessageInfo) makeKnownFieldsFunc(si structInfo) {
 		mi.fields[fd.Number()] = &fi
 	}
 
-	mi.oneofs = map[protoreflect.Name]*oneofInfo{}
+	mi.oneofs = map[pref.Name]*oneofInfo{}
 	for i := 0; i < md.Oneofs().Len(); i++ {
 		od := md.Oneofs().Get(i)
 		mi.oneofs[od.Name()] = makeOneofInfo(od, si, mi.Exporter)
@@ -117,13 +117,13 @@ func (mi *MessageInfo) makeUnknownFieldsFunc(t reflect.Type, si structInfo) {
 	switch {
 	case si.unknownOffset.IsValid() && si.unknownType == unknownFieldsAType:
 		// Handle as []byte.
-		mi.getUnknown = func(p pointer) protoreflect.RawFields {
+		mi.getUnknown = func(p pointer) pref.RawFields {
 			if p.IsNil() {
 				return nil
 			}
 			return *p.Apply(mi.unknownOffset).Bytes()
 		}
-		mi.setUnknown = func(p pointer, b protoreflect.RawFields) {
+		mi.setUnknown = func(p pointer, b pref.RawFields) {
 			if p.IsNil() {
 				panic("invalid SetUnknown on nil Message")
 			}
@@ -131,7 +131,7 @@ func (mi *MessageInfo) makeUnknownFieldsFunc(t reflect.Type, si structInfo) {
 		}
 	case si.unknownOffset.IsValid() && si.unknownType == unknownFieldsBType:
 		// Handle as *[]byte.
-		mi.getUnknown = func(p pointer) protoreflect.RawFields {
+		mi.getUnknown = func(p pointer) pref.RawFields {
 			if p.IsNil() {
 				return nil
 			}
@@ -141,7 +141,7 @@ func (mi *MessageInfo) makeUnknownFieldsFunc(t reflect.Type, si structInfo) {
 			}
 			return **bp
 		}
-		mi.setUnknown = func(p pointer, b protoreflect.RawFields) {
+		mi.setUnknown = func(p pointer, b pref.RawFields) {
 			if p.IsNil() {
 				panic("invalid SetUnknown on nil Message")
 			}
@@ -152,10 +152,10 @@ func (mi *MessageInfo) makeUnknownFieldsFunc(t reflect.Type, si structInfo) {
 			**bp = b
 		}
 	default:
-		mi.getUnknown = func(pointer) protoreflect.RawFields {
+		mi.getUnknown = func(pointer) pref.RawFields {
 			return nil
 		}
-		mi.setUnknown = func(p pointer, _ protoreflect.RawFields) {
+		mi.setUnknown = func(p pointer, _ pref.RawFields) {
 			if p.IsNil() {
 				panic("invalid SetUnknown on nil Message")
 			}
@@ -224,7 +224,7 @@ func (mi *MessageInfo) makeFieldTypes(si structInfo) {
 		}
 		if ft != nil {
 			if mi.fieldTypes == nil {
-				mi.fieldTypes = make(map[protoreflect.FieldNumber]interface{})
+				mi.fieldTypes = make(map[pref.FieldNumber]interface{})
 			}
 			mi.fieldTypes[fd.Number()] = reflect.Zero(ft).Interface()
 		}
@@ -233,7 +233,7 @@ func (mi *MessageInfo) makeFieldTypes(si structInfo) {
 
 type extensionMap map[int32]ExtensionField
 
-func (m *extensionMap) Range(f func(protoreflect.FieldDescriptor, protoreflect.Value) bool) {
+func (m *extensionMap) Range(f func(pref.FieldDescriptor, pref.Value) bool) {
 	if m != nil {
 		for _, x := range *m {
 			xd := x.Type().TypeDescriptor()
@@ -247,7 +247,7 @@ func (m *extensionMap) Range(f func(protoreflect.FieldDescriptor, protoreflect.V
 		}
 	}
 }
-func (m *extensionMap) Has(xt protoreflect.ExtensionType) (ok bool) {
+func (m *extensionMap) Has(xt pref.ExtensionType) (ok bool) {
 	if m == nil {
 		return false
 	}
@@ -266,10 +266,10 @@ func (m *extensionMap) Has(xt protoreflect.ExtensionType) (ok bool) {
 	}
 	return true
 }
-func (m *extensionMap) Clear(xt protoreflect.ExtensionType) {
+func (m *extensionMap) Clear(xt pref.ExtensionType) {
 	delete(*m, int32(xt.TypeDescriptor().Number()))
 }
-func (m *extensionMap) Get(xt protoreflect.ExtensionType) protoreflect.Value {
+func (m *extensionMap) Get(xt pref.ExtensionType) pref.Value {
 	xd := xt.TypeDescriptor()
 	if m != nil {
 		if x, ok := (*m)[int32(xd.Number())]; ok {
@@ -278,7 +278,7 @@ func (m *extensionMap) Get(xt protoreflect.ExtensionType) protoreflect.Value {
 	}
 	return xt.Zero()
 }
-func (m *extensionMap) Set(xt protoreflect.ExtensionType, v protoreflect.Value) {
+func (m *extensionMap) Set(xt pref.ExtensionType, v pref.Value) {
 	xd := xt.TypeDescriptor()
 	isValid := true
 	switch {
@@ -302,9 +302,9 @@ func (m *extensionMap) Set(xt protoreflect.ExtensionType, v protoreflect.Value) 
 	x.Set(xt, v)
 	(*m)[int32(xd.Number())] = x
 }
-func (m *extensionMap) Mutable(xt protoreflect.ExtensionType) protoreflect.Value {
+func (m *extensionMap) Mutable(xt pref.ExtensionType) pref.Value {
 	xd := xt.TypeDescriptor()
-	if xd.Kind() != protoreflect.MessageKind && xd.Kind() != protoreflect.GroupKind && !xd.IsList() && !xd.IsMap() {
+	if xd.Kind() != pref.MessageKind && xd.Kind() != pref.GroupKind && !xd.IsList() && !xd.IsMap() {
 		panic("invalid Mutable on field with non-composite type")
 	}
 	if x, ok := (*m)[int32(xd.Number())]; ok {
@@ -319,6 +319,7 @@ func (m *extensionMap) Mutable(xt protoreflect.ExtensionType) protoreflect.Value
 // concrete message. It provides a way to implement the ProtoReflect method
 // in an allocation-free way without needing to have a shadow Go type generated
 // for every message type. This technique only works using unsafe.
+//
 //
 // Example generated code:
 //
@@ -350,11 +351,12 @@ func (m *extensionMap) Mutable(xt protoreflect.ExtensionType) protoreflect.Value
 // It has access to the message info as its first field, and a pointer to the
 // MessageState is identical to a pointer to the concrete message value.
 //
+//
 // Requirements:
-//   - The type M must implement protoreflect.ProtoMessage.
-//   - The address of m must not be nil.
-//   - The address of m and the address of m.state must be equal,
-//     even though they are different Go types.
+//	• The type M must implement protoreflect.ProtoMessage.
+//	• The address of m must not be nil.
+//	• The address of m and the address of m.state must be equal,
+//	even though they are different Go types.
 type MessageState struct {
 	pragma.NoUnkeyedLiterals
 	pragma.DoNotCompare
@@ -366,8 +368,8 @@ type MessageState struct {
 type messageState MessageState
 
 var (
-	_ protoreflect.Message = (*messageState)(nil)
-	_ unwrapper            = (*messageState)(nil)
+	_ pref.Message = (*messageState)(nil)
+	_ unwrapper    = (*messageState)(nil)
 )
 
 // messageDataType is a tuple of a pointer to the message data and
@@ -385,16 +387,16 @@ type (
 )
 
 var (
-	_ protoreflect.Message      = (*messageReflectWrapper)(nil)
-	_ unwrapper                 = (*messageReflectWrapper)(nil)
-	_ protoreflect.ProtoMessage = (*messageIfaceWrapper)(nil)
-	_ unwrapper                 = (*messageIfaceWrapper)(nil)
+	_ pref.Message      = (*messageReflectWrapper)(nil)
+	_ unwrapper         = (*messageReflectWrapper)(nil)
+	_ pref.ProtoMessage = (*messageIfaceWrapper)(nil)
+	_ unwrapper         = (*messageIfaceWrapper)(nil)
 )
 
 // MessageOf returns a reflective view over a message. The input must be a
 // pointer to a named Go struct. If the provided type has a ProtoReflect method,
 // it must be implemented by calling this method.
-func (mi *MessageInfo) MessageOf(m interface{}) protoreflect.Message {
+func (mi *MessageInfo) MessageOf(m interface{}) pref.Message {
 	if reflect.TypeOf(m) != mi.GoReflectType {
 		panic(fmt.Sprintf("type mismatch: got %T, want %v", m, mi.GoReflectType))
 	}
@@ -419,7 +421,7 @@ func (m *messageIfaceWrapper) Reset() {
 		rv.Elem().Set(reflect.Zero(rv.Type().Elem()))
 	}
 }
-func (m *messageIfaceWrapper) ProtoReflect() protoreflect.Message {
+func (m *messageIfaceWrapper) ProtoReflect() pref.Message {
 	return (*messageReflectWrapper)(m)
 }
 func (m *messageIfaceWrapper) protoUnwrap() interface{} {
@@ -428,7 +430,7 @@ func (m *messageIfaceWrapper) protoUnwrap() interface{} {
 
 // checkField verifies that the provided field descriptor is valid.
 // Exactly one of the returned values is populated.
-func (mi *MessageInfo) checkField(fd protoreflect.FieldDescriptor) (*fieldInfo, protoreflect.ExtensionType) {
+func (mi *MessageInfo) checkField(fd pref.FieldDescriptor) (*fieldInfo, pref.ExtensionType) {
 	var fi *fieldInfo
 	if n := fd.Number(); 0 < n && int(n) < len(mi.denseFields) {
 		fi = mi.denseFields[n]
@@ -453,7 +455,7 @@ func (mi *MessageInfo) checkField(fd protoreflect.FieldDescriptor) (*fieldInfo, 
 		if !mi.Desc.ExtensionRanges().Has(fd.Number()) {
 			panic(fmt.Sprintf("extension %v extends %v outside the extension range", fd.FullName(), mi.Desc.FullName()))
 		}
-		xtd, ok := fd.(protoreflect.ExtensionTypeDescriptor)
+		xtd, ok := fd.(pref.ExtensionTypeDescriptor)
 		if !ok {
 			panic(fmt.Sprintf("extension %v does not implement protoreflect.ExtensionTypeDescriptor", fd.FullName()))
 		}

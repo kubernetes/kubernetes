@@ -45,7 +45,7 @@ type Cgroup struct {
 }
 
 // parseCgroupString parses each line of the /proc/[pid]/cgroup file
-// Line format is hierarchyID:[controller1,controller2]:path.
+// Line format is hierarchyID:[controller1,controller2]:path
 func parseCgroupString(cgroupStr string) (*Cgroup, error) {
 	var err error
 
@@ -69,7 +69,7 @@ func parseCgroupString(cgroupStr string) (*Cgroup, error) {
 	return cgroup, nil
 }
 
-// parseCgroups reads each line of the /proc/[pid]/cgroup file.
+// parseCgroups reads each line of the /proc/[pid]/cgroup file
 func parseCgroups(data []byte) ([]Cgroup, error) {
 	var cgroups []Cgroup
 	scanner := bufio.NewScanner(bytes.NewReader(data))
@@ -88,7 +88,7 @@ func parseCgroups(data []byte) ([]Cgroup, error) {
 
 // Cgroups reads from /proc/<pid>/cgroups and returns a []*Cgroup struct locating this PID in each process
 // control hierarchy running on this system. On every system (v1 and v2), all hierarchies contain all processes,
-// so the len of the returned struct is equal to the number of active hierarchies on this system.
+// so the len of the returned struct is equal to the number of active hierarchies on this system
 func (p Proc) Cgroups() ([]Cgroup, error) {
 	data, err := util.ReadFileNoStat(p.path("cgroup"))
 	if err != nil {

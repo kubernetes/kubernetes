@@ -138,7 +138,10 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err er
 
 	// build the printer
 	o.Printer, err = o.PrintFlags.ToPrinter()
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // RunConvert implements the generic Convert command

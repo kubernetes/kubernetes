@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -83,7 +84,7 @@ func parseIPVSStats(r io.Reader) (IPVSStats, error) {
 		stats       IPVSStats
 	)
 
-	statContent, err := io.ReadAll(r)
+	statContent, err := ioutil.ReadAll(r)
 	if err != nil {
 		return IPVSStats{}, err
 	}

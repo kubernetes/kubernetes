@@ -10,16 +10,17 @@ import (
 	"reflect"
 
 	"google.golang.org/protobuf/internal/descopts"
-	"google.golang.org/protobuf/internal/filedesc"
+	fdesc "google.golang.org/protobuf/internal/filedesc"
 	pimpl "google.golang.org/protobuf/internal/impl"
-	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
+	pref "google.golang.org/protobuf/reflect/protoreflect"
+	preg "google.golang.org/protobuf/reflect/protoregistry"
 )
 
 // Builder constructs type descriptors from a raw file descriptor
 // and associated Go types for each enum and message declaration.
 //
-// # Flattened Ordering
+//
+// Flattened Ordering
 //
 // The protobuf type system represents declarations as a tree. Certain nodes in
 // the tree require us to either associate it with a concrete Go type or to
@@ -51,7 +52,7 @@ import (
 // that children themselves may have.
 type Builder struct {
 	// File is the underlying file descriptor builder.
-	File filedesc.Builder
+	File fdesc.Builder
 
 	// GoTypes is a unique set of the Go types for all declarations and
 	// dependencies. Each type is represented as a zero value of the Go type.
@@ -107,22 +108,22 @@ type Builder struct {
 	// TypeRegistry is the registry to register each type descriptor.
 	// If nil, it uses protoregistry.GlobalTypes.
 	TypeRegistry interface {
-		RegisterMessage(protoreflect.MessageType) error
-		RegisterEnum(protoreflect.EnumType) error
-		RegisterExtension(protoreflect.ExtensionType) error
+		RegisterMessage(pref.MessageType) error
+		RegisterEnum(pref.EnumType) error
+		RegisterExtension(pref.ExtensionType) error
 	}
 }
 
 // Out is the output of the builder.
 type Out struct {
-	File protoreflect.FileDescriptor
+	File pref.FileDescriptor
 }
 
 func (tb Builder) Build() (out Out) {
 	// Replace the resolver with one that resolves dependencies by index,
 	// which is faster and more reliable than relying on the global registry.
 	if tb.File.FileRegistry == nil {
-		tb.File.FileRegistry = protoregistry.GlobalFiles
+		tb.File.FileRegistry = preg.GlobalFiles
 	}
 	tb.File.FileRegistry = &resolverByIndex{
 		goTypes:      tb.GoTypes,
@@ -132,7 +133,7 @@ func (tb Builder) Build() (out Out) {
 
 	// Initialize registry if unpopulated.
 	if tb.TypeRegistry == nil {
-		tb.TypeRegistry = protoregistry.GlobalTypes
+		tb.TypeRegistry = preg.GlobalTypes
 	}
 
 	fbOut := tb.File.Build()
@@ -182,23 +183,23 @@ func (tb Builder) Build() (out Out) {
 			for i := range fbOut.Messages {
 				switch fbOut.Messages[i].Name() {
 				case "FileOptions":
-					descopts.File = messageGoTypes[i].(protoreflect.ProtoMessage)
+					descopts.File = messageGoTypes[i].(pref.ProtoMessage)
 				case "EnumOptions":
-					descopts.Enum = messageGoTypes[i].(protoreflect.ProtoMessage)
+					descopts.Enum = messageGoTypes[i].(pref.ProtoMessage)
 				case "EnumValueOptions":
-					descopts.EnumValue = messageGoTypes[i].(protoreflect.ProtoMessage)
+					descopts.EnumValue = messageGoTypes[i].(pref.ProtoMessage)
 				case "MessageOptions":
-					descopts.Message = messageGoTypes[i].(protoreflect.ProtoMessage)
+					descopts.Message = messageGoTypes[i].(pref.ProtoMessage)
 				case "FieldOptions":
-					descopts.Field = messageGoTypes[i].(protoreflect.ProtoMessage)
+					descopts.Field = messageGoTypes[i].(pref.ProtoMessage)
 				case "OneofOptions":
-					descopts.Oneof = messageGoTypes[i].(protoreflect.ProtoMessage)
+					descopts.Oneof = messageGoTypes[i].(pref.ProtoMessage)
 				case "ExtensionRangeOptions":
-					descopts.ExtensionRange = messageGoTypes[i].(protoreflect.ProtoMessage)
+					descopts.ExtensionRange = messageGoTypes[i].(pref.ProtoMessage)
 				case "ServiceOptions":
-					descopts.Service = messageGoTypes[i].(protoreflect.ProtoMessage)
+					descopts.Service = messageGoTypes[i].(pref.ProtoMessage)
 				case "MethodOptions":
-					descopts.Method = messageGoTypes[i].(protoreflect.ProtoMessage)
+					descopts.Method = messageGoTypes[i].(pref.ProtoMessage)
 				}
 			}
 		}
@@ -215,11 +216,11 @@ func (tb Builder) Build() (out Out) {
 		const listExtDeps = 2
 		var goType reflect.Type
 		switch fbOut.Extensions[i].L1.Kind {
-		case protoreflect.EnumKind:
+		case pref.EnumKind:
 			j := depIdxs.Get(tb.DependencyIndexes, listExtDeps, depIdx)
 			goType = reflect.TypeOf(tb.GoTypes[j])
 			depIdx++
-		case protoreflect.MessageKind, protoreflect.GroupKind:
+		case pref.MessageKind, pref.GroupKind:
 			j := depIdxs.Get(tb.DependencyIndexes, listExtDeps, depIdx)
 			goType = reflect.TypeOf(tb.GoTypes[j])
 			depIdx++
@@ -241,22 +242,22 @@ func (tb Builder) Build() (out Out) {
 	return out
 }
 
-var goTypeForPBKind = map[protoreflect.Kind]reflect.Type{
-	protoreflect.BoolKind:     reflect.TypeOf(bool(false)),
-	protoreflect.Int32Kind:    reflect.TypeOf(int32(0)),
-	protoreflect.Sint32Kind:   reflect.TypeOf(int32(0)),
-	protoreflect.Sfixed32Kind: reflect.TypeOf(int32(0)),
-	protoreflect.Int64Kind:    reflect.TypeOf(int64(0)),
-	protoreflect.Sint64Kind:   reflect.TypeOf(int64(0)),
-	protoreflect.Sfixed64Kind: reflect.TypeOf(int64(0)),
-	protoreflect.Uint32Kind:   reflect.TypeOf(uint32(0)),
-	protoreflect.Fixed32Kind:  reflect.TypeOf(uint32(0)),
-	protoreflect.Uint64Kind:   reflect.TypeOf(uint64(0)),
-	protoreflect.Fixed64Kind:  reflect.TypeOf(uint64(0)),
-	protoreflect.FloatKind:    reflect.TypeOf(float32(0)),
-	protoreflect.DoubleKind:   reflect.TypeOf(float64(0)),
-	protoreflect.StringKind:   reflect.TypeOf(string("")),
-	protoreflect.BytesKind:    reflect.TypeOf([]byte(nil)),
+var goTypeForPBKind = map[pref.Kind]reflect.Type{
+	pref.BoolKind:     reflect.TypeOf(bool(false)),
+	pref.Int32Kind:    reflect.TypeOf(int32(0)),
+	pref.Sint32Kind:   reflect.TypeOf(int32(0)),
+	pref.Sfixed32Kind: reflect.TypeOf(int32(0)),
+	pref.Int64Kind:    reflect.TypeOf(int64(0)),
+	pref.Sint64Kind:   reflect.TypeOf(int64(0)),
+	pref.Sfixed64Kind: reflect.TypeOf(int64(0)),
+	pref.Uint32Kind:   reflect.TypeOf(uint32(0)),
+	pref.Fixed32Kind:  reflect.TypeOf(uint32(0)),
+	pref.Uint64Kind:   reflect.TypeOf(uint64(0)),
+	pref.Fixed64Kind:  reflect.TypeOf(uint64(0)),
+	pref.FloatKind:    reflect.TypeOf(float32(0)),
+	pref.DoubleKind:   reflect.TypeOf(float64(0)),
+	pref.StringKind:   reflect.TypeOf(string("")),
+	pref.BytesKind:    reflect.TypeOf([]byte(nil)),
 }
 
 type depIdxs []int32
@@ -273,13 +274,13 @@ type (
 		fileRegistry
 	}
 	fileRegistry interface {
-		FindFileByPath(string) (protoreflect.FileDescriptor, error)
-		FindDescriptorByName(protoreflect.FullName) (protoreflect.Descriptor, error)
-		RegisterFile(protoreflect.FileDescriptor) error
+		FindFileByPath(string) (pref.FileDescriptor, error)
+		FindDescriptorByName(pref.FullName) (pref.Descriptor, error)
+		RegisterFile(pref.FileDescriptor) error
 	}
 )
 
-func (r *resolverByIndex) FindEnumByIndex(i, j int32, es []filedesc.Enum, ms []filedesc.Message) protoreflect.EnumDescriptor {
+func (r *resolverByIndex) FindEnumByIndex(i, j int32, es []fdesc.Enum, ms []fdesc.Message) pref.EnumDescriptor {
 	if depIdx := int(r.depIdxs.Get(i, j)); int(depIdx) < len(es)+len(ms) {
 		return &es[depIdx]
 	} else {
@@ -287,7 +288,7 @@ func (r *resolverByIndex) FindEnumByIndex(i, j int32, es []filedesc.Enum, ms []f
 	}
 }
 
-func (r *resolverByIndex) FindMessageByIndex(i, j int32, es []filedesc.Enum, ms []filedesc.Message) protoreflect.MessageDescriptor {
+func (r *resolverByIndex) FindMessageByIndex(i, j int32, es []fdesc.Enum, ms []fdesc.Message) pref.MessageDescriptor {
 	if depIdx := int(r.depIdxs.Get(i, j)); depIdx < len(es)+len(ms) {
 		return &ms[depIdx-len(es)]
 	} else {

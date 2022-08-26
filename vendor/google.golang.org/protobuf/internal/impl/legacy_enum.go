@@ -13,12 +13,13 @@ import (
 	"google.golang.org/protobuf/internal/filedesc"
 	"google.golang.org/protobuf/internal/strs"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	pref "google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // legacyEnumName returns the name of enums used in legacy code.
 // It is neither the protobuf full name nor the qualified Go name,
 // but rather an odd hybrid of both.
-func legacyEnumName(ed protoreflect.EnumDescriptor) string {
+func legacyEnumName(ed pref.EnumDescriptor) string {
 	var protoPkg string
 	enumName := string(ed.FullName())
 	if fd := ed.ParentFile(); fd != nil {
@@ -33,68 +34,68 @@ func legacyEnumName(ed protoreflect.EnumDescriptor) string {
 
 // legacyWrapEnum wraps v as a protoreflect.Enum,
 // where v must be a int32 kind and not implement the v2 API already.
-func legacyWrapEnum(v reflect.Value) protoreflect.Enum {
+func legacyWrapEnum(v reflect.Value) pref.Enum {
 	et := legacyLoadEnumType(v.Type())
-	return et.New(protoreflect.EnumNumber(v.Int()))
+	return et.New(pref.EnumNumber(v.Int()))
 }
 
 var legacyEnumTypeCache sync.Map // map[reflect.Type]protoreflect.EnumType
 
 // legacyLoadEnumType dynamically loads a protoreflect.EnumType for t,
 // where t must be an int32 kind and not implement the v2 API already.
-func legacyLoadEnumType(t reflect.Type) protoreflect.EnumType {
+func legacyLoadEnumType(t reflect.Type) pref.EnumType {
 	// Fast-path: check if a EnumType is cached for this concrete type.
 	if et, ok := legacyEnumTypeCache.Load(t); ok {
-		return et.(protoreflect.EnumType)
+		return et.(pref.EnumType)
 	}
 
 	// Slow-path: derive enum descriptor and initialize EnumType.
-	var et protoreflect.EnumType
+	var et pref.EnumType
 	ed := LegacyLoadEnumDesc(t)
 	et = &legacyEnumType{
 		desc:   ed,
 		goType: t,
 	}
 	if et, ok := legacyEnumTypeCache.LoadOrStore(t, et); ok {
-		return et.(protoreflect.EnumType)
+		return et.(pref.EnumType)
 	}
 	return et
 }
 
 type legacyEnumType struct {
-	desc   protoreflect.EnumDescriptor
+	desc   pref.EnumDescriptor
 	goType reflect.Type
 	m      sync.Map // map[protoreflect.EnumNumber]proto.Enum
 }
 
-func (t *legacyEnumType) New(n protoreflect.EnumNumber) protoreflect.Enum {
+func (t *legacyEnumType) New(n pref.EnumNumber) pref.Enum {
 	if e, ok := t.m.Load(n); ok {
-		return e.(protoreflect.Enum)
+		return e.(pref.Enum)
 	}
 	e := &legacyEnumWrapper{num: n, pbTyp: t, goTyp: t.goType}
 	t.m.Store(n, e)
 	return e
 }
-func (t *legacyEnumType) Descriptor() protoreflect.EnumDescriptor {
+func (t *legacyEnumType) Descriptor() pref.EnumDescriptor {
 	return t.desc
 }
 
 type legacyEnumWrapper struct {
-	num   protoreflect.EnumNumber
-	pbTyp protoreflect.EnumType
+	num   pref.EnumNumber
+	pbTyp pref.EnumType
 	goTyp reflect.Type
 }
 
-func (e *legacyEnumWrapper) Descriptor() protoreflect.EnumDescriptor {
+func (e *legacyEnumWrapper) Descriptor() pref.EnumDescriptor {
 	return e.pbTyp.Descriptor()
 }
-func (e *legacyEnumWrapper) Type() protoreflect.EnumType {
+func (e *legacyEnumWrapper) Type() pref.EnumType {
 	return e.pbTyp
 }
-func (e *legacyEnumWrapper) Number() protoreflect.EnumNumber {
+func (e *legacyEnumWrapper) Number() pref.EnumNumber {
 	return e.num
 }
-func (e *legacyEnumWrapper) ProtoReflect() protoreflect.Enum {
+func (e *legacyEnumWrapper) ProtoReflect() pref.Enum {
 	return e
 }
 func (e *legacyEnumWrapper) protoUnwrap() interface{} {
@@ -104,8 +105,8 @@ func (e *legacyEnumWrapper) protoUnwrap() interface{} {
 }
 
 var (
-	_ protoreflect.Enum = (*legacyEnumWrapper)(nil)
-	_ unwrapper         = (*legacyEnumWrapper)(nil)
+	_ pref.Enum = (*legacyEnumWrapper)(nil)
+	_ unwrapper = (*legacyEnumWrapper)(nil)
 )
 
 var legacyEnumDescCache sync.Map // map[reflect.Type]protoreflect.EnumDescriptor
@@ -114,15 +115,15 @@ var legacyEnumDescCache sync.Map // map[reflect.Type]protoreflect.EnumDescriptor
 // which must be an int32 kind and not implement the v2 API already.
 //
 // This is exported for testing purposes.
-func LegacyLoadEnumDesc(t reflect.Type) protoreflect.EnumDescriptor {
+func LegacyLoadEnumDesc(t reflect.Type) pref.EnumDescriptor {
 	// Fast-path: check if an EnumDescriptor is cached for this concrete type.
 	if ed, ok := legacyEnumDescCache.Load(t); ok {
-		return ed.(protoreflect.EnumDescriptor)
+		return ed.(pref.EnumDescriptor)
 	}
 
 	// Slow-path: initialize EnumDescriptor from the raw descriptor.
 	ev := reflect.Zero(t).Interface()
-	if _, ok := ev.(protoreflect.Enum); ok {
+	if _, ok := ev.(pref.Enum); ok {
 		panic(fmt.Sprintf("%v already implements proto.Enum", t))
 	}
 	edV1, ok := ev.(enumV1)
@@ -131,7 +132,7 @@ func LegacyLoadEnumDesc(t reflect.Type) protoreflect.EnumDescriptor {
 	}
 	b, idxs := edV1.EnumDescriptor()
 
-	var ed protoreflect.EnumDescriptor
+	var ed pref.EnumDescriptor
 	if len(idxs) == 1 {
 		ed = legacyLoadFileDesc(b).Enums().Get(idxs[0])
 	} else {
@@ -157,10 +158,10 @@ var aberrantEnumDescCache sync.Map // map[reflect.Type]protoreflect.EnumDescript
 // We are unable to use the global enum registry since it is
 // unfortunately keyed by the protobuf full name, which we also do not know.
 // Thus, this produces some bogus enum descriptor based on the Go type name.
-func aberrantLoadEnumDesc(t reflect.Type) protoreflect.EnumDescriptor {
+func aberrantLoadEnumDesc(t reflect.Type) pref.EnumDescriptor {
 	// Fast-path: check if an EnumDescriptor is cached for this concrete type.
 	if ed, ok := aberrantEnumDescCache.Load(t); ok {
-		return ed.(protoreflect.EnumDescriptor)
+		return ed.(pref.EnumDescriptor)
 	}
 
 	// Slow-path: construct a bogus, but unique EnumDescriptor.
@@ -181,7 +182,7 @@ func aberrantLoadEnumDesc(t reflect.Type) protoreflect.EnumDescriptor {
 	// An exhaustive query is clearly impractical, but can be best-effort.
 
 	if ed, ok := aberrantEnumDescCache.LoadOrStore(t, ed); ok {
-		return ed.(protoreflect.EnumDescriptor)
+		return ed.(pref.EnumDescriptor)
 	}
 	return ed
 }
@@ -191,7 +192,7 @@ func aberrantLoadEnumDesc(t reflect.Type) protoreflect.EnumDescriptor {
 // It should be sufficiently unique within a program.
 //
 // This is exported for testing purposes.
-func AberrantDeriveFullName(t reflect.Type) protoreflect.FullName {
+func AberrantDeriveFullName(t reflect.Type) pref.FullName {
 	sanitize := func(r rune) rune {
 		switch {
 		case r == '/':
@@ -214,5 +215,5 @@ func AberrantDeriveFullName(t reflect.Type) protoreflect.FullName {
 			ss[i] = "x" + s
 		}
 	}
-	return protoreflect.FullName(strings.Join(ss, "."))
+	return pref.FullName(strings.Join(ss, "."))
 }

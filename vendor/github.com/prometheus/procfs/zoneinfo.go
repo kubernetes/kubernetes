@@ -11,7 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build !windows
 // +build !windows
 
 package procfs
@@ -19,7 +18,7 @@ package procfs
 import (
 	"bytes"
 	"fmt"
-	"os"
+	"io/ioutil"
 	"regexp"
 	"strings"
 
@@ -73,7 +72,7 @@ var nodeZoneRE = regexp.MustCompile(`(\d+), zone\s+(\w+)`)
 // structs containing the relevant info.  More information available here:
 // https://www.kernel.org/doc/Documentation/sysctl/vm.txt
 func (fs FS) Zoneinfo() ([]Zoneinfo, error) {
-	data, err := os.ReadFile(fs.proc.Path("zoneinfo"))
+	data, err := ioutil.ReadFile(fs.proc.Path("zoneinfo"))
 	if err != nil {
 		return nil, fmt.Errorf("error reading zoneinfo %q: %w", fs.proc.Path("zoneinfo"), err)
 	}

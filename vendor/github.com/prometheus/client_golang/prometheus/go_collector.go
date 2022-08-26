@@ -19,10 +19,6 @@ import (
 	"time"
 )
 
-// goRuntimeMemStats provides the metrics initially provided by runtime.ReadMemStats.
-// From Go 1.17 those similar (and better) statistics are provided by runtime/metrics, so
-// while eval closure works on runtime.MemStats, the struct from Go 1.17+ is
-// populated using runtime/metrics.
 func goRuntimeMemStats() memStatsMetrics {
 	return memStatsMetrics{
 		{
@@ -201,6 +197,14 @@ func goRuntimeMemStats() memStatsMetrics {
 			),
 			eval:    func(ms *runtime.MemStats) float64 { return float64(ms.NextGC) },
 			valType: GaugeValue,
+		}, {
+			desc: NewDesc(
+				memstatNamespace("gc_cpu_fraction"),
+				"The fraction of this program's available CPU time used by the GC since the program started.",
+				nil, nil,
+			),
+			eval:    func(ms *runtime.MemStats) float64 { return ms.GCCPUFraction },
+			valType: GaugeValue,
 		},
 	}
 }
@@ -228,7 +232,7 @@ func newBaseGoCollector() baseGoCollector {
 			"A summary of the pause duration of garbage collection cycles.",
 			nil, nil),
 		gcLastTimeDesc: NewDesc(
-			"go_memstats_last_gc_time_seconds",
+			memstatNamespace("last_gc_time_seconds"),
 			"Number of seconds since 1970 of last garbage collection.",
 			nil, nil),
 		goInfoDesc: NewDesc(
@@ -250,9 +254,8 @@ func (c *baseGoCollector) Describe(ch chan<- *Desc) {
 // Collect returns the current state of all metrics of the collector.
 func (c *baseGoCollector) Collect(ch chan<- Metric) {
 	ch <- MustNewConstMetric(c.goroutinesDesc, GaugeValue, float64(runtime.NumGoroutine()))
-
-	n := getRuntimeNumThreads()
-	ch <- MustNewConstMetric(c.threadsDesc, GaugeValue, n)
+	n, _ := runtime.ThreadCreateProfile(nil)
+	ch <- MustNewConstMetric(c.threadsDesc, GaugeValue, float64(n))
 
 	var stats debug.GCStats
 	stats.PauseQuantiles = make([]time.Duration, 5)
@@ -265,6 +268,7 @@ func (c *baseGoCollector) Collect(ch chan<- Metric) {
 	quantiles[0.0] = stats.PauseQuantiles[0].Seconds()
 	ch <- MustNewConstSummary(c.gcDesc, uint64(stats.NumGC), stats.PauseTotal.Seconds(), quantiles)
 	ch <- MustNewConstMetric(c.gcLastTimeDesc, GaugeValue, float64(stats.LastGC.UnixNano())/1e9)
+
 	ch <- MustNewConstMetric(c.goInfoDesc, GaugeValue, 1)
 }
 

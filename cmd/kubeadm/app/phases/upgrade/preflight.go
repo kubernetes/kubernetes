@@ -110,5 +110,8 @@ func checkMigration(client clientset.Interface) error {
 
 	currentInstalledCoreDNSversion = strings.TrimLeft(currentInstalledCoreDNSversion, "v")
 	_, err = migration.Migrate(currentInstalledCoreDNSversion, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"), corefile, false)
-	return errors.Wrap(err, "CoreDNS will not be upgraded")
+	if err != nil {
+		return errors.Wrap(err, "CoreDNS will not be upgraded")
+	}
+	return nil
 }

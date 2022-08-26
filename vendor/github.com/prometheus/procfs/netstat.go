@@ -21,13 +21,13 @@ import (
 	"strings"
 )
 
-// NetStat contains statistics for all the counters from one file.
+// NetStat contains statistics for all the counters from one file
 type NetStat struct {
-	Stats    map[string][]uint64
 	Filename string
+	Stats    map[string][]uint64
 }
 
-// NetStat retrieves stats from `/proc/net/stat/`.
+// NetStat retrieves stats from /proc/net/stat/
 func (fs FS) NetStat() ([]NetStat, error) {
 	statFiles, err := filepath.Glob(fs.proc.Path("net/stat/*"))
 	if err != nil {
@@ -55,7 +55,7 @@ func (fs FS) NetStat() ([]NetStat, error) {
 		// Other strings represent per-CPU counters
 		for scanner.Scan() {
 			for num, counter := range strings.Fields(scanner.Text()) {
-				value, err := strconv.ParseUint(counter, 16, 64)
+				value, err := strconv.ParseUint(counter, 16, 32)
 				if err != nil {
 					return nil, err
 				}

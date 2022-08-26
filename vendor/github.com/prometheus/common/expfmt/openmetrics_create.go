@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/protobuf/ptypes"
 	"github.com/prometheus/common/model"
 
 	dto "github.com/prometheus/client_model/go"
@@ -472,11 +473,10 @@ func writeExemplar(w enhancedWriter, e *dto.Exemplar) (int, error) {
 		if err != nil {
 			return written, err
 		}
-		err = (*e).Timestamp.CheckValid()
+		ts, err := ptypes.Timestamp((*e).Timestamp)
 		if err != nil {
 			return written, err
 		}
-		ts := (*e).Timestamp.AsTime()
 		// TODO(beorn7): Format this directly from components of ts to
 		// avoid overflow/underflow and precision issues of the float
 		// conversion.

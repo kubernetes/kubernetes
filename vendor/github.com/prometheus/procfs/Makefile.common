@@ -36,6 +36,29 @@ GO_VERSION        ?= $(shell $(GO) version)
 GO_VERSION_NUMBER ?= $(word 3, $(GO_VERSION))
 PRE_GO_111        ?= $(shell echo $(GO_VERSION_NUMBER) | grep -E 'go1\.(10|[0-9])\.')
 
+GOVENDOR :=
+GO111MODULE :=
+ifeq (, $(PRE_GO_111))
+	ifneq (,$(wildcard go.mod))
+		# Enforce Go modules support just in case the directory is inside GOPATH (and for Travis CI).
+		GO111MODULE := on
+
+		ifneq (,$(wildcard vendor))
+			# Always use the local vendor/ directory to satisfy the dependencies.
+			GOOPTS := $(GOOPTS) -mod=vendor
+		endif
+	endif
+else
+	ifneq (,$(wildcard go.mod))
+		ifneq (,$(wildcard vendor))
+$(warning This repository requires Go >= 1.11 because of Go modules)
+$(warning Some recipes may not work as expected as the current Go runtime is '$(GO_VERSION_NUMBER)')
+		endif
+	else
+		# This repository isn't using Go modules (yet).
+		GOVENDOR := $(FIRST_GOPATH)/bin/govendor
+	endif
+endif
 PROMU        := $(FIRST_GOPATH)/bin/promu
 pkgs          = ./...
 
@@ -55,23 +78,17 @@ ifneq ($(shell which gotestsum),)
 endif
 endif
 
-PROMU_VERSION ?= 0.13.0
+PROMU_VERSION ?= 0.12.0
 PROMU_URL     := https://github.com/prometheus/promu/releases/download/v$(PROMU_VERSION)/promu-$(PROMU_VERSION).$(GO_BUILD_PLATFORM).tar.gz
 
 GOLANGCI_LINT :=
 GOLANGCI_LINT_OPTS ?=
-GOLANGCI_LINT_VERSION ?= v1.45.2
+GOLANGCI_LINT_VERSION ?= v1.39.0
 # golangci-lint only supports linux, darwin and windows platforms on i386/amd64.
 # windows isn't included here because of the path separator being different.
 ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux darwin))
 	ifeq ($(GOHOSTARCH),$(filter $(GOHOSTARCH),amd64 i386))
-		# If we're in CI and there is an Actions file, that means the linter
-		# is being run in Actions, so we don't need to run it here.
-		ifeq (,$(CIRCLE_JOB))
-			GOLANGCI_LINT := $(FIRST_GOPATH)/bin/golangci-lint
-		else ifeq (,$(wildcard .github/workflows/golangci-lint.yml))
-			GOLANGCI_LINT := $(FIRST_GOPATH)/bin/golangci-lint
-		endif
+		GOLANGCI_LINT := $(FIRST_GOPATH)/bin/golangci-lint
 	endif
 endif
 
@@ -127,25 +144,32 @@ common-check_license:
 .PHONY: common-deps
 common-deps:
 	@echo ">> getting dependencies"
-	$(GO) mod download
+ifdef GO111MODULE
+	GO111MODULE=$(GO111MODULE) $(GO) mod download
+else
+	$(GO) get $(GOOPTS) -t ./...
+endif
 
 .PHONY: update-go-deps
 update-go-deps:
 	@echo ">> updating Go dependencies"
 	@for m in $$($(GO) list -mod=readonly -m -f '{{ if and (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
-		$(GO) get -d $$m; \
+		$(GO) get $$m; \
 	done
-	$(GO) mod tidy
+	GO111MODULE=$(GO111MODULE) $(GO) mod tidy
+ifneq (,$(wildcard vendor))
+	GO111MODULE=$(GO111MODULE) $(GO) mod vendor
+endif
 
 .PHONY: common-test-short
 common-test-short: $(GOTEST_DIR)
 	@echo ">> running short tests"
-	$(GOTEST) -short $(GOOPTS) $(pkgs)
+	GO111MODULE=$(GO111MODULE) $(GOTEST) -short $(GOOPTS) $(pkgs)
 
 .PHONY: common-test
 common-test: $(GOTEST_DIR)
 	@echo ">> running all tests"
-	$(GOTEST) $(test-flags) $(GOOPTS) $(pkgs)
+	GO111MODULE=$(GO111MODULE) $(GOTEST) $(test-flags) $(GOOPTS) $(pkgs)
 
 $(GOTEST_DIR):
 	@mkdir -p $@
@@ -153,21 +177,25 @@ $(GOTEST_DIR):
 .PHONY: common-format
 common-format:
 	@echo ">> formatting code"
-	$(GO) fmt $(pkgs)
+	GO111MODULE=$(GO111MODULE) $(GO) fmt $(pkgs)
 
 .PHONY: common-vet
 common-vet:
 	@echo ">> vetting code"
-	$(GO) vet $(GOOPTS) $(pkgs)
+	GO111MODULE=$(GO111MODULE) $(GO) vet $(GOOPTS) $(pkgs)
 
 .PHONY: common-lint
 common-lint: $(GOLANGCI_LINT)
 ifdef GOLANGCI_LINT
 	@echo ">> running golangci-lint"
+ifdef GO111MODULE
 # 'go list' needs to be executed before staticcheck to prepopulate the modules cache.
 # Otherwise staticcheck might fail randomly for some reason not yet explained.
-	$(GO) list -e -compiled -test=true -export=false -deps=true -find=false -tags= -- ./... > /dev/null
-	$(GOLANGCI_LINT) run $(GOLANGCI_LINT_OPTS) $(pkgs)
+	GO111MODULE=$(GO111MODULE) $(GO) list -e -compiled -test=true -export=false -deps=true -find=false -tags= -- ./... > /dev/null
+	GO111MODULE=$(GO111MODULE) $(GOLANGCI_LINT) run $(GOLANGCI_LINT_OPTS) $(pkgs)
+else
+	$(GOLANGCI_LINT) run $(pkgs)
+endif
 endif
 
 .PHONY: common-yamllint
@@ -184,15 +212,28 @@ endif
 common-staticcheck: lint
 
 .PHONY: common-unused
-common-unused:
+common-unused: $(GOVENDOR)
+ifdef GOVENDOR
+	@echo ">> running check for unused packages"
+	@$(GOVENDOR) list +unused | grep . && exit 1 || echo 'No unused packages'
+else
+ifdef GO111MODULE
 	@echo ">> running check for unused/missing packages in go.mod"
-	$(GO) mod tidy
+	GO111MODULE=$(GO111MODULE) $(GO) mod tidy
+ifeq (,$(wildcard vendor))
 	@git diff --exit-code -- go.sum go.mod
+else
+	@echo ">> running check for unused packages in vendor/"
+	GO111MODULE=$(GO111MODULE) $(GO) mod vendor
+	@git diff --exit-code -- go.sum go.mod vendor/
+endif
+endif
+endif
 
 .PHONY: common-build
 common-build: promu
 	@echo ">> building binaries"
-	$(PROMU) build --prefix $(PREFIX) $(PROMU_BINARIES)
+	GO111MODULE=$(GO111MODULE) $(PROMU) build --prefix $(PREFIX) $(PROMU_BINARIES)
 
 .PHONY: common-tarball
 common-tarball: promu
@@ -246,6 +287,12 @@ $(GOLANGCI_LINT):
 	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_VERSION)/install.sh \
 		| sed -e '/install -d/d' \
 		| sh -s -- -b $(FIRST_GOPATH)/bin $(GOLANGCI_LINT_VERSION)
+endif
+
+ifdef GOVENDOR
+.PHONY: $(GOVENDOR)
+$(GOVENDOR):
+	GOOS= GOARCH= $(GO) get -u github.com/kardianos/govendor
 endif
 
 .PHONY: precheck

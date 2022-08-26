@@ -19,6 +19,7 @@ limitations under the License.
 package app
 
 import (
+	"errors"
 	goflag "flag"
 	"fmt"
 	"net"
@@ -74,6 +75,9 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/iptables"
+	"k8s.io/kubernetes/pkg/proxy/ipvs"
+	"k8s.io/kubernetes/pkg/proxy/userspace"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -83,12 +87,20 @@ import (
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
-	"k8s.io/utils/pointer"
+	utilpointer "k8s.io/utils/pointer"
+)
+
+const (
+	proxyModeUserspace   = "userspace"
+	proxyModeIPTables    = "iptables"
+	proxyModeIPVS        = "ipvs"
+	proxyModeKernelspace = "kernelspace" //nolint:deadcode,varcheck
 )
 
 // proxyRun defines the interface to run a specified ProxyServer
 type proxyRun interface {
 	Run() error
+	CleanupAndExit() error
 }
 
 // Options contains everything necessary to create and run a proxy server.
@@ -170,8 +182,8 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("healthz-port", "This flag is deprecated and will be removed in a future release. Please use --healthz-bind-address instead.")
 	fs.Int32Var(&o.metricsPort, "metrics-port", o.metricsPort, "The port to bind the metrics server. Use 0 to disable.")
 	fs.MarkDeprecated("metrics-port", "This flag is deprecated and will be removed in a future release. Please use --metrics-bind-address instead.")
-	fs.Int32Var(o.config.OOMScoreAdj, "oom-score-adj", pointer.Int32Deref(o.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]. This parameter is ignored if a config file is specified by --config.")
-	fs.Int32Var(o.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", pointer.Int32Deref(o.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
+	fs.Int32Var(o.config.OOMScoreAdj, "oom-score-adj", utilpointer.Int32PtrDerefOr(o.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]. This parameter is ignored if a config file is specified by --config.")
+	fs.Int32Var(o.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", utilpointer.Int32PtrDerefOr(o.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
 	fs.Int32Var(o.config.Conntrack.MaxPerCore, "conntrack-max-per-core", *o.config.Conntrack.MaxPerCore,
 		"Maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrack-min).")
 	fs.Int32Var(o.config.Conntrack.Min, "conntrack-min", *o.config.Conntrack.Min,
@@ -302,13 +314,13 @@ func (o *Options) Run() error {
 		return o.writeConfigFile()
 	}
 
-	if o.CleanupAndExit {
-		return cleanupAndExit()
-	}
-
 	proxyServer, err := NewProxyServer(o)
 	if err != nil {
 		return err
+	}
+
+	if o.CleanupAndExit {
+		return proxyServer.CleanupAndExit()
 	}
 
 	o.proxyServer = proxyServer
@@ -533,7 +545,7 @@ type ProxyServer struct {
 	Recorder               events.EventRecorder
 	ConntrackConfiguration kubeproxyconfig.KubeProxyConntrackConfiguration
 	Conntracker            Conntracker // if nil, ignored
-	ProxyMode              kubeproxyconfig.ProxyMode
+	ProxyMode              string
 	NodeRef                *v1.ObjectReference
 	MetricsBindAddress     string
 	BindAddressHardFail    bool
@@ -604,7 +616,7 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 	go wait.Until(fn, 5*time.Second, wait.NeverStop)
 }
 
-func serveMetrics(bindAddress string, proxyMode kubeproxyconfig.ProxyMode, enableProfiling bool, errCh chan error) {
+func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh chan error) {
 	if len(bindAddress) == 0 {
 		return
 	}
@@ -801,6 +813,27 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 		return floor, nil
 	}
 	return 0, nil
+}
+
+// CleanupAndExit remove iptables rules and ipset/ipvs rules in ipvs proxy mode
+// and exit if success return nil
+func (s *ProxyServer) CleanupAndExit() error {
+	// cleanup IPv6 and IPv4 iptables rules
+	ipts := []utiliptables.Interface{
+		utiliptables.New(s.execer, utiliptables.ProtocolIPv4),
+		utiliptables.New(s.execer, utiliptables.ProtocolIPv6),
+	}
+	var encounteredError bool
+	for _, ipt := range ipts {
+		encounteredError = userspace.CleanupLeftovers(ipt) || encounteredError
+		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
+		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, ipt, s.IpsetInterface) || encounteredError
+	}
+	if encounteredError {
+		return errors.New("encountered an error while tearing down rules")
+	}
+
+	return nil
 }
 
 // detectNodeIP returns the nodeIP used by the proxier

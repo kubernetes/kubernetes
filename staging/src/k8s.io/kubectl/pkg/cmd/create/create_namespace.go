@@ -143,7 +143,10 @@ func (o *NamespaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	}
 
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Run calls the CreateSubcommandOptions.Run in NamespaceOpts instance

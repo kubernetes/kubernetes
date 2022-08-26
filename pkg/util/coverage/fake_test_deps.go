@@ -18,8 +18,6 @@ package coverage
 
 import (
 	"io"
-	"reflect"
-	"time"
 )
 
 // This is an implementation of testing.testDeps. It doesn't need to do anything, because
@@ -28,18 +26,6 @@ import (
 //
 //nolint:unused // U1000 see comment above, we know it's unused normally.
 type fakeTestDeps struct{}
-
-// https://go.dev/src/testing/fuzz.go#L88
-//
-//nolint:unused // U1000 see comment above, we know it's unused normally.
-type corpusEntry = struct {
-	Parent     string
-	Path       string
-	Data       []byte
-	Values     []any
-	Generation int
-	IsSeed     bool
-}
 
 //nolint:unused // U1000 see comment above, we know it's unused normally.
 func (fakeTestDeps) ImportPath() string {
@@ -50,9 +36,6 @@ func (fakeTestDeps) ImportPath() string {
 func (fakeTestDeps) MatchString(pat, str string) (bool, error) {
 	return false, nil
 }
-
-//nolint:unused // U1000 see comment above, we know it's unused normally.
-func (fakeTestDeps) SetPanicOnExit0(bool) {}
 
 //nolint:unused // U1000 see comment above, we know it's unused normally.
 func (fakeTestDeps) StartCPUProfile(io.Writer) error {
@@ -79,29 +62,3 @@ func (fakeTestDeps) WriteHeapProfile(io.Writer) error {
 func (fakeTestDeps) WriteProfileTo(string, io.Writer, int) error {
 	return nil
 }
-
-//nolint:unused // U1000 see comment above, we know it's unused normally.
-func (fakeTestDeps) CoordinateFuzzing(time.Duration, int64, time.Duration, int64, int, []corpusEntry, []reflect.Type, string, string) error {
-	return nil
-}
-
-//nolint:unused // U1000 see comment above, we know it's unused normally.
-func (fakeTestDeps) RunFuzzWorker(func(corpusEntry) error) error {
-	return nil
-}
-
-//nolint:unused // U1000 see comment above, we know it's unused normally.
-func (fakeTestDeps) ReadCorpus(string, []reflect.Type) ([]corpusEntry, error) {
-	return nil, nil
-}
-
-//nolint:unused // U1000 see comment above, we know it's unused normally.
-func (fakeTestDeps) CheckCorpus([]any, []reflect.Type) error {
-	return nil
-}
-
-//nolint:unused // U1000 see comment above, we know it's unused normally.
-func (fakeTestDeps) ResetCoverage() {}
-
-//nolint:unused // U1000 see comment above, we know it's unused normally.
-func (fakeTestDeps) SnapshotCoverage() {}

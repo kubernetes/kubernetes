@@ -34,7 +34,7 @@ const (
 	readLimit = 4294967296 // Byte -> 4 GiB
 )
 
-// This contains generic data structures for both udp and tcp sockets.
+// this contains generic data structures for both udp and tcp sockets
 type (
 	// NetIPSocket represents the contents of /proc/net/{t,u}dp{,6} file without the header.
 	NetIPSocket []*netIPSocketLine

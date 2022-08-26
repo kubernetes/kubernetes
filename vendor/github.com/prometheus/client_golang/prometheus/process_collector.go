@@ -16,6 +16,7 @@ package prometheus
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -103,7 +104,8 @@ func NewProcessCollector(opts ProcessCollectorOpts) Collector {
 	}
 
 	if opts.PidFn == nil {
-		c.pidFn = getPIDFn()
+		pid := os.Getpid()
+		c.pidFn = func() (int, error) { return pid, nil }
 	} else {
 		c.pidFn = opts.PidFn
 	}
@@ -150,13 +152,13 @@ func (c *processCollector) reportError(ch chan<- Metric, desc *Desc, err error) 
 // It is meant to be used for the PidFn field in ProcessCollectorOpts.
 func NewPidFileFn(pidFilePath string) func() (int, error) {
 	return func() (int, error) {
-		content, err := os.ReadFile(pidFilePath)
+		content, err := ioutil.ReadFile(pidFilePath)
 		if err != nil {
-			return 0, fmt.Errorf("can't read pid file %q: %w", pidFilePath, err)
+			return 0, fmt.Errorf("can't read pid file %q: %+v", pidFilePath, err)
 		}
 		pid, err := strconv.Atoi(strings.TrimSpace(string(content)))
 		if err != nil {
-			return 0, fmt.Errorf("can't parse pid file %q: %w", pidFilePath, err)
+			return 0, fmt.Errorf("can't parse pid file %q: %+v", pidFilePath, err)
 		}
 
 		return pid, nil

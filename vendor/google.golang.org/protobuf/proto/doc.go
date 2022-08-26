@@ -6,17 +6,18 @@
 //
 // For documentation on protocol buffers in general, see:
 //
-//	https://developers.google.com/protocol-buffers
+//   https://developers.google.com/protocol-buffers
 //
 // For a tutorial on using protocol buffers with Go, see:
 //
-//	https://developers.google.com/protocol-buffers/docs/gotutorial
+//   https://developers.google.com/protocol-buffers/docs/gotutorial
 //
 // For a guide to generated Go protocol buffer code, see:
 //
-//	https://developers.google.com/protocol-buffers/docs/reference/go-generated
+//   https://developers.google.com/protocol-buffers/docs/reference/go-generated
 //
-// # Binary serialization
+//
+// Binary serialization
 //
 // This package contains functions to convert to and from the wire format,
 // an efficient binary serialization of protocol buffers.
@@ -29,7 +30,8 @@
 // • Unmarshal converts a message from the wire format.
 // The UnmarshalOptions type provides more control over wire unmarshaling.
 //
-// # Basic message operations
+//
+// Basic message operations
 //
 // • Clone makes a deep copy of a message.
 //
@@ -43,7 +45,8 @@
 //
 // • CheckInitialized reports whether all required fields in a message are set.
 //
-// # Optional scalar constructors
+//
+// Optional scalar constructors
 //
 // The API for some generated messages represents optional scalar fields
 // as pointers to a value. For example, an optional string field has the
@@ -58,14 +61,16 @@
 //
 // Optional scalar fields are only supported in proto2.
 //
-// # Extension accessors
+//
+// Extension accessors
 //
 // • HasExtension, GetExtension, SetExtension, and ClearExtension
 // access extension field values in a protocol buffer message.
 //
 // Extension fields are only supported in proto2.
 //
-// # Related packages
+//
+// Related packages
 //
 // • Package "google.golang.org/protobuf/encoding/protojson" converts messages to
 // and from JSON.

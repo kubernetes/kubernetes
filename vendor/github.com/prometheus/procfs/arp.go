@@ -15,26 +15,9 @@ package procfs
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
-	"os"
-	"strconv"
 	"strings"
-)
-
-// Learned from include/uapi/linux/if_arp.h.
-const (
-	// completed entry (ha valid).
-	ATFComplete = 0x02
-	// permanent entry.
-	ATFPermanent = 0x04
-	// Publish entry.
-	ATFPublish = 0x08
-	// Has requested trailers.
-	ATFUseTrailers = 0x10
-	// Obsoleted: Want to use a netmask (only for proxy entries).
-	ATFNetmask = 0x20
-	// Don't answer this addresses.
-	ATFDontPublish = 0x40
 )
 
 // ARPEntry contains a single row of the columnar data represented in
@@ -46,14 +29,12 @@ type ARPEntry struct {
 	HWAddr net.HardwareAddr
 	// Name of the device
 	Device string
-	// Flags
-	Flags byte
 }
 
 // GatherARPEntries retrieves all the ARP entries, parse the relevant columns,
 // and then return a slice of ARPEntry's.
 func (fs FS) GatherARPEntries() ([]ARPEntry, error) {
-	data, err := os.ReadFile(fs.proc.Path("net/arp"))
+	data, err := ioutil.ReadFile(fs.proc.Path("net/arp"))
 	if err != nil {
 		return nil, fmt.Errorf("error reading arp %q: %w", fs.proc.Path("net/arp"), err)
 	}
@@ -91,26 +72,14 @@ func parseARPEntries(data []byte) ([]ARPEntry, error) {
 }
 
 func parseARPEntry(columns []string) (ARPEntry, error) {
-	entry := ARPEntry{Device: columns[5]}
 	ip := net.ParseIP(columns[0])
-	entry.IPAddr = ip
+	mac := net.HardwareAddr(columns[3])
 
-	if mac, err := net.ParseMAC(columns[3]); err == nil {
-		entry.HWAddr = mac
-	} else {
-		return ARPEntry{}, err
-	}
-
-	if flags, err := strconv.ParseUint(columns[2], 0, 8); err == nil {
-		entry.Flags = byte(flags)
-	} else {
-		return ARPEntry{}, err
+	entry := ARPEntry{
+		IPAddr: ip,
+		HWAddr: mac,
+		Device: columns[5],
 	}
 
 	return entry, nil
-}
-
-// IsComplete returns true if ARP entry is marked with complete flag.
-func (entry *ARPEntry) IsComplete() bool {
-	return entry.Flags&ATFComplete != 0
 }

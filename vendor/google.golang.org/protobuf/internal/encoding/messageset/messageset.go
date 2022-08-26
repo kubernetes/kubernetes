@@ -10,7 +10,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/errors"
-	"google.golang.org/protobuf/reflect/protoreflect"
+	pref "google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // The MessageSet wire format is equivalent to a message defined as follows,
@@ -33,7 +33,6 @@ const (
 // ExtensionName is the field name for extensions of MessageSet.
 //
 // A valid MessageSet extension must be of the form:
-//
 //	message MyMessage {
 //		extend proto2.bridge.MessageSet {
 //			optional MyMessage message_set_extension = 1234;
@@ -43,13 +42,13 @@ const (
 const ExtensionName = "message_set_extension"
 
 // IsMessageSet returns whether the message uses the MessageSet wire format.
-func IsMessageSet(md protoreflect.MessageDescriptor) bool {
+func IsMessageSet(md pref.MessageDescriptor) bool {
 	xmd, ok := md.(interface{ IsMessageSet() bool })
 	return ok && xmd.IsMessageSet()
 }
 
 // IsMessageSetExtension reports this field properly extends a MessageSet.
-func IsMessageSetExtension(fd protoreflect.FieldDescriptor) bool {
+func IsMessageSetExtension(fd pref.FieldDescriptor) bool {
 	switch {
 	case fd.Name() != ExtensionName:
 		return false

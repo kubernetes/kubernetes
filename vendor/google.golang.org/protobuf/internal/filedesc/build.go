@@ -12,7 +12,8 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/genid"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
+	pref "google.golang.org/protobuf/reflect/protoreflect"
+	preg "google.golang.org/protobuf/reflect/protoregistry"
 )
 
 // Builder construct a protoreflect.FileDescriptor from the raw descriptor.
@@ -37,7 +38,7 @@ type Builder struct {
 	// TypeResolver resolves extension field types for descriptor options.
 	// If nil, it uses protoregistry.GlobalTypes.
 	TypeResolver interface {
-		protoregistry.ExtensionTypeResolver
+		preg.ExtensionTypeResolver
 	}
 
 	// FileRegistry is use to lookup file, enum, and message dependencies.
@@ -45,8 +46,8 @@ type Builder struct {
 	// If nil, it uses protoregistry.GlobalFiles.
 	FileRegistry interface {
 		FindFileByPath(string) (protoreflect.FileDescriptor, error)
-		FindDescriptorByName(protoreflect.FullName) (protoreflect.Descriptor, error)
-		RegisterFile(protoreflect.FileDescriptor) error
+		FindDescriptorByName(pref.FullName) (pref.Descriptor, error)
+		RegisterFile(pref.FileDescriptor) error
 	}
 }
 
@@ -54,8 +55,8 @@ type Builder struct {
 // If so, it permits looking up an enum or message dependency based on the
 // sub-list and element index into filetype.Builder.DependencyIndexes.
 type resolverByIndex interface {
-	FindEnumByIndex(int32, int32, []Enum, []Message) protoreflect.EnumDescriptor
-	FindMessageByIndex(int32, int32, []Enum, []Message) protoreflect.MessageDescriptor
+	FindEnumByIndex(int32, int32, []Enum, []Message) pref.EnumDescriptor
+	FindMessageByIndex(int32, int32, []Enum, []Message) pref.MessageDescriptor
 }
 
 // Indexes of each sub-list in filetype.Builder.DependencyIndexes.
@@ -69,7 +70,7 @@ const (
 
 // Out is the output of the Builder.
 type Out struct {
-	File protoreflect.FileDescriptor
+	File pref.FileDescriptor
 
 	// Enums is all enum descriptors in "flattened ordering".
 	Enums []Enum
@@ -96,10 +97,10 @@ func (db Builder) Build() (out Out) {
 
 	// Initialize resolvers and registries if unpopulated.
 	if db.TypeResolver == nil {
-		db.TypeResolver = protoregistry.GlobalTypes
+		db.TypeResolver = preg.GlobalTypes
 	}
 	if db.FileRegistry == nil {
-		db.FileRegistry = protoregistry.GlobalFiles
+		db.FileRegistry = preg.GlobalFiles
 	}
 
 	fd := newRawFile(db)

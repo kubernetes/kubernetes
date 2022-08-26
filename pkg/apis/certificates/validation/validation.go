@@ -87,7 +87,11 @@ func validateCSR(obj *certificates.CertificateSigningRequest) error {
 		return err
 	}
 	// check that the signature is valid
-	return csr.CheckSignature()
+	err = csr.CheckSignature()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func validateCertificate(pemData []byte) error {

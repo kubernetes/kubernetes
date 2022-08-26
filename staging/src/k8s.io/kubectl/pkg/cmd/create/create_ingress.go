@@ -211,7 +211,10 @@ func (o *CreateIngressOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	}
 
 	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Validate validates the Ingress object to be created

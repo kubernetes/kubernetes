@@ -19,34 +19,18 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-// LabelPairSorter implements sort.Interface. It is used to sort a slice of
-// dto.LabelPair pointers.
-type LabelPairSorter []*dto.LabelPair
+// metricSorter is a sortable slice of *dto.Metric.
+type metricSorter []*dto.Metric
 
-func (s LabelPairSorter) Len() int {
+func (s metricSorter) Len() int {
 	return len(s)
 }
 
-func (s LabelPairSorter) Swap(i, j int) {
+func (s metricSorter) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-func (s LabelPairSorter) Less(i, j int) bool {
-	return s[i].GetName() < s[j].GetName()
-}
-
-// MetricSorter is a sortable slice of *dto.Metric.
-type MetricSorter []*dto.Metric
-
-func (s MetricSorter) Len() int {
-	return len(s)
-}
-
-func (s MetricSorter) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s MetricSorter) Less(i, j int) bool {
+func (s metricSorter) Less(i, j int) bool {
 	if len(s[i].Label) != len(s[j].Label) {
 		// This should not happen. The metrics are
 		// inconsistent. However, we have to deal with the fact, as
@@ -84,7 +68,7 @@ func (s MetricSorter) Less(i, j int) bool {
 // the slice, with the contained Metrics sorted within each MetricFamily.
 func NormalizeMetricFamilies(metricFamiliesByName map[string]*dto.MetricFamily) []*dto.MetricFamily {
 	for _, mf := range metricFamiliesByName {
-		sort.Sort(MetricSorter(mf.Metric))
+		sort.Sort(metricSorter(mf.Metric))
 	}
 	names := make([]string, 0, len(metricFamiliesByName))
 	for name, mf := range metricFamiliesByName {

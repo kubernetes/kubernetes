@@ -9,12 +9,12 @@ import (
 	"sort"
 	"sync"
 
-	"google.golang.org/protobuf/reflect/protoreflect"
+	pref "google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type messageField struct {
-	fd protoreflect.FieldDescriptor
-	v  protoreflect.Value
+	fd pref.FieldDescriptor
+	v  pref.Value
 }
 
 var messageFieldPool = sync.Pool{
@@ -25,8 +25,8 @@ type (
 	// FieldRnger is an interface for visiting all fields in a message.
 	// The protoreflect.Message type implements this interface.
 	FieldRanger interface{ Range(VisitField) }
-	// VisitField is called every time a message field is visited.
-	VisitField = func(protoreflect.FieldDescriptor, protoreflect.Value) bool
+	// VisitField is called everytime a message field is visited.
+	VisitField = func(pref.FieldDescriptor, pref.Value) bool
 )
 
 // RangeFields iterates over the fields of fs according to the specified order.
@@ -47,7 +47,7 @@ func RangeFields(fs FieldRanger, less FieldOrder, fn VisitField) {
 	}()
 
 	// Collect all fields in the message and sort them.
-	fs.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+	fs.Range(func(fd pref.FieldDescriptor, v pref.Value) bool {
 		fields = append(fields, messageField{fd, v})
 		return true
 	})
@@ -64,8 +64,8 @@ func RangeFields(fs FieldRanger, less FieldOrder, fn VisitField) {
 }
 
 type mapEntry struct {
-	k protoreflect.MapKey
-	v protoreflect.Value
+	k pref.MapKey
+	v pref.Value
 }
 
 var mapEntryPool = sync.Pool{
@@ -76,8 +76,8 @@ type (
 	// EntryRanger is an interface for visiting all fields in a message.
 	// The protoreflect.Map type implements this interface.
 	EntryRanger interface{ Range(VisitEntry) }
-	// VisitEntry is called every time a map entry is visited.
-	VisitEntry = func(protoreflect.MapKey, protoreflect.Value) bool
+	// VisitEntry is called everytime a map entry is visited.
+	VisitEntry = func(pref.MapKey, pref.Value) bool
 )
 
 // RangeEntries iterates over the entries of es according to the specified order.
@@ -98,7 +98,7 @@ func RangeEntries(es EntryRanger, less KeyOrder, fn VisitEntry) {
 	}()
 
 	// Collect all entries in the map and sort them.
-	es.Range(func(k protoreflect.MapKey, v protoreflect.Value) bool {
+	es.Range(func(k pref.MapKey, v pref.Value) bool {
 		entries = append(entries, mapEntry{k, v})
 		return true
 	})

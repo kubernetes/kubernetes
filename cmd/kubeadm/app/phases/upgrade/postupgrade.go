@@ -20,9 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -36,6 +34,7 @@ import (
 	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
@@ -68,12 +67,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	// Write the new kubelet config down to disk and the env file if needed
 	if err := writeKubeletConfigFiles(client, cfg, patchesDir, dryRun, out); err != nil {
 		errs = append(errs, err)
-	}
-
-	// TODO: Temporary workaround. Remove in 1.27:
-	// https://github.com/kubernetes/kubeadm/issues/2626
-	if err := CleanupKubeletDynamicEnvFileContainerRuntime(dryRun); err != nil {
-		return err
 	}
 
 	// Annotate the node with the crisocket information, sourced either from the InitConfiguration struct or
@@ -254,33 +247,10 @@ func RemoveOldControlPlaneTaint(client clientset.Interface) error {
 	return nil
 }
 
-// CleanupKubeletDynamicEnvFileContainerRuntime reads the kubelet dynamic environment file
-// from disk, ensure that the container runtime flag is removed.
-// TODO: Temporary workaround. Remove in 1.27:
-// https://github.com/kubernetes/kubeadm/issues/2626
-func CleanupKubeletDynamicEnvFileContainerRuntime(dryRun bool) error {
-	filePath := filepath.Join(kubeadmconstants.KubeletRunDirectory, kubeadmconstants.KubeletEnvFileName)
-	if dryRun {
-		fmt.Printf("[dryrun] Would ensure that %q does not include a --container-runtime flag\n", filePath)
-		return nil
-	}
-	klog.V(2).Infof("Ensuring that %q does not include a --container-runtime flag", filePath)
-	bytes, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return errors.Wrapf(err, "failed to read kubelet configuration from file %q", filePath)
-	}
-	updated := cleanupKubeletDynamicEnvFileContainerRuntime(string(bytes))
-	if err := ioutil.WriteFile(filePath, []byte(updated), 0644); err != nil {
-		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", filePath)
-	}
-	return nil
-}
-
-func cleanupKubeletDynamicEnvFileContainerRuntime(str string) string {
+func updateKubeletDynamicEnvFileWithURLScheme(str string) string {
 	const (
-		// `remote` is the only possible value
-		containerRuntimeFlag = "container-runtime"
-		endpointFlag         = "container-runtime-endpoint"
+		flag   = "container-runtime-endpoint"
+		scheme = kubeadmapiv1.DefaultContainerRuntimeURLScheme + "://"
 	)
 	// Trim the prefix
 	str = strings.TrimLeft(str, fmt.Sprintf("%s=\"", kubeadmconstants.KubeletEnvFileVariableName))
@@ -290,29 +260,29 @@ func cleanupKubeletDynamicEnvFileContainerRuntime(str string) string {
 	// its value to have the scheme prefix.
 	split := strings.Split(str, " ")
 	for i, s := range split {
-		if !(strings.Contains(s, containerRuntimeFlag) && !strings.Contains(s, endpointFlag)) {
+		if !strings.Contains(s, flag) {
 			continue
 		}
 		keyValue := strings.Split(s, "=")
 		if len(keyValue) < 2 {
 			// Post init/join, the user may have edited the file and has flags that are not
 			// followed by "=". If that is the case the next argument must be the value
-			// of the endpoint flag and if its not a flag itself.
+			// of the endpoint flag and if its not a flag itself. Update that argument with
+			// the scheme instead.
 			if i+1 < len(split) {
 				nextArg := split[i+1]
-				if strings.HasPrefix(nextArg, "-") {
-					// remove the flag only
-					split = append(split[:i], split[i+1:]...)
-				} else {
-					// remove the flag and value
-					split = append(split[:i], split[i+2:]...)
+				if !strings.HasPrefix(nextArg, "-") && !strings.HasPrefix(nextArg, scheme) {
+					split[i+1] = scheme + nextArg
 				}
 			}
 			continue
 		}
-
-		// remove the flag and value in one
-		split = append(split[:i], split[i+1:]...)
+		if len(keyValue[1]) == 0 || strings.HasPrefix(keyValue[1], scheme) {
+			continue // The flag value already has the URL scheme prefix or is empty
+		}
+		// Missing prefix. Add it and update the key=value pair
+		keyValue[1] = scheme + keyValue[1]
+		split[i] = strings.Join(keyValue, "=")
 	}
 	str = strings.Join(split, " ")
 	return fmt.Sprintf("%s=\"%s", kubeadmconstants.KubeletEnvFileVariableName, str)

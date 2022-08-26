@@ -80,7 +80,7 @@ func (opts formatOptions) CanFormatDiffSlice(v *valueNode) bool {
 	}
 
 	// Use specialized string diffing for longer slices or strings.
-	const minLength = 32
+	const minLength = 64
 	return vx.Len() >= minLength && vy.Len() >= minLength
 }
 
@@ -563,10 +563,10 @@ func cleanupSurroundingIdentical(groups []diffStats, eq func(i, j int) bool) []d
 		nx := ds.NumIdentical + ds.NumRemoved + ds.NumModified
 		ny := ds.NumIdentical + ds.NumInserted + ds.NumModified
 		var numLeadingIdentical, numTrailingIdentical int
-		for j := 0; j < nx && j < ny && eq(ix+j, iy+j); j++ {
+		for i := 0; i < nx && i < ny && eq(ix+i, iy+i); i++ {
 			numLeadingIdentical++
 		}
-		for j := 0; j < nx && j < ny && eq(ix+nx-1-j, iy+ny-1-j); j++ {
+		for i := 0; i < nx && i < ny && eq(ix+nx-1-i, iy+ny-1-i); i++ {
 			numTrailingIdentical++
 		}
 		if numIdentical := numLeadingIdentical + numTrailingIdentical; numIdentical > 0 {

@@ -43,6 +43,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/component-base/configz"
@@ -73,11 +74,12 @@ var timeoutForNodePodCIDR = 5 * time.Minute
 
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
-	return newProxyServer(o.config, o.master)
+	return newProxyServer(o.config, o.CleanupAndExit, o.master)
 }
 
 func newProxyServer(
 	config *proxyconfigapi.KubeProxyConfiguration,
+	cleanupAndExit bool,
 	master string) (*ProxyServer, error) {
 
 	if config == nil {
@@ -90,8 +92,33 @@ func newProxyServer(
 		return nil, fmt.Errorf("unable to register configz: %s", err)
 	}
 
+	var iptInterface utiliptables.Interface
 	var ipvsInterface utilipvs.Interface
+	var kernelHandler ipvs.KernelHandler
 	var ipsetInterface utilipset.Interface
+
+	// Create a iptables utils.
+	execer := exec.New()
+
+	kernelHandler = ipvs.NewLinuxKernelHandler()
+	ipsetInterface = utilipset.New(execer)
+	canUseIPVS, err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface, config.IPVS.Scheduler)
+	if string(config.Mode) == proxyModeIPVS && err != nil {
+		klog.ErrorS(err, "Can't use the IPVS proxier")
+	}
+
+	if canUseIPVS {
+		ipvsInterface = utilipvs.New()
+	}
+
+	// We omit creation of pretty much everything if we run in cleanup mode
+	if cleanupAndExit {
+		return &ProxyServer{
+			execer:         execer,
+			IpvsInterface:  ipvsInterface,
+			IpsetInterface: ipsetInterface,
+		}, nil
+	}
 
 	if len(config.ShowHiddenMetricsForVersion) > 0 {
 		metrics.SetShowHidden()
@@ -129,7 +156,7 @@ func newProxyServer(
 	var proxier proxy.Provider
 	var detectLocalMode proxyconfigapi.LocalMode
 
-	proxyMode := getProxyMode(config.Mode)
+	proxyMode := getProxyMode(string(config.Mode), canUseIPVS, iptables.LinuxKernelCompatTester{})
 	detectLocalMode, err = getDetectLocalMode(config)
 	if err != nil {
 		return nil, fmt.Errorf("cannot determine detect-local-mode: %v", err)
@@ -151,13 +178,12 @@ func newProxyServer(
 	if netutils.IsIPv6(nodeIP) {
 		primaryProtocol = utiliptables.ProtocolIPv6
 	}
-	execer := exec.New()
-	iptInterface := utiliptables.New(execer, primaryProtocol)
+	iptInterface = utiliptables.New(execer, primaryProtocol)
 
 	var ipt [2]utiliptables.Interface
 	dualStack := true // While we assume that node supports, we do further checks below
 
-	if proxyMode != proxyconfigapi.ProxyModeUserspace {
+	if proxyMode != proxyModeUserspace {
 		// Create iptables handlers for both families, one is already created
 		// Always ordered as IPv4, IPv6
 		if primaryProtocol == utiliptables.ProtocolIPv4 {
@@ -176,7 +202,7 @@ func newProxyServer(
 		}
 	}
 
-	if proxyMode == proxyconfigapi.ProxyModeIPTables {
+	if proxyMode == proxyModeIPTables {
 		klog.V(0).InfoS("Using iptables Proxier")
 		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
@@ -239,14 +265,7 @@ func newProxyServer(
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 		proxymetrics.RegisterMetrics()
-	} else if proxyMode == proxyconfigapi.ProxyModeIPVS {
-		kernelHandler := ipvs.NewLinuxKernelHandler()
-		ipsetInterface = utilipset.New(execer)
-		if err := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface, config.IPVS.Scheduler); err != nil {
-			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
-		}
-		ipvsInterface = utilipvs.New()
-
+	} else if proxyMode == proxyModeIPVS {
 		klog.V(0).InfoS("Using ipvs Proxier")
 		if dualStack {
 			klog.V(0).InfoS("Creating dualStackProxier for ipvs")
@@ -342,7 +361,7 @@ func newProxyServer(
 	}
 
 	useEndpointSlices := true
-	if proxyMode == proxyconfigapi.ProxyModeUserspace {
+	if proxyMode == proxyModeUserspace {
 		// userspace mode doesn't support endpointslice.
 		useEndpointSlices = false
 	}
@@ -547,37 +566,40 @@ func cidrTuple(cidrList string) [2]string {
 	return cidrs
 }
 
-func getProxyMode(proxyMode proxyconfigapi.ProxyMode) proxyconfigapi.ProxyMode {
-	if proxyMode == "" {
-		klog.InfoS("Using iptables proxy")
-		return proxyconfigapi.ProxyModeIPTables
-	} else {
-		return proxyMode
+func getProxyMode(proxyMode string, canUseIPVS bool, kcompat iptables.KernelCompatTester) string {
+	switch proxyMode {
+	case proxyModeUserspace:
+		return proxyModeUserspace
+	case proxyModeIPTables:
+		return tryIPTablesProxy(kcompat)
+	case proxyModeIPVS:
+		return tryIPVSProxy(canUseIPVS, kcompat)
 	}
+	klog.InfoS("Unknown proxy mode, assuming iptables proxy", "proxyMode", proxyMode)
+	return tryIPTablesProxy(kcompat)
 }
 
-// cleanupAndExit remove iptables rules and ipset/ipvs rules
-func cleanupAndExit() error {
-	execer := exec.New()
-
-	// cleanup IPv6 and IPv4 iptables rules, regardless of current configuration
-	ipts := []utiliptables.Interface{
-		utiliptables.New(execer, utiliptables.ProtocolIPv4),
-		utiliptables.New(execer, utiliptables.ProtocolIPv6),
+func tryIPVSProxy(canUseIPVS bool, kcompat iptables.KernelCompatTester) string {
+	if canUseIPVS {
+		return proxyModeIPVS
 	}
 
-	ipsetInterface := utilipset.New(execer)
-	ipvsInterface := utilipvs.New()
+	// Try to fallback to iptables before falling back to userspace
+	klog.V(1).InfoS("Can't use ipvs proxier, trying iptables proxier")
+	return tryIPTablesProxy(kcompat)
+}
 
-	var encounteredError bool
-	for _, ipt := range ipts {
-		encounteredError = userspace.CleanupLeftovers(ipt) || encounteredError
-		encounteredError = iptables.CleanupLeftovers(ipt) || encounteredError
-		encounteredError = ipvs.CleanupLeftovers(ipvsInterface, ipt, ipsetInterface) || encounteredError
+func tryIPTablesProxy(kcompat iptables.KernelCompatTester) string {
+	// guaranteed false on error, error only necessary for debugging
+	useIPTablesProxy, err := iptables.CanUseIPTablesProxier(kcompat)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("can't determine whether to use iptables proxy, using userspace proxier: %v", err))
+		return proxyModeUserspace
 	}
-	if encounteredError {
-		return errors.New("encountered an error while tearing down rules")
+	if useIPTablesProxy {
+		return proxyModeIPTables
 	}
-
-	return nil
+	// Fallback.
+	klog.V(1).InfoS("Can't use iptables proxy, using userspace proxier")
+	return proxyModeUserspace
 }

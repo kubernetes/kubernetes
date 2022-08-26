@@ -137,7 +137,7 @@ func parseSlabInfo21(r *bytes.Reader) (SlabInfo, error) {
 	return s, nil
 }
 
-// SlabInfo reads data from `/proc/slabinfo`.
+// SlabInfo reads data from /proc/slabinfo
 func (fs FS) SlabInfo() (SlabInfo, error) {
 	// TODO: Consider passing options to allow for parsing different
 	// slabinfo versions. However, slabinfo 2.1 has been stable since

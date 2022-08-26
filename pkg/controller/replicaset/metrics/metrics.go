@@ -36,5 +36,9 @@ var SortingDeletionAgeRatio = metrics.NewHistogram(
 
 // Register registers ReplicaSet controller metrics.
 func Register(registrationFunc func(metrics.Registerable) error) error {
-	return registrationFunc(SortingDeletionAgeRatio)
+	err := registrationFunc(SortingDeletionAgeRatio)
+	if err != nil {
+		return err
+	}
+	return nil
 }

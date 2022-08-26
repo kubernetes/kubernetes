@@ -19,6 +19,7 @@ package cacher
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"sort"
 	"sync"
 	"time"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
@@ -189,8 +189,8 @@ type watchCache struct {
 	// An underlying storage.Versioner.
 	versioner storage.Versioner
 
-	// cacher's group resource
-	groupResource schema.GroupResource
+	// cacher's objectType.
+	objectType reflect.Type
 
 	// For testing cache interval invalidation.
 	indexValidator indexValidator
@@ -203,7 +203,7 @@ func newWatchCache(
 	versioner storage.Versioner,
 	indexers *cache.Indexers,
 	clock clock.Clock,
-	groupResource schema.GroupResource) *watchCache {
+	objectType reflect.Type) *watchCache {
 	wc := &watchCache{
 		capacity:            defaultLowerBoundCapacity,
 		keyFunc:             keyFunc,
@@ -219,9 +219,10 @@ func newWatchCache(
 		eventHandler:        eventHandler,
 		clock:               clock,
 		versioner:           versioner,
-		groupResource:       groupResource,
+		objectType:          objectType,
 	}
-	metrics.WatchCacheCapacity.WithLabelValues(groupResource.String()).Set(float64(wc.capacity))
+	objType := objectType.String()
+	metrics.WatchCacheCapacity.WithLabelValues(objType).Set(float64(wc.capacity))
 	wc.cond = sync.NewCond(wc.RLocker())
 	wc.indexValidator = wc.isIndexValidLocked
 
@@ -386,7 +387,7 @@ func (w *watchCache) doCacheResizeLocked(capacity int) {
 		newCache[i%capacity] = w.cache[i%w.capacity]
 	}
 	w.cache = newCache
-	metrics.RecordsWatchCacheCapacityChange(w.groupResource.String(), w.capacity, capacity)
+	metrics.RecordsWatchCacheCapacityChange(w.objectType.String(), w.capacity, capacity)
 	w.capacity = capacity
 }
 

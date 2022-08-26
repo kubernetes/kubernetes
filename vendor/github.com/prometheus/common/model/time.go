@@ -193,7 +193,7 @@ func ParseDuration(durationStr string) (Duration, error) {
 		// Allow 0 without a unit.
 		return 0, nil
 	case "":
-		return 0, errors.New("empty duration string")
+		return 0, fmt.Errorf("empty duration string")
 	}
 	matches := durationRE.FindStringSubmatch(durationStr)
 	if matches == nil {

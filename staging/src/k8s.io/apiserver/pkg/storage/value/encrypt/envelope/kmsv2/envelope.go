@@ -60,6 +60,8 @@ type envelopeTransformer struct {
 
 	cacheSize    int
 	cacheEnabled bool
+
+	pluginName string
 }
 
 // EncryptResponse is the response from the Envelope service when encrypting data.

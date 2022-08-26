@@ -30,11 +30,9 @@ import (
 // conflictPolicy configures the policy for handling registration conflicts.
 //
 // It can be over-written at compile time with a linker-initialized variable:
-//
 //	go build -ldflags "-X google.golang.org/protobuf/reflect/protoregistry.conflictPolicy=warn"
 //
 // It can be over-written at program execution with an environment variable:
-//
 //	GOLANG_PROTOBUF_REGISTRATION_CONFLICT=warn ./main
 //
 // Neither of the above are covered by the compatibility promise and

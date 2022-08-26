@@ -11,7 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux && (riscv || riscv64)
 // +build linux
 // +build riscv riscv64
 

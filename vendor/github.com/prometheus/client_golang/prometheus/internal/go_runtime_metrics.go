@@ -61,9 +61,9 @@ func RuntimeMetricsToProm(d *metrics.Description) (string, string, string, bool)
 	// name has - replaced with _ and is concatenated with the unit and
 	// other data.
 	name = strings.ReplaceAll(name, "-", "_")
-	name += "_" + unit
-	if d.Cumulative && d.Kind != metrics.KindFloat64Histogram {
-		name += "_total"
+	name = name + "_" + unit
+	if d.Cumulative {
+		name = name + "_total"
 	}
 
 	valid := model.IsValidMetricName(model.LabelValue(namespace + "_" + subsystem + "_" + name))
@@ -84,12 +84,12 @@ func RuntimeMetricsToProm(d *metrics.Description) (string, string, string, bool)
 func RuntimeMetricsBucketsForUnit(buckets []float64, unit string) []float64 {
 	switch unit {
 	case "bytes":
-		// Re-bucket as powers of 2.
-		return reBucketExp(buckets, 2)
+		// Rebucket as powers of 2.
+		return rebucketExp(buckets, 2)
 	case "seconds":
-		// Re-bucket as powers of 10 and then merge all buckets greater
+		// Rebucket as powers of 10 and then merge all buckets greater
 		// than 1 second into the +Inf bucket.
-		b := reBucketExp(buckets, 10)
+		b := rebucketExp(buckets, 10)
 		for i := range b {
 			if b[i] <= 1 {
 				continue
@@ -103,11 +103,11 @@ func RuntimeMetricsBucketsForUnit(buckets []float64, unit string) []float64 {
 	return buckets
 }
 
-// reBucketExp takes a list of bucket boundaries (lower bound inclusive) and
+// rebucketExp takes a list of bucket boundaries (lower bound inclusive) and
 // downsamples the buckets to those a multiple of base apart. The end result
 // is a roughly exponential (in many cases, perfectly exponential) bucketing
 // scheme.
-func reBucketExp(buckets []float64, base float64) []float64 {
+func rebucketExp(buckets []float64, base float64) []float64 {
 	bucket := buckets[0]
 	var newBuckets []float64
 	// We may see a -Inf here, in which case, add it and skip it
