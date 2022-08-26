@@ -198,6 +198,29 @@ func (e *Runner) Run(args []string) error {
 		return err
 	}
 
+	// precheck phase dependencies before actual execution
+	missedDeps := make(map[string][]string)
+	visited := make(map[string]struct{})
+	for _, p := range e.phaseRunners {
+		if run, ok := phaseRunFlags[p.generatedName]; !run || !ok {
+			continue
+		}
+		for _, dep := range p.Phase.Dependencies {
+			if _, ok := visited[dep]; !ok {
+				missedDeps[p.Phase.Name] = append(missedDeps[p.Phase.Name], dep)
+			}
+		}
+		visited[p.Phase.Name] = struct{}{}
+	}
+	if len(missedDeps) > 0 {
+		var msg strings.Builder
+		msg.WriteString("unresolved dependencies:")
+		for phase, missedPhases := range missedDeps {
+			msg.WriteString(fmt.Sprintf("\n\tmissing %v phase(s) needed by %q phase", missedPhases, phase))
+		}
+		return errors.New(msg.String())
+	}
+
 	// builds the runner data
 	var data RunData
 	if data, err = e.InitData(args); err != nil {
