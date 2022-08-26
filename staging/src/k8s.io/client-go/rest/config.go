@@ -374,11 +374,11 @@ func RESTClientForConfigAndClient(config *Config, httpClient *http.Client) (*RES
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
 	}
 
-	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
-	if err == nil && config.WarningHandler != nil {
+	restClient := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
+	if config.WarningHandler != nil {
 		restClient.warningHandler = config.WarningHandler
 	}
-	return restClient, err
+	return restClient, nil
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -441,11 +441,11 @@ func UnversionedRESTClientForConfigAndClient(config *Config, httpClient *http.Cl
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
 	}
 
-	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
-	if err == nil && config.WarningHandler != nil {
+	restClient := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
+	if config.WarningHandler != nil {
 		restClient.warningHandler = config.WarningHandler
 	}
-	return restClient, err
+	return restClient, nil
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the

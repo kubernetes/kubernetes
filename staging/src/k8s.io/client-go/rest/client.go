@@ -105,7 +105,7 @@ type RESTClient struct {
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.
-func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientContentConfig, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
+func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientContentConfig, rateLimiter flowcontrol.RateLimiter, client *http.Client) *RESTClient {
 	if len(config.ContentType) == 0 {
 		config.ContentType = "application/json"
 	}
@@ -125,7 +125,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 		rateLimiter:      rateLimiter,
 
 		Client: client,
-	}, nil
+	}
 }
 
 // GetRateLimiter returns rate limiter for a given client, or nil if it's called on a nil client
@@ -157,8 +157,7 @@ func readExpBackoffConfig() BackoffManager {
 // Verb begins a request with a verb (GET, POST, PUT, DELETE).
 //
 // Example usage of RESTClient's request building interface:
-// c, err := NewRESTClient(...)
-// if err != nil { ... }
+// c := NewRESTClient(...)
 // resp, err := c.Verb("GET").
 //
 //	Path("pods").

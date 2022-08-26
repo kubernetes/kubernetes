@@ -2260,12 +2260,7 @@ func testRESTClientWithConfig(t testing.TB, srv *httptest.Server, contentConfig 
 		c = srv.Client()
 	}
 	versionedAPIPath := defaultResourcePathWithPrefix("", "", "", "")
-	client, err := NewRESTClient(base, versionedAPIPath, contentConfig, nil, c)
-	if err != nil {
-		t.Fatalf("failed to create a client: %v", err)
-	}
-	return client
-
+	return NewRESTClient(base, versionedAPIPath, contentConfig, nil, c)
 }
 
 func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
