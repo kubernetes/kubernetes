@@ -255,7 +255,7 @@ func isKMSv2ProviderHealthy(name string, response *envelopekmsv2.StatusResponse)
 }
 
 // GetTransformerOverrides returns the transformer overrides by reading and parsing the encryption provider configuration file
-func GetTransformerOverrides(filepath string) (map[schema.GroupResource]value.Transformer, error) {
+func GetTransformerOverrides(filepath string) (map[schema.GroupResource]*value.MutableTransformer, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening encryption provider configuration file %q: %v", filepath, err)
@@ -269,7 +269,7 @@ func GetTransformerOverrides(filepath string) (map[schema.GroupResource]value.Tr
 	return result, nil
 }
 
-func parseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.Transformer, error) {
+func parseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]*value.MutableTransformer, error) {
 	configFileContents, err := ioutil.ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("could not read contents: %v", err)
@@ -297,12 +297,12 @@ func parseEncryptionConfiguration(f io.Reader) (map[schema.GroupResource]value.T
 		}
 	}
 
-	result := map[schema.GroupResource]value.Transformer{}
+	result := map[schema.GroupResource]*value.MutableTransformer{}
 	for gr, transList := range resourceToPrefixTransformer {
 		result[gr] = value.NewMutableTransformer(value.NewPrefixTransformers(fmt.Errorf("no matching prefix found"), transList...))
 	}
-	return result, nil
 
+	return result, nil
 }
 
 func loadConfig(data []byte) (*apiserverconfig.EncryptionConfiguration, error) {

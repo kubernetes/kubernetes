@@ -27,6 +27,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net/http"
+	"os"
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -107,8 +109,7 @@ func (r envelope) plainTextPayload(secretETCDPath string) ([]byte, error) {
 // 8. No-op updates to the secret should cause new AES GCM key to be used
 // 9. Direct AES GCM decryption works after the new AES GCM key is used
 func TestKMSProvider(t *testing.T) {
-	encryptionConfig := `
-kind: EncryptionConfiguration
+	encryptionConfig := `kind: EncryptionConfiguration
 apiVersion: apiserver.config.k8s.io/v1
 resources:
   - resources:
@@ -117,8 +118,8 @@ resources:
     - kms:
        name: kms-provider
        cachesize: 1000
-       endpoint: unix:///@kms-provider.sock
-`
+       endpoint: unix:///@kms-provider.sock`
+
 	providerName := "kms-provider"
 	pluginMock, err := mock.NewBase64Plugin("@kms-provider.sock")
 	if err != nil {
@@ -145,8 +146,8 @@ resources:
 	// Since Data Encryption Key (DEK) is randomly generated (per encryption operation), we need to ask KMS Mock for it.
 	plainTextDEK := pluginMock.LastEncryptRequest()
 
-	secretETCDPath := test.getETCDPath()
-	rawEnvelope, err := test.getRawSecretFromETCD()
+	secretETCDPath := test.getETCDPath(test.secret.Name)
+	rawEnvelope, err := test.getRawSecretFromETCD(test.secret.Name)
 	if err != nil {
 		t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
 	}
@@ -225,7 +226,7 @@ resources:
 	}
 
 	// confirm that direct AES GCM decryption does not work
-	failingRawEnvelope, err := test.getRawSecretFromETCD()
+	failingRawEnvelope, err := test.getRawSecretFromETCD(test.secret.Name)
 	if err != nil {
 		t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
 	}
@@ -258,7 +259,7 @@ resources:
 	}
 
 	// confirm that direct AES GCM decryption works
-	oldRawEnvelope, err := test.getRawSecretFromETCD()
+	oldRawEnvelope, err := test.getRawSecretFromETCD(test.secret.Name)
 	if err != nil {
 		t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
 	}
@@ -276,6 +277,58 @@ resources:
 	}
 	if !strings.Contains(string(oldPlainSecret), oldSecretVal) {
 		t.Fatalf("expected %q after decryption, but got %q", oldSecretVal, string(oldPlainSecret))
+	}
+
+	// delete the old secret before updating encyption config
+	err = secretClient.Delete(ctx, test.secret.Name, metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("failed to delete secret, err: %v", err)
+	}
+
+	// ToDo:(nilekh) - add similar test for KMS V2
+	// test encryption config hot reload
+	updatedEncryptionConfig := `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+       name: another-kms-provider
+       cachesize: 1000
+       endpoint: unix:///@kms-provider.sock`
+
+	// update encryption config
+	if err := os.WriteFile(path.Join(test.configDir, encryptionConfigFileName), []byte(updatedEncryptionConfig), 0644); err != nil {
+		t.Fatalf("failed to update encryption config, err: %v", err)
+	}
+
+	_, err = test.createSecret(anotherTestSecret, testNamespace)
+	if err != nil {
+		t.Fatalf("Failed to create test secret, error: %v", err)
+	}
+
+	rawEnvelopeOfUpdatedSecret, err := test.getRawSecretFromETCD(anotherTestSecret)
+	wantPrefixAfterConfigUpdate := "k8s:enc:kms:v1:another-kms-provider:"
+
+	// assert if the prefix is updated after config update
+	if !bytes.HasPrefix(rawEnvelopeOfUpdatedSecret, []byte(wantPrefixAfterConfigUpdate)) {
+		t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, rawEnvelope)
+	}
+
+	// restart apiserver with updated kms encryption config and assert if it can still encrypt and decrypt secrets
+	test.restartTestKubeAPIServer(t)
+
+	_, err = test.createSecret(anotherTestSecret, testNamespace)
+	if err != nil {
+		t.Fatalf("Failed to create test secret, error: %v", err)
+	}
+
+	rawEnvelopeOfUpdatedSecret, err = test.getRawSecretFromETCD(anotherTestSecret)
+
+	// assert if the prefix is updated after config update
+	if !bytes.HasPrefix(rawEnvelopeOfUpdatedSecret, []byte(wantPrefixAfterConfigUpdate)) {
+		t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, rawEnvelope)
 	}
 }
 

@@ -269,6 +269,7 @@ func CreateKubeAPIServerConfig(s completedServerRunOptions) (
 		ExtraConfig: controlplane.ExtraConfig{
 			APIResourceConfigSource: storageFactory.APIResourceConfigSource,
 			StorageFactory:          storageFactory,
+			EncryptionProviderConfigFilepath: s.Etcd.EncryptionProviderConfigFilepath,
 			EventTTL:                s.EventTTL,
 			KubeletClientConfig:     s.KubeletConfig,
 			EnableLogsSupport:       s.EnableLogsHandler,

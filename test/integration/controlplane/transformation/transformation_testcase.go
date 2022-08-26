@@ -49,6 +49,7 @@ const (
 	encryptionConfigFileName = "encryption.conf"
 	testNamespace            = "secret-encryption-test"
 	testSecret               = "test-secret"
+	anotherTestSecret        = "another-test-secret"
 	metricsPrefix            = "apiserver_storage_"
 
 	// precomputed key and secret for use with AES CBC
@@ -85,20 +86,41 @@ func newTransformTest(l kubeapiservertesting.Logger, transformerConfigYAML strin
 		}
 	}
 
+	if err = e.startKubeAPIServer(l); err != nil {
+		return nil, fmt.Errorf("error while starting KubeAPIServer: %v", err)
+	}
+
+	return &e, nil
+}
+
+func (e *transformTest) startKubeAPIServer(l kubeapiservertesting.Logger) error {
+	var err error
+	
+	e.storageConfig = framework.SharedEtcd()
 	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(l, nil, e.getEncryptionOptions(), e.storageConfig); err != nil {
-		return nil, fmt.Errorf("failed to start KubeAPI server: %v", err)
+		return fmt.Errorf("failed to start KubeAPI server: %v", err)
 	}
 	klog.Infof("Started kube-apiserver %v", e.kubeAPIServer.ClientConfig.Host)
 
 	if e.restClient, err = kubernetes.NewForConfig(e.kubeAPIServer.ClientConfig); err != nil {
-		return nil, fmt.Errorf("error while creating rest client: %v", err)
+		return fmt.Errorf("error while creating rest client: %v", err)
 	}
 
 	if e.ns, err = e.createNamespace(testNamespace); err != nil {
-		return nil, err
+		return err
 	}
 
-	return &e, nil
+	return nil
+}
+
+func (e *transformTest) restartTestKubeAPIServer(l kubeapiservertesting.Logger) error {
+	e.kubeAPIServer.TearDownFn()
+	
+	if err := e.startKubeAPIServer(l); err != nil {
+		return fmt.Errorf("error while starting KubeAPIServer: %v", err)
+	}
+
+	return nil
 }
 
 func (e *transformTest) cleanUp() {
@@ -108,7 +130,7 @@ func (e *transformTest) cleanUp() {
 }
 
 func (e *transformTest) run(unSealSecretFunc unSealSecret, expectedEnvelopePrefix string) {
-	response, err := e.readRawRecordFromETCD(e.getETCDPath())
+	response, err := e.readRawRecordFromETCD(e.getETCDPath(e.secret.Name))
 	if err != nil {
 		e.logger.Errorf("failed to read from etcd: %v", err)
 		return
@@ -122,7 +144,7 @@ func (e *transformTest) run(unSealSecretFunc unSealSecret, expectedEnvelopePrefi
 
 	// etcd path of the key is used as the authenticated context - need to pass it to decrypt
 	ctx := context.Background()
-	dataCtx := value.DefaultContext([]byte(e.getETCDPath()))
+	dataCtx := value.DefaultContext([]byte(e.getETCDPath(e.secret.Name)))
 	// Envelope header precedes the cipherTextPayload
 	sealedData := response.Kvs[0].Value[len(expectedEnvelopePrefix):]
 	transformerConfig, err := e.getEncryptionConfig()
@@ -157,12 +179,12 @@ func (e *transformTest) benchmark(b *testing.B) {
 	}
 }
 
-func (e *transformTest) getETCDPath() string {
-	return fmt.Sprintf("/%s/secrets/%s/%s", e.storageConfig.Prefix, e.ns.Name, e.secret.Name)
+func (e *transformTest) getETCDPath(secretName string) string {
+	return fmt.Sprintf("/%s/secrets/%s/%s", e.storageConfig.Prefix, e.ns.Name, secretName)
 }
 
-func (e *transformTest) getRawSecretFromETCD() ([]byte, error) {
-	secretETCDPath := e.getETCDPath()
+func (e *transformTest) getRawSecretFromETCD(secretName string) ([]byte, error) {
+	secretETCDPath := e.getETCDPath(secretName)
 	etcdResponse, err := e.readRawRecordFromETCD(secretETCDPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s from etcd: %v", secretETCDPath, err)
@@ -233,6 +255,14 @@ func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, er
 	}
 
 	return secret, nil
+}
+
+func (e *transformTest) deleteSecret(secret *corev1.Secret) (error) {	
+	if err := e.restClient.CoreV1().Secrets(secret.Namespace).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{}); err != nil {
+		return fmt.Errorf("error while deleting secret: %v", err)
+	}
+
+	return nil
 }
 
 func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetResponse, error) {

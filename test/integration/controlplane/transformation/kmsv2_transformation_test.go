@@ -146,8 +146,8 @@ resources:
 	// Since Data Encryption Key (DEK) is randomly generated (per encryption operation), we need to ask KMS Mock for it.
 	plainTextDEK := pluginMock.LastEncryptRequest()
 
-	secretETCDPath := test.getETCDPath()
-	rawEnvelope, err := test.getRawSecretFromETCD()
+	secretETCDPath := test.getETCDPath(test.secret.Name)
+	rawEnvelope, err := test.getRawSecretFromETCD(test.secret.Name)
 	if err != nil {
 		t.Fatalf("failed to read %s from etcd: %v", secretETCDPath, err)
 	}

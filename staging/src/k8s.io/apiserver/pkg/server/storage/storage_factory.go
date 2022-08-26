@@ -56,6 +56,9 @@ type StorageFactory interface {
 	// Backends gets all backends for all registered storage destinations.
 	// Used for getting all instances for health validations.
 	Backends() []Backend
+
+	// UpdateMutableTransformer updates transformers when kms encyption config is updated.
+	UpdateMutableTransformer(groupResource schema.GroupResource, transformer *value.MutableTransformer)
 }
 
 // DefaultStorageFactory takes a GroupResource and returns back its storage interface.  This result includes:
@@ -113,7 +116,7 @@ type groupResourceOverrides struct {
 	// returned decoders will be priority for attempt to decode.
 	decoderDecoratorFn func([]runtime.Decoder) []runtime.Decoder
 	// transformer is optional and shall encrypt that resource at rest.
-	transformer value.Transformer
+	transformer *value.MutableTransformer
 	// disablePaging will prevent paging on the provided resource.
 	disablePaging bool
 }
@@ -210,10 +213,14 @@ func (s *DefaultStorageFactory) SetSerializer(groupResource schema.GroupResource
 	s.Overrides[groupResource] = overrides
 }
 
-func (s *DefaultStorageFactory) SetTransformer(groupResource schema.GroupResource, transformer value.Transformer) {
+func (s *DefaultStorageFactory) SetTransformer(groupResource schema.GroupResource, transformer *value.MutableTransformer) {
 	overrides := s.Overrides[groupResource]
 	overrides.transformer = transformer
 	s.Overrides[groupResource] = overrides
+}
+
+func (s *DefaultStorageFactory) UpdateMutableTransformer(groupResource schema.GroupResource, transformer *value.MutableTransformer) {
+	s.Overrides[groupResource].transformer.Set(transformer)
 }
 
 // AddCohabitatingResources links resources together the order of the slice matters!  its the priority order of lookup for finding a storage location

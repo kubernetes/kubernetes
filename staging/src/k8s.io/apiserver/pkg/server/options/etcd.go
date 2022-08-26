@@ -197,7 +197,7 @@ func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 	if err := s.addEtcdHealthEndpoint(c); err != nil {
 		return err
 	}
-	transformerOverrides := make(map[schema.GroupResource]value.Transformer)
+	transformerOverrides := make(map[schema.GroupResource]*value.MutableTransformer)
 	if len(s.EncryptionProviderConfigFilepath) > 0 {
 		var err error
 		transformerOverrides, err = encryptionconfig.GetTransformerOverrides(s.EncryptionProviderConfigFilepath)
@@ -258,7 +258,7 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 
 type SimpleRestOptionsFactory struct {
 	Options              EtcdOptions
-	TransformerOverrides map[schema.GroupResource]value.Transformer
+	TransformerOverrides map[schema.GroupResource]*value.MutableTransformer
 }
 
 func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {

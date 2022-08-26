@@ -64,6 +64,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	kmsconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -195,6 +196,9 @@ type ExtraConfig struct {
 	// RepairServicesInterval interval used by the repair loops for
 	// the Services NodePort and ClusterIP resources
 	RepairServicesInterval time.Duration
+
+	// EncryptionProviderConfigFilepath for KMS
+	EncryptionProviderConfigFilepath string
 }
 
 // Config defines configuration for the master
@@ -493,6 +497,38 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			).Run(hookContext.StopCh)
 			return nil
 		})
+	}
+
+	// register kms encryption config hot reload controller
+	// if encryption-provider-config flag is provided
+	if c.ExtraConfig.EncryptionProviderConfigFilepath != "" {
+		m.GenericAPIServer.AddPostStartHookOrDie(
+			"start-kms-encryption-config-hot-reloader",
+			func(hookContext genericapiserver.PostStartHookContext) error {
+				// get context
+				ctx, cancel := context.WithCancel(context.Background())
+				go func() {
+					select {
+					case <-hookContext.StopCh:
+						cancel() // stopCh closed, so cancel our context
+					case <-ctx.Done():
+					}
+				}()
+
+				kmsConfigController, err := kmsconfigcontroller.NewDynamicKMSEncryptionConfiguration(
+					"kms-encryption-config",
+					c.ExtraConfig.EncryptionProviderConfigFilepath,
+					c.ExtraConfig.StorageFactory,
+				)
+				if err != nil {
+					return err
+				}
+
+				go kmsConfigController.Run(ctx)
+
+				return nil
+			},
+		)
 	}
 
 	return m, nil
