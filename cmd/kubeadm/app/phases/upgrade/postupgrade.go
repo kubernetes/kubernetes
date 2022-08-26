@@ -279,7 +279,8 @@ func CleanupKubeletDynamicEnvFileContainerRuntime(dryRun bool) error {
 func cleanupKubeletDynamicEnvFileContainerRuntime(str string) string {
 	const (
 		// `remote` is the only possible value
-		flag = "container-runtime"
+		containerRuntimeFlag = "container-runtime"
+		endpointFlag         = "container-runtime-endpoint"
 	)
 	// Trim the prefix
 	str = strings.TrimLeft(str, fmt.Sprintf("%s=\"", kubeadmconstants.KubeletEnvFileVariableName))
@@ -289,7 +290,7 @@ func cleanupKubeletDynamicEnvFileContainerRuntime(str string) string {
 	// its value to have the scheme prefix.
 	split := strings.Split(str, " ")
 	for i, s := range split {
-		if !strings.Contains(s, flag) {
+		if !(strings.Contains(s, containerRuntimeFlag) && !strings.Contains(s, endpointFlag)) {
 			continue
 		}
 		keyValue := strings.Split(s, "=")
@@ -309,6 +310,7 @@ func cleanupKubeletDynamicEnvFileContainerRuntime(str string) string {
 			}
 			continue
 		}
+
 		// remove the flag and value in one
 		split = append(split[:i], split[i+1:]...)
 	}
