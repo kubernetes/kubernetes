@@ -445,5 +445,5 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 	}
 
 	// understandable output by default
-	fmt.Fprintf(o.Out, "%s \"%s\" %s\n", kindString, info.Name, operation)
+	fmt.Fprintf(o.Out, "%s/%s %s\n", kindString, info.Name, operation)
 }
