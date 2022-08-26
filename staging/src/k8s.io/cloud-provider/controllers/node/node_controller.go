@@ -759,7 +759,7 @@ func getInstanceTypeByProviderIDOrName(ctx context.Context, instances cloudprovi
 	return instanceType, err
 }
 
-// getZoneByProviderIDorName will attempt to get the zone of node using its providerID
+// getZoneByProviderIDOrName will attempt to get the zone of node using its providerID
 // then it's name. If both attempts fail, an error is returned.
 func getZoneByProviderIDOrName(ctx context.Context, zones cloudprovider.Zones, providerID, nodeName string) (cloudprovider.Zone, error) {
 	zone, err := zones.GetZoneByProviderID(ctx, providerID)

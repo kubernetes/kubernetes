@@ -495,8 +495,7 @@ func (s *serviceCache) GetByKey(key string) (interface{}, bool, error) {
 	return nil, false, nil
 }
 
-// ListKeys implements the interface required by DeltaFIFO to list the keys we
-// already know about.
+// allServices list the keys we already know about.
 func (s *serviceCache) allServices() []*v1.Service {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
