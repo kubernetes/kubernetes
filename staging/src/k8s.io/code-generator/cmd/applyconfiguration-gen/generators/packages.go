@@ -30,6 +30,7 @@ import (
 	"k8s.io/klog/v2"
 
 	applygenargs "k8s.io/code-generator/cmd/applyconfiguration-gen/args"
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 )
 
@@ -81,6 +82,13 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 		var toGenerate []applyConfig
 		for _, t := range p.Types {
+			// If we don't have an ObjectMeta field, we lack the information required to make the Apply or ApplyStatus call
+			// to the kube-apiserver, so we don't need to generate the type at all
+			clientTags := genclientTags(t)
+			if clientTags.GenerateClient && !hasObjectMetaField(t) {
+				klog.V(5).Infof("skipping type %v because does not have ObjectMeta", t)
+				continue
+			}
 			if typePkg, ok := refs[t.Name]; ok {
 				toGenerate = append(toGenerate, applyConfig{
 					Type:               t,
@@ -236,8 +244,12 @@ func packageTypesForInputDirs(context *generator.Context, inputDirs []string, ou
 			klog.Warningf("Skipping internal package: %s", p.Path)
 			continue
 		}
-		gv := groupVersion(p)
-		pkg := filepath.Join(outputPath, gv.Group.PackageName(), strings.ToLower(gv.Version.NonEmpty()))
+		// This is how the client generator finds the package we are creating. It uses the API package name, not the group name.
+		// This matches the approach of the client-gen, so the two generator can work together.
+		// For example, if openshift/api/cloudnetwork/v1 contains an apigroup cloud.network.openshift.io, the client-gen
+		// builds a package called cloudnetwork/v1 to contain it. This change makes the applyconfiguration-gen use the same.
+		_, gvPackageString := util.ParsePathGroupVersion(p.Path)
+		pkg := filepath.Join(outputPath, strings.ToLower(gvPackageString))
 		pkgTypes[pkg] = p
 	}
 	return pkgTypes
@@ -273,4 +285,13 @@ func isInternalPackage(p *types.Package) bool {
 func isInternal(m types.Member) bool {
 	_, ok := lookupJSONTags(m)
 	return !ok
+}
+
+func hasObjectMetaField(t *types.Type) bool {
+	for _, member := range t.Members {
+		if objectMeta.Name == member.Type.Name && member.Embedded {
+			return true
+		}
+	}
+	return false
 }
