@@ -36,7 +36,7 @@ import (
 )
 
 var (
-	defaultCFSQuota = metav1.Duration{Duration: 100 * time.Microsecond}
+	defaultCFSQuota = metav1.Duration{Duration: 100 * time.Millisecond}
 )
 
 // ValidateKubeletConfiguration validates `kc` and returns an error if it is invalid
