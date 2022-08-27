@@ -178,6 +178,15 @@ func makeServiceMap(proxier *Proxier, allServices ...*v1.Service) {
 	proxier.servicesSynced = true
 }
 
+func makeEndpointSliceMap(proxier *Proxier, allEpSlices ...*discovery.EndpointSlice) {
+	for i := range allEpSlices {
+		proxier.OnEndpointSliceAdd(allEpSlices[i])
+	}
+	proxier.mu.Lock()
+	defer proxier.mu.Unlock()
+	proxier.endpointSlicesSynced = true
+}
+
 func makeTestService(namespace, name string, svcFunc func(*v1.Service)) *v1.Service {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1376,6 +1385,88 @@ func TestNodePortIPv6(t *testing.T) {
 				checkIptables(t, ipt, test.expectedIptablesChains)
 			}
 		})
+	}
+}
+
+func Test_syncEndpoint_updateWeightsOnRestart(t *testing.T) {
+	tcpProtocol := v1.ProtocolTCP
+
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
+
+	svc1 := makeTestService("ns1", "svc1", func(svc *v1.Service) {
+		svc.Spec.ClusterIP = "10.20.30.41"
+		svc.Spec.Ports = []v1.ServicePort{{
+			Name:     "p80",
+			Port:     int32(80),
+			Protocol: v1.ProtocolTCP,
+		}}
+	})
+	epSlice1 := makeTestEndpointSlice("ns1", "svc1", 1, func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{{
+			Addresses: []string{"10.180.0.1"},
+		}}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     pointer.StringPtr("p80"),
+			Port:     pointer.Int32(80),
+			Protocol: &tcpProtocol,
+		}}
+	})
+
+	// sync proxy rules to get to the desired initial state
+	makeServiceMap(fp, svc1)
+	makeEndpointSliceMap(fp, epSlice1)
+	fp.syncProxyRules()
+
+	serv := &utilipvs.VirtualServer{
+		Address:   netutils.ParseIPSloppy("10.20.30.41"),
+		Port:      uint16(80),
+		Protocol:  string(tcpProtocol),
+		Scheduler: fp.ipvsScheduler,
+	}
+
+	vs, err := fp.ipvs.GetVirtualServer(serv)
+	if err != nil {
+		t.Errorf("failed to get virtual server, err: %v", err)
+	}
+
+	rss, err := fp.ipvs.GetRealServers(vs)
+	if err != nil {
+		t.Errorf("failed to get real servers, err: %v", err)
+	}
+	for _, rs := range rss {
+		rs.Weight = 0
+		if err = fp.ipvs.UpdateRealServer(vs, rs); err != nil {
+			t.Errorf("failed to update real server: %v, err: %v", rs, err)
+		}
+	}
+
+	// simulate a restart by enabling initial sync logic.
+	fp.initialSync = true
+	err = fp.syncEndpoint(proxy.ServicePortName{
+		NamespacedName: types.NamespacedName{
+			Name:      "svc1",
+			Namespace: "ns1",
+		},
+		Port:     "80",
+		Protocol: tcpProtocol,
+	}, true, vs)
+	if err != nil {
+		t.Errorf("failed to sync endpoint, err: %v", err)
+	}
+
+	rss, err = fp.ipvs.GetRealServers(vs)
+	if err != nil {
+		t.Errorf("failed to get real server, err: %v", err)
+	}
+	for _, rs := range rss {
+		if rs.Weight != 1 {
+			t.Logf("unexpected realserver weight: %d, expected weight: 1", rs.Weight)
+			t.Errorf("unexpected realserver state")
+		}
 	}
 }
 
