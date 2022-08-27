@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	core "k8s.io/client-go/testing"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"k8s.io/kubectl/pkg/metricsutil"
 	"k8s.io/kubectl/pkg/scheme"
 	metricsv1alpha1api "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 	metricsv1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
@@ -86,9 +87,11 @@ func TestTopPod(t *testing.T) {
 		expectedQuery      string
 		expectedPods       []string
 		expectedContainers []string
+		expectedColumns    []string
 		namespaces         []string
 		containers         bool
 		listsNamespaces    bool
+		enumeratesDef      bool
 	}{
 		{
 			name:            "all namespaces",
@@ -167,6 +170,13 @@ func TestTopPod(t *testing.T) {
 			},
 			namespaces: []string{testNS, testNS, testNS},
 			containers: true,
+		},
+		{
+			name:            "pods with resource definitions",
+			options:         &TopPodOptions{Enumerate: true},
+			expectedColumns: append(metricsutil.PodColumns, metricsutil.EnumColumns...),
+			namespaces:      []string{testNS, testNS},
+			enumeratesDef:   true,
 		},
 	}
 	cmdtesting.InitTestErrorHandler(t)
@@ -282,6 +292,14 @@ func TestTopPod(t *testing.T) {
 				resultContainers := getResultColumnValues(result, 1)
 				if !reflect.DeepEqual(testCase.expectedContainers, resultContainers) {
 					t.Errorf("containers not matching:\n\texpectedContainers: %v\n\tresultContainers: %v\n", testCase.expectedContainers, resultContainers)
+				}
+			}
+			if testCase.enumeratesDef {
+				resultColumns := strings.Split(result, "\n")[0]
+				for _, c := range testCase.expectedColumns {
+					if !strings.Contains(resultColumns, c) {
+						t.Errorf("enumerated output not present:\n\texpectedColums: %v\n\tresultColumns: %v\n", testCase.expectedColumns, resultColumns)
+					}
 				}
 			}
 		})

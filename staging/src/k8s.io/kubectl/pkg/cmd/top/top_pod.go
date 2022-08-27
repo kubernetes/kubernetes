@@ -53,6 +53,7 @@ type TopPodOptions struct {
 	NoHeaders          bool
 	UseProtocolBuffers bool
 	Sum                bool
+	Enumerate          bool
 
 	PodClient       corev1client.PodsGetter
 	Printer         *metricsutil.TopCmdPrinter
@@ -84,7 +85,10 @@ var (
 		kubectl top pod POD_NAME --containers
 
 		# Show metrics for the pods defined by label name=myLabel
-		kubectl top pod -l name=myLabel`))
+		kubectl top pod -l name=myLabel
+
+		# Show resource definitions for the pods
+		kubectl top pod --enumerate`))
 )
 
 func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions.IOStreams) *cobra.Command {
@@ -117,6 +121,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers.")
 	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
 	cmd.Flags().BoolVar(&o.Sum, "sum", o.Sum, "Print the sum of the resource usage")
+	cmd.Flags().BoolVar(&o.Enumerate, "enumerate", o.Enumerate, "If present, list the cpu memory requests and limits defined in the manifest.")
 	return cmd
 }
 
@@ -158,7 +163,7 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 func (o *TopPodOptions) Validate() error {
 	if len(o.SortBy) > 0 {
-		if o.SortBy != sortByCPU && o.SortBy != sortByMemory {
+		if o.SortBy != sortByCPU.String() && o.SortBy != sortByMemory.String() {
 			return errors.New("--sort-by accepts only cpu or memory")
 		}
 	}
@@ -200,11 +205,19 @@ func (o TopPodOptions) RunTopPod() error {
 		return err
 	}
 
+	pods := &corev1.PodList{}
+	if o.Enumerate {
+		pods, err = getPodsFromCoreAPI(o.PodClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector, fieldSelector)
+		if err != nil {
+			return err
+		}
+	}
+
 	// First we check why no metrics have been received.
 	if len(metrics.Items) == 0 {
 		// If the API server query is successful but all the pods are newly created,
 		// the metrics are probably not ready yet, so we return the error here in the first place.
-		err := verifyEmptyMetrics(o, labelSelector, fieldSelector)
+		err := verifyEmptyMetrics(pods)
 		if err != nil {
 			return err
 		}
@@ -217,7 +230,7 @@ func (o TopPodOptions) RunTopPod() error {
 		}
 	}
 
-	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum)
+	return o.Printer.PrintPodMetrics(metrics.Items, pods.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum, o.Enumerate)
 }
 
 func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, fieldSelector fields.Selector) (*metricsapi.PodMetricsList, error) {
@@ -247,30 +260,37 @@ func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespac
 	return metrics, nil
 }
 
-func verifyEmptyMetrics(o TopPodOptions, labelSelector labels.Selector, fieldSelector fields.Selector) error {
-	if len(o.ResourceName) > 0 {
-		pod, err := o.PodClient.Pods(o.Namespace).Get(context.TODO(), o.ResourceName, metav1.GetOptions{})
+func getPodsFromCoreAPI(coreClient corev1client.PodsGetter, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, fieldSelector fields.Selector) (*corev1.PodList, error) {
+	var err error
+	ns := metav1.NamespaceAll
+	if !allNamespaces {
+		ns = namespace
+	}
+	podList := &corev1.PodList{}
+	if resourceName != "" {
+		p, err := coreClient.Pods(ns).Get(context.TODO(), resourceName, metav1.GetOptions{})
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if err := checkPodAge(pod); err != nil {
-			return err
-		}
+		podList.Items = []corev1.Pod{*p}
 	} else {
-		pods, err := o.PodClient.Pods(o.Namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labelSelector.String(),
-			FieldSelector: fieldSelector.String(),
-		})
+		podList, err = coreClient.Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector.String(), FieldSelector: fieldSelector.String()})
 		if err != nil {
+			return nil, err
+		}
+	}
+
+	return podList, nil
+}
+
+func verifyEmptyMetrics(pods *corev1.PodList) error {
+	if len(pods.Items) == 0 {
+		return nil
+	}
+
+	for _, pod := range pods.Items {
+		if err := checkPodAge(&pod); err != nil {
 			return err
-		}
-		if len(pods.Items) == 0 {
-			return nil
-		}
-		for _, pod := range pods.Items {
-			if err := checkPodAge(&pod); err != nil {
-				return err
-			}
 		}
 	}
 	return errors.New("metrics not available yet")

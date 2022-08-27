@@ -133,7 +133,7 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 
 func (o *TopNodeOptions) Validate() error {
 	if len(o.SortBy) > 0 {
-		if o.SortBy != sortByCPU && o.SortBy != sortByMemory {
+		if o.SortBy != sortByCPU.String() && o.SortBy != sortByMemory.String() {
 			return errors.New("--sort-by accepts only cpu or memory")
 		}
 	}

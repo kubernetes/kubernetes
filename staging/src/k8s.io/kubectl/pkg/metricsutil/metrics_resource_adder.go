@@ -43,3 +43,15 @@ func (adder *ResourceAdder) AddPodMetrics(m *metricsapi.PodMetrics) {
 		}
 	}
 }
+
+// AddPodMetricsWithResources adds each pod metric to the total, as well as the resources
+func (adder *ResourceAdder) AddPodMetricsWithResources(m *metricsapi.PodMetrics, cache map[string]*ResourceContainerInfo) {
+	for _, c := range m.Containers {
+		container := cache[c.Name].Container
+		for _, res := range adder.resources {
+			total := adder.total[res]
+			total.Add(extractResource(&c, container, res))
+			adder.total[res] = total
+		}
+	}
+}
