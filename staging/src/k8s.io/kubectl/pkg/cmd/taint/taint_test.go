@@ -196,6 +196,22 @@ func TestTaint(t *testing.T) {
 			expectFatal: false,
 			expectTaint: true,
 		},
+		{
+			description: "node has two taints, remove all of them with 'delete-all' flag",
+			oldTaints: []corev1.Taint{{
+				Key:    "dedicated",
+				Value:  "namespaceA",
+				Effect: "NoSchedule",
+			}, {
+				Key:    "foo",
+				Value:  "bar",
+				Effect: "PreferNoSchedule",
+			}},
+			newTaints:   []corev1.Taint{},
+			args:        []string{"node", "node-name", "--delete-all"},
+			expectFatal: false,
+			expectTaint: true,
+		},
 
 		// error cases
 		{
@@ -235,6 +251,12 @@ func TestTaint(t *testing.T) {
 				Effect: "NoSchedule",
 			}},
 			args:        []string{"node", "node-name", "foo=bar:NoSchedule"},
+			expectFatal: true,
+			expectTaint: false,
+		},
+		{
+			description: "add or remove taint with 'delete-all' flag shoule be rejected",
+			args:        []string{"node", "node-name", "--delete-all", "foo=bar:NoSchedule-"},
 			expectFatal: true,
 			expectTaint: false,
 		},
@@ -377,6 +399,41 @@ func TestValidateFlags(t *testing.T) {
 		{
 			taintOpts:   TaintOptions{selector: "", all: false, resources: []string{"node", "node-name"}},
 			description: "Without Selector and ALL flags and if node name is provided",
+			expectFatal: false,
+		},
+		{
+			taintOpts: TaintOptions{
+				all:       true,
+				deleteAll: true,
+				taintsToAdd: []corev1.Taint{
+					{
+						Key:    "foo",
+						Value:  "bar",
+						Effect: "NoSchedule",
+					},
+				},
+			},
+			description: "With delete-all flag and add taint args",
+			expectFatal: true,
+		},
+		{
+			taintOpts: TaintOptions{
+				all:       true,
+				deleteAll: true,
+				taintsToRemove: []corev1.Taint{
+					{
+						Key:    "foo",
+						Value:  "bar",
+						Effect: "NoSchedule",
+					},
+				},
+			},
+			description: "With delete-all flag and remove taint args",
+			expectFatal: true,
+		},
+		{
+			taintOpts:   TaintOptions{all: true, deleteAll: true},
+			description: "Without taint args and delete-all flag",
 			expectFatal: false,
 		},
 	}

@@ -58,6 +58,7 @@ type TaintOptions struct {
 	selector       string
 	overwrite      bool
 	all            bool
+	deleteAll      bool
 	fieldManager   string
 
 	ClientForMapping func(*meta.RESTMapping) (resource.RESTClient, error)
@@ -93,7 +94,10 @@ var (
 		kubectl taint node -l myLabel=X  dedicated=foo:PreferNoSchedule
 
 		# Add to node 'foo' a taint with key 'bar' and no value
-		kubectl taint nodes foo bar:NoSchedule`))
+		kubectl taint nodes foo bar:NoSchedule
+
+		# Remove all node taints
+		kubectl taint nodes --all --delete-all`))
 )
 
 func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -124,6 +128,7 @@ func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	cmdutil.AddLabelSelectorFlagVar(cmd, &options.selector)
 	cmd.Flags().BoolVar(&options.overwrite, "overwrite", options.overwrite, "If true, allow taints to be overwritten, otherwise reject taint updates that overwrite existing taints.")
 	cmd.Flags().BoolVar(&options.all, "all", options.all, "Select all nodes in the cluster")
+	cmd.Flags().BoolVar(&options.deleteAll, "delete-all", options.deleteAll, "Remove all taints of node")
 	cmdutil.AddFieldManagerFlagVar(cmd, &options.fieldManager, "kubectl-taint")
 	return cmd
 }
@@ -183,7 +188,7 @@ func (o *TaintOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if len(o.resources) < 1 {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name>")
 	}
-	if len(taintArgs) < 1 {
+	if len(taintArgs) < 1 && !o.deleteAll {
 		return fmt.Errorf("at least one taint update is required")
 	}
 
@@ -221,9 +226,11 @@ func (o TaintOptions) validateFlags() error {
 	if !o.all && o.selector == "" {
 		if len(o.resources) < 2 {
 			return fmt.Errorf("at least one resource name must be specified since 'all' parameter is not set")
-		} else {
-			return nil
 		}
+	}
+	// Cannot have a non-empty taintArgs and delete-all flag set. They are mutually exclusive.
+	if o.deleteAll && (len(o.taintsToAdd) > 0 || len(o.taintsToRemove) > 0) {
+		return fmt.Errorf("setting 'delete-all' parameter with a non empty taint args is prohibited")
 	}
 	return nil
 }
@@ -371,6 +378,9 @@ func (o TaintOptions) updateTaints(obj runtime.Object) (string, error) {
 		if exists := checkIfTaintsAlreadyExists(node.Spec.Taints, o.taintsToAdd); len(exists) != 0 {
 			return "", fmt.Errorf("node %s already has %v taint(s) with same effect(s) and --overwrite is false", node.Name, exists)
 		}
+	}
+	if o.deleteAll {
+		o.taintsToRemove = append([]v1.Taint{}, node.Spec.Taints...)
 	}
 	operation, newTaints, err := reorganizeTaints(node, o.overwrite, o.taintsToAdd, o.taintsToRemove)
 	if err != nil {
