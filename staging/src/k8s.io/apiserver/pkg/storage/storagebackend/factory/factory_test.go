@@ -105,8 +105,10 @@ func TestCreateHealthcheck(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			ready := make(chan struct{})
 			tc.cfg.Transport.ServerList = client.Endpoints()
 			newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, error) {
+				defer close(ready)
 				dummyKV := mockKV{
 					get: func(ctx context.Context) (*clientv3.GetResponse, error) {
 						select {
@@ -121,13 +123,14 @@ func TestCreateHealthcheck(t *testing.T) {
 				return client, nil
 			}
 			stop := make(chan struct{})
+			defer close(stop)
+
 			healthcheck, err := CreateHealthCheck(tc.cfg, stop)
 			if err != nil {
 				t.Fatal(err)
 			}
 			// Wait for healthcheck to establish connection
-			time.Sleep(2 * time.Second)
-
+			<-ready
 			got := healthcheck()
 
 			if !errors.Is(got, tc.want) {
@@ -202,8 +205,10 @@ func TestCreateReadycheck(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			ready := make(chan struct{})
 			tc.cfg.Transport.ServerList = client.Endpoints()
 			newETCD3Client = func(c storagebackend.TransportConfig) (*clientv3.Client, error) {
+				defer close(ready)
 				dummyKV := mockKV{
 					get: func(ctx context.Context) (*clientv3.GetResponse, error) {
 						select {
@@ -218,12 +223,14 @@ func TestCreateReadycheck(t *testing.T) {
 				return client, nil
 			}
 			stop := make(chan struct{})
+			defer close(stop)
+
 			healthcheck, err := CreateReadyCheck(tc.cfg, stop)
 			if err != nil {
 				t.Fatal(err)
 			}
 			// Wait for healthcheck to establish connection
-			time.Sleep(2 * time.Second)
+			<-ready
 
 			got := healthcheck()
 
