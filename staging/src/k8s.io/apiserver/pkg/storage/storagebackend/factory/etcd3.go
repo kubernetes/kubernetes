@@ -127,7 +127,7 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 	// constructing the etcd v3 client blocks and times out if etcd is not available.
 	// retry in a loop in the background until we successfully create the client, storing the client or error encountered
 
-	lock := sync.Mutex{}
+	lock := sync.RWMutex{}
 	var client *clientv3.Client
 	clientErr := fmt.Errorf("etcd client connection not yet established")
 
@@ -175,8 +175,8 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 		// not be closed during healthcheck.
 		// Given that healthchecks has a 2s timeout, worst case of blocking
 		// shutdown for additional 2s seems acceptable.
-		lock.Lock()
-		defer lock.Unlock()
+		lock.RLock()
+		defer lock.RUnlock()
 		if clientErr != nil {
 			return clientErr
 		}
