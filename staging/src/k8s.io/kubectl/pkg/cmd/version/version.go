@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/component-base/version"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
