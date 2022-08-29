@@ -726,8 +726,15 @@ func (p *sharedProcessor) distribute(obj interface{}, sync bool) {
 	defer p.listenersLock.RUnlock()
 
 	for listener, isSyncing := range p.listeners {
-		if !sync || isSyncing {
+		switch {
+		case !sync:
+			// non-sync messages are delivered to every listener
 			listener.add(obj)
+		case isSyncing:
+			// sync messages are delivered to every syncing listenter
+			listener.add(obj)
+		default:
+			// skipping a sync obj for a non-syncing listener
 		}
 	}
 }
