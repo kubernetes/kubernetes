@@ -751,21 +751,18 @@ func (p *sharedProcessor) run(stopCh <-chan struct{}) {
 	}()
 	<-stopCh
 
-	func() {
-		p.listenersLock.Lock()
-		defer p.listenersLock.Unlock()
-		for listener := range p.listeners {
-			close(listener.addCh) // Tell .pop() to stop. .pop() will tell .run() to stop
-		}
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+	for listener := range p.listeners {
+		close(listener.addCh) // Tell .pop() to stop. .pop() will tell .run() to stop
+	}
 
-		// Wipe out list of listeners since they are now closed
-		// (processorListener cannot be re-used)
-		p.listeners = nil
+	// Wipe out list of listeners since they are now closed
+	// (processorListener cannot be re-used)
+	p.listeners = nil
 
-		// Reset to false since there are nil listeners, also to block new listeners
-		// that are added from being run now that the processor was stopped
-		p.listenersStarted = false
-	}()
+	// Reset to false since no listeners are running
+	p.listenersStarted = false
 
 	p.wg.Wait() // Wait for all .pop() and .run() to stop
 }
@@ -789,7 +786,6 @@ func (p *sharedProcessor) shouldResync() bool {
 			listener.determineNextResync(now)
 		}
 	}
-
 	return resyncNeeded
 }
 
