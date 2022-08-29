@@ -22,7 +22,7 @@ import (
 	"math"
 	"sync/atomic"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -88,6 +88,10 @@ func (pl *InterPodAffinity) processExistingPod(
 		return
 	}
 
+	// Bypass terminating pod.
+	if existingPod.Pod.DeletionTimestamp != nil {
+		return
+	}
 	// For every soft pod affinity term of <pod>, if <existingPod> matches the term,
 	// increment <p.counts> for every node in the cluster with the same <term.TopologyKey>
 	// value as that of <existingPods>`s node by the term`s weight.

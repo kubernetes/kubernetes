@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -735,6 +736,22 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgIndia}},
 			},
 			expectedList: []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: framework.MaxNodeScore}},
+		},
+		{
+			name: "Affinity with terminating pods",
+			pod:  &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegion}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "node1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "node2"}, ObjectMeta: metav1.ObjectMeta{
+					Labels:            podLabelSecurityS1,
+					DeletionTimestamp: &metav1.Time{Time: time.Now()},
+				}},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgIndia}},
+			},
+			expectedList: []framework.NodeScore{{Name: "node1", Score: framework.MaxNodeScore}, {Name: "node2", Score: 0}},
 		},
 	}
 	for _, test := range tests {
