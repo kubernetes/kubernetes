@@ -42,8 +42,7 @@ import (
 type EtcdOptions struct {
 	// The value of Paging on StorageConfig will be overridden by the
 	// calculated feature gate value.
-	StorageConfig                    storagebackend.Config
-	EncryptionProviderConfigFilepath string
+	StorageConfig storagebackend.Config
 
 	EtcdServersOverrides []string
 
@@ -59,6 +58,14 @@ type EtcdOptions struct {
 	DefaultWatchCacheSize int
 	// WatchCacheSizes represents override to a given resource
 	WatchCacheSizes []string
+
+	// EncryptionProviderConfigFilepath is loaded once via LoadEncryptionConfigOnce.
+	// This prevents unnecessary gRPC connections to KMS plugins and ensures that
+	// the API server only has one view into the current key ID of KMS v2 plugins.
+	EncryptionProviderConfigFilepath string
+	encryptionProviderConfigErr      error
+	transformers                     map[schema.GroupResource]value.Transformer
+	kmsHealthChecks                  []healthz.HealthChecker
 }
 
 var storageTypes = sets.NewString(
@@ -197,13 +204,9 @@ func (s *EtcdOptions) ApplyTo(c *server.Config) error {
 	if err := s.addEtcdHealthEndpoint(c); err != nil {
 		return err
 	}
-	transformerOverrides := make(map[schema.GroupResource]value.Transformer)
-	if len(s.EncryptionProviderConfigFilepath) > 0 {
-		var err error
-		transformerOverrides, err = encryptionconfig.GetTransformerOverrides(s.EncryptionProviderConfigFilepath, c.DrainedNotify())
-		if err != nil {
-			return err
-		}
+	transformerOverrides, _, err := s.LoadEncryptionConfigOnce(c.DrainedNotify())
+	if err != nil {
+		return err
 	}
 
 	// use the StorageObjectCountTracker interface instance from server.Config
@@ -245,15 +248,27 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 		return readyCheck()
 	}))
 
-	if s.EncryptionProviderConfigFilepath != "" {
-		kmsPluginHealthzChecks, err := encryptionconfig.GetKMSPluginHealthzCheckers(s.EncryptionProviderConfigFilepath, c.DrainedNotify())
-		if err != nil {
-			return err
-		}
-		c.AddHealthChecks(kmsPluginHealthzChecks...)
+	_, kmsPluginHealthzChecks, err := s.LoadEncryptionConfigOnce(c.DrainedNotify())
+	if err != nil {
+		return err
 	}
+	c.AddHealthChecks(kmsPluginHealthzChecks...)
 
 	return nil
+}
+
+func (s *EtcdOptions) LoadEncryptionConfigOnce(stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, []healthz.HealthChecker, error) {
+	if len(s.transformers) > 0 || len(s.kmsHealthChecks) > 0 || s.encryptionProviderConfigErr != nil {
+		return s.transformers, s.kmsHealthChecks, s.encryptionProviderConfigErr
+	}
+
+	if len(s.EncryptionProviderConfigFilepath) == 0 {
+		return nil, nil, nil
+	}
+
+	s.transformers, s.kmsHealthChecks, s.encryptionProviderConfigErr = encryptionconfig.LoadEncryptionConfig(s.EncryptionProviderConfigFilepath, stopCh)
+
+	return s.transformers, s.kmsHealthChecks, s.encryptionProviderConfigErr
 }
 
 type SimpleRestOptionsFactory struct {

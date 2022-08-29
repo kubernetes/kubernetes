@@ -43,10 +43,12 @@ const (
 )
 
 var (
-	aesKeySizes = []int{16, 24, 32}
 	// See https://golang.org/pkg/crypto/aes/#NewCipher for details on supported key sizes for AES.
-	secretBoxKeySizes = []int{32}
+	aesKeySizes = []int{16, 24, 32}
+
 	// See https://godoc.org/golang.org/x/crypto/nacl/secretbox#Open for details on the supported key sizes for Secretbox.
+	secretBoxKeySizes = []int{32}
+
 	root = field.NewPath("resources")
 )
 

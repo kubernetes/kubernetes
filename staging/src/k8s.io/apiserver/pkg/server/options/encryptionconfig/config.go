@@ -94,16 +94,6 @@ func (p *kmsv2PluginProbe) toHealthzCheck(idx int) healthz.HealthChecker {
 	})
 }
 
-func GetKMSPluginHealthzCheckers(filepath string, stopCh <-chan struct{}) ([]healthz.HealthChecker, error) {
-	_, kmsHealthChecks, err := LoadEncryptionConfig(filepath, stopCh)
-	return kmsHealthChecks, err
-}
-
-func GetTransformerOverrides(filepath string, stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, error) {
-	transformers, _, err := LoadEncryptionConfig(filepath, stopCh)
-	return transformers, err
-}
-
 func LoadEncryptionConfig(filepath string, stopCh <-chan struct{}) (map[schema.GroupResource]value.Transformer, []healthz.HealthChecker, error) {
 	config, err := loadConfig(filepath)
 	if err != nil {
