@@ -53,6 +53,12 @@ type PortForwarder struct {
 	requestID     int
 	out           io.Writer
 	errOut        io.Writer
+
+	// ErrorHandler is an optionally provided function that can be used to control how errors in handleConnection are
+	// handled. If ErrorHandler is nil, or if the function returns false, PortForwarder will perform its default error
+	// handling. If the function returns true, that indicates the error was handled, and PortForwarder will not perform
+	// any additional error handling.
+	ErrorHandler func(err error) bool
 }
 
 // ForwardedPort contains a Local:Remote port pairing.
@@ -402,7 +408,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 
 	// always expect something on errorChan (it may be nil)
 	err = <-errorChan
-	if err != nil {
+	if err != nil && (pf.ErrorHandler == nil || !pf.ErrorHandler(err)) {
 		runtime.HandleError(err)
 		pf.streamConn.Close()
 	}

@@ -508,6 +508,7 @@ func TestHandleConnection(t *testing.T) {
 	assert.Equal(t, "test data from local", remoteDataReceived.String())
 	assert.Equal(t, "test data from remote", localConnection.receiveBuffer.String())
 	assert.Equal(t, "Handling connection for 1111\n", out.String())
+	assert.False(t, (pf.streamConn.(*fakeConnection)).closed)
 }
 
 func TestHandleConnectionSendsRemoteError(t *testing.T) {
@@ -541,6 +542,68 @@ func TestHandleConnectionSendsRemoteError(t *testing.T) {
 	assert.Equal(t, "", remoteDataReceived.String())
 	assert.Equal(t, "", localConnection.receiveBuffer.String())
 	assert.Equal(t, "Handling connection for 1111\n", out.String())
+	assert.True(t, (pf.streamConn.(*fakeConnection)).closed)
+}
+
+func TestErrorHandler(t *testing.T) {
+	testCases := []struct {
+		name                   string
+		errorHandler           func(err error) bool
+		expectConnectionClosed bool
+	}{
+		{
+			name:                   "Default error handling should be performed when ConnectionErrorHandler is nil",
+			expectConnectionClosed: true,
+		},
+		{
+			name:                   "Default error handling should be performed when ConnectionErrorHandler returns false",
+			errorHandler:           func(err error) bool { return false },
+			expectConnectionClosed: true,
+		},
+		{
+			name:                   "Default error handling should not be performed when ConnectionErrorHandler returns true",
+			errorHandler:           func(err error) bool { return true },
+			expectConnectionClosed: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			out := bytes.NewBufferString("")
+			errOut := bytes.NewBufferString("")
+
+			pf, err := New(&fakeDialer{}, []string{":2222"}, nil, nil, out, errOut)
+			if err != nil {
+				t.Fatalf("error while calling New: %s", err)
+			}
+
+			// Set error handler
+			pf.ErrorHandler = tc.errorHandler
+
+			// Setup fake local connection
+			localConnection := &fakeConn{
+				sendBuffer:    bytes.NewBufferString(""),
+				receiveBuffer: bytes.NewBufferString(""),
+			}
+
+			// Setup fake remote connection to return an error message on the error stream
+			remoteDataToSend := bytes.NewBufferString("")
+			remoteDataReceived := bytes.NewBufferString("")
+			remoteErrorToSend := bytes.NewBufferString("something bad happened")
+			remoteConnection := newFakeConnection()
+			remoteConnection.dataStream.readFunc = remoteDataToSend.Read
+			remoteConnection.dataStream.writeFunc = remoteDataReceived.Write
+			remoteConnection.errorStream.readFunc = remoteErrorToSend.Read
+			pf.streamConn = remoteConnection
+
+			// Test handleConnection, using go-routine because it needs to be able to write to unbuffered pf.errorChan
+			pf.handleConnection(localConnection, ForwardedPort{Local: 1111, Remote: 2222})
+
+			assert.Equal(t, "", remoteDataReceived.String())
+			assert.Equal(t, "", localConnection.receiveBuffer.String())
+			assert.Equal(t, "Handling connection for 1111\n", out.String())
+			assert.Equal(t, tc.expectConnectionClosed, (pf.streamConn.(*fakeConnection)).closed)
+		})
+	}
 }
 
 func TestWaitForConnectionExitsOnStreamConnClosed(t *testing.T) {

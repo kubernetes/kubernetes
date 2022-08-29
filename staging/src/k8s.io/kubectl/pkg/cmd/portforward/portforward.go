@@ -31,6 +31,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -141,7 +142,20 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 	if err != nil {
 		return err
 	}
+	fw.ErrorHandler = portForwardErrorHandler
 	return fw.ForwardPorts()
+}
+
+// portForwardErrorHandler handles errors that occur during an accepted port forward connection, so that
+// "connection reset by peer" can be treated as non-fatal. If the error ends in "connection reset by peer", this
+// function logs it and returns true, indicating that the error was handled, and allowing the port forwarder to continue
+// listening for and accepting new connections.
+func portForwardErrorHandler(err error) bool {
+	if err != nil && strings.HasSuffix(strings.ToLower(err.Error()), "connection reset by peer") {
+		runtime.HandleError(err)
+		return true
+	}
+	return false
 }
 
 // splitPort splits port string which is in form of [LOCAL PORT]:REMOTE PORT

@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
@@ -978,5 +979,28 @@ func TestCheckUDPPort(t *testing.T) {
 		if tc.expectError {
 			t.Errorf("%v: unexpected success", tc.name)
 		}
+	}
+}
+
+func TestPortForwardErrorHandler(t *testing.T) {
+	testCases := []struct {
+		name           string
+		err            error
+		expectedResult bool
+	}{
+		{"it should return true if the error is connection reset by peer", errors.New("connection reset by peer"), true},
+		{"it should return true even if the error is not lower case", errors.New("CONNECTION RESET BY PEER"), true},
+		{"it should return true if the error ends with connection reset by peer", errors.New("error: connection reset by peer"), true},
+		{"it should return false if connection reset by peer is not the suffix", errors.New("connection reset by peer."), false},
+		{"it should return false for any other error", errors.New("something bad happened"), false},
+		{"it should return false if err is nil", nil, false},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actualResult := portForwardErrorHandler(tc.err)
+			if actualResult != tc.expectedResult {
+				t.Fatalf("expected %t, got %t", tc.expectedResult, actualResult)
+			}
+		})
 	}
 }
