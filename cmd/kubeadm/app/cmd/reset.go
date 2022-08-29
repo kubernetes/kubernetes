@@ -78,7 +78,6 @@ type resetData struct {
 	inputReader           io.Reader
 	outputWriter          io.Writer
 	cfg                   *kubeadmapi.InitConfiguration
-	dirsToClean           []string
 	dryRun                bool
 }
 
@@ -178,19 +177,10 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 		Use:   "reset",
 		Short: "Performs a best effort revert of changes made to this host by 'kubeadm init' or 'kubeadm join'",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := resetRunner.InitData(args)
+			err := resetRunner.Run(args)
 			if err != nil {
 				return err
 			}
-
-			err = resetRunner.Run(args)
-			if err != nil {
-				return err
-			}
-
-			// Then clean contents from the stateful kubelet, etcd and cni directories
-			data := c.(*resetData)
-			cleanDirs(data)
 
 			// output help text instructing user how to remove cni folders
 			fmt.Print(cniCleanupInstructions)
@@ -218,21 +208,6 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 	resetRunner.BindToCommand(cmd)
 
 	return cmd
-}
-
-func cleanDirs(data *resetData) {
-	if data.DryRun() {
-		fmt.Printf("[reset] Would delete contents of stateful directories: %v\n", data.dirsToClean)
-		return
-	}
-
-	fmt.Printf("[reset] Deleting contents of stateful directories: %v\n", data.dirsToClean)
-	for _, dir := range data.dirsToClean {
-		klog.V(1).Infof("[reset] Deleting contents of %s", dir)
-		if err := phases.CleanDir(dir); err != nil {
-			klog.Warningf("[reset] Failed to delete contents of %q directory: %v", dir, err)
-		}
-	}
 }
 
 // Cfg returns the InitConfiguration.
@@ -268,11 +243,6 @@ func (r *resetData) InputReader() io.Reader {
 // IgnorePreflightErrors returns the list of preflight errors to ignore.
 func (r *resetData) IgnorePreflightErrors() sets.String {
 	return r.ignorePreflightErrors
-}
-
-// AddDirsToClean add a list of dirs to the list of dirs that will be removed.
-func (r *resetData) AddDirsToClean(dirs ...string) {
-	r.dirsToClean = append(r.dirsToClean, dirs...)
 }
 
 // CRISocketPath returns the criSocketPath.

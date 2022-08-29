@@ -18,6 +18,7 @@ package phases
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -51,6 +52,7 @@ func NewCleanupNodePhase() workflow.Phase {
 }
 
 func runCleanupNode(c workflow.RunData) error {
+	dirsToClean := []string{filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)}
 	r, ok := c.(resetData)
 	if !ok {
 		return errors.New("cleanup-node phase invoked with an invalid data struct")
@@ -82,7 +84,7 @@ func runCleanupNode(c workflow.RunData) error {
 		kubeletRunDir, err := absoluteKubeletRunDirectory()
 		if err == nil {
 			// Only clean absoluteKubeletRunDirectory if umountDirsCmd passed without error
-			r.AddDirsToClean(kubeletRunDir)
+			dirsToClean = append(dirsToClean, kubeletRunDir)
 		}
 	} else {
 		fmt.Printf("[reset] Would unmount mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
@@ -101,7 +103,8 @@ func runCleanupNode(c workflow.RunData) error {
 	if certsDir != kubeadmapiv1.DefaultCertificatesDir {
 		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
 	}
-	resetConfigDir(kubeadmconstants.KubernetesDir, certsDir, r.DryRun())
+	dirsToClean = append(dirsToClean, certsDir)
+	resetConfigDir(kubeadmconstants.KubernetesDir, dirsToClean, r.DryRun())
 
 	if r.Cfg() != nil && features.Enabled(r.Cfg().FeatureGates, features.RootlessControlPlane) {
 		if !r.DryRun() {
@@ -143,12 +146,8 @@ func removeContainers(execer utilsexec.Interface, criSocketPath string) error {
 	return containerRuntime.RemoveContainers(containers)
 }
 
-// resetConfigDir is used to cleanup the files kubeadm writes in /etc/kubernetes/.
-func resetConfigDir(configPathDir, pkiPathDir string, isDryRun bool) {
-	dirsToClean := []string{
-		filepath.Join(configPathDir, kubeadmconstants.ManifestsSubDirName),
-		pkiPathDir,
-	}
+// resetConfigDir is used to cleanup the files in the folder defined in dirsToClean.
+func resetConfigDir(configPathDir string, dirsToClean []string, isDryRun bool) {
 	if !isDryRun {
 		fmt.Printf("[reset] Deleting contents of directories: %v\n", dirsToClean)
 		for _, dir := range dirsToClean {
@@ -203,4 +202,17 @@ func CleanDir(filePath string) error {
 		}
 	}
 	return nil
+}
+
+func IsDirEmpty(dir string) (bool, error) {
+	d, err := os.Open(dir)
+	if err != nil {
+		return false, err
+	}
+	defer d.Close()
+	_, err = d.Readdirnames(1)
+	if err == io.EOF {
+		return true, nil
+	}
+	return false, nil
 }
