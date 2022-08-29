@@ -1586,9 +1586,7 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 
 	// copy pod status IPs to avoid race conditions with PodStatus #102806
 	podIPs := make([]string, len(podStatus.IPs))
-	for j, ip := range podStatus.IPs {
-		podIPs[j] = ip
-	}
+	copy(podIPs, podStatus.IPs)
 
 	// make podIPs order match node IP family preference #97979
 	podIPs = kl.sortPodIPs(podIPs)
