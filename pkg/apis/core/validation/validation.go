@@ -5976,8 +5976,11 @@ func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, fld *f
 func ValidateResourceQuantityValue(resource string, value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
+
 	if helper.IsIntegerResourceName(resource) {
-		if value.MilliValue()%int64(1000) != int64(0) {
+		if value.Value() >=  (math.MaxInt64/10) {
+			allErrs = append(allErrs, field.Invalid(fldPath, value, fmt.Errorf("quantity is too great: %v", value).Error()))
+		} else if value.ScaledValue(-1)%int64(10) != int64(0) {
 			allErrs = append(allErrs, field.Invalid(fldPath, value, isNotIntegerErrorMsg))
 		}
 	}

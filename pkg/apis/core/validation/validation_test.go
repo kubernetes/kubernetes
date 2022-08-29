@@ -17262,6 +17262,24 @@ func TestValidateResourceQuota(t *testing.T) {
 		Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScope("foo")},
 	}
 
+	exceedStorageQuotaSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			"foo.storageclass.storage.k8s.io/requests.storage": resource.MustParse("900Pi"),
+		},
+		//Scopes: []core.ResourceQuotaScope{core.ResourceQuotaScope("foo")},
+	}
+
+	storageQuotaSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			"foo.storageclass.storage.k8s.io/requests.storage": resource.MustParse("800Pi"),
+		},
+	}
+	invalidStorageQuotaSpec := core.ResourceQuotaSpec{
+		Hard: core.ResourceList{
+			"foo.storageclass.storage.k8s.io/requests.storage": resource.MustParse("92233720368547758.0101"),
+		},
+	}
+
 	testCases := map[string]struct {
 		rq        core.ResourceQuota
 		errDetail string
@@ -17382,6 +17400,17 @@ func TestValidateResourceQuota(t *testing.T) {
 		"invalid-cross-namespace-affinity": {
 			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidCrossNamespaceAffinitySpec},
 			errDetail: "must be 'Exist' when scope is any of ResourceQuotaScopeTerminating, ResourceQuotaScopeNotTerminating, ResourceQuotaScopeBestEffort, ResourceQuotaScopeNotBestEffort or ResourceQuotaScopeCrossNamespacePodAffinity",
+		},
+		"invalid-storage-resource-quota-overflow": {
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: exceedStorageQuotaSpec},
+			errDetail: "quantity is too great",
+		},
+		"storage-resource-quota": {
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: storageQuotaSpec},
+		},
+		"invalid-storage-resource-quota-non-integer": {
+			rq:        core.ResourceQuota{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: invalidStorageQuotaSpec},
+			errDetail: isNotIntegerErrorMsg,
 		},
 	}
 	for name, tc := range testCases {
