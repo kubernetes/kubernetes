@@ -26,21 +26,38 @@ import (
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
-	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	servertesting "k8s.io/apiextensions-apiserver/pkg/cmd/server/testing"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 )
 
 // StartDefaultServer starts a test server.
 func StartDefaultServer(t servertesting.Logger, flags ...string) (func(), *rest.Config, *serveroptions.CustomResourceDefinitionsServerOptions, error) {
+	tearDownFn, s, err := startDefaultServer(t, flags...)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return tearDownFn, s.ClientConfig, s.ServerOpts, nil
+}
+
+func StartDefaultServerWithConfigAccess(t servertesting.Logger, flags ...string) (func(), *rest.Config, apiserver.CompletedConfig, error) {
+	tearDownFn, s, err := startDefaultServer(t, flags...)
+	if err != nil {
+		return nil, nil, apiserver.CompletedConfig{}, err
+	}
+	return tearDownFn, s.ClientConfig, s.CompletedConfig, nil
+}
+
+func startDefaultServer(t servertesting.Logger, flags ...string) (func(), servertesting.TestServer, error) {
 	// create kubeconfig which will not actually be used. But authz/authn needs it to startup.
 	fakeKubeConfig, err := ioutil.TempFile("", "kubeconfig")
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, servertesting.TestServer{}, err
 	}
 	fakeKubeConfig.WriteString(`
 apiVersion: v1
@@ -75,7 +92,7 @@ users:
 	), nil)
 	if err != nil {
 		os.Remove(fakeKubeConfig.Name())
-		return nil, nil, nil, err
+		return nil, servertesting.TestServer{}, err
 	}
 
 	tearDownFn := func() {
@@ -83,7 +100,7 @@ users:
 		s.TearDownFn()
 	}
 
-	return tearDownFn, s.ClientConfig, s.ServerOpts, nil
+	return tearDownFn, s, nil
 }
 
 // StartDefaultServerWithClients starts a test server and returns clients for it.

@@ -163,12 +163,12 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv2, true)()
 	// Set factory for mock envelope service
 	factory := envelopeServiceFactory
-	factoryKMSv2 := envelopeKMSv2ServiceFactory
+	factoryKMSv2 := EnvelopeKMSv2ServiceFactory
 	envelopeServiceFactory = newMockEnvelopeService
-	envelopeKMSv2ServiceFactory = newMockEnvelopeKMSv2Service
+	EnvelopeKMSv2ServiceFactory = newMockEnvelopeKMSv2Service
 	defer func() {
 		envelopeServiceFactory = factory
-		envelopeKMSv2ServiceFactory = factoryKMSv2
+		EnvelopeKMSv2ServiceFactory = factoryKMSv2
 	}()
 
 	ctx := testContext(t)

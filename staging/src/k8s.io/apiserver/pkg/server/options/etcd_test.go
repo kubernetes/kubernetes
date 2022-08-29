@@ -204,6 +204,7 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 		name                 string
 		encryptionConfigPath string
 		wantChecks           []string
+		skipHealth           bool
 	}{
 		{
 			name:                 "single kms-provider, expect single kms healthz check",
@@ -215,6 +216,12 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 			encryptionConfigPath: "testdata/encryption-configs/multiple-kms-providers.yaml",
 			wantChecks:           []string{"etcd", "kms-provider-0", "kms-provider-1"},
 		},
+		{
+			name:                 "two kms-providers with skip, expect zero kms healthz checks",
+			encryptionConfigPath: "testdata/encryption-configs/multiple-kms-providers.yaml",
+			wantChecks:           nil,
+			skipHealth:           true,
+		},
 	}
 
 	scheme := runtime.NewScheme()
@@ -225,8 +232,12 @@ func TestKMSHealthzEndpoint(t *testing.T) {
 			serverConfig := server.NewConfig(codecs)
 			etcdOptions := &EtcdOptions{
 				EncryptionProviderConfigFilepath: tc.encryptionConfigPath,
+				SkipHealthEndpoints:              tc.skipHealth,
 			}
-			if err := etcdOptions.addEtcdHealthEndpoint(serverConfig); err != nil {
+			if err := etcdOptions.Complete(serverConfig.StorageObjectCountTracker, serverConfig.DrainedNotify()); err != nil {
+				t.Fatal(err)
+			}
+			if err := etcdOptions.ApplyTo(serverConfig); err != nil {
 				t.Fatalf("Failed to add healthz error: %v", err)
 			}
 
@@ -244,11 +255,18 @@ func TestReadinessCheck(t *testing.T) {
 		name              string
 		wantReadyzChecks  []string
 		wantHealthzChecks []string
+		skipHealth        bool
 	}{
 		{
 			name:              "Readyz should have etcd-readiness check",
 			wantReadyzChecks:  []string{"etcd", "etcd-readiness"},
 			wantHealthzChecks: []string{"etcd"},
+		},
+		{
+			name:              "skip health, Readyz should not have etcd-readiness check",
+			wantReadyzChecks:  nil,
+			wantHealthzChecks: nil,
+			skipHealth:        true,
 		},
 	}
 
@@ -258,8 +276,11 @@ func TestReadinessCheck(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			serverConfig := server.NewConfig(codecs)
-			etcdOptions := &EtcdOptions{}
-			if err := etcdOptions.addEtcdHealthEndpoint(serverConfig); err != nil {
+			etcdOptions := &EtcdOptions{SkipHealthEndpoints: tc.skipHealth}
+			if err := etcdOptions.Complete(serverConfig.StorageObjectCountTracker, serverConfig.DrainedNotify()); err != nil {
+				t.Fatal(err)
+			}
+			if err := etcdOptions.ApplyTo(serverConfig); err != nil {
 				t.Fatalf("Failed to add healthz error: %v", err)
 			}
 
