@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -152,6 +153,11 @@ type APIAggregator struct {
 	// openAPIV3AggregationController downloads and caches OpenAPI v3 specs.
 	openAPIV3AggregationController *openapiv3controller.AggregationController
 
+	// discoveryAggregationController downloads and caches discovery documents
+	// from all aggregated apiservices so they may be served as a unified
+	// document from /discovery/<version>
+	discoveryAggregationController DiscoveryAggregationController
+
 	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
 	// overwrites proxyTransport dialer if not nil
 	egressSelector *egressselector.EgressSelector
@@ -167,6 +173,8 @@ func (cfg *Config) Complete() CompletedConfig {
 	// the kube aggregator wires its own discovery mechanism
 	// TODO eventually collapse this by extracting all of the discovery out
 	c.GenericConfig.EnableDiscovery = false
+	c.GenericConfig.EnableAggregatedDiscoveryEndpoint = false
+
 	version := version.Get()
 	c.GenericConfig.Version = &version
 
@@ -359,8 +367,8 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	return s, nil
 }
 
-// PrepareRun prepares the aggregator to run, by setting up the OpenAPI spec and calling
-// the generic PrepareRun.
+// PrepareRun prepares the aggregator to run, by setting up the OpenAPI spec &
+// aggregated discovery document and calling the generic PrepareRun.
 func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	// add post start hook before generic PrepareRun in order to be before /healthz installation
 	if s.openAPIConfig != nil {
@@ -374,6 +382,34 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapiv3-controller", func(context genericapiserver.PostStartHookContext) error {
 			go s.openAPIV3AggregationController.Run(context.StopCh)
 			return nil
+		})
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryEndpoint) {
+		s.discoveryAggregationController = NewDiscoveryManager(
+			s.GenericAPIServer.Serializer,
+		)
+
+		// Inform discovery manager of all local api servers which contain
+		// crds/builtin types
+		s.discoveryAggregationController.AddLocalAPIService(
+			"kube-aggregator", s.GenericAPIServer.DiscoveryResourceManager)
+
+		i := 0
+		for delegate := s.GenericAPIServer.NextDelegate(); delegate != nil && delegate.NextDelegate() != nil; delegate = delegate.NextDelegate() {
+			s.discoveryAggregationController.AddLocalAPIService("delegate_"+strconv.Itoa(i), delegate.UnprotectedHandler())
+			i++
+		}
+
+		// Setup discovery endpoint
+		s.GenericAPIServer.Handler.GoRestfulContainer.Add(s.discoveryAggregationController.WebService())
+		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-discovery-controller", func(context genericapiserver.PostStartHookContext) error {
+			// Run discovery manager's worker to watch for new/removed/updated
+			// APIServices to the discovery document can be updated at runtime
+			//
+			// Run populates only the local APIServices and returns an error if
+			// there was any.
+			return s.discoveryAggregationController.Run(context.StopCh)
 		})
 	}
 
@@ -426,6 +462,10 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		if s.openAPIV3AggregationController != nil {
 			s.openAPIV3AggregationController.UpdateAPIService(proxyHandler, apiService)
 		}
+		// Forward calls to discovery manager to update discovery document
+		if s.discoveryAggregationController != nil {
+			s.discoveryAggregationController.AddAPIService(apiService, proxyHandler)
+		}
 		return nil
 	}
 
@@ -450,6 +490,10 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	if s.openAPIV3AggregationController != nil {
 		s.openAPIV3AggregationController.AddAPIService(proxyHandler, apiService)
 	}
+	if s.discoveryAggregationController != nil {
+		s.discoveryAggregationController.AddAPIService(apiService, proxyHandler)
+	}
+
 	s.proxyHandlers[apiService.Name] = proxyHandler
 	s.GenericAPIServer.Handler.NonGoRestfulMux.Handle(proxyPath, proxyHandler)
 	s.GenericAPIServer.Handler.NonGoRestfulMux.UnlistedHandlePrefix(proxyPath+"/", proxyHandler)
@@ -482,6 +526,11 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 // RemoveAPIService removes the APIService from being handled.  It is not thread-safe, so only call it on one thread at a time please.
 // It's a slow moving API, so it's ok to run the controller on a single thread.
 func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
+	// Forward calls to discovery manager to update discovery document
+	if s.discoveryAggregationController != nil {
+		s.discoveryAggregationController.RemoveAPIService(apiServiceName)
+	}
+
 	version := v1helper.APIServiceNameToGroupVersion(apiServiceName)
 
 	proxyPath := "/apis/" + version.Group + "/" + version.Version
