@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"sync"
 	"time"
 
@@ -331,6 +332,11 @@ func (rq *Controller) syncResourceQuotaFromKey(ctx context.Context, key string) 
 	return rq.syncResourceQuota(ctx, resourceQuota)
 }
 
+const (
+	kcpClusterScopedQuotaNamespace                 = "admin"
+	kcpExperimentalClusterScopedQuotaAnnotationKey = "experimental.quota.kcp.dev/cluster-scoped"
+)
+
 // syncResourceQuota runs a complete sync of resource quota status across all known kinds
 func (rq *Controller) syncResourceQuota(ctx context.Context, resourceQuota *v1.ResourceQuota) (err error) {
 	// quota is dirty if any part of spec hard limits differs from the status hard limits
@@ -349,7 +355,15 @@ func (rq *Controller) syncResourceQuota(ctx context.Context, resourceQuota *v1.R
 
 	var errs []error
 
-	newUsage, err := quota.CalculateUsage(resourceQuota.Namespace, resourceQuota.Spec.Scopes, hardLimits, rq.registry, resourceQuota.Spec.ScopeSelector)
+	// kcp edits for cluster scoped quota
+	clusterScoped, _ := strconv.ParseBool(resourceQuota.Annotations[kcpExperimentalClusterScopedQuotaAnnotationKey])
+
+	namespaceToCheck := resourceQuota.Namespace
+	if namespaceToCheck == kcpClusterScopedQuotaNamespace && clusterScoped {
+		namespaceToCheck = ""
+	}
+
+	newUsage, err := quota.CalculateUsage(namespaceToCheck, resourceQuota.Spec.Scopes, hardLimits, rq.registry, resourceQuota.Spec.ScopeSelector)
 	if err != nil {
 		// if err is non-nil, remember it to return, but continue updating status with any resources in newUsage
 		errs = append(errs, err)
