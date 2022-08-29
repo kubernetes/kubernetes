@@ -23,7 +23,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/selection"
 )
 
 func TestThreadSafeStoreDeleteRemovesEmptySetsFromIndex(t *testing.T) {
@@ -164,75 +163,6 @@ func TestThreadSafeStoreIndexingFunctionsWithMultipleValues(t *testing.T) {
 	assert.NoError(compare("foo", []string{}))
 	assert.NoError(compare("bar", []string{"key2"}))
 	assert.NoError(compare("baz", []string{}))
-}
-
-func TestThreadSafeStoreByIndexes(t *testing.T) {
-	testIndexer1 := "test1Indexer"
-	testIndexer2 := "test2Indexer"
-
-	indexers := Indexers{
-		testIndexer1: func(obj interface{}) (strings []string, e error) {
-			indexes := []string{obj.(string)[:4]}
-			return indexes, nil
-		},
-		testIndexer2: func(obj interface{}) (strings []string, e error) {
-			indexes := []string{obj.(string)[4:5]}
-			return indexes, nil
-		},
-	}
-
-	indices := Indices{}
-	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
-
-	store.Add(testIndexer1, testIndexer1)
-	store.Add(testIndexer2, testIndexer2)
-
-	tests := []struct {
-		name string
-		in   IndexConditions
-		out  []interface{}
-	}{
-		{
-			name: "equal match",
-			in: IndexConditions{
-				{Operator: selection.Equals, IndexName: testIndexer1, IndexedValue: "test"},
-				{Operator: selection.Equals, IndexName: testIndexer2, IndexedValue: "1"},
-			},
-			out: []interface{}{testIndexer1},
-		},
-		{
-			name: "double equal match",
-			in: IndexConditions{
-				{Operator: selection.DoubleEquals, IndexName: testIndexer1, IndexedValue: "test"},
-				{Operator: selection.DoubleEquals, IndexName: testIndexer2, IndexedValue: "1"},
-			},
-			out: []interface{}{testIndexer1},
-		},
-		{
-			name: "not equal match",
-			in: IndexConditions{
-				{Operator: selection.Equals, IndexName: testIndexer1, IndexedValue: "test"},
-				{Operator: selection.NotEquals, IndexName: testIndexer2, IndexedValue: "1"},
-			},
-			out: []interface{}{testIndexer2},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := store.ByIndexes(tt.in)
-			if err != nil {
-				t.Errorf("ByIndexes() error = %v", err)
-				return
-			}
-			if len(got) != len(tt.out) {
-				t.Errorf("ByIndexes() len of got = %v, len of want = %v", got, tt.out)
-			}
-			if got[0].(string) != tt.out[0].(string) {
-				t.Errorf("ByIndexes() got = %v, want = %v", got, tt.out)
-			}
-		})
-	}
 }
 
 func BenchmarkIndexer(b *testing.B) {

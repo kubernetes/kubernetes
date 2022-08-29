@@ -217,8 +217,8 @@ func (c *cache) ByIndex(indexName, indexedValue string) ([]interface{}, error) {
 	return c.cacheStorage.ByIndex(indexName, indexedValue)
 }
 
-func (c *cache) ByIndexes(conds IndexConditions) ([]interface{}, error) {
-	return c.cacheStorage.ByIndexes(conds)
+func (c *cache) ByIndexes(conds IndexConditions, opts *JointIndexOptions) ([]interface{}, error) {
+	return c.cacheStorage.ByIndexes(conds, opts)
 }
 
 func (c *cache) AddIndexers(newIndexers Indexers) error {

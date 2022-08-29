@@ -55,12 +55,11 @@ type Indexer interface {
 	AddIndexers(newIndexers Indexers) error
 }
 
-// JointIndexer for doing convenient joint index against indexer
+// IndexerWithJointIndexer for doing convenient joint index against indexer
 // by given multi IndexConditions
-type JointIndexer interface {
+type IndexerWithJointIndexer interface {
 	Indexer
-	// ByIndexes returns the stored objects by given IndexConditions
-	ByIndexes(conds IndexConditions) ([]interface{}, error)
+	ByIndexes(conds IndexConditions, opts *JointIndexOptions) ([]interface{}, error)
 }
 
 // IndexFunc knows how to compute the set of indexed values for an object.

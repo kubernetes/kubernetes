@@ -63,17 +63,7 @@ type ThreadSafeStore interface {
 // ThreadSafeStoreWithJointIndexer makes a convenient union query based on ThreadSafeStore
 type ThreadSafeStoreWithJointIndexer interface {
 	ThreadSafeStore
-	ByIndexes(conds IndexConditions) ([]interface{}, error)
-}
-
-// IndexConditions is AND of all IndexCondition
-type IndexConditions []IndexCondition
-
-// IndexCondition contains a IndexName, a IndexedValue, and an operator.
-type IndexCondition struct {
-	Operator     selection.Operator
-	IndexName    string
-	IndexedValue string
+	ByIndexes(conds IndexConditions, opts *JointIndexOptions) ([]interface{}, error)
 }
 
 // threadSafeMap implements ThreadSafeStore
@@ -334,21 +324,21 @@ func (c *threadSafeMap) ByIndex(indexName, indexedValue string) ([]interface{}, 
 }
 
 // ByIndexes Joint indexing by multiple indexers while supporting Operator
-func (c *threadSafeMap) ByIndexes(conds IndexConditions) ([]interface{}, error) {
+func (c *threadSafeMap) ByIndexes(conds IndexConditions, opts *JointIndexOptions) ([]interface{}, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	set := sets.NewString()
-	for _, cond := range conds {
+	for i, cond := range conds {
 		populatedIndex, err := c.storeKeysByIndexCondition(cond)
 		if err != nil {
 			return nil, err
 		}
-		if set.Len() == 0 {
-			set = populatedIndex
-			continue
-		}
-		set = set.Intersection(populatedIndex)
+		conds[i].indexedResult = populatedIndex
+	}
+
+	set, err := conds.apply(opts)
+	if err != nil {
+		return nil, err
 	}
 
 	list := make([]interface{}, 0, set.Len())
@@ -385,7 +375,6 @@ func (c *threadSafeMap) applyOperator(op selection.Operator, set sets.String) (s
 		return set, nil
 	case selection.NotEquals:
 		return sets.NewString(c.ListKeys()...).Difference(set), nil
-		// todo(weilaaa): support more selections
 	}
 
 	return nil, fmt.Errorf("operator \"%v\" is not supported", op)
