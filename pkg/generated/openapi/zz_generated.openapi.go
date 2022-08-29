@@ -28710,7 +28710,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressRule(ref common.ReferenceCallbac
 					},
 					"http": {
 						SchemaProps: spec.SchemaProps{
-							Description: "http is a list of http selectors pointing to backends. A path is matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. A backend defines the referenced service endpoint to which the traffic will be forwarded to.",
+							Description: "HTTP is a list of http selectors pointing to backends. A path is matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. A backend defines the referenced service endpoint to which the traffic will be forwarded to.",
 							Ref:         ref("k8s.io/api/extensions/v1beta1.HTTPIngressRuleValue"),
 						},
 					},
@@ -28731,7 +28731,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressRuleValue(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"http": {
 						SchemaProps: spec.SchemaProps{
-							Description: "http is a list of http selectors pointing to backends. A path is matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. A backend defines the referenced service endpoint to which the traffic will be forwarded to.",
+							Description: "HTTP is a list of http selectors pointing to backends. A path is matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. A backend defines the referenced service endpoint to which the traffic will be forwarded to.",
 							Ref:         ref("k8s.io/api/extensions/v1beta1.HTTPIngressRuleValue"),
 						},
 					},
@@ -33765,7 +33765,8 @@ func schema_k8sio_api_networking_v1_IngressRule(ref common.ReferenceCallback) co
 					},
 					"http": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/networking/v1.HTTPIngressRuleValue"),
+							Description: "HTTP is a list of http selectors pointing to backends. A path is matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. A backend defines the referenced service endpoint to which the traffic will be forwarded to.",
+							Ref:         ref("k8s.io/api/networking/v1.HTTPIngressRuleValue"),
 						},
 					},
 				},
@@ -33785,7 +33786,8 @@ func schema_k8sio_api_networking_v1_IngressRuleValue(ref common.ReferenceCallbac
 				Properties: map[string]spec.Schema{
 					"http": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/networking/v1.HTTPIngressRuleValue"),
+							Description: "HTTP is a list of http selectors pointing to backends. A path is matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. A backend defines the referenced service endpoint to which the traffic will be forwarded to.",
+							Ref:         ref("k8s.io/api/networking/v1.HTTPIngressRuleValue"),
 						},
 					},
 				},
@@ -34874,7 +34876,8 @@ func schema_k8sio_api_networking_v1beta1_IngressRule(ref common.ReferenceCallbac
 					},
 					"http": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/networking/v1beta1.HTTPIngressRuleValue"),
+							Description: "HTTP is a list of http selectors pointing to backends. A path is matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. A backend defines the referenced service endpoint to which the traffic will be forwarded to.",
+							Ref:         ref("k8s.io/api/networking/v1beta1.HTTPIngressRuleValue"),
 						},
 					},
 				},
@@ -34894,7 +34897,8 @@ func schema_k8sio_api_networking_v1beta1_IngressRuleValue(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"http": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/networking/v1beta1.HTTPIngressRuleValue"),
+							Description: "HTTP is a list of http selectors pointing to backends. A path is matched against the path of an incoming request. Currently it can contain characters disallowed from the conventional \"path\" part of a URL as defined by RFC 3986. Paths must begin with a '/'. A backend defines the referenced service endpoint to which the traffic will be forwarded to.",
+							Ref:         ref("k8s.io/api/networking/v1beta1.HTTPIngressRuleValue"),
 						},
 					},
 				},
