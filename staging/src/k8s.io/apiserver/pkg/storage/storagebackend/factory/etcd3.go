@@ -35,6 +35,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -123,6 +124,30 @@ func newETCD3ReadyCheck(c storagebackend.Config, stopCh <-chan struct{}) (func()
 	return newETCD3Check(c, timeout, stopCh)
 }
 
+// atomic error acts as a cache for atomically store an error
+// the error is only updated if the timestamp is more recent than
+// current stored error.
+type atomicLastError struct {
+	mu        sync.RWMutex
+	err       error
+	timestamp time.Time
+}
+
+func (a *atomicLastError) Store(err error, t time.Time) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.timestamp.IsZero() || a.timestamp.Before(t) {
+		a.err = err
+		a.timestamp = t
+	}
+}
+
+func (a *atomicLastError) Load() error {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.err
+}
+
 func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan struct{}) (func() error, error) {
 	// constructing the etcd v3 client blocks and times out if etcd is not available.
 	// retry in a loop in the background until we successfully create the client, storing the client or error encountered
@@ -133,10 +158,8 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 
 	go wait.PollUntil(time.Second, func() (bool, error) {
 		newClient, err := newETCD3Client(c.Transport)
-
 		lock.Lock()
 		defer lock.Unlock()
-
 		// Ensure that server is already not shutting down.
 		select {
 		case <-stopCh:
@@ -146,7 +169,6 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 			return true, nil
 		default:
 		}
-
 		if err != nil {
 			clientErr = err
 			return false, nil
@@ -169,6 +191,12 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 		}
 	}()
 
+	// limit to a request every half of the configured timeout with a maximum burst of one
+	// rate limited requests will receive the last request sent error (note: not the last received response)
+	limiter := rate.NewLimiter(rate.Every(timeout/2), 1)
+	// initial state is the clientErr
+	lastError := &atomicLastError{err: fmt.Errorf("etcd client connection not yet established")}
+
 	return func() error {
 		// Given that client is closed on shutdown we hold the lock for
 		// the entire period of healthcheck call to ensure that client will
@@ -177,17 +205,23 @@ func newETCD3Check(c storagebackend.Config, timeout time.Duration, stopCh <-chan
 		// shutdown for additional 2s seems acceptable.
 		lock.RLock()
 		defer lock.RUnlock()
+
 		if clientErr != nil {
 			return clientErr
+		}
+		if limiter.Allow() == false {
+			return lastError.Load()
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		// See https://github.com/etcd-io/etcd/blob/c57f8b3af865d1b531b979889c602ba14377420e/etcdctl/ctlv3/command/ep_command.go#L118
+		now := time.Now()
 		_, err := client.Get(ctx, path.Join("/", c.Prefix, "health"))
-		if err == nil {
-			return nil
+		if err != nil {
+			err = fmt.Errorf("error getting data from etcd: %w", err)
 		}
-		return fmt.Errorf("error getting data from etcd: %w", err)
+		lastError.Store(err, now)
+		return err
 	}, nil
 }
 
