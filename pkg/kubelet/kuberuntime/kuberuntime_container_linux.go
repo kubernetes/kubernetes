@@ -167,6 +167,8 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 		cpuPeriod := int64(quotaPeriod)
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
 			cpuPeriod = int64(m.cpuCFSQuotaPeriod.Duration / time.Microsecond)
+			// TODO: uncommenting this suppose to fix pull-kubernetes-e2e-gce-alpha-features but would be a real breaking change
+			// cpuPeriod = m.cpuCFSQuotaPeriod.Duration
 		}
 		cpuQuota := milliCPUToQuota(cpuLimit.MilliValue(), cpuPeriod)
 		resources.CpuQuota = cpuQuota
