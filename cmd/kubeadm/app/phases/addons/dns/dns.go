@@ -105,15 +105,13 @@ func EnsureDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inter
 func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, replicas *int32, out io.Writer, printManifest bool) error {
 	// Get the YAML manifest
 	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct {
-		DeploymentName, Image, OldControlPlaneTaintKey, ControlPlaneTaintKey string
-		Replicas                                                             *int32
+		DeploymentName, Image, ControlPlaneTaintKey string
+		Replicas                                    *int32
 	}{
-		DeploymentName: kubeadmconstants.CoreDNSDeploymentName,
-		Image:          images.GetDNSImage(cfg),
-		// TODO: https://github.com/kubernetes/kubeadm/issues/2200
-		OldControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleOldControlPlane,
-		ControlPlaneTaintKey:    kubeadmconstants.LabelNodeRoleControlPlane,
-		Replicas:                replicas,
+		DeploymentName:       kubeadmconstants.CoreDNSDeploymentName,
+		Image:                images.GetDNSImage(cfg),
+		ControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleControlPlane,
+		Replicas:             replicas,
 	})
 	if err != nil {
 		return errors.Wrap(err, "error when parsing CoreDNS deployment template")

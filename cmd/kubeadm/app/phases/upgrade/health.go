@@ -125,10 +125,6 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration)
 					},
 					Tolerations: []v1.Toleration{
 						{
-							Key:    constants.LabelNodeRoleOldControlPlane,
-							Effect: v1.TaintEffectNoSchedule,
-						},
-						{
 							Key:    constants.LabelNodeRoleControlPlane,
 							Effect: v1.TaintEffectNoSchedule,
 						},
